@@ -42,6 +42,7 @@ Docker Compose
 | `--compatibility` |  |  | Run compose in backward compatibility mode |
 | `--env-file` | `string` |  | Specify an alternate environment file. |
 | `-f`, `--file` | `stringArray` |  | Compose configuration files |
+| `--parallel` | `int` | `-1` | Control max parallelism, -1 for unlimited |
 | `--profile` | `stringArray` |  | Specify a profile to enable |
 | `--project-directory` | `string` |  | Specify an alternate working directory
 (default: the path of the, first specified, Compose file) |

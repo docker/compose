@@ -75,6 +75,8 @@ type Service interface {
 	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	// MaxConcurrency defines upper limit for concurrent operations against engine API
+	MaxConcurrency(parallel int)
 }
 
 // BuildOptions group options of the Build API

@@ -263,10 +263,11 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 
 	opts := projectOptions{}
 	var (
-		ansi    string
-		noAnsi  bool
-		verbose bool
-		version bool
+		ansi     string
+		noAnsi   bool
+		verbose  bool
+		version  bool
+		parallel int
 	)
 	c := &cobra.Command{
 		Short:            "Docker Compose",
@@ -325,6 +326,9 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
 			}
+			if parallel > 0 {
+				backend.MaxConcurrency(parallel)
+			}
 			return nil
 		},
 	}
@@ -370,6 +374,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	)
 
 	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
+	c.Flags().IntVar(&parallel, "parallel", -1, `Control max parallelism, -1 for unlimited`)
 	c.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
 	c.Flags().MarkHidden("version") //nolint:errcheck
 	c.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)

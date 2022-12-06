@@ -208,6 +208,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: parallel
+      value_type: int
+      default_value: "-1"
+      description: Control max parallelism, -1 for unlimited
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: profile
       value_type: stringArray
       default_value: '[]'

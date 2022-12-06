@@ -50,6 +50,7 @@ type ServiceProxy struct {
 	EventsFn             func(ctx context.Context, project string, options EventsOptions) error
 	PortFn               func(ctx context.Context, project string, service string, port uint16, options PortOptions) (string, int, error)
 	ImagesFn             func(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	MaxConcurrencyFn     func(parallel int)
 	interceptors         []Interceptor
 }
 
@@ -87,6 +88,7 @@ func (s *ServiceProxy) WithService(service Service) *ServiceProxy {
 	s.EventsFn = service.Events
 	s.PortFn = service.Port
 	s.ImagesFn = service.Images
+	s.MaxConcurrencyFn = service.MaxConcurrency
 	return s
 }
 
@@ -307,4 +309,8 @@ func (s *ServiceProxy) Images(ctx context.Context, project string, options Image
 		return nil, ErrNotImplemented
 	}
 	return s.ImagesFn(ctx, project, options)
+}
+
+func (s *ServiceProxy) MaxConcurrency(i int) {
+	s.MaxConcurrencyFn(i)
 }

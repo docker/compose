@@ -41,12 +41,14 @@ import (
 // NewComposeService create a local implementation of the compose.Service API
 func NewComposeService(dockerCli command.Cli) api.Service {
 	return &composeService{
-		dockerCli: dockerCli,
+		dockerCli:      dockerCli,
+		maxConcurrency: -1,
 	}
 }
 
 type composeService struct {
-	dockerCli command.Cli
+	dockerCli      command.Cli
+	maxConcurrency int
 }
 
 func (s *composeService) apiClient() client.APIClient {
@@ -55,6 +57,10 @@ func (s *composeService) apiClient() client.APIClient {
 
 func (s *composeService) configFile() *configfile.ConfigFile {
 	return s.dockerCli.ConfigFile()
+}
+
+func (s *composeService) MaxConcurrency(i int) {
+	s.maxConcurrency = i
 }
 
 func (s *composeService) stdout() *streams.Out {
