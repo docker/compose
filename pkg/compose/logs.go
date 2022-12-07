@@ -65,19 +65,16 @@ func (s *composeService) Logs(
 
 	if options.Follow {
 		printer := newLogPrinter(consumer)
-		eg.Go(func() error {
-			for _, c := range containers {
-				printer.HandleEvent(api.ContainerEvent{
-					Type:      api.ContainerEventAttach,
-					Container: getContainerNameWithoutProject(c),
-					Service:   c.Labels[api.ServiceLabel],
-				})
-			}
-			return nil
-		})
+		for _, c := range containers {
+			printer.HandleEvent(api.ContainerEvent{
+				Type:      api.ContainerEventAttach,
+				Container: getContainerNameWithoutProject(c),
+				Service:   c.Labels[api.ServiceLabel],
+			})
+		}
 
 		eg.Go(func() error {
-			return s.watchContainers(ctx, projectName, options.Services, printer.HandleEvent, containers, func(c types.Container) error {
+			return s.watchContainers(ctx, projectName, options.Services, nil, printer.HandleEvent, containers, func(c types.Container) error {
 				printer.HandleEvent(api.ContainerEvent{
 					Type:      api.ContainerEventAttach,
 					Container: getContainerNameWithoutProject(c),

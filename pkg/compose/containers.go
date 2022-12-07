@@ -141,3 +141,14 @@ func (containers Containers) sorted() Containers {
 	})
 	return containers
 }
+
+func (containers Containers) remove(id string) Containers {
+	for i, c := range containers {
+		if c.ID == id {
+			l := len(containers) - 1
+			containers[i] = containers[l]
+			return containers[:l]
+		}
+	}
+	return containers
+}

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -50,13 +51,6 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 	}
 
-	if len(options.Services) > 0 {
-		err := project.ForServices(options.Services)
-		if err != nil {
-			return err
-		}
-	}
-
 	eg, ctx := errgroup.WithContext(ctx)
 	if listener != nil {
 		attached, err := s.attach(ctx, project, listener, options.AttachTo)
@@ -65,7 +59,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 
 		eg.Go(func() error {
-			return s.watchContainers(context.Background(), project.Name, options.AttachTo, listener, attached, func(container moby.Container) error {
+			return s.watchContainers(context.Background(), project.Name, options.AttachTo, options.Services, listener, attached, func(container moby.Container) error {
 				return s.attachContainer(ctx, container, listener)
 			})
 		})
@@ -116,9 +110,20 @@ func getDependencyCondition(service types.ServiceConfig, project *types.Project)
 type containerWatchFn func(container moby.Container) error
 
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
-func (s *composeService) watchContainers(ctx context.Context, projectName string, services []string, listener api.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
-	watched := map[string]int{}
+func (s *composeService) watchContainers(ctx context.Context, projectName string, services, required []string,
+	listener api.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
+	if len(required) == 0 {
+		required = services
+	}
+
+	var (
+		expected Containers
+		watched  = map[string]int{}
+	)
 	for _, c := range containers {
+		if utils.Contains(required, c.Labels[api.ServiceLabel]) {
+			expected = append(expected, c)
+		}
 		watched[c.ID] = 0
 	}
 
@@ -143,22 +148,18 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 			}
 			name := getContainerNameWithoutProject(container)
 
-			if event.Status == "stop" {
+			service := container.Labels[api.ServiceLabel]
+			switch event.Status {
+			case "stop":
 				listener(api.ContainerEvent{
 					Type:      api.ContainerEventStopped,
 					Container: name,
-					Service:   container.Labels[api.ServiceLabel],
+					Service:   service,
 				})
 
 				delete(watched, container.ID)
-				if len(watched) == 0 {
-					// all project containers stopped, we're done
-					stop()
-				}
-				return nil
-			}
-
-			if event.Status == "die" {
+				expected = expected.remove(container.ID)
+			case "die":
 				restarted := watched[container.ID]
 				watched[container.ID] = restarted + 1
 				// Container terminated.
@@ -167,7 +168,7 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 				listener(api.ContainerEvent{
 					Type:       api.ContainerEventExit,
 					Container:  name,
-					Service:    container.Labels[api.ServiceLabel],
+					Service:    service,
 					ExitCode:   inspected.State.ExitCode,
 					Restarting: willRestart,
 				})
@@ -175,21 +176,15 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 				if !willRestart {
 					// we're done with this one
 					delete(watched, container.ID)
+					expected = expected.remove(container.ID)
 				}
-
-				if len(watched) == 0 {
-					// all project containers stopped, we're done
-					stop()
-				}
-				return nil
-			}
-
-			if event.Status == "start" {
+			case "start":
 				count, ok := watched[container.ID]
 				mustAttach := ok && count > 0 // Container restarted, need to re-attach
 				if !ok {
 					// A new container has just been added to service by scale
 					watched[container.ID] = 0
+					expected = append(expected, container)
 					mustAttach = true
 				}
 				if mustAttach {
@@ -200,7 +195,9 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 					}
 				}
 			}
-
+			if len(expected) == 0 {
+				stop()
+			}
 			return nil
 		},
 	})
