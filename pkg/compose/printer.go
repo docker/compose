@@ -28,19 +28,23 @@ type logPrinter interface {
 	HandleEvent(event api.ContainerEvent)
 	Run(ctx context.Context, cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error)
 	Cancel()
+	Stop()
 }
 
 type printer struct {
 	queue    chan api.ContainerEvent
 	consumer api.LogConsumer
+	stopCh   chan struct{}
 }
 
 // newLogPrinter builds a LogPrinter passing containers logs to LogConsumer
 func newLogPrinter(consumer api.LogConsumer) logPrinter {
 	queue := make(chan api.ContainerEvent)
+	stopCh := make(chan struct{}, 1) // printer MAY stop on his own, so Stop MUST not be blocking
 	printer := printer{
 		consumer: consumer,
 		queue:    queue,
+		stopCh:   stopCh,
 	}
 	return &printer
 }
@@ -49,6 +53,10 @@ func (p *printer) Cancel() {
 	p.queue <- api.ContainerEvent{
 		Type: api.UserCancel,
 	}
+}
+
+func (p *printer) Stop() {
+	p.stopCh <- struct{}{}
 }
 
 func (p *printer) HandleEvent(event api.ContainerEvent) {
@@ -64,6 +72,8 @@ func (p *printer) Run(ctx context.Context, cascadeStop bool, exitCodeFrom string
 	containers := map[string]struct{}{}
 	for {
 		select {
+		case <-p.stopCh:
+			return exitCode, nil
 		case <-ctx.Done():
 			return exitCode, ctx.Err()
 		case event := <-p.queue:

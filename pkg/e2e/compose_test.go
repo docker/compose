@@ -259,3 +259,13 @@ networks:
     name: compose-e2e-convert-interpolate_default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
 	})
 }
+
+func TestStopWithDependeciesAttached(t *testing.T) {
+	const projectName = "compose-e2e-stop-with-deps"
+	c := NewParallelCLI(t, WithEnv("COMMAND=echo hello"))
+
+	t.Run("up", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo")
+		res.Assert(t, icmd.Expected{Out: "exited with code 0"})
+	})
+}
