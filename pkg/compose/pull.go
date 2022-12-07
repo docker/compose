@@ -294,14 +294,11 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 				return err
 			})
 		}
+		err := eg.Wait()
 		for i, service := range needPull {
 			if pulledImages[i] != "" {
 				images[service.Image] = pulledImages[i]
 			}
-		}
-		err := eg.Wait()
-		if err != nil {
-			return err
 		}
 		return err
 	})
