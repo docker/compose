@@ -32,6 +32,7 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type runOptions struct {
@@ -113,6 +114,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 			projectOptions: p,
 		},
 	}
+	createOpts := createOptions{}
 	cmd := &cobra.Command{
 		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
@@ -139,9 +141,8 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 			if err != nil {
 				return err
 			}
-			ignore := project.Environment["COMPOSE_IGNORE_ORPHANS"]
-			opts.ignoreOrphans = strings.ToLower(ignore) == "true"
-			return runRun(ctx, backend, project, opts)
+			opts.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
+			return runRun(ctx, backend, project, opts, createOpts)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -161,6 +162,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.BoolVar(&opts.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
 	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
+	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container.")
 
 	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
 	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
@@ -181,11 +183,13 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions) error {
+func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions, createOpts createOptions) error {
 	err := opts.apply(project)
 	if err != nil {
 		return err
 	}
+
+	createOpts.Apply(project)
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
 		return startDependencies(ctx, backend, *project, opts.Service, opts.ignoreOrphans)

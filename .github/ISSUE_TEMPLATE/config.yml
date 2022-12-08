@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Docker Community Slack
+    url: https://dockr.ly/slack
+    about: 'Use the #docker-compose channel'
+  - name: Docker Support Forums
+    url: https://forums.docker.com/c/open-source-projects/compose/15
+    about: 'Use the "Open Source Projects > Compose" category'
+  - name: 'Ask on Stack Overflow'
+    url: https://stackoverflow.com/questions/tagged/docker-compose
+    about: 'Use the [docker-compose] tag when creating new questions'

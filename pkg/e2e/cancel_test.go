@@ -20,7 +20,7 @@
 package e2e
 
 import (
-	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/compose/v2/pkg/utils"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
@@ -41,8 +42,12 @@ func TestComposeCancel(t *testing.T) {
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
 		// sending kill signal
-		cmd, stdout, stderr, err := StartWithNewGroupID(c.NewDockerComposeCmd(t, "-f", buildProjectPath, "build",
-			"--progress", "plain"))
+		stdout := &utils.SafeBuffer{}
+		stderr := &utils.SafeBuffer{}
+		cmd, err := StartWithNewGroupID(context.Background(),
+			c.NewDockerComposeCmd(t, "-f", buildProjectPath, "build", "--progress", "plain"),
+			stdout,
+			stderr)
 		assert.NilError(t, err)
 
 		c.WaitForCondition(t, func() (bool, string) {
@@ -65,15 +70,16 @@ func TestComposeCancel(t *testing.T) {
 	})
 }
 
-func StartWithNewGroupID(command icmd.Cmd) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer, error) {
-	cmd := exec.Command(command.Command[0], command.Command[1:]...)
+func StartWithNewGroupID(ctx context.Context, command icmd.Cmd, stdout *utils.SafeBuffer, stderr *utils.SafeBuffer) (*exec.Cmd, error) {
+	cmd := exec.CommandContext(ctx, command.Command[0], command.Command[1:]...)
 	cmd.Env = command.Env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	if stdout != nil {
+		cmd.Stdout = stdout
+	}
+	if stderr != nil {
+		cmd.Stderr = stderr
+	}
 	err := cmd.Start()
-	return cmd, &stdout, &stderr, err
+	return cmd, err
 }

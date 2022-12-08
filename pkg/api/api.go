@@ -72,9 +72,11 @@ type Service interface {
 	// Events executes the equivalent to a `compose events`
 	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
-	Port(ctx context.Context, projectName string, service string, port int, options PortOptions) (string, int, error)
+	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	// MaxConcurrency defines upper limit for concurrent operations against engine API
+	MaxConcurrency(parallel int)
 }
 
 // BuildOptions group options of the Build API
@@ -179,10 +181,13 @@ type ConvertOptions struct {
 	Format string
 	// Output defines the path to save the application model
 	Output string
+	// Resolve image reference to digests
+	ResolveImageDigests bool
 }
 
 // PushOptions group options of the Push API
 type PushOptions struct {
+	Quiet          bool
 	IgnoreFailures bool
 }
 

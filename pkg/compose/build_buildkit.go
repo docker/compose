@@ -95,7 +95,7 @@ func (s *composeService) getDrivers(ctx context.Context) ([]build.DriverInfo, er
 	dis := make([]build.DriverInfo, len(ng.Nodes))
 	var f driver.Factory
 	if ng.Driver != "" {
-		factories := driver.GetFactories()
+		factories := driver.GetFactories(true)
 		for _, fac := range factories {
 			if fac.Name() == ng.Driver {
 				f = fac
@@ -103,8 +103,8 @@ func (s *composeService) getDrivers(ctx context.Context) ([]build.DriverInfo, er
 			}
 		}
 		if f == nil {
-			if f = driver.GetFactory(ng.Driver, true); f == nil {
-				return nil, fmt.Errorf("failed to find buildx driver %q", ng.Driver)
+			if f, err = driver.GetFactory(ng.Driver, true); f == nil || err != nil {
+				return nil, fmt.Errorf("failed to find buildx driver %q, error: %w", ng.Driver, err)
 			}
 		}
 	} else {
@@ -113,7 +113,7 @@ func (s *composeService) getDrivers(ctx context.Context) ([]build.DriverInfo, er
 		if err != nil {
 			return nil, err
 		}
-		f, err = driver.GetDefaultFactory(ctx, dockerapi, false)
+		f, err = driver.GetDefaultFactory(ctx, ep, dockerapi, false)
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +176,7 @@ func (s *composeService) getDrivers(ctx context.Context) ([]build.DriverInfo, er
 					}
 				}
 
-				d, err := driver.GetDriver(ctx, "buildx_buildkit_"+n.Name, f, dockerapi, imageopt.Auth, kcc, n.Flags, n.Files, n.DriverOpts, n.Platforms, "")
+				d, err := driver.GetDriver(ctx, "buildx_buildkit_"+n.Name, f, n.Endpoint, dockerapi, imageopt.Auth, kcc, n.Flags, n.Files, n.DriverOpts, n.Platforms, "")
 				if err != nil {
 					di.Err = err
 					return nil

@@ -27,7 +27,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
@@ -41,6 +40,8 @@ import (
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -397,6 +398,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		LogConfig:      logConfig,
 		GroupAdd:       service.GroupAdd,
 		Links:          links,
+		OomScoreAdj:    int(service.OomScoreAdj),
 	}
 
 	return &containerConfig, &hostConfig, networkConfig, nil
@@ -488,11 +490,25 @@ func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
 			attempts = int(*policy.MaxAttempts)
 		}
 		restart = container.RestartPolicy{
-			Name:              policy.Condition,
+			Name:              mapRestartPolicyCondition(policy.Condition),
 			MaximumRetryCount: attempts,
 		}
 	}
 	return restart
+}
+
+func mapRestartPolicyCondition(condition string) string {
+	// map definitions of deploy.restart_policy to engine definitions
+	switch condition {
+	case "none", "no":
+		return "no"
+	case "on-failure", "unless-stopped":
+		return condition
+	case "any", "always":
+		return "always"
+	default:
+		return condition
+	}
 }
 
 func getDeployResources(s types.ServiceConfig) container.Resources {
@@ -578,6 +594,12 @@ func setReservations(reservations *types.Resource, resources *container.Resource
 	if reservations == nil {
 		return
 	}
+	// Cpu reservation is a swarm option and PIDs is only a limit
+	// So we only need to map memory reservation and devices
+	if reservations.MemoryBytes != 0 {
+		resources.MemoryReservation = int64(reservations.MemoryBytes)
+	}
+
 	for _, device := range reservations.Devices {
 		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
 			Capabilities: [][]string{device.Capabilities},
@@ -968,7 +990,7 @@ func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) 
 			logrus.Warnf("mount of type `bind` should not define `volume` option")
 		}
 		if volume.Tmpfs != nil {
-			logrus.Warnf("mount of type `tmpfs` should not define `tmpfs` option")
+			logrus.Warnf("mount of type `bind` should not define `tmpfs` option")
 		}
 		return buildBindOption(volume.Bind), nil, nil
 	case "volume":
@@ -1023,7 +1045,7 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 	}
 	return &mount.TmpfsOptions{
 		SizeBytes: int64(tmpfs.Size),
-		// Mode:      , // FIXME missing from model ?
+		Mode:      os.FileMode(tmpfs.Mode),
 	}
 }
 
@@ -1155,7 +1177,7 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 	eventName := fmt.Sprintf("Volume %q", volume.Name)
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(eventName))
-	_, err := s.apiClient().VolumeCreate(ctx, volume_api.VolumeCreateBody{
+	_, err := s.apiClient().VolumeCreate(ctx, volume_api.CreateOptions{
 		Labels:     volume.Labels,
 		Name:       volume.Name,
 		Driver:     volume.Driver,

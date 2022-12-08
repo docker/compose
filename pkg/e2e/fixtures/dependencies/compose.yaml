@@ -1,8 +1,10 @@
 services:
   foo:
     image: nginx:alpine
+    command: "${COMMAND}"
     depends_on:
       - bar
 
   bar:
     image: nginx:alpine
+    scale: 2

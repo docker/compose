@@ -22,8 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/compose/v2/pkg/utils"
+
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
 	"github.com/pkg/errors"
@@ -241,7 +244,8 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.StoppingEvent(eventName))
-			err := s.apiClient().ContainerStop(ctx, container.ID, timeout)
+			timeoutInSecond := utils.DurationSecondToInt(timeout)
+			err := s.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
@@ -270,7 +274,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				Force:         true,
 				RemoveVolumes: volumes,
 			})
-			if err != nil {
+			if err != nil && !errdefs.IsNotFound(err) {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err
 			}

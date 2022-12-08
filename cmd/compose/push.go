@@ -29,6 +29,7 @@ type pushOptions struct {
 	composeOptions
 
 	Ignorefailures bool
+	Quiet          bool
 }
 
 func pushCommand(p *projectOptions, backend api.Service) *cobra.Command {
@@ -44,6 +45,7 @@ func pushCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		ValidArgsFunction: completeServiceNames(p),
 	}
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
+	pushCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Push without printing progress information")
 
 	return pushCmd
 }
@@ -56,5 +58,6 @@ func runPush(ctx context.Context, backend api.Service, opts pushOptions, service
 
 	return backend.Push(ctx, project, api.PushOptions{
 		IgnoreFailures: opts.Ignorefailures,
+		Quiet:          opts.Quiet,
 	})
 }

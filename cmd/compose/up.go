@@ -214,6 +214,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 			ExitCodeFrom: upOptions.exitCodeFrom,
 			CascadeStop:  upOptions.cascadeStop,
 			Wait:         upOptions.wait,
+			Services:     services,
 		},
 	})
 }

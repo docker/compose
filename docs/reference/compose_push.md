@@ -8,6 +8,7 @@ Push service images
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--ignore-push-failures` |  |  | Push what it can and ignores images with push failures |
+| `-q`, `--quiet` |  |  | Push without printing progress information |
 
 
 <!---MARKER_GEN_END-->

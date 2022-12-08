@@ -23,16 +23,17 @@ import (
 	"io"
 	"strings"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/compose-spec/compose-go/types"
+	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -40,12 +41,14 @@ import (
 // NewComposeService create a local implementation of the compose.Service API
 func NewComposeService(dockerCli command.Cli) api.Service {
 	return &composeService{
-		dockerCli: dockerCli,
+		dockerCli:      dockerCli,
+		maxConcurrency: -1,
 	}
 }
 
 type composeService struct {
-	dockerCli command.Cli
+	dockerCli      command.Cli
+	maxConcurrency int
 }
 
 func (s *composeService) apiClient() client.APIClient {
@@ -54,6 +57,10 @@ func (s *composeService) apiClient() client.APIClient {
 
 func (s *composeService) configFile() *configfile.ConfigFile {
 	return s.dockerCli.ConfigFile()
+}
+
+func (s *composeService) MaxConcurrency(i int) {
+	s.maxConcurrency = i
 }
 
 func (s *composeService) stdout() *streams.Out {
@@ -93,13 +100,34 @@ func getContainerNameWithoutProject(c moby.Container) string {
 }
 
 func (s *composeService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
+	if options.ResolveImageDigests {
+		info, err := s.apiClient().Info(ctx)
+		if err != nil {
+			return nil, err
+		}
+		err = project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+			auth, err := encodedAuth(named, info, s.configFile())
+			if err != nil {
+				return "", err
+			}
+			inspect, err := s.apiClient().DistributionInspect(ctx, named.String(), auth)
+			if err != nil {
+				return "", err
+			}
+			return inspect.Descriptor.Digest, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	switch options.Format {
 	case "json":
 		return json.MarshalIndent(project, "", "  ")
 	case "yaml":
 		return yaml.Marshal(project)
 	default:
-		return nil, fmt.Errorf("unsupported format %q", options)
+		return nil, fmt.Errorf("unsupported format %q", options.Format)
 	}
 }
 

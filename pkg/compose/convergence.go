@@ -27,6 +27,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -125,17 +126,13 @@ func updateServices(service *types.ServiceConfig, cnts Containers) {
 	if len(cnts) == 0 {
 		return
 	}
-	cnt := cnts[0]
-	serviceName := cnt.Labels[api.ServiceLabel]
 
-	if d := getDependentServiceFromMode(service.NetworkMode); d == serviceName {
-		service.NetworkMode = types.NetworkModeContainerPrefix + cnt.ID
-	}
-	if d := getDependentServiceFromMode(service.Ipc); d == serviceName {
-		service.Ipc = types.NetworkModeContainerPrefix + cnt.ID
-	}
-	if d := getDependentServiceFromMode(service.Pid); d == serviceName {
-		service.Pid = types.NetworkModeContainerPrefix + cnt.ID
+	for _, str := range []*string{&service.NetworkMode, &service.Ipc, &service.Pid} {
+		if d := getDependentServiceFromMode(*str); d != "" {
+			if serviceContainers := cnts.filter(isService(d)); len(serviceContainers) > 0 {
+				*str = types.NetworkModeContainerPrefix + serviceContainers[0].ID
+			}
+		}
 	}
 	var links []string
 	for _, serviceLink := range service.Links {
@@ -180,7 +177,10 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			// Scale Down
 			container := container
 			eg.Go(func() error {
-				err := c.service.apiClient().ContainerStop(ctx, container.ID, timeout)
+				timeoutInSecond := utils.DurationSecondToInt(timeout)
+				err := c.service.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{
+					Timeout: timeoutInSecond,
+				})
 				if err != nil {
 					return err
 				}
@@ -222,10 +222,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		updated[i] = container
 	}
 
-	next, err := nextContainerNumber(containers)
-	if err != nil {
-		return err
-	}
+	next := nextContainerNumber(containers)
 	for i := 0; i < expected-actual; i++ {
 		// Scale UP
 		number := next + i
@@ -366,18 +363,23 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 	return true, nil
 }
 
-func nextContainerNumber(containers []moby.Container) (int, error) {
+func nextContainerNumber(containers []moby.Container) int {
 	max := 0
 	for _, c := range containers {
-		n, err := strconv.Atoi(c.Labels[api.ContainerNumberLabel])
+		s, ok := c.Labels[api.ContainerNumberLabel]
+		if !ok {
+			logrus.Warnf("container %s is missing %s label", c.ID, api.ContainerNumberLabel)
+		}
+		n, err := strconv.Atoi(s)
 		if err != nil {
-			return 0, err
+			logrus.Warnf("container %s has invalid %s label: %s", c.ID, api.ContainerNumberLabel, s)
+			continue
 		}
 		if n > max {
 			max = n
 		}
 	}
-	return max + 1, nil
+	return max + 1
 
 }
 
@@ -399,7 +401,7 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	w := progress.ContextWriter(ctx)
 	eventName := "Container " + name
 	w.Event(progress.CreatingEvent(eventName))
-	container, err = s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases, attachStdin)
+	container, err = s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases, attachStdin, w)
 	if err != nil {
 		return
 	}
@@ -412,7 +414,8 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	var created moby.Container
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Working, "Recreate"))
-	err := s.apiClient().ContainerStop(ctx, replaced.ID, timeout)
+	timeoutInSecond := utils.DurationSecondToInt(timeout)
+	err := s.apiClient().ContainerStop(ctx, replaced.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 	if err != nil {
 		return created, err
 	}
@@ -432,7 +435,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 		inherited = &replaced
 	}
 	name = getContainerName(project.Name, service, number)
-	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true, false)
+	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true, false, w)
 	if err != nil {
 		return created, err
 	}
@@ -470,7 +473,7 @@ func (s *composeService) startContainer(ctx context.Context, container moby.Cont
 }
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, inherit *moby.Container, autoRemove bool, useNetworkAliases bool, attachStdin bool) (moby.Container, error) {
+	name string, number int, inherit *moby.Container, autoRemove bool, useNetworkAliases bool, attachStdin bool, w progress.Writer) (moby.Container, error) {
 	var created moby.Container
 	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, inherit, autoRemove, attachStdin)
 	if err != nil {
@@ -488,6 +491,13 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	response, err := s.apiClient().ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, plat, name)
 	if err != nil {
 		return created, err
+	}
+	for _, warning := range response.Warnings {
+		w.Event(progress.Event{
+			ID:     service.Name,
+			Status: progress.Warning,
+			Text:   warning,
+		})
 	}
 	inspectedContainer, err := s.apiClient().ContainerInspect(ctx, response.ID)
 	if err != nil {

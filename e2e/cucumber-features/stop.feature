@@ -10,6 +10,7 @@ Background:
           sleep: # will be killed
             image: alpine
             command: ping localhost
+            init: true
         """
 
 Scenario: Cascade stop
@@ -22,7 +23,7 @@ Scenario: Exit code from
     When I run "compose up --exit-code-from sleep"
     Then the output contains "should_fail-1 exited with code 1"
     And the output contains "Aborting on container exit..."
-    And the exit code is 137
+    And the exit code is 143
 
 Scenario: Exit code from unknown service
     When I run "compose up --exit-code-from unknown"

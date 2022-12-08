@@ -27,7 +27,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) Port(ctx context.Context, projectName string, service string, port int, options api.PortOptions) (string, int, error) {
+func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
 	projectName = strings.ToLower(projectName)
 	list, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
@@ -40,13 +40,27 @@ func (s *composeService) Port(ctx context.Context, projectName string, service s
 		return "", 0, err
 	}
 	if len(list) == 0 {
-		return "", 0, fmt.Errorf("no container found for %s_%d", service, options.Index)
+		return "", 0, fmt.Errorf("no container found for %s%s%d", service, api.Separator, options.Index)
 	}
 	container := list[0]
 	for _, p := range container.Ports {
-		if p.PrivatePort == uint16(port) && p.Type == options.Protocol {
+		if p.PrivatePort == port && p.Type == options.Protocol {
 			return p.IP, int(p.PublicPort), nil
 		}
 	}
-	return "", 0, err
+	return "", 0, portNotFoundError(options.Protocol, port, container)
+}
+
+func portNotFoundError(protocol string, port uint16, ctr moby.Container) error {
+	formatPort := func(protocol string, port uint16) string {
+		return fmt.Sprintf("%d/%s", port, protocol)
+	}
+
+	var containerPorts []string
+	for _, p := range ctr.Ports {
+		containerPorts = append(containerPorts, formatPort(p.Type, p.PublicPort))
+	}
+
+	name := strings.TrimPrefix(ctr.Names[0], "/")
+	return fmt.Errorf("no port %s for container %s: %s", formatPort(protocol, port), name, strings.Join(containerPorts, ", "))
 }

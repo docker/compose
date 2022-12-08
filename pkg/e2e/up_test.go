@@ -21,11 +21,13 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/icmd"
@@ -42,6 +44,9 @@ func TestUpServiceUnhealthy(t *testing.T) {
 }
 
 func TestUpDependenciesNotStopped(t *testing.T) {
+	if _, ok := os.LookupEnv("CI"); ok {
+		t.Skip("Skipping test on CI... flaky")
+	}
 	c := NewParallelCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=up-deps-stop",
 	))
@@ -51,9 +56,6 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	}
 	reset()
 	t.Cleanup(reset)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	t.Log("Launching orphan container (background)")
 	c.RunDockerComposeCmd(t,
@@ -66,22 +68,18 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	RequireServiceState(t, c, "orphan", "running")
 
 	t.Log("Launching app container with implicit dependency")
-	var upOut lockedBuffer
-	var upCmd *exec.Cmd
-	go func() {
-		testCmd := c.NewDockerComposeCmd(t,
-			"-f=./fixtures/ups-deps-stop/compose.yaml",
-			"up",
-			"app",
-		)
-		cmd := exec.CommandContext(ctx, testCmd.Command[0], testCmd.Command[1:]...)
-		cmd.Env = testCmd.Env
-		cmd.Stdout = &upOut
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	upOut := &utils.SafeBuffer{}
+	testCmd := c.NewDockerComposeCmd(t,
+		"-f=./fixtures/ups-deps-stop/compose.yaml",
+		"up",
+		"app",
+	)
 
-		assert.NoError(t, cmd.Start(), "Failed to run compose up")
-		upCmd = cmd
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd, err := StartWithNewGroupID(ctx, testCmd, upOut, nil)
+	assert.NoError(t, err, "Failed to run compose up")
 
 	t.Log("Waiting for containers to be in running state")
 	upOut.RequireEventuallyContains(t, "hello app")
@@ -89,13 +87,13 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	RequireServiceState(t, c, "dependency", "running")
 
 	t.Log("Simulating Ctrl-C")
-	require.NoError(t, syscall.Kill(-upCmd.Process.Pid, syscall.SIGINT),
+	require.NoError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT),
 		"Failed to send SIGINT to compose up process")
 
 	time.AfterFunc(5*time.Second, cancel)
 
 	t.Log("Waiting for `compose up` to exit")
-	err := upCmd.Wait()
+	err = cmd.Wait()
 	if err != nil {
 		exitErr := err.(*exec.ExitError)
 		require.EqualValues(t, exitErr.ExitCode(), 130)
@@ -105,4 +103,23 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	// dependency should still be running
 	RequireServiceState(t, c, "dependency", "running")
 	RequireServiceState(t, c, "orphan", "running")
+}
+
+func TestUpWithBuildDependencies(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Run("up with service using image build by an another service", func(t *testing.T) {
+		// ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError(t, "rmi", "built-image-dependency")
+
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/dependencies",
+			"-f", "fixtures/dependencies/service-image-depends-on.yaml", "up", "-d")
+
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/dependencies",
+				"-f", "fixtures/dependencies/service-image-depends-on.yaml", "down", "--rmi", "all")
+		})
+
+		res.Assert(t, icmd.Success)
+	})
 }
