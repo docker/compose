@@ -110,8 +110,12 @@ func getDependencyCondition(service types.ServiceConfig, project *types.Project)
 type containerWatchFn func(container moby.Container) error
 
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
-func (s *composeService) watchContainers(ctx context.Context, projectName string, services, required []string,
+func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
+	projectName string, services, required []string,
 	listener api.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
+	if len(containers) == 0 {
+		return nil
+	}
 	if len(required) == 0 {
 		required = services
 	}
