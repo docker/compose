@@ -37,6 +37,9 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 	if err != nil {
 		return nil, err
 	}
+	if len(containers) == 0 {
+		return containers, nil
+	}
 
 	containers.sorted() // This enforce predictable colors assignment
 
