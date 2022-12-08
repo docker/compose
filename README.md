@@ -13,7 +13,7 @@
 [![Build Status](https://img.shields.io/github/workflow/status/docker/compose/ci?label=ci&logo=github&style=flat-square)](https://github.com/docker/compose/actions?query=workflow%3Aci)
 [![Go Report Card](https://goreportcard.com/badge/github.com/docker/compose/v2?style=flat-square)](https://goreportcard.com/report/github.com/docker/compose/v2)
 [![Codecov](https://codecov.io/gh/docker/compose/branch/master/graph/badge.svg?token=HP3K4Y4ctu)](https://codecov.io/gh/docker/compose)
-
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/docker/compose/badge)](https://api.securityscorecards.dev/projects/github.com/docker/compose)
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
 Docker Compose is a tool for running multi-container applications on Docker
@@ -42,7 +42,7 @@ for Windows and macOS.
 You can download Docker Compose binaries from the
 [release page](https://github.com/docker/compose/releases) on this repository.
 
-Rename the relevant binary for your OS to `docker-compose` and copy it to `$HOME/.docker/cli-plugins` 
+Rename the relevant binary for your OS to `docker-compose` and copy it to `$HOME/.docker/cli-plugins`
 
 Or copy it into one of these folders to install it system-wide:
 
