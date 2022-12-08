@@ -7,7 +7,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go v1.8.0
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.6.10
+	github.com/containerd/containerd v1.6.12
 	github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf
 	github.com/docker/buildx v0.9.1 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.20+incompatible // replaced; see replace rule for actual version
@@ -75,7 +75,7 @@ require (
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
