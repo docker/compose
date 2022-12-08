@@ -31,6 +31,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
+	"github.com/hashicorp/go-multierror"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -65,12 +66,14 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(s.maxConcurrency)
 
-	var mustBuild []string
+	var (
+		mustBuild         []string
+		pullErrors        = make([]error, len(project.Services))
+		imagesBeingPulled = map[string]string{}
+	)
 
-	imagesBeingPulled := map[string]string{}
-
-	for _, service := range project.Services {
-		service := service
+	for i, service := range project.Services {
+		i, service := i, service
 		if service.Image == "" {
 			w.Event(progress.Event{
 				ID:     service.Name,
@@ -113,13 +116,14 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		eg.Go(func() error {
 			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
+				pullErrors[i] = err
 				if !opts.IgnoreFailures {
 					if service.Build != nil {
 						mustBuild = append(mustBuild, service.Name)
+					} else {
+						return err // fail fast if image can't be pulled nor built
 					}
-					return err
 				}
-				w.TailMsgf("Pulling %s: %s", service.Name, err.Error())
 			}
 			return nil
 		})
@@ -131,7 +135,11 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		w.TailMsgf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(mustBuild, " "))
 	}
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	return multierror.Append(nil, pullErrors...).ErrorOrNil()
 }
 
 func imageAlreadyPresent(serviceImage string, localImages map[string]string) bool {
