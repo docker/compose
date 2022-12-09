@@ -27,7 +27,7 @@ import (
 type pushOptions struct {
 	*projectOptions
 	composeOptions
-
+	IncludeDeps    bool
 	Ignorefailures bool
 	Quiet          bool
 }
@@ -45,6 +45,7 @@ func pushCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		ValidArgsFunction: completeServiceNames(p),
 	}
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
+	pushCmd.Flags().BoolVar(&opts.IncludeDeps, "include-deps", false, "Also push images of services declared as dependencies")
 	pushCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Push without printing progress information")
 
 	return pushCmd
@@ -54,6 +55,10 @@ func runPush(ctx context.Context, backend api.Service, opts pushOptions, service
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
+	}
+
+	if !opts.IncludeDeps {
+		FilterServices(project, services)
 	}
 
 	return backend.Push(ctx, project, api.PushOptions{
