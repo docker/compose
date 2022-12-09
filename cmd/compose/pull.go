@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
@@ -67,6 +68,21 @@ func pullCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
+func FilterServices(project *types.Project, services []string) error {
+	enabled, err := project.GetServices(services...)
+	if err != nil {
+		return err
+	}
+	for _, s := range project.Services {
+		if !utils.StringContains(services, s.Name) {
+			project.DisabledServices = append(project.DisabledServices, s)
+		}
+	}
+	project.Services = enabled
+
+	return nil
+}
+
 func runPull(ctx context.Context, backend api.Service, opts pullOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
@@ -74,16 +90,7 @@ func runPull(ctx context.Context, backend api.Service, opts pullOptions, service
 	}
 
 	if !opts.includeDeps {
-		enabled, err := project.GetServices(services...)
-		if err != nil {
-			return err
-		}
-		for _, s := range project.Services {
-			if !utils.StringContains(services, s.Name) {
-				project.DisabledServices = append(project.DisabledServices, s)
-			}
-		}
-		project.Services = enabled
+		FilterServices(project, services)
 	}
 
 	return backend.Pull(ctx, project, api.PullOptions{
