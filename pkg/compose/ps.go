@@ -91,10 +91,13 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 			summary[i] = api.ContainerSummary{
 				ID:         container.ID,
 				Name:       getCanonicalContainerName(container),
+				Image:      container.Image,
 				Project:    container.Labels[api.ProjectLabel],
 				Service:    container.Labels[api.ServiceLabel],
 				Command:    container.Command,
 				State:      container.State,
+				Status:     container.Status,
+				Created:    container.Created,
 				Health:     health,
 				ExitCode:   exitCode,
 				Publishers: publishers,

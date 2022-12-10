@@ -24,12 +24,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types"
 
 	formatter2 "github.com/docker/cli/cli/command/formatter"
+	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -142,21 +144,18 @@ SERVICES:
 
 	return formatter.Print(containers, opts.Format, os.Stdout,
 		writer(containers),
-		"NAME", "COMMAND", "SERVICE", "STATUS", "PORTS")
+		"NAME", "IMAGE", "COMMAND", "SERVICE", "CREATED", "STATUS", "PORTS")
 }
 
 func writer(containers []api.ContainerSummary) func(w io.Writer) {
 	return func(w io.Writer) {
 		for _, container := range containers {
 			ports := displayablePorts(container)
-			status := container.State
-			if status == "running" && container.Health != "" {
-				status = fmt.Sprintf("%s (%s)", container.State, container.Health)
-			} else if status == "exited" || status == "dead" {
-				status = fmt.Sprintf("%s (%d)", container.State, container.ExitCode)
-			}
+			createdAt := time.Unix(container.Created, 0)
+			created := units.HumanDuration(time.Now().UTC().Sub(createdAt)) + " ago"
+			status := container.Status
 			command := formatter2.Ellipsis(container.Command, 20)
-			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", container.Name, strconv.Quote(command), container.Service, status, ports)
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", container.Name, container.Image, strconv.Quote(command), container.Service, created, status, ports)
 		}
 	}
 }
