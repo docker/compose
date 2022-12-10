@@ -318,10 +318,13 @@ type PortPublisher struct {
 type ContainerSummary struct {
 	ID         string
 	Name       string
+	Image      any
 	Command    string
 	Project    string
 	Service    string
+	Created    int64
 	State      string
+	Status     string
 	Health     string
 	ExitCode   int
 	Publishers PortPublishers
