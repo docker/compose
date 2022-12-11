@@ -83,7 +83,7 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := psCmd.Flags()
-	flags.StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json]")
+	flags.StringVar(&opts.Format, "format", "table", "Format the output. Values: [table | json]")
 	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property (supported filters: status).")
 	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")

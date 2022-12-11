@@ -9,7 +9,7 @@ List containers
 | --- | --- | --- | --- |
 | `-a`, `--all` |  |  | Show all stopped containers (including those created by the run command) |
 | [`--filter`](#filter) | `string` |  | Filter services by a property (supported filters: status). |
-| [`--format`](#format) | `string` | `pretty` | Format the output. Values: [pretty \| json] |
+| [`--format`](#format) | `string` | `table` | Format the output. Values: [table \| json] |
 | `-q`, `--quiet` |  |  | Only display IDs |
 | `--services` |  |  | Display services |
 | [`--status`](#status) | `stringArray` |  | Filter services by status. Values: [paused \| restarting \| removing \| running \| dead \| created \| exited] |

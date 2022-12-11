@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -311,6 +312,27 @@ func ComposeStandalonePath(t testing.TB) string {
 func StdoutContains(expected string) func(*icmd.Result) bool {
 	return func(res *icmd.Result) bool {
 		return strings.Contains(res.Stdout(), expected)
+	}
+}
+
+func IsHealthy(service string) func(res *icmd.Result) bool {
+	return func(res *icmd.Result) bool {
+		type state struct {
+			Name   string `json:"name"`
+			Health string `json:"health"`
+		}
+
+		ps := []state{}
+		err := json.Unmarshal([]byte(res.Stdout()), &ps)
+		if err != nil {
+			return false
+		}
+		for _, state := range ps {
+			if state.Name == service && state.Health == "healthy" {
+				return true
+			}
+		}
+		return false
 	}
 }
 

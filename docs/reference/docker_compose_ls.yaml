@@ -27,8 +27,8 @@ options:
       swarm: false
     - option: format
       value_type: string
-      default_value: pretty
-      description: 'Format the output. Values: [pretty | json].'
+      default_value: table
+      description: 'Format the output. Values: [table | json].'
       deprecated: false
       hidden: false
       experimental: false
