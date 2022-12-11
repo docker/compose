@@ -28,14 +28,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPsPretty(t *testing.T) {
+func TestPsTable(t *testing.T) {
 	ctx := context.Background()
 	origStdout := os.Stdout
 	t.Cleanup(func() {
 		os.Stdout = origStdout
 	})
 	dir := t.TempDir()
-	f, err := os.Create(filepath.Join(dir, "output.txt"))
+	out := filepath.Join(dir, "output.txt")
+	f, err := os.Create(out)
 	if err != nil {
 		t.Fatal("could not create output file")
 	}
@@ -51,8 +52,9 @@ func TestPsPretty(t *testing.T) {
 		DoAndReturn(func(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 			return []api.ContainerSummary{
 				{
-					ID:   "abc123",
-					Name: "ABC",
+					ID:    "abc123",
+					Name:  "ABC",
+					Image: "foo/bar",
 					Publishers: api.PortPublishers{
 						{
 							TargetPort:    8080,
@@ -76,8 +78,7 @@ func TestPsPretty(t *testing.T) {
 	_, err = f.Seek(0, 0)
 	assert.NoError(t, err)
 
-	output := make([]byte, 256)
-	_, err = f.Read(output)
+	output, err := os.ReadFile(out)
 	assert.NoError(t, err)
 
 	assert.Contains(t, string(output), "8080/tcp, 8443/tcp")

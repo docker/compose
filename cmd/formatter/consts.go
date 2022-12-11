@@ -17,10 +17,13 @@
 package formatter
 
 const (
-	// JSON is the constant for Json formats on list commands
+	// JSON Print in JSON format
 	JSON = "json"
 	// TemplateLegacyJSON the legacy json formatting value using go template
 	TemplateLegacyJSON = "{{json.}}"
 	// PRETTY is the constant for default formats on list commands
+	// Deprecated: use TABLE
 	PRETTY = "pretty"
+	// TABLE Print output in table format with column headers (default)
+	TABLE = "table"
 )

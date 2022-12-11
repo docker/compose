@@ -9,7 +9,7 @@ List running compose projects
 | --- | --- | --- | --- |
 | `-a`, `--all` |  |  | Show all stopped Compose projects |
 | `--filter` | `filter` |  | Filter output based on conditions provided. |
-| `--format` | `string` | `pretty` | Format the output. Values: [pretty \| json]. |
+| `--format` | `string` | `table` | Format the output. Values: [table \| json]. |
 | `-q`, `--quiet` |  |  | Only display IDs. |
 
 

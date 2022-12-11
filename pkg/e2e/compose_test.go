@@ -88,13 +88,11 @@ func TestLocalComposeUp(t *testing.T) {
 
 	t.Run("check healthcheck output", func(t *testing.T) {
 		c.WaitForCmdResult(t, c.NewDockerComposeCmd(t, "-p", projectName, "ps", "--format", "json"),
-			StdoutContains(`"Name":"compose-e2e-demo-web-1","Command":"/dispatcher","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
+			IsHealthy(projectName+"-web-1"),
 			5*time.Second, 1*time.Second)
 
 		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: `NAME                       COMMAND                  SERVICE             STATUS              PORTS`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-web-1     "/dispatcher"            web                 running (healthy)   0.0.0.0:90->80/tcp`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-db-1      "docker-entrypoint.s…"   db                  running             5432/tcp`})
+		assertServiceStatus(t, projectName, "web", "(healthy)", res.Stdout())
 	})
 
 	t.Run("images", func(t *testing.T) {
