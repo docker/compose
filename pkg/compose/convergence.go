@@ -721,21 +721,17 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	}
 
 	w := progress.ContextWriter(ctx)
-	eg, ctx := errgroup.WithContext(ctx)
 	for _, container := range containers {
 		if container.State == ContainerRunning {
 			continue
 		}
-		container := container
-		eg.Go(func() error {
-			eventName := getContainerProgressName(container)
-			w.Event(progress.StartingEvent(eventName))
-			err := s.apiClient().ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
-			if err == nil {
-				w.Event(progress.StartedEvent(eventName))
-			}
+		eventName := getContainerProgressName(container)
+		w.Event(progress.StartingEvent(eventName))
+		err := s.apiClient().ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
+		if err != nil {
 			return err
-		})
+		}
+		w.Event(progress.StartedEvent(eventName))
 	}
-	return eg.Wait()
+	return nil
 }

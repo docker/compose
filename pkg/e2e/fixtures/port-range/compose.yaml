@@ -1,0 +1,6 @@
+services:
+  a:
+    image: nginx:alpine
+    scale: 5
+    ports:
+      - "6005-6015:80"
