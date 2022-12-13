@@ -23,8 +23,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/docker/pkg/jsonmessage"
 )
 
 // LogConsumer consume logs from services and format them
@@ -36,10 +38,11 @@ type logConsumer struct {
 	stderr     io.Writer
 	color      bool
 	prefix     bool
+	timestamp  bool
 }
 
 // NewLogConsumer creates a new LogConsumer
-func NewLogConsumer(ctx context.Context, stdout, stderr io.Writer, color bool, prefix bool) api.LogConsumer {
+func NewLogConsumer(ctx context.Context, stdout, stderr io.Writer, color, prefix, timestamp bool) api.LogConsumer {
 	return &logConsumer{
 		ctx:        ctx,
 		presenters: sync.Map{},
@@ -48,6 +51,7 @@ func NewLogConsumer(ctx context.Context, stdout, stderr io.Writer, color bool, p
 		stderr:     stderr,
 		color:      color,
 		prefix:     prefix,
+		timestamp:  timestamp,
 	}
 }
 
@@ -99,8 +103,13 @@ func (l *logConsumer) write(w io.Writer, container, message string) {
 		return
 	}
 	p := l.getPresenter(container)
+	timestamp := time.Now().Format(jsonmessage.RFC3339NanoFixed)
 	for _, line := range strings.Split(message, "\n") {
-		fmt.Fprintf(w, "%s%s\n", p.prefix, line)
+		if l.timestamp {
+			fmt.Fprintf(w, "%s%s%s\n", p.prefix, timestamp, line)
+		} else {
+			fmt.Fprintf(w, "%s%s\n", p.prefix, line)
+		}
 	}
 }
 

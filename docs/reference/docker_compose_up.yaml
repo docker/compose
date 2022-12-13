@@ -230,6 +230,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: timestamps
+      value_type: bool
+      default_value: "false"
+      description: Show timestamps.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: wait
       value_type: bool
       default_value: "false"

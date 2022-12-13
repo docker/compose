@@ -20,10 +20,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/docker/compose/v2/cmd/formatter"
-
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 )
 
@@ -67,7 +66,7 @@ func runLogs(ctx context.Context, backend api.Service, opts logsOptions, service
 	if err != nil {
 		return err
 	}
-	consumer := formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !opts.noColor, !opts.noPrefix)
+	consumer := formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !opts.noColor, !opts.noPrefix, false)
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
 		Services:   services,
