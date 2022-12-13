@@ -67,7 +67,7 @@ func runLogs(ctx context.Context, backend api.Service, opts logsOptions, service
 	if err != nil {
 		return err
 	}
-	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
+	consumer := formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !opts.noColor, !opts.noPrefix)
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
 		Services:   services,

@@ -69,9 +69,17 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 		Service:   serviceName,
 	})
 
-	w := utils.GetWriter(func(line string) {
+	wOut := utils.GetWriter(func(line string) {
 		listener(api.ContainerEvent{
 			Type:      api.ContainerEventLog,
+			Container: containerName,
+			Service:   serviceName,
+			Line:      line,
+		})
+	})
+	wErr := utils.GetWriter(func(line string) {
+		listener(api.ContainerEvent{
+			Type:      api.ContainerEventErr,
 			Container: containerName,
 			Service:   serviceName,
 			Line:      line,
@@ -83,7 +91,7 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 		return err
 	}
 
-	_, _, err = s.attachContainerStreams(ctx, container.ID, inspect.Config.Tty, nil, w, w)
+	_, _, err = s.attachContainerStreams(ctx, container.ID, inspect.Config.Tty, nil, wOut, wErr)
 	return err
 }
 

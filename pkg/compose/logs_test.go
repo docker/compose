@@ -98,7 +98,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	require.Equal(
 		t,
 		[]string{"hello stdout", "hello stderr"},
-		consumer.LogsForContainer("service", "c"),
+		consumer.LogsForContainer("c"),
 	)
 }
 
@@ -169,36 +169,37 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	err := tested.Logs(ctx, name, consumer, opts)
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"hello c1"}, consumer.LogsForContainer("serviceA", "c1"))
-	require.Equal(t, []string{"hello c2"}, consumer.LogsForContainer("serviceA", "c2"))
-	require.Empty(t, consumer.LogsForContainer("serviceB", "c3"))
-	require.Equal(t, []string{"hello c4"}, consumer.LogsForContainer("serviceC", "c4"))
+	require.Equal(t, []string{"hello c1"}, consumer.LogsForContainer("c1"))
+	require.Equal(t, []string{"hello c2"}, consumer.LogsForContainer("c2"))
+	require.Empty(t, consumer.LogsForContainer("c3"))
+	require.Equal(t, []string{"hello c4"}, consumer.LogsForContainer("c4"))
 }
 
 type testLogConsumer struct {
 	mu sync.Mutex
-	// logs is keyed by service, then container; values are log lines
-	logs map[string]map[string][]string
+	// logs is keyed container; values are log lines
+	logs map[string][]string
 }
 
-func (l *testLogConsumer) Log(containerName, service, message string) {
+func (l *testLogConsumer) Log(containerName, message string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.logs == nil {
-		l.logs = make(map[string]map[string][]string)
+		l.logs = make(map[string][]string)
 	}
-	if l.logs[service] == nil {
-		l.logs[service] = make(map[string][]string)
-	}
-	l.logs[service][containerName] = append(l.logs[service][containerName], message)
+	l.logs[containerName] = append(l.logs[containerName], message)
+}
+
+func (l *testLogConsumer) Err(containerName, message string) {
+	l.Log(containerName, message)
 }
 
 func (l *testLogConsumer) Status(containerName, msg string) {}
 
 func (l *testLogConsumer) Register(containerName string) {}
 
-func (l *testLogConsumer) LogsForContainer(svc string, containerName string) []string {
+func (l *testLogConsumer) LogsForContainer(containerName string) []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.logs[svc][containerName]
+	return l.logs[containerName]
 }

@@ -66,3 +66,13 @@ func TestPortRange(t *testing.T) {
 
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
 }
+
+func TestStdoutStderr(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "e2e-stdout-stderr"
+
+	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/stdout-stderr/compose.yaml", "--project-name", projectName, "up")
+	res.Assert(t, icmd.Expected{Out: "log to stdout", Err: "log to stderr"})
+
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
+}

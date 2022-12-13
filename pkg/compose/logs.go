@@ -99,7 +99,6 @@ func (s *composeService) logContainers(ctx context.Context, consumer api.LogCons
 		return err
 	}
 
-	service := c.Labels[api.ServiceLabel]
 	r, err := s.apiClient().ContainerLogs(ctx, cnt.ID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -116,7 +115,7 @@ func (s *composeService) logContainers(ctx context.Context, consumer api.LogCons
 
 	name := getContainerNameWithoutProject(c)
 	w := utils.GetWriter(func(line string) {
-		consumer.Log(name, service, line)
+		consumer.Log(name, line)
 	})
 	if cnt.Config.Tty {
 		_, err = io.Copy(w, r)
