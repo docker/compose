@@ -416,16 +416,28 @@ func (m *MockLogConsumer) EXPECT() *MockLogConsumerMockRecorder {
 	return m.recorder
 }
 
-// Log mocks base method.
-func (m *MockLogConsumer) Log(containerName, service, message string) {
+// Err mocks base method.
+func (m *MockLogConsumer) Err(containerName, message string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Log", containerName, service, message)
+	m.ctrl.Call(m, "Err", containerName, message)
+}
+
+// Err indicates an expected call of Err.
+func (mr *MockLogConsumerMockRecorder) Err(containerName, message interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Err", reflect.TypeOf((*MockLogConsumer)(nil).Err), containerName, message)
+}
+
+// Log mocks base method.
+func (m *MockLogConsumer) Log(containerName, message string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Log", containerName, message)
 }
 
 // Log indicates an expected call of Log.
-func (mr *MockLogConsumerMockRecorder) Log(containerName, service, message interface{}) *gomock.Call {
+func (mr *MockLogConsumerMockRecorder) Log(containerName, message interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockLogConsumer)(nil).Log), containerName, service, message)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockLogConsumer)(nil).Log), containerName, message)
 }
 
 // Register mocks base method.
