@@ -187,13 +187,6 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
-	ef := o.EnvFile
-	if ef != "" && !filepath.IsAbs(ef) {
-		ef, err = filepath.Abs(ef)
-		if err != nil {
-			return nil, err
-		}
-	}
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
 			api.ProjectLabel:     project.Name,
@@ -203,8 +196,8 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
 			api.OneoffLabel:      "False", // default, will be overridden by `run` command
 		}
-		if ef != "" {
-			s.CustomLabels[api.EnvironmentFileLabel] = ef
+		if o.EnvFile != "" {
+			s.CustomLabels[api.EnvironmentFileLabel] = o.EnvFile
 		}
 		project.Services[i] = s
 	}
@@ -250,7 +243,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
+func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
 	// filter out useless commandConn.CloseWrite warning message that can occur
 	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
 	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
@@ -325,6 +318,12 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 				}
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
+			}
+			if opts.EnvFile != "" && !filepath.IsAbs(opts.EnvFile) {
+				opts.EnvFile, err = filepath.Abs(opts.EnvFile)
+				if err != nil {
+					return err
+				}
 			}
 			if parallel > 0 {
 				backend.MaxConcurrency(parallel)
