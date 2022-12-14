@@ -140,7 +140,7 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 func (o *projectOptions) projectOrName(services ...string) (*types.Project, string, error) {
 	name := o.ProjectName
 	var project *types.Project
-	if o.ProjectName == "" {
+	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
 		p, err := o.toProject(services)
 		if err != nil {
 			envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
