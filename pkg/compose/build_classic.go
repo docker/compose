@@ -28,10 +28,10 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/build"
+	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
-	"github.com/docker/docker/cli"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/jsonmessage"
