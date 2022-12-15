@@ -49,6 +49,7 @@ type upOptions struct {
 	noPrefix           bool
 	attachDependencies bool
 	attach             []string
+	timestamp          bool
 	wait               bool
 }
 
@@ -126,6 +127,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&up.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
 	flags.StringVar(&up.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
 	flags.IntVarP(&create.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
+	flags.BoolVar(&up.timestamp, "timestamps", false, "Show timestamps.")
 	flags.BoolVar(&up.noDeps, "no-deps", false, "Don't start linked services.")
 	flags.BoolVar(&create.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
 	flags.BoolVarP(&create.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
@@ -176,7 +178,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 
 	var consumer api.LogConsumer
 	if !upOptions.Detach {
-		consumer = formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !upOptions.noColor, !upOptions.noPrefix)
+		consumer = formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 	}
 
 	attachTo := services
