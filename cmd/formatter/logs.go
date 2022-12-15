@@ -32,18 +32,20 @@ type logConsumer struct {
 	ctx        context.Context
 	presenters sync.Map // map[string]*presenter
 	width      int
-	writer     io.Writer
+	stdout     io.Writer
+	stderr     io.Writer
 	color      bool
 	prefix     bool
 }
 
 // NewLogConsumer creates a new LogConsumer
-func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) api.LogConsumer {
+func NewLogConsumer(ctx context.Context, stdout, stderr io.Writer, color bool, prefix bool) api.LogConsumer {
 	return &logConsumer{
 		ctx:        ctx,
 		presenters: sync.Map{},
 		width:      0,
-		writer:     w,
+		stdout:     stdout,
+		stderr:     stderr,
 		color:      color,
 		prefix:     prefix,
 	}
@@ -83,20 +85,29 @@ func (l *logConsumer) getPresenter(container string) *presenter {
 }
 
 // Log formats a log message as received from name/container
-func (l *logConsumer) Log(container, service, message string) {
+func (l *logConsumer) Log(container, message string) {
+	l.write(l.stdout, container, message)
+}
+
+// Log formats a log message as received from name/container
+func (l *logConsumer) Err(container, message string) {
+	l.write(l.stderr, container, message)
+}
+
+func (l *logConsumer) write(w io.Writer, container, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
 	p := l.getPresenter(container)
 	for _, line := range strings.Split(message, "\n") {
-		fmt.Fprintf(l.writer, "%s%s\n", p.prefix, line)
+		fmt.Fprintf(w, "%s%s\n", p.prefix, line)
 	}
 }
 
 func (l *logConsumer) Status(container, msg string) {
 	p := l.getPresenter(container)
 	s := p.colors(fmt.Sprintf("%s %s\n", container, msg))
-	l.writer.Write([]byte(s)) //nolint:errcheck
+	l.stdout.Write([]byte(s)) //nolint:errcheck
 }
 
 func (l *logConsumer) computeWidth() {

@@ -30,7 +30,7 @@ import (
 // Print prints formatted lists in different formats
 func Print(toJSON interface{}, format string, outWriter io.Writer, writerFn func(w io.Writer), headers ...string) error {
 	switch strings.ToLower(format) {
-	case PRETTY, "":
+	case TABLE, PRETTY, "":
 		return PrintPrettySection(outWriter, writerFn, headers...)
 	case TemplateLegacyJSON:
 		switch reflect.TypeOf(toJSON).Kind() {

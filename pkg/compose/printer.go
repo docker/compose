@@ -118,7 +118,11 @@ func (p *printer) Run(ctx context.Context, cascadeStop bool, exitCodeFrom string
 				}
 			case api.ContainerEventLog:
 				if !aborting {
-					p.consumer.Log(container, event.Service, event.Line)
+					p.consumer.Log(container, event.Line)
+				}
+			case api.ContainerEventErr:
+				if !aborting {
+					p.consumer.Err(container, event.Line)
 				}
 			}
 		}

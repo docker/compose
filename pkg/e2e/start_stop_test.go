@@ -36,12 +36,6 @@ func TestStartStop(t *testing.T) {
 		return fmt.Sprintf("%s\\s+%s\\(%d\\)", projectName, status, 2)
 	}
 
-	getServiceRegx := func(service string, status string) string {
-		// match output with random spaces like:
-		// e2e-start-stop-db-1      "echo hello"       db          running
-		return fmt.Sprintf("%s-%s-1.+%s\\s+%s", projectName, service, service, status)
-	}
-
 	t.Run("Up a project", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "up",
 			"-d")
@@ -51,8 +45,8 @@ func TestStartStop(t *testing.T) {
 		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
 
 		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps")
-		testify.Regexp(t, getServiceRegx("simple", "running"), res.Stdout())
-		testify.Regexp(t, getServiceRegx("another", "running"), res.Stdout())
+		assertServiceStatus(t, projectName, "simple", "Up", res.Stdout())
+		assertServiceStatus(t, projectName, "another", "Up", res.Stdout())
 	})
 
 	t.Run("stop project", func(t *testing.T) {
@@ -68,8 +62,8 @@ func TestStartStop(t *testing.T) {
 		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-no-dependencies-words-1"), res.Combined())
 
 		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps", "--all")
-		testify.Regexp(t, getServiceRegx("simple", "exited"), res.Stdout())
-		testify.Regexp(t, getServiceRegx("another", "exited"), res.Stdout())
+		assertServiceStatus(t, projectName, "simple", "Exited", res.Stdout())
+		assertServiceStatus(t, projectName, "another", "Exited", res.Stdout())
 	})
 
 	t.Run("start project", func(t *testing.T) {

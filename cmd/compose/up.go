@@ -176,7 +176,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 
 	var consumer api.LogConsumer
 	if !upOptions.Detach {
-		consumer = formatter.NewLogConsumer(ctx, os.Stdout, !upOptions.noColor, !upOptions.noPrefix)
+		consumer = formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !upOptions.noColor, !upOptions.noPrefix)
 	}
 
 	attachTo := services

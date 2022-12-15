@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/distribution/distribution/v3/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
@@ -94,10 +95,13 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 			tag := ""
 			repository := ""
 			if len(inspect.RepoTags) > 0 {
-				repotag := strings.Split(inspect.RepoTags[0], ":")
-				repository = repotag[0]
-				if len(repotag) > 1 {
-					tag = repotag[1]
+				ref, err := reference.ParseDockerRef(inspect.RepoTags[0])
+				if err != nil {
+					return err
+				}
+				repository = reference.FamiliarName(ref)
+				if tagged, ok := ref.(reference.Tagged); ok {
+					tag = tagged.Tag()
 				}
 			}
 			l.Lock()

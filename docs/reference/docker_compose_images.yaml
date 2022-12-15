@@ -5,6 +5,16 @@ usage: docker compose images [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: format
+      value_type: string
+      default_value: table
+      description: 'Format the output. Values: [table | json].'
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: quiet
       shorthand: q
       value_type: bool

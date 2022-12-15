@@ -35,7 +35,8 @@ import (
 
 type imageOptions struct {
 	*projectOptions
-	Quiet bool
+	Quiet  bool
+	Format string
 }
 
 func imagesCommand(p *projectOptions, backend api.Service) *cobra.Command {
@@ -50,6 +51,7 @@ func imagesCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
+	imgCmd.Flags().StringVar(&opts.Format, "format", "table", "Format the output. Values: [table | json].")
 	imgCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return imgCmd
 }
@@ -88,7 +90,7 @@ func runImages(ctx context.Context, backend api.Service, opts imageOptions, serv
 		return images[i].ContainerName < images[j].ContainerName
 	})
 
-	return formatter.Print(images, formatter.PRETTY, os.Stdout,
+	return formatter.Print(images, opts.Format, os.Stdout,
 		func(w io.Writer) {
 			for _, img := range images {
 				id := stringid.TruncateID(img.ID)
@@ -104,5 +106,5 @@ func runImages(ctx context.Context, backend api.Service, opts imageOptions, serv
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", img.ContainerName, repo, tag, id, size)
 			}
 		},
-		"Container", "Repository", "Tag", "Image Id", "Size")
+		"CONTAINER", "REPOSITORY", "TAG", "IMAGE ID", "SIZE")
 }

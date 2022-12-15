@@ -40,7 +40,7 @@ func TestPs(t *testing.T) {
 
 	assert.Contains(t, res.Combined(), "Container e2e-ps-busybox-1  Started", res.Combined())
 
-	t.Run("pretty", func(t *testing.T) {
+	t.Run("table", func(t *testing.T) {
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
 		lines := strings.Split(res.Stdout(), "\n")
 		assert.Equal(t, 4, len(lines))

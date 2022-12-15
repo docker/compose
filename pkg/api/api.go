@@ -318,10 +318,13 @@ type PortPublisher struct {
 type ContainerSummary struct {
 	ID         string
 	Name       string
+	Image      any
 	Command    string
 	Project    string
 	Service    string
+	Created    int64
 	State      string
+	Status     string
 	Health     string
 	ExitCode   int
 	Publishers PortPublishers
@@ -437,7 +440,8 @@ type Stack struct {
 
 // LogConsumer is a callback to process log messages from services
 type LogConsumer interface {
-	Log(containerName, service, message string)
+	Log(containerName, message string)
+	Err(containerName, message string)
 	Status(container, msg string)
 	Register(container string)
 }
@@ -461,8 +465,10 @@ type ContainerEvent struct {
 }
 
 const (
-	// ContainerEventLog is a ContainerEvent of type log. Line is set
+	// ContainerEventLog is a ContainerEvent of type log on stdout. Line is set
 	ContainerEventLog = iota
+	// ContainerEventErr is a ContainerEvent of type log on stderr. Line is set
+	ContainerEventErr
 	// ContainerEventAttach is a ContainerEvent of type attach. First event sent about a container
 	ContainerEventAttach
 	// ContainerEventStopped is a ContainerEvent of type stopped.

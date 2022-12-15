@@ -45,7 +45,7 @@ func TestCopy(t *testing.T) {
 
 	t.Run("make sure service is running", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: `nginx               running`})
+		assertServiceStatus(t, projectName, "nginx", "Up", res.Stdout())
 	})
 
 	t.Run("copy to container copies the file to the all containers by default", func(t *testing.T) {

@@ -26,15 +26,16 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func assertServiceStatus(t *testing.T, projectName, service, status string, ps string) {
+	// match output with random spaces like:
+	// e2e-start-stop-db-1      alpine:latest "echo hello"     db	1 minutes ago	Exited (0) 1 minutes ago
+	regx := fmt.Sprintf("%s-%s-1.+%s\\s+.+%s.+", projectName, service, service, status)
+	testify.Regexp(t, regx, ps)
+}
+
 func TestRestart(t *testing.T) {
 	c := NewParallelCLI(t)
 	const projectName = "e2e-restart"
-
-	getServiceRegx := func(service string, status string) string {
-		// match output with random spaces like:
-		// e2e-start-stop-db-1      "echo hello"     db      running
-		return fmt.Sprintf("%s-%s-1.+%s\\s+%s", projectName, service, service, status)
-	}
 
 	t.Run("Up a project", func(t *testing.T) {
 		// This is just to ensure the containers do NOT exist
@@ -48,7 +49,7 @@ func TestRestart(t *testing.T) {
 			StdoutContains(`"State":"exited"`), 10*time.Second, 1*time.Second)
 
 		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps", "-a")
-		testify.Regexp(t, getServiceRegx("restart", "exited"), res.Stdout())
+		assertServiceStatus(t, projectName, "restart", "Exited", res.Stdout())
 
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose.yaml", "--project-name", projectName, "restart")
 
@@ -56,7 +57,7 @@ func TestRestart(t *testing.T) {
 		time.Sleep(time.Second)
 
 		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps")
-		testify.Regexp(t, getServiceRegx("restart", "running"), res.Stdout())
+		assertServiceStatus(t, projectName, "restart", "Up", res.Stdout())
 
 		// Clean up
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
