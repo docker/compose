@@ -58,7 +58,10 @@ func runPush(ctx context.Context, backend api.Service, opts pushOptions, service
 	}
 
 	if !opts.IncludeDeps {
-		FilterServices(project, services)
+		err := withSelectedServicesOnly(project, services)
+		if err != nil {
+			return err
+		}
 	}
 
 	return backend.Push(ctx, project, api.PushOptions{
