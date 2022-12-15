@@ -32,4 +32,11 @@ func TestSecretFromEnv(t *testing.T) {
 			})
 		res.Assert(t, icmd.Expected{Out: "BAR"})
 	})
+	t.Run("secret uid", func(t *testing.T) {
+		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "foo", "ls", "-al", "/var/run/secrets/bar"),
+			func(cmd *icmd.Cmd) {
+				cmd.Env = append(cmd.Env, "SECRET=BAR")
+			})
+		res.Assert(t, icmd.Expected{Out: "-r--r-----    1 1005     1005"})
+	})
 }
