@@ -2,10 +2,14 @@ services:
   foo:
     image: alpine
     secrets:
-      - bar
+      - source: secret
+        target: bar
+        uid: "1005"
+        gid: "1005"
+        mode: 0440
     command: cat /run/secrets/bar
 
 secrets:
-  bar:
+  secret:
     environment: SECRET
 

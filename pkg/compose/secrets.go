@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -69,11 +70,29 @@ func createTar(env string, config types.ServiceSecretConfig) (bytes.Buffer, erro
 		target = "/run/secrets/" + config.Target
 	}
 
+	var uid, gid int
+	if config.UID != "" {
+		v, err := strconv.Atoi(config.UID)
+		if err != nil {
+			return b, err
+		}
+		uid = v
+	}
+	if config.GID != "" {
+		v, err := strconv.Atoi(config.GID)
+		if err != nil {
+			return b, err
+		}
+		gid = v
+	}
+
 	header := &tar.Header{
 		Name:    target,
 		Size:    int64(len(value)),
 		Mode:    int64(mode),
 		ModTime: time.Now(),
+		Uid:     uid,
+		Gid:     gid,
 	}
 	err := tarWriter.WriteHeader(header)
 	if err != nil {
