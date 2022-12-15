@@ -55,16 +55,10 @@ type upOptions struct {
 
 func (opts upOptions) apply(project *types.Project, services []string) error {
 	if opts.noDeps {
-		enabled, err := project.GetServices(services...)
+		err := withSelectedServicesOnly(project, services)
 		if err != nil {
 			return err
 		}
-		for _, s := range project.Services {
-			if !utils.StringContains(services, s.Name) {
-				project.DisabledServices = append(project.DisabledServices, s)
-			}
-		}
-		project.Services = enabled
 	}
 
 	if opts.exitCodeFrom != "" {
