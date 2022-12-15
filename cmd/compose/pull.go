@@ -68,7 +68,7 @@ func pullCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func FilterServices(project *types.Project, services []string) error {
+func withSelectedServicesOnly(project *types.Project, services []string) error {
 	enabled, err := project.GetServices(services...)
 	if err != nil {
 		return err
@@ -90,7 +90,10 @@ func runPull(ctx context.Context, backend api.Service, opts pullOptions, service
 	}
 
 	if !opts.includeDeps {
-		FilterServices(project, services)
+		err := withSelectedServicesOnly(project, services)
+		if err != nil {
+			return err
+		}
 	}
 
 	return backend.Pull(ctx, project, api.PullOptions{
