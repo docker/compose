@@ -18,7 +18,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.6.0
-	github.com/mattn/go-isatty v0.0.16
+	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/moby/buildkit v0.10.4 // replaced; see replace rule for actual version
 	github.com/moby/term v0.0.0-20221128092401-c43b287e0e0f

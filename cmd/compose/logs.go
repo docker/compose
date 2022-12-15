@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -38,7 +37,7 @@ type logsOptions struct {
 	timestamps bool
 }
 
-func logsCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func logsCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	opts := logsOptions{
 		ProjectOptions: p,
 	}
@@ -46,7 +45,7 @@ func logsCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Use:   "logs [OPTIONS] [SERVICE...]",
 		Short: "View output from containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runLogs(ctx, backend, opts, args)
+			return runLogs(ctx, streams, backend, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -61,12 +60,12 @@ func logsCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return logsCmd
 }
 
-func runLogs(ctx context.Context, backend api.Service, opts logsOptions, services []string) error {
+func runLogs(ctx context.Context, streams api.Streams, backend api.Service, opts logsOptions, services []string) error {
 	project, name, err := opts.projectOrName(services...)
 	if err != nil {
 		return err
 	}
-	consumer := formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !opts.noColor, !opts.noPrefix, false)
+	consumer := formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !opts.noColor, !opts.noPrefix, false)
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
 		Services:   services,

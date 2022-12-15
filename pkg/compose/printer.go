@@ -94,7 +94,6 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 				if cascadeStop {
 					if !aborting {
 						aborting = true
-						fmt.Println("Aborting on container exit...")
 						err := stopFn()
 						if err != nil {
 							return 0, err

@@ -48,7 +48,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 		names = append(names, getContainerNameWithoutProject(c))
 	}
 
-	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
+	fmt.Fprintf(s.stdout(), "Attaching to %s\n", strings.Join(names, ", "))
 
 	for _, container := range containers {
 		err := s.attachContainer(ctx, container, listener)

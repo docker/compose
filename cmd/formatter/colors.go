@@ -18,10 +18,9 @@ package formatter
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
-	"github.com/mattn/go-isatty"
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 var names = []string{
@@ -47,20 +46,20 @@ const (
 )
 
 // SetANSIMode configure formatter for colored output on ANSI-compliant console
-func SetANSIMode(ansi string) {
-	if !useAnsi(ansi) {
+func SetANSIMode(streams api.Streams, ansi string) {
+	if !useAnsi(streams, ansi) {
 		nextColor = func() colorFunc {
 			return monochrome
 		}
 	}
 }
 
-func useAnsi(ansi string) bool {
+func useAnsi(streams api.Streams, ansi string) bool {
 	switch ansi {
 	case Always:
 		return true
 	case Auto:
-		return isatty.IsTerminal(os.Stdout.Fd())
+		return streams.Out().IsTerminal()
 	}
 	return false
 }

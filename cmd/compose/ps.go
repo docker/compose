@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -67,7 +66,7 @@ func (p *psOptions) parseFilter() error {
 	return nil
 }
 
-func psCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func psCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	opts := psOptions{
 		ProjectOptions: p,
 	}
@@ -78,7 +77,7 @@ func psCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			return opts.parseFilter()
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPs(ctx, backend, args, opts)
+			return runPs(ctx, streams, backend, args, opts)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -92,7 +91,7 @@ func psCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return psCmd
 }
 
-func runPs(ctx context.Context, backend api.Service, services []string, opts psOptions) error {
+func runPs(ctx context.Context, streams api.Streams, backend api.Service, services []string, opts psOptions) error {
 	project, name, err := opts.projectOrName(services...)
 	if err != nil {
 		return err
@@ -126,7 +125,7 @@ SERVICES:
 
 	if opts.Quiet {
 		for _, c := range containers {
-			fmt.Println(c.ID)
+			fmt.Fprintln(streams.Out(), c.ID)
 		}
 		return nil
 	}
@@ -138,11 +137,11 @@ SERVICES:
 				services = append(services, s.Service)
 			}
 		}
-		fmt.Println(strings.Join(services, "\n"))
+		fmt.Fprintln(streams.Out(), strings.Join(services, "\n"))
 		return nil
 	}
 
-	return formatter.Print(containers, opts.Format, os.Stdout,
+	return formatter.Print(containers, opts.Format, streams.Out(),
 		writer(containers),
 		"NAME", "IMAGE", "COMMAND", "SERVICE", "CREATED", "STATUS", "PORTS")
 }
