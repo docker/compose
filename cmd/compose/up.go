@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -87,7 +86,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 	return nil
 }
 
-func upCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	upCmd := &cobra.Command{
@@ -102,7 +101,7 @@ func upCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			if create.ignoreOrphans && create.removeOrphans {
 				return fmt.Errorf("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined")
 			}
-			return runUp(ctx, backend, create, up, project, services)
+			return runUp(ctx, streams, backend, create, up, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -158,7 +157,7 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
-func runUp(ctx context.Context, backend api.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
+func runUp(ctx context.Context, streams api.Streams, backend api.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
 	if len(project.Services) == 0 {
 		return fmt.Errorf("no service selected")
 	}
@@ -172,7 +171,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 
 	var consumer api.LogConsumer
 	if !upOptions.Detach {
-		consumer = formatter.NewLogConsumer(ctx, os.Stdout, os.Stderr, !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
+		consumer = formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 	}
 
 	attachTo := services

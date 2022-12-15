@@ -34,7 +34,7 @@ type portOptions struct {
 	index    int
 }
 
-func portCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func portCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	opts := portOptions{
 		ProjectOptions: p,
 	}
@@ -52,7 +52,7 @@ func portCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPort(ctx, backend, opts, args[0])
+			return runPort(ctx, streams, backend, opts, args[0])
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -61,7 +61,7 @@ func portCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func runPort(ctx context.Context, backend api.Service, opts portOptions, service string) error {
+func runPort(ctx context.Context, streams api.Streams, backend api.Service, opts portOptions, service string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
@@ -74,6 +74,6 @@ func runPort(ctx context.Context, backend api.Service, opts portOptions, service
 		return err
 	}
 
-	fmt.Printf("%s:%d\n", ip, port)
+	fmt.Fprintf(streams.Out(), "%s:%d\n", ip, port)
 	return nil
 }

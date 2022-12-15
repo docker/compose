@@ -59,7 +59,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	}
 	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
 	if options.Force {
-		fmt.Println(msg)
+		fmt.Fprintln(s.stdout(), msg)
 	} else {
 		confirm, err := prompt.User{}.Confirm(msg, false)
 		if err != nil {

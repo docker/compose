@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -38,13 +37,13 @@ type lsOptions struct {
 	Filter opts.FilterOpt
 }
 
-func listCommand(backend api.Service) *cobra.Command {
+func listCommand(streams api.Streams, backend api.Service) *cobra.Command {
 	lsOpts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls [OPTIONS]",
 		Short: "List running compose projects",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runList(ctx, backend, lsOpts)
+			return runList(ctx, streams, backend, lsOpts)
 		}),
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
@@ -61,7 +60,7 @@ var acceptedListFilters = map[string]bool{
 	"name": true,
 }
 
-func runList(ctx context.Context, backend api.Service, lsOpts lsOptions) error {
+func runList(ctx context.Context, streams api.Streams, backend api.Service, lsOpts lsOptions) error {
 	filters := lsOpts.Filter.Value()
 	err := filters.Validate(acceptedListFilters)
 	if err != nil {
@@ -74,7 +73,7 @@ func runList(ctx context.Context, backend api.Service, lsOpts lsOptions) error {
 	}
 	if lsOpts.Quiet {
 		for _, s := range stackList {
-			fmt.Println(s.Name)
+			fmt.Fprintln(streams.Out(), s.Name)
 		}
 		return nil
 	}
@@ -91,7 +90,7 @@ func runList(ctx context.Context, backend api.Service, lsOpts lsOptions) error {
 	}
 
 	view := viewFromStackList(stackList)
-	return formatter.Print(view, lsOpts.Format, os.Stdout, func(w io.Writer) {
+	return formatter.Print(view, lsOpts.Format, streams.Out(), func(w io.Writer) {
 		for _, stack := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", stack.Name, stack.Status, stack.ConfigFiles)
 		}

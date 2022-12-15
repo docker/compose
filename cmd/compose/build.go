@@ -73,7 +73,7 @@ var printerModes = []string{
 	buildx.PrinterModeQuiet,
 }
 
-func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -82,7 +82,7 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Short: "Build or rebuild services",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.memory != "" {
-				fmt.Println("WARNING --memory is ignored as not supported in buildkit.")
+				fmt.Fprintln(streams.Err(), "WARNING --memory is ignored as not supported in buildkit.")
 			}
 			if opts.quiet {
 				opts.progress = buildx.PrinterModeQuiet

@@ -18,10 +18,12 @@ package compose
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/cli/cli/streams"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
 	"github.com/golang/mock/gomock"
@@ -30,10 +32,6 @@ import (
 
 func TestPsTable(t *testing.T) {
 	ctx := context.Background()
-	origStdout := os.Stdout
-	t.Cleanup(func() {
-		os.Stdout = origStdout
-	})
 	dir := t.TempDir()
 	out := filepath.Join(dir, "output.txt")
 	f, err := os.Create(out)
@@ -42,7 +40,6 @@ func TestPsTable(t *testing.T) {
 	}
 	defer func() { _ = f.Close() }()
 
-	os.Stdout = f
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -72,7 +69,7 @@ func TestPsTable(t *testing.T) {
 		}).AnyTimes()
 
 	opts := psOptions{ProjectOptions: &ProjectOptions{ProjectName: "test"}}
-	err = runPs(ctx, backend, nil, opts)
+	err = runPs(ctx, stream{out: streams.NewOut(f)}, backend, nil, opts)
 	assert.NoError(t, err)
 
 	_, err = f.Seek(0, 0)
@@ -82,4 +79,22 @@ func TestPsTable(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Contains(t, string(output), "8080/tcp, 8443/tcp")
+}
+
+type stream struct {
+	out *streams.Out
+	err io.Writer
+	in  *streams.In
+}
+
+func (s stream) Out() *streams.Out {
+	return s.out
+}
+
+func (s stream) Err() io.Writer {
+	return s.err
+}
+
+func (s stream) In() *streams.In {
+	return s.in
 }

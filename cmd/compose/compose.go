@@ -31,7 +31,6 @@ import (
 	"github.com/docker/buildx/util/logutil"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/cli/cli/command"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -243,7 +242,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
+func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //nolint:gocyclo
 	// filter out useless commandConn.CloseWrite warning message that can occur
 	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
 	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
@@ -305,7 +304,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 			if verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			}
-			formatter.SetANSIMode(ansi)
+			formatter.SetANSIMode(streams, ansi)
 			switch ansi {
 			case "never":
 				progress.Mode = progress.ModePlain
@@ -333,27 +332,27 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 	}
 
 	c.AddCommand(
-		upCommand(&opts, backend),
+		upCommand(&opts, streams, backend),
 		downCommand(&opts, backend),
 		startCommand(&opts, backend),
 		restartCommand(&opts, backend),
 		stopCommand(&opts, backend),
-		psCommand(&opts, backend),
-		listCommand(backend),
-		logsCommand(&opts, backend),
-		convertCommand(&opts, backend),
+		psCommand(&opts, streams, backend),
+		listCommand(streams, backend),
+		logsCommand(&opts, streams, backend),
+		convertCommand(&opts, streams, backend),
 		killCommand(&opts, backend),
-		runCommand(&opts, dockerCli, backend),
+		runCommand(&opts, streams, backend),
 		removeCommand(&opts, backend),
-		execCommand(&opts, dockerCli, backend),
+		execCommand(&opts, streams, backend),
 		pauseCommand(&opts, backend),
 		unpauseCommand(&opts, backend),
-		topCommand(&opts, backend),
-		eventsCommand(&opts, backend),
-		portCommand(&opts, backend),
-		imagesCommand(&opts, backend),
+		topCommand(&opts, streams, backend),
+		eventsCommand(&opts, streams, backend),
+		portCommand(&opts, streams, backend),
+		imagesCommand(&opts, streams, backend),
 		versionCommand(),
-		buildCommand(&opts, backend),
+		buildCommand(&opts, streams, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),

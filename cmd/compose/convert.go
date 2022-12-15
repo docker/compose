@@ -50,7 +50,7 @@ type convertOptions struct {
 	noConsistency       bool
 }
 
-func convertCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func convertCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	opts := convertOptions{
 		ProjectOptions: p,
 	}
@@ -73,22 +73,22 @@ func convertCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.services {
-				return runServices(opts)
+				return runServices(streams, opts)
 			}
 			if opts.volumes {
-				return runVolumes(opts)
+				return runVolumes(streams, opts)
 			}
 			if opts.hash != "" {
-				return runHash(opts)
+				return runHash(streams, opts)
 			}
 			if opts.profiles {
-				return runProfiles(opts, args)
+				return runProfiles(streams, opts, args)
 			}
 			if opts.images {
-				return runConfigImages(opts, args)
+				return runConfigImages(streams, opts, args)
 			}
 
-			return runConvert(ctx, backend, opts, args)
+			return runConvert(ctx, streams, backend, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -110,7 +110,7 @@ func convertCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
+func runConvert(ctx context.Context, streams api.Streams, backend api.Service, opts convertOptions, services []string) error {
 	var content []byte
 	project, err := opts.ToProject(services,
 		cli.WithInterpolation(!opts.noInterpolate),
@@ -139,7 +139,7 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 		return nil
 	}
 
-	var out io.Writer = os.Stdout
+	var out io.Writer = streams.Out()
 	if opts.Output != "" && len(content) > 0 {
 		file, err := os.Create(opts.Output)
 		if err != nil {
@@ -151,29 +151,29 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 	return err
 }
 
-func runServices(opts convertOptions) error {
+func runServices(streams api.Streams, opts convertOptions) error {
 	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
 	}
 	return project.WithServices(project.ServiceNames(), func(s types.ServiceConfig) error {
-		fmt.Println(s.Name)
+		fmt.Fprintln(streams.Out(), s.Name)
 		return nil
 	})
 }
 
-func runVolumes(opts convertOptions) error {
+func runVolumes(streams api.Streams, opts convertOptions) error {
 	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
 	}
 	for n := range project.Volumes {
-		fmt.Println(n)
+		fmt.Fprintln(streams.Out(), n)
 	}
 	return nil
 }
 
-func runHash(opts convertOptions) error {
+func runHash(streams api.Streams, opts convertOptions) error {
 	var services []string
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
@@ -187,12 +187,12 @@ func runHash(opts convertOptions) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%s %s\n", s.Name, hash)
+		fmt.Fprintf(streams.Out(), "%s %s\n", s.Name, hash)
 	}
 	return nil
 }
 
-func runProfiles(opts convertOptions, services []string) error {
+func runProfiles(streams api.Streams, opts convertOptions, services []string) error {
 	set := map[string]struct{}{}
 	project, err := opts.ToProject(services)
 	if err != nil {
@@ -209,21 +209,21 @@ func runProfiles(opts convertOptions, services []string) error {
 	}
 	sort.Strings(profiles)
 	for _, p := range profiles {
-		fmt.Println(p)
+		fmt.Fprintln(streams.Out(), p)
 	}
 	return nil
 }
 
-func runConfigImages(opts convertOptions, services []string) error {
+func runConfigImages(streams api.Streams, opts convertOptions, services []string) error {
 	project, err := opts.ToProject(services)
 	if err != nil {
 		return err
 	}
 	for _, s := range project.Services {
 		if s.Image != "" {
-			fmt.Println(s.Image)
+			fmt.Fprintln(streams.Out(), s.Image)
 		} else {
-			fmt.Printf("%s%s%s\n", project.Name, api.Separator, s.Name)
+			fmt.Fprintf(streams.Out(), "%s%s%s\n", project.Name, api.Separator, s.Name)
 		}
 	}
 	return nil
