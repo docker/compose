@@ -260,7 +260,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		stdinOpen = service.StdinOpen
 	)
 
-	volumeMounts, binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
+	binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -289,7 +289,6 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		StopSignal:      service.StopSignal,
 		Env:             ToMobyEnv(env),
 		Healthcheck:     ToMobyHealthCheck(service.HealthCheck),
-		Volumes:         volumeMounts,
 		StopTimeout:     ToSeconds(service.StopGracePeriod),
 	}
 
@@ -731,30 +730,32 @@ func getDependentServiceFromMode(mode string) string {
 	return ""
 }
 
-func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Project, service types.ServiceConfig,
-	inherit *moby.Container) (map[string]struct{}, []string, []mount.Mount, error) {
-	var mounts = []mount.Mount{}
+func (s *composeService) buildContainerVolumes(
+	ctx context.Context,
+	p types.Project,
+	service types.ServiceConfig,
+	inherit *moby.Container,
+) ([]string, []mount.Mount, error) {
+	var mounts []mount.Mount
+	var binds []string
 
 	image := api.GetImageNameOrDefault(service, p.Name)
 	imgInspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, image)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	mountOptions, err := buildContainerMountOptions(p, service, imgInspect, inherit)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	volumeMounts := map[string]struct{}{}
-	binds := []string{}
 MOUNTS:
 	for _, m := range mountOptions {
 		if m.Type == mount.TypeNamedPipe {
 			mounts = append(mounts, m)
 			continue
 		}
-		volumeMounts[m.Target] = struct{}{}
 		if m.Type == mount.TypeBind {
 			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
@@ -774,7 +775,7 @@ MOUNTS:
 		}
 		mounts = append(mounts, m)
 	}
-	return volumeMounts, binds, mounts, nil
+	return binds, mounts, nil
 }
 
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
