@@ -94,4 +94,18 @@ func TestPs(t *testing.T) {
 		}
 		assert.Equal(t, 2, count, "Did not match both services:\n"+res.Combined())
 	})
+
+	t.Run("ps --all", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "stop")
+		assert.NoError(t, res.Error)
+
+		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
+		lines := strings.Split(res.Stdout(), "\n")
+		assert.Equal(t, 2, len(lines))
+
+		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "--all")
+		lines = strings.Split(res.Stdout(), "\n")
+		assert.Equal(t, 4, len(lines))
+	})
+
 }

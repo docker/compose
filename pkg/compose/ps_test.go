@@ -46,7 +46,7 @@ func TestPs(t *testing.T) {
 	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
 	args.Add("label", "com.docker.compose.oneoff=False")
-	listOpts := moby.ContainerListOptions{Filters: args, All: true}
+	listOpts := moby.ContainerListOptions{Filters: args, All: false}
 	c1, inspect1 := containerDetails("service1", "123", "running", "healthy", 0)
 	c2, inspect2 := containerDetails("service1", "456", "running", "", 0)
 	c2.Ports = []moby.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
