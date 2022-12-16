@@ -32,7 +32,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 	if options.All {
 		oneOff = oneOffInclude
 	}
-	containers, err := s.getContainers(ctx, projectName, oneOff, true, options.Services...)
+	containers, err := s.getContainers(ctx, projectName, oneOff, options.All, options.Services...)
 	if err != nil {
 		return nil, err
 	}
