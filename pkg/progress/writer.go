@@ -66,16 +66,30 @@ func Run(ctx context.Context, pf progressFunc) error {
 // RunWithStatus will run a writer and the progress function in parallel and return a status
 func RunWithStatus(ctx context.Context, pf progressFuncWithStatus) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
-	w, err := NewWriter(os.Stderr)
-	var result string
-	if err != nil {
-		return "", err
+
+	var (
+		w      Writer
+		result string
+	)
+
+	if ctx.Value(writerKey{}) != nil {
+		if _w, ok := ctx.Value(writerKey{}).(Writer); ok {
+			w = _w
+		}
 	}
+
+	if w == nil {
+		_w, err := NewWriter(os.Stderr)
+		if err != nil {
+			return "", err
+		}
+		w = _w
+		ctx = WithContextWriter(ctx, w)
+	}
+
 	eg.Go(func() error {
 		return w.Start(context.Background())
 	})
-
-	ctx = WithContextWriter(ctx, w)
 
 	eg.Go(func() error {
 		defer w.Stop()
@@ -86,7 +100,7 @@ func RunWithStatus(ctx context.Context, pf progressFuncWithStatus) (string, erro
 		return err
 	})
 
-	err = eg.Wait()
+	err := eg.Wait()
 	return result, err
 }
 

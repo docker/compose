@@ -18,6 +18,8 @@ package progress
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -28,4 +30,58 @@ func TestNoopWriter(t *testing.T) {
 	writer := ContextWriter(todo)
 
 	assert.Equal(t, writer, &noopWriter{})
+}
+
+func TestRunWithStatusWithoutCustomContextWriter(t *testing.T) {
+	r, w, err := os.Pipe()
+	assert.NilError(t, err)
+
+	os.Stderr = w // mock Stderr for default writer just for testing purpose
+
+	result := make(chan string)
+	go func() {
+		buf := make([]byte, 256)
+		n, _ := r.Read(buf)
+		result <- string(buf[:n])
+	}()
+
+	// run without any custom writer, so it will use the default writer
+	_, err = RunWithStatus(context.TODO(), func(ctx context.Context) (string, error) {
+		ContextWriter(ctx).Event(Event{Text: "pass"})
+		return "test", nil
+	})
+
+	assert.NilError(t, err)
+
+	actual := <-result
+	assert.Equal(t, strings.TrimSpace(actual), "pass")
+}
+
+func TestRunWithStatusrWithCustomContextWriter(t *testing.T) {
+	r, w, err := os.Pipe()
+	assert.NilError(t, err)
+
+	writer, err := NewWriter(w) // custom writer
+	assert.NilError(t, err)
+
+	result := make(chan string)
+	go func() {
+		buf := make([]byte, 256)
+		n, _ := r.Read(buf)
+		result <- string(buf[:n])
+	}()
+
+	// attach the custom writer to the context
+	ctx := WithContextWriter(context.TODO(), writer)
+
+	// run with the custom writer
+	_, err = RunWithStatus(ctx, func(ctx context.Context) (string, error) {
+		ContextWriter(ctx).Event(Event{Text: "pass"})
+		return "test", nil
+	})
+
+	assert.NilError(t, err)
+
+	actual := <-result
+	assert.Equal(t, strings.TrimSpace(actual), "pass")
 }
