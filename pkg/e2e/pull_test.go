@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 )
 
 func TestComposePull(t *testing.T) {
@@ -78,4 +79,15 @@ func TestComposePull(t *testing.T) {
 
 		assert.Assert(t, strings.Contains(output, "Skipped - No image to be pulled"))
 	})
+
+	t.Run("Verify pull failure", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/compose-pull/unknown-image", "pull")
+		res.Assert(t, icmd.Expected{ExitCode: 18, Err: "pull access denied for does_not_exists"})
+	})
+
+	t.Run("Verify ignore pull failure", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/unknown-image", "pull", "--ignore-pull-failures")
+		res.Assert(t, icmd.Expected{Err: "Some service image(s) must be built from source by running:"})
+	})
+
 }
