@@ -1,0 +1,10 @@
+services:
+  web:
+    image: nginx:alpine
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: alpine
+    command: sh -c "exit 1"
+
