@@ -31,6 +31,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -277,7 +278,7 @@ func containerEvents(containers Containers, eventFunc func(string) progress.Even
 	return events
 }
 
-// ServiceConditionRunningOrHealthy is a service condition on statys running or healthy
+// ServiceConditionRunningOrHealthy is a service condition on status running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig) error {
@@ -315,7 +316,8 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 				case types.ServiceConditionHealthy:
 					healthy, err := s.isServiceHealthy(ctx, project, dep, false)
 					if err != nil {
-						return err
+						w.Events(containerEvents(containers, progress.ErrorEvent))
+						return errors.Wrap(err, "dependency failed to start")
 					}
 					if healthy {
 						w.Events(containerEvents(containers, progress.Healthy))
@@ -644,7 +646,7 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 }
 
 func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Project, service string, fallbackRunning bool) (bool, error) {
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, service)
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, service)
 	if err != nil {
 		return false, err
 	}
@@ -660,6 +662,10 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 		if container.Config.Healthcheck == nil && fallbackRunning {
 			// Container does not define a health check, but we can fall back to "running" state
 			return container.State != nil && container.State.Status == "running", nil
+		}
+
+		if container.State.Status == "exited" {
+			return false, fmt.Errorf("container for service %q exited (%d)", service, container.State.ExitCode)
 		}
 
 		if container.State == nil || container.State.Health == nil {

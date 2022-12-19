@@ -123,3 +123,18 @@ func TestUpWithBuildDependencies(t *testing.T) {
 		res.Assert(t, icmd.Success)
 	})
 }
+
+func TestUpWithDependencyExit(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Run("up with dependency to exit before being healthy", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/dependencies",
+			"-f", "fixtures/dependencies/dependency-exit.yaml", "up", "-d")
+
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "--project-name", "dependencies", "down")
+		})
+
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container for service \"db\" exited (1)"})
+	})
+}
