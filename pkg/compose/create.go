@@ -529,7 +529,8 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		CPURealtimePeriod:  s.CPURTPeriod,
 		CPURealtimeRuntime: s.CPURTRuntime,
 		CPUShares:          s.CPUShares,
-		CPUPercent:         int64(s.CPUS * 100),
+		NanoCPUs:           int64(s.CPUS * 1e9),
+		CPUPercent:         int64(s.CPUPercent * 100),
 		CpusetCpus:         s.CPUSet,
 		DeviceCgroupRules:  s.DeviceCgroupRules,
 	}
