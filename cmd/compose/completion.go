@@ -32,9 +32,9 @@ func noCompletion() validArgsFn {
 	}
 }
 
-func completeServiceNames(p *projectOptions) validArgsFn {
+func completeServiceNames(p *ProjectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		project, err := p.toProject(nil)
+		project, err := p.ToProject(nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

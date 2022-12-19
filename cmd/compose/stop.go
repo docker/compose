@@ -26,14 +26,14 @@ import (
 )
 
 type stopOptions struct {
-	*projectOptions
+	*ProjectOptions
 	timeChanged bool
 	timeout     int
 }
 
-func stopCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func stopCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := stopOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "stop [OPTIONS] [SERVICE...]",

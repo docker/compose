@@ -27,7 +27,7 @@ import (
 )
 
 type logsOptions struct {
-	*projectOptions
+	*ProjectOptions
 	composeOptions
 	follow     bool
 	tail       string
@@ -38,9 +38,9 @@ type logsOptions struct {
 	timestamps bool
 }
 
-func logsCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func logsCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := logsOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	logsCmd := &cobra.Command{
 		Use:   "logs [OPTIONS] [SERVICE...]",

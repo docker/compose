@@ -43,7 +43,7 @@ type createOptions struct {
 	quietPull     bool
 }
 
-func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func createCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := createOptions{}
 	cmd := &cobra.Command{
 		Use:   "create [OPTIONS] [SERVICE...]",

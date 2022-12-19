@@ -26,13 +26,13 @@ import (
 )
 
 type restartOptions struct {
-	*projectOptions
+	*ProjectOptions
 	timeout int
 }
 
-func restartCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func restartCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := restartOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	restartCmd := &cobra.Command{
 		Use:   "restart [OPTIONS] [SERVICE...]",

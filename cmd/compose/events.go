@@ -31,10 +31,10 @@ type eventsOpts struct {
 	json bool
 }
 
-func eventsCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func eventsCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := eventsOpts{
 		composeOptions: &composeOptions{
-			projectOptions: p,
+			ProjectOptions: p,
 		},
 	}
 	cmd := &cobra.Command{

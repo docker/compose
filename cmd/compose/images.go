@@ -34,14 +34,14 @@ import (
 )
 
 type imageOptions struct {
-	*projectOptions
+	*ProjectOptions
 	Quiet  bool
 	Format string
 }
 
-func imagesCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func imagesCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := imageOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	imgCmd := &cobra.Command{
 		Use:   "images [OPTIONS] [SERVICE...]",

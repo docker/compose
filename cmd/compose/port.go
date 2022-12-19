@@ -28,15 +28,15 @@ import (
 )
 
 type portOptions struct {
-	*projectOptions
+	*ProjectOptions
 	port     uint16
 	protocol string
 	index    int
 }
 
-func portCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func portCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := portOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "port [OPTIONS] SERVICE PRIVATE_PORT",

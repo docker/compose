@@ -30,7 +30,7 @@ import (
 )
 
 type pullOptions struct {
-	*projectOptions
+	*ProjectOptions
 	composeOptions
 	quiet              bool
 	parallel           bool
@@ -39,9 +39,9 @@ type pullOptions struct {
 	ignorePullFailures bool
 }
 
-func pullCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := pullOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "pull [OPTIONS] [SERVICE...]",
@@ -84,7 +84,7 @@ func withSelectedServicesOnly(project *types.Project, services []string) error {
 }
 
 func runPull(ctx context.Context, backend api.Service, opts pullOptions, services []string) error {
-	project, err := opts.toProject(services)
+	project, err := opts.ToProject(services)
 	if err != nil {
 		return err
 	}

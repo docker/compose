@@ -24,15 +24,15 @@ import (
 )
 
 type removeOptions struct {
-	*projectOptions
+	*ProjectOptions
 	force   bool
 	stop    bool
 	volumes bool
 }
 
-func removeCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func removeCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := removeOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "rm [OPTIONS] [SERVICE...]",
