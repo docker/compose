@@ -108,10 +108,10 @@ func (opts runOptions) apply(project *types.Project) error {
 	return nil
 }
 
-func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := runOptions{
 		composeOptions: &composeOptions{
-			projectOptions: p,
+			ProjectOptions: p,
 		},
 	}
 	createOpts := createOptions{}
@@ -137,7 +137,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			project, err := p.toProject([]string{opts.Service}, cgo.WithResolvedPaths(true))
+			project, err := p.ToProject([]string{opts.Service}, cgo.WithResolvedPaths(true))
 			if err != nil {
 				return err
 			}

@@ -31,7 +31,7 @@ import (
 )
 
 type downOptions struct {
-	*projectOptions
+	*ProjectOptions
 	removeOrphans bool
 	timeChanged   bool
 	timeout       int
@@ -39,9 +39,9 @@ type downOptions struct {
 	images        string
 }
 
-func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func downCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := downOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	downCmd := &cobra.Command{
 		Use:   "down [OPTIONS]",

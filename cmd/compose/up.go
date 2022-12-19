@@ -34,7 +34,7 @@ import (
 
 // composeOptions hold options common to `up` and `run` to run compose project
 type composeOptions struct {
-	*projectOptions
+	*ProjectOptions
 }
 
 type upOptions struct {
@@ -87,7 +87,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 	return nil
 }
 
-func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	upCmd := &cobra.Command{

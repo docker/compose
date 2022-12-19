@@ -34,7 +34,7 @@ import (
 )
 
 type buildOptions struct {
-	*projectOptions
+	*ProjectOptions
 	composeOptions
 	quiet    bool
 	pull     bool
@@ -73,9 +73,9 @@ var printerModes = []string{
 	buildx.PrinterModeQuiet,
 }
 
-func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := buildOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "build [OPTIONS] [SERVICE...]",
@@ -129,7 +129,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runBuild(ctx context.Context, backend api.Service, opts buildOptions, services []string) error {
-	project, err := opts.toProject(services, cli.WithResolvedPaths(true))
+	project, err := opts.ToProject(services, cli.WithResolvedPaths(true))
 	if err != nil {
 		return err
 	}

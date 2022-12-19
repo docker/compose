@@ -71,7 +71,7 @@ func TestPsTable(t *testing.T) {
 			}, nil
 		}).AnyTimes()
 
-	opts := psOptions{projectOptions: &projectOptions{ProjectName: "test"}}
+	opts := psOptions{ProjectOptions: &ProjectOptions{ProjectName: "test"}}
 	err = runPs(ctx, backend, nil, opts)
 	assert.NoError(t, err)
 

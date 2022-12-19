@@ -27,14 +27,14 @@ import (
 )
 
 type killOptions struct {
-	*projectOptions
+	*ProjectOptions
 	removeOrphans bool
 	signal        string
 }
 
-func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func killCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := killOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "kill [OPTIONS] [SERVICE...]",
@@ -65,5 +65,4 @@ func runKill(ctx context.Context, backend api.Service, opts killOptions, service
 		Services:      services,
 		Signal:        opts.signal,
 	})
-
 }

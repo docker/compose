@@ -31,12 +31,12 @@ import (
 )
 
 type topOptions struct {
-	*projectOptions
+	*ProjectOptions
 }
 
-func topCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func topCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := topOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	topCmd := &cobra.Command{
 		Use:   "top [SERVICES...]",

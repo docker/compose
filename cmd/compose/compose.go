@@ -91,7 +91,7 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 	})
 }
 
-type projectOptions struct {
+type ProjectOptions struct {
 	ProjectName   string
 	Profiles      []string
 	ConfigPaths   []string
@@ -108,16 +108,16 @@ type ProjectFunc func(ctx context.Context, project *types.Project) error
 type ProjectServicesFunc func(ctx context.Context, project *types.Project, services []string) error
 
 // WithProject creates a cobra run command from a ProjectFunc based on configured project options and selected services
-func (o *projectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, args []string) error {
+func (o *ProjectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, args []string) error {
 	return o.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
 		return fn(ctx, project)
 	})
 }
 
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
-func (o *projectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
+func (o *ProjectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
 	return Adapt(func(ctx context.Context, args []string) error {
-		project, err := o.toProject(args, cli.WithResolvedPaths(true))
+		project, err := o.ToProject(args, cli.WithResolvedPaths(true))
 		if err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func (o *projectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Co
 	})
 }
 
-func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
+func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
@@ -137,11 +137,11 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	_ = f.MarkHidden("workdir")
 }
 
-func (o *projectOptions) projectOrName(services ...string) (*types.Project, string, error) {
+func (o *ProjectOptions) projectOrName(services ...string) (*types.Project, string, error) {
 	name := o.ProjectName
 	var project *types.Project
 	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
-		p, err := o.toProject(services)
+		p, err := o.ToProject(services)
 		if err != nil {
 			envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
 			if envProjectName != "" {
@@ -155,7 +155,7 @@ func (o *projectOptions) projectOrName(services ...string) (*types.Project, stri
 	return project, name, nil
 }
 
-func (o *projectOptions) toProjectName() (string, error) {
+func (o *ProjectOptions) toProjectName() (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil
 	}
@@ -165,14 +165,14 @@ func (o *projectOptions) toProjectName() (string, error) {
 		return envProjectName, nil
 	}
 
-	project, err := o.toProject(nil)
+	project, err := o.ToProject(nil)
 	if err != nil {
 		return "", err
 	}
 	return project.Name, nil
 }
 
-func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
 		return nil, compose.WrapComposeError(err)
@@ -222,7 +222,7 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 	return project, err
 }
 
-func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
+func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
@@ -254,7 +254,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		"commandConn.CloseRead:",
 	))
 
-	opts := projectOptions{}
+	opts := ProjectOptions{}
 	var (
 		ansi     string
 		noAnsi   bool
@@ -383,7 +383,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 	return c
 }
 
-func setEnvWithDotEnv(prjOpts *projectOptions) error {
+func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
 	options, err := prjOpts.toProjectOptions()
 	if err != nil {
 		return compose.WrapComposeError(err)

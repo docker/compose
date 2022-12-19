@@ -24,12 +24,12 @@ import (
 )
 
 type startOptions struct {
-	*projectOptions
+	*ProjectOptions
 }
 
-func startCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func startCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := startOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	startCmd := &cobra.Command{
 		Use:   "start [SERVICE...]",

@@ -39,7 +39,7 @@ import (
 )
 
 type psOptions struct {
-	*projectOptions
+	*ProjectOptions
 	Format   string
 	All      bool
 	Quiet    bool
@@ -67,9 +67,9 @@ func (p *psOptions) parseFilter() error {
 	return nil
 }
 
-func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func psCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := psOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	psCmd := &cobra.Command{
 		Use:   "ps [OPTIONS] [SERVICE...]",

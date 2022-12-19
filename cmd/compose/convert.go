@@ -35,7 +35,7 @@ import (
 )
 
 type convertOptions struct {
-	*projectOptions
+	*ProjectOptions
 	Format              string
 	Output              string
 	quiet               bool
@@ -50,9 +50,9 @@ type convertOptions struct {
 	noConsistency       bool
 }
 
-func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func convertCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := convertOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Aliases: []string{"config"},
@@ -112,13 +112,12 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 
 func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
 	var content []byte
-	project, err := opts.toProject(services,
+	project, err := opts.ToProject(services,
 		cli.WithInterpolation(!opts.noInterpolate),
 		cli.WithResolvedPaths(true),
 		cli.WithNormalization(!opts.noNormalize),
 		cli.WithConsistency(!opts.noConsistency),
 		cli.WithDiscardEnvFile)
-
 	if err != nil {
 		return err
 	}
@@ -153,7 +152,7 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 }
 
 func runServices(opts convertOptions) error {
-	project, err := opts.toProject(nil)
+	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
 	}
@@ -164,7 +163,7 @@ func runServices(opts convertOptions) error {
 }
 
 func runVolumes(opts convertOptions) error {
-	project, err := opts.toProject(nil)
+	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
 	}
@@ -179,7 +178,7 @@ func runHash(opts convertOptions) error {
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
 	}
-	project, err := opts.toProject(services)
+	project, err := opts.ToProject(services)
 	if err != nil {
 		return err
 	}
@@ -195,7 +194,7 @@ func runHash(opts convertOptions) error {
 
 func runProfiles(opts convertOptions, services []string) error {
 	set := map[string]struct{}{}
-	project, err := opts.toProject(services)
+	project, err := opts.ToProject(services)
 	if err != nil {
 		return err
 	}
@@ -216,7 +215,7 @@ func runProfiles(opts convertOptions, services []string) error {
 }
 
 func runConfigImages(opts convertOptions, services []string) error {
-	project, err := opts.toProject(services)
+	project, err := opts.ToProject(services)
 	if err != nil {
 		return err
 	}

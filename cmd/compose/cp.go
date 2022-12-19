@@ -27,7 +27,7 @@ import (
 )
 
 type copyOptions struct {
-	*projectOptions
+	*ProjectOptions
 
 	source      string
 	destination string
@@ -37,9 +37,9 @@ type copyOptions struct {
 	copyUIDGID  bool
 }
 
-func copyCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func copyCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := copyOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	copyCmd := &cobra.Command{
 		Use: `cp [OPTIONS] SERVICE:SRC_PATH DEST_PATH|-

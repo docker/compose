@@ -25,12 +25,12 @@ import (
 )
 
 type pauseOptions struct {
-	*projectOptions
+	*ProjectOptions
 }
 
-func pauseCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func pauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := pauseOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "pause [SERVICE...]",
@@ -56,12 +56,12 @@ func runPause(ctx context.Context, backend api.Service, opts pauseOptions, servi
 }
 
 type unpauseOptions struct {
-	*projectOptions
+	*ProjectOptions
 }
 
-func unpauseCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func unpauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := unpauseOptions{
-		projectOptions: p,
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "unpause [SERVICE...]",
