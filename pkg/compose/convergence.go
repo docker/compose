@@ -479,10 +479,14 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	if err != nil {
 		return created, err
 	}
+	platform := service.Platform
+	if platform == "" {
+		platform = project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	}
 	var plat *specs.Platform
-	if service.Platform != "" {
+	if platform != "" {
 		var p specs.Platform
-		p, err = platforms.Parse(service.Platform)
+		p, err = platforms.Parse(platform)
 		if err != nil {
 			return created, err
 		}
