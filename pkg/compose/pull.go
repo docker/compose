@@ -47,7 +47,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 	})
 }
 
-func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
+func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
 	info, err := s.apiClient().Info(ctx)
 	if err != nil {
 		return err
@@ -117,12 +117,12 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[i] = err
-				if !opts.IgnoreFailures {
-					if service.Build != nil {
-						mustBuild = append(mustBuild, service.Name)
-					} else {
-						return err // fail fast if image can't be pulled nor built
-					}
+				if service.Build != nil {
+					mustBuild = append(mustBuild, service.Name)
+				}
+				if !opts.IgnoreFailures && service.Build == nil {
+					// fail fast if image can't be pulled nor built
+					return err
 				}
 			}
 			return nil
@@ -131,14 +131,16 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 	err = eg.Wait()
 
-	if !opts.IgnoreFailures && len(mustBuild) > 0 {
+	if len(mustBuild) > 0 {
 		w.TailMsgf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(mustBuild, " "))
 	}
 
 	if err != nil {
 		return err
 	}
-
+	if opts.IgnoreFailures {
+		return nil
+	}
 	return multierror.Append(nil, pullErrors...).ErrorOrNil()
 }
 

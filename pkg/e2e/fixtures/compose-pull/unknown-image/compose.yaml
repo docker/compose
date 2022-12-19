@@ -1,0 +1,9 @@
+services:
+  fail:
+    image: does_not_exists
+  can_build:
+    image: doesn_t_exists_either
+    build: .
+  valid:
+    image: alpine:3.15
+
