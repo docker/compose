@@ -10,7 +10,7 @@ require (
 	github.com/containerd/containerd v1.6.14
 	github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf
 	github.com/docker/buildx v0.9.1 // when updating, also update the replace rules accordingly
-	github.com/docker/cli v20.10.20+incompatible // replaced; see replace rule for actual version
+	github.com/docker/cli v23.0.0-beta.1.0.20221209132446-990674901b4f+incompatible // replaced; see replace rule for actual version
 	github.com/docker/cli-docs-tool v0.5.0
 	github.com/docker/docker v20.10.20+incompatible // replaced; see replace rule for actual version
 	github.com/docker/go-connections v0.4.0
@@ -156,8 +156,8 @@ replace (
 	// Override for e2e tests
 	github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220922095256-4c4b17abdae7
 
-	github.com/docker/cli => github.com/docker/cli v20.10.3-0.20221013132413-1d6c6e2367e2+incompatible // 22.06 master branch
-	github.com/docker/docker => github.com/docker/docker v20.10.3-0.20221021173910-5aac513617f0+incompatible // 22.06 branch
+	github.com/docker/cli => github.com/docker/cli v23.0.0-beta.1.0.20221209132446-990674901b4f+incompatible // 23.x master branch
+	github.com/docker/docker => github.com/docker/docker v23.0.0-beta.1+incompatible // 23.x master branch
 	github.com/moby/buildkit => github.com/moby/buildkit v0.10.1-0.20220816171719-55ba9d14360a // same as buildx
 
 	// For k8s dependencies, we use a replace directive, to prevent them being
