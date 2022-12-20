@@ -17,25 +17,27 @@
 package compose
 
 import (
-	"encoding/json"
+	"testing"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/opencontainers/go-digest"
+	"gotest.tools/v3/assert"
 )
 
-// ServiceHash computes the configuration hash for a service.
-func ServiceHash(o types.ServiceConfig) (string, error) {
-	// remove the Build config when generating the service hash
-	o.Build = nil
-	o.PullPolicy = ""
-	o.Scale = 1
-	if o.Deploy != nil {
-		var one uint64 = 1
-		o.Deploy.Replicas = &one
+func TestServiceHash(t *testing.T) {
+	hash1, err := ServiceHash(serviceConfig(1))
+	assert.NilError(t, err)
+	hash2, err := ServiceHash(serviceConfig(2))
+	assert.NilError(t, err)
+	assert.Equal(t, hash1, hash2)
+}
+
+func serviceConfig(replicas uint64) types.ServiceConfig {
+	return types.ServiceConfig{
+		Scale: int(replicas),
+		Deploy: &types.DeployConfig{
+			Replicas: &replicas,
+		},
+		Name:  "foo",
+		Image: "bar",
 	}
-	bytes, err := json.Marshal(o)
-	if err != nil {
-		return "", err
-	}
-	return digest.SHA256.FromBytes(bytes).Encoded(), nil
 }
