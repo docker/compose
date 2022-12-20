@@ -20,9 +20,12 @@ import (
 	"context"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -59,7 +62,12 @@ func (s *composeService) Logs(
 	for _, c := range containers {
 		c := c
 		eg.Go(func() error {
-			return s.logContainers(ctx, consumer, c, options)
+			err := s.logContainers(ctx, consumer, c, options)
+			if _, ok := err.(errdefs.ErrNotImplemented); ok {
+				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(c), err.Error())
+				return nil
+			}
+			return err
 		})
 	}
 
@@ -79,13 +87,24 @@ func (s *composeService) Logs(
 		}
 
 		eg.Go(func() error {
-			err := s.watchContainers(ctx, projectName, options.Services, nil, printer.HandleEvent, containers, func(c types.Container) error {
+			err := s.watchContainers(ctx, projectName, options.Services, nil, printer.HandleEvent, containers, func(c types.Container, t time.Time) error {
 				printer.HandleEvent(api.ContainerEvent{
 					Type:      api.ContainerEventAttach,
 					Container: getContainerNameWithoutProject(c),
 					Service:   c.Labels[api.ServiceLabel],
 				})
-				return s.logContainers(ctx, consumer, c, options)
+				err := s.logContainers(ctx, consumer, c, api.LogOptions{
+					Follow:     options.Follow,
+					Since:      t.Format(time.RFC3339Nano),
+					Until:      options.Until,
+					Tail:       options.Tail,
+					Timestamps: options.Timestamps,
+				})
+				if _, ok := err.(errdefs.ErrNotImplemented); ok {
+					// ignore
+					return nil
+				}
+				return err
 			})
 			printer.Stop()
 			return err

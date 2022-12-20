@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -59,9 +60,10 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 
 		eg.Go(func() error {
-			return s.watchContainers(context.Background(), project.Name, options.AttachTo, options.Services, listener, attached, func(container moby.Container) error {
-				return s.attachContainer(ctx, container, listener)
-			})
+			return s.watchContainers(context.Background(), project.Name, options.AttachTo, options.Services, listener, attached,
+				func(container moby.Container, _ time.Time) error {
+					return s.attachContainer(ctx, container, listener)
+				})
 		})
 	}
 
@@ -107,7 +109,7 @@ func getDependencyCondition(service types.ServiceConfig, project *types.Project)
 	return ServiceConditionRunningOrHealthy
 }
 
-type containerWatchFn func(container moby.Container) error
+type containerWatchFn func(container moby.Container, t time.Time) error
 
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
 func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
@@ -167,7 +169,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				restarted := watched[container.ID]
 				watched[container.ID] = restarted + 1
 				// Container terminated.
-				willRestart := willContainerRestart(inspected, restarted)
+				willRestart := inspected.State.Restarting
 
 				listener(api.ContainerEvent{
 					Type:       api.ContainerEventExit,
@@ -193,7 +195,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				}
 				if mustAttach {
 					// Container restarted, need to re-attach
-					err := onStart(container)
+					err := onStart(container, event.Timestamp)
 					if err != nil {
 						return err
 					}
@@ -209,15 +211,4 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 		return nil
 	}
 	return err
-}
-
-func willContainerRestart(container moby.ContainerJSON, restarted int) bool {
-	policy := container.HostConfig.RestartPolicy
-	if policy.IsAlways() || policy.IsUnlessStopped() {
-		return true
-	}
-	if policy.IsOnFailure() {
-		return container.State.ExitCode != 0 && policy.MaximumRetryCount > restarted
-	}
-	return false
 }
