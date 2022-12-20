@@ -68,7 +68,7 @@ func TestLocalComposeLogsFollow(t *testing.T) {
 
 	t.Run("logs", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "--follow")
-		assert.Check(t, strings.Count(res.Combined(), "PING localhost (127.0.0.1)") == 2)
+		assert.Check(t, strings.Count(res.Combined(), "PING localhost (127.0.0.1)") == 2, res.Combined())
 	})
 
 	t.Run("down", func(t *testing.T) {
