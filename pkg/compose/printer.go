@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -26,7 +25,7 @@ import (
 // logPrinter watch application containers an collect their logs
 type logPrinter interface {
 	HandleEvent(event api.ContainerEvent)
-	Run(ctx context.Context, cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error)
+	Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error)
 	Cancel()
 	Stop()
 }
@@ -64,7 +63,7 @@ func (p *printer) HandleEvent(event api.ContainerEvent) {
 }
 
 //nolint:gocyclo
-func (p *printer) Run(ctx context.Context, cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error) {
+func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error) {
 	var (
 		aborting bool
 		exitCode int
@@ -74,8 +73,6 @@ func (p *printer) Run(ctx context.Context, cascadeStop bool, exitCodeFrom string
 		select {
 		case <-p.stopCh:
 			return exitCode, nil
-		case <-ctx.Done():
-			return exitCode, ctx.Err()
 		case event := <-p.queue:
 			container := event.Container
 			switch event.Type {
