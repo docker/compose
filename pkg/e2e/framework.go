@@ -134,8 +134,8 @@ func initializePlugins(t testing.TB, configDir string) {
 	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
 		"Failed to create cli-plugins directory")
 	composePlugin, err := findExecutable(DockerComposeExecutableName)
-	if os.IsNotExist(err) {
-		t.Logf("WARNING: docker-compose cli-plugin not found")
+	if err != nil {
+		t.Errorf("WARNING: docker-compose cli-plugin not found %s", err.Error())
 	}
 	buildxPlugin, err := findPluginExecutable(DockerBuildxExecutableName)
 	if os.IsNotExist(err) {
@@ -159,8 +159,11 @@ func dirContents(dir string) []string {
 }
 
 func findExecutable(executableName string) (string, error) {
-	_, filename, _, _ := runtime.Caller(0)
-	root := filepath.Join(filepath.Dir(filename), "..", "..")
+	filename, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	root := filepath.Join(filepath.Dir(filename), "..")
 	buildPath := filepath.Join(root, "bin", "build")
 
 	bin, err := filepath.Abs(filepath.Join(buildPath, executableName))
