@@ -103,7 +103,7 @@ func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
 	for _, opt := range opts {
 		opt(c)
 	}
-
+	t.Log(c.RunDockerComposeCmdNoCheck(t, "version").Combined())
 	return c
 }
 
