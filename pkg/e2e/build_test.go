@@ -338,6 +338,27 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 
 }
 
+func TestBuildPrivileged(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	// declare builder
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-privileged", "--use", "--bootstrap", "--buildkitd-flags",
+		`'--allow-insecure-entitlement=security.insecure'`)
+	assert.NilError(t, result.Error)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/privileged", "down")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", "build-privileged")
+	})
+
+	t.Run("use build privileged mode to run insecure build command", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/privileged", "build")
+		assert.NilError(t, res.Error, res.Stderr())
+		res.Assert(t, icmd.Expected{Out: "CapEff:\t0000003fffffffff"})
+
+	})
+}
+
 func TestBuildPlatformsStandardErrors(t *testing.T) {
 	c := NewParallelCLI(t)
 
@@ -380,4 +401,17 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 			Err:      `DOCKER_DEFAULT_PLATFORM "windows/amd64" value should be part of the service.build.platforms: ["linux/amd64" "linux/arm64"]`,
 		})
 	})
+
+	t.Run("no privileged support with Classic Builder", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/privileged", "build")
+
+		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+			cmd.Env = append(cmd.Env, "DOCKER_BUILDKIT=0")
+		})
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "this builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use builder supporting privileged mode",
+		})
+	})
+
 }

@@ -30,6 +30,7 @@ import (
 	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
+	"github.com/docker/compose/v2/pkg/utils"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/docker/docker/pkg/archive"
@@ -38,6 +39,7 @@ import (
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/hashicorp/go-multierror"
+	"github.com/moby/buildkit/util/entitlements"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -91,6 +93,9 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 
 	if len(options.Platforms) > 1 {
 		return "", errors.Errorf("this builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use multi-arch builder")
+	}
+	if utils.Contains(options.Allow, entitlements.EntitlementSecurityInsecure) {
+		return "", errors.Errorf("this builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use builder supporting privileged mode")
 	}
 
 	if options.Labels == nil {

@@ -1,0 +1,5 @@
+services:
+  privileged-service:
+    build:
+      context: .
+      privileged: true
