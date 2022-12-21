@@ -362,7 +362,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		return nil, nil, nil, err
 	}
 
-	securityOpts, err := parseSecurityOpts(p, service.SecurityOpt)
+	securityOpts, unconfined, err := parseSecurityOpts(p, service.SecurityOpt)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -401,35 +401,50 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		OomScoreAdj:    int(service.OomScoreAdj),
 	}
 
+	if unconfined {
+		hostConfig.MaskedPaths = []string{}
+		hostConfig.ReadonlyPaths = []string{}
+	}
+
 	return &containerConfig, &hostConfig, networkConfig, nil
 }
 
 // copy/pasted from https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697 + RelativePath
 // TODO find so way to share this code with docker/cli
-func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, error) {
-	for key, opt := range securityOpts {
+func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool, error) {
+	var (
+		unconfined bool
+		parsed     []string
+	)
+	for _, opt := range securityOpts {
+		if opt == "systempaths=unconfined" {
+			unconfined = true
+			continue
+		}
 		con := strings.SplitN(opt, "=", 2)
 		if len(con) == 1 && con[0] != "no-new-privileges" {
 			if strings.Contains(opt, ":") {
 				con = strings.SplitN(opt, ":", 2)
 			} else {
-				return securityOpts, errors.Errorf("Invalid security-opt: %q", opt)
+				return securityOpts, false, errors.Errorf("Invalid security-opt: %q", opt)
 			}
 		}
 		if con[0] == "seccomp" && con[1] != "unconfined" {
 			f, err := os.ReadFile(p.RelativePath(con[1]))
 			if err != nil {
-				return securityOpts, errors.Errorf("opening seccomp profile (%s) failed: %v", con[1], err)
+				return securityOpts, false, errors.Errorf("opening seccomp profile (%s) failed: %v", con[1], err)
 			}
 			b := bytes.NewBuffer(nil)
 			if err := json.Compact(b, f); err != nil {
-				return securityOpts, errors.Errorf("compacting json for seccomp profile (%s) failed: %v", con[1], err)
+				return securityOpts, false, errors.Errorf("compacting json for seccomp profile (%s) failed: %v", con[1], err)
 			}
-			securityOpts[key] = fmt.Sprintf("seccomp=%s", b.Bytes())
+			parsed = append(parsed, fmt.Sprintf("seccomp=%s", b.Bytes()))
+		} else {
+			parsed = append(parsed, opt)
 		}
 	}
 
-	return securityOpts, nil
+	return parsed, unconfined, nil
 }
 
 func (s *composeService) prepareLabels(service types.ServiceConfig, number int) (map[string]string, error) {
