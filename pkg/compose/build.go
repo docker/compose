@@ -33,6 +33,7 @@ import (
 	"github.com/moby/buildkit/session/auth/authprovider"
 	"github.com/moby/buildkit/session/secrets/secretsprovider"
 	"github.com/moby/buildkit/session/sshforward/sshprovider"
+	"github.com/moby/buildkit/util/entitlements"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -71,7 +72,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
-
 		for _, image := range service.Build.CacheFrom {
 			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
 				Type:  "registry",
@@ -258,6 +258,10 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	if len(service.Build.Tags) > 0 {
 		tags = append(tags, service.Build.Tags...)
 	}
+	var allow []entitlements.Entitlement
+	if service.Build.Privileged {
+		allow = append(allow, entitlements.EntitlementSecurityInsecure)
+	}
 
 	imageLabels := getImageBuildLabels(project, service)
 
@@ -279,6 +283,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		NetworkMode: service.Build.Network,
 		ExtraHosts:  service.Build.ExtraHosts.AsList(),
 		Session:     sessionConfig,
+		Allow:       allow,
 	}, nil
 }
 
