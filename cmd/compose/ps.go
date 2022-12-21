@@ -96,6 +96,16 @@ func runPs(ctx context.Context, streams api.Streams, backend api.Service, servic
 	if err != nil {
 		return err
 	}
+
+	if project != nil && len(services) > 0 {
+		names := project.ServiceNames()
+		for _, service := range services {
+			if !utils.StringContains(names, service) {
+				return fmt.Errorf("no such service: %s", service)
+			}
+		}
+	}
+
 	containers, err := backend.Ps(ctx, name, api.PsOptions{
 		Project:  project,
 		All:      opts.All,
@@ -103,16 +113,6 @@ func runPs(ctx context.Context, streams api.Streams, backend api.Service, servic
 	})
 	if err != nil {
 		return err
-	}
-
-SERVICES:
-	for _, s := range services {
-		for _, c := range containers {
-			if c.Service == s {
-				continue SERVICES
-			}
-		}
-		return fmt.Errorf("no such service: %s", s)
 	}
 
 	if len(opts.Status) != 0 {
