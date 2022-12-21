@@ -44,8 +44,11 @@ var (
 	// DockerComposeExecutableName is the OS dependent Docker CLI binary name
 	DockerComposeExecutableName = "docker-" + compose.PluginName
 
-	// DockerScanExecutableName is the OS dependent Docker CLI binary name
+	// DockerScanExecutableName is the OS dependent Docker Scan plugin binary name
 	DockerScanExecutableName = "docker-scan"
+
+	// DockerBuildxExecutableName is the Os dependent Buildx plugin binary name
+	DockerBuildxExecutableName = "docker-buildx"
 
 	// WindowsExecutableSuffix is the Windows executable suffix
 	WindowsExecutableSuffix = ".exe"
@@ -56,6 +59,7 @@ func init() {
 		DockerExecutableName += WindowsExecutableSuffix
 		DockerComposeExecutableName += WindowsExecutableSuffix
 		DockerScanExecutableName += WindowsExecutableSuffix
+		DockerBuildxExecutableName += WindowsExecutableSuffix
 	}
 }
 
@@ -133,8 +137,13 @@ func initializePlugins(t testing.TB, configDir string) {
 	if os.IsNotExist(err) {
 		t.Logf("WARNING: docker-compose cli-plugin not found")
 	}
+	buildxPlugin, err := findPluginExecutable(DockerBuildxExecutableName)
+	if os.IsNotExist(err) {
+		t.Logf("WARNING: docker-buildx cli-plugin not found")
+	}
 	if err == nil {
 		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerComposeExecutableName))
+		CopyFile(t, buildxPlugin, filepath.Join(configDir, "cli-plugins", DockerBuildxExecutableName))
 		// We don't need a functional scan plugin, but a valid plugin binary
 		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerScanExecutableName))
 	}
@@ -164,6 +173,22 @@ func findExecutable(executableName string) (string, error) {
 	}
 
 	return "", errors.Wrap(os.ErrNotExist, "executable not found")
+}
+
+func findPluginExecutable(pluginExecutableName string) (string, error) {
+	dockerUserDir := ".docker/cli-plugins"
+	userDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	bin, err := filepath.Abs(filepath.Join(userDir, dockerUserDir, pluginExecutableName))
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(bin); err == nil {
+		return bin, nil
+	}
+	return "", errors.Wrap(os.ErrNotExist, fmt.Sprintf("plugin not found %s", pluginExecutableName))
 }
 
 // CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
