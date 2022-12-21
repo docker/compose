@@ -56,22 +56,3 @@ func TestLocalComposeLogs(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
 }
-
-func TestLocalComposeLogsFollow(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "compose-e2e-logs-restart"
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/logs-test/restart.yaml", "--project-name", projectName, "up", "-d")
-	})
-
-	t.Run("logs", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "--follow")
-		assert.Check(t, strings.Count(res.Combined(), "PING localhost (127.0.0.1)") == 2, res.Combined())
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-}
