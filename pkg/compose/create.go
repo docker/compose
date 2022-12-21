@@ -301,35 +301,9 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	}
 
 	var networkConfig *network.NetworkingConfig
-
 	for _, id := range service.NetworksByPriority() {
-		net := p.Networks[id]
-		config := service.Networks[id]
-		var ipam *network.EndpointIPAMConfig
-		var (
-			ipv4Address string
-			ipv6Address string
-		)
-		if config != nil {
-			ipv4Address = config.Ipv4Address
-			ipv6Address = config.Ipv6Address
-			ipam = &network.EndpointIPAMConfig{
-				IPv4Address:  ipv4Address,
-				IPv6Address:  ipv6Address,
-				LinkLocalIPs: config.LinkLocalIPs,
-			}
-		}
-		networkConfig = &network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				net.Name: {
-					Aliases:     getAliases(service, config),
-					IPAddress:   ipv4Address,
-					IPv6Gateway: ipv6Address,
-					IPAMConfig:  ipam,
-				},
-			},
-		}
-		break //nolint:staticcheck
+		networkConfig = s.createNetworkConfig(p, service, id)
+		break
 	}
 
 	tmpfs := map[string]string{}
@@ -407,6 +381,35 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	}
 
 	return &containerConfig, &hostConfig, networkConfig, nil
+}
+
+func (s *composeService) createNetworkConfig(p *types.Project, service types.ServiceConfig, networkID string) *network.NetworkingConfig {
+	net := p.Networks[networkID]
+	config := service.Networks[networkID]
+	var ipam *network.EndpointIPAMConfig
+	var (
+		ipv4Address string
+		ipv6Address string
+	)
+	if config != nil {
+		ipv4Address = config.Ipv4Address
+		ipv6Address = config.Ipv6Address
+		ipam = &network.EndpointIPAMConfig{
+			IPv4Address:  ipv4Address,
+			IPv6Address:  ipv6Address,
+			LinkLocalIPs: config.LinkLocalIPs,
+		}
+	}
+	return &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			net.Name: {
+				Aliases:     getAliases(service, config),
+				IPAddress:   ipv4Address,
+				IPv6Gateway: ipv6Address,
+				IPAMConfig:  ipam,
+			},
+		},
+	}
 }
 
 // copy/pasted from https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697 + RelativePath
