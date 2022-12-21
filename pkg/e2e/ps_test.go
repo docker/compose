@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/icmd"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -108,4 +109,14 @@ func TestPs(t *testing.T) {
 		assert.Equal(t, 4, len(lines))
 	})
 
+	t.Run("ps unknown", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "stop")
+		assert.NoError(t, res.Error)
+
+		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "nginx")
+		res.Assert(t, icmd.Success)
+
+		res = c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "unknown")
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "no such service: unknown"})
+	})
 }
