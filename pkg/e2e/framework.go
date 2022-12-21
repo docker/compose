@@ -133,17 +133,19 @@ func initializePlugins(t testing.TB, configDir string) {
 
 	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
 		"Failed to create cli-plugins directory")
-	composePlugin, err := findExecutable(DockerComposeExecutableName)
+	composePlugin, err := findExecutable(t, DockerComposeExecutableName)
 	if err != nil {
 		t.Errorf("WARNING: docker-compose cli-plugin not found %s", err.Error())
 	}
-	buildxPlugin, err := findPluginExecutable(DockerBuildxExecutableName)
-	if os.IsNotExist(err) {
-		t.Logf("WARNING: docker-buildx cli-plugin not found")
-	}
+
 	if err == nil {
 		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerComposeExecutableName))
-		CopyFile(t, buildxPlugin, filepath.Join(configDir, "cli-plugins", DockerBuildxExecutableName))
+		buildxPlugin, err := findPluginExecutable(DockerBuildxExecutableName)
+		if err != nil {
+			t.Logf("WARNING: docker-buildx cli-plugin not found, using default buildx installation.")
+		} else {
+			CopyFile(t, buildxPlugin, filepath.Join(configDir, "cli-plugins", DockerBuildxExecutableName))
+		}
 		// We don't need a functional scan plugin, but a valid plugin binary
 		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerScanExecutableName))
 	}
@@ -158,19 +160,24 @@ func dirContents(dir string) []string {
 	return res
 }
 
-func findExecutable(executableName string) (string, error) {
+func findExecutable(t testing.TB, executableName string) (string, error) {
 	filename, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
+	t.Logf("Current dir %s", filename)
 	root := filepath.Join(filepath.Dir(filename), "..")
+	t.Logf("Root dir %s", root)
+
 	buildPath := filepath.Join(root, "bin", "build")
 
 	bin, err := filepath.Abs(filepath.Join(buildPath, executableName))
 	if err != nil {
+		t.Errorf("Error finding compose binary %s", err.Error())
 		return "", err
 	}
 
+	t.Logf("binary path %s", bin)
 	if _, err := os.Stat(bin); err == nil {
 		return bin, nil
 	}
@@ -197,19 +204,28 @@ func findPluginExecutable(pluginExecutableName string) (string, error) {
 // CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
 func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
 	t.Helper()
+	t.Logf("copy %s to %s", sourceFile, destinationFile)
 
 	src, err := os.Open(sourceFile)
 	require.NoError(t, err, "Failed to open source file: %s")
 	//nolint:errcheck
 	defer src.Close()
+	t.Logf("Source file opened %s ", src.Name())
 
 	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755)
 	require.NoError(t, err, "Failed to open destination file: %s", destinationFile)
 	//nolint:errcheck
 	defer dst.Close()
+	t.Logf("Destination file opened %s ", dst.Name())
 
 	_, err = io.Copy(dst, src)
 	require.NoError(t, err, "Failed to copy file: %s", sourceFile)
+	t.Logf("File copied?  %s ", err)
+	fileStat, err := dst.Stat()
+	if err != nil {
+		t.Logf("Can't get file stat %s ", err)
+	}
+	t.Logf("File stat: %+v", fileStat)
 }
 
 // BaseEnvironment provides the minimal environment variables used across all
@@ -330,7 +346,7 @@ func ComposeStandalonePath(t testing.TB) string {
 	if !composeStandaloneMode {
 		require.Fail(t, "Not running in standalone mode")
 	}
-	composeBinary, err := findExecutable(DockerComposeExecutableName)
+	composeBinary, err := findExecutable(t, DockerComposeExecutableName)
 	require.NoError(t, err, "Could not find standalone Compose binary (%q)",
 		DockerComposeExecutableName)
 	return composeBinary
