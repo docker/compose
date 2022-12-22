@@ -130,8 +130,6 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    env:
-      DESTDIR: "./bin/build"
     strategy:
       fail-fast: false
       matrix:
@@ -185,7 +183,7 @@ jobs:
         if: ${{ matrix.mode == 'standalone' }}
         run: |
           rm -f /usr/local/bin/docker-compose
-          cp bin/build/docker-compose /usr/local/bin
+          cp ${{ env.DESTDIR }}/build/docker-compose /usr/local/bin
           make e2e-compose-standalone
 
   release:

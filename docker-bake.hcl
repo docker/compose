@@ -26,12 +26,9 @@ variable "DOCS_FORMATS" {
 
 # Defines the output folder
 variable "DESTDIR" {
-  default = ""
+  default = "./bin"
 }
-function "bindir" {
-  params = [defaultdir]
-  result = DESTDIR != "" ? DESTDIR : "./bin/${defaultdir}"
-}
+
 
 target "_common" {
   args = {
@@ -80,13 +77,13 @@ target "vendor-update" {
 target "test" {
   inherits = ["_common"]
   target = "test-coverage"
-  output = [bindir("coverage")]
+  output = ["${DESTDIR}/coverage"]
 }
 
 target "binary" {
   inherits = ["_common"]
   target = "binary"
-  output = [bindir("build")]
+  output = ["${DESTDIR}/build"]
   platforms = ["local"]
 }
 
@@ -110,7 +107,7 @@ target "binary-cross" {
 target "release" {
   inherits = ["binary-cross"]
   target = "release"
-  output = [bindir("release")]
+  output = ["${DESTDIR}/release"]
 }
 
 target "docs-validate" {
