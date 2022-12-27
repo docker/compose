@@ -12,4 +12,4 @@ Background:
 Scenario: compose up
     When I run "compose up -d"
     Then the output contains "simple-1  Started"
-    And service "simple" is "running"
+    And service "simple" is "Up"
