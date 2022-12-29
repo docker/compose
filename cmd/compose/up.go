@@ -93,6 +93,7 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 		Use:   "up [OPTIONS] [SERVICE...]",
 		Short: "Create and start containers",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+			create.pullChanged = cmd.Flags().Changed("pull")
 			create.timeChanged = cmd.Flags().Changed("timeout")
 			return validateFlags(&up, &create)
 		}),
