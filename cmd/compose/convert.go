@@ -17,11 +17,9 @@
 package compose
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"strings"
@@ -139,15 +137,10 @@ func runConvert(ctx context.Context, streams api.Streams, backend api.Service, o
 		return nil
 	}
 
-	var out io.Writer = streams.Out()
 	if opts.Output != "" && len(content) > 0 {
-		file, err := os.Create(opts.Output)
-		if err != nil {
-			return err
-		}
-		out = bufio.NewWriter(file)
+		return os.WriteFile(opts.Output, content, 0o666)
 	}
-	_, err = fmt.Fprint(out, string(content))
+	_, err = fmt.Fprint(streams.Out(), string(content))
 	return err
 }
 
