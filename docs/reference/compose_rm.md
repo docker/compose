@@ -10,11 +10,11 @@ Any data which is not in a volume will be lost.
 
 ### Options
 
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `-f`, `--force` |  |  | Don't ask to confirm removal |
-| `-s`, `--stop` |  |  | Stop the containers, if required, before removing |
-| `-v`, `--volumes` |  |  | Remove any anonymous volumes attached to containers |
+| Name              | Type | Default | Description                                         |
+|:------------------|:-----|:--------|:----------------------------------------------------|
+| `-f`, `--force`   |      |         | Don't ask to confirm removal                        |
+| `-s`, `--stop`    |      |         | Stop the containers, if required, before removing   |
+| `-v`, `--volumes` |      |         | Remove any anonymous volumes attached to containers |
 
 
 <!---MARKER_GEN_END-->

@@ -5,48 +5,47 @@ Docker Compose
 
 ### Subcommands
 
-| Name | Description |
-| --- | --- |
-| [`build`](compose_build.md) | Build or rebuild services |
-| [`convert`](compose_convert.md) | Converts the compose file to platform's canonical format |
-| [`cp`](compose_cp.md) | Copy files/folders between a service container and the local filesystem |
-| [`create`](compose_create.md) | Creates containers for a service. |
-| [`down`](compose_down.md) | Stop and remove containers, networks |
-| [`events`](compose_events.md) | Receive real time events from containers. |
-| [`exec`](compose_exec.md) | Execute a command in a running container. |
-| [`images`](compose_images.md) | List images used by the created containers |
-| [`kill`](compose_kill.md) | Force stop service containers. |
-| [`logs`](compose_logs.md) | View output from containers |
-| [`ls`](compose_ls.md) | List running compose projects |
-| [`pause`](compose_pause.md) | Pause services |
-| [`port`](compose_port.md) | Print the public port for a port binding. |
-| [`ps`](compose_ps.md) | List containers |
-| [`pull`](compose_pull.md) | Pull service images |
-| [`push`](compose_push.md) | Push service images |
-| [`restart`](compose_restart.md) | Restart service containers |
-| [`rm`](compose_rm.md) | Removes stopped service containers |
-| [`run`](compose_run.md) | Run a one-off command on a service. |
-| [`start`](compose_start.md) | Start services |
-| [`stop`](compose_stop.md) | Stop services |
-| [`top`](compose_top.md) | Display the running processes |
-| [`unpause`](compose_unpause.md) | Unpause services |
-| [`up`](compose_up.md) | Create and start containers |
-| [`version`](compose_version.md) | Show the Docker Compose version information |
+| Name                            | Description                                                             |
+|:--------------------------------|:------------------------------------------------------------------------|
+| [`build`](compose_build.md)     | Build or rebuild services                                               |
+| [`convert`](compose_convert.md) | Converts the compose file to platform's canonical format                |
+| [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local filesystem |
+| [`create`](compose_create.md)   | Creates containers for a service.                                       |
+| [`down`](compose_down.md)       | Stop and remove containers, networks                                    |
+| [`events`](compose_events.md)   | Receive real time events from containers.                               |
+| [`exec`](compose_exec.md)       | Execute a command in a running container.                               |
+| [`images`](compose_images.md)   | List images used by the created containers                              |
+| [`kill`](compose_kill.md)       | Force stop service containers.                                          |
+| [`logs`](compose_logs.md)       | View output from containers                                             |
+| [`ls`](compose_ls.md)           | List running compose projects                                           |
+| [`pause`](compose_pause.md)     | Pause services                                                          |
+| [`port`](compose_port.md)       | Print the public port for a port binding.                               |
+| [`ps`](compose_ps.md)           | List containers                                                         |
+| [`pull`](compose_pull.md)       | Pull service images                                                     |
+| [`push`](compose_push.md)       | Push service images                                                     |
+| [`restart`](compose_restart.md) | Restart service containers                                              |
+| [`rm`](compose_rm.md)           | Removes stopped service containers                                      |
+| [`run`](compose_run.md)         | Run a one-off command on a service.                                     |
+| [`start`](compose_start.md)     | Start services                                                          |
+| [`stop`](compose_stop.md)       | Stop services                                                           |
+| [`top`](compose_top.md)         | Display the running processes                                           |
+| [`unpause`](compose_unpause.md) | Unpause services                                                        |
+| [`up`](compose_up.md)           | Create and start containers                                             |
+| [`version`](compose_version.md) | Show the Docker Compose version information                             |
 
 
 ### Options
 
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--ansi` | `string` | `auto` | Control when to print ANSI control characters ("never"\|"always"\|"auto") |
-| `--compatibility` |  |  | Run compose in backward compatibility mode |
-| `--env-file` | `string` |  | Specify an alternate environment file. |
-| `-f`, `--file` | `stringArray` |  | Compose configuration files |
-| `--parallel` | `int` | `-1` | Control max parallelism, -1 for unlimited |
-| `--profile` | `stringArray` |  | Specify a profile to enable |
-| `--project-directory` | `string` |  | Specify an alternate working directory
-(default: the path of the, first specified, Compose file) |
-| `-p`, `--project-name` | `string` |  | Project name |
+| Name                   | Type          | Default | Description                                                                                         |
+|:-----------------------|:--------------|:--------|:----------------------------------------------------------------------------------------------------|
+| `--ansi`               | `string`      | `auto`  | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
+| `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
+| `--env-file`           | `string`      |         | Specify an alternate environment file.                                                              |
+| `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
+| `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |
+| `--profile`            | `stringArray` |         | Specify a profile to enable                                                                         |
+| `--project-directory`  | `string`      |         | Specify an alternate working directory<br>(default: the path of the, first specified, Compose file) |
+| `-p`, `--project-name` | `string`      |         | Project name                                                                                        |
 
 
 <!---MARKER_GEN_END-->
