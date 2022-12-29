@@ -11,7 +11,7 @@ require (
 	github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf
 	github.com/docker/buildx v0.9.1 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.20+incompatible // replaced; see replace rule for actual version
-	github.com/docker/cli-docs-tool v0.5.0
+	github.com/docker/cli-docs-tool v0.5.1
 	github.com/docker/docker v20.10.20+incompatible // replaced; see replace rule for actual version
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.5.0
