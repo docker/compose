@@ -5,11 +5,11 @@ Push service images
 
 ### Options
 
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--ignore-push-failures` |  |  | Push what it can and ignores images with push failures |
-| `--include-deps` |  |  | Also push images of services declared as dependencies |
-| `-q`, `--quiet` |  |  | Push without printing progress information |
+| Name                     | Type | Default | Description                                            |
+|:-------------------------|:-----|:--------|:-------------------------------------------------------|
+| `--ignore-push-failures` |      |         | Push what it can and ignores images with push failures |
+| `--include-deps`         |      |         | Also push images of services declared as dependencies  |
+| `-q`, `--quiet`          |      |         | Push without printing progress information             |
 
 
 <!---MARKER_GEN_END-->

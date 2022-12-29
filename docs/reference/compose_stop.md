@@ -5,9 +5,9 @@ Stop services
 
 ### Options
 
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `-t`, `--timeout` | `int` | `10` | Specify a shutdown timeout in seconds |
+| Name              | Type  | Default | Description                           |
+|:------------------|:------|:--------|:--------------------------------------|
+| `-t`, `--timeout` | `int` | `10`    | Specify a shutdown timeout in seconds |
 
 
 <!---MARKER_GEN_END-->
