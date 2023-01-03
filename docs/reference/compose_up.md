@@ -15,6 +15,7 @@ Create and start containers
 | `-d`, `--detach`             |               |           | Detached mode: Run containers in the background                                                          |
 | `--exit-code-from`           | `string`      |           | Return the exit code of the selected service container. Implies --abort-on-container-exit                |
 | `--force-recreate`           |               |           | Recreate containers even if their configuration and image haven't changed.                               |
+| `--no-attach`                | `stringArray` |           | Don't attach to specified service.                                                                       |
 | `--no-build`                 |               |           | Don't build an image, even if it's missing.                                                              |
 | `--no-color`                 |               |           | Produce monochrome output.                                                                               |
 | `--no-deps`                  |               |           | Don't start linked services.                                                                             |
@@ -40,6 +41,9 @@ Builds, (re)creates, starts, and attaches to containers for a service.
 Unless they are already running, this command also starts any linked services.
 
 The `docker compose up` command aggregates the output of each container (like `docker compose logs --follow` does).
+One can optionally select a subset of services to attach to using `--attach` flag, or exclude some services using 
+`--no-attach` to prevent output to be flooded by some verbose services. 
+
 When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
 background and leaves them running.
 
