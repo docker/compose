@@ -37,6 +37,7 @@ type pullOptions struct {
 	noParallel         bool
 	includeDeps        bool
 	ignorePullFailures bool
+	noBuildable        bool
 }
 
 func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
@@ -58,13 +59,14 @@ func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := cmd.Flags()
-	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information")
-	cmd.Flags().BoolVar(&opts.includeDeps, "include-deps", false, "Also pull services declared as dependencies")
+	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information.")
+	cmd.Flags().BoolVar(&opts.includeDeps, "include-deps", false, "Also pull services declared as dependencies.")
 	cmd.Flags().BoolVar(&opts.parallel, "parallel", true, "DEPRECATED pull multiple images in parallel.")
 	flags.MarkHidden("parallel") //nolint:errcheck
 	cmd.Flags().BoolVar(&opts.parallel, "no-parallel", true, "DEPRECATED disable parallel pulling.")
 	flags.MarkHidden("no-parallel") //nolint:errcheck
-	cmd.Flags().BoolVar(&opts.ignorePullFailures, "ignore-pull-failures", false, "Pull what it can and ignores images with pull failures")
+	cmd.Flags().BoolVar(&opts.ignorePullFailures, "ignore-pull-failures", false, "Pull what it can and ignores images with pull failures.")
+	cmd.Flags().BoolVar(&opts.noBuildable, "ignore-buildable", false, "Ignore images that can be built.")
 	return cmd
 }
 
@@ -97,7 +99,8 @@ func runPull(ctx context.Context, backend api.Service, opts pullOptions, service
 	}
 
 	return backend.Pull(ctx, project, api.PullOptions{
-		Quiet:          opts.quiet,
-		IgnoreFailures: opts.ignorePullFailures,
+		Quiet:           opts.quiet,
+		IgnoreFailures:  opts.ignorePullFailures,
+		IgnoreBuildable: opts.noBuildable,
 	})
 }
