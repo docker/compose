@@ -48,6 +48,7 @@ type upOptions struct {
 	noPrefix           bool
 	attachDependencies bool
 	attach             []string
+	noAttach           []string
 	timestamp          bool
 	wait               bool
 }
@@ -128,6 +129,7 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
 	flags.BoolVar(&create.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 	flags.StringArrayVar(&up.attach, "attach", []string{}, "Attach to service output.")
+	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Don't attach to specified service.")
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 
 	return upCmd
@@ -185,6 +187,7 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 	if len(attachTo) == 0 {
 		attachTo = project.ServiceNames()
 	}
+	attachTo = utils.RemoveAll(attachTo, upOptions.noAttach)
 
 	create := api.CreateOptions{
 		Services:             services,

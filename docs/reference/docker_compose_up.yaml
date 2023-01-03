@@ -6,6 +6,9 @@ long: |-
     Unless they are already running, this command also starts any linked services.
 
     The `docker compose up` command aggregates the output of each container (like `docker compose logs --follow` does).
+    One can optionally select a subset of services to attach to using `--attach` flag, or exclude some services using
+    `--no-attach` to prevent output to be flooded by some verbose services.
+
     When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
     background and leaves them running.
 
@@ -98,6 +101,16 @@ options:
       default_value: "false"
       description: |
         Recreate containers even if their configuration and image haven't changed.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-attach
+      value_type: stringArray
+      default_value: '[]'
+      description: Don't attach to specified service.
       deprecated: false
       hidden: false
       experimental: false
