@@ -72,12 +72,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
-		for _, image := range service.Build.CacheFrom {
-			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
-				Type:  "registry",
-				Attrs: map[string]string{"ref": image},
-			})
-		}
 		buildOptions.Exports = []bclient.ExportEntry{{
 			Type: "docker",
 			Attrs: map[string]string{
