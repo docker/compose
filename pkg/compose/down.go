@@ -274,7 +274,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				Force:         true,
 				RemoveVolumes: volumes,
 			})
-			if err != nil && !errdefs.IsNotFound(err) {
+			if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err
 			}
