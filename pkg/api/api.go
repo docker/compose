@@ -193,8 +193,9 @@ type PushOptions struct {
 
 // PullOptions group options of the Pull API
 type PullOptions struct {
-	Quiet          bool
-	IgnoreFailures bool
+	Quiet           bool
+	IgnoreFailures  bool
+	IgnoreBuildable bool
 }
 
 // ImagesOptions group options of the Images API

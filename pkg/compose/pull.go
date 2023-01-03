@@ -102,6 +102,15 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			}
 		}
 
+		if service.Build != nil && opts.IgnoreBuildable {
+			w.Event(progress.Event{
+				ID:     service.Name,
+				Status: progress.Done,
+				Text:   "Skipped - Image can be built",
+			})
+			continue
+		}
+
 		if s, ok := imagesBeingPulled[service.Image]; ok {
 			w.Event(progress.Event{
 				ID:     service.Name,

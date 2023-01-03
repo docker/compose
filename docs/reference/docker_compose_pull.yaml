@@ -7,10 +7,20 @@ usage: docker compose pull [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: ignore-buildable
+      value_type: bool
+      default_value: "false"
+      description: Ignore images that can be built.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: ignore-pull-failures
       value_type: bool
       default_value: "false"
-      description: Pull what it can and ignores images with pull failures
+      description: Pull what it can and ignores images with pull failures.
       deprecated: false
       hidden: false
       experimental: false
@@ -20,7 +30,7 @@ options:
     - option: include-deps
       value_type: bool
       default_value: "false"
-      description: Also pull services declared as dependencies
+      description: Also pull services declared as dependencies.
       deprecated: false
       hidden: false
       experimental: false
@@ -51,7 +61,7 @@ options:
       shorthand: q
       value_type: bool
       default_value: "false"
-      description: Pull without printing progress information
+      description: Pull without printing progress information.
       deprecated: false
       hidden: false
       experimental: false
@@ -99,6 +109,9 @@ examples: |-
        ⠹ 77a0c198cde5 Waiting                                                  9.3s
        ⠹ c8752d5b785c Waiting                                                  9.3s
     ```
+
+    `docker compose pull` will try to pull image for services with a build section. If pull fails, it will let
+    user know this service image MUST be built. You can skip this by setting `--ignore-buildable` flag
 deprecated: false
 experimental: false
 experimentalcli: false
