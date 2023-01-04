@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -323,6 +324,13 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 				if err != nil {
 					return err
 				}
+			}
+			if v, ok := os.LookupEnv("COMPOSE_PARALLEL_LIMIT"); ok && !cmd.Flags().Changed("parallel") {
+				i, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("COMPOSE_PARALLEL_LIMIT must be an integer (found: %q)", v)
+				}
+				parallel = i
 			}
 			if parallel > 0 {
 				backend.MaxConcurrency(parallel)
