@@ -138,3 +138,19 @@ func TestUpWithDependencyExit(t *testing.T) {
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container for service \"db\" exited (1)"})
 	})
 }
+
+func TestExitRemovesDependencies(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "e2e-removes-dependencies"
+
+	t.Run("up with dependency to remove dependencies on exit", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "fixtures/abort/compose.yaml", "--project-name", projectName,
+			"up", "--abort-on-container-exit", "test")
+
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "--project-name", "dependencies", "down")
+		})
+
+		res.Assert(t, icmd.Expected{Err: "Container e2e-removes-dependencies-test-1  Stopped"})
+	})
+}

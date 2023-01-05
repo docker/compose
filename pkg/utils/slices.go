@@ -29,6 +29,14 @@ func Contains[T any](origin []T, element T) bool {
 	return false
 }
 
+// Append adds element to a slice if not already present
+func Append[T any](origin []T, element T) []T {
+	if !Contains(origin, element) {
+		origin = append(origin, element)
+	}
+	return origin
+}
+
 // RemoveAll removes all elements from origin slice
 func RemoveAll[T any](origin []T, elements []T) []T {
 	var filtered []T

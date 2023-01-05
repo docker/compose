@@ -87,8 +87,9 @@ func newConvergence(services []string, state Containers, s *composeService) *con
 	}
 }
 
-func (c *convergence) apply(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	return InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+func (c *convergence) apply(ctx context.Context, project *types.Project, options api.CreateOptions) (*ConvergenceResult, error) {
+	result := newConvergenceResult()
+	return result, InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err
@@ -98,10 +99,12 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 		if utils.StringContains(options.Services, name) {
 			strategy = options.Recreate
 		}
-		err = c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
+		operations, err := c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
 		if err != nil {
 			return err
 		}
+
+		result.addAll(operations)
 
 		c.updateProject(project, name)
 		return nil
@@ -162,10 +165,11 @@ func updateServices(service *types.ServiceConfig, cnts Containers) {
 	}
 }
 
-func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error {
+func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) (*ConvergenceResult, error) {
+	operations := newConvergenceResult()
 	expected, err := getScale(service)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	containers := c.getObservedState(service.Name)
 	actual := len(containers)
@@ -187,12 +191,13 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 				}
 				return c.service.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 			})
+			operations.add(container, containerRemoved)
 			continue
 		}
 
 		mustRecreate, err := mustRecreate(service, container, recreate)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if mustRecreate {
 			i, container := i, container
@@ -201,6 +206,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 				updated[i] = recreated
 				return err
 			})
+			operations.add(container, containerRecreated)
 			continue
 		}
 
@@ -210,15 +216,16 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		switch container.State {
 		case ContainerRunning:
 			w.Event(progress.RunningEvent(name))
-		case ContainerCreated:
 		case ContainerRestarting:
-		case ContainerExited:
+		case ContainerCreated, ContainerExited:
 			w.Event(progress.CreatedEvent(name))
+			operations.add(container, containerStarted)
 		default:
 			container := container
 			eg.Go(func() error {
 				return c.service.startContainer(ctx, container)
 			})
+			operations.add(container, containerStarted)
 		}
 		updated[i] = container
 	}
@@ -238,8 +245,12 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	}
 
 	err = eg.Wait()
+	for i := 0; i < expected-actual; i++ {
+		container := updated[actual+i]
+		operations.add(container, containerCreated)
+	}
 	c.setObservedState(service.Name, updated)
-	return err
+	return operations, err
 }
 
 func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {

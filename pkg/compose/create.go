@@ -50,11 +50,12 @@ import (
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, options)
+		_, err := s.create(ctx, project, options)
+		return err
 	})
 }
 
-func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) (*ConvergenceResult, error) {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
@@ -62,27 +63,27 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	var observedState Containers
 	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = s.ensureImagesExists(ctx, project, options.QuietPull)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	prepareNetworks(project)
 
 	err = prepareVolumes(project)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := s.ensureProjectVolumes(ctx, project); err != nil {
-		return err
+		return nil, err
 	}
 
 	allServices := project.AllServices()
@@ -96,7 +97,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 			w := progress.ContextWriter(ctx)
 			err := s.removeContainers(ctx, w, orphans, nil, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		} else {
 			logrus.Warnf("Found orphan containers (%s) for this project. If "+
@@ -108,7 +109,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	err = prepareServicesDependsOn(project)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)

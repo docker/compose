@@ -1,0 +1,9 @@
+services:
+  backend:
+    image: nginx:alpine
+
+  test:
+    image: alpine
+    command: /bin/true
+    links:
+      - backend
