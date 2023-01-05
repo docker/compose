@@ -47,7 +47,8 @@ type graphTraversal struct {
 	targetServiceStatus         ServiceStatus
 	adjacentServiceStatusToSkip ServiceStatus
 
-	visitorFn func(context.Context, string) error
+	visitorFn      func(context.Context, string) error
+	maxConcurrency int
 }
 
 func upDirectionTraversal(visitorFn func(context.Context, string) error) *graphTraversal {
@@ -79,6 +80,9 @@ func InDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 		return err
 	}
 	t := upDirectionTraversal(fn)
+	for _, option := range options {
+		option(t)
+	}
 	return t.visit(ctx, graph)
 }
 
@@ -96,6 +100,9 @@ func (t *graphTraversal) visit(ctx context.Context, g *Graph) error {
 	nodes := t.extremityNodesFn(g)
 
 	eg, ctx := errgroup.WithContext(ctx)
+	if t.maxConcurrency > 0 {
+		eg.SetLimit(t.maxConcurrency)
+	}
 	t.run(ctx, g, eg, nodes)
 
 	return eg.Wait()

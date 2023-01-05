@@ -51,14 +51,16 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	opts := map[string]build.Options{}
 	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
 
-	services, err := project.GetServices(options.Services...)
-	if err != nil {
-		return err
-	}
-
-	for _, service := range services {
+	return InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
+			return nil
+		}
+		service, err := project.GetService(name)
+		if err != nil {
+			return err
+		}
 		if service.Build == nil {
-			continue
+			return nil
 		}
 		imageName := api.GetImageNameOrDefault(service, project.Name)
 		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
@@ -91,10 +93,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			}}
 		}
 		opts[imageName] = buildOptions
-	}
-
-	_, err = s.doBuild(ctx, project, opts, options.Progress)
-	return err
+		_, err = s.doBuild(ctx, project, opts, options.Progress)
+		return err
+	}, func(traversal *graphTraversal) {
+		traversal.maxConcurrency = s.maxConcurrency
+	})
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, quietPull bool) error {
