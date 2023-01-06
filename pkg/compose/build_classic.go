@@ -59,6 +59,12 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 			errs = multierror.Append(errs, err).ErrorOrNil()
 		}
 		nameDigests[imageName] = digest
+		if errs != nil {
+			return nil
+		}
+		if len(o.Exports) != 0 && o.Exports[0].Attrs["push"] == "true" {
+			return s.push(ctx, project, api.PushOptions{})
+		}
 		return nil
 	})
 	if err != nil {

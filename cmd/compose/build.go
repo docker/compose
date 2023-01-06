@@ -38,6 +38,7 @@ type buildOptions struct {
 	composeOptions
 	quiet    bool
 	pull     bool
+	push     bool
 	progress string
 	args     []string
 	noCache  bool
@@ -57,6 +58,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 
 	return api.BuildOptions{
 		Pull:     opts.pull,
+		Push:     opts.push,
 		Progress: opts.progress,
 		Args:     types.NewMappingWithEquals(opts.args),
 		NoCache:  opts.noCache,
@@ -108,6 +110,7 @@ func buildCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
+	cmd.Flags().BoolVar(&opts.push, "push", false, "Push service images.")
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	cmd.Flags().StringVar(&opts.progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
