@@ -61,7 +61,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	if options.Force {
 		fmt.Fprintln(s.stdout(), msg)
 	} else {
-		confirm, err := prompt.User{}.Confirm(msg, false)
+		confirm, err := prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)
 		if err != nil {
 			return err
 		}
