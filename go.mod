@@ -7,7 +7,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go v1.8.2
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.6.14
+	github.com/containerd/containerd v1.6.15
 	github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf
 	github.com/docker/buildx v0.9.1 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.20+incompatible // replaced; see replace rule for actual version
