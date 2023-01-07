@@ -48,7 +48,6 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 }
 
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
-	opts := map[string]build.Options{}
 	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
 
 	return InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
@@ -92,7 +91,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				Attrs: map[string]string{},
 			}}
 		}
-		opts[imageName] = buildOptions
+		opts := map[string]build.Options{imageName: buildOptions}
 		_, err = s.doBuild(ctx, project, opts, options.Progress)
 		return err
 	}, func(traversal *graphTraversal) {
