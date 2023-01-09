@@ -62,6 +62,19 @@ func Convert(args []string) []string {
 			continue
 		}
 		if len(arg) > 0 && arg[0] != '-' {
+
+			for j := i + 1; j < l-1; j++ {
+				// with compose V1, -H can be passed after command
+				if args[j] == "-H" || args[j] == "--host" {
+					rootFlags = append(rootFlags, args[j], args[j+1])
+					if l > j+2 {
+						args = append(args[0:j], args[j+2:]...)
+					} else {
+						args = args[0:j]
+					}
+				}
+			}
+
 			// not a top-level flag anymore, keep the rest of the command unmodified
 			if arg == compose.PluginName {
 				i++

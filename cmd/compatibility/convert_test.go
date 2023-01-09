@@ -44,6 +44,11 @@ func Test_convert(t *testing.T) {
 			want: []string{"--host", "tcp://1.2.3.4", "compose", "up"},
 		},
 		{
+			name: "with H",
+			args: []string{"up", "-H", "tcp://1.2.3.4"},
+			want: []string{"-H", "tcp://1.2.3.4", "compose", "up"},
+		},
+		{
 			name: "compose --verbose",
 			args: []string{"--verbose"},
 			want: []string{"--debug", "compose"},
