@@ -17,7 +17,7 @@ variable "GO_VERSION" {
 }
 
 variable "BUILD_TAGS" {
-  default = "e2e,kube"
+  default = "e2e"
 }
 
 variable "DOCS_FORMATS" {
