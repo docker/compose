@@ -37,19 +37,9 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 		return nil, err
 	}
 
-	project := options.Project
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return nil, err
-		}
+	if len(options.Services) != 0 {
+		containers = containers.filter(isService(options.Services...))
 	}
-
-	if len(options.Services) == 0 {
-		options.Services = project.ServiceNames()
-	}
-
-	containers = containers.filter(isService(options.Services...))
 	summary := make([]api.ContainerSummary, len(containers))
 	eg, ctx := errgroup.WithContext(ctx)
 	for i, container := range containers {
