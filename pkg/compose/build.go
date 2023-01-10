@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
+	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
@@ -223,6 +224,12 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	tags = append(tags, imageTag)
 
 	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
+
+	for k, v := range storeutil.GetProxyConfig(s.dockerCli) {
+		if _, ok := buildArgs[k]; !ok {
+			buildArgs[k] = v
+		}
+	}
 
 	plats, err := addPlatforms(project, service)
 	if err != nil {
