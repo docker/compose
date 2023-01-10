@@ -12,6 +12,7 @@ Creates containers for a service.
 | `--no-build`       |          |           | Don't build an image, even if it's missing.                                           |
 | `--no-recreate`    |          |           | If containers already exist, don't recreate them. Incompatible with --force-recreate. |
 | `--pull`           | `string` | `missing` | Pull image before running ("always"\|"missing"\|"never")                              |
+| `--remove-orphans` |          |           | Remove containers for services not defined in the Compose file.                       |
 
 
 <!---MARKER_GEN_END-->
