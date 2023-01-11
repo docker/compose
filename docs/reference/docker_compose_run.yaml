@@ -172,6 +172,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: remove-orphans
+      value_type: bool
+      default_value: "false"
+      description: Remove containers for services not defined in the Compose file.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: rm
       value_type: bool
       default_value: "false"
@@ -240,16 +250,6 @@ options:
       shorthand: w
       value_type: string
       description: Working directory inside the container
-      deprecated: false
-      hidden: false
-      experimental: false
-      experimentalcli: false
-      kubernetes: false
-      swarm: false
-    - option: remove-orphans
-      value_type: bool
-      default_value: "false"
-      description: Remove containers for services not defined in the Compose file.
       deprecated: false
       hidden: false
       experimental: false
