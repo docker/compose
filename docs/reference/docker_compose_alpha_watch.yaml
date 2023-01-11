@@ -1,0 +1,25 @@
+command: docker compose alpha watch
+short: |
+    EXPERIMENTAL - Watch build context for service and rebuild/refresh containers when files are updated
+long: |
+    EXPERIMENTAL - Watch build context for service and rebuild/refresh containers when files are updated
+usage: docker compose alpha watch [SERVICE...]
+pname: docker compose alpha
+plink: docker_compose_alpha.yaml
+options:
+    - option: quiet
+      value_type: bool
+      default_value: "false"
+      description: hide build output
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

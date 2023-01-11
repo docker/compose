@@ -393,6 +393,20 @@ func (mr *MockServiceMockRecorder) Up(ctx, project, options interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Up", reflect.TypeOf((*MockService)(nil).Up), ctx, project, options)
 }
 
+// Watch mocks base method.
+func (m *MockService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Watch", ctx, project, services, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Watch indicates an expected call of Watch.
+func (mr *MockServiceMockRecorder) Watch(ctx, project, services, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockService)(nil).Watch), ctx, project, services, options)
+}
+
 // MockLogConsumer is a mock of LogConsumer interface.
 type MockLogConsumer struct {
 	ctrl     *gomock.Controller
