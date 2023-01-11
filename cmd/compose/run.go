@@ -162,7 +162,7 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
 	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container.")
-	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 
 	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
 	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
