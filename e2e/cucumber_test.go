@@ -57,12 +57,14 @@ func TestCucumber(t *testing.T) {
 
 func setup(s *godog.ScenarioContext) {
 	t := s.TestingT()
+	projectName := strings.Split(t.Name(), "/")[1]
 	cli := e2e.NewCLI(t, e2e.WithEnv(
-		fmt.Sprintf("COMPOSE_PROJECT_NAME=%s", strings.Split(t.Name(), "/")[1]),
+		fmt.Sprintf("COMPOSE_PROJECT_NAME=%s", projectName),
 	))
 	th := testHelper{
-		T:   t,
-		CLI: cli,
+		T:           t,
+		CLI:         cli,
+		ProjectName: projectName,
 	}
 
 	s.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
@@ -84,6 +86,7 @@ func setup(s *godog.ScenarioContext) {
 
 type testHelper struct {
 	T               *testing.T
+	ProjectName     string
 	ComposeFile     string
 	CommandOutput   string
 	CommandExitCode int
@@ -91,11 +94,12 @@ type testHelper struct {
 }
 
 func (th *testHelper) serviceIsStatus(service, status string) error {
+	serviceContainerName := fmt.Sprintf("%s-%s-1", strings.ToLower(th.ProjectName), service)
+	statusRegex := fmt.Sprintf("%s.*%s", serviceContainerName, status)
 	res := th.CLI.RunDockerComposeCmd(th.T, "ps", "-a")
-	statusRegex := fmt.Sprintf("%s\\s+%s", service, status)
 	r, _ := regexp.Compile(statusRegex)
 	if !r.MatchString(res.Combined()) {
-		return fmt.Errorf("Missing/incorrect ps output:\n%s", res.Combined())
+		return fmt.Errorf("Missing/incorrect ps output:\n%s\nregex:\n%s", res.Combined(), statusRegex)
 	}
 	return nil
 }

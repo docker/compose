@@ -17,5 +17,5 @@ Scenario: Start single service
     Then the output contains "simple-1  Created"
     And the output contains "another-1  Created"
     Then I run "compose start another"
-    And service "another" is "running"
-    And service "simple" is "created"
+    And service "another" is "Up"
+    And service "simple" is "Created"
