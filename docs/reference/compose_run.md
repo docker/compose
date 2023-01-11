@@ -24,6 +24,7 @@ Run a one-off command on a service.
 | `-u`, `--user`        | `string`      |         | Run as specified username or uid                                                  |
 | `-v`, `--volume`      | `stringArray` |         | Bind mount a volume.                                                              |
 | `-w`, `--workdir`     | `string`      |         | Working directory inside the container                                            |
+| `--remove-orphans`    |               |         | Remove containers for services not defined in the Compose file.                   |
 
 
 <!---MARKER_GEN_END-->
