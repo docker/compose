@@ -261,6 +261,7 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 		verbose  bool
 		version  bool
 		parallel int
+		dryRun   bool
 	)
 	c := &cobra.Command{
 		Short:            "Docker Compose",
@@ -335,6 +336,7 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 			if parallel > 0 {
 				backend.MaxConcurrency(parallel)
 			}
+			backend.DryRunMode(dryRun)
 			return nil
 		},
 	}
@@ -389,6 +391,8 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 	c.Flags().MarkHidden("no-ansi") //nolint:errcheck
 	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	c.Flags().MarkHidden("verbose") //nolint:errcheck
+	c.Flags().BoolVar(&dryRun, "dry-run", false, "Execute command in dry run mode")
+	c.Flags().MarkHidden("dry-run") //nolint:errcheck
 	return c
 }
 

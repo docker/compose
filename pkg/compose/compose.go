@@ -43,12 +43,14 @@ func NewComposeService(dockerCli command.Cli) api.Service {
 	return &composeService{
 		dockerCli:      dockerCli,
 		maxConcurrency: -1,
+		dryRun:         false,
 	}
 }
 
 type composeService struct {
 	dockerCli      command.Cli
 	maxConcurrency int
+	dryRun         bool
 }
 
 func (s *composeService) apiClient() client.APIClient {
@@ -61,6 +63,10 @@ func (s *composeService) configFile() *configfile.ConfigFile {
 
 func (s *composeService) MaxConcurrency(i int) {
 	s.maxConcurrency = i
+}
+
+func (s *composeService) DryRunMode(dryRun bool) {
+	s.dryRun = dryRun
 }
 
 func (s *composeService) stdout() *streams.Out {
