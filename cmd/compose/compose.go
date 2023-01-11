@@ -365,7 +365,9 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),
 		copyCommand(&opts, backend),
+		alphaCommand(&opts, backend),
 	)
+
 	c.Flags().SetInterspersed(false)
 	opts.addProjectFlags(c.Flags())
 	c.RegisterFlagCompletionFunc( //nolint:errcheck
