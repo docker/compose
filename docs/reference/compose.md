@@ -41,7 +41,6 @@ Docker Compose
 |:-----------------------|:--------------|:--------|:----------------------------------------------------------------------------------------------------|
 | `--ansi`               | `string`      | `auto`  | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
 | `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
-| `--dry-run`            |               |         | Execute command in dry run mode                                                                     |
 | `--env-file`           | `string`      |         | Specify an alternate environment file.                                                              |
 | `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
 | `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |

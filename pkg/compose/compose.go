@@ -20,13 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"strings"
-
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -34,6 +32,8 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
+	"io"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -65,8 +65,20 @@ func (s *composeService) MaxConcurrency(i int) {
 	s.maxConcurrency = i
 }
 
-func (s *composeService) DryRunMode(dryRun bool) {
-	s.dryRun = dryRun
+func (s *composeService) DryRunMode(dryRun bool) error {
+	if dryRun {
+		cli, err := command.NewDockerCli()
+		if err != nil {
+			return err
+		}
+		cli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
+			dryRunClient := api.NewDryRunClient()
+			dryRunClient.WithAPIClient(s.apiClient())
+			return dryRunClient, nil
+		}))
+		s.dockerCli = cli
+	}
+	return nil
 }
 
 func (s *composeService) stdout() *streams.Out {

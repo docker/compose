@@ -183,7 +183,7 @@ options:
       default_value: "false"
       description: Execute command in dry run mode
       deprecated: false
-      hidden: false
+      hidden: true
       experimental: false
       experimentalcli: false
       kubernetes: false

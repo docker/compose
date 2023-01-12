@@ -108,9 +108,11 @@ func (mr *MockServiceMockRecorder) Down(ctx, projectName, options interface{}) *
 }
 
 // DryRunMode mocks base method.
-func (m *MockService) DryRunMode(dryRun bool) {
+func (m *MockService) DryRunMode(dryRun bool) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DryRunMode", dryRun)
+	ret := m.ctrl.Call(m, "DryRunMode", dryRun)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DryRunMode indicates an expected call of DryRunMode.

@@ -336,8 +336,7 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 			if parallel > 0 {
 				backend.MaxConcurrency(parallel)
 			}
-			backend.DryRunMode(dryRun)
-			return nil
+			return backend.DryRunMode(dryRun)
 		},
 	}
 
