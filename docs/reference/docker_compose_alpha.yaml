@@ -9,7 +9,7 @@ clink:
     - docker_compose_alpha_watch.yaml
 deprecated: false
 experimental: false
-experimentalcli: false
+experimentalcli: true
 kubernetes: false
 swarm: false
 
