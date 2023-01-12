@@ -25,6 +25,9 @@ func alphaCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Short:  "Experimental commands",
 		Use:    "alpha [COMMAND]",
 		Hidden: true,
+		Annotations: map[string]string{
+			"experimentalCLI": "true",
+		},
 	}
 	cmd.AddCommand(watchCommand(p, backend))
 	return cmd
