@@ -15,34 +15,19 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.19.4
+ARG GO_VERSION=1.19.4-alpine
 ARG XX_VERSION=1.1.2
 ARG GOLANGCI_LINT_VERSION=v1.49.0
 ARG ADDLICENSE_VERSION=v1.0.0
 
-ARG BUILD_TAGS="e2e,kube"
-ARG DOCS_FORMATS="md,yaml"
-ARG LICENSE_FILES=".*\(Dockerfile\|Makefile\|\.go\|\.hcl\|\.sh\)"
-
-# xx is a helper for cross-compilation
-FROM --platform=${BUILDPLATFORM} tonistiigi/xx:${XX_VERSION} AS xx
-
-FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
-FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
-
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS base
-COPY --from=xx / /
-RUN apk add --no-cache \
-  docker \
-  file \
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
+WORKDIR /compose-cli
+RUN apk add --no-cache -vv \
   git \
+  docker \
   make \
   protoc \
   protobuf-dev
-WORKDIR /src
-ENV CGO_ENABLED=0
-
-FROM base AS build-base
 COPY go.* .
 RUN --mount=type=cache,target=/go/pkg/mod \
   --mount=type=cache,target=/root/.cache/go-build \
@@ -52,19 +37,33 @@ FROM base AS make-compose-plugin
 ENV CGO_ENABLED=0
 ARG TARGETOS
 ARG TARGETARCH
-ARG TARGETVARIANT
-RUN --mount=from=binary \
-  mkdir -p /out && \
-  # TODO: should just use standard arch
-  TARGETARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH"); \
-  TARGETARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "$TARGETARCH"); \
-  cp docker-compose* "/out/docker-compose-${TARGETOS}-${TARGETARCH}${TARGETVARIANT}$(ls docker-compose* | sed -e 's/^docker-compose//')"
+ARG BUILD_TAGS
+ARG GIT_TAG
+RUN --mount=target=. \
+  --mount=type=cache,target=/go/pkg/mod \
+  --mount=type=cache,target=/root/.cache/go-build \
+  GOOS=${TARGETOS} \
+  GOARCH=${TARGETARCH} \
+  BUILD_TAGS=${BUILD_TAGS} \
+  GIT_TAG=${GIT_TAG} \
+  make COMPOSE_BINARY=/out/docker-compose -f builder.Makefile compose-plugin
 
 FROM debian:bullseye-slim AS compose-plugin
-WORKDIR /root
-COPY --from=make-compose-plugin /out/* /usr/local/bin/
 
-RUN adduser --gecos "" --disabled-password --home /home/cfu --shell /bin/bash cfu
-USER cfu
+COPY --from=make-compose-plugin /out/* /usr/local/bin/
+# add user
+RUN addgroup --gid 3000 compose && \
+  adduser --uid 3000 --gecos "" --disabled-password \
+  --ingroup compose \
+  --home /home/compose \
+  --shell /bin/bash compose
+
+WORKDIR /home/compose
+
+RUN chown -R compose:compose /home/compose && \
+  chmod 755 /home/compose
+
+
+USER compose:compose
 
 ENTRYPOINT [ "docker-compose" ]
