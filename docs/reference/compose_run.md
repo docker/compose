@@ -18,6 +18,7 @@ Run a one-off command on a service.
 | `--no-deps`           |               |         | Don't start linked services.                                                      |
 | `-p`, `--publish`     | `stringArray` |         | Publish a container's port(s) to the host.                                        |
 | `--quiet-pull`        |               |         | Pull without printing progress information.                                       |
+| `--remove-orphans`    |               |         | Remove containers for services not defined in the Compose file.                   |
 | `--rm`                |               |         | Automatically remove the container when it exits                                  |
 | `--service-ports`     |               |         | Run command with the service's ports enabled and mapped to the host.              |
 | `--use-aliases`       |               |         | Use the service's network useAliases in the network(s) the container connects to. |
