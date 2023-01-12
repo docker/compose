@@ -331,7 +331,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 					if exited {
 						w.Events(containerEvents(containers, progress.Exited))
 						if code != 0 {
-							return fmt.Errorf("service %q didn't completed successfully: exit %d", dep, code)
+							return fmt.Errorf("service %q didn't complete successfully: exit %d", dep, code)
 						}
 						return nil
 					}
