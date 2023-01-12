@@ -158,7 +158,7 @@ func (w *ttyWriter) print() {
 	}
 
 	skipChildEvents := false
-	if len(w.eventIDs) > goterm.Height()-1 {
+	if len(w.eventIDs) > goterm.Height()-2 {
 		skipChildEvents = true
 	}
 	numLines := 0
