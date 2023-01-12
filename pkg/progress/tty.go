@@ -157,6 +157,10 @@ func (w *ttyWriter) print() {
 		}
 	}
 
+	skipChildEvents := false
+	if len(w.eventIDs) > goterm.Height()-1 {
+		skipChildEvents = true
+	}
 	numLines := 0
 	for _, v := range w.eventIDs {
 		event := w.events[v]
@@ -169,6 +173,9 @@ func (w *ttyWriter) print() {
 		for _, v := range w.eventIDs {
 			ev := w.events[v]
 			if ev.ParentID == event.ID {
+				if skipChildEvents {
+					continue
+				}
 				line := lineText(ev, "  ", terminalWidth, statusPadding, runtime.GOOS != "windows")
 				fmt.Fprint(w.out, line)
 				numLines++
