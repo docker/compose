@@ -20,6 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/cli/cli/command"
@@ -32,8 +35,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
-	"io"
-	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -71,11 +72,14 @@ func (s *composeService) DryRunMode(dryRun bool) error {
 		if err != nil {
 			return err
 		}
-		cli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
+		err = cli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
 			dryRunClient := api.NewDryRunClient()
 			dryRunClient.WithAPIClient(s.apiClient())
 			return dryRunClient, nil
 		}))
+		if err != nil {
+			return err
+		}
 		s.dockerCli = cli
 	}
 	return nil
