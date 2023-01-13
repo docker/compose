@@ -235,7 +235,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		Text:   "Pulled",
 	})
 
-	inspected, _, err := s.dockerCli.Client().ImageInspectWithRaw(ctx, service.Image)
+	inspected, _, err := s.apiClient().ImageInspectWithRaw(ctx, service.Image)
 	if err != nil {
 		return "", err
 	}

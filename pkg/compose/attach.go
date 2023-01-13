@@ -86,7 +86,7 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 		})
 	})
 
-	inspect, err := s.dockerCli.Client().ContainerInspect(ctx, container.ID)
+	inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)
 	if err != nil {
 		return err
 	}

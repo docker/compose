@@ -56,7 +56,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 
 	applyRunOptions(project, &service, opts)
 
-	if err := s.dockerCli.In().CheckTty(opts.Interactive, service.Tty); err != nil {
+	if err := s.stdin().CheckTty(opts.Interactive, service.Tty); err != nil {
 		return "", err
 	}
 
