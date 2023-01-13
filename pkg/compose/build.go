@@ -44,14 +44,16 @@ import (
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.build(ctx, project, options)
+		_, err := s.build(ctx, project, options)
+		return err
 	})
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
+func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
 	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
 
-	return InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	var imageIDs map[string]string
+	err := InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
@@ -93,11 +95,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			}}
 		}
 		opts := map[string]build.Options{imageName: buildOptions}
-		_, err = s.doBuild(ctx, project, opts, options.Progress)
+		imageIDs, err = s.doBuild(ctx, project, opts, options.Progress)
 		return err
 	}, func(traversal *graphTraversal) {
 		traversal.maxConcurrency = s.maxConcurrency
 	})
+	return imageIDs, err
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, quietPull bool) error {
