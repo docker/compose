@@ -290,6 +290,99 @@ func (d *DryRunClient) WithAPIClient(apiClient client.APIClient) {
 	d.CheckpointListFn = apiClient.CheckpointList
 }
 
+// All methods and functions which need to be overridden for dry run.
+
+func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options moby.ContainerAttachOptions) (moby.HijackedResponse, error) {
+	return moby.HijackedResponse{}, ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerType.Config, hostConfig *containerType.HostConfig,
+	networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (containerType.CreateResponse, error) {
+	return containerType.CreateResponse{}, ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal string) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerPause(ctx context.Context, container string) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options moby.ContainerRemoveOptions) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerRename(ctx context.Context, container, newContainerName string) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, options containerType.StopOptions) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options moby.ContainerStartOptions) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerStop(ctx context.Context, container string, options containerType.StopOptions) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, moby.ContainerPathStat, error) {
+	return nil, moby.ContainerPathStat{}, ErrNotImplemented
+}
+
+func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options moby.CopyToContainerOptions) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options moby.ImageBuildOptions) (moby.ImageBuildResponse, error) {
+	return moby.ImageBuildResponse{}, ErrNotImplemented
+}
+
+func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.ImagePullOptions) (io.ReadCloser, error) {
+	return nil, ErrNotImplemented
+}
+
+func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.ImagePushOptions) (io.ReadCloser, error) {
+	return nil, ErrNotImplemented
+}
+
+func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]moby.ImageDeleteResponseItem, error) {
+	return nil, ErrNotImplemented
+}
+
+func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, container string, config *network.EndpointSettings) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options moby.NetworkCreate) (moby.NetworkCreateResponse, error) {
+	return moby.NetworkCreateResponse{}, ErrNotImplemented
+}
+
+func (d *DryRunClient) NetworkDisconnect(ctx context.Context, networkName, container string, force bool) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) NetworkRemove(ctx context.Context, networkName string) error {
+	return ErrNotImplemented
+}
+
+func (d *DryRunClient) VolumeCreate(ctx context.Context, options volume.CreateOptions) (volume.Volume, error) {
+	return volume.Volume{}, ErrNotImplemented
+}
+
+func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force bool) error {
+	return ErrNotImplemented
+}
+
+// Functions delegated to original APIClient (not used by Compose or not modifying the Compose stack
+
 func (d *DryRunClient) ConfigList(ctx context.Context, options moby.ConfigListOptions) ([]swarm.Config, error) {
 	if d.ConfigListFn == nil {
 		return nil, ErrNotImplemented
@@ -325,26 +418,11 @@ func (d *DryRunClient) ConfigUpdate(ctx context.Context, id string, version swar
 	return d.ConfigUpdateFn(ctx, id, version, config)
 }
 
-func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options moby.ContainerAttachOptions) (moby.HijackedResponse, error) {
-	if d.ContainerAttachFn == nil {
-		return moby.HijackedResponse{}, ErrNotImplemented
-	}
-	return d.ContainerAttachFn(ctx, container, options)
-}
-
 func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, options moby.ContainerCommitOptions) (moby.IDResponse, error) {
 	if d.ContainerCommitFn == nil {
 		return moby.IDResponse{}, ErrNotImplemented
 	}
 	return d.ContainerCommitFn(ctx, container, options)
-}
-
-func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerType.Config, hostConfig *containerType.HostConfig,
-	networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (containerType.CreateResponse, error) {
-	if d.ContainerCreateFn == nil {
-		return containerType.CreateResponse{}, ErrNotImplemented
-	}
-	return d.ContainerCreateFn(ctx, config, hostConfig, networkingConfig, platform, containerName)
 }
 
 func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]containerType.ContainerChangeResponseItem, error) {
@@ -410,13 +488,6 @@ func (d *DryRunClient) ContainerInspectWithRaw(ctx context.Context, container st
 	return d.ContainerInspectWithRawFn(ctx, container, getSize)
 }
 
-func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal string) error {
-	if d.ContainerKillFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerKillFn(ctx, container, signal)
-}
-
 func (d *DryRunClient) ContainerList(ctx context.Context, options moby.ContainerListOptions) ([]moby.Container, error) {
 	if d.ContainerListFn == nil {
 		return nil, ErrNotImplemented
@@ -431,39 +502,11 @@ func (d *DryRunClient) ContainerLogs(ctx context.Context, container string, opti
 	return d.ContainerLogsFn(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerPause(ctx context.Context, container string) error {
-	if d.ContainerPauseFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerPauseFn(ctx, container)
-}
-
-func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options moby.ContainerRemoveOptions) error {
-	if d.ContainerRemoveFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerRemoveFn(ctx, container, options)
-}
-
-func (d *DryRunClient) ContainerRename(ctx context.Context, container, newContainerName string) error {
-	if d.ContainerRenameFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerRenameFn(ctx, container, newContainerName)
-}
-
 func (d *DryRunClient) ContainerResize(ctx context.Context, container string, options moby.ResizeOptions) error {
 	if d.ContainerResizeFn == nil {
 		return ErrNotImplemented
 	}
 	return d.ContainerResizeFn(ctx, container, options)
-}
-
-func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, options containerType.StopOptions) error {
-	if d.ContainerRestartFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerRestartFn(ctx, container, options)
 }
 
 func (d *DryRunClient) ContainerStatPath(ctx context.Context, container, path string) (moby.ContainerPathStat, error) {
@@ -487,32 +530,11 @@ func (d *DryRunClient) ContainerStatsOneShot(ctx context.Context, container stri
 	return d.ContainerStatsOneShotFn(ctx, container)
 }
 
-func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options moby.ContainerStartOptions) error {
-	if d.ContainerStartFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerStartFn(ctx, container, options)
-}
-
-func (d *DryRunClient) ContainerStop(ctx context.Context, container string, options containerType.StopOptions) error {
-	if d.ContainerStopFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerStopFn(ctx, container, options)
-}
-
 func (d *DryRunClient) ContainerTop(ctx context.Context, container string, arguments []string) (containerType.ContainerTopOKBody, error) {
 	if d.ContainerTopFn == nil {
 		return containerType.ContainerTopOKBody{}, ErrNotImplemented
 	}
 	return d.ContainerTopFn(ctx, container, arguments)
-}
-
-func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) error {
-	if d.ContainerUnpauseFn == nil {
-		return ErrNotImplemented
-	}
-	return d.ContainerUnpauseFn(ctx, container)
 }
 
 func (d *DryRunClient) ContainerUpdate(ctx context.Context, container string, updateConfig containerType.UpdateConfig) (containerType.ContainerUpdateOKBody, error) {
@@ -531,20 +553,6 @@ func (d *DryRunClient) ContainerWait(ctx context.Context, container string, cond
 	return d.ContainerWaitFn(ctx, container, condition)
 }
 
-func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, moby.ContainerPathStat, error) {
-	if d.CopyFromContainerFn == nil {
-		return nil, moby.ContainerPathStat{}, ErrNotImplemented
-	}
-	return d.CopyFromContainerFn(ctx, container, srcPath)
-}
-
-func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options moby.CopyToContainerOptions) error {
-	if d.CopyToContainerFn == nil {
-		return ErrNotImplemented
-	}
-	return d.CopyToContainerFn(ctx, container, path, content, options)
-}
-
 func (d *DryRunClient) ContainersPrune(ctx context.Context, pruneFilters filters.Args) (moby.ContainersPruneReport, error) {
 	if d.ContainersPruneFn == nil {
 		return moby.ContainersPruneReport{}, ErrNotImplemented
@@ -557,13 +565,6 @@ func (d *DryRunClient) DistributionInspect(ctx context.Context, imageName, encod
 		return registry.DistributionInspect{}, ErrNotImplemented
 	}
 	return d.DistributionInspectFn(ctx, imageName, encodedRegistryAuth)
-}
-
-func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options moby.ImageBuildOptions) (moby.ImageBuildResponse, error) {
-	if d.ImageBuildFn == nil {
-		return moby.ImageBuildResponse{}, ErrNotImplemented
-	}
-	return d.ImageBuildFn(ctx, reader, options)
 }
 
 func (d *DryRunClient) BuildCachePrune(ctx context.Context, opts moby.BuildCachePruneOptions) (*moby.BuildCachePruneReport, error) {
@@ -622,27 +623,6 @@ func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, quiet boo
 	return d.ImageLoadFn(ctx, input, quiet)
 }
 
-func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.ImagePullOptions) (io.ReadCloser, error) {
-	if d.ImagePullFn == nil {
-		return nil, ErrNotImplemented
-	}
-	return d.ImagePullFn(ctx, ref, options)
-}
-
-func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.ImagePushOptions) (io.ReadCloser, error) {
-	if d.ImagePushFn == nil {
-		return nil, ErrNotImplemented
-	}
-	return d.ImagePushFn(ctx, ref, options)
-}
-
-func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]moby.ImageDeleteResponseItem, error) {
-	if d.ImageRemoveFn == nil {
-		return nil, ErrNotImplemented
-	}
-	return d.ImageRemoveFn(ctx, imageName, options)
-}
-
 func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options moby.ImageSearchOptions) ([]registry.SearchResult, error) {
 	if d.ImageSearchFn == nil {
 		return nil, ErrNotImplemented
@@ -699,27 +679,6 @@ func (d *DryRunClient) NodeUpdate(ctx context.Context, nodeID string, version sw
 	return d.NodeUpdateFn(ctx, nodeID, version, node)
 }
 
-func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, container string, config *network.EndpointSettings) error {
-	if d.NetworkConnectFn == nil {
-		return ErrNotImplemented
-	}
-	return d.NetworkConnectFn(ctx, networkName, container, config)
-}
-
-func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options moby.NetworkCreate) (moby.NetworkCreateResponse, error) {
-	if d.NetworkCreateFn == nil {
-		return moby.NetworkCreateResponse{}, ErrNotImplemented
-	}
-	return d.NetworkCreateFn(ctx, name, options)
-}
-
-func (d *DryRunClient) NetworkDisconnect(ctx context.Context, networkName, container string, force bool) error {
-	if d.NetworkDisconnectFn == nil {
-		return ErrNotImplemented
-	}
-	return d.NetworkDisconnectFn(ctx, networkName, container, force)
-}
-
 func (d *DryRunClient) NetworkInspect(ctx context.Context, networkName string, options moby.NetworkInspectOptions) (moby.NetworkResource, error) {
 	if d.NetworkInspectFn == nil {
 		return moby.NetworkResource{}, ErrNotImplemented
@@ -739,10 +698,6 @@ func (d *DryRunClient) NetworkList(ctx context.Context, options moby.NetworkList
 		return nil, ErrNotImplemented
 	}
 	return d.NetworkListFn(ctx, options)
-}
-
-func (d *DryRunClient) NetworkRemove(ctx context.Context, networkName string) error {
-	return d.NetworkRemoveFn(ctx, networkName)
 }
 
 func (d *DryRunClient) NetworksPrune(ctx context.Context, pruneFilter filters.Args) (moby.NetworksPruneReport, error) {
@@ -1006,13 +961,6 @@ func (d *DryRunClient) Ping(ctx context.Context) (moby.Ping, error) {
 	return d.PingFn(ctx)
 }
 
-func (d *DryRunClient) VolumeCreate(ctx context.Context, options volume.CreateOptions) (volume.Volume, error) {
-	if d.VolumeCreateFn == nil {
-		return volume.Volume{}, ErrNotImplemented
-	}
-	return d.VolumeCreateFn(ctx, options)
-}
-
 func (d *DryRunClient) VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error) {
 	if d.VolumeInspectFn == nil {
 		return volume.Volume{}, ErrNotImplemented
@@ -1032,13 +980,6 @@ func (d *DryRunClient) VolumeList(ctx context.Context, filter filters.Args) (vol
 		return volume.ListResponse{}, ErrNotImplemented
 	}
 	return d.VolumeListFn(ctx, filter)
-}
-
-func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force bool) error {
-	if d.VolumeRemoveFn == nil {
-		return ErrNotImplemented
-	}
-	return d.VolumeRemoveFn(ctx, volumeID, force)
 }
 
 func (d *DryRunClient) VolumesPrune(ctx context.Context, pruneFilter filters.Args) (moby.VolumesPruneReport, error) {
