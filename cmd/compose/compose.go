@@ -26,6 +26,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/docker/cli/cli/command"
+
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	composegoutils "github.com/compose-spec/compose-go/utils"
@@ -243,7 +245,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //nolint:gocyclo
+func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
 	// filter out useless commandConn.CloseWrite warning message that can occur
 	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
 	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
