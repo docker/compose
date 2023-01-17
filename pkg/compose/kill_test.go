@@ -50,7 +50,7 @@ func TestKillAll(t *testing.T) {
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(name)),
+		Filters: filters.NewArgs(projectFilter(name), hasConfigHashLabel()),
 	}).Return(
 		[]moby.Container{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
 	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
@@ -81,7 +81,7 @@ func TestKillSignal(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 	listOptions := moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName)),
+		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName), hasConfigHashLabel()),
 	}
 
 	ctx := context.Background()
@@ -133,6 +133,7 @@ func anyCancellableContext() gomock.Matcher {
 func projectFilterListOpt(withOneOff bool) moby.ContainerListOptions {
 	filter := filters.NewArgs(
 		projectFilter(strings.ToLower(testProject)),
+		hasConfigHashLabel(),
 	)
 	if !withOneOff {
 		filter.Add("label", fmt.Sprintf("%s=False", compose.OneoffLabel))

@@ -52,7 +52,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
 		All:     true,
-		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name)),
+		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
 		[]moby.Container{
 			testContainer("service", "c", false),
@@ -125,7 +125,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
 		All:     true,
-		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name)),
+		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
 		[]moby.Container{
 			testContainer("serviceA", "c1", false),
