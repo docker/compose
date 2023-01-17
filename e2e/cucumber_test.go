@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -78,9 +79,12 @@ func setup(s *godog.ScenarioContext) {
 	})
 
 	s.Step(`^a compose file$`, th.setComposeFile)
+	s.Step(`^a dockerfile$`, th.setDockerfile)
 	s.Step(`^I run "compose (.*)"$`, th.runComposeCommand)
+	s.Step(`^I run "docker (.*)"$`, th.runDockerCommand)
 	s.Step(`service "(.*)" is "(.*)"$`, th.serviceIsStatus)
-	s.Step(`output contains "(.*)"$`, th.outputContains)
+	s.Step(`output contains "(.*)"$`, th.outputContains(true))
+	s.Step(`output does not contain "(.*)"$`, th.outputContains(false))
 	s.Step(`exit code is (\d+)$`, th.exitCodeIs)
 }
 
@@ -88,6 +92,7 @@ type testHelper struct {
 	T               *testing.T
 	ProjectName     string
 	ComposeFile     string
+	TestDir         string
 	CommandOutput   string
 	CommandExitCode int
 	CLI             *e2e.CLI
@@ -104,16 +109,21 @@ func (th *testHelper) serviceIsStatus(service, status string) error {
 	return nil
 }
 
-func (th *testHelper) outputContains(substring string) error {
-	if !strings.Contains(th.CommandOutput, substring) {
-		return fmt.Errorf("Missing output substring: %s\noutput: %s", substring, th.CommandOutput)
+func (th *testHelper) outputContains(expected bool) func(string) error {
+	return func(substring string) error {
+		contains := strings.Contains(th.CommandOutput, substring)
+		if contains && !expected {
+			return fmt.Errorf("Unexpected substring in output: %s\noutput: %s", substring, th.CommandOutput)
+		} else if !contains && expected {
+			return fmt.Errorf("Missing substring in output: %s\noutput: %s", substring, th.CommandOutput)
+		}
+		return nil
 	}
-	return nil
 }
 
 func (th *testHelper) exitCodeIs(exitCode int) error {
 	if exitCode != th.CommandExitCode {
-		return fmt.Errorf("Wrong exit code: %d expected: %d", th.CommandExitCode, exitCode)
+		return fmt.Errorf("Wrong exit code: %d expected: %d || command output: %s", th.CommandExitCode, exitCode, th.CommandOutput)
 	}
 	return nil
 }
@@ -127,6 +137,21 @@ func (th *testHelper) runComposeCommand(command string) error {
 
 	cmd := th.CLI.NewDockerComposeCmd(th.T, commandArgs...)
 	cmd.Stdin = strings.NewReader(th.ComposeFile)
+	cmd.Dir = th.TestDir
+	res := icmd.RunCmd(cmd)
+	th.CommandOutput = res.Combined()
+	th.CommandExitCode = res.ExitCode
+	return nil
+}
+
+func (th *testHelper) runDockerCommand(command string) error {
+	commandArgs, err := shellwords.Parse(command)
+	if err != nil {
+		return err
+	}
+
+	cmd := th.CLI.NewDockerCmd(th.T, commandArgs...)
+	cmd.Dir = th.TestDir
 	res := icmd.RunCmd(cmd)
 	th.CommandOutput = res.Combined()
 	th.CommandExitCode = res.ExitCode
@@ -135,5 +160,16 @@ func (th *testHelper) runComposeCommand(command string) error {
 
 func (th *testHelper) setComposeFile(composeString string) error {
 	th.ComposeFile = composeString
+	return nil
+}
+
+func (th *testHelper) setDockerfile(dockerfileString string) error {
+	tempDir := th.T.TempDir()
+	th.TestDir = tempDir
+
+	err := os.WriteFile(filepath.Join(tempDir, "Dockerfile"), []byte(dockerfileString), 0o644)
+	if err != nil {
+		return err
+	}
 	return nil
 }

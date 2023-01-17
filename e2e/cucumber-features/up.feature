@@ -11,5 +11,7 @@ Background:
 
 Scenario: --pull always
     When I run "compose up --pull=always -d"
-    Then the output contains "simple Pulled"
+    And the output contains "simple Pulled"
+    Then I run "compose up --pull=always -d"
+    And the output contains "simple Pulled"
 

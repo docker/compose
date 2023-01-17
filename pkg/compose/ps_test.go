@@ -42,7 +42,7 @@ func TestPs(t *testing.T) {
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	ctx := context.Background()
-	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
+	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)), hasConfigHashLabel())
 	args.Add("label", "com.docker.compose.oneoff=False")
 	listOpts := moby.ContainerListOptions{Filters: args, All: false}
 	c1, inspect1 := containerDetails("service1", "123", "running", "healthy", 0)

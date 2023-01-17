@@ -68,6 +68,7 @@ func TestServiceLinks(t *testing.T) {
 			projectFilter(testProject),
 			serviceFilter("db"),
 			oneOffFilter(false),
+			hasConfigHashLabel(),
 		),
 		All: true,
 	}
@@ -193,6 +194,7 @@ func TestServiceLinks(t *testing.T) {
 				projectFilter(testProject),
 				serviceFilter("web"),
 				oneOffFilter(false),
+				hasConfigHashLabel(),
 			),
 			All: true,
 		}
