@@ -59,6 +59,7 @@ func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...st
 	if len(selectedServices) == 1 {
 		f = append(f, serviceFilter(selectedServices[0]))
 	}
+	f = append(f, hasConfigHashLabel())
 	switch oneOff {
 	case oneOffOnly:
 		f = append(f, oneOffFilter(true))
