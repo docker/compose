@@ -37,7 +37,7 @@ require (
 	golang.org/x/sync v0.1.0
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.4.0
-	k8s.io/client-go v0.24.1 // replaced; see replace for the actual version used
+	k8s.io/client-go v0.24.1 // indirect; replaced; see replace for the actual version used
 )
 
 require (
