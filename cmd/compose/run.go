@@ -42,6 +42,7 @@ type runOptions struct {
 	Detach        bool
 	Remove        bool
 	noTty         bool
+	tty           bool
 	interactive   bool
 	user          string
 	workdir       string
@@ -133,6 +134,13 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 				}
 				opts.entrypointCmd = command
 			}
+			if cmd.Flags().Changed("tty") {
+				if cmd.Flags().Changed("no-TTY") {
+					return fmt.Errorf("--tty and --no-TTY can't be used together")
+				} else {
+					opts.noTty = !opts.tty
+				}
+			}
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
@@ -165,7 +173,7 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 
 	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
-	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
+	cmd.Flags().BoolVarP(&opts.tty, "tty", "t", true, "Allocate a pseudo-TTY.")
 	cmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	flags.SetNormalizeFunc(normalizeRunFlags)
