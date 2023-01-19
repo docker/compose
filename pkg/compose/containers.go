@@ -99,6 +99,12 @@ func isService(services ...string) containerPredicate {
 	}
 }
 
+func isRunning() containerPredicate {
+	return func(c moby.Container) bool {
+		return c.State == "running"
+	}
+}
+
 func isNotService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
 		service := c.Labels[api.ServiceLabel]
