@@ -72,6 +72,7 @@ func (s *composeService) Logs(
 	}
 
 	if options.Follow {
+		containers = containers.filter(isRunning())
 		printer := newLogPrinter(consumer)
 		eg.Go(func() error {
 			_, err := printer.Run(false, "", nil)
