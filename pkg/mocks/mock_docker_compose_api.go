@@ -107,6 +107,20 @@ func (mr *MockServiceMockRecorder) Down(ctx, projectName, options interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Down", reflect.TypeOf((*MockService)(nil).Down), ctx, projectName, options)
 }
 
+// DryRunMode mocks base method.
+func (m *MockService) DryRunMode(dryRun bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DryRunMode", dryRun)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DryRunMode indicates an expected call of DryRunMode.
+func (mr *MockServiceMockRecorder) DryRunMode(dryRun interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DryRunMode", reflect.TypeOf((*MockService)(nil).DryRunMode), dryRun)
+}
+
 // Events mocks base method.
 func (m *MockService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
 	m.ctrl.T.Helper()

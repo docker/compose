@@ -52,6 +52,7 @@ type ServiceProxy struct {
 	ImagesFn             func(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 	WatchFn              func(ctx context.Context, project *types.Project, services []string, options WatchOptions) error
 	MaxConcurrencyFn     func(parallel int)
+	DryRunModeFn         func(dryRun bool) error
 	interceptors         []Interceptor
 }
 
@@ -91,6 +92,7 @@ func (s *ServiceProxy) WithService(service Service) *ServiceProxy {
 	s.ImagesFn = service.Images
 	s.WatchFn = service.Watch
 	s.MaxConcurrencyFn = service.MaxConcurrency
+	s.DryRunModeFn = service.DryRunMode
 	return s
 }
 
@@ -323,4 +325,8 @@ func (s *ServiceProxy) Watch(ctx context.Context, project *types.Project, servic
 
 func (s *ServiceProxy) MaxConcurrency(i int) {
 	s.MaxConcurrencyFn(i)
+}
+
+func (s *ServiceProxy) DryRunMode(dryRun bool) error {
+	return s.DryRunModeFn(dryRun)
 }

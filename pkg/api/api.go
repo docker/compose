@@ -77,6 +77,8 @@ type Service interface {
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 	// MaxConcurrency defines upper limit for concurrent operations against engine API
 	MaxConcurrency(parallel int)
+	// DryRunMode defines if dry run applies to the command
+	DryRunMode(dryRun bool) error
 	// Watch services' development context and sync/notify/rebuild/restart on changes
 	Watch(ctx context.Context, project *types.Project, services []string, options WatchOptions) error
 }

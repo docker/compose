@@ -26,6 +26,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/docker/cli/cli/command"
+
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	composegoutils "github.com/compose-spec/compose-go/utils"
@@ -243,7 +245,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //nolint:gocyclo
+func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
 	// filter out useless commandConn.CloseWrite warning message that can occur
 	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
 	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
@@ -261,6 +263,7 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 		verbose  bool
 		version  bool
 		parallel int
+		dryRun   bool
 	)
 	c := &cobra.Command{
 		Short:            "Docker Compose",
@@ -335,7 +338,7 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 			if parallel > 0 {
 				backend.MaxConcurrency(parallel)
 			}
-			return nil
+			return backend.DryRunMode(dryRun)
 		},
 	}
 
@@ -389,6 +392,8 @@ func RootCommand(streams api.Streams, backend api.Service) *cobra.Command { //no
 	c.Flags().MarkHidden("no-ansi") //nolint:errcheck
 	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	c.Flags().MarkHidden("verbose") //nolint:errcheck
+	c.Flags().BoolVar(&dryRun, "dry-run", false, "Execute command in dry run mode")
+	c.Flags().MarkHidden("dry-run") //nolint:errcheck
 	return c
 }
 

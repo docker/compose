@@ -27,6 +27,7 @@ import (
 	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -43,12 +44,14 @@ func NewComposeService(dockerCli command.Cli) api.Service {
 	return &composeService{
 		dockerCli:      dockerCli,
 		maxConcurrency: -1,
+		dryRun:         false,
 	}
 }
 
 type composeService struct {
 	dockerCli      command.Cli
 	maxConcurrency int
+	dryRun         bool
 }
 
 func (s *composeService) apiClient() client.APIClient {
@@ -61,6 +64,24 @@ func (s *composeService) configFile() *configfile.ConfigFile {
 
 func (s *composeService) MaxConcurrency(i int) {
 	s.maxConcurrency = i
+}
+
+func (s *composeService) DryRunMode(dryRun bool) error {
+	if dryRun {
+		cli, err := command.NewDockerCli()
+		if err != nil {
+			return err
+		}
+		err = cli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
+			dryRunClient := api.NewDryRunClient(s.apiClient())
+			return dryRunClient, nil
+		}))
+		if err != nil {
+			return err
+		}
+		s.dockerCli = cli
+	}
+	return nil
 }
 
 func (s *composeService) stdout() *streams.Out {
