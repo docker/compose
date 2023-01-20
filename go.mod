@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go v1.8.2
+	github.com/compose-spec/compose-go v1.9.0
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.15
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000
