@@ -30,6 +30,7 @@ type logsOptions struct {
 	*ProjectOptions
 	composeOptions
 	follow     bool
+	index      int
 	tail       string
 	since      string
 	until      string
@@ -52,6 +53,7 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	}
 	flags := logsCmd.Flags()
 	flags.BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")
+	flags.IntVar(&opts.index, "index", 1, "index of the container if there are multiple instances of a service [default: 1].")
 	flags.StringVar(&opts.since, "since", "", "Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
 	flags.StringVar(&opts.until, "until", "", "Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
