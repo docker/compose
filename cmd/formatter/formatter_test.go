@@ -75,5 +75,5 @@ func TestPrint(t *testing.T) {
 
 // Test the absence of unexpected goroutines.
 func TestColorsGoroutinesLeak(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	goleak.VerifyNone(t)
 }

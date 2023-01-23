@@ -99,6 +99,7 @@ func cleanInfiniteGoroutine() {
 }
 
 func init() {
+	defer cleanInfiniteGoroutine()
 	colors := map[string]colorFunc{}
 	for i, name := range names {
 		colors[name] = makeColorFunc(strconv.Itoa(30 + i))
@@ -131,5 +132,4 @@ func init() {
 		}
 	}()
 
-	defer cleanInfiniteGoroutine()
 }
