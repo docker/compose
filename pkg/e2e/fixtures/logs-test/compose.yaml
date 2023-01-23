@@ -5,3 +5,6 @@ services:
   hello:
     image: alpine
     command: echo hello
+    deploy:
+      mode: replicated
+      replicas: 2

@@ -16,6 +16,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: index
+      value_type: int
+      default_value: "1"
+      description: |
+        Index of the container if there are multiple instances of a service [default: 1].
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-color
       value_type: bool
       default_value: "false"
