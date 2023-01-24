@@ -92,14 +92,8 @@ func rainbowColor() colorFunc {
 }
 
 var loop = make(chan colorFunc)
-var quitChan = make(chan bool)
-
-func cleanInfiniteGoroutine() {
-	quitChan <- true
-}
 
 func init() {
-	defer cleanInfiniteGoroutine()
 	colors := map[string]colorFunc{}
 	for i, name := range names {
 		colors[name] = makeColorFunc(strconv.Itoa(30 + i))
@@ -122,14 +116,8 @@ func init() {
 		}
 
 		for {
-			select {
-			case <-quitChan:
-				return
-			default:
-				loop <- rainbow[i]
-				i = (i + 1) % len(rainbow)
-			}
+			loop <- rainbow[i]
+			i = (i + 1) % len(rainbow)
 		}
 	}()
-
 }

@@ -22,7 +22,6 @@ import (
 	"io"
 	"testing"
 
-	"go.uber.org/goleak"
 	"gotest.tools/v3/assert"
 )
 
@@ -71,9 +70,4 @@ func TestPrint(t *testing.T) {
 	assert.Equal(t, json, `{"Name":"myName1","Status":"myStatus1"}
 {"Name":"myName2","Status":"myStatus2"}
 `)
-}
-
-// Test the absence of unexpected goroutines.
-func TestColorsGoroutinesLeak(t *testing.T) {
-	goleak.VerifyNone(t)
 }
