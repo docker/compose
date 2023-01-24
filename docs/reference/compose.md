@@ -141,13 +141,22 @@ You can also enable multiple profiles, e.g. with `docker compose --profile front
 
 Profiles can also be set by `COMPOSE_PROFILES` environment variable.
 
+### Configuring parallelism
+
+Use `--parallel` to specify the maximum level of parallelism for concurrent engine calls.
+Calling `docker compose --parallel 1 pull` will pull the pullable images defined in the Compose file
+one at a time. This can also be used to control build concurrency.
+
+Parallelism can also be set by the `COMPOSE_PARALLEL_LIMIT` environment variable.
+
 ### Set up environment variables
 
 You can set environment variables for various docker compose options, including the `-f`, `-p` and `--profiles` flags.
 
 Setting the `COMPOSE_FILE` environment variable is equivalent to passing the `-f` flag,
 `COMPOSE_PROJECT_NAME` environment variable does the same as the `-p` flag,
-and `COMPOSE_PROFILES` environment variable is equivalent to the `--profiles` flag.
+`COMPOSE_PROFILES` environment variable is equivalent to the `--profiles` flag
+and `COMPOSE_PARALLEL_LIMIT` does the same as the `--parallel` flag.
 
 If flags are explicitly set on the command line, the associated environment variable is ignored.
 
