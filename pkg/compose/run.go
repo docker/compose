@@ -128,7 +128,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 		service.Labels = service.Labels.Add(k, v)
 	}
 
-	if opts.EnvFiles != nil {
-		service.EnvFile = opts.EnvFiles
+	if opts.ServiceEnvFiles != nil {
+		service.EnvFile = append(service.EnvFile, opts.ServiceEnvFiles...)
 	}
 }

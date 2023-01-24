@@ -259,8 +259,8 @@ type RunOptions struct {
 	// QuietPull makes the pulling process quiet
 	QuietPull bool
 	// used by exec
-	Index    int
-	EnvFiles []string
+	Index           int
+	ServiceEnvFiles []string
 }
 
 // EventsOptions group options of the Events API
