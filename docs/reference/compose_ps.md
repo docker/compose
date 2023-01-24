@@ -20,13 +20,20 @@ List containers
 ## Description
 
 Lists containers for a Compose project, with current status and exposed ports.
-By default, both running and stopped containers are shown:
 
 ```console
 $ docker compose ps
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
-example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->80/tcp
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
+```
+
+By default, only running containers are shown. `--all` flag can be used to include stopped containers
+
+```console
+$ docker compose ps --all
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
+example-bar-1   alpine    "/entrypoint.…"   bar        4 seconds ago   exited (0)
 ```
 
 ## Examples
@@ -89,12 +96,12 @@ to show only containers that are running or only containers that have exited:
 
 ```console
 $ docker compose ps --status=running
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->80/tcp
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
 
 $ docker compose ps --status=exited
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-bar-1   alpine    "/entrypoint.…"   bar        4 seconds ago   exited (0)
 ```
 
 ### <a name="filter"></a> Filter containers by status (--filter)
@@ -105,12 +112,8 @@ this time using the `--filter` flag:
 
 ```console
 $ docker compose ps --filter status=running
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->80/tcp
-
-$ docker compose ps --filter status=running
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
 ```
 
 The `docker compose ps` command currently only supports the `--filter status=<status>`
