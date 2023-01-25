@@ -150,6 +150,8 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
+require go.uber.org/goleak v1.1.12
+
 replace (
 	// Override for e2e tests
 	github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220922095256-4c4b17abdae7
