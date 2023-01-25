@@ -20,7 +20,7 @@ options:
       value_type: int
       default_value: "1"
       description: |
-        Index of the container if there are multiple instances of a service [default: 1].
+        index of the container if there are multiple instances of a service [default: 1].
       deprecated: false
       hidden: false
       experimental: false
