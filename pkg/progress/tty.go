@@ -118,7 +118,7 @@ func (w *ttyWriter) printTailEvents() {
 	}
 }
 
-func (w *ttyWriter) print() {
+func (w *ttyWriter) print() { //nolint:gocyclo
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	if len(w.eventIDs) == 0 {
@@ -182,7 +182,12 @@ func (w *ttyWriter) print() {
 			}
 		}
 	}
-
+	for i := numLines; i < w.numLines; i++ {
+		if numLines < goterm.Height()-2 {
+			fmt.Fprintln(w.out, strings.Repeat(" ", terminalWidth))
+			numLines++
+		}
+	}
 	w.numLines = numLines
 }
 
