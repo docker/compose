@@ -56,9 +56,13 @@ func TestLocalComposeLogs(t *testing.T) {
 
 	t.Run("logs hello index", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "--index", "2", "hello")
-		// TODO: see if there is a way we can verify that the logs is from the second replica
-		// or if we need to..
-		res.Assert(t, icmd.Expected{Out: `hello`})
+
+		//  docker-compose logs hello
+		// logs-test-hello-2  | hello
+		// logs-test-hello-1  | hello
+		t.Log(res.Stdout())
+		assert.Assert(t, !strings.Contains(res.Stdout(), "hello-1"))
+		assert.Assert(t, strings.Contains(res.Stdout(), "hello-2"))
 	})
 
 	t.Run("down", func(t *testing.T) {
