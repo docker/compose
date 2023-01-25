@@ -19,6 +19,7 @@ package formatter
 import (
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -88,8 +89,11 @@ func makeColorFunc(code string) colorFunc {
 var nextColor = rainbowColor
 var rainbow []colorFunc
 var currentIndex = 0
+var mutex sync.Mutex
 
 func rainbowColor() colorFunc {
+	mutex.Lock()
+	defer mutex.Unlock()
 	result := rainbow[currentIndex]
 	currentIndex = (currentIndex + 1) % len(rainbow)
 	return result
