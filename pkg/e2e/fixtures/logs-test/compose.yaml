@@ -5,3 +5,5 @@ services:
   hello:
     image: alpine
     command: echo hello
+    deploy:
+      replicas: 2
