@@ -91,6 +91,8 @@ type WatchOptions struct {
 type BuildOptions struct {
 	// Pull always attempt to pull a newer version of the image
 	Pull bool
+	// Push pushes service images
+	Push bool
 	// Progress set type of progress output ("auto", "plain", "tty")
 	Progress string
 	// Args set build-time args
