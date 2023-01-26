@@ -38,7 +38,7 @@ func TestUpServiceUnhealthy(t *testing.T) {
 	const projectName = "e2e-start-fail"
 
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container for service "fail" is unhealthy`})
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container e2e-start-fail-fail-1 is unhealthy`})
 
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 }
@@ -135,6 +135,6 @@ func TestUpWithDependencyExit(t *testing.T) {
 			c.RunDockerComposeCmd(t, "--project-name", "dependencies", "down")
 		})
 
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container for service \"db\" exited (1)"})
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container dependencies-db-1 exited (1)"})
 	})
 }

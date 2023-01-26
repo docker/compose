@@ -290,8 +290,8 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			continue
 		}
 
-		containers = containers.filter(isService(dep))
-		w.Events(containerEvents(containers, progress.Waiting))
+		waitingFor := containers.filter(isService(dep))
+		w.Events(containerEvents(waitingFor, progress.Waiting))
 
 		dep, config := dep, config
 		eg.Go(func() error {
@@ -301,31 +301,31 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 				<-ticker.C
 				switch config.Condition {
 				case ServiceConditionRunningOrHealthy:
-					healthy, err := s.isServiceHealthy(ctx, containers, dep, true)
+					healthy, err := s.isServiceHealthy(ctx, waitingFor, true)
 					if err != nil {
 						return err
 					}
 					if healthy {
-						w.Events(containerEvents(containers, progress.Healthy))
+						w.Events(containerEvents(waitingFor, progress.Healthy))
 						return nil
 					}
 				case types.ServiceConditionHealthy:
-					healthy, err := s.isServiceHealthy(ctx, containers, dep, false)
+					healthy, err := s.isServiceHealthy(ctx, waitingFor, false)
 					if err != nil {
-						w.Events(containerEvents(containers, progress.ErrorEvent))
+						w.Events(containerEvents(waitingFor, progress.ErrorEvent))
 						return errors.Wrap(err, "dependency failed to start")
 					}
 					if healthy {
-						w.Events(containerEvents(containers, progress.Healthy))
+						w.Events(containerEvents(waitingFor, progress.Healthy))
 						return nil
 					}
 				case types.ServiceConditionCompletedSuccessfully:
-					exited, code, err := s.isServiceCompleted(ctx, containers, dep)
+					exited, code, err := s.isServiceCompleted(ctx, waitingFor)
 					if err != nil {
 						return err
 					}
 					if exited {
-						w.Events(containerEvents(containers, progress.Exited))
+						w.Events(containerEvents(waitingFor, progress.Exited))
 						if code != 0 {
 							return fmt.Errorf("service %q didn't complete successfully: exit %d", dep, code)
 						}
@@ -646,42 +646,41 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 	return nil
 }
 
-func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, service string, fallbackRunning bool) (bool, error) {
-	if len(containers) == 0 {
-		return false, nil
-	}
+func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool) (bool, error) {
 	for _, c := range containers {
 		container, err := s.apiClient().ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return false, err
 		}
+		name := container.Name[1:]
+
+		if container.State.Status == "exited" {
+			return false, fmt.Errorf("container %s exited (%d)", name, container.State.ExitCode)
+		}
+
 		if container.Config.Healthcheck == nil && fallbackRunning {
 			// Container does not define a health check, but we can fall back to "running" state
 			return container.State != nil && container.State.Status == "running", nil
 		}
 
-		if container.State.Status == "exited" {
-			return false, fmt.Errorf("container for service %q exited (%d)", service, container.State.ExitCode)
-		}
-
 		if container.State == nil || container.State.Health == nil {
-			return false, fmt.Errorf("container for service %q has no healthcheck configured", service)
+			return false, fmt.Errorf("container %s has no healthcheck configured", name)
 		}
 		switch container.State.Health.Status {
 		case moby.Healthy:
 			// Continue by checking the next container.
 		case moby.Unhealthy:
-			return false, fmt.Errorf("container for service %q is unhealthy", service)
+			return false, fmt.Errorf("container %s is unhealthy", name)
 		case moby.Starting:
 			return false, nil
 		default:
-			return false, fmt.Errorf("container for service %q had unexpected health status %q", service, container.State.Health.Status)
+			return false, fmt.Errorf("container %s had unexpected health status %q", name, container.State.Health.Status)
 		}
 	}
 	return true, nil
 }
 
-func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers, dep string) (bool, int, error) {
+func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
 	for _, c := range containers {
 		container, err := s.apiClient().ContainerInspect(ctx, c.ID)
 		if err != nil {
@@ -712,7 +711,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	}
 
 	w := progress.ContextWriter(ctx)
-	for _, container := range containers {
+	for _, container := range containers.filter(isService(service.Name)) {
 		if container.State == ContainerRunning {
 			continue
 		}
