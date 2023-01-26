@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"github.com/docker/docker/api/types/filters"
 	"strings"
 	"time"
 
@@ -75,13 +76,25 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		})
 	}
 
-	err := InDependencyOrder(ctx, project, func(c context.Context, name string) error {
+	var containers Containers
+	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+			oneOffFilter(false),
+		),
+		All: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err
 		}
 
-		return s.startService(ctx, project, service)
+		return s.startService(ctx, project, service, containers.filter(isService(service.Name)))
 	})
 	if err != nil {
 		return err
@@ -94,7 +107,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 				Condition: getDependencyCondition(s, project),
 			}
 		}
-		err = s.waitDependencies(ctx, project, depends)
+		err = s.waitDependencies(ctx, project, depends, containers)
 		if err != nil {
 			return err
 		}
