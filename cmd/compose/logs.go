@@ -56,7 +56,7 @@ func logsCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 	flags.BoolVarP(&opts.timestamps, "timestamps", "t", false, "Show timestamps.")
-	flags.StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
+	flags.StringVarP(&opts.tail, "tail", "n", "all", "Number of lines to show from the end of the logs for each container.")
 	return logsCmd
 }
 
