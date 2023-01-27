@@ -53,9 +53,9 @@ func convertCommand(p *ProjectOptions, streams api.Streams, backend api.Service)
 		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Aliases: []string{"config"},
-		Use:     "convert [OPTIONS] [SERVICE...]",
-		Short:   "Converts the compose file to platform's canonical format",
+		Aliases: []string{"convert"}, // for backward compatibility with Cloud integrations
+		Use:     "config [OPTIONS] [SERVICE...]",
+		Short:   "Parse, resolve and render compose file in canonical format",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.quiet {
 				devnull, err := os.Open(os.DevNull)
@@ -86,7 +86,7 @@ func convertCommand(p *ProjectOptions, streams api.Streams, backend api.Service)
 				return runConfigImages(streams, opts, args)
 			}
 
-			return runConvert(ctx, streams, backend, opts, args)
+			return runConfig(ctx, streams, backend, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -108,7 +108,7 @@ func convertCommand(p *ProjectOptions, streams api.Streams, backend api.Service)
 	return cmd
 }
 
-func runConvert(ctx context.Context, streams api.Streams, backend api.Service, opts convertOptions, services []string) error {
+func runConfig(ctx context.Context, streams api.Streams, backend api.Service, opts convertOptions, services []string) error {
 	var content []byte
 	project, err := opts.ToProject(services,
 		cli.WithInterpolation(!opts.noInterpolate),
@@ -120,7 +120,7 @@ func runConvert(ctx context.Context, streams api.Streams, backend api.Service, o
 		return err
 	}
 
-	content, err = backend.Convert(ctx, project, api.ConvertOptions{
+	content, err = backend.Config(ctx, project, api.ConfigOptions{
 		Format:              opts.Format,
 		Output:              opts.Output,
 		ResolveImageDigests: opts.resolveImageDigests,

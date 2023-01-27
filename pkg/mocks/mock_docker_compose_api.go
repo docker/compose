@@ -50,19 +50,19 @@ func (mr *MockServiceMockRecorder) Build(ctx, project, options interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Build", reflect.TypeOf((*MockService)(nil).Build), ctx, project, options)
 }
 
-// Convert mocks base method.
-func (m *MockService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
+// Config mocks base method.
+func (m *MockService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Convert", ctx, project, options)
+	ret := m.ctrl.Call(m, "Config", ctx, project, options)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Convert indicates an expected call of Convert.
-func (mr *MockServiceMockRecorder) Convert(ctx, project, options interface{}) *gomock.Call {
+// Config indicates an expected call of Config.
+func (mr *MockServiceMockRecorder) Config(ctx, project, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Convert", reflect.TypeOf((*MockService)(nil).Convert), ctx, project, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockService)(nil).Config), ctx, project, options)
 }
 
 // Copy mocks base method.
