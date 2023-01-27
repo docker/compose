@@ -21,9 +21,15 @@ import (
 	"os"
 	"sync"
 
+	"github.com/docker/compose/v2/pkg/api"
+
 	"github.com/containerd/console"
 	"github.com/moby/term"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	DRYRUN_PREFIX = " DRY-RUN MODE - "
 )
 
 // Writer can write multiple progress events
@@ -66,7 +72,7 @@ func Run(ctx context.Context, pf progressFunc) error {
 // RunWithStatus will run a writer and the progress function in parallel and return a status
 func RunWithStatus(ctx context.Context, pf progressFuncWithStatus) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
-	w, err := NewWriter(os.Stderr)
+	w, err := NewWriter(ctx, os.Stderr)
 	var result string
 	if err != nil {
 		return "", err
@@ -103,21 +109,26 @@ const (
 var Mode = ModeAuto
 
 // NewWriter returns a new multi-progress writer
-func NewWriter(out console.File) (Writer, error) {
+func NewWriter(ctx context.Context, out console.File) (Writer, error) {
 	_, isTerminal := term.GetFdInfo(out)
+	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
+	if !ok {
+		dryRun = false
+	}
 	if Mode == ModeAuto && isTerminal {
-		return newTTYWriter(out)
+		return newTTYWriter(out, dryRun)
 	}
 	if Mode == ModeTTY {
-		return newTTYWriter(out)
+		return newTTYWriter(out, dryRun)
 	}
 	return &plainWriter{
-		out:  out,
-		done: make(chan bool),
+		out:    out,
+		done:   make(chan bool),
+		dryRun: dryRun,
 	}, nil
 }
 
-func newTTYWriter(out console.File) (Writer, error) {
+func newTTYWriter(out console.File, dryRun bool) (Writer, error) {
 	con, err := console.ConsoleFromFile(out)
 	if err != nil {
 		return nil, err
@@ -130,5 +141,6 @@ func newTTYWriter(out console.File) (Writer, error) {
 		repeated: false,
 		done:     make(chan bool),
 		mtx:      &sync.Mutex{},
+		dryRun:   dryRun,
 	}, nil
 }
