@@ -63,7 +63,7 @@ func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerTyp
 }
 
 func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal string) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerPause(ctx context.Context, container string) error {
