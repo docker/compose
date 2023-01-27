@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -41,6 +43,7 @@ type createOptions struct {
 	timeChanged   bool
 	timeout       int
 	quietPull     bool
+	scale         []string
 }
 
 func createCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
@@ -59,7 +62,9 @@ func createCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
-			opts.Apply(project)
+			if err := opts.Apply(project); err != nil {
+				return err
+			}
 			return backend.Create(ctx, project, api.CreateOptions{
 				RemoveOrphans:        opts.removeOrphans,
 				IgnoreOrphans:        opts.ignoreOrphans,
@@ -79,6 +84,7 @@ func createCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	return cmd
 }
 
@@ -110,7 +116,7 @@ func (opts createOptions) GetTimeout() *time.Duration {
 	return nil
 }
 
-func (opts createOptions) Apply(project *types.Project) {
+func (opts createOptions) Apply(project *types.Project) error {
 	if opts.pullChanged {
 		for i, service := range project.Services {
 			service.PullPolicy = opts.Pull
@@ -135,4 +141,20 @@ func (opts createOptions) Apply(project *types.Project) {
 			project.Services[i] = service
 		}
 	}
+	for _, scale := range opts.scale {
+		split := strings.Split(scale, "=")
+		if len(split) != 2 {
+			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
+		}
+		name := split[0]
+		replicas, err := strconv.Atoi(split[1])
+		if err != nil {
+			return err
+		}
+		err = setServiceScale(project, name, uint64(replicas))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

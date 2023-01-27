@@ -197,7 +197,10 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		return err
 	}
 
-	createOpts.Apply(project)
+	err = createOpts.Apply(project)
+	if err != nil {
+		return err
+	}
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
 		return startDependencies(ctx, backend, *project, opts.Service, opts.ignoreOrphans)

@@ -19,8 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/docker/compose/v2/cmd/formatter"
 
@@ -43,7 +41,6 @@ type upOptions struct {
 	noDeps             bool
 	cascadeStop        bool
 	exitCodeFrom       string
-	scale              []string
 	noColor            bool
 	noPrefix           bool
 	attachDependencies bool
@@ -63,22 +60,6 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 
 	if opts.exitCodeFrom != "" {
 		_, err := project.GetService(opts.exitCodeFrom)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, scale := range opts.scale {
-		split := strings.Split(scale, "=")
-		if len(split) != 2 {
-			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
-		}
-		name := split[0]
-		replicas, err := strconv.Atoi(split[1])
-		if err != nil {
-			return err
-		}
-		err = setServiceScale(project, name, uint64(replicas))
 		if err != nil {
 			return err
 		}
@@ -113,7 +94,7 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
 	flags.StringVar(&create.Pull, "pull", "missing", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
-	flags.StringArrayVar(&up.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
+	flags.StringArrayVar(&create.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output.")
 	flags.BoolVar(&up.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 	flags.BoolVar(&create.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
@@ -165,9 +146,12 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		return fmt.Errorf("no service selected")
 	}
 
-	createOptions.Apply(project)
+	err := createOptions.Apply(project)
+	if err != nil {
+		return err
+	}
 
-	err := upOptions.apply(project, services)
+	err = upOptions.apply(project, services)
 	if err != nil {
 		return err
 	}
