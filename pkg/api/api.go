@@ -52,7 +52,7 @@ type Service interface {
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context, options ListOptions) ([]Stack, error)
 	// Convert translate compose model into backend's native format
-	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
+	Config(ctx context.Context, project *types.Project, options ConfigOptions) ([]byte, error)
 	// Kill executes the equivalent to a `compose kill`
 	Kill(ctx context.Context, projectName string, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
@@ -185,8 +185,8 @@ type DownOptions struct {
 	Volumes bool
 }
 
-// ConvertOptions group options of the Convert API
-type ConvertOptions struct {
+// ConfigOptions group options of the Config API
+type ConfigOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
 	// Output defines the path to save the application model

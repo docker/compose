@@ -115,7 +115,7 @@ pname: docker
 plink: docker.yaml
 cname:
     - docker compose build
-    - docker compose convert
+    - docker compose config
     - docker compose cp
     - docker compose create
     - docker compose down
@@ -141,7 +141,7 @@ cname:
     - docker compose version
 clink:
     - docker_compose_build.yaml
-    - docker_compose_convert.yaml
+    - docker_compose_config.yaml
     - docker_compose_cp.yaml
     - docker_compose_create.yaml
     - docker_compose_down.yaml

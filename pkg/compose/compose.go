@@ -120,7 +120,7 @@ func getContainerNameWithoutProject(c moby.Container) string {
 	return name
 }
 
-func (s *composeService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
+func (s *composeService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {
 	if options.ResolveImageDigests {
 		info, err := s.apiClient().Info(ctx)
 		if err != nil {

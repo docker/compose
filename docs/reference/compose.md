@@ -9,7 +9,7 @@ Docker Compose
 |:--------------------------------|:------------------------------------------------------------------------|
 | [`alpha`](compose_alpha.md)     | Experimental commands                                                   |
 | [`build`](compose_build.md)     | Build or rebuild services                                               |
-| [`convert`](compose_convert.md) | Converts the compose file to platform's canonical format                |
+| [`config`](compose_config.md)   | Parse, resolve and render compose file in canonical format              |
 | [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local filesystem |
 | [`create`](compose_create.md)   | Creates containers for a service.                                       |
 | [`down`](compose_down.md)       | Stop and remove containers, networks                                    |
