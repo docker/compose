@@ -67,7 +67,7 @@ func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal stri
 }
 
 func (d *DryRunClient) ContainerPause(ctx context.Context, container string) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options moby.ContainerRemoveOptions) error {
@@ -91,7 +91,7 @@ func (d *DryRunClient) ContainerStop(ctx context.Context, container string, opti
 }
 
 func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, moby.ContainerPathStat, error) {
