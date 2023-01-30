@@ -1,19 +1,36 @@
+//go:build darwin
+// +build darwin
+
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package watch
 
 import (
 	"path/filepath"
 	"time"
 
+	"github.com/fsnotify/fsevents"
 	"github.com/pkg/errors"
-
-	"github.com/tilt-dev/tilt/pkg/logger"
-
-	"github.com/tilt-dev/fsevents"
+	"github.com/sirupsen/logrus"
 )
 
 // A file watcher optimized for Darwin.
-// Uses FSEvents to avoid the terrible perf characteristics of kqueue.
-type darwinNotify struct {
+// Uses FSEvents to avoid the terrible perf characteristics of kqueue. Requires CGO
+type fseventNotify struct {
 	stream *fsevents.EventStream
 	events chan FileEvent
 	errors chan error
@@ -21,11 +38,10 @@ type darwinNotify struct {
 
 	pathsWereWatching map[string]interface{}
 	ignore            PathMatcher
-	logger            logger.Logger
 	sawAnyHistoryDone bool
 }
 
-func (d *darwinNotify) loop() {
+func (d *fseventNotify) loop() {
 	for {
 		select {
 		case <-d.stop:
@@ -58,7 +74,7 @@ func (d *darwinNotify) loop() {
 
 				ignore, err := d.ignore.Matches(e.Path)
 				if err != nil {
-					d.logger.Infof("Error matching path %q: %v", e.Path, err)
+					logrus.Infof("Error matching path %q: %v", e.Path, err)
 				} else if ignore {
 					continue
 				}
@@ -70,7 +86,7 @@ func (d *darwinNotify) loop() {
 }
 
 // Add a path to be watched. Should only be called during initialization.
-func (d *darwinNotify) initAdd(name string) {
+func (d *fseventNotify) initAdd(name string) {
 	d.stream.Paths = append(d.stream.Paths, name)
 
 	if d.pathsWereWatching == nil {
@@ -79,7 +95,7 @@ func (d *darwinNotify) initAdd(name string) {
 	d.pathsWereWatching[name] = struct{}{}
 }
 
-func (d *darwinNotify) Start() error {
+func (d *fseventNotify) Start() error {
 	if len(d.stream.Paths) == 0 {
 		return nil
 	}
@@ -93,7 +109,7 @@ func (d *darwinNotify) Start() error {
 	return nil
 }
 
-func (d *darwinNotify) Close() error {
+func (d *fseventNotify) Close() error {
 	numberOfWatches.Add(int64(-len(d.stream.Paths)))
 
 	d.stream.Stop()
@@ -103,18 +119,17 @@ func (d *darwinNotify) Close() error {
 	return nil
 }
 
-func (d *darwinNotify) Events() chan FileEvent {
+func (d *fseventNotify) Events() chan FileEvent {
 	return d.events
 }
 
-func (d *darwinNotify) Errors() chan error {
+func (d *fseventNotify) Errors() chan error {
 	return d.errors
 }
 
-func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*darwinNotify, error) {
-	dw := &darwinNotify{
+func newFSEventWatcher(paths []string, ignore PathMatcher) (*fseventNotify, error) {
+	dw := &fseventNotify{
 		ignore: ignore,
-		logger: l,
 		stream: &fsevents.EventStream{
 			Latency: 1 * time.Millisecond,
 			Flags:   fsevents.FileEvents,
@@ -139,4 +154,4 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*darwinNot
 	return dw, nil
 }
 
-var _ Notify = &darwinNotify{}
+var _ Notify = &fseventNotify{}

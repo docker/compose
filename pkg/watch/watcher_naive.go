@@ -1,5 +1,18 @@
-//go:build !darwin
-// +build !darwin
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 package watch
 
@@ -12,10 +25,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/tilt-dev/fsnotify"
-	"github.com/tilt-dev/tilt/internal/ospath"
-	"github.com/tilt-dev/tilt/pkg/logger"
 )
 
 // A naive file watcher that uses the plain fsnotify API.
@@ -33,7 +45,6 @@ type naiveNotify struct {
 	notifyList map[string]bool
 
 	ignore PathMatcher
-	log    logger.Logger
 
 	isWatcherRecursive bool
 	watcher            *fsnotify.Watcher
@@ -71,7 +82,9 @@ func (d *naiveNotify) Start() error {
 		// we should have caught that above, let's just skip it.
 		if os.IsNotExist(err) {
 			continue
-		} else if fi.IsDir() {
+		}
+
+		if fi.IsDir() {
 			err = d.watchRecursively(name)
 			if err != nil {
 				return errors.Wrapf(err, "notify.Add(%q)", name)
@@ -141,7 +154,7 @@ func (d *naiveNotify) Errors() chan error {
 	return d.errors
 }
 
-func (d *naiveNotify) loop() {
+func (d *naiveNotify) loop() { //nolint:gocyclo
 	defer close(d.wrappedEvents)
 	for e := range d.events {
 		// The Windows fsnotify event stream sometimes gets events with empty names
@@ -202,13 +215,13 @@ func (d *naiveNotify) loop() {
 			if shouldWatch {
 				err := d.add(path)
 				if err != nil && !os.IsNotExist(err) {
-					d.log.Infof("Error watching path %s: %s", e.Name, err)
+					logrus.Infof("Error watching path %s: %s", e.Name, err)
 				}
 			}
 			return nil
 		})
 		if err != nil && !os.IsNotExist(err) {
-			d.log.Infof("Error walking directory %s: %s", e.Name, err)
+			logrus.Infof("Error walking directory %s: %s", e.Name, err)
 		}
 	}
 }
@@ -216,7 +229,7 @@ func (d *naiveNotify) loop() {
 func (d *naiveNotify) shouldNotify(path string) bool {
 	ignore, err := d.ignore.Matches(path)
 	if err != nil {
-		d.log.Infof("Error matching path %q: %v", path, err)
+		logrus.Infof("Error matching path %q: %v", path, err)
 	} else if ignore {
 		return false
 	}
@@ -225,14 +238,11 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 		// We generally don't care when directories change at the root of an ADD
 		stat, err := os.Lstat(path)
 		isDir := err == nil && stat.IsDir()
-		if isDir {
-			return false
-		}
-		return true
+		return !isDir
 	}
 
 	for root := range d.notifyList {
-		if ospath.IsChild(root, path) {
+		if IsChild(root, path) {
 			return true
 		}
 	}
@@ -267,7 +277,7 @@ func (d *naiveNotify) shouldSkipDir(path string) (bool, error) {
 	// - A parent of a directory that's in our notify list
 	//   (i.e., to cover the "path doesn't exist" case).
 	for root := range d.notifyList {
-		if ospath.IsChild(root, path) || ospath.IsChild(path, root) {
+		if IsChild(root, path) || IsChild(path, root) {
 			return false, nil
 		}
 	}
@@ -284,7 +294,7 @@ func (d *naiveNotify) add(path string) error {
 	return nil
 }
 
-func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNotify, error) {
+func newWatcher(paths []string, ignore PathMatcher) (*naiveNotify, error) {
 	if ignore == nil {
 		return nil, fmt.Errorf("newWatcher: ignore is nil")
 	}
@@ -319,7 +329,6 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 	wmw := &naiveNotify{
 		notifyList:         notifyList,
 		ignore:             ignore,
-		log:                l,
 		watcher:            fsw,
 		events:             fsw.Events,
 		wrappedEvents:      wrappedEvents,
