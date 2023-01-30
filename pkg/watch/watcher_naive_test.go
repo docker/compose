@@ -1,5 +1,18 @@
-//go:build !darwin
-// +build !darwin
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 package watch
 
@@ -39,7 +52,7 @@ func TestDontWatchEachFile(t *testing.T) {
 	f.WriteFile(f.JoinPath(watched, "initial.txt"), "initial data")
 
 	initialDir := f.JoinPath(watched, "initial_dir")
-	if err := os.Mkdir(initialDir, 0777); err != nil {
+	if err := os.Mkdir(initialDir, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,13 +69,13 @@ func TestDontWatchEachFile(t *testing.T) {
 
 	// inplace
 	inplace := f.JoinPath(watched, "inplace")
-	if err := os.Mkdir(inplace, 0777); err != nil {
+	if err := os.Mkdir(inplace, 0o777); err != nil {
 		t.Fatal(err)
 	}
 	f.WriteFile(f.JoinPath(inplace, "inplace.txt"), "inplace data")
 
 	inplaceDir := f.JoinPath(inplace, "inplace_dir")
-	if err := os.Mkdir(inplaceDir, 0777); err != nil {
+	if err := os.Mkdir(inplaceDir, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,7 +94,7 @@ func TestDontWatchEachFile(t *testing.T) {
 	f.WriteFile(f.JoinPath(staged, "staged.txt"), "staged data")
 
 	stagedDir := f.JoinPath(staged, "staged_dir")
-	if err := os.Mkdir(stagedDir, 0777); err != nil {
+	if err := os.Mkdir(stagedDir, 0o777); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,10 +122,10 @@ func TestDontWatchEachFile(t *testing.T) {
 func inotifyNodes() (int, error) {
 	pid := os.Getpid()
 
-	output, err := exec.Command("bash", "-c", fmt.Sprintf(
+	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf(
 		"find /proc/%d/fd -lname anon_inode:inotify -printf '%%hinfo/%%f\n' | xargs cat | grep -c '^inotify'", pid)).Output()
 	if err != nil {
-		return 0, fmt.Errorf("error running command to determine number of watched files: %v", err)
+		return 0, fmt.Errorf("error running command to determine number of watched files: %v\n %s", err, output)
 	}
 
 	n, err := strconv.Atoi(strings.TrimSpace(string(output)))

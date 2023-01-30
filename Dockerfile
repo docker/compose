@@ -35,6 +35,7 @@ COPY --from=xx / /
 RUN apk add --no-cache \
       docker \
       file \
+      findutils \
       git \
       make \
       protoc \

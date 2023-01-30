@@ -1,3 +1,19 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package watch
 
 import (
@@ -13,10 +29,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/tilt-dev/tilt/internal/dockerignore"
-	"github.com/tilt-dev/tilt/internal/testutils/tempdir"
-	"github.com/tilt-dev/tilt/pkg/logger"
 )
 
 // Each implementation of the notify interface should have the same basic
@@ -24,15 +36,18 @@ import (
 
 func TestWindowsBufferSize(t *testing.T) {
 	orig := os.Getenv(WindowsBufferSizeEnvVar)
-	defer os.Setenv(WindowsBufferSizeEnvVar, orig)
+	defer os.Setenv(WindowsBufferSizeEnvVar, orig) //nolint:errcheck
 
-	os.Setenv(WindowsBufferSizeEnvVar, "")
+	err := os.Setenv(WindowsBufferSizeEnvVar, "")
+	assert.Nil(t, err)
 	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
 
-	os.Setenv(WindowsBufferSizeEnvVar, "a")
+	err = os.Setenv(WindowsBufferSizeEnvVar, "a")
+	assert.Nil(t, err)
 	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
 
-	os.Setenv(WindowsBufferSizeEnvVar, "10")
+	err = os.Setenv(WindowsBufferSizeEnvVar, "10")
+	assert.Nil(t, err)
 	assert.Equal(t, 10, DesiredWindowsBufferSize())
 }
 
@@ -71,7 +86,7 @@ func TestEventOrdering(t *testing.T) {
 	for i, dir := range dirs {
 		base := fmt.Sprintf("%d.txt", i)
 		p := filepath.Join(dir, base)
-		err := os.WriteFile(p, []byte(base), os.FileMode(0777))
+		err := os.WriteFile(p, []byte(base), os.FileMode(0o777))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -174,7 +189,7 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 
 	// change something inside sub directory
 	changeFilePath := filepath.Join(subPath, "change")
-	file, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
+	file, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0o666)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +251,7 @@ func TestRemoveAndAddBack(t *testing.T) {
 	path := filepath.Join(f.paths[0], "change")
 
 	d1 := []byte("hello\ngo\n")
-	err := os.WriteFile(path, d1, 0644)
+	err := os.WriteFile(path, d1, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +266,7 @@ func TestRemoveAndAddBack(t *testing.T) {
 	f.assertEvents(path)
 	f.events = nil
 
-	err = os.WriteFile(path, d1, 0644)
+	err = os.WriteFile(path, d1, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +287,7 @@ func TestSingleFile(t *testing.T) {
 	f.fsync()
 
 	d2 := []byte("hello\nworld\n")
-	err := os.WriteFile(path, d2, 0644)
+	err := os.WriteFile(path, d2, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +317,7 @@ func TestWriteGoodLink(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	goodFile := filepath.Join(f.paths[0], "goodFile")
-	err := os.WriteFile(goodFile, []byte("hello"), 0644)
+	err := os.WriteFile(goodFile, []byte("hello"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +402,7 @@ func TestWatchNonexistentFileInNonexistentDirectoryCreatedSimultaneously(t *test
 	f := newNotifyFixture(t)
 
 	root := f.JoinPath("root")
-	err := os.Mkdir(root, 0777)
+	err := os.Mkdir(root, 0o777)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +419,7 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	root := f.JoinPath("root")
-	err := os.Mkdir(root, 0777)
+	err := os.Mkdir(root, 0o777)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,12 +430,12 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	f.fsync()
 	f.events = nil
 
-	err = os.Mkdir(parent, 0777)
+	err = os.Mkdir(parent, 0o777)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// for directories that were the root of an Add, we don't report creation, cf. watcher_darwin.go
+	// for directories that were the root of an Add, we don't report creation, cf. watcher_fsevent.go
 	f.assertEvents()
 
 	f.events = nil
@@ -433,7 +448,7 @@ func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	root := f.JoinPath("root")
-	err := os.Mkdir(root, 0777)
+	err := os.Mkdir(root, 0o777)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +458,7 @@ func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
 	f.watch(file)
 	f.assertEvents()
 
-	err = os.Mkdir(parent, 0777)
+	err = os.Mkdir(parent, 0o777)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +489,7 @@ func TestWatchCountInnerFileWithIgnore(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	root := f.paths[0]
-	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{
+	ignore, _ := NewDockerPatternMatcher(root, []string{
 		"a",
 		"!a/b",
 	})
@@ -497,7 +512,7 @@ func TestIgnoreCreatedDir(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	root := f.paths[0]
-	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{"a/b"})
+	ignore, _ := NewDockerPatternMatcher(root, []string{"a/b"})
 	f.setIgnore(ignore)
 
 	a := f.JoinPath(root, "a")
@@ -517,7 +532,7 @@ func TestIgnoreCreatedDirWithExclusions(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	root := f.paths[0]
-	ignore, _ := dockerignore.NewDockerPatternMatcher(root,
+	ignore, _ := NewDockerPatternMatcher(root,
 		[]string{
 			"a/b",
 			"c",
@@ -542,7 +557,7 @@ func TestIgnoreInitialDir(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	root := f.TempDir("root")
-	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{"a/b"})
+	ignore, _ := NewDockerPatternMatcher(root, []string{"a/b"})
 	f.setIgnore(ignore)
 
 	a := f.JoinPath(root, "a")
@@ -568,7 +583,7 @@ type notifyFixture struct {
 	ctx    context.Context
 	cancel func()
 	out    *bytes.Buffer
-	*tempdir.TempDirFixture
+	*TempDirFixture
 	notify Notify
 	ignore PathMatcher
 	paths  []string
@@ -581,7 +596,7 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 	nf := &notifyFixture{
 		ctx:            ctx,
 		cancel:         cancel,
-		TempDirFixture: tempdir.NewTempDirFixture(t),
+		TempDirFixture: NewTempDirFixture(t),
 		paths:          []string{},
 		ignore:         EmptyMatcher{},
 		out:            out,
@@ -609,7 +624,7 @@ func (f *notifyFixture) rebuildWatcher() {
 	}
 
 	// create a new watcher
-	notify, err := NewWatcher(f.paths, f.ignore, logger.NewTestLogger(f.out))
+	notify, err := NewWatcher(f.paths, f.ignore)
 	if err != nil {
 		f.T().Fatal(err)
 	}
@@ -674,7 +689,7 @@ func (f *notifyFixture) fsyncWithRetryCount(retryCount int) {
 	syncPathBase := fmt.Sprintf("sync-%d.txt", time.Now().UnixNano())
 	syncPath := filepath.Join(f.paths[0], syncPathBase)
 	anySyncPath := filepath.Join(f.paths[0], "sync-")
-	timeout := time.After(250 * time.Millisecond)
+	timeout := time.After(250 * time.Second)
 
 	f.WriteFile(syncPath, time.Now().String())
 
