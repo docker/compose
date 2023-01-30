@@ -40,6 +40,7 @@ type ttyWriter struct {
 	done       chan bool
 	mtx        *sync.Mutex
 	tailEvents []string
+	dryRun     bool
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -107,7 +108,11 @@ func (w *ttyWriter) Events(events []Event) {
 func (w *ttyWriter) TailMsgf(msg string, args ...interface{}) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	w.tailEvents = append(w.tailEvents, fmt.Sprintf(msg, args...))
+	msgWithPrefix := msg
+	if w.dryRun {
+		msgWithPrefix = strings.TrimSpace(DRYRUN_PREFIX + msg)
+	}
+	w.tailEvents = append(w.tailEvents, fmt.Sprintf(msgWithPrefix, args...))
 }
 
 func (w *ttyWriter) printTailEvents() {
@@ -167,7 +172,7 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 		if event.ParentID != "" {
 			continue
 		}
-		line := lineText(event, "", terminalWidth, statusPadding, runtime.GOOS != "windows")
+		line := lineText(event, "", terminalWidth, statusPadding, runtime.GOOS != "windows", w.dryRun)
 		fmt.Fprint(w.out, line)
 		numLines++
 		for _, v := range w.eventIDs {
@@ -176,7 +181,7 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 				if skipChildEvents {
 					continue
 				}
-				line := lineText(ev, "  ", terminalWidth, statusPadding, runtime.GOOS != "windows")
+				line := lineText(ev, "  ", terminalWidth, statusPadding, runtime.GOOS != "windows", w.dryRun)
 				fmt.Fprint(w.out, line)
 				numLines++
 			}
@@ -191,13 +196,17 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 	w.numLines = numLines
 }
 
-func lineText(event Event, pad string, terminalWidth, statusPadding int, color bool) string {
+func lineText(event Event, pad string, terminalWidth, statusPadding int, color bool, dryRun bool) string {
 	endTime := time.Now()
 	if event.Status != Working {
 		endTime = event.startTime
 		if (event.endTime != time.Time{}) {
 			endTime = event.endTime
 		}
+	}
+	prefix := ""
+	if dryRun {
+		prefix = DRYRUN_PREFIX
 	}
 
 	elapsed := endTime.Sub(event.startTime).Seconds()
@@ -215,9 +224,10 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 	if maxStatusLen > 0 && len(status) > maxStatusLen {
 		status = status[:maxStatusLen] + "..."
 	}
-	text := fmt.Sprintf("%s %s %s %s%s %s",
+	text := fmt.Sprintf("%s %s%s %s %s%s %s",
 		pad,
 		event.spinner.String(),
+		prefix,
 		event.ID,
 		event.Text,
 		strings.Repeat(" ", padding),

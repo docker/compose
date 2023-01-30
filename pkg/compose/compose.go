@@ -66,22 +66,22 @@ func (s *composeService) MaxConcurrency(i int) {
 	s.maxConcurrency = i
 }
 
-func (s *composeService) DryRunMode(dryRun bool) error {
+func (s *composeService) DryRunMode(ctx context.Context, dryRun bool) (context.Context, error) {
 	if dryRun {
 		cli, err := command.NewDockerCli()
 		if err != nil {
-			return err
+			return ctx, err
 		}
 		err = cli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
 			dryRunClient := api.NewDryRunClient(s.apiClient())
 			return dryRunClient, nil
 		}))
 		if err != nil {
-			return err
+			return ctx, err
 		}
 		s.dockerCli = cli
 	}
-	return nil
+	return context.WithValue(ctx, api.DryRunKey{}, dryRun), nil
 }
 
 func (s *composeService) stdout() *streams.Out {
