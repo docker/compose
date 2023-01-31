@@ -19,6 +19,9 @@
 
 package watch
 
+/**
+FIXME this implementation requires CGO
+
 import (
 	"path/filepath"
 	"time"
@@ -155,3 +158,4 @@ func newFSEventWatcher(paths []string, ignore PathMatcher) (*fseventNotify, erro
 }
 
 var _ Notify = &fseventNotify{}
+**/

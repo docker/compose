@@ -24,7 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
-	"github.com/fsnotify/fsnotify"
+	"github.com/docker/compose/v2/pkg/watch"
 	"github.com/jonboulle/clockwork"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
@@ -88,25 +88,32 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		}
 		context := service.Build.Context
 
-		watcher, err := fsnotify.NewWatcher()
+		ignore, err := watch.LoadDockerIgnore(context)
 		if err != nil {
 			return err
 		}
+
+		watcher, err := watch.NewWatcher([]string{context}, ignore)
+		if err != nil {
+			return err
+		}
+
 		fmt.Println("watching " + context)
-		err = watcher.Add(context)
+		err = watcher.Start()
 		if err != nil {
 			return err
 		}
+
 		eg.Go(func() error {
 			defer watcher.Close() //nolint:errcheck
 			for {
 				select {
 				case <-ctx.Done():
 					return nil
-				case event := <-watcher.Events:
-					log.Println("fs event :", event.String())
+				case event := <-watcher.Events():
+					log.Println("fs event :", event.Path())
 					needRefresh <- service.Name
-				case err := <-watcher.Errors:
+				case err := <-watcher.Errors():
 					return err
 				}
 			}

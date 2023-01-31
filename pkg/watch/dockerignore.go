@@ -60,7 +60,7 @@ func (i dockerPathMatcher) MatchesEntireDir(f string) (bool, error) {
 	return true, nil
 }
 
-func NewDockerIgnoreTester(repoRoot string) (*dockerPathMatcher, error) {
+func LoadDockerIgnore(repoRoot string) (*dockerPathMatcher, error) {
 	absRoot, err := filepath.Abs(repoRoot)
 	if err != nil {
 		return nil, err
