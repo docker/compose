@@ -40,6 +40,7 @@ import (
 	_ "github.com/docker/buildx/driver/docker"           //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/docker-container" //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/kubernetes"       //nolint:blank-imports
+	_ "github.com/docker/buildx/driver/remote"           //nolint:blank-imports
 	xprogress "github.com/docker/buildx/util/progress"
 )
 
