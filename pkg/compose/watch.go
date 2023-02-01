@@ -17,7 +17,7 @@ package compose
 import (
 	"context"
 	"fmt"
-	"log"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,56 +32,29 @@ import (
 )
 
 type DevelopmentConfig struct {
+	Sync     map[string]string `json:"sync,omitempty"`
+	Excludes []string          `json:"excludes,omitempty"`
 }
 
 const quietPeriod = 2 * time.Second
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
-	fmt.Fprintln(s.stderr(), "not implemented yet")
+	needRebuild := make(chan string)
+	needSync := make(chan api.CopyOptions, 5)
 
 	eg, ctx := errgroup.WithContext(ctx)
-	needRefresh := make(chan string)
 	eg.Go(func() error {
 		clock := clockwork.NewRealClock()
-		debounce(ctx, clock, quietPeriod, needRefresh, func(services []string) {
-			fmt.Fprintf(s.stderr(), "Updating %s after changes were detected\n", strings.Join(services, ", "))
-			imageIds, err := s.build(ctx, project, api.BuildOptions{
-				Services: services,
-			})
-			if err != nil {
-				fmt.Fprintf(s.stderr(), "Build failed")
-			}
-			for i, service := range project.Services {
-				if id, ok := imageIds[service.Name]; ok {
-					service.Image = id
-				}
-				project.Services[i] = service
-			}
-
-			err = s.Up(ctx, project, api.UpOptions{
-				Create: api.CreateOptions{
-					Services: services,
-					Inherit:  true,
-				},
-				Start: api.StartOptions{
-					Services: services,
-					Project:  project,
-				},
-			})
-			if err != nil {
-				fmt.Fprintf(s.stderr(), "Application failed to start after update")
-			}
-		})
+		debounce(ctx, clock, quietPeriod, needRebuild, s.makeRebuildFn(ctx, project))
 		return nil
 	})
 
+	eg.Go(s.makeSyncFn(ctx, project, needSync))
+
 	err := project.WithServices(services, func(service types.ServiceConfig) error {
-		var config DevelopmentConfig
-		if y, ok := service.Extensions["x-develop"]; ok {
-			err := mapstructure.Decode(y, &config)
-			if err != nil {
-				return err
-			}
+		config, err := loadDevelopmentConfig(service, project)
+		if err != nil {
+			return err
 		}
 		if service.Build == nil {
 			return errors.New("can't watch a service without a build section")
@@ -98,7 +71,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			return err
 		}
 
-		fmt.Println("watching " + context)
+		fmt.Fprintf(s.stderr(), "watching %s\n", context)
 		err = watcher.Start()
 		if err != nil {
 			return err
@@ -106,13 +79,32 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 		eg.Go(func() error {
 			defer watcher.Close() //nolint:errcheck
+		WATCH:
 			for {
 				select {
 				case <-ctx.Done():
 					return nil
 				case event := <-watcher.Events():
-					log.Println("fs event :", event.Path())
-					needRefresh <- service.Name
+					fmt.Fprintf(s.stderr(), "change detected on %s\n", event.Path())
+
+					for src, dest := range config.Sync {
+						path := filepath.Clean(event.Path())
+						src = filepath.Clean(src)
+						if watch.IsChild(path, src) {
+							rel, err := filepath.Rel(src, path)
+							if err != nil {
+								return err
+							}
+							dest = filepath.Join(dest, rel)
+							needSync <- api.CopyOptions{
+								Source:      path,
+								Destination: fmt.Sprintf("%s:%s", service.Name, dest),
+							}
+							continue WATCH
+						}
+					}
+
+					needRebuild <- service.Name
 				case err := <-watcher.Errors():
 					return err
 				}
@@ -125,6 +117,73 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	}
 
 	return eg.Wait()
+}
+
+func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (DevelopmentConfig, error) {
+	var config DevelopmentConfig
+	if y, ok := service.Extensions["x-develop"]; ok {
+		err := mapstructure.Decode(y, &config)
+		if err != nil {
+			return DevelopmentConfig{}, err
+		}
+		for src, dest := range config.Sync {
+			if !filepath.IsAbs(src) {
+				delete(config.Sync, src)
+				src = filepath.Join(project.WorkingDir, src)
+				config.Sync[src] = dest
+			}
+		}
+	}
+	return config, nil
+}
+
+func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Project) func(services []string) {
+	return func(services []string) {
+		fmt.Fprintf(s.stderr(), "Updating %s after changes were detected\n", strings.Join(services, ", "))
+		imageIds, err := s.build(ctx, project, api.BuildOptions{
+			Services: services,
+		})
+		if err != nil {
+			fmt.Fprintf(s.stderr(), "Build failed")
+		}
+		for i, service := range project.Services {
+			if id, ok := imageIds[service.Name]; ok {
+				service.Image = id
+			}
+			project.Services[i] = service
+		}
+
+		err = s.Up(ctx, project, api.UpOptions{
+			Create: api.CreateOptions{
+				Services: services,
+				Inherit:  true,
+			},
+			Start: api.StartOptions{
+				Services: services,
+				Project:  project,
+			},
+		})
+		if err != nil {
+			fmt.Fprintf(s.stderr(), "Application failed to start after update")
+		}
+	}
+}
+
+func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project, needSync chan api.CopyOptions) func() error {
+	return func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case opt := <-needSync:
+				err := s.Copy(ctx, project.Name, opt)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(s.stderr(), "%s updated\n", opt.Source)
+			}
+		}
+	}
 }
 
 func debounce(ctx context.Context, clock clockwork.Clock, delay time.Duration, input chan string, fn func(services []string)) {

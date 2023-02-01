@@ -23,7 +23,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/tilt-dev/fsnotify"
 )
 
 var (
@@ -86,7 +88,7 @@ func NewWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 	return newWatcher(paths, ignore)
 }
 
-const WindowsBufferSizeEnvVar = "TILT_WATCH_WINDOWS_BUFFER_SIZE"
+const WindowsBufferSizeEnvVar = "COMPOSE_WATCH_WINDOWS_BUFFER_SIZE"
 
 const defaultBufferSize int = 65536
 
@@ -102,5 +104,5 @@ func DesiredWindowsBufferSize() int {
 }
 
 func IsWindowsShortReadError(err error) bool {
-	return runtime.GOOS == "windows" && err != nil && strings.Contains(err.Error(), "short read")
+	return runtime.GOOS == "windows" && !errors.Is(err, fsnotify.ErrEventOverflow)
 }

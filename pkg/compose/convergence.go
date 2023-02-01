@@ -551,7 +551,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 }
 
 // getLinks mimics V1 compose/service.py::Service::_get_links()
-func (s composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) ([]string, error) {
+func (s *composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) ([]string, error) {
 	var links []string
 	format := func(k, v string) string {
 		return fmt.Sprintf("%s:%s", k, v)
