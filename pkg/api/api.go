@@ -468,6 +468,7 @@ type ContainerEvent struct {
 	// This is only suitable for display purposes within Compose, as it's
 	// not guaranteed to be unique across services.
 	Container string
+	ID        string
 	Service   string
 	Line      string
 	// ContainerEventExit only
@@ -484,6 +485,8 @@ const (
 	ContainerEventAttach
 	// ContainerEventStopped is a ContainerEvent of type stopped.
 	ContainerEventStopped
+	// ContainerEventRecreated let consumer know container stopped but his being replaced
+	ContainerEventRecreated
 	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
 	ContainerEventExit
 	// UserCancel user cancelled compose up, we are stopping containers
