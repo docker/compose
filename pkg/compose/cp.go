@@ -79,10 +79,18 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 	}
 
 	g := errgroup.Group{}
-	for _, container := range containers {
-		containerID := container.ID
+	for _, cont := range containers {
+		container := cont
 		g.Go(func() error {
-			return copyFunc(ctx, containerID, srcPath, dstPath, options)
+			if err := copyFunc(ctx, container.ID, srcPath, dstPath, options); err != nil {
+				return err
+			}
+			fromOrInside := "inside"
+			if direction == fromService {
+				fromOrInside = "from"
+			}
+			fmt.Fprintf(s.stderr(), "Copy %s to path %s %s %s service container\n", srcPath, dstPath, fromOrInside, getCanonicalContainerName(container))
+			return nil
 		})
 	}
 
@@ -194,14 +202,17 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		// extracted. This function also infers from the source and destination
 		// info which directory to extract to, which may be the parent of the
 		// destination that the user specified.
-		dstDir, preparedArchive, err := archive.PrepareArchiveCopy(srcArchive, srcInfo, dstInfo)
-		if err != nil {
-			return err
-		}
-		defer preparedArchive.Close() //nolint:errcheck
+		// Don't create the archive if running in Dry Run mode
+		if !s.dryRun {
+			dstDir, preparedArchive, err := archive.PrepareArchiveCopy(srcArchive, srcInfo, dstInfo)
+			if err != nil {
+				return err
+			}
+			defer preparedArchive.Close() //nolint:errcheck
 
-		resolvedDstPath = dstDir
-		content = preparedArchive
+			resolvedDstPath = dstDir
+			content = preparedArchive
+		}
 	}
 
 	options := moby.CopyToContainerOptions{

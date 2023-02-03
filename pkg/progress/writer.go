@@ -28,10 +28,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	DRYRUN_PREFIX = " DRY-RUN MODE - "
-)
-
 // Writer can write multiple progress events
 type Writer interface {
 	Start(context.Context) error

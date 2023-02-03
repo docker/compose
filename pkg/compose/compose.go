@@ -67,6 +67,7 @@ func (s *composeService) MaxConcurrency(i int) {
 }
 
 func (s *composeService) DryRunMode(ctx context.Context, dryRun bool) (context.Context, error) {
+	s.dryRun = dryRun
 	if dryRun {
 		cli, err := command.NewDockerCli()
 		if err != nil {
