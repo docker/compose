@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 type plainWriter struct {
@@ -40,7 +42,7 @@ func (p *plainWriter) Start(ctx context.Context) error {
 func (p *plainWriter) Event(e Event) {
 	prefix := ""
 	if p.dryRun {
-		prefix = "DRY RUN MODE - "
+		prefix = api.DRYRUN_PREFIX
 	}
 	fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.StatusText)
 }
@@ -54,7 +56,7 @@ func (p *plainWriter) Events(events []Event) {
 func (p *plainWriter) TailMsgf(m string, args ...interface{}) {
 	prefix := ""
 	if p.dryRun {
-		prefix = DRYRUN_PREFIX
+		prefix = api.DRYRUN_PREFIX
 	}
 	fmt.Fprintln(p.out, append([]interface{}{prefix, m}, args...)...)
 }

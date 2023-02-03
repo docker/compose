@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/buger/goterm"
@@ -110,7 +111,7 @@ func (w *ttyWriter) TailMsgf(msg string, args ...interface{}) {
 	defer w.mtx.Unlock()
 	msgWithPrefix := msg
 	if w.dryRun {
-		msgWithPrefix = strings.TrimSpace(DRYRUN_PREFIX + msg)
+		msgWithPrefix = strings.TrimSpace(api.DRYRUN_PREFIX + msg)
 	}
 	w.tailEvents = append(w.tailEvents, fmt.Sprintf(msgWithPrefix, args...))
 }
@@ -206,7 +207,7 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 	}
 	prefix := ""
 	if dryRun {
-		prefix = DRYRUN_PREFIX
+		prefix = api.DRYRUN_PREFIX
 	}
 
 	elapsed := endTime.Sub(event.startTime).Seconds()

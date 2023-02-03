@@ -18,9 +18,11 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
@@ -33,6 +35,10 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+const (
+	DRYRUN_PREFIX = " DRY-RUN MODE - "
 )
 
 var _ client.APIClient = &DryRunClient{}
@@ -95,11 +101,18 @@ func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) e
 }
 
 func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, moby.ContainerPathStat, error) {
-	return nil, moby.ContainerPathStat{}, ErrNotImplemented
+	rc := io.NopCloser(strings.NewReader(""))
+	if _, err := d.ContainerStatPath(ctx, container, srcPath); err != nil {
+		return rc, moby.ContainerPathStat{}, fmt.Errorf(" %s Could not find the file %s in container %s", DRYRUN_PREFIX, srcPath, container)
+	}
+	return rc, moby.ContainerPathStat{}, nil
 }
 
 func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options moby.CopyToContainerOptions) error {
-	return ErrNotImplemented
+	if _, err := d.ContainerStatPath(ctx, container, path); err != nil {
+		return fmt.Errorf(" %s Could not find the file %s in container %s", DRYRUN_PREFIX, path, container)
+	}
+	return nil
 }
 
 func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options moby.ImageBuildOptions) (moby.ImageBuildResponse, error) {
