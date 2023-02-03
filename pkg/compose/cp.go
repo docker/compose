@@ -82,15 +82,15 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 	for _, cont := range containers {
 		container := cont
 		g.Go(func() error {
-			err := copyFunc(ctx, container.ID, srcPath, dstPath, options)
-			if s.dryRun && err == nil {
-				fromOrInside := "inside"
-				if direction == fromService {
-					fromOrInside = "from"
-				}
-				fmt.Printf("Copy %s to path %s %s %s service container\n", srcPath, dstPath, fromOrInside, getCanonicalContainerName(container))
+			if err := copyFunc(ctx, container.ID, srcPath, dstPath, options); err != nil {
+				return err
 			}
-			return err
+			fromOrInside := "inside"
+			if direction == fromService {
+				fromOrInside = "from"
+			}
+			fmt.Fprintf(s.stderr(), "Copy %s to path %s %s %s service container\n", srcPath, dstPath, fromOrInside, getCanonicalContainerName(container))
+			return nil
 		})
 	}
 
