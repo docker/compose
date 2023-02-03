@@ -83,6 +83,7 @@ func (s *composeService) Logs(
 			printer.HandleEvent(api.ContainerEvent{
 				Type:      api.ContainerEventAttach,
 				Container: getContainerNameWithoutProject(c),
+				ID:        c.ID,
 				Service:   c.Labels[api.ServiceLabel],
 			})
 		}
@@ -92,6 +93,7 @@ func (s *composeService) Logs(
 				printer.HandleEvent(api.ContainerEvent{
 					Type:      api.ContainerEventAttach,
 					Container: getContainerNameWithoutProject(c),
+					ID:        c.ID,
 					Service:   c.Labels[api.ServiceLabel],
 				})
 				err := s.logContainers(ctx, consumer, c, api.LogOptions{
@@ -106,6 +108,14 @@ func (s *composeService) Logs(
 					return nil
 				}
 				return err
+			}, func(c types.Container, t time.Time) error {
+				printer.HandleEvent(api.ContainerEvent{
+					Type:      api.ContainerEventAttach,
+					Container: "", // actual name will be set by start event
+					ID:        c.ID,
+					Service:   c.Labels[api.ServiceLabel],
+				})
+				return nil
 			})
 			printer.Stop()
 			return err

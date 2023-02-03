@@ -171,7 +171,7 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 	if len(attachTo) == 0 {
 		attachTo = project.ServiceNames()
 	}
-	attachTo = utils.RemoveAll(attachTo, upOptions.noAttach)
+	attachTo = utils.Remove(attachTo, upOptions.noAttach...)
 
 	create := api.CreateOptions{
 		Services:             services,

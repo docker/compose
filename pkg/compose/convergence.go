@@ -416,17 +416,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	var created moby.Container
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Working, "Recreate"))
-	timeoutInSecond := utils.DurationSecondToInt(timeout)
-	err := s.apiClient().ContainerStop(ctx, replaced.ID, containerType.StopOptions{Timeout: timeoutInSecond})
-	if err != nil {
-		return created, err
-	}
-	name := getCanonicalContainerName(replaced)
-	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
-	err = s.apiClient().ContainerRename(ctx, replaced.ID, tmpName)
-	if err != nil {
-		return created, err
-	}
+
 	number, err := strconv.Atoi(replaced.Labels[api.ContainerNumberLabel])
 	if err != nil {
 		return created, err
@@ -436,15 +426,30 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if inherit {
 		inherited = &replaced
 	}
-	name = getContainerName(project.Name, service, number)
-	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true, false, w)
+	name := getContainerName(project.Name, service, number)
+	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
+	service.Labels[api.ContainerReplaceLabel] = replaced.ID
+	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited, false, true, false, w)
 	if err != nil {
 		return created, err
 	}
+
+	timeoutInSecond := utils.DurationSecondToInt(timeout)
+	err = s.apiClient().ContainerStop(ctx, replaced.ID, containerType.StopOptions{Timeout: timeoutInSecond})
+	if err != nil {
+		return created, err
+	}
+
 	err = s.apiClient().ContainerRemove(ctx, replaced.ID, moby.ContainerRemoveOptions{})
 	if err != nil {
 		return created, err
 	}
+
+	err = s.apiClient().ContainerRename(ctx, created.ID, name)
+	if err != nil {
+		return created, err
+	}
+
 	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Done, "Recreated"))
 	setDependentLifecycle(project, service.Name, forceRecreate)
 	return created, err
