@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"time"
@@ -38,12 +39,9 @@ func (s *composeService) Logs(
 	consumer api.LogConsumer,
 	options api.LogOptions,
 ) error {
-	projectName = strings.ToLower(projectName)
 
-	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
-	if err != nil {
-		return err
-	}
+	var containers Containers
+	var err error
 
 	project := options.Project
 	if project == nil {
@@ -52,9 +50,27 @@ func (s *composeService) Logs(
 			return err
 		}
 	}
-
+	projectName = strings.ToLower(projectName)
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
+	}
+
+	switch {
+	case options.Index > 0:
+		if len(options.Services) != 1 {
+			return errors.New("can only specify --index with one service name")
+		}
+		container, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, options.Services[0], options.Index)
+		if err != nil {
+			return err
+		}
+		containers = append(containers, container)
+
+	default:
+		containers, err = s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
+		if err != nil {
+			return err
+		}
 	}
 
 	containers = containers.filter(isService(options.Services...))
