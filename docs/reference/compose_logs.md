@@ -9,7 +9,7 @@ View output from containers
 |:---------------------|:---------|:--------|:-----------------------------------------------------------------------------------------------|
 | `--dry-run`          |          |         | Execute command in dry run mode                                                                |
 | `-f`, `--follow`     |          |         | Follow log output.                                                                             |
-| `--index`            | `int`    | `1`     | index of the container if there are multiple instances of a service [default: 1].              |
+| `--index`            | `int`    | `0`     | index of the container if service has multiple replicas                                        |
 | `--no-color`         |          |         | Produce monochrome output.                                                                     |
 | `--no-log-prefix`    |          |         | Don't print prefix in logs.                                                                    |
 | `--since`            | `string` |         | Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)    |
