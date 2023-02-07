@@ -1,3 +1,6 @@
+//go:build !darwin
+// +build !darwin
+
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -294,7 +297,7 @@ func (d *naiveNotify) add(path string) error {
 	return nil
 }
 
-func newWatcher(paths []string, ignore PathMatcher) (*naiveNotify, error) {
+func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 	if ignore == nil {
 		return nil, fmt.Errorf("newWatcher: ignore is nil")
 	}

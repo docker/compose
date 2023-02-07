@@ -27,12 +27,16 @@ ARG LICENSE_FILES=".*\(Dockerfile\|Makefile\|\.go\|\.hcl\|\.sh\)"
 # xx is a helper for cross-compilation
 FROM --platform=${BUILDPLATFORM} tonistiigi/xx:${XX_VERSION} AS xx
 
+# osxcross contains the MacOSX cross toolchain for xx
+FROM crazymax/osxcross:11.3-alpine AS osxcross
+
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
 FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS base
 COPY --from=xx / /
 RUN apk add --no-cache \
+      clang \
       docker \
       file \
       findutils \
@@ -73,10 +77,12 @@ EOT
 FROM build-base AS build
 ARG BUILD_TAGS
 ARG TARGETPLATFORM
-RUN xx-go --wrap
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=bind,from=osxcross,src=/osxsdk,target=/xx-sdk \
+    xx-go --wrap && \
+    if [ "$(xx-info os)" == "darwin" ]; then export CGO_ENABLED=1; fi && \
     make build GO_BUILDTAGS="$BUILD_TAGS" DESTDIR=/usr/bin && \
     xx-verify --static /usr/bin/docker-compose
 
