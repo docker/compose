@@ -303,10 +303,10 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 }
 
 func flatten(in types.MappingWithEquals) types.Mapping {
-	if len(in) == 0 {
-		return nil
-	}
 	out := types.Mapping{}
+	if len(in) == 0 {
+		return out
+	}
 	for k, v := range in {
 		if v == nil {
 			continue
