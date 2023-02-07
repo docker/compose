@@ -435,7 +435,7 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// for directories that were the root of an Add, we don't report creation, cf. watcher_fsevent.go
+	// for directories that were the root of an Add, we don't report creation, cf. watcher_darwin.go
 	f.assertEvents()
 
 	f.events = nil

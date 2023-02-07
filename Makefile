@@ -53,7 +53,7 @@ all: build
 
 .PHONY: build ## Build the compose cli-plugin
 build:
-	CGO_ENABLED=0 GO111MODULE=on go build -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose$(BINARY_EXT)" ./cmd
+	GO111MODULE=on go build -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose$(BINARY_EXT)" ./cmd
 
 .PHONY: binary
 binary:

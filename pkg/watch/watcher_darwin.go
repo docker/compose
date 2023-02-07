@@ -19,9 +19,6 @@
 
 package watch
 
-/**
-FIXME this implementation requires CGO
-
 import (
 	"path/filepath"
 	"time"
@@ -130,7 +127,7 @@ func (d *fseventNotify) Errors() chan error {
 	return d.errors
 }
 
-func newFSEventWatcher(paths []string, ignore PathMatcher) (*fseventNotify, error) {
+func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 	dw := &fseventNotify{
 		ignore: ignore,
 		stream: &fsevents.EventStream{
@@ -158,4 +155,3 @@ func newFSEventWatcher(paths []string, ignore PathMatcher) (*fseventNotify, erro
 }
 
 var _ Notify = &fseventNotify{}
-**/
