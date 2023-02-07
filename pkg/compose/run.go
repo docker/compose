@@ -76,11 +76,6 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err := s.ensureImagesExists(ctx, project, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
 	}
-	if !opts.NoDeps {
-		if err := s.waitDependencies(ctx, project, service.DependsOn); err != nil {
-			return "", err
-		}
-	}
 
 	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
@@ -88,6 +83,11 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 	updateServices(&service, observedState)
 
+	if !opts.NoDeps {
+		if err := s.waitDependencies(ctx, project, service.DependsOn, observedState); err != nil {
+			return "", err
+		}
+	}
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1,
 		opts.AutoRemove, opts.UseNetworkAliases, opts.Interactive)
 	if err != nil {
