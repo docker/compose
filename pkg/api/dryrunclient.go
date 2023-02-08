@@ -77,7 +77,7 @@ func (d *DryRunClient) ContainerPause(ctx context.Context, container string) err
 }
 
 func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options moby.ContainerRemoveOptions) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerRename(ctx context.Context, container, newContainerName string) error {

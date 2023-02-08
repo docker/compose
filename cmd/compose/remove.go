@@ -79,5 +79,6 @@ func runRemove(ctx context.Context, backend api.Service, opts removeOptions, ser
 		Force:    opts.force,
 		Volumes:  opts.volumes,
 		Project:  project,
+		Stop:     opts.stop,
 	})
 }
