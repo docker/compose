@@ -155,6 +155,17 @@ func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force 
 	return ErrNotImplemented
 }
 
+func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config moby.ExecConfig) (moby.IDResponse, error) {
+	fmt.Printf("%sCreating Exec configuration for container %s with command '%s'\n", DRYRUN_PREFIX, container, strings.Join(config.Cmd, " "))
+	config.Cmd = []string{"true"}
+	return d.apiClient.ContainerExecCreate(ctx, container, config)
+}
+
+func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config moby.ExecStartCheck) error {
+	fmt.Printf("%sExecuting command in detach mode\n", DRYRUN_PREFIX)
+	return nil
+}
+
 // Functions delegated to original APIClient (not used by Compose or not modifying the Compose stack
 
 func (d *DryRunClient) ConfigList(ctx context.Context, options moby.ConfigListOptions) ([]swarm.Config, error) {
@@ -189,20 +200,12 @@ func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, c
 	return d.apiClient.ContainerExecAttach(ctx, execID, config)
 }
 
-func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config moby.ExecConfig) (moby.IDResponse, error) {
-	return d.apiClient.ContainerExecCreate(ctx, container, config)
-}
-
 func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (moby.ContainerExecInspect, error) {
 	return d.apiClient.ContainerExecInspect(ctx, execID)
 }
 
 func (d *DryRunClient) ContainerExecResize(ctx context.Context, execID string, options moby.ResizeOptions) error {
 	return d.apiClient.ContainerExecResize(ctx, execID, options)
-}
-
-func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config moby.ExecStartCheck) error {
-	return d.apiClient.ContainerExecStart(ctx, execID, config)
 }
 
 func (d *DryRunClient) ContainerExport(ctx context.Context, container string) (io.ReadCloser, error) {
