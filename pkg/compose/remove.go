@@ -45,7 +45,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	}
 
 	stoppedContainers := containers.filter(func(c moby.Container) bool {
-		return c.State != ContainerRunning
+		return c.State != ContainerRunning || (options.Stop && s.dryRun)
 	})
 
 	var names []string

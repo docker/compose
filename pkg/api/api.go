@@ -229,8 +229,8 @@ type KillOptions struct {
 type RemoveOptions struct {
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project *types.Project
-	// DryRun just list removable resources
-	DryRun bool
+	// Stop option passed in the command line
+	Stop bool
 	// Volumes remove anonymous volumes
 	Volumes bool
 	// Force don't ask to confirm removal
