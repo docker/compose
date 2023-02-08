@@ -93,7 +93,7 @@ func (d *DryRunClient) ContainerStart(ctx context.Context, container string, opt
 }
 
 func (d *DryRunClient) ContainerStop(ctx context.Context, container string, options containerType.StopOptions) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) error {
