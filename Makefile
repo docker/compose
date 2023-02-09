@@ -61,7 +61,7 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) $(TEST_COVERAGE_FLAGS) -count=1 ./pkg/e2e
+	CGO_ENABLED=1 go test $(TEST_FLAGS) $(TEST_COVERAGE_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
