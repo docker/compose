@@ -33,7 +33,12 @@ ifeq ($(DETECTED_OS),Windows)
 	BINARY_EXT=.exe
 endif
 
-TEST_COVERAGE_FLAGS = -race -coverprofile=coverage.out -covermode=atomic
+TEST_COVERAGE_FLAGS = -coverprofile=coverage.out -covermode=atomic
+ifneq ($(DETECTED_OS),Windows)
+	# go race detector requires gcc on Windows so not used by default
+	# https://github.com/golang/go/issues/27089
+	TEST_COVERAGE_FLAGS += -race
+endif
 TEST_FLAGS?=
 E2E_TEST?=
 ifeq ($(E2E_TEST),)
@@ -61,7 +66,7 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	CGO_ENABLED=1 go test $(TEST_FLAGS) $(TEST_COVERAGE_FLAGS) -count=1 ./pkg/e2e
+	go test $(TEST_FLAGS) $(TEST_COVERAGE_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
