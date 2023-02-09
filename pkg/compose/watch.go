@@ -28,12 +28,23 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
 type DevelopmentConfig struct {
-	Sync     map[string]string `json:"sync,omitempty"`
-	Excludes []string          `json:"excludes,omitempty"`
+	Watch []Trigger `json:"watch,omitempty"`
+}
+
+const (
+	WatchActionSync    = "sync"
+	WatchActionRebuild = "rebuild"
+)
+
+type Trigger struct {
+	Path   string `json:"path,omitempty"`
+	Action string `json:"action,omitempty"`
+	Target string `json:"target,omitempty"`
 }
 
 const quietPeriod = 2 * time.Second
@@ -85,26 +96,38 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 				case <-ctx.Done():
 					return nil
 				case event := <-watcher.Events():
-					fmt.Fprintf(s.stderr(), "change detected on %s\n", event.Path())
+					path := event.Path()
 
-					for src, dest := range config.Sync {
-						path := filepath.Clean(event.Path())
-						src = filepath.Clean(src)
-						if watch.IsChild(path, src) {
-							rel, err := filepath.Rel(src, path)
-							if err != nil {
-								return err
-							}
-							dest = filepath.Join(dest, rel)
-							needSync <- api.CopyOptions{
-								Source:      path,
-								Destination: fmt.Sprintf("%s:%s", service.Name, dest),
+					for _, trigger := range config.Watch {
+						logrus.Debugf("change deteced on %s - comparing with %s", path, trigger.Path)
+						if watch.IsChild(trigger.Path, path) {
+							fmt.Fprintf(s.stderr(), "change detected on %s\n", path)
+
+							switch trigger.Action {
+							case WatchActionSync:
+								logrus.Debugf("modified file %s triggered sync", path)
+								rel, err := filepath.Rel(trigger.Path, path)
+								if err != nil {
+									return err
+								}
+								dest := filepath.Join(trigger.Target, rel)
+								needSync <- api.CopyOptions{
+									Source:      path,
+									Destination: fmt.Sprintf("%s:%s", service.Name, dest),
+								}
+							case WatchActionRebuild:
+								logrus.Debugf("modified file %s require image to be rebuilt", path)
+								needRebuild <- service.Name
+							default:
+								return fmt.Errorf("watch action %q is not supported", trigger)
 							}
 							continue WATCH
 						}
 					}
 
+					// default
 					needRebuild <- service.Name
+
 				case err := <-watcher.Errors():
 					return err
 				}
@@ -124,14 +147,17 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 	if y, ok := service.Extensions["x-develop"]; ok {
 		err := mapstructure.Decode(y, &config)
 		if err != nil {
-			return DevelopmentConfig{}, err
+			return config, err
 		}
-		for src, dest := range config.Sync {
-			if !filepath.IsAbs(src) {
-				delete(config.Sync, src)
-				src = filepath.Join(project.WorkingDir, src)
-				config.Sync[src] = dest
+		for i, trigger := range config.Watch {
+			if !filepath.IsAbs(trigger.Path) {
+				trigger.Path = filepath.Join(project.WorkingDir, trigger.Path)
 			}
+			trigger.Path = filepath.Clean(trigger.Path)
+			if trigger.Path == "" {
+				return config, errors.New("watch rules MUST define a path")
+			}
+			config.Watch[i] = trigger
 		}
 	}
 	return config, nil
