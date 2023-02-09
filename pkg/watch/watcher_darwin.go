@@ -20,6 +20,7 @@
 package watch
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -52,18 +53,8 @@ func (d *fseventNotify) loop() {
 			}
 
 			for _, e := range events {
+				fmt.Println(e)
 				e.Path = filepath.Join("/", e.Path)
-
-				if e.Flags&fsevents.HistoryDone == fsevents.HistoryDone {
-					d.sawAnyHistoryDone = true
-					continue
-				}
-
-				// We wait until we've seen the HistoryDone event for this watcher before processing any events
-				// so that we skip all of the "spurious" events that precede it.
-				if !d.sawAnyHistoryDone {
-					continue
-				}
 
 				_, isPathWereWatching := d.pathsWereWatching[e.Path]
 				if e.Flags&fsevents.ItemIsDir == fsevents.ItemIsDir && e.Flags&fsevents.ItemCreated == fsevents.ItemCreated && isPathWereWatching {
