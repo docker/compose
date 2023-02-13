@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -107,8 +108,17 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 				Condition: getDependencyCondition(s, project),
 			}
 		}
+		if options.WaitTimeout > 0 {
+			withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
+			ctx = withTimeout
+			defer cancel()
+		}
+
 		err = s.waitDependencies(ctx, project, depends, containers)
 		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
+			}
 			return err
 		}
 	}
