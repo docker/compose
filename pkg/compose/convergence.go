@@ -424,7 +424,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	}
 	name := getContainerName(project.Name, service, number)
 	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
-	service.Labels[api.ContainerReplaceLabel] = replaced.ID
+	service.CustomLabels[api.ContainerReplaceLabel] = replaced.ID
 	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited, false, true, false, w)
 	if err != nil {
 		return created, err
