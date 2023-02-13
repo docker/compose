@@ -49,7 +49,7 @@ type Trigger struct {
 
 const quietPeriod = 2 * time.Second
 
-func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
+func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint:gocyclo
 	needRebuild := make(chan string)
 	needSync := make(chan api.CopyOptions, 5)
 
@@ -62,27 +62,37 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 	eg.Go(s.makeSyncFn(ctx, project, needSync))
 
-	err := project.WithServices(services, func(service types.ServiceConfig) error {
+	ss, err := project.GetServices(services...)
+	if err != nil {
+		return err
+	}
+	for _, service := range ss {
 		config, err := loadDevelopmentConfig(service, project)
 		if err != nil {
 			return err
 		}
+		name := service.Name
 		if service.Build == nil {
-			return errors.New("can't watch a service without a build section")
+			if len(services) != 0 || len(config.Watch) != 0 {
+				// watch explicitly requested on service, but no build section set
+				return fmt.Errorf("service %s doesn't have a build section", name)
+			}
+			logrus.Infof("service %s ignored. Can't watch a service without a build section", name)
+			continue
 		}
-		context := service.Build.Context
+		bc := service.Build.Context
 
-		ignore, err := watch.LoadDockerIgnore(context)
+		ignore, err := watch.LoadDockerIgnore(bc)
 		if err != nil {
 			return err
 		}
 
-		watcher, err := watch.NewWatcher([]string{context}, ignore)
+		watcher, err := watch.NewWatcher([]string{bc}, ignore)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintf(s.stderr(), "watching %s\n", context)
+		fmt.Fprintf(s.stderr(), "watching %s\n", bc)
 		err = watcher.Start()
 		if err != nil {
 			return err
@@ -113,11 +123,11 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 								dest := filepath.Join(trigger.Target, rel)
 								needSync <- api.CopyOptions{
 									Source:      path,
-									Destination: fmt.Sprintf("%s:%s", service.Name, dest),
+									Destination: fmt.Sprintf("%s:%s", name, dest),
 								}
 							case WatchActionRebuild:
 								logrus.Debugf("modified file %s require image to be rebuilt", path)
-								needRebuild <- service.Name
+								needRebuild <- name
 							default:
 								return fmt.Errorf("watch action %q is not supported", trigger)
 							}
@@ -126,17 +136,13 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 					}
 
 					// default
-					needRebuild <- service.Name
+					needRebuild <- name
 
 				case err := <-watcher.Errors():
 					return err
 				}
 			}
 		})
-		return nil
-	})
-	if err != nil {
-		return err
 	}
 
 	return eg.Wait()
