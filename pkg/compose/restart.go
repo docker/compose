@@ -48,14 +48,14 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	}
 
 	if len(options.Services) == 0 {
-		options.Services = project.ServiceNames()
+		err = project.ForServices(options.Services)
+		if err != nil {
+			return err
+		}
 	}
 
 	w := progress.ContextWriter(ctx)
 	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		if !utils.StringContains(options.Services, service) {
-			return nil
-		}
 		eg, ctx := errgroup.WithContext(ctx)
 		for _, container := range containers.filter(isService(service)) {
 			container := container
