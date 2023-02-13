@@ -23,7 +23,9 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
+	"github.com/distribution/distribution/v3/uuid"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
@@ -35,6 +37,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -48,12 +51,19 @@ type DryRunKey struct{}
 // DryRunClient implements APIClient by delegating to implementation functions. This allows lazy init and per-method overrides
 type DryRunClient struct {
 	apiClient client.APIClient
+	execs     sync.Map
+}
+
+type execDetails struct {
+	container string
+	command   []string
 }
 
 // NewDryRunClient produces a DryRunClient
 func NewDryRunClient(apiClient client.APIClient) *DryRunClient {
 	return &DryRunClient{
 		apiClient: apiClient,
+		execs:     sync.Map{},
 	}
 }
 
@@ -156,13 +166,23 @@ func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force 
 }
 
 func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config moby.ExecConfig) (moby.IDResponse, error) {
-	fmt.Printf("%sCreating Exec configuration for container %s with command '%s'\n", DRYRUN_PREFIX, container, strings.Join(config.Cmd, " "))
-	config.Cmd = []string{"true"}
-	return d.apiClient.ContainerExecCreate(ctx, container, config)
+	id := uuid.Generate().String()
+	d.execs.Store(id, execDetails{
+		container: container,
+		command:   config.Cmd,
+	})
+	return moby.IDResponse{
+		ID: id,
+	}, nil
 }
 
 func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config moby.ExecStartCheck) error {
-	fmt.Printf("%sExecuting command in detach mode\n", DRYRUN_PREFIX)
+	v, ok := d.execs.LoadAndDelete(execID)
+	if !ok {
+		return fmt.Errorf("invalid exec ID %q", execID)
+	}
+	details := v.(execDetails)
+	fmt.Printf("%sExecuting command %q in %s (detached mode)\n", DRYRUN_PREFIX, details.command, details.container)
 	return nil
 }
 
@@ -197,7 +217,7 @@ func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]c
 }
 
 func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config moby.ExecStartCheck) (moby.HijackedResponse, error) {
-	return d.apiClient.ContainerExecAttach(ctx, execID, config)
+	return moby.HijackedResponse{}, errors.New("interactive exec is not supported in dry-run mode")
 }
 
 func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (moby.ContainerExecInspect, error) {
