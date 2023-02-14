@@ -150,7 +150,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-require go.uber.org/goleak v1.1.12
+require go.uber.org/goleak v1.2.1
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.16.3 // indirect
