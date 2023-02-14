@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -29,19 +28,21 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/buger/goterm"
+	"github.com/docker/go-units"
 	"github.com/morikuni/aec"
 )
 
 type ttyWriter struct {
-	out        io.Writer
-	events     map[string]Event
-	eventIDs   []string
-	repeated   bool
-	numLines   int
-	done       chan bool
-	mtx        *sync.Mutex
-	tailEvents []string
-	dryRun     bool
+	out             io.Writer
+	events          map[string]Event
+	eventIDs        []string
+	repeated        bool
+	numLines        int
+	done            chan bool
+	mtx             *sync.Mutex
+	tailEvents      []string
+	dryRun          bool
+	skipChildEvents bool
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -85,6 +86,9 @@ func (w *ttyWriter) Event(e Event) {
 		last.Status = e.Status
 		last.Text = e.Text
 		last.StatusText = e.StatusText
+		last.Total = e.Total
+		last.Current = e.Current
+		last.Percent = e.Percent
 		// allow set/unset of parent, but not swapping otherwise prompt is flickering
 		if last.ParentID == "" || e.ParentID == "" {
 			last.ParentID = e.ParentID
@@ -163,9 +167,8 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 		}
 	}
 
-	skipChildEvents := false
 	if len(w.eventIDs) > goterm.Height()-2 {
-		skipChildEvents = true
+		w.skipChildEvents = true
 	}
 	numLines := 0
 	for _, v := range w.eventIDs {
@@ -173,16 +176,16 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 		if event.ParentID != "" {
 			continue
 		}
-		line := lineText(event, "", terminalWidth, statusPadding, runtime.GOOS != "windows", w.dryRun)
+		line := w.lineText(event, "", terminalWidth, statusPadding, w.dryRun)
 		fmt.Fprint(w.out, line)
 		numLines++
 		for _, v := range w.eventIDs {
 			ev := w.events[v]
 			if ev.ParentID == event.ID {
-				if skipChildEvents {
+				if w.skipChildEvents {
 					continue
 				}
-				line := lineText(ev, "  ", terminalWidth, statusPadding, runtime.GOOS != "windows", w.dryRun)
+				line := w.lineText(ev, "  ", terminalWidth, statusPadding, w.dryRun)
 				fmt.Fprint(w.out, line)
 				numLines++
 			}
@@ -197,7 +200,7 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 	w.numLines = numLines
 }
 
-func lineText(event Event, pad string, terminalWidth, statusPadding int, color bool, dryRun bool) string {
+func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPadding int, dryRun bool) string {
 	endTime := time.Now()
 	if event.Status != Working {
 		endTime = event.startTime
@@ -207,12 +210,38 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 	}
 	prefix := ""
 	if dryRun {
-		prefix = api.DRYRUN_PREFIX
+		prefix = aec.Apply(api.DRYRUN_PREFIX, aec.CyanF)
 	}
 
 	elapsed := endTime.Sub(event.startTime).Seconds()
 
-	textLen := len(fmt.Sprintf("%s %s", event.ID, event.Text))
+	var (
+		total      int64
+		current    int64
+		completion []string
+	)
+
+	for _, v := range w.eventIDs {
+		ev := w.events[v]
+		if ev.ParentID == event.ID {
+			total += ev.Total
+			current += ev.Current
+			completion = append(completion, percentChars[(len(percentChars)-1)*ev.Percent/100])
+		}
+	}
+
+	var txt string
+	if len(completion) > 0 {
+		txt = fmt.Sprintf("%s %s [%s] %7s/%-7s %s",
+			event.ID,
+			aec.Apply(fmt.Sprintf("%d layers", len(completion)), aec.YellowF),
+			aec.Apply(strings.Join(completion, ""), aec.GreenF, aec.Bold),
+			units.HumanSize(float64(current)), units.HumanSize(float64(total)),
+			event.Text)
+	} else {
+		txt = fmt.Sprintf("%s %s", event.ID, event.Text)
+	}
+	textLen := len(txt)
 	padding := statusPadding - textLen
 	if padding < 0 {
 		padding = 0
@@ -225,31 +254,16 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 	if maxStatusLen > 0 && len(status) > maxStatusLen {
 		status = status[:maxStatusLen] + "..."
 	}
-	text := fmt.Sprintf("%s %s%s %s %s%s %s",
+	text := fmt.Sprintf("%s %s%s %s%s %s",
 		pad,
-		event.spinner.String(),
+		event.Spinner(),
 		prefix,
-		event.ID,
-		event.Text,
+		txt,
 		strings.Repeat(" ", padding),
-		status,
+		aec.Apply(status, event.Status.color()),
 	)
-	timer := fmt.Sprintf("%.1fs\n", elapsed)
-	o := align(text, timer, terminalWidth)
-
-	if color {
-		color := aec.WhiteF
-		if event.Status == Done {
-			color = aec.BlueF
-		}
-		if event.Status == Error {
-			color = aec.RedF
-		}
-		if event.Status == Warning {
-			color = aec.YellowF
-		}
-		return aec.Apply(o, color)
-	}
+	timer := fmt.Sprintf("%.1fs ", elapsed)
+	o := align(text, aec.Apply(timer, aec.BlueF), terminalWidth)
 
 	return o
 }
@@ -257,7 +271,7 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 func numDone(events map[string]Event) int {
 	i := 0
 	for _, e := range events {
-		if e.Status == Done {
+		if e.Status != Working {
 			i++
 		}
 	}
@@ -265,5 +279,32 @@ func numDone(events map[string]Event) int {
 }
 
 func align(l, r string, w int) string {
-	return fmt.Sprintf("%-[2]*[1]s %[3]s", l, w-len(r)-1, r)
+	ll := lenAnsi(l)
+	lr := lenAnsi(r)
+	pad := strings.Repeat(" ", w-ll-lr)
+	return fmt.Sprintf("%s%s%s\n", l, pad, r)
 }
+
+// lenAnsi count of user-perceived characters in ANSI string.
+func lenAnsi(s string) int {
+	length := 0
+	ansiCode := false
+	for _, r := range s {
+		if r == '\x1b' {
+			ansiCode = true
+			continue
+		}
+		if ansiCode && r == 'm' {
+			ansiCode = false
+			continue
+		}
+		if !ansiCode {
+			length++
+		}
+	}
+	return length
+}
+
+var (
+	percentChars = strings.Split("⠀⡀⣀⣄⣤⣦⣶⣷⣿", "")
+)

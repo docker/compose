@@ -16,20 +16,37 @@
 
 package progress
 
-import "time"
+import (
+	"time"
+
+	"github.com/morikuni/aec"
+)
 
 // EventStatus indicates the status of an action
 type EventStatus int
+
+func (s EventStatus) color() aec.ANSI {
+	switch s {
+	case Done:
+		return aec.GreenF
+	case Warning:
+		return aec.YellowF.With(aec.Bold)
+	case Error:
+		return aec.RedF.With(aec.Bold)
+	default:
+		return aec.DefaultF
+	}
+}
 
 const (
 	// Working means that the current task is working
 	Working EventStatus = iota
 	// Done means that the current task is done
 	Done
-	// Error means that the current task has errored
-	Error
 	// Warning means that the current task has warning
 	Warning
+	// Error means that the current task has errored
+	Error
 )
 
 // Event represents a progress event.
@@ -39,7 +56,10 @@ type Event struct {
 	Text       string
 	Status     EventStatus
 	StatusText string
+	Current    int64
+	Percent    int
 
+	Total     int64
 	startTime time.Time
 	endTime   time.Time
 	spinner   *spinner
@@ -147,4 +167,23 @@ func NewEvent(id string, status EventStatus, statusText string) Event {
 func (e *Event) stop() {
 	e.endTime = time.Now()
 	e.spinner.Stop()
+}
+
+var (
+	spinnerDone    = aec.Apply("✔", aec.GreenF)
+	spinnerWarning = aec.Apply("!", aec.YellowF)
+	spinnerError   = aec.Apply("✘", aec.RedF)
+)
+
+func (e *Event) Spinner() any {
+	switch e.Status {
+	case Done:
+		return spinnerDone
+	case Warning:
+		return spinnerWarning
+	case Error:
+		return spinnerError
+	default:
+		return e.spinner.String()
+	}
 }
