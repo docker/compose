@@ -139,11 +139,15 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.W
 		return
 	}
 	var (
-		text   string
-		status = progress.Working
+		text    string
+		status  = progress.Working
+		total   int64
+		current int64
+		percent int
 	)
-	if jm.Status == "Pull complete" || jm.Status == "Already exists" {
+	if jm.Status == "Pushed" || jm.Status == "Already exists" {
 		status = progress.Done
+		percent = 100
 	}
 	if jm.Error != nil {
 		status = progress.Error
@@ -151,11 +155,22 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.W
 	}
 	if jm.Progress != nil {
 		text = jm.Progress.String()
+		if jm.Progress.Total != 0 {
+			current = jm.Progress.Current
+			total = jm.Progress.Total
+			if jm.Progress.Total > 0 {
+				percent = int(jm.Progress.Current * 100 / jm.Progress.Total)
+			}
+		}
 	}
+
 	w.Event(progress.Event{
 		ID:         fmt.Sprintf("Pushing %s: %s", prefix, jm.ID),
 		Text:       jm.Status,
 		Status:     status,
+		Current:    current,
+		Total:      total,
+		Percent:    percent,
 		StatusText: text,
 	})
 }

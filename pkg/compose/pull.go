@@ -336,23 +336,53 @@ func isServiceImageToBuild(service types.ServiceConfig, services []types.Service
 	return false
 }
 
+const (
+	PreparingPhase         = "Preparing"
+	WaitingPhase           = "Waiting"
+	PullingFsPhase         = "Pulling fs layer"
+	DownloadingPhase       = "Downloading"
+	DownloadCompletePhase  = "Download complete"
+	ExtractingPhase        = "Extracting"
+	VerifyingChecksumPhase = "Verifying Checksum"
+	AlreadyExistsPhase     = "Already exists"
+	PullCompletePhase      = "Pull complete"
+)
+
 func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.Writer) {
 	if jm.ID == "" || jm.Progress == nil {
 		return
 	}
 
 	var (
-		text   string
-		status = progress.Working
+		text    string
+		total   int64
+		percent int
+		current int64
+		status  = progress.Working
 	)
 
 	text = jm.Progress.String()
 
-	if jm.Status == "Pull complete" ||
-		jm.Status == "Already exists" ||
-		strings.Contains(jm.Status, "Image is up to date") ||
+	switch jm.Status {
+	case PreparingPhase, WaitingPhase, PullingFsPhase:
+		percent = 0
+	case DownloadingPhase, ExtractingPhase, VerifyingChecksumPhase:
+		if jm.Progress != nil {
+			current = jm.Progress.Current
+			total = jm.Progress.Total
+			if jm.Progress.Total > 0 {
+				percent = int(jm.Progress.Current * 100 / jm.Progress.Total)
+			}
+		}
+	case DownloadCompletePhase, AlreadyExistsPhase, PullCompletePhase:
+		status = progress.Done
+		percent = 100
+	}
+
+	if strings.Contains(jm.Status, "Image is up to date") ||
 		strings.Contains(jm.Status, "Downloaded newer image") {
 		status = progress.Done
+		percent = 100
 	}
 
 	if jm.Error != nil {
@@ -363,6 +393,9 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.W
 	w.Event(progress.Event{
 		ID:         jm.ID,
 		ParentID:   parent,
+		Current:    current,
+		Total:      total,
+		Percent:    percent,
 		Text:       jm.Status,
 		Status:     status,
 		StatusText: text,
