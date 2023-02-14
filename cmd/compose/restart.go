@@ -28,6 +28,7 @@ import (
 type restartOptions struct {
 	*ProjectOptions
 	timeout int
+	noDeps  bool
 }
 
 func restartCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
@@ -44,6 +45,7 @@ func restartCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	}
 	flags := restartCmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
+	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't restart dependent services.")
 
 	return restartCmd
 }
@@ -52,6 +54,13 @@ func runRestart(ctx context.Context, backend api.Service, opts restartOptions, s
 	project, name, err := opts.projectOrName()
 	if err != nil {
 		return err
+	}
+
+	if opts.noDeps {
+		err := withSelectedServicesOnly(project, services)
+		if err != nil {
+			return err
+		}
 	}
 
 	timeout := time.Duration(opts.timeout) * time.Second

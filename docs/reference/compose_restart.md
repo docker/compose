@@ -7,6 +7,7 @@ Restart service containers
 
 | Name              | Type  | Default | Description                           |
 |:------------------|:------|:--------|:--------------------------------------|
+| `--no-deps`       |       |         | Don't restart dependent services.     |
 | `-t`, `--timeout` | `int` | `10`    | Specify a shutdown timeout in seconds |
 
 

@@ -15,6 +15,16 @@ usage: docker compose restart [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: no-deps
+      value_type: bool
+      default_value: "false"
+      description: Don't restart dependent services.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: timeout
       shorthand: t
       value_type: int
