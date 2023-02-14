@@ -171,11 +171,24 @@ func runHash(streams api.Streams, opts convertOptions) error {
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
 	}
-	project, err := opts.ToProject(services)
+	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
 	}
-	for _, s := range project.Services {
+
+	if len(services) > 0 {
+		err = withSelectedServicesOnly(project, services)
+		if err != nil {
+			return err
+		}
+	}
+
+	sorted := project.Services
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Name < sorted[j].Name
+	})
+
+	for _, s := range sorted {
 		hash, err := compose.ServiceHash(s)
 		if err != nil {
 			return err
