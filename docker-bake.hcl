@@ -13,7 +13,7 @@
 // limitations under the License.
 
 variable "GO_VERSION" {
-  default = "1.20.0"
+  default = "1.20.1"
 }
 
 variable "BUILD_TAGS" {
