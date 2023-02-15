@@ -198,7 +198,8 @@ options:
       kubernetes: false
       swarm: false
     - option: env-file
-      value_type: string
+      value_type: stringArray
+      default_value: '[]'
       description: Specify an alternate environment file.
       deprecated: false
       hidden: false
