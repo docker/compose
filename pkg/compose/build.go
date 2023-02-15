@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
@@ -75,6 +76,13 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
 		if err != nil {
 			return err
+		}
+		if len(options.BuildContexts) > 0 {
+			parsedBuildContexts, err := parseBuildContexts(options.BuildContexts)
+			if err != nil {
+				return err
+			}
+			buildOptions.Inputs.NamedContexts = parsedBuildContexts
 		}
 		for _, image := range service.Build.CacheFrom {
 			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
@@ -400,6 +408,18 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 	ret.Add(api.ProjectLabel, project.Name)
 	ret.Add(api.ServiceLabel, service.Name)
 	return ret
+}
+
+func parseBuildContexts(buildContexts []string) (map[string]build.NamedContext, error) {
+	namedContexts := map[string]build.NamedContext{}
+	for _, buildContext := range buildContexts {
+		parts := strings.Split(buildContext, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("the build context '%s' must be in the format NAME=VALUE", buildContext)
+		}
+		namedContexts[parts[0]] = build.NamedContext{Path: parts[1]}
+	}
+	return namedContexts, nil
 }
 
 func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {

@@ -89,6 +89,8 @@ type WatchOptions struct {
 
 // BuildOptions group options of the Build API
 type BuildOptions struct {
+	// Additional build contexts passed in the command line
+	BuildContexts []string
 	// Pull always attempt to pull a newer version of the image
 	Pull bool
 	// Push pushes service images

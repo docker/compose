@@ -36,14 +36,15 @@ import (
 type buildOptions struct {
 	*ProjectOptions
 	composeOptions
-	quiet    bool
-	pull     bool
-	push     bool
-	progress string
-	args     []string
-	noCache  bool
-	memory   string
-	ssh      string
+	quiet         bool
+	pull          bool
+	push          bool
+	progress      string
+	args          []string
+	noCache       bool
+	memory        string
+	ssh           string
+	buildContexts []string
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -57,14 +58,15 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}
 
 	return api.BuildOptions{
-		Pull:     opts.pull,
-		Push:     opts.push,
-		Progress: opts.progress,
-		Args:     types.NewMappingWithEquals(opts.args),
-		NoCache:  opts.noCache,
-		Quiet:    opts.quiet,
-		Services: services,
-		SSHs:     SSHKeys,
+		BuildContexts: opts.buildContexts,
+		Pull:          opts.pull,
+		Push:          opts.push,
+		Progress:      opts.progress,
+		Args:          types.NewMappingWithEquals(opts.args),
+		NoCache:       opts.noCache,
+		Quiet:         opts.quiet,
+		Services:      services,
+		SSHs:          SSHKeys,
 	}, nil
 }
 
@@ -115,6 +117,7 @@ func buildCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	cmd.Flags().StringVar(&opts.progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
+	cmd.Flags().StringArrayVar(&opts.buildContexts, "build-context", []string{}, "Set additional build contexts.")
 	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	cmd.Flags().MarkHidden("parallel") //nolint:errcheck
