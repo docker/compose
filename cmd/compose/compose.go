@@ -99,7 +99,7 @@ type ProjectOptions struct {
 	ConfigPaths   []string
 	WorkDir       string
 	ProjectDir    string
-	EnvFile       string
+	EnvFiles      []string
 	Compatibility bool
 }
 
@@ -132,7 +132,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
+	f.StringArrayVar(&o.EnvFiles, "env-file", nil, "Specify an alternate environment file.")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
@@ -198,8 +198,8 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
 			api.OneoffLabel:      "False", // default, will be overridden by `run` command
 		}
-		if o.EnvFile != "" {
-			s.CustomLabels[api.EnvironmentFileLabel] = o.EnvFile
+		if len(o.EnvFiles) != 0 {
+			s.CustomLabels[api.EnvironmentFileLabel] = strings.Join(o.EnvFiles, ",")
 		}
 		project.Services[i] = s
 	}
@@ -229,7 +229,7 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
 			cli.WithOsEnv,
-			cli.WithEnvFile(o.EnvFile),
+			cli.WithEnvFiles(o.EnvFiles...),
 			cli.WithDotEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
@@ -322,10 +322,13 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
 			}
-			if opts.EnvFile != "" && !filepath.IsAbs(opts.EnvFile) {
-				opts.EnvFile, err = filepath.Abs(opts.EnvFile)
-				if err != nil {
-					return err
+			for i, file := range opts.EnvFiles {
+				if !filepath.IsAbs(file) {
+					file, err = filepath.Abs(file)
+					if err != nil {
+						return err
+					}
+					opts.EnvFiles[i] = file
 				}
 			}
 			if v, ok := os.LookupEnv("COMPOSE_PARALLEL_LIMIT"); ok && !cmd.Flags().Changed("parallel") {
