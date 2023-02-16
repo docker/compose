@@ -46,7 +46,7 @@ import (
 )
 
 func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, opts map[string]buildx.Options) (map[string]string, error) {
-	var nameDigests = make(map[string]string)
+	nameDigests := make(map[string]string)
 	var errs error
 	err := project.WithServices(nil, func(service types.ServiceConfig) error {
 		imageName := api.GetImageNameOrDefault(service, project.Name)
@@ -102,6 +102,9 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	}
 	if utils.Contains(options.Allow, entitlements.EntitlementSecurityInsecure) {
 		return "", errors.Errorf("this builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use builder supporting privileged mode")
+	}
+	if len(options.Inputs.NamedContexts) > 0 {
+		return "", errors.Errorf("this builder doesn't support additional contexts, set DOCKER_BUILDKIT=1 to use BuildKit which does")
 	}
 
 	if options.Labels == nil {
