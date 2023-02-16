@@ -32,7 +32,7 @@ import (
 	"github.com/docker/compose/v2/pkg/compose"
 )
 
-type convertOptions struct {
+type configOptions struct {
 	*ProjectOptions
 	Format              string
 	Output              string
@@ -48,8 +48,17 @@ type convertOptions struct {
 	noConsistency       bool
 }
 
+func (o *configOptions) ToProject(services []string) (*types.Project, error) {
+	return o.ProjectOptions.ToProject(services,
+		cli.WithInterpolation(!o.noInterpolate),
+		cli.WithResolvedPaths(true),
+		cli.WithNormalization(!o.noNormalize),
+		cli.WithConsistency(!o.noConsistency),
+		cli.WithDiscardEnvFile)
+}
+
 func convertCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
-	opts := convertOptions{
+	opts := configOptions{
 		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
@@ -108,14 +117,9 @@ func convertCommand(p *ProjectOptions, streams api.Streams, backend api.Service)
 	return cmd
 }
 
-func runConfig(ctx context.Context, streams api.Streams, backend api.Service, opts convertOptions, services []string) error {
+func runConfig(ctx context.Context, streams api.Streams, backend api.Service, opts configOptions, services []string) error {
 	var content []byte
-	project, err := opts.ToProject(services,
-		cli.WithInterpolation(!opts.noInterpolate),
-		cli.WithResolvedPaths(true),
-		cli.WithNormalization(!opts.noNormalize),
-		cli.WithConsistency(!opts.noConsistency),
-		cli.WithDiscardEnvFile)
+	project, err := opts.ToProject(services)
 	if err != nil {
 		return err
 	}
@@ -144,7 +148,7 @@ func runConfig(ctx context.Context, streams api.Streams, backend api.Service, op
 	return err
 }
 
-func runServices(streams api.Streams, opts convertOptions) error {
+func runServices(streams api.Streams, opts configOptions) error {
 	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
@@ -155,7 +159,7 @@ func runServices(streams api.Streams, opts convertOptions) error {
 	})
 }
 
-func runVolumes(streams api.Streams, opts convertOptions) error {
+func runVolumes(streams api.Streams, opts configOptions) error {
 	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
@@ -166,7 +170,7 @@ func runVolumes(streams api.Streams, opts convertOptions) error {
 	return nil
 }
 
-func runHash(streams api.Streams, opts convertOptions) error {
+func runHash(streams api.Streams, opts configOptions) error {
 	var services []string
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
@@ -198,7 +202,7 @@ func runHash(streams api.Streams, opts convertOptions) error {
 	return nil
 }
 
-func runProfiles(streams api.Streams, opts convertOptions, services []string) error {
+func runProfiles(streams api.Streams, opts configOptions, services []string) error {
 	set := map[string]struct{}{}
 	project, err := opts.ToProject(services)
 	if err != nil {
@@ -220,7 +224,7 @@ func runProfiles(streams api.Streams, opts convertOptions, services []string) er
 	return nil
 }
 
-func runConfigImages(streams api.Streams, opts convertOptions, services []string) error {
+func runConfigImages(streams api.Streams, opts configOptions, services []string) error {
 	project, err := opts.ToProject(services)
 	if err != nil {
 		return err
