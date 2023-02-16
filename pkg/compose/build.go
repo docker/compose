@@ -80,6 +80,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			if err != nil {
 				return err
 			}
+			if len(service.Build.AdditionalContexts) > 0 {
+				buildOptions.Inputs.NamedContexts = toBuildContexts(service.Build.AdditionalContexts)
+			}
 			for _, image := range service.Build.CacheFrom {
 				buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
 					Type:  "registry",
@@ -200,7 +203,6 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 		}
 	}
 	return opts, nil
-
 }
 
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
@@ -420,6 +422,14 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 	ret.Add(api.ProjectLabel, project.Name)
 	ret.Add(api.ServiceLabel, service.Name)
 	return ret
+}
+
+func toBuildContexts(additionalContexts map[string]*string) map[string]build.NamedContext {
+	namedContexts := map[string]build.NamedContext{}
+	for name, buildContext := range additionalContexts {
+		namedContexts[name] = build.NamedContext{Path: *buildContext}
+	}
+	return namedContexts
 }
 
 func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {
