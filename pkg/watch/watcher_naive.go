@@ -129,6 +129,7 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 		}
 
 		if shouldSkipDir {
+			logrus.Debugf("Ignoring directory and its contents (recursively): %s", path)
 			return filepath.SkipDir
 		}
 
@@ -234,6 +235,7 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 	if err != nil {
 		logrus.Infof("Error matching path %q: %v", path, err)
 	} else if ignore {
+		logrus.Tracef("Ignoring event for path: %v", path)
 		return false
 	}
 

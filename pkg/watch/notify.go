@@ -106,3 +106,39 @@ func DesiredWindowsBufferSize() int {
 func IsWindowsShortReadError(err error) bool {
 	return runtime.GOOS == "windows" && !errors.Is(err, fsnotify.ErrEventOverflow)
 }
+
+type CompositePathMatcher struct {
+	Matchers []PathMatcher
+}
+
+func NewCompositeMatcher(matchers ...PathMatcher) PathMatcher {
+	if len(matchers) == 0 {
+		return EmptyMatcher{}
+	}
+	return CompositePathMatcher{Matchers: matchers}
+}
+
+func (c CompositePathMatcher) Matches(f string) (bool, error) {
+	for _, t := range c.Matchers {
+		ret, err := t.Matches(f)
+		if err != nil {
+			return false, err
+		}
+		if ret {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c CompositePathMatcher) MatchesEntireDir(f string) (bool, error) {
+	for _, t := range c.Matchers {
+		matches, err := t.MatchesEntireDir(f)
+		if matches || err != nil {
+			return matches, err
+		}
+	}
+	return false, nil
+}
+
+var _ PathMatcher = CompositePathMatcher{}
