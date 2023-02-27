@@ -22,14 +22,15 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
-	"github.com/docker/compose/v2/pkg/watch"
 	"github.com/jonboulle/clockwork"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
+	"github.com/docker/compose/v2/pkg/watch"
 )
 
 type DevelopmentConfig struct {
@@ -82,10 +83,23 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		}
 		bc := service.Build.Context
 
-		ignore, err := watch.LoadDockerIgnore(bc)
+		dockerIgnores, err := watch.LoadDockerIgnore(bc)
 		if err != nil {
 			return err
 		}
+
+		// add a hardcoded set of ignores on top of what came from .dockerignore
+		// some of this should likely be configurable (e.g. there could be cases
+		// where you want `.git` to be synced) but this is suitable for now
+		dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{".git/"})
+		if err != nil {
+			return err
+		}
+		ignore := watch.NewCompositeMatcher(
+			dockerIgnores,
+			watch.EphemeralPathMatcher,
+			dotGitIgnore,
+		)
 
 		watcher, err := watch.NewWatcher([]string{bc}, ignore)
 		if err != nil {
@@ -109,7 +123,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 					path := event.Path()
 
 					for _, trigger := range config.Watch {
-						logrus.Debugf("change deteced on %s - comparing with %s", path, trigger.Path)
+						logrus.Debugf("change detected on %s - comparing with %s", path, trigger.Path)
 						if watch.IsChild(trigger.Path, path) {
 							fmt.Fprintf(s.stderr(), "change detected on %s\n", path)
 
@@ -126,7 +140,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 									Destination: fmt.Sprintf("%s:%s", name, dest),
 								}
 							case WatchActionRebuild:
-								logrus.Debugf("modified file %s require image to be rebuilt", path)
+								logrus.Debugf("modified file %s requires image to be rebuilt", path)
 								needRebuild <- name
 							default:
 								return fmt.Errorf("watch action %q is not supported", trigger)
@@ -176,7 +190,7 @@ func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Proje
 			Services: services,
 		})
 		if err != nil {
-			fmt.Fprintf(s.stderr(), "Build failed")
+			fmt.Fprintf(s.stderr(), "Build failed\n")
 		}
 		for i, service := range project.Services {
 			if id, ok := imageIds[service.Name]; ok {
@@ -196,7 +210,7 @@ func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Proje
 			},
 		})
 		if err != nil {
-			fmt.Fprintf(s.stderr(), "Application failed to start after update")
+			fmt.Fprintf(s.stderr(), "Application failed to start after update\n")
 		}
 	}
 }
@@ -212,7 +226,7 @@ func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project,
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(s.stderr(), "%s updated\n", opt.Source)
+				fmt.Fprintf(s.stderr(), "%s updated\n", opt.Destination)
 			}
 		}
 	}

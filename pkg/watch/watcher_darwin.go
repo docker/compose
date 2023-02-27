@@ -20,7 +20,6 @@
 package watch
 
 import (
-	"fmt"
 	"path/filepath"
 	"time"
 
@@ -53,7 +52,6 @@ func (d *fseventNotify) loop() {
 			}
 
 			for _, e := range events {
-				fmt.Println(e)
 				e.Path = filepath.Join("/", e.Path)
 
 				_, isPathWereWatching := d.pathsWereWatching[e.Path]
@@ -67,6 +65,7 @@ func (d *fseventNotify) loop() {
 				if err != nil {
 					logrus.Infof("Error matching path %q: %v", e.Path, err)
 				} else if ignore {
+					logrus.Tracef("Ignoring event for path: %v", e.Path)
 					continue
 				}
 
