@@ -189,6 +189,15 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
+	err = project.EnableServices(services...)
+	if err != nil {
+		return nil, err
+	}
+
+	project.WithoutUnnecessaryResources()
+
+	err = project.ForServices(services)
+
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
 			api.ProjectLabel:     project.Name,
@@ -204,23 +213,6 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		project.Services[i] = s
 	}
 
-	if profiles, ok := options.Environment["COMPOSE_PROFILES"]; ok && len(o.Profiles) == 0 {
-		o.Profiles = append(o.Profiles, strings.Split(profiles, ",")...)
-	}
-
-	if len(services) > 0 {
-		s, err := project.GetServices(services...)
-		if err != nil {
-			return nil, err
-		}
-		o.Profiles = append(o.Profiles, s.GetProfiles()...)
-	}
-
-	project.ApplyProfiles(o.Profiles)
-
-	project.WithoutUnnecessaryResources()
-
-	err = project.ForServices(services)
 	return project, err
 }
 
@@ -233,6 +225,7 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithDotEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
+			cli.WithProfiles(o.Profiles),
 			cli.WithName(o.ProjectName))...)
 }
 
@@ -359,7 +352,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		psCommand(&opts, streams, backend),
 		listCommand(streams, backend),
 		logsCommand(&opts, streams, backend),
-		convertCommand(&opts, streams, backend),
+		configCommand(&opts, streams, backend),
 		killCommand(&opts, backend),
 		runCommand(&opts, streams, backend),
 		removeCommand(&opts, backend),

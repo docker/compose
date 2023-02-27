@@ -54,10 +54,11 @@ func (o *configOptions) ToProject(services []string) (*types.Project, error) {
 		cli.WithResolvedPaths(true),
 		cli.WithNormalization(!o.noNormalize),
 		cli.WithConsistency(!o.noConsistency),
+		cli.WithProfiles(o.Profiles),
 		cli.WithDiscardEnvFile)
 }
 
-func convertCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func configCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	opts := configOptions{
 		ProjectOptions: p,
 	}

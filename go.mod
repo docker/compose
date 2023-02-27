@@ -177,6 +177,8 @@ require (
 )
 
 replace (
+	github.com/compose-spec/compose-go => github.com/ndeloof/compose-go v1.2.4-0.20230228082114-ffc730be6172
+
 	// Override for e2e tests
 	github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220922095256-4c4b17abdae7
 
