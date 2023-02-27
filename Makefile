@@ -15,7 +15,7 @@
 PKG := github.com/docker/compose/v2
 VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
 
-GO_LDFLAGS ?= -s -w -X ${PKG}/internal.Version=${VERSION}
+GO_LDFLAGS ?= -w -X ${PKG}/internal.Version=${VERSION}
 GO_BUILDTAGS ?= e2e
 
 ifeq ($(OS),Windows_NT)
