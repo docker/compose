@@ -281,7 +281,11 @@ func numDone(events map[string]Event) int {
 func align(l, r string, w int) string {
 	ll := lenAnsi(l)
 	lr := lenAnsi(r)
-	pad := strings.Repeat(" ", w-ll-lr)
+	pad := ""
+	count := w - ll - lr
+	if count > 0 {
+		pad = strings.Repeat(" ", count)
+	}
 	return fmt.Sprintf("%s%s%s\n", l, pad, r)
 }
 
