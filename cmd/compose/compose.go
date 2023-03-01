@@ -193,6 +193,11 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, errors.New("project name can't be empty. Use `--project-name` to set a valid name")
 	}
 
+	err = project.EnableServices(services...)
+	if err != nil {
+		return nil, err
+	}
+
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
 			api.ProjectLabel:     project.Name,
@@ -207,20 +212,6 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		}
 		project.Services[i] = s
 	}
-
-	if profiles, ok := options.Environment["COMPOSE_PROFILES"]; ok && len(o.Profiles) == 0 {
-		o.Profiles = append(o.Profiles, strings.Split(profiles, ",")...)
-	}
-
-	if len(services) > 0 {
-		s, err := project.GetServices(services...)
-		if err != nil {
-			return nil, err
-		}
-		o.Profiles = append(o.Profiles, s.GetProfiles()...)
-	}
-
-	project.ApplyProfiles(o.Profiles)
 
 	project.WithoutUnnecessaryResources()
 
@@ -237,6 +228,7 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithDotEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
+			cli.WithProfiles(o.Profiles),
 			cli.WithName(o.ProjectName))...)
 }
 

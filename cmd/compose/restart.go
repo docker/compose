@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -57,7 +58,7 @@ func runRestart(ctx context.Context, backend api.Service, opts restartOptions, s
 	}
 
 	if opts.noDeps {
-		err := withSelectedServicesOnly(project, services)
+		err := project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}
