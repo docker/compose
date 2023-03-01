@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
@@ -181,13 +182,18 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 			for _, dc := range strings.Split(dependencies, ",") {
 				dcArr := strings.Split(dc, ":")
 				condition := ServiceConditionRunningOrHealthy
+				// Let's restart the dependency by default if we don't have the info stored in the label
+				restart := true
 				dependency := dcArr[0]
 
 				// backward compatibility
 				if len(dcArr) > 1 {
 					condition = dcArr[1]
+					if len(dcArr) > 2 {
+						restart, _ = strconv.ParseBool(dcArr[2])
+					}
 				}
-				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition}
+				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition, Restart: restart}
 			}
 		}
 		project.Services = append(project.Services, *service)
