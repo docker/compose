@@ -103,7 +103,7 @@ func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
 	for _, opt := range opts {
 		opt(c)
 	}
-	t.Log(c.RunDockerComposeCmdNoCheck(t, "version").Combined())
+	c.RunDockerComposeCmdNoCheck(t, "version")
 	return c
 }
 
@@ -305,7 +305,10 @@ func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
 // RunDockerComposeCmdNoCheck runs a docker compose command, don't presume of any expectation and returns a result
 func (c *CLI) RunDockerComposeCmdNoCheck(t testing.TB, args ...string) *icmd.Result {
 	t.Helper()
-	return icmd.RunCmd(c.NewDockerComposeCmd(t, args...))
+	cmd := c.NewDockerComposeCmd(t, args...)
+	cmd.Stdout = os.Stdout
+	t.Logf("Running command: %s", strings.Join(cmd.Command, " "))
+	return icmd.RunCmd(cmd)
 }
 
 // NewDockerComposeCmd creates a command object for Compose, either in plugin
