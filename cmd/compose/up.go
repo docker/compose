@@ -54,7 +54,7 @@ type upOptions struct {
 
 func (opts upOptions) apply(project *types.Project, services []string) error {
 	if opts.noDeps {
-		err := withSelectedServicesOnly(project, services)
+		err := project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}

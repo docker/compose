@@ -54,6 +54,7 @@ func (o *configOptions) ToProject(services []string) (*types.Project, error) {
 		cli.WithResolvedPaths(true),
 		cli.WithNormalization(!o.noNormalize),
 		cli.WithConsistency(!o.noConsistency),
+		cli.WithProfiles(o.Profiles),
 		cli.WithDiscardEnvFile)
 }
 
@@ -181,7 +182,7 @@ func runHash(streams api.Streams, opts configOptions) error {
 	}
 
 	if len(services) > 0 {
-		err = withSelectedServicesOnly(project, services)
+		err = project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}

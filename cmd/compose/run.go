@@ -91,12 +91,10 @@ func (opts runOptions) apply(project *types.Project) error {
 	}
 
 	if opts.noDeps {
-		for _, s := range project.Services {
-			if s.Name != opts.Service {
-				project.DisabledServices = append(project.DisabledServices, s)
-			}
+		err := project.ForServices([]string{opts.Service}, types.IgnoreDependencies)
+		if err != nil {
+			return err
 		}
-		project.Services = types.Services{target}
 	}
 
 	for i, s := range project.Services {

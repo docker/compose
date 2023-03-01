@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -58,7 +59,7 @@ func runPush(ctx context.Context, backend api.Service, opts pushOptions, service
 	}
 
 	if !opts.IncludeDeps {
-		err := withSelectedServicesOnly(project, services)
+		err := project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}

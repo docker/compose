@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type pullOptions struct {
@@ -70,21 +69,6 @@ func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func withSelectedServicesOnly(project *types.Project, services []string) error {
-	enabled, err := project.GetServices(services...)
-	if err != nil {
-		return err
-	}
-	for _, s := range project.Services {
-		if !utils.StringContains(services, s.Name) {
-			project.DisabledServices = append(project.DisabledServices, s)
-		}
-	}
-	project.Services = enabled
-
-	return nil
-}
-
 func runPull(ctx context.Context, backend api.Service, opts pullOptions, services []string) error {
 	project, err := opts.ToProject(services)
 	if err != nil {
@@ -92,7 +76,7 @@ func runPull(ctx context.Context, backend api.Service, opts pullOptions, service
 	}
 
 	if !opts.includeDeps {
-		err := withSelectedServicesOnly(project, services)
+		err := project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}
