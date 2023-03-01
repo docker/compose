@@ -189,6 +189,10 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
+	if project.Name == "" {
+		return nil, errors.New("project name can't be empty. Use `--project-name` to set a valid name")
+	}
+
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
 			api.ProjectLabel:     project.Name,
