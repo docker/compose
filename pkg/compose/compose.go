@@ -75,8 +75,7 @@ func (s *composeService) DryRunMode(ctx context.Context, dryRun bool) (context.C
 			return ctx, err
 		}
 		err = cli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
-			dryRunClient := api.NewDryRunClient(s.apiClient())
-			return dryRunClient, nil
+			return api.NewDryRunClient(s.apiClient(), cli)
 		}))
 		if err != nil {
 			return ctx, err

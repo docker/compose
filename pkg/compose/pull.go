@@ -130,6 +130,13 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 					mustBuild = append(mustBuild, service.Name)
 				}
 				if !opts.IgnoreFailures && service.Build == nil {
+					if s.dryRun {
+						w.Event(progress.Event{
+							ID:     service.Name,
+							Status: progress.Error,
+							Text:   fmt.Sprintf(" - Pull error for image: %s", service.Image),
+						})
+					}
 					// fail fast if image can't be pulled nor built
 					return err
 				}
