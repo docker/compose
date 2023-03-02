@@ -95,7 +95,7 @@ func (d *DryRunClient) ContainerRename(ctx context.Context, container, newContai
 }
 
 func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, options containerType.StopOptions) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options moby.ContainerStartOptions) error {
