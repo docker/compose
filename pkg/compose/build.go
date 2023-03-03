@@ -298,8 +298,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 
 	return build.Options{
 		Inputs: build.Inputs{
-			ContextPath:    service.Build.Context,
-			DockerfilePath: dockerFilePath(service.Build.Context, service.Build.Dockerfile),
+			ContextPath:      service.Build.Context,
+			DockerfileInline: service.Build.DockerfileInline,
+			DockerfilePath:   dockerFilePath(service.Build.Context, service.Build.Dockerfile),
 		},
 		CacheFrom:   cacheFrom,
 		CacheTo:     cacheTo,
@@ -343,6 +344,9 @@ func mergeArgs(m ...types.Mapping) types.Mapping {
 }
 
 func dockerFilePath(ctxName string, dockerfile string) string {
+	if dockerfile == "" {
+		return ""
+	}
 	if urlutil.IsGitURL(ctxName) || filepath.IsAbs(dockerfile) {
 		return dockerfile
 	}
