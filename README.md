@@ -15,6 +15,7 @@
     <a href="https://codecov.io/gh/docker/compose"><img src="https://codecov.io/gh/docker/compose/branch/master/graph/badge.svg?token=HP3K4Y4ctu" alt="Codecov"></a>
     <a href="https://api.securityscorecards.dev/projects/github.com/docker/compose"><img src="https://api.securityscorecards.dev/projects/github.com/docker/compose/badge" alt="OpenSSF Scorecard"></a>
 </p>
+<hr>
 <p align="center">
     <img src="logo.png?raw=true" alt="Docker Compose">
 </p>
