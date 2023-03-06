@@ -25,6 +25,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/buildx/builder"
+	"github.com/docker/buildx/util/imagetools"
+	"github.com/docker/cli/cli/command"
+
 	"github.com/distribution/distribution/v3/uuid"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
@@ -52,6 +56,7 @@ type DryRunKey struct{}
 type DryRunClient struct {
 	apiClient client.APIClient
 	execs     sync.Map
+	resolver  *imagetools.Resolver
 }
 
 type execDetails struct {
@@ -60,11 +65,20 @@ type execDetails struct {
 }
 
 // NewDryRunClient produces a DryRunClient
-func NewDryRunClient(apiClient client.APIClient) *DryRunClient {
+func NewDryRunClient(apiClient client.APIClient, cli *command.DockerCli) (*DryRunClient, error) {
+	b, err := builder.New(cli, builder.WithSkippedValidation())
+	if err != nil {
+		return nil, err
+	}
+	configFile, err := b.ImageOpt()
+	if err != nil {
+		return nil, err
+	}
 	return &DryRunClient{
 		apiClient: apiClient,
 		execs:     sync.Map{},
-	}
+		resolver:  imagetools.New(configFile),
+	}, nil
 }
 
 // All methods and functions which need to be overridden for dry run.
@@ -129,8 +143,16 @@ func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options
 	return moby.ImageBuildResponse{}, ErrNotImplemented
 }
 
+func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (moby.ImageInspect, []byte, error) {
+	return moby.ImageInspect{ID: "dryRunId"}, nil, nil
+}
+
 func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.ImagePullOptions) (io.ReadCloser, error) {
-	return nil, ErrNotImplemented
+	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
+		return nil, err
+	}
+	rc := io.NopCloser(strings.NewReader(""))
+	return rc, nil
 }
 
 func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.ImagePushOptions) (io.ReadCloser, error) {
@@ -302,10 +324,6 @@ func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string) ([]im
 
 func (d *DryRunClient) ImageImport(ctx context.Context, source moby.ImageImportSource, ref string, options moby.ImageImportOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageImport(ctx, source, ref, options)
-}
-
-func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (moby.ImageInspect, []byte, error) {
-	return d.apiClient.ImageInspectWithRaw(ctx, imageName)
 }
 
 func (d *DryRunClient) ImageList(ctx context.Context, options moby.ImageListOptions) ([]moby.ImageSummary, error) {
