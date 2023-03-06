@@ -8,15 +8,15 @@
 - [Contributing](#contributing)
 # Docker Compose v2
 <p align="center">
-    <a href="https://github.com/docker/compose/releases/latest"><img src="https://img.shields.io/github/release/docker/compose.svg?style=flat-square"</a>
-    <a href="https://pkg.go.dev/github.com/docker/compose/v2"><img src="https://img.shields.io/badge/go.dev-docs-007d9c?style=flat-square&logo=go&logoColor=white"</a>
-    <a href="https://github.com/docker/compose/actions?query=workflow%3Aci"><img src="https://img.shields.io/static/v1?label=ci&message=actions&color=green&logo=github"</a>
-    <a href="https://goreportcard.com/report/github.com/docker/compose/v2"><img src="https://goreportcard.com/badge/github.com/docker/compose/v2?style=flat-square"</a>
-    <a href="https://codecov.io/gh/docker/compose"><img src="https://codecov.io/gh/docker/compose/branch/master/graph/badge.svg?token=HP3K4Y4ctu"</a>
-    <a href="https://api.securityscorecards.dev/projects/github.com/docker/compose"><img src="https://api.securityscorecards.dev/projects/github.com/docker/compose/badge"</a>
+    <a href="https://github.com/docker/compose/releases/latest"><img src="https://img.shields.io/github/release/docker/compose.svg?style=flat-square" alt="GitHub release"></a>
+    <a href="https://pkg.go.dev/github.com/docker/compose/v2"><img src="https://img.shields.io/badge/go.dev-docs-007d9c?style=flat-square&logo=go&logoColor=white" alt="PkgGoDev"></a>
+    <a href="https://github.com/docker/compose/actions?query=workflow%3Aci"><img src="https://img.shields.io/static/v1?label=ci&message=actions&color=green&logo=github" alt="Build Status"></a>
+    <a href="https://goreportcard.com/report/github.com/docker/compose/v2"><img src="https://goreportcard.com/badge/github.com/docker/compose/v2?style=flat-square" alt="Go Report Card"></a>
+    <a href="https://codecov.io/gh/docker/compose"><img src="https://codecov.io/gh/docker/compose/branch/master/graph/badge.svg?token=HP3K4Y4ctu" alt="Codecov"></a>
+    <a href="https://api.securityscorecards.dev/projects/github.com/docker/compose"><img src="https://api.securityscorecards.dev/projects/github.com/docker/compose/badge" alt="OpenSSF Scorecard"></a>
 </p>
 <p align="center">
-    <img src="logo.png?raw=true">
+    <img src="logo.png?raw=true" alt="Docker Compose">
 </p>
 
 Docker Compose is a tool for running multi-container applications on Docker
