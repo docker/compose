@@ -62,7 +62,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 
 	slug := stringid.GenerateRandomID()
 	if service.ContainerName == "" {
-		service.ContainerName = fmt.Sprintf("%s_%s_run_%s", project.Name, service.Name, stringid.TruncateID(slug))
+		service.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, service.Name, stringid.TruncateID(slug), api.Separator)
 	}
 	service.Scale = 1
 	service.Restart = ""
