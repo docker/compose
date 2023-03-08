@@ -46,7 +46,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	return progress.Run(ctx, func(ctx context.Context) error {
 		_, err := s.build(ctx, project, options)
 		return err
-	})
+	}, s.stderr())
 }
 
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {

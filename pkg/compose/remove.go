@@ -71,7 +71,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	}
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.remove(ctx, stoppedContainers, options)
-	})
+	}, s.stderr())
 }
 
 func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {
