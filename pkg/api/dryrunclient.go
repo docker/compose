@@ -17,7 +17,9 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -40,6 +42,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
@@ -156,7 +159,25 @@ func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.I
 }
 
 func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.ImagePushOptions) (io.ReadCloser, error) {
-	return nil, ErrNotImplemented
+	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
+		return nil, err
+	}
+	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
+		Status: "Pushed",
+		Progress: &jsonmessage.JSONProgress{
+			Current:    100,
+			Total:      100,
+			Start:      0,
+			HideCounts: false,
+			Units:      "Mb",
+		},
+		ID: ref,
+	})
+	if err != nil {
+		return nil, err
+	}
+	rc := io.NopCloser(bytes.NewReader(jsonMessage))
+	return rc, nil
 }
 
 func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]moby.ImageDeleteResponseItem, error) {
