@@ -1,5 +1,3 @@
-//go:build !standalone
-
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -18,4 +16,23 @@
 
 package e2e
 
-const composeStandaloneMode = false
+import "os"
+
+const (
+	RunInProcess = iota
+	RunStandalone
+	RunAsCLIPlugin
+)
+
+var e2eMode = RunInProcess
+
+func init() {
+	switch os.Getenv("E2E_MODE") {
+	case "IN_PROCESS":
+		e2eMode = RunInProcess
+	case "STANDALONE":
+		e2eMode = RunStandalone
+	case "CLI_PLUGIN":
+		e2eMode = RunAsCLIPlugin
+	}
+}

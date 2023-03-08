@@ -145,7 +145,7 @@ func publishedPortForService(t testing.TB, cli *CLI, service string, targetPort 
 		}
 	}
 	require.NoError(t, json.Unmarshal([]byte(res.Stdout()), &psOut),
-		"Failed to parse `%s` output", res.Cmd.String())
+		"Failed to parse command output")
 	require.Len(t, psOut, 1, "Expected exactly 1 service")
 	svc := psOut[0]
 	for _, pp := range svc.Publishers {

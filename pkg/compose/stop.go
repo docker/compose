@@ -28,7 +28,7 @@ import (
 func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.stop(ctx, strings.ToLower(projectName), options)
-	})
+	}, s.stderr())
 }
 
 func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions) error {

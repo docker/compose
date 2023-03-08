@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,9 +29,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/cli/cli"
+	"github.com/docker/cli/cli-plugins/plugin"
+	dockercli "github.com/docker/cli/cli/command"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
 
@@ -84,7 +89,9 @@ type CLIOption func(c *CLI)
 // suitable for usage across child tests.
 func NewParallelCLI(t *testing.T, opts ...CLIOption) *CLI {
 	t.Helper()
-	t.Parallel()
+	if e2eMode != RunInProcess {
+		t.Parallel()
+	}
 	return NewCLI(t, opts...)
 }
 
@@ -238,12 +245,12 @@ func (c *CLI) NewCmd(command string, args ...string) icmd.Cmd {
 }
 
 // NewCmdWithEnv creates a cmd object configured with the test environment set with additional env vars
-func (c *CLI) NewCmdWithEnv(envvars []string, command string, args ...string) icmd.Cmd {
+func (c *CLI) NewCmdWithEnv(envvars []string, cmd string, args ...string) icmd.Cmd {
 	// base env -> CLI overrides -> cmd overrides
 	cmdEnv := append(c.BaseEnvironment(), c.env...)
 	cmdEnv = append(cmdEnv, envvars...)
 	return icmd.Cmd{
-		Command: append([]string{command}, args...),
+		Command: append([]string{cmd}, args...),
 		Env:     cmdEnv,
 	}
 }
@@ -256,53 +263,51 @@ func (c *CLI) MetricsSocket() string {
 // NewDockerCmd creates a docker cmd without running it
 func (c *CLI) NewDockerCmd(t testing.TB, args ...string) icmd.Cmd {
 	t.Helper()
-	for _, arg := range args {
-		if arg == compose.PluginName {
-			t.Fatal("This test called 'RunDockerCmd' for 'compose'. Please prefer 'RunDockerComposeCmd' to be able to test as a plugin and standalone")
-		}
-	}
-	return c.NewCmd(DockerExecutableName, args...)
+	return c.NewCmd("docker", args...)
 }
 
 // RunDockerOrExitError runs a docker command and returns a result
-func (c *CLI) RunDockerOrExitError(t testing.TB, args ...string) *icmd.Result {
+func (c *CLI) RunDockerOrExitError(t testing.TB, args ...string) Result {
 	t.Helper()
 	t.Logf("\t[%s] docker %s\n", t.Name(), strings.Join(args, " "))
-	return icmd.RunCmd(c.NewDockerCmd(t, args...))
+	return c.RunCommand(t, c.NewDockerCmd(t, args...))
 }
 
 // RunCmd runs a command, expects no error and returns a result
-func (c *CLI) RunCmd(t testing.TB, args ...string) *icmd.Result {
+func (c *CLI) RunCmd(t testing.TB, args ...string) Result {
 	t.Helper()
 	t.Logf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
 	assert.Assert(t, len(args) >= 1, "require at least one command in parameters")
-	res := icmd.RunCmd(c.NewCmd(args[0], args[1:]...))
+	res := c.RunCommand(t, c.NewCmd(args[0], args[1:]...))
 	res.Assert(t, icmd.Success)
 	return res
 }
 
 // RunCmdInDir runs a command in a given dir, expects no error and returns a result
-func (c *CLI) RunCmdInDir(t testing.TB, dir string, args ...string) *icmd.Result {
+func (c *CLI) RunCmdInDir(t testing.TB, dir string, args ...string) Result {
 	t.Helper()
 	t.Logf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
 	assert.Assert(t, len(args) >= 1, "require at least one command in parameters")
 	cmd := c.NewCmd(args[0], args[1:]...)
 	cmd.Dir = dir
-	res := icmd.RunCmd(cmd)
+	if e2eMode == RunInProcess {
+		t.Skip("cmd.Dir is not supported running inside test process")
+	}
+	res := c.RunCommand(t, cmd)
 	res.Assert(t, icmd.Success)
 	return res
 }
 
 // RunDockerCmd runs a docker command, expects no error and returns a result
-func (c *CLI) RunDockerCmd(t testing.TB, args ...string) *icmd.Result {
+func (c *CLI) RunDockerCmd(t testing.TB, args ...string) Result {
 	t.Helper()
 	res := c.RunDockerOrExitError(t, args...)
-	res.Assert(t, icmd.Success)
+	assert.Equal(t, res, icmd.Success)
 	return res
 }
 
 // RunDockerComposeCmd runs a docker compose command, expects no error and returns a result
-func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
+func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) Result {
 	t.Helper()
 	res := c.RunDockerComposeCmdNoCheck(t, args...)
 	res.Assert(t, icmd.Success)
@@ -310,23 +315,226 @@ func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
 }
 
 // RunDockerComposeCmdNoCheck runs a docker compose command, don't presume of any expectation and returns a result
-func (c *CLI) RunDockerComposeCmdNoCheck(t testing.TB, args ...string) *icmd.Result {
+func (c *CLI) RunDockerComposeCmdNoCheck(t testing.TB, args ...string) Result {
 	t.Helper()
 	cmd := c.NewDockerComposeCmd(t, args...)
 	cmd.Stdout = os.Stdout
+	return c.RunCommand(t, cmd)
+}
+
+func (c *CLI) RunCommand(t testing.TB, cmd icmd.Cmd, cmdOperators ...icmd.CmdOp) Result {
 	t.Logf("Running command: %s", strings.Join(cmd.Command, " "))
-	return icmd.RunCmd(cmd)
+	if cmd.Command[0] == "docker" {
+		cmd.Command[0] = DockerExecutableName
+	}
+
+	switch e2eMode {
+	case RunAsCLIPlugin:
+		return icmdResult{icmd.RunCmd(cmd, cmdOperators...)}
+	case RunStandalone:
+		if len(cmd.Command) > 1 && cmd.Command[1] == "compose" {
+			cmd.Command[0] = ComposeStandalonePath(t)
+		}
+		return icmdResult{icmd.RunCmd(cmd, cmdOperators...)}
+	default:
+		if len(cmd.Command) > 1 && cmd.Command[1] == "compose" {
+			return c.runInProcess(t, cmd, cmdOperators...)
+		} else {
+			return icmdResult{icmd.RunCmd(cmd, cmdOperators...)}
+		}
+	}
+}
+
+func (c *CLI) runInProcess(t testing.TB, cmd icmd.Cmd, cmdOperators ...icmd.CmdOp) Result {
+	for _, op := range cmdOperators {
+		op(&cmd)
+	}
+
+	for _, s := range c.env {
+		parts := strings.SplitN(s, "=", 2)
+		t.Setenv(parts[0], parts[1])
+	}
+
+	for _, s := range cmd.Env {
+		parts := strings.SplitN(s, "=", 2)
+		t.Setenv(parts[0], parts[1])
+	}
+
+	stdout := bytes.Buffer{}
+	stderr := bytes.Buffer{}
+	dockerCli, err := dockercli.NewDockerCli(dockercli.WithOutputStream(&stdout), dockercli.WithErrorStream(&stderr))
+	assert.NilError(t, err)
+	composePlugin, meta := compose.MakeRootCommandFn(dockerCli), compose.Metadata()
+
+	os.Args = cmd.Command
+	err = plugin.RunPlugin(dockerCli, composePlugin, meta)
+
+	var exitCode int
+	if err != nil {
+		exitCode = 1
+		if sterr, ok := err.(cli.StatusError); ok {
+			if sterr.Status != "" {
+				fmt.Fprintln(dockerCli.Err(), sterr.Status)
+			}
+			// StatusError should only be used for errors, and all errors should
+			// have a non-zero exit status, so never exit with 0
+			exitCode = sterr.StatusCode
+			if sterr.StatusCode == 0 {
+				exitCode = 1
+			}
+		}
+		fmt.Fprintln(dockerCli.Err(), err)
+	}
+	return &invocationResult{
+		ExitCode: exitCode,
+		error:    err,
+		Timeout:  false,
+		Out:      stdout.String(),
+		Err:      stderr.String(),
+	}
+}
+
+type Result interface {
+	fmt.Stringer
+	Error() error
+	Stdout() string
+	Stderr() string
+	Combined() string
+	Assert(t assert.TestingT, exp icmd.Expected) Result
+}
+
+type icmdResult struct {
+	*icmd.Result
+}
+
+func (i icmdResult) Assert(t assert.TestingT, exp icmd.Expected) Result {
+	i.Result.Assert(t, exp)
+	return i
+}
+
+func (i icmdResult) Error() error {
+	return i.Result.Error
+}
+
+// invocationResult implements Result for a command ran directly running PluginMain() function in-process
+type invocationResult struct {
+	ExitCode int
+	error    error
+	// Timeout is true if the command was killed because it ran for too long
+	Timeout bool
+	Out     string
+	Err     string
+}
+
+func (r *invocationResult) Error() error {
+	return r.error
+}
+
+func (r *invocationResult) Stdout() string {
+	return r.Out
+}
+
+func (r *invocationResult) Stderr() string {
+	return r.Err
+}
+
+func (r *invocationResult) Combined() string {
+	return r.Out + r.Err
+}
+
+func (r *invocationResult) Assert(t assert.TestingT, exp icmd.Expected) Result {
+	assert.Assert(t, r.Equal(exp))
+	return r
+}
+
+func (r *invocationResult) Equal(exp icmd.Expected) cmp.Comparison {
+	return func() cmp.Result {
+		return cmp.ResultFromError(r.match(exp))
+	}
+}
+
+func (r *invocationResult) Compare(exp icmd.Expected) error {
+	return r.match(exp)
+}
+
+func (r *invocationResult) String() string {
+	var timeout string
+	if r.Timeout {
+		timeout = " (timeout)"
+	}
+	var errString string
+	if r.Error() != nil {
+		errString = "\nError:    " + r.Error().Error()
+	}
+
+	return fmt.Sprintf(`
+ExitCode: %d%s%s
+Stdout:   %v
+Stderr:   %v
+`,
+		r.ExitCode,
+		timeout,
+		errString,
+		r.Stdout(),
+		r.Stderr())
+}
+
+func (r *invocationResult) match(exp icmd.Expected) error {
+	errs := []string{}
+	add := func(format string, args ...interface{}) {
+		errs = append(errs, fmt.Sprintf(format, args...))
+	}
+
+	if exp.ExitCode != r.ExitCode {
+		add("ExitCode was %d expected %d", r.ExitCode, exp.ExitCode)
+	}
+	if exp.Timeout != r.Timeout {
+		if exp.Timeout {
+			add("Expected command to timeout")
+		} else {
+			add("Expected command to finish, but it hit the timeout")
+		}
+	}
+	if !matchOutput(exp.Out, r.Out) {
+		add("Expected stdout to contain %q", exp.Out)
+	}
+	if !matchOutput(exp.Err, r.Err) {
+		add("Expected stderr to contain %q", exp.Err)
+	}
+	switch {
+	// If a non-zero exit code is expected there is going to be an error.
+	// Don't require an error message as well as an exit code because the
+	// error message is going to be "exit status <code> which is not useful
+	case exp.Error == "" && exp.ExitCode != 0:
+	case exp.Error == "" && r.Error() != nil:
+		add("Expected no error")
+	case exp.Error != "" && r.Error() == nil:
+		add("Expected error to contain %q, but there was no error", exp.Error)
+	case exp.Error != "" && !strings.Contains(r.Error().Error(), exp.Error):
+		add("Expected error to contain %q", exp.Error)
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s\nFailures:\n%s", r, strings.Join(errs, "\n"))
+}
+
+func matchOutput(expected string, actual string) bool {
+	switch expected {
+	case icmd.None:
+		return actual == ""
+	default:
+		return strings.Contains(actual, expected)
+	}
 }
 
 // NewDockerComposeCmd creates a command object for Compose, either in plugin
 // or standalone mode (based on build tags).
 func (c *CLI) NewDockerComposeCmd(t testing.TB, args ...string) icmd.Cmd {
 	t.Helper()
-	if composeStandaloneMode {
-		return c.NewCmd(ComposeStandalonePath(t), args...)
-	}
-	args = append([]string{"compose"}, args...)
-	return c.NewCmd(DockerExecutableName, args...)
+	cargs := append([]string{"compose"}, args...)
+	return c.NewDockerCmd(t, cargs...)
 }
 
 // ComposeStandalonePath returns the path to the locally-built Compose
@@ -336,7 +544,7 @@ func (c *CLI) NewDockerComposeCmd(t testing.TB, args ...string) icmd.Cmd {
 // in standalone test mode.
 func ComposeStandalonePath(t testing.TB) string {
 	t.Helper()
-	if !composeStandaloneMode {
+	if e2eMode != RunStandalone {
 		require.Fail(t, "Not running in standalone mode")
 	}
 	composeBinary, err := findExecutable(DockerComposeExecutableName)
@@ -346,14 +554,14 @@ func ComposeStandalonePath(t testing.TB) string {
 }
 
 // StdoutContains returns a predicate on command result expecting a string in stdout
-func StdoutContains(expected string) func(*icmd.Result) bool {
-	return func(res *icmd.Result) bool {
+func StdoutContains(expected string) func(Result) bool {
+	return func(res Result) bool {
 		return strings.Contains(res.Stdout(), expected)
 	}
 }
 
-func IsHealthy(service string) func(res *icmd.Result) bool {
-	return func(res *icmd.Result) bool {
+func IsHealthy(service string) func(res Result) bool {
+	return func(res Result) bool {
 		type state struct {
 			Name   string `json:"name"`
 			Health string `json:"health"`
@@ -377,16 +585,16 @@ func IsHealthy(service string) func(res *icmd.Result) bool {
 func (c *CLI) WaitForCmdResult(
 	t testing.TB,
 	command icmd.Cmd,
-	predicate func(*icmd.Result) bool,
+	predicate func(Result) bool,
 	timeout time.Duration,
 	delay time.Duration,
 ) {
 	t.Helper()
 	assert.Assert(t, timeout.Nanoseconds() > delay.Nanoseconds(), "timeout must be greater than delay")
-	var res *icmd.Result
+	var res Result
 	checkStopped := func(logt poll.LogT) poll.Result {
 		fmt.Printf("\t[%s] %s\n", t.Name(), strings.Join(command.Command, " "))
-		res = icmd.RunCmd(command)
+		res = c.RunCommand(t, command)
 		if !predicate(res) {
 			return poll.Continue("Cmd output did not match requirement: %q", res.Combined())
 		}

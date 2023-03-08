@@ -180,8 +180,9 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
+	api.Separator = api.DefaultSeparator
 	if o.Compatibility || utils.StringToBool(options.Environment["COMPOSE_COMPATIBILITY"]) {
-		api.Separator = "_"
+		api.Separator = api.ComposeV1Separator
 	}
 
 	project, err := cli.ProjectFromOptions(options)
@@ -271,7 +272,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				return cmd.Help()
 			}
 			if version {
-				return versionCommand().Execute()
+				return versionCommand(streams).Execute()
 			}
 			_ = cmd.Help()
 			return dockercli.StatusError{
@@ -371,7 +372,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		eventsCommand(&opts, streams, backend),
 		portCommand(&opts, streams, backend),
 		imagesCommand(&opts, streams, backend),
-		versionCommand(),
+		versionCommand(streams),
 		buildCommand(&opts, streams, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),

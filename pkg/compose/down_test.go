@@ -19,10 +19,12 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -45,6 +47,8 @@ func TestDown(t *testing.T) {
 		dockerCli: cli,
 	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
+	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{
@@ -96,6 +100,8 @@ func TestDownRemoveOrphans(t *testing.T) {
 		dockerCli: cli,
 	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
+	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(true)).Return(
 		[]moby.Container{
@@ -136,6 +142,8 @@ func TestDownRemoveVolumes(t *testing.T) {
 		dockerCli: cli,
 	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
+	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{testContainer("service1", "123", false)}, nil)
@@ -179,6 +187,8 @@ func TestDownRemoveImages(t *testing.T) {
 		dockerCli: cli,
 	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
+	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).
 		Return([]moby.Container{
@@ -270,6 +280,8 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 		dockerCli: cli,
 	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
+	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	container := testContainer("service1", "123", false)
 

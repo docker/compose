@@ -109,7 +109,7 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Combined(), "orphan"))
 
 		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
-		res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		res = c.RunCommand(t, cmd, func(cmd *icmd.Cmd) {
 			cmd.Env = append(cmd.Env, "COMPOSE_IGNORE_ORPHANS=True")
 		})
 		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))

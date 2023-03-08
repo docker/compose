@@ -93,7 +93,7 @@ func TestLocalComposeVolume(t *testing.T) {
 }
 
 func TestProjectVolumeBind(t *testing.T) {
-	if composeStandaloneMode {
+	if e2eMode != RunAsCLIPlugin {
 		t.Skip()
 	}
 	c := NewParallelCLI(t)

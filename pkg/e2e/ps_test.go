@@ -33,7 +33,7 @@ func TestPs(t *testing.T) {
 	const projectName = "e2e-ps"
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "up", "-d")
-	if assert.NoError(t, res.Error) {
+	if assert.NoError(t, res.Error()) {
 		t.Cleanup(func() {
 			_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 		})
@@ -98,7 +98,7 @@ func TestPs(t *testing.T) {
 
 	t.Run("ps --all", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "stop")
-		assert.NoError(t, res.Error)
+		assert.NoError(t, res.Error())
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
 		lines := strings.Split(res.Stdout(), "\n")
@@ -111,7 +111,7 @@ func TestPs(t *testing.T) {
 
 	t.Run("ps unknown", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "stop")
-		assert.NoError(t, res.Error)
+		assert.NoError(t, res.Error())
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "nginx")
 		res.Assert(t, icmd.Success)

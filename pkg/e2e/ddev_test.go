@@ -32,7 +32,7 @@ import (
 const ddevVersion = "v1.19.1"
 
 func TestComposeRunDdev(t *testing.T) {
-	if !composeStandaloneMode {
+	if e2eMode == RunAsCLIPlugin {
 		t.Skip("Not running in plugin mode - ddev only supports invoking standalone `docker-compose`")
 	}
 	if runtime.GOOS == "windows" {

@@ -224,7 +224,7 @@ func TestBuildImageDependencies(t *testing.T) {
 		resetState := func() {
 			cli.RunDockerComposeCmd(t, "down", "--rmi=all", "-t=0")
 			res := cli.RunDockerOrExitError(t, "image", "rm", "build-dependencies-service")
-			if res.Error != nil {
+			if res.Error() != nil {
 				require.Contains(t, res.Stderr(), `Error: No such image: build-dependencies-service`)
 			}
 		}
@@ -277,7 +277,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 
 	// declare builder
 	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-platform", "--use", "--bootstrap")
-	assert.NilError(t, result.Error)
+	assert.NilError(t, result.Error())
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "down")
@@ -295,7 +295,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 
 	t.Run("multi-arch build ok", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
-		assert.NilError(t, res.Error, res.Stderr())
+		assert.NilError(t, res.Error(), res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/arm64"})
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/amd64"})
 
@@ -304,7 +304,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 	t.Run("multi-arch multi service builds ok", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
 			"-f", "fixtures/build-test/platforms/compose-multiple-platform-builds.yaml", "build")
-		assert.NilError(t, res.Error, res.Stderr())
+		assert.NilError(t, res.Error(), res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "I'm Service A and I am building for linux/arm64"})
 		res.Assert(t, icmd.Expected{Out: "I'm Service A and I am building for linux/amd64"})
 		res.Assert(t, icmd.Expected{Out: "I'm Service B and I am building for linux/arm64"})
@@ -315,16 +315,16 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 
 	t.Run("multi-arch up --build", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "up", "--build")
-		assert.NilError(t, res.Error, res.Stderr())
+		assert.NilError(t, res.Error(), res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "platforms-platforms-1 exited with code 0"})
 	})
 
 	t.Run("use DOCKER_DEFAULT_PLATFORM value when up --build", func(t *testing.T) {
 		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "up", "--build")
-		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		res := c.RunCommand(t, cmd, func(cmd *icmd.Cmd) {
 			cmd.Env = append(cmd.Env, "DOCKER_DEFAULT_PLATFORM=linux/amd64")
 		})
-		assert.NilError(t, res.Error, res.Stderr())
+		assert.NilError(t, res.Error(), res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/amd64"})
 		assert.Assert(t, !strings.Contains(res.Stdout(), "I am building for linux/arm64"))
 	})
@@ -332,7 +332,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 	t.Run("use service platform value when no build platforms defined ", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
 			"-f", "fixtures/build-test/platforms/compose-service-platform-and-no-build-platforms.yaml", "build")
-		assert.NilError(t, res.Error, res.Stderr())
+		assert.NilError(t, res.Error(), res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/386"})
 	})
 
@@ -344,7 +344,7 @@ func TestBuildPrivileged(t *testing.T) {
 	// declare builder
 	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-privileged", "--use", "--bootstrap", "--buildkitd-flags",
 		`'--allow-insecure-entitlement=security.insecure'`)
-	assert.NilError(t, result.Error)
+	assert.NilError(t, result.Error())
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/privileged", "down")
@@ -353,7 +353,7 @@ func TestBuildPrivileged(t *testing.T) {
 
 	t.Run("use build privileged mode to run insecure build command", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/privileged", "build")
-		assert.NilError(t, res.Error, res.Stderr())
+		assert.NilError(t, res.Error(), res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "CapEff:\t0000003fffffffff"})
 
 	})

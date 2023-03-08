@@ -73,12 +73,12 @@ install: binary
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
 	rm -rf covdatafiles
 	mkdir covdatafiles
-	GOCOVERDIR=covdatafiles go test $(TEST_FLAGS) -count=1 ./pkg/e2e
+	E2E_MODE=CLI_PLUGIN GOCOVERDIR=covdatafiles go test $(TEST_FLAGS) -count=1 ./pkg/e2e
 	go tool covdata textfmt -i=covdatafiles -o=coverage.out
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
+	E2E_MODE=STANDALONE go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
 .PHONY: test-cucumber
 test-cucumber:

@@ -44,7 +44,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 	}
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.pull(ctx, project, options)
-	})
+	}, s.stderr())
 }
 
 func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
@@ -327,7 +327,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			}
 		}
 		return err
-	})
+	}, s.stderr())
 }
 
 func isServiceImageToBuild(service types.ServiceConfig, services []types.ServiceConfig) bool {

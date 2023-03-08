@@ -494,8 +494,13 @@ const (
 	UserCancel
 )
 
+const (
+	DefaultSeparator   = "-"
+	ComposeV1Separator = "_"
+)
+
 // Separator is used for naming components
-var Separator = "-"
+var Separator = DefaultSeparator
 
 // GetImageNameOrDefault computes the default image name for a service, used to tag built images
 func GetImageNameOrDefault(service types.ServiceConfig, projectName string) string {
