@@ -48,11 +48,11 @@ func TestLocalComposeRun(t *testing.T) {
 		for _, line := range lines {
 			fields := strings.Fields(line)
 			containerID := fields[len(fields)-1]
-			assert.Assert(t, !strings.HasPrefix(containerID, "run-test_front"))
-			if strings.HasPrefix(containerID, "run-test_back") {
+			assert.Assert(t, !strings.HasPrefix(containerID, "run-test-front"))
+			if strings.HasPrefix(containerID, "run-test-back") {
 				// only the one-off container for back service
-				assert.Assert(t, strings.HasPrefix(containerID, "run-test_back_run_"), containerID)
-				truncatedSlug = strings.Replace(containerID, "run-test_back_run_", "", 1)
+				assert.Assert(t, strings.HasPrefix(containerID, "run-test-back-run-"), containerID)
+				truncatedSlug = strings.Replace(containerID, "run-test-back-run-", "", 1)
 				runContainerID = containerID
 			}
 			if strings.HasPrefix(containerID, "run-test-db-1") {
@@ -75,7 +75,7 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
 
 		res = c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, strings.Contains(res.Stdout(), "run-test_back"), res.Stdout())
+		assert.Assert(t, strings.Contains(res.Stdout(), "run-test-back"), res.Stdout())
 	})
 
 	t.Run("down", func(t *testing.T) {
@@ -92,7 +92,7 @@ func TestLocalComposeRun(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: "compose_run_test.go"})
 
 		res = c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, strings.Contains(res.Stdout(), "run-test_back"), res.Stdout())
+		assert.Assert(t, strings.Contains(res.Stdout(), "run-test-back"), res.Stdout())
 	})
 
 	t.Run("compose run --publish", func(t *testing.T) {
