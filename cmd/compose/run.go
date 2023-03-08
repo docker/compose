@@ -147,7 +147,7 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 				return err
 			}
 			opts.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
-			return runRun(ctx, backend, project, opts, createOpts)
+			return runRun(ctx, backend, project, opts, createOpts, streams)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -189,7 +189,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions, createOpts createOptions) error {
+func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions, createOpts createOptions, streams api.Streams) error {
 	err := opts.apply(project)
 	if err != nil {
 		return err
@@ -202,7 +202,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
 		return startDependencies(ctx, backend, *project, opts.Service, opts.ignoreOrphans)
-	})
+	}, streams.Err())
 	if err != nil {
 		return err
 	}

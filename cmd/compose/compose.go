@@ -271,7 +271,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				return cmd.Help()
 			}
 			if version {
-				return versionCommand().Execute()
+				return versionCommand(streams).Execute()
 			}
 			_ = cmd.Help()
 			return dockercli.StatusError{
@@ -371,7 +371,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		eventsCommand(&opts, streams, backend),
 		portCommand(&opts, streams, backend),
 		imagesCommand(&opts, streams, backend),
-		versionCommand(),
+		versionCommand(streams),
 		buildCommand(&opts, streams, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),

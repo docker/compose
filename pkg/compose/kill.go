@@ -31,7 +31,7 @@ import (
 func (s *composeService) Kill(ctx context.Context, projectName string, options api.KillOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.kill(ctx, strings.ToLower(projectName), options)
-	})
+	}, s.stderr())
 }
 
 func (s *composeService) kill(ctx context.Context, projectName string, options api.KillOptions) error {
