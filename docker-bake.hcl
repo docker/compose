@@ -83,6 +83,16 @@ target "test" {
   output = [bindir("coverage")]
 }
 
+target "binary-with-coverage" {
+  inherits = ["_common"]
+  target = "binary"
+  args = {
+    BUILD_FLAGS = "-cover"
+  }
+  output = [bindir("build")]
+  platforms = ["local"]
+}
+
 target "binary" {
   inherits = ["_common"]
   target = "binary"

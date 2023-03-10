@@ -39,6 +39,7 @@ ifneq ($(DETECTED_OS),Windows)
 	# https://github.com/golang/go/issues/27089
 	TEST_COVERAGE_FLAGS += -race
 endif
+BUILD_FLAGS?=
 TEST_FLAGS?=
 E2E_TEST?=
 ifeq ($(E2E_TEST),)
@@ -53,11 +54,15 @@ all: build
 
 .PHONY: build ## Build the compose cli-plugin
 build:
-	GO111MODULE=on go build -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose$(BINARY_EXT)" ./cmd
+	GO111MODULE=on go build $(BUILD_FLAGS) -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose$(BINARY_EXT)" ./cmd
 
 .PHONY: binary
 binary:
 	$(BUILDX_CMD) bake binary
+
+.PHONY: binary-with-coverage
+binary-with-coverage:
+	$(BUILDX_CMD) bake binary-with-coverage
 
 .PHONY: install
 install: binary
@@ -66,7 +71,10 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) $(TEST_COVERAGE_FLAGS) -count=1 ./pkg/e2e
+	rm -rf covdatafiles
+	mkdir covdatafiles
+	GOCOVERDIR=covdatafiles go test $(TEST_FLAGS) -count=1 ./pkg/e2e
+	go tool covdata textfmt -i=covdatafiles -o=coverage.out
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test

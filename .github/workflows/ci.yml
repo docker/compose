@@ -158,7 +158,7 @@ jobs:
         name: Build
         uses: docker/bake-action@v2
         with:
-          targets: binary
+          targets: binary-with-coverage
           set: |
             *.cache-from=type=gha,scope=binary-linux-amd64
             *.cache-from=type=gha,scope=binary-e2e-${{ matrix.mode }}
@@ -178,9 +178,6 @@ jobs:
         run: |
           make e2e-compose
       -
-        name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-      -
         name: Test standalone mode
         if: ${{ matrix.mode == 'standalone' }}
         run: |
@@ -192,6 +189,9 @@ jobs:
         if: ${{ matrix.mode == 'cucumber'}}
         run: |
           make test-cucumber
+      -
+        name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
 
   release:
     permissions:

@@ -76,6 +76,7 @@ EOT
 
 FROM build-base AS build
 ARG BUILD_TAGS
+ARG BUILD_FLAGS
 ARG TARGETPLATFORM
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
