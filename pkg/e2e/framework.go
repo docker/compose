@@ -214,12 +214,19 @@ func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
 // BaseEnvironment provides the minimal environment variables used across all
 // Docker / Compose commands.
 func (c *CLI) BaseEnvironment() []string {
-	return []string{
+	env := []string{
 		"HOME=" + c.HomeDir,
 		"USER=" + os.Getenv("USER"),
 		"DOCKER_CONFIG=" + c.ConfigDir,
 		"KUBECONFIG=invalid",
 	}
+	if coverdir, ok := os.LookupEnv("GOCOVERDIR"); ok {
+		_, filename, _, _ := runtime.Caller(0)
+		root := filepath.Join(filepath.Dir(filename), "..", "..")
+		coverdir = filepath.Join(root, coverdir)
+		env = append(env, fmt.Sprintf("GOCOVERDIR=%s", coverdir))
+	}
+	return env
 }
 
 // NewCmd creates a cmd object configured with the test environment set
