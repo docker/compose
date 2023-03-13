@@ -105,6 +105,8 @@ type BuildOptions struct {
 	Services []string
 	// Ssh authentications passed in the command line
 	SSHs []types.SSHKey
+	// AllPlatforms build for all configured platforms
+	AllPlatforms bool
 }
 
 // CreateOptions group options of the Create API

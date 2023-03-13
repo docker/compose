@@ -57,14 +57,15 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}
 
 	return api.BuildOptions{
-		Pull:     opts.pull,
-		Push:     opts.push,
-		Progress: opts.progress,
-		Args:     types.NewMappingWithEquals(opts.args),
-		NoCache:  opts.noCache,
-		Quiet:    opts.quiet,
-		Services: services,
-		SSHs:     SSHKeys,
+		Pull:         opts.pull,
+		Push:         opts.push,
+		Progress:     opts.progress,
+		Args:         types.NewMappingWithEquals(opts.args),
+		NoCache:      opts.noCache,
+		Quiet:        opts.quiet,
+		Services:     services,
+		SSHs:         SSHKeys,
+		AllPlatforms: true,
 	}, nil
 }
 

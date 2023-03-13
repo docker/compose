@@ -27,10 +27,8 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
-	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
-	"github.com/docker/compose/v2/pkg/utils"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/docker/docker/pkg/archive"
@@ -39,30 +37,28 @@ import (
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/hashicorp/go-multierror"
-	"github.com/moby/buildkit/util/entitlements"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, opts map[string]buildx.Options) (map[string]string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, opts api.BuildOptions) (map[string]string, error) {
 	var nameDigests = make(map[string]string)
 	var errs error
 	err := project.WithServices(nil, func(service types.ServiceConfig) error {
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		o, ok := opts[imageName]
-		if !ok {
+		if service.Build == nil {
 			return nil
 		}
-		digest, err := s.doBuildClassicSimpleImage(ctx, o)
+
+		digest, err := s.doBuildClassicSimpleImage(ctx, service.Image, service.Build)
 		if err != nil {
 			errs = multierror.Append(errs, err).ErrorOrNil()
 		}
-		nameDigests[imageName] = digest
+		nameDigests[service.Image] = digest
 		if errs != nil {
 			return nil
 		}
-		if len(o.Exports) != 0 && o.Exports[0].Attrs["push"] == "true" {
+		if opts.Push {
 			return s.push(ctx, project, api.PushOptions{})
 		}
 		return nil
@@ -75,7 +71,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 }
 
 //nolint:gocyclo
-func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options buildx.Options) (string, error) {
+func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, imageName string, config *types.BuildConfig) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
 		dockerfileCtx io.ReadCloser
@@ -86,28 +82,22 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		err error
 	)
 
-	dockerfileName := options.Inputs.DockerfilePath
-	specifiedContext := options.Inputs.ContextPath
+	dockerfileName := dockerFilePath(config.Context, config.Dockerfile)
+	specifiedContext := config.Context
 	progBuff := s.stdout()
 	buildBuff := s.stdout()
-	if options.ImageIDFile != "" {
-		// Avoid leaving a stale file if we eventually fail
-		if err := os.Remove(options.ImageIDFile); err != nil && !os.IsNotExist(err) {
-			return "", errors.Wrap(err, "removing image ID file")
-		}
-	}
 
-	if len(options.Platforms) > 1 {
+	if len(config.Platforms) > 1 {
 		return "", errors.Errorf("this builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use multi-arch builder")
 	}
-	if utils.Contains(options.Allow, entitlements.EntitlementSecurityInsecure) {
+	if config.Privileged {
 		return "", errors.Errorf("this builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use builder supporting privileged mode")
 	}
 
-	if options.Labels == nil {
-		options.Labels = make(map[string]string)
+	if config.Labels == nil {
+		config.Labels = make(map[string]string)
 	}
-	options.Labels[api.ImageBuilderLabel] = "classic"
+	config.Labels[api.ImageBuilderLabel] = "classic"
 
 	switch {
 	case isLocalDir(specifiedContext):
@@ -186,10 +176,12 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	for k, auth := range creds {
 		authConfigs[k] = dockertypes.AuthConfig(auth)
 	}
-	buildOptions := imageBuildOptions(options)
+	buildOptions := imageBuildOptions(config)
 	buildOptions.Version = dockertypes.BuilderV1
 	buildOptions.Dockerfile = relDockerfile
 	buildOptions.AuthConfigs = authConfigs
+
+	buildOptions.Tags = append(buildOptions.Tags, imageName)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -231,16 +223,6 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 			"It is recommended to double check and reset permissions for sensitive "+
 			"files and directories.")
 	}
-
-	if options.ImageIDFile != "" {
-		if imageID == "" {
-			return "", errors.Errorf("Server did not provide an image ID. Cannot write %s", options.ImageIDFile)
-		}
-		if err := os.WriteFile(options.ImageIDFile, []byte(imageID), 0o666); err != nil {
-			return "", err
-		}
-	}
-
 	return imageID, nil
 }
 
@@ -249,25 +231,16 @@ func isLocalDir(c string) bool {
 	return err == nil
 }
 
-func imageBuildOptions(options buildx.Options) dockertypes.ImageBuildOptions {
+func imageBuildOptions(options *types.BuildConfig) dockertypes.ImageBuildOptions {
 	return dockertypes.ImageBuildOptions{
 		Tags:        options.Tags,
 		NoCache:     options.NoCache,
 		Remove:      true,
 		PullParent:  options.Pull,
-		BuildArgs:   toMapStringStringPtr(options.BuildArgs),
+		BuildArgs:   options.Args,
 		Labels:      options.Labels,
-		NetworkMode: options.NetworkMode,
-		ExtraHosts:  options.ExtraHosts,
+		NetworkMode: options.Network,
+		ExtraHosts:  options.ExtraHosts.AsList(),
 		Target:      options.Target,
 	}
-}
-
-func toMapStringStringPtr(source map[string]string) map[string]*string {
-	dest := make(map[string]*string)
-	for k, v := range source {
-		v := v
-		dest[k] = &v
-	}
-	return dest
 }

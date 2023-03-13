@@ -44,66 +44,133 @@ import (
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		_, err := s.build(ctx, project, options)
+		_, err := s.build(ctx, project, nil, options)
 		return err
 	})
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
-	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
+func (s *composeService) build(ctx context.Context, project *types.Project, localImages map[string]string, options api.BuildOptions) (map[string]string, error) {
+	err := s.normalizeForBuild(project, localImages, options)
+	if err != nil {
+		return nil, err
+	}
 
-	var imageIDs map[string]string
-	err := InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
+		fmt.Println("Building with classic builder")
+		return s.doBuildClassic(ctx, project, options)
+	}
+
+	return s.buildBuildkit(ctx, project, options)
+}
+
+func (s *composeService) buildBuildkit(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
+	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
+	buildOptions, err := s.getBuildOptions(project)
+	if err != nil {
+		return nil, err
+	}
+
+	builtIDs := make([]string, len(project.Services))
+	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-		if service.Build == nil {
-			return nil
-		}
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
-		if err != nil {
-			return err
-		}
-		buildOptions.Pull = options.Pull
-		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
-		buildOptions.NoCache = options.NoCache
-		buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
-		if err != nil {
-			return err
-		}
-		for _, image := range service.Build.CacheFrom {
-			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
-				Type:  "registry",
-				Attrs: map[string]string{"ref": image},
-			})
-		}
-		buildOptions.Exports = []bclient.ExportEntry{{
-			Type: "docker",
-			Attrs: map[string]string{
-				"load": "true",
-				"push": fmt.Sprint(options.Push),
-			},
-		}}
-		if len(buildOptions.Platforms) > 1 {
+
+		for i, service := range project.Services {
+			if service.Name != name {
+				continue
+			}
+
+			if service.Build == nil {
+				return nil
+			}
+			buildOptions := buildOptions[service.Image]
+			if err != nil {
+				return err
+			}
+			buildOptions.Pull = options.Pull
+			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
+			buildOptions.NoCache = options.NoCache
+			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
+			if err != nil {
+				return err
+			}
+			for _, image := range service.Build.CacheFrom {
+				buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
+					Type:  "registry",
+					Attrs: map[string]string{"ref": image},
+				})
+			}
 			buildOptions.Exports = []bclient.ExportEntry{{
-				Type: "image",
+				Type: "docker",
 				Attrs: map[string]string{
+					"load": "true",
 					"push": fmt.Sprint(options.Push),
 				},
 			}}
+			if len(buildOptions.Platforms) > 1 {
+				buildOptions.Exports = []bclient.ExportEntry{{
+					Type: "image",
+					Attrs: map[string]string{
+						"push": fmt.Sprint(options.Push),
+					},
+				}}
+			}
+			opts := map[string]build.Options{service.Image: buildOptions}
+			builtID, err := s.doBuildBuildkit(ctx, opts, options.Progress)
+			if err != nil {
+				return err
+			}
+
+			builtIDs[i] = builtID[service.Image]
+			return nil
 		}
-		opts := map[string]build.Options{imageName: buildOptions}
-		imageIDs, err = s.doBuild(ctx, project, opts, options.Progress)
-		return err
+		return fmt.Errorf("no service %s", name) // unexpected as we iterate on project services
 	}, func(traversal *graphTraversal) {
 		traversal.maxConcurrency = s.maxConcurrency
 	})
+
+	imageIDs := map[string]string{}
+	for i, d := range builtIDs {
+		if d != "" {
+			imageIDs[project.Services[i].Image] = d
+		}
+	}
 	return imageIDs, err
+}
+
+// normalizeForBuild updates project to prepare for build according to BuildOptions
+func (s *composeService) normalizeForBuild(project *types.Project, localImages map[string]string, options api.BuildOptions) error {
+	for i, service := range project.Services {
+		if service.Image == "" && service.Build == nil {
+			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+		}
+
+		if service.Build == nil {
+			continue
+		}
+
+		service.Image = api.GetImageNameOrDefault(service, project.Name)
+
+		if !options.AllPlatforms {
+			selected, err := useDockerDefaultOrServicePlatform(project, service, true)
+			if err != nil {
+				return nil
+			}
+			var pf []string
+			for _, p := range selected {
+				pf = append(pf, platforms.Format(p))
+			}
+			service.Build.Platforms = pf
+		}
+
+		_, localImagePresent := localImages[service.Image]
+		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
+			service.Build = nil
+		}
+		project.Services[i] = service
+	}
+	return nil
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, quietPull bool) error {
@@ -127,11 +194,9 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	if quietPull {
 		mode = xprogress.PrinterModeQuiet
 	}
-	opts, err := s.getBuildOptions(project, images)
-	if err != nil {
-		return err
-	}
-	builtImages, err := s.doBuild(ctx, project, opts, mode)
+	builtImages, err := s.build(ctx, project, images, api.BuildOptions{
+		Progress: mode,
+	})
 	if err != nil {
 		return err
 	}
@@ -153,35 +218,23 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	return nil
 }
 
-func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, error) {
+func (s *composeService) getBuildOptions(project *types.Project) (map[string]build.Options, error) {
 	opts := map[string]build.Options{}
 	for _, service := range project.Services {
-		if service.Image == "" && service.Build == nil {
-			return nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
-		}
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		_, localImagePresent := images[imageName]
-
-		if service.Build != nil {
-			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
-				continue
-			}
-			opt, err := s.toBuildOptions(project, service, imageName, []types.SSHKey{})
-			if err != nil {
-				return nil, err
-			}
-			opt.Exports = []bclient.ExportEntry{{
-				Type: "docker",
-				Attrs: map[string]string{
-					"load": "true",
-				},
-			}}
-			if opt.Platforms, err = useDockerDefaultOrServicePlatform(project, service, true); err != nil {
-				opt.Platforms = []specs.Platform{}
-			}
-			opts[imageName] = opt
+		if service.Build == nil {
 			continue
 		}
+		opt, err := s.toBuildOptions(project, service, service.Image, []types.SSHKey{})
+		if err != nil {
+			return nil, err
+		}
+		opt.Exports = []bclient.ExportEntry{{
+			Type: "docker",
+			Attrs: map[string]string{
+				"load": "true",
+			},
+		}}
+		opts[service.Image] = opt
 	}
 	return opts, nil
 
@@ -213,16 +266,6 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	}
 
 	return images, nil
-}
-
-func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
-	if len(opts) == 0 {
-		return nil, nil
-	}
-	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
-		return s.doBuildClassic(ctx, project, opts)
-	}
-	return s.doBuildBuildkit(ctx, opts, mode)
 }
 
 func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, sshKeys []types.SSHKey) (build.Options, error) {

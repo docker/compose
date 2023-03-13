@@ -186,7 +186,7 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Project) func(services []string) {
 	return func(services []string) {
 		fmt.Fprintf(s.stderr(), "Updating %s after changes were detected\n", strings.Join(services, ", "))
-		imageIds, err := s.build(ctx, project, api.BuildOptions{
+		imageIds, err := s.build(ctx, project, nil, api.BuildOptions{
 			Services: services,
 		})
 		if err != nil {
