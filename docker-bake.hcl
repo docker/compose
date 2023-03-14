@@ -33,6 +33,9 @@ function "bindir" {
   result = DESTDIR != "" ? DESTDIR : "./bin/${defaultdir}"
 }
 
+# Special target: https://github.com/docker/metadata-action#bake-definition
+target "meta-helper" {}
+
 target "_common" {
   args = {
     GO_VERSION = GO_VERSION
@@ -133,4 +136,9 @@ target "docs-update" {
   inherits = ["_common"]
   target = "docs-update"
   output = ["./docs"]
+}
+
+target "image-cross" {
+  inherits = ["meta-helper", "binary-cross"]
+  output = ["type=image"]
 }

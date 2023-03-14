@@ -168,6 +168,8 @@ FROM binary-unix AS binary-linux
 FROM scratch AS binary-windows
 COPY --link --from=build /usr/bin/docker-compose /docker-compose.exe
 FROM binary-$TARGETOS AS binary
+# enable scanning for this stage
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
 
 FROM --platform=$BUILDPLATFORM alpine AS releaser
 WORKDIR /work
