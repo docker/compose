@@ -52,57 +52,73 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
 	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
 
-	var imageIDs map[string]string
+	builtIDs := make([]string, len(project.Services))
 	err := InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-		if service.Build == nil {
-			return nil
-		}
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
-		if err != nil {
-			return err
-		}
-		buildOptions.Pull = options.Pull
-		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
-		buildOptions.NoCache = options.NoCache
-		buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
-		if err != nil {
-			return err
-		}
-		for _, image := range service.Build.CacheFrom {
-			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
-				Type:  "registry",
-				Attrs: map[string]string{"ref": image},
-			})
-		}
-		buildOptions.Exports = []bclient.ExportEntry{{
-			Type: "docker",
-			Attrs: map[string]string{
-				"load": "true",
-				"push": fmt.Sprint(options.Push),
-			},
-		}}
-		if len(buildOptions.Platforms) > 1 {
+		for i, service := range project.Services {
+			if service.Name != name {
+				continue
+			}
+			service, err := project.GetService(name)
+			if err != nil {
+				return err
+			}
+			if service.Build == nil {
+				return nil
+			}
+			imageName := api.GetImageNameOrDefault(service, project.Name)
+			buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
+			if err != nil {
+				return err
+			}
+			buildOptions.Pull = options.Pull
+			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
+			buildOptions.NoCache = options.NoCache
+			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
+			if err != nil {
+				return err
+			}
+			for _, image := range service.Build.CacheFrom {
+				buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
+					Type:  "registry",
+					Attrs: map[string]string{"ref": image},
+				})
+			}
 			buildOptions.Exports = []bclient.ExportEntry{{
-				Type: "image",
+				Type: "docker",
 				Attrs: map[string]string{
+					"load": "true",
 					"push": fmt.Sprint(options.Push),
 				},
 			}}
+			if len(buildOptions.Platforms) > 1 {
+				buildOptions.Exports = []bclient.ExportEntry{{
+					Type: "image",
+					Attrs: map[string]string{
+						"push": fmt.Sprint(options.Push),
+					},
+				}}
+			}
+			opts := map[string]build.Options{imageName: buildOptions}
+			ids, err := s.doBuild(ctx, project, opts, options.Progress)
+			if err != nil {
+				return err
+			}
+			builtIDs[i] = ids[imageName]
 		}
-		opts := map[string]build.Options{imageName: buildOptions}
-		imageIDs, err = s.doBuild(ctx, project, opts, options.Progress)
-		return err
+		return nil
 	}, func(traversal *graphTraversal) {
 		traversal.maxConcurrency = s.maxConcurrency
 	})
+
+	imageIDs := map[string]string{}
+	for i, d := range builtIDs {
+		if d != "" {
+			imageIDs[project.Services[i].Image] = d
+		}
+	}
 	return imageIDs, err
 }
 
