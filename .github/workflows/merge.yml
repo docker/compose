@@ -10,10 +10,12 @@ on:
       - 'v2'
     tags:
       - 'v*'
-  workflow_dispatch:
 
 permissions:
   contents: read # to fetch code (actions/checkout)
+
+env:
+  REPO_SLUG: "docker/compose-bin"
 
 jobs:
   e2e:
@@ -72,3 +74,47 @@ jobs:
         run: |
           make e2e-compose-standalone
 
+  bin-image:
+    runs-on: ubuntu-22.04
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      -
+        name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.REPO_SLUG }}
+          tags: |
+            type=ref,event=tag
+            type=edge
+          bake-target: meta-helper
+      -
+        name: Login to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
+      -
+        name: Build and push image
+        uses: docker/bake-action@v2
+        with:
+          files: |
+            ./docker-bake.hcl
+            ${{ steps.meta.outputs.bake-file }}
+          targets: image-cross
+          push: ${{ github.event_name != 'pull_request' }}
+          set: |
+            *.cache-from=type=gha,scope=bin-image
+            *.cache-to=type=gha,scope=bin-image,mode=max
+            *.attest=type=sbom
+            *.attest=type=provenance,mode=max,builder-id=https://github.com/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
