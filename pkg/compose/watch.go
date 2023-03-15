@@ -54,6 +54,11 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	needRebuild := make(chan string)
 	needSync := make(chan api.CopyOptions, 5)
 
+	err := s.prepareProjectForBuild(project, nil)
+	if err != nil {
+		return err
+	}
+
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		clock := clockwork.NewRealClock()

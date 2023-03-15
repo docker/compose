@@ -69,41 +69,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				return nil
 			}
 			imageName := api.GetImageNameOrDefault(service, project.Name)
-			buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
+			buildOptions, err := s.toBuildOptions(project, service, imageName, options)
 			if err != nil {
 				return err
 			}
-			buildOptions.Pull = options.Pull
 			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
-			buildOptions.NoCache = options.NoCache
-			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
-			if err != nil {
-				return err
-			}
-			if len(service.Build.AdditionalContexts) > 0 {
-				buildOptions.Inputs.NamedContexts = toBuildContexts(service.Build.AdditionalContexts)
-			}
-			for _, image := range service.Build.CacheFrom {
-				buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
-					Type:  "registry",
-					Attrs: map[string]string{"ref": image},
-				})
-			}
-			buildOptions.Exports = []bclient.ExportEntry{{
-				Type: "docker",
-				Attrs: map[string]string{
-					"load": "true",
-					"push": fmt.Sprint(options.Push),
-				},
-			}}
-			if len(buildOptions.Platforms) > 1 {
-				buildOptions.Exports = []bclient.ExportEntry{{
-					Type: "image",
-					Attrs: map[string]string{
-						"push": fmt.Sprint(options.Push),
-					},
-				}}
-			}
 			opts := map[string]build.Options{imageName: buildOptions}
 			ids, err := s.doBuild(ctx, project, opts, options.Progress)
 			if err != nil {
@@ -146,11 +116,14 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	if quietPull {
 		mode = xprogress.PrinterModeQuiet
 	}
-	opts, err := s.getBuildOptions(project, images)
+
+	err = s.prepareProjectForBuild(project, images)
 	if err != nil {
 		return err
 	}
-	builtImages, err := s.doBuild(ctx, project, opts, mode)
+	builtImages, err := s.build(ctx, project, api.BuildOptions{
+		Progress: mode,
+	})
 	if err != nil {
 		return err
 	}
@@ -172,37 +145,45 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	return nil
 }
 
-func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, error) {
-	opts := map[string]build.Options{}
-	for _, service := range project.Services {
+func (s *composeService) prepareProjectForBuild(project *types.Project, images map[string]string) error {
+	platform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	for i, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
-			return nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
 		}
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		_, localImagePresent := images[imageName]
-
-		if service.Build != nil {
-			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
-				continue
-			}
-			opt, err := s.toBuildOptions(project, service, imageName, []types.SSHKey{})
-			if err != nil {
-				return nil, err
-			}
-			opt.Exports = []bclient.ExportEntry{{
-				Type: "docker",
-				Attrs: map[string]string{
-					"load": "true",
-				},
-			}}
-			if opt.Platforms, err = useDockerDefaultOrServicePlatform(project, service, true); err != nil {
-				opt.Platforms = []specs.Platform{}
-			}
-			opts[imageName] = opt
+		if service.Build == nil {
 			continue
 		}
+
+		imageName := api.GetImageNameOrDefault(service, project.Name)
+		service.Image = imageName
+
+		_, localImagePresent := images[imageName]
+		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
+			service.Build = nil
+			project.Services[i] = service
+			continue
+		}
+
+		if platform != "" {
+			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, platform) {
+				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", service.Name, platform)
+			}
+			service.Platform = platform
+		}
+
+		if service.Platform == "" {
+			// let builder to build for default platform
+			service.Build.Platforms = nil
+		} else {
+			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, service.Platform) {
+				return fmt.Errorf("service %q build configuration does not support platform: %s", service.Name, platform)
+			}
+			service.Build.Platforms = []string{service.Platform}
+		}
+		project.Services[i] = service
 	}
-	return opts, nil
+	return nil
 }
 
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
@@ -243,7 +224,7 @@ func (s *composeService) doBuild(ctx context.Context, project *types.Project, op
 	return s.doBuildBuildkit(ctx, opts, mode)
 }
 
-func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, sshKeys []types.SSHKey) (build.Options, error) {
+func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, options api.BuildOptions) (build.Options, error) {
 	var tags []string
 	tags = append(tags, imageTag)
 
@@ -272,8 +253,8 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	sessionConfig := []session.Attachable{
 		authprovider.NewDockerAuthProvider(s.configFile()),
 	}
-	if len(sshKeys) > 0 || len(service.Build.SSH) > 0 {
-		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, sshKeys...))
+	if len(options.SSHs) > 0 || len(service.Build.SSH) > 0 {
+		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, options.SSHs...))
 		if err != nil {
 			return build.Options{}, err
 		}
@@ -298,20 +279,37 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 
 	imageLabels := getImageBuildLabels(project, service)
 
+	exports := []bclient.ExportEntry{{
+		Type: "docker",
+		Attrs: map[string]string{
+			"load": "true",
+			"push": fmt.Sprint(options.Push),
+		},
+	}}
+	if len(service.Build.Platforms) > 1 {
+		exports = []bclient.ExportEntry{{
+			Type: "image",
+			Attrs: map[string]string{
+				"push": fmt.Sprint(options.Push),
+			},
+		}}
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:      service.Build.Context,
 			DockerfileInline: service.Build.DockerfileInline,
 			DockerfilePath:   dockerFilePath(service.Build.Context, service.Build.Dockerfile),
+			NamedContexts:    toBuildContexts(service.Build.AdditionalContexts),
 		},
 		CacheFrom:   cacheFrom,
 		CacheTo:     cacheTo,
-		NoCache:     service.Build.NoCache,
-		Pull:        service.Build.Pull,
+		NoCache:     service.Build.NoCache || options.NoCache,
+		Pull:        service.Build.Pull || options.Pull,
 		BuildArgs:   buildArgs,
 		Tags:        tags,
 		Target:      service.Build.Target,
-		Exports:     []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
+		Exports:     exports,
 		Platforms:   plats,
 		Labels:      imageLabels,
 		NetworkMode: service.Build.Network,
