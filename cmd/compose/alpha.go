@@ -34,6 +34,7 @@ func alphaCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	cmd.AddCommand(
 		watchCommand(p, backend),
 		dryRunRedirectCommand(p),
+		vizCommand(p),
 	)
 	return cmd
 }
