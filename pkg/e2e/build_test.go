@@ -265,7 +265,11 @@ func TestBuildImageDependencies(t *testing.T) {
 	})
 
 	t.Run("BuildKit", func(t *testing.T) {
-		t.Skip("See https://github.com/docker/compose/issues/9232")
+		cli := NewParallelCLI(t, WithEnv(
+			"DOCKER_BUILDKIT=1",
+			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
+		))
+		doTest(t, cli)
 	})
 }
 

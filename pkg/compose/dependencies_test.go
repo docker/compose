@@ -27,24 +27,26 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-var project = types.Project{
-	Services: []types.ServiceConfig{
-		{
-			Name: "test1",
-			DependsOn: map[string]types.ServiceDependency{
-				"test2": {},
+func createTestProject() *types.Project {
+	return &types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name: "test1",
+				DependsOn: map[string]types.ServiceDependency{
+					"test2": {},
+				},
+			},
+			{
+				Name: "test2",
+				DependsOn: map[string]types.ServiceDependency{
+					"test3": {},
+				},
+			},
+			{
+				Name: "test3",
 			},
 		},
-		{
-			Name: "test2",
-			DependsOn: map[string]types.ServiceDependency{
-				"test3": {},
-			},
-		},
-		{
-			Name: "test3",
-		},
-	},
+	}
 }
 
 func TestTraversalWithMultipleParents(t *testing.T) {
@@ -97,7 +99,7 @@ func TestInDependencyUpCommandOrder(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var order []string
-	err := InDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+	err := InDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
 		order = append(order, service)
 		return nil
 	})
@@ -110,7 +112,7 @@ func TestInDependencyReverseDownCommandOrder(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var order []string
-	err := InReverseDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+	err := InReverseDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
 		order = append(order, service)
 		return nil
 	})
