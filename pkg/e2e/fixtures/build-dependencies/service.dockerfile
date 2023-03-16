@@ -12,8 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM alpine
-
-COPY --from=base /hello.txt /hello.txt
+FROM base
 
 CMD [ "cat", "/hello.txt" ]
