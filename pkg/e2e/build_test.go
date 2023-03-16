@@ -374,7 +374,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "this builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use multi-arch builder",
+			Err:      "the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit",
 		})
 	})
 
@@ -391,7 +391,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 			"-f", "fixtures/build-test/platforms/compose-service-platform-not-in-build-platforms.yaml", "build")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      `service.platform "linux/riscv64" should be part of the service.build.platforms: ["linux/amd64" "linux/arm64"]`,
+			Err:      `service "platforms" build configuration does not support platform: linux/riscv64`,
 		})
 	})
 
@@ -402,7 +402,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      `DOCKER_DEFAULT_PLATFORM "windows/amd64" value should be part of the service.build.platforms: ["linux/amd64" "linux/arm64"]`,
+			Err:      `service "platforms" build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: windows/amd64`,
 		})
 	})
 
@@ -414,7 +414,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "this builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use builder supporting privileged mode",
+			Err:      "the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit",
 		})
 	})
 

@@ -43,6 +43,10 @@ import (
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
+	err := options.Apply(project)
+	if err != nil {
+		return err
+	}
 	return progress.Run(ctx, func(ctx context.Context) error {
 		_, err := s.build(ctx, project, options)
 		return err
@@ -50,10 +54,14 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 }
 
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
-	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
+	args := options.Args.Resolve(envResolver(project.Environment))
 
+	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
+	if err != nil {
+		return nil, err
+	}
 	builtIDs := make([]string, len(project.Services))
-	err := InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
@@ -61,25 +69,37 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			if service.Name != name {
 				continue
 			}
-			service, err := project.GetService(name)
-			if err != nil {
-				return err
-			}
+
 			if service.Build == nil {
 				return nil
 			}
-			imageName := api.GetImageNameOrDefault(service, project.Name)
-			buildOptions, err := s.toBuildOptions(project, service, imageName, options)
+
+			if !buildkitEnabled {
+				service.Build.Args = service.Build.Args.OverrideBy(args)
+				id, err := s.doBuildClassic(ctx, service)
+				if err != nil {
+					return err
+				}
+				builtIDs[i] = id
+
+				if options.Push {
+					return s.push(ctx, project, api.PushOptions{})
+				}
+				return nil
+			}
+			buildOptions, err := s.toBuildOptions(project, service, options)
 			if err != nil {
 				return err
 			}
-			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
-			opts := map[string]build.Options{imageName: buildOptions}
-			ids, err := s.doBuild(ctx, project, opts, options.Progress)
+			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
+			opts := map[string]build.Options{service.Name: buildOptions}
+
+			ids, err := s.doBuildBuildkit(ctx, opts, options.Progress)
 			if err != nil {
 				return err
 			}
-			builtIDs[i] = ids[imageName]
+			builtIDs[i] = ids[service.Name]
+			return nil
 		}
 		return nil
 	}, func(traversal *graphTraversal) {
@@ -146,39 +166,26 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 }
 
 func (s *composeService) prepareProjectForBuild(project *types.Project, images map[string]string) error {
-	platform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	err := api.BuildOptions{}.Apply(project)
+	if err != nil {
+		return err
+	}
 	for i, service := range project.Services {
-		if service.Image == "" && service.Build == nil {
-			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
-		}
 		if service.Build == nil {
 			continue
 		}
 
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		service.Image = imageName
-
-		_, localImagePresent := images[imageName]
+		_, localImagePresent := images[service.Image]
 		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 			service.Build = nil
 			project.Services[i] = service
 			continue
 		}
 
-		if platform != "" {
-			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, platform) {
-				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", service.Name, platform)
-			}
-			service.Platform = platform
-		}
-
 		if service.Platform == "" {
 			// let builder to build for default platform
 			service.Build.Platforms = nil
 		} else {
-			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, service.Platform) {
-				return fmt.Errorf("service %q build configuration does not support platform: %s", service.Name, platform)
-			}
 			service.Build.Platforms = []string{service.Platform}
 		}
 		project.Services[i] = service
@@ -214,19 +221,8 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	return images, nil
 }
 
-func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
-	if len(opts) == 0 {
-		return nil, nil
-	}
-	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
-		return s.doBuildClassic(ctx, project, opts)
-	}
-	return s.doBuildBuildkit(ctx, opts, mode)
-}
-
-func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, options api.BuildOptions) (build.Options, error) {
-	var tags []string
-	tags = append(tags, imageTag)
+func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, options api.BuildOptions) (build.Options, error) {
+	tags := []string{service.Image}
 
 	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
 
@@ -304,8 +300,8 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		},
 		CacheFrom:   cacheFrom,
 		CacheTo:     cacheTo,
-		NoCache:     service.Build.NoCache || options.NoCache,
-		Pull:        service.Build.Pull || options.Pull,
+		NoCache:     service.Build.NoCache,
+		Pull:        service.Build.Pull,
 		BuildArgs:   buildArgs,
 		Tags:        tags,
 		Target:      service.Build.Target,
