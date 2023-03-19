@@ -203,8 +203,8 @@ github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3/go.mod h1:zA
 github.com/denisenkom/go-mssqldb v0.0.0-20191128021309-1d7a30a10f73/go.mod h1:xbL0rPBG9cCiLr28tMa8zpbdarY27NDyej4t/EjAShU=
 github.com/distribution/distribution/v3 v3.0.0-20230214150026-36d8c594d7aa h1:L9Ay/slwQ4ERSPaurC+TVkZrM0K98GNrEEo1En3e8as=
 github.com/distribution/distribution/v3 v3.0.0-20230214150026-36d8c594d7aa/go.mod h1:WHNsWjnIn2V1LYOrME7e8KxSeKunYHsxEm4am0BUtcI=
-github.com/docker/buildx v0.10.3 h1:9bPC/SZV85ZQDAa1rk5bjodsrK8HIBFThOUpWc052t0=
-github.com/docker/buildx v0.10.3/go.mod h1:2mHDjD0QevclBGYIXDOWY/ZU71JAzx7w4CfgroYbHQw=
+github.com/docker/buildx v0.10.4 h1:qsHwlUZaLu7UQkDhJDSRQ+jrvWf6mqwwtY+gWO3rzuA=
+github.com/docker/buildx v0.10.4/go.mod h1:2mHDjD0QevclBGYIXDOWY/ZU71JAzx7w4CfgroYbHQw=
 github.com/docker/cli v23.0.1+incompatible h1:LRyWITpGzl2C9e9uGxzisptnxAn1zfZKXy13Ul2Q5oM=
 github.com/docker/cli v23.0.1+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli-docs-tool v0.5.1 h1:jIk/cCZurZERhALPVKhqlNxTQGxn2kcI+56gE57PQXg=
