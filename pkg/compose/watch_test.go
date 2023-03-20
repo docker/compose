@@ -24,24 +24,27 @@ import (
 )
 
 func Test_debounce(t *testing.T) {
-	ch := make(chan string)
+	ch := make(chan fileMapping)
 	var (
 		ran int
 		got []string
 	)
 	clock := clockwork.NewFakeClock()
-	ctx, stop := context.WithCancel(context.TODO())
+	ctx, stop := context.WithCancel(context.Background())
+	t.Cleanup(stop)
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		debounce(ctx, clock, quietPeriod, ch, func(services []string) {
-			got = append(got, services...)
+		debounce(ctx, clock, quietPeriod, ch, func(services rebuildServices) {
+			for svc := range services {
+				got = append(got, svc)
+			}
 			ran++
 			stop()
 		})
 		return nil
 	})
 	for i := 0; i < 100; i++ {
-		ch <- "test"
+		ch <- fileMapping{service: "test"}
 	}
 	assert.Equal(t, ran, 0)
 	clock.Advance(quietPeriod)
