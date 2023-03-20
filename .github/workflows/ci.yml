@@ -123,6 +123,9 @@ jobs:
           set: |
             *.cache-from=type=gha,scope=test
             *.cache-to=type=gha,scope=test
+      -
+        name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
 
   e2e:
     runs-on: ubuntu-latest
