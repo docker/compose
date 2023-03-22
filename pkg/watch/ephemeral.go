@@ -25,9 +25,7 @@ package watch
 // there or aren't in the right places.
 //
 // https://app.clubhouse.io/windmill/story/691/filter-out-ephemeral-file-changes
-var EphemeralPathMatcher = initEphemeralPathMatcher()
-
-func initEphemeralPathMatcher() PathMatcher {
+func EphemeralPathMatcher() PathMatcher {
 	golandPatterns := []string{"**/*___jb_old___", "**/*___jb_tmp___", "**/.idea/**"}
 	emacsPatterns := []string{"**/.#*", "**/#*#"}
 	// if .swp is taken (presumably because multiple vims are running in that dir),
