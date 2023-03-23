@@ -133,7 +133,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		}
 		ignore := watch.NewCompositeMatcher(
 			dockerIgnores,
-			watch.EphemeralPathMatcher,
+			watch.EphemeralPathMatcher(),
 			dotGitIgnore,
 		)
 
@@ -336,17 +336,17 @@ type rebuildServices map[string]utils.Set[string]
 
 func debounce(ctx context.Context, clock clockwork.Clock, delay time.Duration, input <-chan fileMapping, fn func(services rebuildServices)) {
 	services := make(rebuildServices)
-	t := clock.AfterFunc(delay, func() {
-		if len(services) > 0 {
-			fn(services)
-			// TODO(milas): this is a data race!
-			services = make(rebuildServices)
-		}
-	})
+	t := clock.NewTimer(delay)
+	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-t.Chan():
+			if len(services) > 0 {
+				go fn(services)
+				services = make(rebuildServices)
+			}
 		case e := <-input:
 			t.Reset(delay)
 			svc, ok := services[e.Service]

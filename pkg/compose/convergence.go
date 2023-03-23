@@ -455,6 +455,9 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 
 // setDependentLifecycle define the Lifecycle strategy for all services to depend on specified service
 func setDependentLifecycle(project *types.Project, service string, strategy string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	for i, s := range project.Services {
 		if utils.StringContains(s.GetDependencies(), service) {
 			if s.Extensions == nil {
