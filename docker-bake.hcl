@@ -13,7 +13,8 @@
 // limitations under the License.
 
 variable "GO_VERSION" {
-  default = "1.20.1"
+  # default ARG value set in Dockerfile
+  default = null
 }
 
 variable "BUILD_TAGS" {
