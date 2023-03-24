@@ -390,8 +390,8 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
 			"-f", "fixtures/build-test/platforms/compose-service-platform-not-in-build-platforms.yaml", "build")
 		res.Assert(t, icmd.Expected{
-			ExitCode: 1,
-			Err:      `service "platforms" build configuration does not support platform: linux/riscv64`,
+			ExitCode: 15,
+			Err:      `service.build.platforms MUST include service.platform "linux/riscv64"`,
 		})
 	})
 
