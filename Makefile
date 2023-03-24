@@ -23,6 +23,7 @@ ifeq ($(OS),Windows_NT)
 else
     DETECTED_OS = $(shell uname -s)
 endif
+
 ifeq ($(DETECTED_OS),Linux)
 	MOBY_DOCKER=/usr/bin/docker
 endif
@@ -71,10 +72,7 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	rm -rf covdatafiles
-	mkdir covdatafiles
-	GOCOVERDIR=covdatafiles go test $(TEST_FLAGS) -count=1 ./pkg/e2e
-	go tool covdata textfmt -i=covdatafiles -o=coverage.out
+	go test $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
