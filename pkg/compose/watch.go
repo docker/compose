@@ -255,6 +255,10 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 }
 
 func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Project) func(services rebuildServices) {
+	for i, service := range project.Services {
+		service.PullPolicy = types.PullPolicyBuild
+		project.Services[i] = service
+	}
 	return func(services rebuildServices) {
 		serviceNames := make([]string, 0, len(services))
 		allPaths := make(utils.Set[string])
@@ -271,20 +275,7 @@ func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Proje
 			strings.Join(serviceNames, ", "),
 			strings.Join(append([]string{""}, allPaths.Elements()...), "\n  - "),
 		)
-		imageIds, err := s.build(ctx, project, api.BuildOptions{
-			Services: serviceNames,
-		})
-		if err != nil {
-			fmt.Fprintf(s.stderr(), "Build failed\n")
-		}
-		for i, service := range project.Services {
-			if id, ok := imageIds[service.Name]; ok {
-				service.Image = id
-			}
-			project.Services[i] = service
-		}
-
-		err = s.Up(ctx, project, api.UpOptions{
+		err := s.Up(ctx, project, api.UpOptions{
 			Create: api.CreateOptions{
 				Services: serviceNames,
 				Inherit:  true,
