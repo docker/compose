@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.11.4
+	github.com/moby/buildkit v0.11.5
 	github.com/moby/term v0.0.0-20221205130635-1aeaba878587
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
