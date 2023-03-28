@@ -31,6 +31,17 @@ import (
 
 func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
 	projectName = strings.ToLower(projectName)
+
+	if options.Stop {
+		err := s.Stop(ctx, projectName, api.StopOptions{
+			Services: options.Services,
+			Project:  options.Project,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 	if err != nil {
 		if api.IsNotFoundError(err) {
@@ -44,14 +55,27 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	stoppedContainers := containers.filter(func(c moby.Container) bool {
-		return c.State != ContainerRunning || (options.Stop && s.dryRun)
-	})
+	var stoppedContainers Containers
+	for _, container := range containers {
+		// We have to inspect containers, as State reported by getContainers suffers a race condition
+		inspected, err := s.apiClient().ContainerInspect(ctx, container.ID)
+		if api.IsNotFoundError(err) {
+			// Already removed. Maybe configured with auto-remove
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !inspected.State.Running || (options.Stop && s.dryRun) {
+			stoppedContainers = append(stoppedContainers, container)
+		}
+	}
 
 	var names []string
 	stoppedContainers.forEach(func(c moby.Container) {
 		names = append(names, getCanonicalContainerName(c))
 	})
+	fmt.Fprintln(s.stderr(), names)
 
 	if len(names) == 0 {
 		fmt.Fprintln(s.stderr(), "No stopped containers")

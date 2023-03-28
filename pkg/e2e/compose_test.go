@@ -169,21 +169,32 @@ func TestRm(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
 	})
 
-	t.Run("rm -sf", func(t *testing.T) {
+	t.Run("rm --stop --force simple", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm",
-			"-sf", "simple")
+			"--stop", "--force", "simple")
 		res.Assert(t, icmd.Expected{Err: "Removed", ExitCode: 0})
 	})
 
-	t.Run("check containers after rm -sf", func(t *testing.T) {
+	t.Run("check containers after rm", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"_simple"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-simple"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), projectName+"-another"), res.Combined())
 	})
 
-	t.Run("rm -sf <none>", func(t *testing.T) {
+	t.Run("up (again)", func(t *testing.T) {
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
+	})
+
+	t.Run("rm ---stop --force <none>", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm",
-			"-sf", "simple")
+			"--stop", "--force")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
+	})
+
+	t.Run("check containers after rm", func(t *testing.T) {
+		res := c.RunDockerCmd(t, "ps", "--all")
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-simple"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-another"), res.Combined())
 	})
 
 	t.Run("down", func(t *testing.T) {
