@@ -19,11 +19,12 @@ package compose
 import (
 	"context"
 	"fmt"
-	"github.com/compose-spec/compose-go/types"
-	"github.com/spf13/cobra"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/compose-spec/compose-go/types"
+	"github.com/spf13/cobra"
 )
 
 type vizOptions struct {
@@ -65,7 +66,7 @@ func vizCommand(p *ProjectOptions) *cobra.Command {
 	return cmd
 }
 
-func runViz(ctx context.Context, opts *vizOptions) error {
+func runViz(_ context.Context, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
 	project, err := opts.ToProject(nil)
 	if err != nil {
@@ -89,7 +90,7 @@ func runViz(ctx context.Context, opts *vizOptions) error {
 	graphBuilder.WriteString("digraph " + project.Name + " {\n")
 	graphBuilder.WriteString(opts.indentationStr + "layout=dot;\n")
 	addNodes(&graphBuilder, graph, opts)
-	graphBuilder.WriteRune('\n')
+	graphBuilder.WriteByte('\n')
 	addEdges(&graphBuilder, graph, opts)
 	graphBuilder.WriteString("}\n")
 
@@ -127,10 +128,10 @@ func addNodes(graphBuilder *strings.Builder, graph vizGraph, opts *vizOptions) *
 				graphBuilder.WriteString("<br/>")
 				if len(portConfig.HostIP) > 0 {
 					graphBuilder.WriteString(portConfig.HostIP)
-					graphBuilder.WriteRune(':')
+					graphBuilder.WriteByte(':')
 				}
 				graphBuilder.WriteString(portConfig.Published)
-				graphBuilder.WriteRune(':')
+				graphBuilder.WriteByte(':')
 				graphBuilder.WriteString(strconv.Itoa(int(portConfig.Target)))
 				graphBuilder.WriteString(" (")
 				graphBuilder.WriteString(portConfig.Protocol)
@@ -172,9 +173,9 @@ func addEdges(graphBuilder *strings.Builder, graph vizGraph, opts *vizOptions) *
 
 // writeQuoted writes "str" to builder
 func writeQuoted(builder *strings.Builder, str string) {
-	builder.WriteRune('"')
+	builder.WriteByte('"')
 	builder.WriteString(str)
-	builder.WriteRune('"')
+	builder.WriteByte('"')
 }
 
 // preferredIndentationStr returns a single string given the indentation preference
