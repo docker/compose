@@ -24,6 +24,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -82,6 +83,12 @@ func NewDryRunClient(apiClient client.APIClient, cli *command.DockerCli) (*DryRu
 		execs:     sync.Map{},
 		resolver:  imagetools.New(configFile),
 	}, nil
+}
+
+func getCallingFunction() string {
+	pc, _, _, _ := runtime.Caller(2)
+	fullName := runtime.FuncForPC(pc).Name()
+	return fullName[strings.LastIndex(fullName, ".")+1:]
 }
 
 // All methods and functions which need to be overridden for dry run.
@@ -162,7 +169,14 @@ func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options
 }
 
 func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (moby.ImageInspect, []byte, error) {
-	return moby.ImageInspect{ID: "dryRunId"}, nil, nil
+	caller := getCallingFunction()
+	switch caller {
+	case "pullServiceImage", "buildContainerVolumes":
+		return moby.ImageInspect{ID: "dryRunId"}, nil, nil
+	default:
+		return d.apiClient.ImageInspectWithRaw(ctx, imageName)
+	}
+
 }
 
 func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.ImagePullOptions) (io.ReadCloser, error) {
@@ -204,7 +218,10 @@ func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, containe
 }
 
 func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options moby.NetworkCreate) (moby.NetworkCreateResponse, error) {
-	return moby.NetworkCreateResponse{}, ErrNotImplemented
+	return moby.NetworkCreateResponse{
+		ID:      name,
+		Warning: "",
+	}, nil
 }
 
 func (d *DryRunClient) NetworkDisconnect(ctx context.Context, networkName, container string, force bool) error {
