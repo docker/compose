@@ -5,9 +5,11 @@ pname: docker compose
 plink: docker_compose.yaml
 cname:
     - docker compose alpha dry-run
+    - docker compose alpha viz
     - docker compose alpha watch
 clink:
     - docker_compose_alpha_dry-run.yaml
+    - docker_compose_alpha_viz.yaml
     - docker_compose_alpha_watch.yaml
 deprecated: false
 experimental: false
