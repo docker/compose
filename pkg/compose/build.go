@@ -75,7 +75,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			}
 
 			if !buildkitEnabled {
-				service.Build.Args = service.Build.Args.OverrideBy(args)
+				if service.Build.Args == nil {
+					service.Build.Args = args
+				} else {
+					service.Build.Args = service.Build.Args.OverrideBy(args)
+				}
 				id, err := s.doBuildClassic(ctx, service)
 				if err != nil {
 					return err
