@@ -20,10 +20,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -35,10 +34,7 @@ type vizOptions struct {
 	indentationStr   string
 }
 
-// maps a service with the services it depends on
-type vizGraph map[*types.ServiceConfig][]*types.ServiceConfig
-
-func vizCommand(p *ProjectOptions) *cobra.Command {
+func vizCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := vizOptions{
 		ProjectOptions: p,
 	}
@@ -54,7 +50,7 @@ func vizCommand(p *ProjectOptions) *cobra.Command {
 			return err
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runViz(ctx, &opts)
+			return runViz(ctx, backend, &opts)
 		}),
 	}
 
@@ -66,7 +62,7 @@ func vizCommand(p *ProjectOptions) *cobra.Command {
 	return cmd
 }
 
-func runViz(_ context.Context, opts *vizOptions) error {
+func runViz(ctx context.Context, backend api.Service, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
 	project, err := opts.ToProject(nil)
 	if err != nil {
@@ -74,108 +70,16 @@ func runViz(_ context.Context, opts *vizOptions) error {
 	}
 
 	// build graph
-	graph := make(vizGraph)
-	for i, serviceConfig := range project.Services {
-		serviceConfigPtr := &project.Services[i]
-		graph[serviceConfigPtr] = make([]*types.ServiceConfig, 0, len(serviceConfig.DependsOn))
-		for dependencyName := range serviceConfig.DependsOn {
-			// no error should be returned since dependencyName should exist
-			dependency, _ := project.GetService(dependencyName)
-			graph[serviceConfigPtr] = append(graph[serviceConfigPtr], &dependency)
-		}
-	}
+	graphStr, _ := backend.Viz(ctx, project, api.VizOptions{
+		IncludeNetworks:  opts.includeNetworks,
+		IncludePorts:     opts.includePorts,
+		IncludeImageName: opts.includeImageName,
+		Indentation:      opts.indentationStr,
+	})
 
-	// build graphviz graph
-	var graphBuilder strings.Builder
-	graphBuilder.WriteString("digraph " + project.Name + " {\n")
-	graphBuilder.WriteString(opts.indentationStr + "layout=dot;\n")
-	addNodes(&graphBuilder, graph, opts)
-	graphBuilder.WriteByte('\n')
-	addEdges(&graphBuilder, graph, opts)
-	graphBuilder.WriteString("}\n")
-
-	fmt.Println(graphBuilder.String())
+	fmt.Println(graphStr)
 
 	return nil
-}
-
-// addNodes adds the corresponding graphviz representation of all the nodes in the given graph to the graphBuilder
-// returns the same graphBuilder
-func addNodes(graphBuilder *strings.Builder, graph vizGraph, opts *vizOptions) *strings.Builder {
-	for serviceNode := range graph {
-		// write:
-		// "service name" [style="filled" label<<font point-size="15">service name</font>
-		graphBuilder.WriteString(opts.indentationStr)
-		writeQuoted(graphBuilder, serviceNode.Name)
-		graphBuilder.WriteString(" [style=\"filled\" label=<<font point-size=\"15\">")
-		graphBuilder.WriteString(serviceNode.Name)
-		graphBuilder.WriteString("</font>")
-
-		if opts.includeNetworks && len(serviceNode.Networks) > 0 {
-			graphBuilder.WriteString("<font point-size=\"10\">")
-			graphBuilder.WriteString("<br/><br/><b>Networks:</b>")
-			for _, networkName := range serviceNode.NetworksByPriority() {
-				graphBuilder.WriteString("<br/>")
-				graphBuilder.WriteString(networkName)
-			}
-			graphBuilder.WriteString("</font>")
-		}
-
-		if opts.includePorts && len(serviceNode.Ports) > 0 {
-			graphBuilder.WriteString("<font point-size=\"10\">")
-			graphBuilder.WriteString("<br/><br/><b>Ports:</b>")
-			for _, portConfig := range serviceNode.Ports {
-				graphBuilder.WriteString("<br/>")
-				if len(portConfig.HostIP) > 0 {
-					graphBuilder.WriteString(portConfig.HostIP)
-					graphBuilder.WriteByte(':')
-				}
-				graphBuilder.WriteString(portConfig.Published)
-				graphBuilder.WriteByte(':')
-				graphBuilder.WriteString(strconv.Itoa(int(portConfig.Target)))
-				graphBuilder.WriteString(" (")
-				graphBuilder.WriteString(portConfig.Protocol)
-				graphBuilder.WriteString(", ")
-				graphBuilder.WriteString(portConfig.Mode)
-				graphBuilder.WriteString(")")
-			}
-			graphBuilder.WriteString("</font>")
-		}
-
-		if opts.includeImageName {
-			graphBuilder.WriteString("<font point-size=\"10\">")
-			graphBuilder.WriteString("<br/><br/><b>Image:</b><br/>")
-			graphBuilder.WriteString(serviceNode.Image)
-			graphBuilder.WriteString("</font>")
-		}
-
-		graphBuilder.WriteString(">];\n")
-	}
-
-	return graphBuilder
-}
-
-// addEdges adds the corresponding graphviz representation of all edges in the given graph to the graphBuilder
-// returns the same graphBuilder
-func addEdges(graphBuilder *strings.Builder, graph vizGraph, opts *vizOptions) *strings.Builder {
-	for parent, children := range graph {
-		for _, child := range children {
-			graphBuilder.WriteString(opts.indentationStr)
-			writeQuoted(graphBuilder, parent.Name)
-			graphBuilder.WriteString(" -> ")
-			writeQuoted(graphBuilder, child.Name)
-			graphBuilder.WriteString(";\n")
-		}
-	}
-
-	return graphBuilder
-}
-
-// writeQuoted writes "str" to builder
-func writeQuoted(builder *strings.Builder, str string) {
-	builder.WriteByte('"')
-	builder.WriteString(str)
-	builder.WriteByte('"')
 }
 
 // preferredIndentationStr returns a single string given the indentation preference

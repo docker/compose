@@ -81,6 +81,19 @@ type Service interface {
 	DryRunMode(ctx context.Context, dryRun bool) (context.Context, error)
 	// Watch services' development context and sync/notify/rebuild/restart on changes
 	Watch(ctx context.Context, project *types.Project, services []string, options WatchOptions) error
+	// Viz generates a graphviz graph of the project services
+	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
+}
+
+type VizOptions struct {
+	// IncludeNetworks if true, network names a container is attached to should appear in the graph node
+	IncludeNetworks bool
+	// IncludePorts if true, ports a container exposes should appear in the graph node
+	IncludePorts bool
+	// IncludeImageName if true, name of the image used to create a container should appear in the graph node
+	IncludeImageName bool
+	// Indentation string to be used to indent graphviz code, e.g. "\t", "    "
+	Indentation string
 }
 
 // WatchOptions group options of the Watch API
