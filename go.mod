@@ -82,7 +82,7 @@ require (
 	github.com/imdario/mergo v0.3.14 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jinzhu/gorm v1.9.11 // indirect
-	github.com/jonboulle/clockwork v0.3.1-0.20230117163003-a89700cec744
+	github.com/jonboulle/clockwork v0.4.0
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.15.12 // indirect
