@@ -231,6 +231,18 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: timeout
+      shorthand: t
+      value_type: int
+      default_value: "10"
+      description: |
+        Use this timeout in seconds for container shutdown when attached or when containers are already running.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: timestamps
       value_type: bool
       default_value: "false"
@@ -255,18 +267,6 @@ options:
       value_type: int
       default_value: "0"
       description: timeout waiting for application to be running|healthy.
-      deprecated: false
-      hidden: false
-      experimental: false
-      experimentalcli: false
-      kubernetes: false
-      swarm: false
-    - option: waitTimeout
-      shorthand: t
-      value_type: int
-      default_value: "10"
-      description: |
-        Use this waitTimeout in seconds for container shutdown when attached or when containers are already running.
       deprecated: false
       hidden: false
       experimental: false

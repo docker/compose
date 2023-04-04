@@ -53,7 +53,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	}, s.stderr())
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
+func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	args := options.Args.Resolve(envResolver(project.Environment))
 
 	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
