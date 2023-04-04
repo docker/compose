@@ -151,7 +151,7 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 
 	firstLine := fmt.Sprintf("[+] Running %d/%d", numDone(w.events), w.numLines)
 	if w.numLines != 0 && numDone(w.events) == w.numLines {
-		firstLine = aec.Apply(firstLine, aec.BlueF)
+		firstLine = DoneColor(firstLine)
 	}
 	fmt.Fprintln(w.out, firstLine)
 
@@ -210,7 +210,7 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 	}
 	prefix := ""
 	if dryRun {
-		prefix = aec.Apply(api.DRYRUN_PREFIX, aec.CyanF)
+		prefix = PrefixColor(api.DRYRUN_PREFIX)
 	}
 
 	elapsed := endTime.Sub(event.startTime).Seconds()
@@ -234,8 +234,8 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 	if len(completion) > 0 {
 		txt = fmt.Sprintf("%s %s [%s] %7s/%-7s %s",
 			event.ID,
-			aec.Apply(fmt.Sprintf("%d layers", len(completion)), aec.YellowF),
-			aec.Apply(strings.Join(completion, ""), aec.GreenF, aec.Bold),
+			CountColor(fmt.Sprintf("%d layers", len(completion))),
+			SuccessColor(strings.Join(completion, "")),
 			units.HumanSize(float64(current)), units.HumanSize(float64(total)),
 			event.Text)
 	} else {
@@ -260,10 +260,10 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 		prefix,
 		txt,
 		strings.Repeat(" ", padding),
-		aec.Apply(status, event.Status.color()),
+		event.Status.colorFn()(status),
 	)
 	timer := fmt.Sprintf("%.1fs ", elapsed)
-	o := align(text, aec.Apply(timer, aec.BlueF), terminalWidth)
+	o := align(text, TimerColor(timer), terminalWidth)
 
 	return o
 }
