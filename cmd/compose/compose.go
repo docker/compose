@@ -305,11 +305,13 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 
-			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" && !cmd.Flags().Changed("ansi") {
-				ansi = "never"
+			formatter.SetANSIMode(streams, ansi)
+
+			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
+				progress.NoColor()
+				formatter.SetANSIMode(streams, formatter.Never)
 			}
 
-			formatter.SetANSIMode(streams, ansi)
 			switch ansi {
 			case "never":
 				progress.Mode = progress.ModePlain

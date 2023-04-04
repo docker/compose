@@ -18,23 +18,21 @@ package progress
 
 import (
 	"time"
-
-	"github.com/morikuni/aec"
 )
 
 // EventStatus indicates the status of an action
 type EventStatus int
 
-func (s EventStatus) color() aec.ANSI {
+func (s EventStatus) colorFn() colorFunc {
 	switch s {
 	case Done:
-		return aec.GreenF
+		return SuccessColor
 	case Warning:
-		return aec.YellowF.With(aec.Bold)
+		return WarningColor
 	case Error:
-		return aec.RedF.With(aec.Bold)
+		return ErrorColor
 	default:
-		return aec.DefaultF
+		return nocolor
 	}
 }
 
@@ -170,19 +168,19 @@ func (e *Event) stop() {
 }
 
 var (
-	spinnerDone    = aec.Apply("✔", aec.GreenF)
-	spinnerWarning = aec.Apply("!", aec.YellowF)
-	spinnerError   = aec.Apply("✘", aec.RedF)
+	spinnerDone    = "✔"
+	spinnerWarning = "!"
+	spinnerError   = "✘"
 )
 
 func (e *Event) Spinner() any {
 	switch e.Status {
 	case Done:
-		return spinnerDone
+		return SuccessColor(spinnerDone)
 	case Warning:
-		return spinnerWarning
+		return WarningColor(spinnerWarning)
 	case Error:
-		return spinnerError
+		return ErrorColor(spinnerError)
 	default:
 		return e.spinner.String()
 	}
