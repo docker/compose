@@ -31,7 +31,12 @@ import (
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
-	err := progress.Run(ctx, func(ctx context.Context) error {
+	project, err := s.preProcess(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	err = progress.Run(ctx, func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
 			return err
