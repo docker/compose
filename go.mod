@@ -9,7 +9,7 @@ require (
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.19
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000
-	github.com/distribution/distribution/v3 v3.0.0-20230223072852-e5d5810851d1
+	github.com/distribution/distribution/v3 v3.0.0-20230327091844-0c958010ace2
 	github.com/docker/buildx v0.10.4
 	github.com/docker/cli v23.0.2+incompatible
 	github.com/docker/cli-docs-tool v0.5.1
@@ -28,7 +28,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
-	github.com/spf13/cobra v1.6.1
+	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.2
 	github.com/theupdateframework/notary v0.7.0
@@ -80,9 +80,9 @@ require (
 	github.com/hashicorp/go-memdb v1.3.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/imdario/mergo v0.3.14 // indirect
-	github.com/inconshreveable/mousetrap v1.0.1 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jinzhu/gorm v1.9.11 // indirect
-	github.com/jonboulle/clockwork v0.3.1-0.20230117163003-a89700cec744
+	github.com/jonboulle/clockwork v0.4.0
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.15.12 // indirect
