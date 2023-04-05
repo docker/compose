@@ -315,7 +315,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 			switch ansi {
 			case "never":
 				progress.Mode = progress.ModePlain
-			case "tty":
+			case "always":
 				progress.Mode = progress.ModeTTY
 			}
 			if opts.WorkDir != "" {
