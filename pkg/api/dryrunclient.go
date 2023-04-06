@@ -210,7 +210,7 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.I
 }
 
 func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]moby.ImageDeleteResponseItem, error) {
-	return nil, ErrNotImplemented
+	return nil, nil
 }
 
 func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, container string, config *network.EndpointSettings) error {
@@ -229,7 +229,7 @@ func (d *DryRunClient) NetworkDisconnect(ctx context.Context, networkName, conta
 }
 
 func (d *DryRunClient) NetworkRemove(ctx context.Context, networkName string) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) VolumeCreate(ctx context.Context, options volume.CreateOptions) (volume.Volume, error) {
@@ -237,7 +237,7 @@ func (d *DryRunClient) VolumeCreate(ctx context.Context, options volume.CreateOp
 }
 
 func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force bool) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config moby.ExecConfig) (moby.IDResponse, error) {
