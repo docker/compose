@@ -237,21 +237,25 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 	return err
 }
 
+func (s *composeService) stopContainer(ctx context.Context, w progress.Writer, container moby.Container, timeout *time.Duration) error {
+	eventName := getContainerProgressName(container)
+	w.Event(progress.StoppingEvent(eventName))
+	timeoutInSecond := utils.DurationSecondToInt(timeout)
+	err := s.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{Timeout: timeoutInSecond})
+	if err != nil {
+		w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
+		return err
+	}
+	w.Event(progress.StoppedEvent(eventName))
+	return nil
+}
+
 func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, container := range containers {
 		container := container
 		eg.Go(func() error {
-			eventName := getContainerProgressName(container)
-			w.Event(progress.StoppingEvent(eventName))
-			timeoutInSecond := utils.DurationSecondToInt(timeout)
-			err := s.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{Timeout: timeoutInSecond})
-			if err != nil {
-				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
-				return err
-			}
-			w.Event(progress.StoppedEvent(eventName))
-			return nil
+			return s.stopContainer(ctx, w, container, timeout)
 		})
 	}
 	return eg.Wait()
@@ -263,10 +267,8 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 		container := container
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
-			w.Event(progress.StoppingEvent(eventName))
-			err := s.stopContainers(ctx, w, []moby.Container{container}, timeout)
+			err := s.stopContainer(ctx, w, container, timeout)
 			if err != nil {
-				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
