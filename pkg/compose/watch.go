@@ -75,7 +75,7 @@ type fileMapping struct {
 	ContainerPath string
 }
 
-func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error {
+func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error { //nolint: gocyclo
 	needRebuild := make(chan fileMapping)
 	needSync := make(chan fileMapping)
 
