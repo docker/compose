@@ -82,6 +82,20 @@ func TestViz(t *testing.T) {
 					"external": nil,
 				},
 			},
+			{
+				Name:  "With host IP",
+				Image: "user/image-name",
+				DependsOn: map[string]types.ServiceDependency{
+					"service1": {},
+				},
+				Ports: []types.ServicePortConfig{
+					{
+						Published: "8888",
+						Target:    8080,
+						HostIP:    "127.0.0.1",
+					},
+				},
+			},
 		},
 		Networks: types.Networks{
 			"internal": types.NetworkConfig{},
@@ -121,7 +135,7 @@ func TestViz(t *testing.T) {
 		assert.NotContains(t, graphStr, "\n   ", graphStr)
 
 		// check digraph name
-		assert.Contains(t, graphStr, "digraph "+project.Name, graphStr)
+		assert.Contains(t, graphStr, "digraph \""+project.Name+"\"", graphStr)
 
 		// check nodes
 		for _, service := range project.Services {
@@ -179,7 +193,7 @@ func TestViz(t *testing.T) {
 		assert.NotContains(t, graphStr, "\n\t\t", graphStr)
 
 		// check digraph name
-		assert.Contains(t, graphStr, "digraph "+project.Name, graphStr)
+		assert.Contains(t, graphStr, "digraph \""+project.Name+"\"", graphStr)
 
 		// check nodes
 		for _, service := range project.Services {

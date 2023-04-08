@@ -42,10 +42,19 @@ func (s *composeService) Viz(_ context.Context, project *types.Project, opts api
 
 	// build graphviz graph
 	var graphBuilder strings.Builder
-	graphBuilder.WriteString("digraph " + project.Name + " {\n")
+
+	// graph name
+	graphBuilder.WriteString("digraph ")
+	writeQuoted(&graphBuilder, project.Name)
+	graphBuilder.WriteString(" {\n")
+
+	// graph layout
+	// dot is the perfect layout for this use case since graph is directed and hierarchical
 	graphBuilder.WriteString(opts.Indentation + "layout=dot;\n")
+
 	addNodes(&graphBuilder, graph, &opts)
 	graphBuilder.WriteByte('\n')
+
 	addEdges(&graphBuilder, graph, &opts)
 	graphBuilder.WriteString("}\n")
 
