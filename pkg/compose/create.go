@@ -51,7 +51,7 @@ import (
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, options)
-	})
+	}, s.stderr())
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
@@ -236,10 +236,16 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	return nil
 }
 
-func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig,
-	number int, inherit *moby.Container, autoRemove bool, attachStdin bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+func (s *composeService) getCreateOptions(ctx context.Context,
+	p *types.Project,
+	service types.ServiceConfig,
+	number int,
+	inherit *moby.Container,
+	autoRemove, attachStdin bool,
+	labels types.Labels,
+) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
-	labels, err := s.prepareLabels(service, number)
+	labels, err := s.prepareLabels(labels, service, number)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -451,15 +457,7 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 	return parsed, unconfined, nil
 }
 
-func (s *composeService) prepareLabels(service types.ServiceConfig, number int) (map[string]string, error) {
-	labels := map[string]string{}
-	for k, v := range service.Labels {
-		labels[k] = v
-	}
-	for k, v := range service.CustomLabels {
-		labels[k] = v
-	}
-
+func (s *composeService) prepareLabels(labels types.Labels, service types.ServiceConfig, number int) (map[string]string, error) {
 	hash, err := ServiceHash(service)
 	if err != nil {
 		return nil, err

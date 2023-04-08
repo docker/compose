@@ -33,19 +33,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/mocks"
 )
 
 func TestComposeService_Logs_Demux(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	name := strings.ToLower(testProject)
 
@@ -113,12 +110,10 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	name := strings.ToLower(testProject)
 

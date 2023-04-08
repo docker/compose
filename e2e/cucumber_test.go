@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/compose-spec/compose-go/loader"
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
 	"github.com/mattn/go-shellwords"
@@ -58,7 +59,7 @@ func TestCucumber(t *testing.T) {
 
 func setup(s *godog.ScenarioContext) {
 	t := s.TestingT()
-	projectName := strings.Split(t.Name(), "/")[1]
+	projectName := loader.NormalizeProjectName(strings.Split(t.Name(), "/")[1])
 	cli := e2e.NewCLI(t, e2e.WithEnv(
 		fmt.Sprintf("COMPOSE_PROJECT_NAME=%s", projectName),
 	))

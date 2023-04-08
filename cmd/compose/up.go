@@ -104,7 +104,7 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 	flags.BoolVar(&up.noStart, "no-start", false, "Don't start the services after creating them.")
 	flags.BoolVar(&up.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
 	flags.StringVar(&up.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
-	flags.IntVarP(&create.timeout, "waitTimeout", "t", 10, "Use this waitTimeout in seconds for container shutdown when attached or when containers are already running.")
+	flags.IntVarP(&create.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
 	flags.BoolVar(&up.timestamp, "timestamps", false, "Show timestamps.")
 	flags.BoolVar(&up.noDeps, "no-deps", false, "Don't start linked services.")
 	flags.BoolVar(&create.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")

@@ -123,6 +123,9 @@ jobs:
           set: |
             *.cache-from=type=gha,scope=test
             *.cache-to=type=gha,scope=test
+      -
+        name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
 
   e2e:
     runs-on: ubuntu-latest
@@ -176,7 +179,11 @@ jobs:
         name: Test plugin mode
         if: ${{ matrix.mode == 'plugin' }}
         run: |
-          make e2e-compose
+          rm -rf ./covdatafiles
+          mkdir ./covdatafiles
+          make e2e-compose GOCOVERDIR=covdatafiles
+          go tool covdata textfmt -i=covdatafiles -o=coverage.out
+
       -
         name: Test standalone mode
         if: ${{ matrix.mode == 'standalone' }}

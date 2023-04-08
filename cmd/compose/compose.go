@@ -271,7 +271,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				return cmd.Help()
 			}
 			if version {
-				return versionCommand().Execute()
+				return versionCommand(streams).Execute()
 			}
 			_ = cmd.Help()
 			return dockercli.StatusError{
@@ -305,15 +305,17 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 
-			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" && !cmd.Flags().Changed("ansi") {
-				ansi = "never"
+			formatter.SetANSIMode(streams, ansi)
+
+			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
+				progress.NoColor()
+				formatter.SetANSIMode(streams, formatter.Never)
 			}
 
-			formatter.SetANSIMode(streams, ansi)
 			switch ansi {
 			case "never":
 				progress.Mode = progress.ModePlain
-			case "tty":
+			case "always":
 				progress.Mode = progress.ModeTTY
 			}
 			if opts.WorkDir != "" {
@@ -371,7 +373,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		eventsCommand(&opts, streams, backend),
 		portCommand(&opts, streams, backend),
 		imagesCommand(&opts, streams, backend),
-		versionCommand(),
+		versionCommand(streams),
 		buildCommand(&opts, streams, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),

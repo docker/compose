@@ -63,12 +63,19 @@ long: |-
 
     ### Use `-p` to specify a project name
 
-    Each configuration has a project name. If you supply a `-p` flag, you can specify a project name. If you don’t
-    specify the flag, Compose uses the current directory name.
-    Project name can also be set by `COMPOSE_PROJECT_NAME` environment variable.
-
-    Many Compose subcommands can be run without a Compose file by passing
-    the project name.
+    Each configuration has a project name. Compose sets the project name using
+    the following mechanisms, in order of precedence:
+    - The `-p` command line flag
+    - The `COMPOSE_PROJECT_NAME` environment variable
+    - The top level `name:` variable from the config file (or the last `name:`
+    from a series of config files specified using `-f`)
+    - The `basename` of the project directory containing the config file (or
+    containing the first config file specified using `-f`)
+    - The `basename` of the current directory if no config file is specified
+    Project names must contain only lowercase letters, decimal digits, dashes,
+    and underscores, and must begin with a lowercase letter or decimal digit. If
+    the `basename` of the project directory or current directory violates this
+    constraint, you must use one of the other mechanisms.
 
     ```console
     $ docker compose -p my_project ps -a

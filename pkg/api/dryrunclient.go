@@ -24,6 +24,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -84,15 +85,36 @@ func NewDryRunClient(apiClient client.APIClient, cli *command.DockerCli) (*DryRu
 	}, nil
 }
 
+func getCallingFunction() string {
+	pc, _, _, _ := runtime.Caller(2)
+	fullName := runtime.FuncForPC(pc).Name()
+	return fullName[strings.LastIndex(fullName, ".")+1:]
+}
+
 // All methods and functions which need to be overridden for dry run.
 
 func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options moby.ContainerAttachOptions) (moby.HijackedResponse, error) {
-	return moby.HijackedResponse{}, ErrNotImplemented
+	return moby.HijackedResponse{}, errors.New("interactive run is not supported in dry-run mode")
 }
 
 func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerType.Config, hostConfig *containerType.HostConfig,
 	networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (containerType.CreateResponse, error) {
-	return containerType.CreateResponse{}, ErrNotImplemented
+	return containerType.CreateResponse{ID: "dryRunId"}, nil
+}
+
+func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (moby.ContainerJSON, error) {
+	containerJSON, err := d.apiClient.ContainerInspect(ctx, container)
+	if err != nil {
+		return moby.ContainerJSON{
+			ContainerJSONBase: &moby.ContainerJSONBase{
+				ID: "dryRunId",
+			},
+			Mounts:          nil,
+			Config:          &containerType.Config{},
+			NetworkSettings: &moby.NetworkSettings{},
+		}, nil
+	}
+	return containerJSON, err
 }
 
 func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal string) error {
@@ -108,7 +130,7 @@ func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, op
 }
 
 func (d *DryRunClient) ContainerRename(ctx context.Context, container, newContainerName string) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, options containerType.StopOptions) error {
@@ -116,7 +138,7 @@ func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, o
 }
 
 func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options moby.ContainerStartOptions) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerStop(ctx context.Context, container string, options containerType.StopOptions) error {
@@ -147,7 +169,14 @@ func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options
 }
 
 func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (moby.ImageInspect, []byte, error) {
-	return moby.ImageInspect{ID: "dryRunId"}, nil, nil
+	caller := getCallingFunction()
+	switch caller {
+	case "pullServiceImage", "buildContainerVolumes":
+		return moby.ImageInspect{ID: "dryRunId"}, nil, nil
+	default:
+		return d.apiClient.ImageInspectWithRaw(ctx, imageName)
+	}
+
 }
 
 func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.ImagePullOptions) (io.ReadCloser, error) {
@@ -181,23 +210,26 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.I
 }
 
 func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]moby.ImageDeleteResponseItem, error) {
-	return nil, ErrNotImplemented
+	return nil, nil
 }
 
 func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, container string, config *network.EndpointSettings) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options moby.NetworkCreate) (moby.NetworkCreateResponse, error) {
-	return moby.NetworkCreateResponse{}, ErrNotImplemented
+	return moby.NetworkCreateResponse{
+		ID:      name,
+		Warning: "",
+	}, nil
 }
 
 func (d *DryRunClient) NetworkDisconnect(ctx context.Context, networkName, container string, force bool) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) NetworkRemove(ctx context.Context, networkName string) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) VolumeCreate(ctx context.Context, options volume.CreateOptions) (volume.Volume, error) {
@@ -205,7 +237,7 @@ func (d *DryRunClient) VolumeCreate(ctx context.Context, options volume.CreateOp
 }
 
 func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force bool) error {
-	return ErrNotImplemented
+	return nil
 }
 
 func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config moby.ExecConfig) (moby.IDResponse, error) {
@@ -273,10 +305,6 @@ func (d *DryRunClient) ContainerExecResize(ctx context.Context, execID string, o
 
 func (d *DryRunClient) ContainerExport(ctx context.Context, container string) (io.ReadCloser, error) {
 	return d.apiClient.ContainerExport(ctx, container)
-}
-
-func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (moby.ContainerJSON, error) {
-	return d.apiClient.ContainerInspect(ctx, container)
 }
 
 func (d *DryRunClient) ContainerInspectWithRaw(ctx context.Context, container string, getSize bool) (moby.ContainerJSON, []byte, error) {

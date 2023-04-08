@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 // Service manages a compose project
@@ -118,6 +119,38 @@ type BuildOptions struct {
 	Services []string
 	// Ssh authentications passed in the command line
 	SSHs []types.SSHKey
+}
+
+// Apply mutates project according to build options
+func (o BuildOptions) Apply(project *types.Project) error {
+	platform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	for i, service := range project.Services {
+		if service.Image == "" && service.Build == nil {
+			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+		}
+
+		if service.Build == nil {
+			continue
+		}
+		service.Image = GetImageNameOrDefault(service, project.Name)
+		if platform != "" {
+			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, platform) {
+				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", service.Name, platform)
+			}
+			service.Platform = platform
+		}
+		if service.Platform != "" {
+			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, service.Platform) {
+				return fmt.Errorf("service %q build configuration does not support platform: %s", service.Name, service.Platform)
+			}
+		}
+
+		service.Build.Pull = service.Build.Pull || o.Pull
+		service.Build.NoCache = service.Build.NoCache || o.NoCache
+
+		project.Services[i] = service
+	}
+	return nil
 }
 
 // CreateOptions group options of the Create API

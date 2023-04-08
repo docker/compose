@@ -25,7 +25,6 @@ import (
 	"gotest.tools/v3/assert"
 
 	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/mocks"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 )
@@ -34,12 +33,10 @@ func TestPs(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)), hasConfigHashLabel())

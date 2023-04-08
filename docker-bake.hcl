@@ -13,7 +13,8 @@
 // limitations under the License.
 
 variable "GO_VERSION" {
-  default = "1.20.1"
+  # default ARG value set in Dockerfile
+  default = null
 }
 
 variable "BUILD_TAGS" {
@@ -32,6 +33,9 @@ function "bindir" {
   params = [defaultdir]
   result = DESTDIR != "" ? DESTDIR : "./bin/${defaultdir}"
 }
+
+# Special target: https://github.com/docker/metadata-action#bake-definition
+target "meta-helper" {}
 
 target "_common" {
   args = {
@@ -133,4 +137,9 @@ target "docs-update" {
   inherits = ["_common"]
   target = "docs-update"
   output = ["./docs"]
+}
+
+target "image-cross" {
+  inherits = ["meta-helper", "binary-cross"]
+  output = ["type=image"]
 }

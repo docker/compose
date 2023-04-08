@@ -18,7 +18,7 @@ package progress
 
 import (
 	"context"
-	"os"
+	"io"
 	"sync"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -58,17 +58,17 @@ type progressFunc func(context.Context) error
 type progressFuncWithStatus func(context.Context) (string, error)
 
 // Run will run a writer and the progress function in parallel
-func Run(ctx context.Context, pf progressFunc) error {
+func Run(ctx context.Context, pf progressFunc, out io.Writer) error {
 	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
 		return "", pf(ctx)
-	})
+	}, out)
 	return err
 }
 
 // RunWithStatus will run a writer and the progress function in parallel and return a status
-func RunWithStatus(ctx context.Context, pf progressFuncWithStatus) (string, error) {
+func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out io.Writer) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
-	w, err := NewWriter(ctx, os.Stderr)
+	w, err := NewWriter(ctx, out)
 	var result string
 	if err != nil {
 		return "", err
@@ -105,17 +105,17 @@ const (
 var Mode = ModeAuto
 
 // NewWriter returns a new multi-progress writer
-func NewWriter(ctx context.Context, out console.File) (Writer, error) {
+func NewWriter(ctx context.Context, out io.Writer) (Writer, error) {
 	_, isTerminal := term.GetFdInfo(out)
 	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
 	if !ok {
 		dryRun = false
 	}
 	if Mode == ModeAuto && isTerminal {
-		return newTTYWriter(out, dryRun)
+		return newTTYWriter(out.(console.File), dryRun)
 	}
 	if Mode == ModeTTY {
-		return newTTYWriter(out, dryRun)
+		return newTTYWriter(out.(console.File), dryRun)
 	}
 	return &plainWriter{
 		out:    out,

@@ -25,7 +25,6 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 
 	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/mocks"
 	containerType "github.com/docker/docker/api/types/container"
 
 	moby "github.com/docker/docker/api/types"
@@ -39,12 +38,10 @@ func TestStopTimeout(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(

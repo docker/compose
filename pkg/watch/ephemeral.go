@@ -24,10 +24,9 @@ package watch
 // stop-gap so they don't have a terrible experience if those files aren't
 // there or aren't in the right places.
 //
-// https://app.clubhouse.io/windmill/story/691/filter-out-ephemeral-file-changes
-var EphemeralPathMatcher = initEphemeralPathMatcher()
-
-func initEphemeralPathMatcher() PathMatcher {
+// NOTE: The underlying `patternmatcher` is NOT always Goroutine-safe, so
+// this is not a singleton; we create an instance for each watcher currently.
+func EphemeralPathMatcher() PathMatcher {
 	golandPatterns := []string{"**/*___jb_old___", "**/*___jb_tmp___", "**/.idea/**"}
 	emacsPatterns := []string{"**/.#*", "**/#*#"}
 	// if .swp is taken (presumably because multiple vims are running in that dir),

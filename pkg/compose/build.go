@@ -43,66 +43,90 @@ import (
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
+	err := options.Apply(project)
+	if err != nil {
+		return err
+	}
 	return progress.Run(ctx, func(ctx context.Context) error {
 		_, err := s.build(ctx, project, options)
 		return err
-	})
+	}, s.stderr())
 }
 
+//nolint:gocyclo
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
-	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
+	args := options.Args.Resolve(envResolver(project.Environment))
 
-	var imageIDs map[string]string
-	err := InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
+	if err != nil {
+		return nil, err
+	}
+	builtIDs := make([]string, len(project.Services))
+	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-		if service.Build == nil {
+		for i, service := range project.Services {
+			if service.Name != name {
+				continue
+			}
+
+			if service.Build == nil {
+				return nil
+			}
+
+			//TODO:glours - condition to be removed when dry-run support of build will be implemented.
+			if s.dryRun {
+				builder := "buildkit"
+				if !buildkitEnabled {
+					builder = "legacy builder"
+				}
+				fmt.Printf("%sBuilding image %s with %s\n", api.DRYRUN_PREFIX, service.Image, builder)
+				return nil
+			}
+
+			if !buildkitEnabled {
+				if service.Build.Args == nil {
+					service.Build.Args = args
+				} else {
+					service.Build.Args = service.Build.Args.OverrideBy(args)
+				}
+				id, err := s.doBuildClassic(ctx, service)
+				if err != nil {
+					return err
+				}
+				builtIDs[i] = id
+
+				if options.Push {
+					return s.push(ctx, project, api.PushOptions{})
+				}
+				return nil
+			}
+			buildOptions, err := s.toBuildOptions(project, service, options)
+			if err != nil {
+				return err
+			}
+			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
+			opts := map[string]build.Options{service.Name: buildOptions}
+
+			ids, err := s.doBuildBuildkit(ctx, opts, options.Progress)
+			if err != nil {
+				return err
+			}
+			builtIDs[i] = ids[service.Name]
 			return nil
 		}
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
-		if err != nil {
-			return err
-		}
-		buildOptions.Pull = options.Pull
-		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
-		buildOptions.NoCache = options.NoCache
-		buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
-		if err != nil {
-			return err
-		}
-		for _, image := range service.Build.CacheFrom {
-			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
-				Type:  "registry",
-				Attrs: map[string]string{"ref": image},
-			})
-		}
-		buildOptions.Exports = []bclient.ExportEntry{{
-			Type: "docker",
-			Attrs: map[string]string{
-				"load": "true",
-				"push": fmt.Sprint(options.Push),
-			},
-		}}
-		if len(buildOptions.Platforms) > 1 {
-			buildOptions.Exports = []bclient.ExportEntry{{
-				Type: "image",
-				Attrs: map[string]string{
-					"push": fmt.Sprint(options.Push),
-				},
-			}}
-		}
-		opts := map[string]build.Options{imageName: buildOptions}
-		imageIDs, err = s.doBuild(ctx, project, opts, options.Progress)
-		return err
+		return nil
 	}, func(traversal *graphTraversal) {
 		traversal.maxConcurrency = s.maxConcurrency
 	})
+
+	imageIDs := map[string]string{}
+	for i, d := range builtIDs {
+		if d != "" {
+			imageIDs[project.Services[i].Image] = d
+		}
+	}
 	return imageIDs, err
 }
 
@@ -127,11 +151,14 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	if quietPull {
 		mode = xprogress.PrinterModeQuiet
 	}
-	opts, err := s.getBuildOptions(project, images)
+
+	err = s.prepareProjectForBuild(project, images)
 	if err != nil {
 		return err
 	}
-	builtImages, err := s.doBuild(ctx, project, opts, mode)
+	builtImages, err := s.build(ctx, project, api.BuildOptions{
+		Progress: mode,
+	})
 	if err != nil {
 		return err
 	}
@@ -153,38 +180,32 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	return nil
 }
 
-func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, error) {
-	opts := map[string]build.Options{}
-	for _, service := range project.Services {
-		if service.Image == "" && service.Build == nil {
-			return nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
-		}
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		_, localImagePresent := images[imageName]
-
-		if service.Build != nil {
-			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
-				continue
-			}
-			opt, err := s.toBuildOptions(project, service, imageName, []types.SSHKey{})
-			if err != nil {
-				return nil, err
-			}
-			opt.Exports = []bclient.ExportEntry{{
-				Type: "docker",
-				Attrs: map[string]string{
-					"load": "true",
-				},
-			}}
-			if opt.Platforms, err = useDockerDefaultOrServicePlatform(project, service, true); err != nil {
-				opt.Platforms = []specs.Platform{}
-			}
-			opts[imageName] = opt
+func (s *composeService) prepareProjectForBuild(project *types.Project, images map[string]string) error {
+	err := api.BuildOptions{}.Apply(project)
+	if err != nil {
+		return err
+	}
+	for i, service := range project.Services {
+		if service.Build == nil {
 			continue
 		}
-	}
-	return opts, nil
 
+		_, localImagePresent := images[service.Image]
+		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
+			service.Build = nil
+			project.Services[i] = service
+			continue
+		}
+
+		if service.Platform == "" {
+			// let builder to build for default platform
+			service.Build.Platforms = nil
+		} else {
+			service.Build.Platforms = []string{service.Platform}
+		}
+		project.Services[i] = service
+	}
+	return nil
 }
 
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
@@ -215,19 +236,8 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	return images, nil
 }
 
-func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
-	if len(opts) == 0 {
-		return nil, nil
-	}
-	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
-		return s.doBuildClassic(ctx, project, opts)
-	}
-	return s.doBuildBuildkit(ctx, opts, mode)
-}
-
-func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, sshKeys []types.SSHKey) (build.Options, error) {
-	var tags []string
-	tags = append(tags, imageTag)
+func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, options api.BuildOptions) (build.Options, error) {
+	tags := []string{service.Image}
 
 	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
 
@@ -254,8 +264,8 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	sessionConfig := []session.Attachable{
 		authprovider.NewDockerAuthProvider(s.configFile()),
 	}
-	if len(sshKeys) > 0 || len(service.Build.SSH) > 0 {
-		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, sshKeys...))
+	if len(options.SSHs) > 0 || len(service.Build.SSH) > 0 {
+		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, options.SSHs...))
 		if err != nil {
 			return build.Options{}, err
 		}
@@ -280,10 +290,28 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 
 	imageLabels := getImageBuildLabels(project, service)
 
+	exports := []bclient.ExportEntry{{
+		Type: "docker",
+		Attrs: map[string]string{
+			"load": "true",
+			"push": fmt.Sprint(options.Push),
+		},
+	}}
+	if len(service.Build.Platforms) > 1 {
+		exports = []bclient.ExportEntry{{
+			Type: "image",
+			Attrs: map[string]string{
+				"push": fmt.Sprint(options.Push),
+			},
+		}}
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
-			ContextPath:    service.Build.Context,
-			DockerfilePath: dockerFilePath(service.Build.Context, service.Build.Dockerfile),
+			ContextPath:      service.Build.Context,
+			DockerfileInline: service.Build.DockerfileInline,
+			DockerfilePath:   dockerFilePath(service.Build.Context, service.Build.Dockerfile),
+			NamedContexts:    toBuildContexts(service.Build.AdditionalContexts),
 		},
 		CacheFrom:   cacheFrom,
 		CacheTo:     cacheTo,
@@ -292,7 +320,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		BuildArgs:   buildArgs,
 		Tags:        tags,
 		Target:      service.Build.Target,
-		Exports:     []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
+		Exports:     exports,
 		Platforms:   plats,
 		Labels:      imageLabels,
 		NetworkMode: service.Build.Network,
@@ -327,6 +355,9 @@ func mergeArgs(m ...types.Mapping) types.Mapping {
 }
 
 func dockerFilePath(ctxName string, dockerfile string) string {
+	if dockerfile == "" {
+		return ""
+	}
 	if urlutil.IsGitURL(ctxName) || filepath.IsAbs(dockerfile) {
 		return dockerfile
 	}
@@ -400,6 +431,14 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 	ret.Add(api.ProjectLabel, project.Name)
 	ret.Add(api.ServiceLabel, service.Name)
 	return ret
+}
+
+func toBuildContexts(additionalContexts map[string]*string) map[string]build.NamedContext {
+	namedContexts := map[string]build.NamedContext{}
+	for name, buildContext := range additionalContexts {
+		namedContexts[name] = build.NamedContext{Path: *buildContext}
+	}
+	return namedContexts
 }
 
 func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {

@@ -40,7 +40,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil
-	})
+	}, s.stderr())
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				Services: options.Create.Services,
 				Project:  project,
 			})
-		})
+		}, s.stderr())
 	}
 	go func() {
 		<-signalChan

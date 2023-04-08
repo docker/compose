@@ -27,55 +27,23 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
-	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
-	"github.com/docker/compose/v2/pkg/utils"
 	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
-	"github.com/hashicorp/go-multierror"
-	"github.com/moby/buildkit/util/entitlements"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, opts map[string]buildx.Options) (map[string]string, error) {
-	var nameDigests = make(map[string]string)
-	var errs error
-	err := project.WithServices(nil, func(service types.ServiceConfig) error {
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-		o, ok := opts[imageName]
-		if !ok {
-			return nil
-		}
-		digest, err := s.doBuildClassicSimpleImage(ctx, o)
-		if err != nil {
-			errs = multierror.Append(errs, err).ErrorOrNil()
-		}
-		nameDigests[imageName] = digest
-		if errs != nil {
-			return nil
-		}
-		if len(o.Exports) != 0 && o.Exports[0].Attrs["push"] == "true" {
-			return s.push(ctx, project, api.PushOptions{})
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return nameDigests, errs
-}
-
 //nolint:gocyclo
-func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options buildx.Options) (string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, service types.ServiceConfig) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
 		dockerfileCtx io.ReadCloser
@@ -86,28 +54,31 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		err error
 	)
 
-	dockerfileName := options.Inputs.DockerfilePath
-	specifiedContext := options.Inputs.ContextPath
+	dockerfileName := dockerFilePath(service.Build.Context, service.Build.Dockerfile)
+	specifiedContext := service.Build.Context
 	progBuff := s.stdout()
 	buildBuff := s.stdout()
-	if options.ImageIDFile != "" {
-		// Avoid leaving a stale file if we eventually fail
-		if err := os.Remove(options.ImageIDFile); err != nil && !os.IsNotExist(err) {
-			return "", errors.Wrap(err, "removing image ID file")
-		}
+
+	if len(service.Build.Platforms) > 1 {
+		return "", errors.Errorf("the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit")
+	}
+	if service.Build.Privileged {
+		return "", errors.Errorf("the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit")
+	}
+	if len(service.Build.AdditionalContexts) > 0 {
+		return "", errors.Errorf("the classic builder doesn't support additional contexts, set DOCKER_BUILDKIT=1 to use BuildKit")
+	}
+	if len(service.Build.SSH) > 0 {
+		return "", errors.Errorf("the classic builder doesn't support SSH keys, set DOCKER_BUILDKIT=1 to use BuildKit")
+	}
+	if len(service.Build.Secrets) > 0 {
+		return "", errors.Errorf("the classic builder doesn't support secrets, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
 
-	if len(options.Platforms) > 1 {
-		return "", errors.Errorf("this builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use multi-arch builder")
+	if service.Build.Labels == nil {
+		service.Build.Labels = make(map[string]string)
 	}
-	if utils.Contains(options.Allow, entitlements.EntitlementSecurityInsecure) {
-		return "", errors.Errorf("this builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use builder supporting privileged mode")
-	}
-
-	if options.Labels == nil {
-		options.Labels = make(map[string]string)
-	}
-	options.Labels[api.ImageBuilderLabel] = "classic"
+	service.Build.Labels[api.ImageBuilderLabel] = "classic"
 
 	switch {
 	case isLocalDir(specifiedContext):
@@ -186,8 +157,8 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	for k, auth := range creds {
 		authConfigs[k] = dockertypes.AuthConfig(auth)
 	}
-	buildOptions := imageBuildOptions(options)
-	buildOptions.Version = dockertypes.BuilderV1
+	buildOptions := imageBuildOptions(service.Build)
+	buildOptions.Tags = append(buildOptions.Tags, service.Image)
 	buildOptions.Dockerfile = relDockerfile
 	buildOptions.AuthConfigs = authConfigs
 
@@ -232,15 +203,6 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 			"files and directories.")
 	}
 
-	if options.ImageIDFile != "" {
-		if imageID == "" {
-			return "", errors.Errorf("Server did not provide an image ID. Cannot write %s", options.ImageIDFile)
-		}
-		if err := os.WriteFile(options.ImageIDFile, []byte(imageID), 0o666); err != nil {
-			return "", err
-		}
-	}
-
 	return imageID, nil
 }
 
@@ -249,25 +211,18 @@ func isLocalDir(c string) bool {
 	return err == nil
 }
 
-func imageBuildOptions(options buildx.Options) dockertypes.ImageBuildOptions {
+func imageBuildOptions(config *types.BuildConfig) dockertypes.ImageBuildOptions {
 	return dockertypes.ImageBuildOptions{
-		Tags:        options.Tags,
-		NoCache:     options.NoCache,
+		Version:     dockertypes.BuilderV1,
+		Tags:        config.Tags,
+		NoCache:     config.NoCache,
 		Remove:      true,
-		PullParent:  options.Pull,
-		BuildArgs:   toMapStringStringPtr(options.BuildArgs),
-		Labels:      options.Labels,
-		NetworkMode: options.NetworkMode,
-		ExtraHosts:  options.ExtraHosts,
-		Target:      options.Target,
+		PullParent:  config.Pull,
+		BuildArgs:   config.Args,
+		Labels:      config.Labels,
+		NetworkMode: config.Network,
+		ExtraHosts:  config.ExtraHosts.AsList(),
+		Target:      config.Target,
+		Isolation:   container.Isolation(config.Isolation),
 	}
-}
-
-func toMapStringStringPtr(source map[string]string) map[string]*string {
-	dest := make(map[string]*string)
-	for k, v := range source {
-		v := v
-		dest[k] = &v
-	}
-	return dest
 }

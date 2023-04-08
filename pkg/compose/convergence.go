@@ -399,7 +399,8 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	w := progress.ContextWriter(ctx)
 	eventName := "Container " + name
 	w.Event(progress.CreatingEvent(eventName))
-	container, err = s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases, attachStdin, w)
+	container, err = s.createMobyContainer(ctx, project, service, name, number, nil,
+		autoRemove, useNetworkAliases, attachStdin, w, mergeLabels(service.Labels, service.CustomLabels))
 	if err != nil {
 		return
 	}
@@ -424,8 +425,9 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	}
 	name := getContainerName(project.Name, service, number)
 	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
-	service.CustomLabels[api.ContainerReplaceLabel] = replaced.ID
-	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited, false, true, false, w)
+	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited,
+		false, true, false, w,
+		mergeLabels(service.Labels, service.CustomLabels).Add(api.ContainerReplaceLabel, replaced.ID))
 	if err != nil {
 		return created, err
 	}
@@ -453,6 +455,9 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 
 // setDependentLifecycle define the Lifecycle strategy for all services to depend on specified service
 func setDependentLifecycle(project *types.Project, service string, strategy string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	for i, s := range project.Services {
 		if utils.StringContains(s.GetDependencies(), service) {
 			if s.Extensions == nil {
@@ -475,10 +480,19 @@ func (s *composeService) startContainer(ctx context.Context, container moby.Cont
 	return nil
 }
 
-func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, inherit *moby.Container, autoRemove bool, useNetworkAliases bool, attachStdin bool, w progress.Writer) (moby.Container, error) {
+func (s *composeService) createMobyContainer(ctx context.Context,
+	project *types.Project,
+	service types.ServiceConfig,
+	name string,
+	number int,
+	inherit *moby.Container,
+	autoRemove, useNetworkAliases, attachStdin bool,
+	w progress.Writer,
+	labels types.Labels,
+) (moby.Container, error) {
 	var created moby.Container
-	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, inherit, autoRemove, attachStdin)
+	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, inherit,
+		autoRemove, attachStdin, labels)
 	if err != nil {
 		return created, err
 	}
@@ -724,4 +738,14 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		w.Event(progress.StartedEvent(eventName))
 	}
 	return nil
+}
+
+func mergeLabels(ls ...types.Labels) types.Labels {
+	merged := types.Labels{}
+	for _, l := range ls {
+		for k, v := range l {
+			merged[k] = v
+		}
+	}
+	return merged
 }

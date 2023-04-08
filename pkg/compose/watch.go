@@ -17,6 +17,9 @@ package compose
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -43,16 +46,43 @@ const (
 )
 
 type Trigger struct {
-	Path   string `json:"path,omitempty"`
-	Action string `json:"action,omitempty"`
-	Target string `json:"target,omitempty"`
+	Path   string   `json:"path,omitempty"`
+	Action string   `json:"action,omitempty"`
+	Target string   `json:"target,omitempty"`
+	Ignore []string `json:"ignore,omitempty"`
 }
 
 const quietPeriod = 2 * time.Second
 
-func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint:gocyclo
-	needRebuild := make(chan string)
-	needSync := make(chan api.CopyOptions, 5)
+// fileMapping contains the Compose service and modified host system path.
+//
+// For file sync, the container path is also included.
+// For rebuild, there is no container path, so it is always empty.
+type fileMapping struct {
+	// Service that the file event is for.
+	Service string
+	// HostPath that was created/modified/deleted outside the container.
+	//
+	// This is the path as seen from the user's perspective, e.g.
+	// 	- C:\Users\moby\Documents\hello-world\main.go
+	//  - /Users/moby/Documents/hello-world/main.go
+	HostPath string
+	// ContainerPath for the target file inside the container (only populated
+	// for sync events, not rebuild).
+	//
+	// This is the path as used in Docker CLI commands, e.g.
+	//	- /workdir/main.go
+	ContainerPath string
+}
+
+func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error { //nolint: gocyclo
+	needRebuild := make(chan fileMapping)
+	needSync := make(chan fileMapping)
+
+	err := s.prepareProjectForBuild(project, nil)
+	if err != nil {
+		return err
+	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -67,20 +97,39 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	if err != nil {
 		return err
 	}
+	watching := false
 	for _, service := range ss {
 		config, err := loadDevelopmentConfig(service, project)
 		if err != nil {
 			return err
 		}
-		name := service.Name
-		if service.Build == nil {
-			if len(services) != 0 || len(config.Watch) != 0 {
-				// watch explicitly requested on service, but no build section set
-				return fmt.Errorf("service %s doesn't have a build section", name)
-			}
-			logrus.Infof("service %s ignored. Can't watch a service without a build section", name)
+
+		if config != nil && len(config.Watch) > 0 && service.Build == nil {
+			// service configured with watchers but no build section
+			return fmt.Errorf("can't watch service %q without a build context", service.Name)
+		}
+
+		if len(services) > 0 && service.Build == nil {
+			// service explicitly selected for watch has no build section
+			return fmt.Errorf("can't watch service %q without a build context", service.Name)
+		}
+
+		if len(services) == 0 && service.Build == nil {
 			continue
 		}
+
+		if config == nil {
+			config = &DevelopmentConfig{
+				Watch: []Trigger{
+					{
+						Path:   service.Build.Context,
+						Action: WatchActionRebuild,
+					},
+				},
+			}
+		}
+
+		name := service.Name
 		bc := service.Build.Context
 
 		dockerIgnores, err := watch.LoadDockerIgnore(bc)
@@ -97,7 +146,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		}
 		ignore := watch.NewCompositeMatcher(
 			dockerIgnores,
-			watch.EphemeralPathMatcher,
+			watch.EphemeralPathMatcher(),
 			dotGitIgnore,
 		)
 
@@ -111,101 +160,141 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		if err != nil {
 			return err
 		}
+		watching = true
 
 		eg.Go(func() error {
 			defer watcher.Close() //nolint:errcheck
-		WATCH:
-			for {
-				select {
-				case <-ctx.Done():
-					return nil
-				case event := <-watcher.Events():
-					path := event.Path()
-
-					for _, trigger := range config.Watch {
-						logrus.Debugf("change detected on %s - comparing with %s", path, trigger.Path)
-						if watch.IsChild(trigger.Path, path) {
-							fmt.Fprintf(s.stderr(), "change detected on %s\n", path)
-
-							switch trigger.Action {
-							case WatchActionSync:
-								logrus.Debugf("modified file %s triggered sync", path)
-								rel, err := filepath.Rel(trigger.Path, path)
-								if err != nil {
-									return err
-								}
-								dest := filepath.Join(trigger.Target, rel)
-								needSync <- api.CopyOptions{
-									Source:      path,
-									Destination: fmt.Sprintf("%s:%s", name, dest),
-								}
-							case WatchActionRebuild:
-								logrus.Debugf("modified file %s requires image to be rebuilt", path)
-								needRebuild <- name
-							default:
-								return fmt.Errorf("watch action %q is not supported", trigger)
-							}
-							continue WATCH
-						}
-					}
-
-					// default
-					needRebuild <- name
-
-				case err := <-watcher.Errors():
-					return err
-				}
-			}
+			return s.watch(ctx, name, watcher, config.Watch, needSync, needRebuild)
 		})
+	}
+
+	if !watching {
+		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'x-develop' section")
 	}
 
 	return eg.Wait()
 }
 
-func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (DevelopmentConfig, error) {
-	var config DevelopmentConfig
-	if y, ok := service.Extensions["x-develop"]; ok {
-		err := mapstructure.Decode(y, &config)
+func (s *composeService) watch(ctx context.Context, name string, watcher watch.Notify, triggers []Trigger, needSync chan fileMapping, needRebuild chan fileMapping) error {
+	ignores := make([]watch.PathMatcher, len(triggers))
+	for i, trigger := range triggers {
+		ignore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
 		if err != nil {
-			return config, err
+			return err
 		}
-		for i, trigger := range config.Watch {
-			if !filepath.IsAbs(trigger.Path) {
-				trigger.Path = filepath.Join(project.WorkingDir, trigger.Path)
+		ignores[i] = ignore
+	}
+
+WATCH:
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case event := <-watcher.Events():
+			hostPath := event.Path()
+
+			for i, trigger := range triggers {
+				logrus.Debugf("change detected on %s - comparing with %s", hostPath, trigger.Path)
+				if watch.IsChild(trigger.Path, hostPath) {
+
+					match, err := ignores[i].Matches(hostPath)
+					if err != nil {
+						return err
+					}
+
+					if match {
+						logrus.Debugf("%s is matching ignore pattern", hostPath)
+						continue
+					}
+
+					fmt.Fprintf(s.stderr(), "change detected on %s\n", hostPath)
+
+					f := fileMapping{
+						HostPath: hostPath,
+						Service:  name,
+					}
+
+					switch trigger.Action {
+					case WatchActionSync:
+						logrus.Debugf("modified file %s triggered sync", hostPath)
+						rel, err := filepath.Rel(trigger.Path, hostPath)
+						if err != nil {
+							return err
+						}
+						// always use Unix-style paths for inside the container
+						f.ContainerPath = path.Join(trigger.Target, rel)
+						needSync <- f
+					case WatchActionRebuild:
+						logrus.Debugf("modified file %s requires image to be rebuilt", hostPath)
+						needRebuild <- f
+					default:
+						return fmt.Errorf("watch action %q is not supported", trigger)
+					}
+					continue WATCH
+				}
 			}
-			trigger.Path = filepath.Clean(trigger.Path)
-			if trigger.Path == "" {
-				return config, errors.New("watch rules MUST define a path")
-			}
-			config.Watch[i] = trigger
+		case err := <-watcher.Errors():
+			return err
 		}
 	}
-	return config, nil
 }
 
-func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Project) func(services []string) {
-	return func(services []string) {
-		fmt.Fprintf(s.stderr(), "Updating %s after changes were detected\n", strings.Join(services, ", "))
-		imageIds, err := s.build(ctx, project, api.BuildOptions{
-			Services: services,
-		})
-		if err != nil {
-			fmt.Fprintf(s.stderr(), "Build failed\n")
+func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (*DevelopmentConfig, error) {
+	var config DevelopmentConfig
+	y, ok := service.Extensions["x-develop"]
+	if !ok {
+		return nil, nil
+	}
+	err := mapstructure.Decode(y, &config)
+	if err != nil {
+		return nil, err
+	}
+	for i, trigger := range config.Watch {
+		if !filepath.IsAbs(trigger.Path) {
+			trigger.Path = filepath.Join(project.WorkingDir, trigger.Path)
 		}
-		for i, service := range project.Services {
-			if id, ok := imageIds[service.Name]; ok {
-				service.Image = id
-			}
-			project.Services[i] = service
+		trigger.Path = filepath.Clean(trigger.Path)
+		if trigger.Path == "" {
+			return nil, errors.New("watch rules MUST define a path")
 		}
 
-		err = s.Up(ctx, project, api.UpOptions{
+		if trigger.Action == WatchActionRebuild && service.Build == nil {
+			return nil, fmt.Errorf("service %s doesn't have a build section, can't apply 'rebuild' on watch", service.Name)
+		}
+
+		config.Watch[i] = trigger
+	}
+	return &config, nil
+}
+
+func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Project) func(services rebuildServices) {
+	for i, service := range project.Services {
+		service.PullPolicy = types.PullPolicyBuild
+		project.Services[i] = service
+	}
+	return func(services rebuildServices) {
+		serviceNames := make([]string, 0, len(services))
+		allPaths := make(utils.Set[string])
+		for serviceName, paths := range services {
+			serviceNames = append(serviceNames, serviceName)
+			for p := range paths {
+				allPaths.Add(p)
+			}
+		}
+
+		fmt.Fprintf(
+			s.stderr(),
+			"Rebuilding %s after changes were detected:%s\n",
+			strings.Join(serviceNames, ", "),
+			strings.Join(append([]string{""}, allPaths.Elements()...), "\n  - "),
+		)
+		err := s.Up(ctx, project, api.UpOptions{
 			Create: api.CreateOptions{
-				Services: services,
+				Services: serviceNames,
 				Inherit:  true,
 			},
 			Start: api.StartOptions{
-				Services: services,
+				Services: serviceNames,
 				Project:  project,
 			},
 		})
@@ -215,39 +304,61 @@ func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Proje
 	}
 }
 
-func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project, needSync chan api.CopyOptions) func() error {
+func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project, needSync <-chan fileMapping) func() error {
 	return func() error {
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
 			case opt := <-needSync:
-				err := s.Copy(ctx, project.Name, opt)
-				if err != nil {
-					return err
+				if fi, statErr := os.Stat(opt.HostPath); statErr == nil && !fi.IsDir() {
+					err := s.Copy(ctx, project.Name, api.CopyOptions{
+						Source:      opt.HostPath,
+						Destination: fmt.Sprintf("%s:%s", opt.Service, opt.ContainerPath),
+					})
+					if err != nil {
+						return err
+					}
+					fmt.Fprintf(s.stderr(), "%s updated\n", opt.ContainerPath)
+				} else if errors.Is(statErr, fs.ErrNotExist) {
+					_, err := s.Exec(ctx, project.Name, api.RunOptions{
+						Service: opt.Service,
+						Command: []string{"rm", "-rf", opt.ContainerPath},
+						Index:   1,
+					})
+					if err != nil {
+						logrus.Warnf("failed to delete %q from %s: %v", opt.ContainerPath, opt.Service, err)
+					}
+					fmt.Fprintf(s.stderr(), "%s deleted from container\n", opt.ContainerPath)
 				}
-				fmt.Fprintf(s.stderr(), "%s updated\n", opt.Destination)
 			}
 		}
 	}
 }
 
-func debounce(ctx context.Context, clock clockwork.Clock, delay time.Duration, input chan string, fn func(services []string)) {
-	services := utils.Set[string]{}
-	t := clock.AfterFunc(delay, func() {
-		if len(services) > 0 {
-			refresh := services.Elements()
-			services.Clear()
-			fn(refresh)
-		}
-	})
+type rebuildServices map[string]utils.Set[string]
+
+func debounce(ctx context.Context, clock clockwork.Clock, delay time.Duration, input <-chan fileMapping, fn func(services rebuildServices)) {
+	services := make(rebuildServices)
+	t := clock.NewTimer(delay)
+	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case service := <-input:
+		case <-t.Chan():
+			if len(services) > 0 {
+				go fn(services)
+				services = make(rebuildServices)
+			}
+		case e := <-input:
 			t.Reset(delay)
-			services.Add(service)
+			svc, ok := services[e.Service]
+			if !ok {
+				svc = make(utils.Set[string])
+				services[e.Service] = svc
+			}
+			svc.Add(e.HostPath)
 		}
 	}
 }

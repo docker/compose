@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/compose/v2/pkg/progress"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/cli/cli/command"
@@ -43,6 +44,12 @@ const (
 )
 
 func (s *composeService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.copy(ctx, projectName, options)
+	}, s.stderr())
+}
+
+func (s *composeService) copy(ctx context.Context, projectName string, options api.CopyOptions) error {
 	projectName = strings.ToLower(projectName)
 	srcService, srcPath := splitCpArg(options.Source)
 	destService, dstPath := splitCpArg(options.Destination)
@@ -78,18 +85,33 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 		return err
 	}
 
+	w := progress.ContextWriter(ctx)
 	g := errgroup.Group{}
 	for _, cont := range containers {
 		container := cont
 		g.Go(func() error {
+			name := getCanonicalContainerName(container)
+			var msg string
+			if direction == fromService {
+				msg = fmt.Sprintf("copy %s:%s to %s", name, srcPath, dstPath)
+			} else {
+				msg = fmt.Sprintf("copy %s to %s:%s", srcPath, name, dstPath)
+			}
+			w.Event(progress.Event{
+				ID:         name,
+				Text:       msg,
+				Status:     progress.Working,
+				StatusText: "Copying",
+			})
 			if err := copyFunc(ctx, container.ID, srcPath, dstPath, options); err != nil {
 				return err
 			}
-			fromOrInside := "inside"
-			if direction == fromService {
-				fromOrInside = "from"
-			}
-			fmt.Fprintf(s.stderr(), "Copy %s to path %s %s %s service container\n", srcPath, dstPath, fromOrInside, getCanonicalContainerName(container))
+			w.Event(progress.Event{
+				ID:         name,
+				Text:       msg,
+				Status:     progress.Done,
+				StatusText: "Copied",
+			})
 			return nil
 		})
 	}
