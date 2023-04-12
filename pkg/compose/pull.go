@@ -48,15 +48,6 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 }
 
 func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
-	info, err := s.apiClient().Info(ctx)
-	if err != nil {
-		return err
-	}
-
-	if info.IndexServerAddress == "" {
-		info.IndexServerAddress = registry.IndexServer
-	}
-
 	images, err := s.getLocalImagesDigests(ctx, project)
 	if err != nil {
 		return err
@@ -123,7 +114,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		imagesBeingPulled[service.Image] = service.Name
 
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[i] = err
 				if service.Build != nil {
@@ -173,7 +164,7 @@ func imageAlreadyPresent(serviceImage string, localImages map[string]string) boo
 	return ok && tagged.Tag() != "latest"
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info,
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig,
 	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
 	w.Event(progress.Event{
 		ID:     service.Name,
@@ -185,7 +176,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 
-	encodedAuth, err := encodedAuth(ref, info, configFile)
+	encodedAuth, err := encodedAuth(ref, configFile)
 	if err != nil {
 		return "", err
 	}
@@ -249,17 +240,13 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	return inspected.ID, nil
 }
 
-func encodedAuth(ref reference.Named, info moby.Info, configFile driver.Auth) (string, error) {
+func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 	repoInfo, err := registry.ParseRepositoryInfo(ref)
 	if err != nil {
 		return "", err
 	}
 
-	key := repoInfo.Index.Name
-	if repoInfo.Index.Official {
-		key = info.IndexServerAddress
-	}
-
+	key := registry.GetAuthConfigKey(repoInfo.Index)
 	authConfig, err := configFile.GetAuthConfig(key)
 	if err != nil {
 		return "", err
@@ -273,15 +260,6 @@ func encodedAuth(ref reference.Named, info moby.Info, configFile driver.Auth) (s
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
-	info, err := s.apiClient().Info(ctx)
-	if err != nil {
-		return err
-	}
-
-	if info.IndexServerAddress == "" {
-		info.IndexServerAddress = registry.IndexServer
-	}
-
 	var needPull []types.ServiceConfig
 	for _, service := range project.Services {
 		if service.Image == "" {
@@ -311,7 +289,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		for i, service := range needPull {
 			i, service := i, service
 			eg.Go(func() error {
-				id, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				pulledImages[i] = id
 				if err != nil && isServiceImageToBuild(service, project.Services) {
 					// image can be built, so we can ignore pull failure

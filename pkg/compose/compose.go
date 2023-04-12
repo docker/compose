@@ -123,12 +123,8 @@ func getContainerNameWithoutProject(c moby.Container) string {
 
 func (s *composeService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {
 	if options.ResolveImageDigests {
-		info, err := s.apiClient().Info(ctx)
-		if err != nil {
-			return nil, err
-		}
-		err = project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
-			auth, err := encodedAuth(named, info, s.configFile())
+		err := project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+			auth, err := encodedAuth(named, s.configFile())
 			if err != nil {
 				return "", err
 			}
