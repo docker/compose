@@ -659,25 +659,25 @@ func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
 	for _, b := range blkio.DeviceReadBps {
 		resources.BlkioDeviceReadBps = append(resources.BlkioDeviceReadBps, &blkiodev.ThrottleDevice{
 			Path: b.Path,
-			Rate: b.Rate,
+			Rate: uint64(b.Rate),
 		})
 	}
 	for _, b := range blkio.DeviceReadIOps {
 		resources.BlkioDeviceReadIOps = append(resources.BlkioDeviceReadIOps, &blkiodev.ThrottleDevice{
 			Path: b.Path,
-			Rate: b.Rate,
+			Rate: uint64(b.Rate),
 		})
 	}
 	for _, b := range blkio.DeviceWriteBps {
 		resources.BlkioDeviceWriteBps = append(resources.BlkioDeviceWriteBps, &blkiodev.ThrottleDevice{
 			Path: b.Path,
-			Rate: b.Rate,
+			Rate: uint64(b.Rate),
 		})
 	}
 	for _, b := range blkio.DeviceWriteIOps {
 		resources.BlkioDeviceWriteIOps = append(resources.BlkioDeviceWriteIOps, &blkiodev.ThrottleDevice{
 			Path: b.Path,
-			Rate: b.Rate,
+			Rate: uint64(b.Rate),
 		})
 	}
 }

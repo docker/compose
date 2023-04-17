@@ -433,10 +433,10 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 	return ret
 }
 
-func toBuildContexts(additionalContexts map[string]*string) map[string]build.NamedContext {
+func toBuildContexts(additionalContexts types.Mapping) map[string]build.NamedContext {
 	namedContexts := map[string]build.NamedContext{}
-	for name, buildContext := range additionalContexts {
-		namedContexts[name] = build.NamedContext{Path: *buildContext}
+	for name, context := range additionalContexts {
+		namedContexts[name] = build.NamedContext{Path: context}
 	}
 	return namedContexts
 }
