@@ -1,44 +1,44 @@
 # docker compose
 
 <!---MARKER_GEN_START-->
+
 Docker Compose
 
 ### Subcommands
 
-| Name                            | Description                                                             |
-|:--------------------------------|:------------------------------------------------------------------------|
-| [`alpha`](compose_alpha.md)     | Experimental commands                                                   |
-| [`build`](compose_build.md)     | Build or rebuild services                                               |
-| [`config`](compose_config.md)   | Parse, resolve and render compose file in canonical format              |
-| [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local filesystem |
-| [`create`](compose_create.md)   | Creates containers for a service.                                       |
-| [`down`](compose_down.md)       | Stop and remove containers, networks                                    |
-| [`events`](compose_events.md)   | Receive real time events from containers.                               |
-| [`exec`](compose_exec.md)       | Execute a command in a running container.                               |
-| [`images`](compose_images.md)   | List images used by the created containers                              |
-| [`kill`](compose_kill.md)       | Force stop service containers.                                          |
-| [`logs`](compose_logs.md)       | View output from containers                                             |
-| [`ls`](compose_ls.md)           | List running compose projects                                           |
-| [`pause`](compose_pause.md)     | Pause services                                                          |
-| [`port`](compose_port.md)       | Print the public port for a port binding.                               |
-| [`ps`](compose_ps.md)           | List containers                                                         |
-| [`pull`](compose_pull.md)       | Pull service images                                                     |
-| [`push`](compose_push.md)       | Push service images                                                     |
-| [`restart`](compose_restart.md) | Restart service containers                                              |
-| [`rm`](compose_rm.md)           | Removes stopped service containers                                      |
-| [`run`](compose_run.md)         | Run a one-off command on a service.                                     |
-| [`start`](compose_start.md)     | Start services                                                          |
-| [`stop`](compose_stop.md)       | Stop services                                                           |
-| [`top`](compose_top.md)         | Display the running processes                                           |
-| [`unpause`](compose_unpause.md) | Unpause services                                                        |
-| [`up`](compose_up.md)           | Create and start containers                                             |
-| [`version`](compose_version.md) | Show the Docker Compose version information                             |
-
+| Name                            | Description                                                              |
+| :------------------------------ | :----------------------------------------------------------------------- |
+| [`alpha`](compose_alpha.md)     | Experimental commands                                                    |
+| [`build`](compose_build.md)     | Build or rebuild services                                                |
+| [`config`](compose_config.md)   | Parse, resolve and render compose file in canonical format               |
+| [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local file system |
+| [`create`](compose_create.md)   | Creates containers for a service.                                        |
+| [`down`](compose_down.md)       | Stop and remove containers, networks                                     |
+| [`events`](compose_events.md)   | Receive real time events from containers.                                |
+| [`exec`](compose_exec.md)       | Execute a command in a running container.                                |
+| [`images`](compose_images.md)   | List images used by the created containers                               |
+| [`kill`](compose_kill.md)       | Force stop service containers.                                           |
+| [`logs`](compose_logs.md)       | View output from containers                                              |
+| [`ls`](compose_ls.md)           | List running compose projects                                            |
+| [`pause`](compose_pause.md)     | Pause services                                                           |
+| [`port`](compose_port.md)       | Print the public port for a port binding.                                |
+| [`ps`](compose_ps.md)           | List containers                                                          |
+| [`pull`](compose_pull.md)       | Pull service images                                                      |
+| [`push`](compose_push.md)       | Push service images                                                      |
+| [`restart`](compose_restart.md) | Restart service containers                                               |
+| [`rm`](compose_rm.md)           | Removes stopped service containers                                       |
+| [`run`](compose_run.md)         | Run a one-off command on a service.                                      |
+| [`start`](compose_start.md)     | Start services                                                           |
+| [`stop`](compose_stop.md)       | Stop services                                                            |
+| [`top`](compose_top.md)         | Display the running processes                                            |
+| [`unpause`](compose_unpause.md) | Unpause services                                                         |
+| [`up`](compose_up.md)           | Create and start containers                                              |
+| [`version`](compose_version.md) | Show the Docker Compose version information                              |
 
 ### Options
 
 | Name                   | Type          | Default | Description                                                                                         |
-|:-----------------------|:--------------|:--------|:----------------------------------------------------------------------------------------------------|
+| :--------------------- | :------------ | :------ | :-------------------------------------------------------------------------------------------------- |
 | `--ansi`               | `string`      | `auto`  | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
 | `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
 | `--env-file`           | `stringArray` |         | Specify an alternate environment file.                                                              |
@@ -48,7 +48,6 @@ Docker Compose
 | `--project-directory`  | `string`      |         | Specify an alternate working directory<br>(default: the path of the, first specified, Compose file) |
 | `-p`, `--project-name` | `string`      |         | Project name                                                                                        |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description
@@ -57,9 +56,11 @@ You can use compose subcommand, `docker compose [-f <arg>...] [options] [COMMAND
 multiple services in Docker containers.
 
 ### Use `-f` to specify the name and path of one or more Compose files
+
 Use the `-f` flag to specify the location of a Compose configuration file.
 
 #### Specifying multiple Compose files
+
 You can supply multiple `-f` configuration files. When you supply multiple files, Compose combines them into a single
 configuration. Compose builds the configuration in the order you supply the files. Subsequent files override and add
 to their predecessors.
@@ -81,6 +82,7 @@ services:
     volumes:
       - "/data"
 ```
+
 If the `docker-compose.admin.yml` also specifies this same service, any matching fields override the previous file.
 New values, add to the `webapp` service configuration.
 
@@ -102,6 +104,7 @@ The `-f` flag is optional. If you don’t provide this flag on the command line,
 and its parent directories looking for a `compose.yaml` or `docker-compose.yaml` file.
 
 #### Specifying a path to a single Compose file
+
 You can use the `-f` flag to specify a path to a Compose file that is not located in the current directory, either
 from the command line or by setting up a `COMPOSE_FILE` environment variable in your shell or in an environment file.
 
@@ -117,17 +120,18 @@ $ docker compose -f ~/sandbox/rails/compose.yaml pull db
 
 Each configuration has a project name. Compose sets the project name using
 the following mechanisms, in order of precedence:
+
 - The `-p` command line flag
 - The `COMPOSE_PROJECT_NAME` environment variable
 - The top level `name:` variable from the config file (or the last `name:`
-from a series of config files specified using `-f`)
+  from a series of config files specified using `-f`)
 - The `basename` of the project directory containing the config file (or
-containing the first config file specified using `-f`)
+  containing the first config file specified using `-f`)
 - The `basename` of the current directory if no config file is specified
-Project names must contain only lowercase letters, decimal digits, dashes,
-and underscores, and must begin with a lowercase letter or decimal digit. If
-the `basename` of the project directory or current directory violates this
-constraint, you must use one of the other mechanisms.
+  Project names must contain only lowercase letters, decimal digits, dashes,
+  and underscores, and must begin with a lowercase letter or decimal digit. If
+  the `basename` of the project directory or current directory violates this
+  constraint, you must use one of the other mechanisms.
 
 ```console
 $ docker compose -p my_project ps -a
