@@ -72,15 +72,18 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			})
 		}, s.stderr())
 	}
+
+	var isTerminated bool
+	eg, ctx := errgroup.WithContext(ctx)
 	go func() {
 		<-signalChan
+		isTerminated = true
 		printer.Cancel()
 		fmt.Fprintln(s.stderr(), "Gracefully stopping... (press Ctrl+C again to force)")
-		stopFunc() //nolint:errcheck
+		eg.Go(stopFunc)
 	}()
 
 	var exitCode int
-	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		code, err := printer.Run(options.Start.CascadeStop, options.Start.ExitCodeFrom, stopFunc)
 		exitCode = code
@@ -88,7 +91,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	})
 
 	err = s.start(ctx, project.Name, options.Start, printer.HandleEvent)
-	if err != nil {
+	if err != nil && !isTerminated { // Ignore error if the process is terminated
 		return err
 	}
 
