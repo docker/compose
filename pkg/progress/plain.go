@@ -53,12 +53,12 @@ func (p *plainWriter) Events(events []Event) {
 	}
 }
 
-func (p *plainWriter) TailMsgf(m string, args ...interface{}) {
-	prefix := ""
+func (p *plainWriter) TailMsgf(msg string, args ...interface{}) {
+	msg = fmt.Sprintf(msg, args...)
 	if p.dryRun {
-		prefix = api.DRYRUN_PREFIX
+		msg = api.DRYRUN_PREFIX + msg
 	}
-	fmt.Fprintln(p.out, append([]interface{}{prefix, m}, args...)...)
+	fmt.Fprintln(p.out, msg)
 }
 
 func (p *plainWriter) Stop() {
