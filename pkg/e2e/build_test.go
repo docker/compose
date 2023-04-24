@@ -167,7 +167,7 @@ func TestBuildSSH(t *testing.T) {
 			"wrong-ssh=./fixtures/build-test/ssh/fake_rsa")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 17,
-			Err:      "failed to solve: rpc error: code = Unknown desc = unset ssh forward key fake-ssh",
+			Err:      "unset ssh forward key fake-ssh",
 		})
 	})
 
@@ -229,7 +229,7 @@ func TestBuildImageDependencies(t *testing.T) {
 			cli.RunDockerComposeCmd(t, "down", "--rmi=all", "-t=0")
 			res := cli.RunDockerOrExitError(t, "image", "rm", "build-dependencies-service")
 			if res.Error != nil {
-				require.Contains(t, res.Stderr(), `Error: No such image: build-dependencies-service`)
+				require.Contains(t, res.Stderr(), `No such image: build-dependencies-service`)
 			}
 		}
 		resetState()
@@ -239,7 +239,7 @@ func TestBuildImageDependencies(t *testing.T) {
 		res := cli.RunDockerOrExitError(t, "image", "inspect", "build-dependencies-service")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "Error: No such image: build-dependencies-service",
+			Err:      "No such image: build-dependencies-service",
 		})
 
 		res = cli.RunDockerComposeCmd(t, "build")
@@ -256,7 +256,7 @@ func TestBuildImageDependencies(t *testing.T) {
 		res = cli.RunDockerOrExitError(t, "image", "inspect", "build-dependencies-service")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "Error: No such image: build-dependencies-service",
+			Err:      "No such image: build-dependencies-service",
 		})
 	}
 
