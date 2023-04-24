@@ -96,18 +96,21 @@ func (s *composeService) Logs(
 					ID:        c.ID,
 					Service:   c.Labels[api.ServiceLabel],
 				})
-				err := s.logContainers(ctx, consumer, c, api.LogOptions{
-					Follow:     options.Follow,
-					Since:      t.Format(time.RFC3339Nano),
-					Until:      options.Until,
-					Tail:       options.Tail,
-					Timestamps: options.Timestamps,
+				eg.Go(func() error {
+					err := s.logContainers(ctx, consumer, c, api.LogOptions{
+						Follow:     options.Follow,
+						Since:      t.Format(time.RFC3339Nano),
+						Until:      options.Until,
+						Tail:       options.Tail,
+						Timestamps: options.Timestamps,
+					})
+					if _, ok := err.(errdefs.ErrNotImplemented); ok {
+						// ignore
+						return nil
+					}
+					return err
 				})
-				if _, ok := err.(errdefs.ErrNotImplemented); ok {
-					// ignore
-					return nil
-				}
-				return err
+				return nil
 			}, func(c types.Container, t time.Time) error {
 				printer.HandleEvent(api.ContainerEvent{
 					Type:      api.ContainerEventAttach,
