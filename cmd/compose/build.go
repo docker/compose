@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
+	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/spf13/cobra"
@@ -42,7 +43,7 @@ type buildOptions struct {
 	progress string
 	args     []string
 	noCache  bool
-	memory   string
+	memory   cliopts.MemBytes
 	ssh      string
 }
 
@@ -75,7 +76,7 @@ var printerModes = []string{
 	buildx.PrinterModeQuiet,
 }
 
-func buildCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -83,9 +84,6 @@ func buildCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *
 		Use:   "build [OPTIONS] [SERVICE...]",
 		Short: "Build or rebuild services",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
-			if opts.memory != "" {
-				fmt.Fprintln(streams.Err(), "WARNING --memory is ignored as not supported in buildkit.")
-			}
 			if opts.quiet {
 				opts.progress = buildx.PrinterModeQuiet
 				devnull, err := os.Open(os.DevNull)
@@ -125,8 +123,7 @@ func buildCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *
 	cmd.Flags().BoolVar(&opts.noCache, "no-cache", false, "Do not use cache when building the image")
 	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
 	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
-	cmd.Flags().StringVarP(&opts.memory, "memory", "m", "", "Set memory limit for the build container. Not supported on buildkit yet.")
-	cmd.Flags().MarkHidden("memory") //nolint:errcheck
+	cmd.Flags().VarP(&opts.memory, "memory", "m", "Set memory limit for the build container. Not supported by BuildKit.")
 
 	return cmd
 }
@@ -141,5 +138,7 @@ func runBuild(ctx context.Context, backend api.Service, opts buildOptions, servi
 	if err != nil {
 		return err
 	}
+
+	apiBuildOptions.Memory = int64(opts.memory)
 	return backend.Build(ctx, project, apiBuildOptions)
 }

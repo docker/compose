@@ -374,7 +374,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		portCommand(&opts, streams, backend),
 		imagesCommand(&opts, streams, backend),
 		versionCommand(streams),
-		buildCommand(&opts, streams, backend),
+		buildCommand(&opts, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),

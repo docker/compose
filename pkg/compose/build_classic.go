@@ -43,7 +43,7 @@ import (
 )
 
 //nolint:gocyclo
-func (s *composeService) doBuildClassic(ctx context.Context, service types.ServiceConfig) (string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, service types.ServiceConfig, options api.BuildOptions) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
 		dockerfileCtx io.ReadCloser
@@ -161,6 +161,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, service types.Servi
 	buildOptions.Tags = append(buildOptions.Tags, service.Image)
 	buildOptions.Dockerfile = relDockerfile
 	buildOptions.AuthConfigs = authConfigs
+	buildOptions.Memory = options.Memory
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

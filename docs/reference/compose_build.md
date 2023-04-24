@@ -5,15 +5,16 @@ Build or rebuild services
 
 ### Options
 
-| Name            | Type          | Default | Description                                                                                                 |
-|:----------------|:--------------|:--------|:------------------------------------------------------------------------------------------------------------|
-| `--build-arg`   | `stringArray` |         | Set build-time variables for services.                                                                      |
-| `--no-cache`    |               |         | Do not use cache when building the image                                                                    |
-| `--progress`    | `string`      | `auto`  | Set type of progress output (auto, tty, plain, quiet)                                                       |
-| `--pull`        |               |         | Always attempt to pull a newer version of the image.                                                        |
-| `--push`        |               |         | Push service images.                                                                                        |
-| `-q`, `--quiet` |               |         | Don't print anything to STDOUT                                                                              |
-| `--ssh`         | `string`      |         | Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent) |
+| Name             | Type          | Default | Description                                                                                                 |
+|:-----------------|:--------------|:--------|:------------------------------------------------------------------------------------------------------------|
+| `--build-arg`    | `stringArray` |         | Set build-time variables for services.                                                                      |
+| `-m`, `--memory` | `bytes`       | `0`     | Set memory limit for the build container. Not supported by BuildKit.                                        |
+| `--no-cache`     |               |         | Do not use cache when building the image                                                                    |
+| `--progress`     | `string`      | `auto`  | Set type of progress output (auto, tty, plain, quiet)                                                       |
+| `--pull`         |               |         | Always attempt to pull a newer version of the image.                                                        |
+| `--push`         |               |         | Push service images.                                                                                        |
+| `-q`, `--quiet`  |               |         | Don't print anything to STDOUT                                                                              |
+| `--ssh`          | `string`      |         | Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent) |
 
 
 <!---MARKER_GEN_END-->
