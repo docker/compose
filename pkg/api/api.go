@@ -119,6 +119,8 @@ type BuildOptions struct {
 	Services []string
 	// Ssh authentications passed in the command line
 	SSHs []types.SSHKey
+	// Memory limit for the build container
+	Memory int64
 }
 
 // Apply mutates project according to build options

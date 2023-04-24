@@ -46,11 +46,12 @@ options:
       swarm: false
     - option: memory
       shorthand: m
-      value_type: string
+      value_type: bytes
+      default_value: "0"
       description: |
-        Set memory limit for the build container. Not supported on buildkit yet.
+        Set memory limit for the build container. Not supported by BuildKit.
       deprecated: false
-      hidden: true
+      hidden: false
       experimental: false
       experimentalcli: false
       kubernetes: false

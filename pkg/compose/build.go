@@ -91,7 +91,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				} else {
 					service.Build.Args = service.Build.Args.OverrideBy(args)
 				}
-				id, err := s.doBuildClassic(ctx, service)
+				id, err := s.doBuildClassic(ctx, service, options)
 				if err != nil {
 					return err
 				}
@@ -102,6 +102,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				}
 				return nil
 			}
+
+			if options.Memory != 0 {
+				fmt.Fprintln(s.stderr(), "WARNING: --memory is not supported by BuildKit and will be ignored.")
+			}
+
 			buildOptions, err := s.toBuildOptions(project, service, options)
 			if err != nil {
 				return err
