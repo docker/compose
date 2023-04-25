@@ -7,7 +7,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go v1.13.4
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.6.19
+	github.com/containerd/containerd v1.6.20
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000 // replaced; see replace for the actual version used
 	github.com/distribution/distribution/v3 v3.0.0-20230327091844-0c958010ace2
 	github.com/docker/buildx v0.10.4
@@ -21,11 +21,11 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.11.5
+	github.com/moby/buildkit v0.11.6
 	github.com/moby/term v0.0.0-20221205130635-1aeaba878587
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.1.0-rc2
+	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.7.0
@@ -60,7 +60,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cloudflare/cfssl v1.4.1 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
-	github.com/containerd/ttrpc v1.1.0 // indirect
+	github.com/containerd/ttrpc v1.1.1 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
