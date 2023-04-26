@@ -49,6 +49,12 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err := prepareVolumes(project); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
 	}
+
+	err := prepareSecrets(project)
+	if err != nil {
+		return "", err
+	}
+
 	service, err := project.GetService(opts.Service)
 	if err != nil {
 		return "", err

@@ -208,6 +208,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		name := getContainerProgressName(container)
 		switch container.State {
 		case ContainerRunning:
+			// Refresh secrets to enforce those are up to date
+			err = c.service.injectSecrets(ctx, project, service, container.ID)
+			if err != nil {
+				return err
+			}
 			w.Event(progress.RunningEvent(name))
 		case ContainerCreated:
 		case ContainerRestarting:
@@ -216,6 +221,10 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		default:
 			container := container
 			eg.Go(func() error {
+				err = c.service.injectSecrets(ctx, project, service, container.ID)
+				if err != nil {
+					return err
+				}
 				return c.service.startContainer(ctx, container)
 			})
 		}
@@ -560,7 +569,6 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 			return created, err
 		}
 	}
-
 	err = s.injectSecrets(ctx, project, service, created.ID)
 	return created, err
 }

@@ -111,6 +111,11 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
+	err = prepareSecrets(project)
+	if err != nil {
+		return err
+	}
+
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
 }
 
@@ -860,17 +865,6 @@ func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.M
 		m[bindMount.Target] = bindMount
 	}
 
-	secrets, err := buildContainerSecretMounts(p, s)
-	if err != nil {
-		return nil, err
-	}
-	for _, s := range secrets {
-		if _, found := m[s.Target]; found {
-			continue
-		}
-		m[s.Target] = s
-	}
-
 	configs, err := buildContainerConfigMounts(p, s)
 	if err != nil {
 		return nil, err
@@ -911,45 +905,6 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, err
 		}
 		mounts[target] = bindMount
-	}
-	values := make([]mount.Mount, 0, len(mounts))
-	for _, v := range mounts {
-		values = append(values, v)
-	}
-	return values, nil
-}
-
-func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
-	var mounts = map[string]mount.Mount{}
-
-	secretsDir := "/run/secrets/"
-	for _, secret := range s.Secrets {
-		target := secret.Target
-		if secret.Target == "" {
-			target = secretsDir + secret.Source
-		} else if !isUnixAbs(secret.Target) {
-			target = secretsDir + secret.Target
-		}
-
-		definedSecret := p.Secrets[secret.Source]
-		if definedSecret.External.External {
-			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
-		}
-
-		if definedSecret.Environment != "" {
-			continue
-		}
-
-		mnt, err := buildMount(p, types.ServiceVolumeConfig{
-			Type:     types.VolumeTypeBind,
-			Source:   definedSecret.File,
-			Target:   target,
-			ReadOnly: true,
-		})
-		if err != nil {
-			return nil, err
-		}
-		mounts[target] = mnt
 	}
 	values := make([]mount.Mount, 0, len(mounts))
 	for _, v := range mounts {
