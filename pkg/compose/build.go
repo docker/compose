@@ -75,16 +75,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				return nil
 			}
 
-			//TODO:glours - condition to be removed when dry-run support of build will be implemented.
-			if s.dryRun {
-				builder := "buildkit"
-				if !buildkitEnabled {
-					builder = "legacy builder"
-				}
-				fmt.Printf("%sBuilding image %s with %s\n", api.DRYRUN_PREFIX, service.Image, builder)
-				return nil
-			}
-
 			if !buildkitEnabled {
 				if service.Build.Args == nil {
 					service.Build.Args = args
