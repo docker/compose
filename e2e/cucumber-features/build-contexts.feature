@@ -7,14 +7,12 @@ Background:
           a:
             build:
                 context: .
+                dockerfile_inline: |
+                    # syntax=docker/dockerfile:1
+                    FROM alpine:latest
+                    COPY --from=dep /etc/hostname /
                 additional_contexts:
                   - dep=docker-image://ubuntu:latest
-        """
-    And a dockerfile
-        """
-        # syntax=docker/dockerfile:1
-        FROM alpine:latest
-        COPY --from=dep /etc/hostname /
         """
 
 Scenario: Build w/ build context
