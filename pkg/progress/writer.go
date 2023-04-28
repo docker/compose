@@ -61,14 +61,21 @@ type progressFuncWithStatus func(context.Context) (string, error)
 func Run(ctx context.Context, pf progressFunc, out io.Writer) error {
 	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
 		return "", pf(ctx)
-	}, out)
+	}, out, "Running")
+	return err
+}
+
+func RunWithTitle(ctx context.Context, pf progressFunc, out io.Writer, progressTitle string) error {
+	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
+		return "", pf(ctx)
+	}, out, progressTitle)
 	return err
 }
 
 // RunWithStatus will run a writer and the progress function in parallel and return a status
-func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out io.Writer) (string, error) {
+func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out io.Writer, progressTitle string) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
-	w, err := NewWriter(ctx, out)
+	w, err := NewWriter(ctx, out, progressTitle)
 	var result string
 	if err != nil {
 		return "", err
@@ -105,17 +112,17 @@ const (
 var Mode = ModeAuto
 
 // NewWriter returns a new multi-progress writer
-func NewWriter(ctx context.Context, out io.Writer) (Writer, error) {
+func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer, error) {
 	_, isTerminal := term.GetFdInfo(out)
 	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
 	if !ok {
 		dryRun = false
 	}
 	if Mode == ModeAuto && isTerminal {
-		return newTTYWriter(out.(console.File), dryRun)
+		return newTTYWriter(out.(console.File), dryRun, progressTitle)
 	}
 	if Mode == ModeTTY {
-		return newTTYWriter(out.(console.File), dryRun)
+		return newTTYWriter(out.(console.File), dryRun, progressTitle)
 	}
 	return &plainWriter{
 		out:    out,
@@ -124,19 +131,20 @@ func NewWriter(ctx context.Context, out io.Writer) (Writer, error) {
 	}, nil
 }
 
-func newTTYWriter(out console.File, dryRun bool) (Writer, error) {
+func newTTYWriter(out console.File, dryRun bool, progressTitle string) (Writer, error) {
 	con, err := console.ConsoleFromFile(out)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ttyWriter{
-		out:      con,
-		eventIDs: []string{},
-		events:   map[string]Event{},
-		repeated: false,
-		done:     make(chan bool),
-		mtx:      &sync.Mutex{},
-		dryRun:   dryRun,
+		out:           con,
+		eventIDs:      []string{},
+		events:        map[string]Event{},
+		repeated:      false,
+		done:          make(chan bool),
+		mtx:           &sync.Mutex{},
+		dryRun:        dryRun,
+		progressTitle: progressTitle,
 	}, nil
 }

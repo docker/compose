@@ -43,6 +43,7 @@ type ttyWriter struct {
 	tailEvents      []string
 	dryRun          bool
 	skipChildEvents bool
+	progressTitle   string
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -149,7 +150,7 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 	fmt.Fprint(w.out, aec.Hide)
 	defer fmt.Fprint(w.out, aec.Show)
 
-	firstLine := fmt.Sprintf("[+] Running %d/%d", numDone(w.events), w.numLines)
+	firstLine := fmt.Sprintf("[+] %s %d/%d", w.progressTitle, numDone(w.events), w.numLines)
 	if w.numLines != 0 && numDone(w.events) == w.numLines {
 		firstLine = DoneColor(firstLine)
 	}
