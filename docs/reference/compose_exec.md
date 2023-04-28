@@ -29,5 +29,5 @@ This is the equivalent of `docker exec` targeting a Compose service.
 With this subcommand, you can run arbitrary commands in your services. Commands allocate a TTY by default, so
 you can use a command such as `docker compose exec web sh` to get an interactive prompt.
 
-Environment from existing configuration is applied.
+Environment from existing configuration is preserved.
 You can for instance introspect your environment by running `docker-compose exec web "/usr/bin/env"`.
