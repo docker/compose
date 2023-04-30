@@ -1,6 +1,6 @@
 backports.shutil_get_terminal_size==1.0.0
 cached-property==1.5.1; python_version < '3.8'
-certifi==2021.5.30
+certifi==2022.12.7
 chardet==3.0.4
 colorama==0.4.4; sys_platform == 'win32'
 distro==1.5.0
