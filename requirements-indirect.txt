@@ -3,7 +3,7 @@ appdirs==1.4.4
 attrs==20.3.0
 bcrypt==3.2.0
 cffi==1.14.4
-cryptography==3.3.2
+cryptography==39.0.1
 distlib==0.3.1
 entrypoints==0.3
 filelock==3.0.12
