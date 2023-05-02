@@ -49,9 +49,9 @@ import (
 )
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, options)
-	}, s.stderr())
+	}, s.stderr(), "Creating")
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
