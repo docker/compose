@@ -28,9 +28,9 @@ import (
 )
 
 func (s *composeService) Pause(ctx context.Context, projectName string, options api.PauseOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.pause(ctx, strings.ToLower(projectName), options)
-	}, s.stderr())
+	}, s.stderr(), "Pausing")
 }
 
 func (s *composeService) pause(ctx context.Context, projectName string, options api.PauseOptions) error {

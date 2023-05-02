@@ -42,9 +42,9 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 	if options.Quiet {
 		return s.pull(ctx, project, options)
 	}
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.pull(ctx, project, options)
-	}, s.stderr())
+	}, s.stderr(), "Pulling")
 }
 
 func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
