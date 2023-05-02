@@ -53,7 +53,6 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	}, s.stderr(), "Building")
 }
 
-//nolint:gocyclo
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
 	args := options.Args.Resolve(envResolver(project.Environment))
 
@@ -72,16 +71,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			}
 
 			if service.Build == nil {
-				return nil
-			}
-
-			//TODO:glours - condition to be removed when dry-run support of build will be implemented.
-			if s.dryRun {
-				builder := "buildkit"
-				if !buildkitEnabled {
-					builder = "legacy builder"
-				}
-				fmt.Printf("%sBuilding image %s with %s\n", api.DRYRUN_PREFIX, service.Image, builder)
 				return nil
 			}
 

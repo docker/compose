@@ -165,7 +165,20 @@ func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path stri
 }
 
 func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options moby.ImageBuildOptions) (moby.ImageBuildResponse, error) {
-	return moby.ImageBuildResponse{}, ErrNotImplemented
+	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
+		Status:   fmt.Sprintf("%[1]sSuccessfully built: dryRunID\n%[1]sSuccessfully tagged: %[2]s\n", DRYRUN_PREFIX, options.Tags[0]),
+		Progress: &jsonmessage.JSONProgress{},
+		ID:       "",
+	})
+	if err != nil {
+		return moby.ImageBuildResponse{}, err
+	}
+	rc := io.NopCloser(bytes.NewReader(jsonMessage))
+
+	return moby.ImageBuildResponse{
+		Body:   rc,
+		OSType: "",
+	}, nil
 }
 
 func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (moby.ImageInspect, []byte, error) {
