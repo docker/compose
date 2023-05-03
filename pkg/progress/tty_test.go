@@ -41,19 +41,19 @@ func TestLineText(t *testing.T) {
 
 	lineWidth := len(fmt.Sprintf("%s %s", ev.ID, ev.Text))
 
-	out := tty().lineText(ev, "", 50, lineWidth, false)
+	out := tty().lineText(ev, true, "", 50, lineWidth, false)
 	assert.Equal(t, out, " . id Text Status                            \x1b[34m0.0s \x1b[0m\n")
 
 	ev.Status = Done
-	out = tty().lineText(ev, "", 50, lineWidth, false)
-	assert.Equal(t, out, " \x1b[32m✔\x1b[0m id Text \x1b[32mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
+	out = tty().lineText(ev, true, "", 50, lineWidth, false)
+	assert.Equal(t, out, " \x1b[32m✔\x1b[0m id Text \x1b[36mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 
 	ev.Status = Error
-	out = tty().lineText(ev, "", 50, lineWidth, false)
+	out = tty().lineText(ev, true, "", 50, lineWidth, false)
 	assert.Equal(t, out, " \x1b[31m\x1b[1m✘\x1b[0m id Text \x1b[31m\x1b[1mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 
 	ev.Status = Warning
-	out = tty().lineText(ev, "", 50, lineWidth, false)
+	out = tty().lineText(ev, true, "", 50, lineWidth, false)
 	assert.Equal(t, out, " \x1b[33m\x1b[1m!\x1b[0m id Text \x1b[33m\x1b[1mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 }
 
@@ -72,7 +72,7 @@ func TestLineTextSingleEvent(t *testing.T) {
 
 	lineWidth := len(fmt.Sprintf("%s %s", ev.ID, ev.Text))
 
-	out := tty().lineText(ev, "", 50, lineWidth, false)
+	out := tty().lineText(ev, true, "", 50, lineWidth, false)
 	assert.Equal(t, out, " \x1b[32m✔\x1b[0m id Text \x1b[32mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 }
 

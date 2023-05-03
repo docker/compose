@@ -33,17 +33,27 @@ import (
 )
 
 type ttyWriter struct {
-	out             io.Writer
-	events          map[string]Event
-	eventIDs        []string
-	repeated        bool
-	numLines        int
-	done            chan bool
-	mtx             *sync.Mutex
-	tailEvents      []string
-	dryRun          bool
-	skipChildEvents bool
-	progressTitle   string
+	out           io.Writer
+	events        map[string]Event
+	eventIDs      []string
+	repeated      bool
+	numLines      int
+	done          chan bool
+	mtx           *sync.Mutex
+	tailEvents    []string
+	dryRun        bool
+	progressTitle string
+}
+
+func (w *ttyWriter) children(id string) []Event {
+	var events []Event
+	for _, v := range w.eventIDs {
+		ev := w.events[v]
+		if ev.ParentID == id {
+			events = append(events, ev)
+		}
+	}
+	return events
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -129,7 +139,9 @@ func (w *ttyWriter) printTailEvents() {
 	}
 }
 
-func (w *ttyWriter) print() { //nolint:gocyclo
+const showLogs = 5
+
+func (w *ttyWriter) print() {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	if len(w.eventIDs) == 0 {
@@ -150,46 +162,47 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 	fmt.Fprint(w.out, aec.Hide)
 	defer fmt.Fprint(w.out, aec.Show)
 
-	firstLine := fmt.Sprintf("[+] %s %d/%d", w.progressTitle, numDone(w.events), w.numLines)
-	if w.numLines != 0 && numDone(w.events) == w.numLines {
+	topLevelEvents := w.topLevelEvents()
+	done := countDone(topLevelEvents)
+	firstLine := fmt.Sprintf("[+] %s %d/%d", w.progressTitle, done, len(topLevelEvents))
+	if done == len(topLevelEvents) {
 		firstLine = DoneColor(firstLine)
 	}
 	fmt.Fprintln(w.out, firstLine)
 
-	var statusPadding int
-	for _, v := range w.eventIDs {
-		event := w.events[v]
-		l := len(fmt.Sprintf("%s %s", event.ID, event.Text))
-		if statusPadding < l {
-			statusPadding = l
-		}
-		if event.ParentID != "" {
-			statusPadding -= 2
-		}
-	}
-
-	if len(w.eventIDs) > goterm.Height()-2 {
-		w.skipChildEvents = true
-	}
+	height := goterm.Height() - 2
 	numLines := 0
-	for _, v := range w.eventIDs {
-		event := w.events[v]
-		if event.ParentID != "" {
-			continue
-		}
-		line := w.lineText(event, "", terminalWidth, statusPadding, w.dryRun)
+	height = height - len(topLevelEvents)
+	statusPadding := computePadding(topLevelEvents)
+	for _, event := range topLevelEvents {
+		line := w.lineText(event, true, "", terminalWidth, statusPadding, w.dryRun)
 		fmt.Fprint(w.out, line)
 		numLines++
-		for _, v := range w.eventIDs {
-			ev := w.events[v]
-			if ev.ParentID == event.ID {
-				if w.skipChildEvents {
-					continue
+
+		if event.Status == Working {
+			children := w.children(event.ID)
+			if len(children) <= height {
+				height = height - len(children)
+				for _, ev := range children {
+					line := w.lineText(ev, false, "  ", terminalWidth, 0, w.dryRun)
+					fmt.Fprint(w.out, line)
+					numLines++
+
+					if ev.Status == Working && height >= showLogs {
+						ch := w.children(ev.ID)
+						if len(ch) > showLogs {
+							w.dropEvents(ch[:len(ch)-showLogs])
+							ch = ch[len(ch)-showLogs:]
+						}
+						for _, ev := range ch {
+							line := w.lineText(ev, false, "     ", terminalWidth, 0, w.dryRun)
+							fmt.Fprint(w.out, line)
+							numLines++
+						}
+					}
 				}
-				line := w.lineText(ev, "  ", terminalWidth, statusPadding, w.dryRun)
-				fmt.Fprint(w.out, line)
-				numLines++
 			}
+
 		}
 	}
 	for i := numLines; i < w.numLines; i++ {
@@ -201,7 +214,39 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 	w.numLines = numLines
 }
 
-func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPadding int, dryRun bool) string {
+func (w *ttyWriter) topLevelEvents() []Event {
+	var events []Event
+	for _, id := range w.eventIDs {
+		event := w.events[id]
+		if event.ParentID == "" {
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
+func computePadding(events []Event) int {
+	var statusPadding int
+	for _, event := range events {
+		l := len(fmt.Sprintf("%s %s", event.ID, event.Text))
+		if statusPadding < l {
+			statusPadding = l
+		}
+	}
+	return statusPadding
+}
+
+func countDone(events []Event) int {
+	var count int
+	for _, event := range events {
+		if event.Status == Done {
+			count++
+		}
+	}
+	return count
+}
+
+func (w *ttyWriter) lineText(event Event, showID bool, pad string, terminalWidth, statusPadding int, dryRun bool) string {
 	endTime := time.Now()
 	if event.Status != Working {
 		endTime = event.startTime
@@ -227,20 +272,31 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 		if ev.ParentID == event.ID {
 			total += ev.Total
 			current += ev.Current
-			completion = append(completion, percentChars[(len(percentChars)-1)*ev.Percent/100])
+			if ev.Percent != 0 {
+				completion = append(completion, percentChars[(len(percentChars)-1)*ev.Percent/100])
+			}
 		}
 	}
 
 	var txt string
+	if showID {
+		prefix = fmt.Sprintf("%s %s", prefix, event.ID)
+	}
 	if len(completion) > 0 {
-		txt = fmt.Sprintf("%s %s [%s] %7s/%-7s %s",
-			event.ID,
+		txt = fmt.Sprintf("%s %s%s%s [%s] %7s/%-7s %s",
+			pad,
+			event.Spinner(),
+			prefix,
 			CountColor(fmt.Sprintf("%d layers", len(completion))),
 			SuccessColor(strings.Join(completion, "")),
 			units.HumanSize(float64(current)), units.HumanSize(float64(total)),
 			event.Text)
 	} else {
-		txt = fmt.Sprintf("%s %s", event.ID, event.Text)
+		txt = fmt.Sprintf("%s %s%s %s",
+			pad,
+			event.Spinner(),
+			prefix,
+			event.Text)
 	}
 	textLen := len(txt)
 	padding := statusPadding - textLen
@@ -249,16 +305,13 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 	}
 	// calculate the max length for the status text, on errors it
 	// is 2-3 lines long and breaks the line formatting
-	maxStatusLen := terminalWidth - textLen - statusPadding - 15
+	maxStatusLen := terminalWidth - textLen - statusPadding
 	status := event.StatusText
 	// in some cases (debugging under VS Code), terminalWidth is set to zero by goterm.Width() ; ensuring we don't tweak strings with negative char index
 	if maxStatusLen > 0 && len(status) > maxStatusLen {
 		status = status[:maxStatusLen] + "..."
 	}
-	text := fmt.Sprintf("%s %s%s %s%s %s",
-		pad,
-		event.Spinner(),
-		prefix,
+	text := fmt.Sprintf("%s%s %s",
 		txt,
 		strings.Repeat(" ", padding),
 		event.Status.colorFn()(status),
@@ -269,14 +322,24 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 	return o
 }
 
-func numDone(events map[string]Event) int {
-	i := 0
+func (w *ttyWriter) dropEvents(events []Event) {
 	for _, e := range events {
-		if e.Status != Working {
-			i++
+		delete(w.events, e.ID)
+	}
+	ids := make([]string, 0, len(w.eventIDs)-len(events))
+	for _, id := range w.eventIDs {
+		skip := false
+		for _, e := range events {
+			if id == e.ID {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			ids = append(ids, id)
 		}
 	}
-	return i
+	w.eventIDs = ids
 }
 
 func align(l, r string, w int) string {

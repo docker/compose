@@ -20,23 +20,120 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
-	"os"
 	"path/filepath"
+	"strings"
+	"unicode"
 
 	_ "github.com/docker/buildx/driver/docker"           //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/docker-container" //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/kubernetes"       //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/remote"           //nolint:blank-imports
-	"github.com/moby/buildkit/client"
+	"github.com/docker/compose/v2/pkg/progress"
+	bclient "github.com/moby/buildkit/client"
+	"github.com/opencontainers/go-digest"
 
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/builder"
 	"github.com/docker/buildx/util/dockerutil"
 	xprogress "github.com/docker/buildx/util/progress"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
-func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]build.Options, mode string) (map[string]string, error) {
+type BuildOutput struct {
+	service  string
+	vertexes map[digest.Digest]*bclient.Vertex
+	logs     map[digest.Digest]int
+	w        progress.Writer
+}
+
+func sanitize(s string) string {
+	split := strings.Split(strings.TrimSpace(s), "\n")
+	return split[len(split)-1]
+}
+
+func (b *BuildOutput) Write(status *bclient.SolveStatus) {
+	for _, v := range status.Vertexes {
+		b.vertexes[v.Digest] = v
+
+		txt := v.Name
+		if v.Cached {
+			txt = "CACHED " + v.Name
+		}
+		if v.ProgressGroup != nil {
+			txt = txt + " => " + v.ProgressGroup.String()
+		}
+		status := progress.Working
+		if v.Completed != nil {
+			status = progress.Done
+		}
+
+		b.w.Event(progress.Event{
+			ParentID:   b.service,
+			ID:         v.Digest.String(),
+			StatusText: sanitize(txt),
+			Status:     status,
+		})
+
+	}
+
+	for _, s := range status.Statuses {
+		txt := s.Name
+		if s.Current > 0 {
+			txt = fmt.Sprintf("%s %dB", s.Name, s.Current)
+		}
+		b.w.Event(progress.Event{
+			ParentID:   b.service,
+			ID:         b.getVertexId(s.Vertex),
+			StatusText: sanitize(txt),
+			Status:     progress.Done,
+		})
+	}
+	for _, s := range status.Warnings {
+		b.w.Event(progress.Event{
+			ParentID:   b.service,
+			ID:         b.getVertexId(s.Vertex),
+			StatusText: sanitize(string(s.Short)),
+		})
+	}
+	for _, l := range status.Logs {
+		var start int
+		count := b.logs[l.Vertex]
+
+		for idx, r := range l.Data {
+			if r == '\n' || r == '\r' {
+				line := string(l.Data[start:idx])
+				start = idx + 1
+				if len(line) == 0 {
+					continue
+				}
+				line = strings.TrimRightFunc(line, unicode.IsSpace)
+				b.w.Event(progress.Event{
+					ParentID:   b.getVertexId(l.Vertex),
+					ID:         fmt.Sprintf("#%d", count),
+					StatusText: line,
+					Status:     progress.Log,
+				})
+				count++
+			}
+		}
+		b.logs[l.Vertex] = count
+	}
+}
+
+func (b *BuildOutput) ValidateLogSource(digest digest.Digest, i interface{}) bool {
+	return true
+}
+
+func (b BuildOutput) ClearLogSource(i interface{}) {
+
+}
+
+func (b *BuildOutput) getVertexId(vertex digest.Digest) string {
+	return b.vertexes[vertex].Digest.String()
+}
+
+var _ xprogress.Writer = &BuildOutput{}
+
+func (s *composeService) doBuildBuildkit(ctx context.Context, service string, opts build.Options, mode string) (map[string]string, error) {
 	b, err := builder.New(s.dockerCli)
 	if err != nil {
 		return nil, err
@@ -47,24 +144,20 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]bu
 		return nil, err
 	}
 
-	var response map[string]*client.SolveResponse
+	writer := progress.ContextWriter(ctx)
+	writer.Event(progress.Event{ID: service, Status: progress.Working})
+	var response map[string]*bclient.SolveResponse
 	if s.dryRun {
-		response = s.dryRunBuildResponse(ctx, opts)
+		response = s.dryRunBuildResponse(ctx, service, opts)
 	} else {
-		// Progress needs its own context that lives longer than the
-		// build one otherwise it won't read all the messages from
-		// build and will lock
-		progressCtx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		w, err := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, mode)
-		if err != nil {
-			return nil, err
+		w := BuildOutput{
+			vertexes: map[digest.Digest]*bclient.Vertex{},
+			logs:     map[digest.Digest]int{},
+			service:  service,
+			w:        writer,
 		}
-		response, err = build.Build(ctx, nodes, opts, dockerutil.NewClient(s.dockerCli), filepath.Dir(s.configFile().Filename), w)
-		errW := w.Wait()
-		if err == nil {
-			err = errW
-		}
+
+		response, err = build.Build(ctx, nodes, map[string]build.Options{service: opts}, dockerutil.NewClient(s.dockerCli), filepath.Dir(s.configFile().Filename), &w)
 		if err != nil {
 			return nil, WrapCategorisedComposeError(err, BuildFailure)
 		}
@@ -82,32 +175,35 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]bu
 		imagesBuilt[name] = digest
 	}
 
+	if err != nil {
+		writer.Event(progress.Event{ID: service, StatusText: err.Error(), Status: progress.Error})
+	} else {
+		writer.Event(progress.Event{ID: service, Status: progress.Done})
+	}
 	return imagesBuilt, err
 }
 
-func (s composeService) dryRunBuildResponse(ctx context.Context, options map[string]build.Options) map[string]*client.SolveResponse {
+func (s composeService) dryRunBuildResponse(ctx context.Context, name string, options build.Options) map[string]*bclient.SolveResponse {
 	w := progress.ContextWriter(ctx)
-	buildResponse := map[string]*client.SolveResponse{}
-	for name, option := range options {
-		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-		w.Event(progress.Event{
-			ID:     " ",
-			Status: progress.Done,
-			Text:   fmt.Sprintf("build service %s", name),
-		})
-		w.Event(progress.Event{
-			ID:     "==>",
-			Status: progress.Done,
-			Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
-		})
-		w.Event(progress.Event{
-			ID:     "==> ==>",
-			Status: progress.Done,
-			Text:   fmt.Sprintf(`naming to %s`, option.Tags[0]),
-		})
-		buildResponse[name] = &client.SolveResponse{ExporterResponse: map[string]string{
-			"containerimage.digest": dryRunUUID,
-		}}
-	}
+	buildResponse := map[string]*bclient.SolveResponse{}
+	dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
+	w.Event(progress.Event{
+		ID:     " ",
+		Status: progress.Done,
+		Text:   fmt.Sprintf("build service %s", name),
+	})
+	w.Event(progress.Event{
+		ID:     "==>",
+		Status: progress.Done,
+		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
+	})
+	w.Event(progress.Event{
+		ID:     "==> ==>",
+		Status: progress.Done,
+		Text:   fmt.Sprintf(`naming to %s`, options.Tags[0]),
+	})
+	buildResponse[name] = &bclient.SolveResponse{ExporterResponse: map[string]string{
+		"containerimage.digest": dryRunUUID,
+	}}
 	return buildResponse
 }

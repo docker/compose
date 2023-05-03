@@ -101,9 +101,8 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				return err
 			}
 			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
-			opts := map[string]build.Options{service.Name: buildOptions}
 
-			ids, err := s.doBuildBuildkit(ctx, opts, options.Progress)
+			ids, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, options.Progress)
 			if err != nil {
 				return err
 			}

@@ -27,7 +27,7 @@ var (
 		return s
 	}
 
-	DoneColor    colorFunc = aec.BlueF.Apply
+	DoneColor    colorFunc = aec.CyanF.Apply
 	TimerColor   colorFunc = aec.BlueF.Apply
 	CountColor   colorFunc = aec.YellowF.Apply
 	WarningColor colorFunc = aec.YellowF.With(aec.Bold).Apply

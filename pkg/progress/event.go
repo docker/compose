@@ -26,6 +26,8 @@ type EventStatus int
 func (s EventStatus) colorFn() colorFunc {
 	switch s {
 	case Done:
+		return DoneColor
+	case Success:
 		return SuccessColor
 	case Warning:
 		return WarningColor
@@ -41,10 +43,14 @@ const (
 	Working EventStatus = iota
 	// Done means that the current task is done
 	Done
+	// Done means that the current task is done
+	Success
 	// Warning means that the current task has warning
 	Warning
 	// Error means that the current task has errored
 	Error
+
+	Log
 )
 
 // Event represents a progress event.
@@ -95,7 +101,7 @@ func Waiting(id string) Event {
 
 // Healthy creates a new healthy event
 func Healthy(id string) Event {
-	return NewEvent(id, Done, "Healthy")
+	return NewEvent(id, Success, "Healthy")
 }
 
 // Exited creates a new exited event
@@ -110,17 +116,17 @@ func RestartingEvent(id string) Event {
 
 // RestartedEvent creates a new Restarted in progress Event
 func RestartedEvent(id string) Event {
-	return NewEvent(id, Done, "Restarted")
+	return NewEvent(id, Success, "Restarted")
 }
 
 // RunningEvent creates a new Running in progress Event
 func RunningEvent(id string) Event {
-	return NewEvent(id, Done, "Running")
+	return NewEvent(id, Success, "Running")
 }
 
 // CreatedEvent creates a new Created (done) Event
 func CreatedEvent(id string) Event {
-	return NewEvent(id, Done, "Created")
+	return NewEvent(id, Success, "Created")
 }
 
 // StoppingEvent creates a new Stopping in progress Event
@@ -130,7 +136,7 @@ func StoppingEvent(id string) Event {
 
 // StoppedEvent creates a new Stopping in progress Event
 func StoppedEvent(id string) Event {
-	return NewEvent(id, Done, "Stopped")
+	return NewEvent(id, Success, "Stopped")
 }
 
 // KillingEvent creates a new Killing in progress Event
@@ -140,7 +146,7 @@ func KillingEvent(id string) Event {
 
 // KilledEvent creates a new Killed in progress Event
 func KilledEvent(id string) Event {
-	return NewEvent(id, Done, "Killed")
+	return NewEvent(id, Success, "Killed")
 }
 
 // RemovingEvent creates a new Removing in progress Event
@@ -150,7 +156,7 @@ func RemovingEvent(id string) Event {
 
 // RemovedEvent creates a new removed (done) Event
 func RemovedEvent(id string) Event {
-	return NewEvent(id, Done, "Removed")
+	return NewEvent(id, Success, "Removed")
 }
 
 // NewEvent new event
@@ -171,16 +177,21 @@ var (
 	spinnerDone    = "✔"
 	spinnerWarning = "!"
 	spinnerError   = "✘"
+	spinnerLog     = "|"
 )
 
 func (e *Event) Spinner() any {
 	switch e.Status {
 	case Done:
 		return SuccessColor(spinnerDone)
+	case Success:
+		return SuccessColor(spinnerDone)
 	case Warning:
 		return WarningColor(spinnerWarning)
 	case Error:
 		return ErrorColor(spinnerError)
+	case Log:
+		return TimerColor(spinnerLog)
 	default:
 		return e.spinner.String()
 	}
