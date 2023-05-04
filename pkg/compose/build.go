@@ -373,15 +373,19 @@ func addSecretsConfig(project *types.Project, service types.ServiceConfig) (sess
 	var sources []secretsprovider.Source
 	for _, secret := range service.Build.Secrets {
 		config := project.Secrets[secret.Source]
+		id := secret.Source
+		if secret.Target != "" {
+			id = secret.Target
+		}
 		switch {
 		case config.File != "":
 			sources = append(sources, secretsprovider.Source{
-				ID:       secret.Source,
+				ID:       id,
 				FilePath: config.File,
 			})
 		case config.Environment != "":
 			sources = append(sources, secretsprovider.Source{
-				ID:  secret.Source,
+				ID:  id,
 				Env: config.Environment,
 			})
 		default:
