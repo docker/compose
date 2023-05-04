@@ -22,5 +22,5 @@ RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret > /tmp/actual
 RUN diff /tmp/expected /tmp/actual
 
 RUN echo "bar" > /tmp/expected
-RUN --mount=type=secret,id=envsecret cat /run/secrets/envsecret > tmp/actual
+RUN --mount=type=secret,id=build_secret cat /run/secrets/build_secret > tmp/actual
 RUN diff --ignore-all-space /tmp/expected /tmp/actual
