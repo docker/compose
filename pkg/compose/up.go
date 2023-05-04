@@ -48,6 +48,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	if options.Start.Attach == nil {
 		return err
 	}
+	if s.dryRun {
+		fmt.Fprintln(s.stdout(), "end of 'compose up' output, interactive run is not supported in dry-run mode")
+		return err
+	}
 
 	printer := newLogPrinter(options.Start.Attach)
 
