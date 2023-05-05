@@ -20,23 +20,22 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	_ "github.com/docker/buildx/driver/docker"           //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/docker-container" //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/kubernetes"       //nolint:blank-imports
 	_ "github.com/docker/buildx/driver/remote"           //nolint:blank-imports
+	buildx "github.com/docker/buildx/util/progress"
 	"github.com/moby/buildkit/client"
 
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/builder"
 	"github.com/docker/buildx/util/dockerutil"
-	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/compose/v2/pkg/progress"
 )
 
-func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]build.Options, mode string) (map[string]string, error) {
+func (s *composeService) doBuildBuildkit(ctx context.Context, service string, opts build.Options, p *buildx.Printer) (map[string]string, error) {
 	b, err := builder.New(s.dockerCli)
 	if err != nil {
 		return nil, err
@@ -49,22 +48,9 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]bu
 
 	var response map[string]*client.SolveResponse
 	if s.dryRun {
-		response = s.dryRunBuildResponse(ctx, opts)
+		response = s.dryRunBuildResponse(ctx, service, opts)
 	} else {
-		// Progress needs its own context that lives longer than the
-		// build one otherwise it won't read all the messages from
-		// build and will lock
-		progressCtx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		w, err := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, mode)
-		if err != nil {
-			return nil, err
-		}
-		response, err = build.Build(ctx, nodes, opts, dockerutil.NewClient(s.dockerCli), filepath.Dir(s.configFile().Filename), w)
-		errW := w.Wait()
-		if err == nil {
-			err = errW
-		}
+		response, err = build.Build(ctx, nodes, map[string]build.Options{service: opts}, dockerutil.NewClient(s.dockerCli), filepath.Dir(s.configFile().Filename), buildx.WithPrefix(p, service, true))
 		if err != nil {
 			return nil, WrapCategorisedComposeError(err, BuildFailure)
 		}
@@ -85,29 +71,27 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]bu
 	return imagesBuilt, err
 }
 
-func (s composeService) dryRunBuildResponse(ctx context.Context, options map[string]build.Options) map[string]*client.SolveResponse {
+func (s composeService) dryRunBuildResponse(ctx context.Context, name string, options build.Options) map[string]*client.SolveResponse {
 	w := progress.ContextWriter(ctx)
 	buildResponse := map[string]*client.SolveResponse{}
-	for name, option := range options {
-		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-		w.Event(progress.Event{
-			ID:     " ",
-			Status: progress.Done,
-			Text:   fmt.Sprintf("build service %s", name),
-		})
-		w.Event(progress.Event{
-			ID:     "==>",
-			Status: progress.Done,
-			Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
-		})
-		w.Event(progress.Event{
-			ID:     "==> ==>",
-			Status: progress.Done,
-			Text:   fmt.Sprintf(`naming to %s`, option.Tags[0]),
-		})
-		buildResponse[name] = &client.SolveResponse{ExporterResponse: map[string]string{
-			"containerimage.digest": dryRunUUID,
-		}}
-	}
+	dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
+	w.Event(progress.Event{
+		ID:     " ",
+		Status: progress.Done,
+		Text:   fmt.Sprintf("build service %s", name),
+	})
+	w.Event(progress.Event{
+		ID:     "==>",
+		Status: progress.Done,
+		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
+	})
+	w.Event(progress.Event{
+		ID:     "==> ==>",
+		Status: progress.Done,
+		Text:   fmt.Sprintf(`naming to %s`, options.Tags[0]),
+	})
+	buildResponse[name] = &client.SolveResponse{ExporterResponse: map[string]string{
+		"containerimage.digest": dryRunUUID,
+	}}
 	return buildResponse
 }
