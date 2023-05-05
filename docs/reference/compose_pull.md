@@ -7,6 +7,7 @@ Pull service images
 
 | Name                     | Type | Default | Description                                             |
 |:-------------------------|:-----|:--------|:--------------------------------------------------------|
+| `--dry-run`              |      |         | Execute command in dry run mode                         |
 | `--ignore-buildable`     |      |         | Ignore images that can be built.                        |
 | `--ignore-pull-failures` |      |         | Pull what it can and ignores images with pull failures. |
 | `--include-deps`         |      |         | Also pull services declared as dependencies.            |

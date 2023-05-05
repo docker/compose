@@ -8,6 +8,7 @@ Execute a command in a running container.
 | Name              | Type          | Default | Description                                                                       |
 |:------------------|:--------------|:--------|:----------------------------------------------------------------------------------|
 | `-d`, `--detach`  |               |         | Detached mode: Run command in the background.                                     |
+| `--dry-run`       |               |         | Execute command in dry run mode                                                   |
 | `-e`, `--env`     | `stringArray` |         | Set environment variables                                                         |
 | `--index`         | `int`         | `1`     | index of the container if there are multiple instances of a service [default: 1]. |
 | `-T`, `--no-TTY`  |               |         | Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.  |

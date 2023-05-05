@@ -4,6 +4,17 @@ long: Starts existing containers for a service.
 usage: docker compose start [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

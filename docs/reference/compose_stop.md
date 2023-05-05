@@ -7,6 +7,7 @@ Stop services
 
 | Name              | Type  | Default | Description                           |
 |:------------------|:------|:--------|:--------------------------------------|
+| `--dry-run`       |       |         | Execute command in dry run mode       |
 | `-t`, `--timeout` | `int` | `10`    | Specify a shutdown timeout in seconds |
 
 

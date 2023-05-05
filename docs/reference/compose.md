@@ -175,7 +175,7 @@ containers for the project.
 ### Use Dry Run mode to test your command
 
 Use `--dry-run` flag to test a command without changing your application stack state.
-Dry Run mode will show you all the steps Compose will apply by executing the command, for example:
+Dry Run mode shows you all the steps Compose applies when executing a command, for example:
 ```console
 $ docker compose --dry-run up --build -d
 [+] Pulling 1/1
@@ -192,10 +192,10 @@ $ docker compose --dry-run up --build -d
  ✔ DRY-RUN MODE -  Container nginx-golang-mysql-backend-1                                Started                                                                                                                                           0.0s
  ✔ DRY-RUN MODE -  Container nginx-golang-mysql-proxy-1                                  Started                                     Started
 ```
-You could see that the first step will be to pull the image defined by `db` service, then build the `backend` service.  
-After that, containers will be created, the `db` service started and the `backend` and `proxy` will wait until `db` service is healthy to start.
+From the example above, you can see that the first step is to pull the image defined by `db` service, then build the `backend` service.  
+Next, the containers are created. The `db` service is started, and the `backend` and `proxy` wait until the `db` service is healthy before starting.
 
-The Dry Run mode is not supported by all commands, especially by the command which doesn't change the state of a Compose stack
+Dry Run mode does not currently work with all commands. In particular, you cannot use Dry Run mode with a command that doesn't change the state of a Compose stack
 such as `ps`, `ls`, `logs` for example.  
 
 Here the list of commands supporting `--dry-run` flag:

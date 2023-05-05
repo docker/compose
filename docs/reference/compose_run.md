@@ -9,6 +9,7 @@ Run a one-off command on a service.
 |:----------------------|:--------------|:--------|:----------------------------------------------------------------------------------|
 | `--build`             |               |         | Build image before starting container.                                            |
 | `-d`, `--detach`      |               |         | Run container in background and print container ID                                |
+| `--dry-run`           |               |         | Execute command in dry run mode                                                   |
 | `--entrypoint`        | `string`      |         | Override the entrypoint of the image                                              |
 | `-e`, `--env`         | `stringArray` |         | Set environment variables                                                         |
 | `-i`, `--interactive` |               |         | Keep STDIN open even if not attached.                                             |
