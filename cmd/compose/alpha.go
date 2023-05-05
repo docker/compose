@@ -15,8 +15,6 @@
 package compose
 
 import (
-	"context"
-
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -33,26 +31,7 @@ func alphaCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	}
 	cmd.AddCommand(
 		watchCommand(p, backend),
-		dryRunRedirectCommand(p),
 		vizCommand(p, backend),
 	)
-	return cmd
-}
-
-// Temporary alpha command as the dry-run will be implemented with a flag
-func dryRunRedirectCommand(p *ProjectOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "dry-run -- [COMMAND...]",
-		Short: "EXPERIMENTAL - Dry run command allow you to test a command without applying changes",
-		PreRunE: Adapt(func(ctx context.Context, args []string) error {
-			return nil
-		}),
-		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
-			rootCmd := cmd.Root()
-			rootCmd.SetArgs(append([]string{"compose", "--dry-run"}, args...))
-			return rootCmd.Execute()
-		}),
-		ValidArgsFunction: completeServiceNames(p),
-	}
 	return cmd
 }

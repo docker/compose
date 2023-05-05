@@ -399,13 +399,12 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
 	c.Flags().IntVar(&parallel, "parallel", -1, `Control max parallelism, -1 for unlimited`)
 	c.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
+	c.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Execute command in dry run mode")
 	c.Flags().MarkHidden("version") //nolint:errcheck
 	c.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
 	c.Flags().MarkHidden("no-ansi") //nolint:errcheck
 	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	c.Flags().MarkHidden("verbose") //nolint:errcheck
-	c.Flags().BoolVar(&dryRun, "dry-run", false, "Execute command in dry run mode")
-	c.Flags().MarkHidden("dry-run") //nolint:errcheck
 	return c
 }
 
