@@ -41,6 +41,7 @@ Docker Compose
 |:-----------------------|:--------------|:--------|:----------------------------------------------------------------------------------------------------|
 | `--ansi`               | `string`      | `auto`  | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
 | `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
+| `--dry-run`            |               |         | Execute command in dry run mode                                                                     |
 | `--env-file`           | `stringArray` |         | Specify an alternate environment file.                                                              |
 | `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
 | `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |
@@ -169,3 +170,49 @@ If flags are explicitly set on the command line, the associated environment vari
 
 Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
 containers for the project.
+
+
+### Use Dry Run mode to test your command
+
+Use `--dry-run` flag to test a command without changing your application stack state.
+Dry Run mode will show you all the steps Compose will apply by executing the command, for example:
+```console
+$ docker compose --dry-run up --build -d
+[+] Pulling 1/1
+ ✔ DRY-RUN MODE -  db Pulled                                                                                                                                                                                                               0.9s
+[+] Running 10/8
+ ✔ DRY-RUN MODE -    build service backend                                                                                                                                                                                                 0.0s
+ ✔ DRY-RUN MODE -  ==> ==> writing image dryRun-754a08ddf8bcb1cf22f310f09206dd783d42f7dd                                                                                                                                                   0.0s
+ ✔ DRY-RUN MODE -  ==> ==> naming to nginx-golang-mysql-backend                                                                                                                                                                            0.0s
+ ✔ DRY-RUN MODE -  Network nginx-golang-mysql_default                                    Created                                                                                                                                           0.0s
+ ✔ DRY-RUN MODE -  Container nginx-golang-mysql-db-1                                     Created                                                                                                                                           0.0s
+ ✔ DRY-RUN MODE -  Container nginx-golang-mysql-backend-1                                Created                                                                                                                                           0.0s
+ ✔ DRY-RUN MODE -  Container nginx-golang-mysql-proxy-1                                  Created                                                                                                                                           0.0s
+ ✔ DRY-RUN MODE -  Container nginx-golang-mysql-db-1                                     Healthy                                                                                                                                           0.5s
+ ✔ DRY-RUN MODE -  Container nginx-golang-mysql-backend-1                                Started                                                                                                                                           0.0s
+ ✔ DRY-RUN MODE -  Container nginx-golang-mysql-proxy-1                                  Started                                     Started
+```
+You could see that the first step will be to pull the image defined by `db` service, then build the `backend` service.  
+After that, containers will be created, the `db` service started and the `backend` and `proxy` will wait until `db` service is healthy to start.
+
+The Dry Run mode is not supported by all commands, especially by the command which doesn't change the state of a Compose stack
+such as `ps`, `ls`, `logs` for example.  
+
+Here the list of commands supporting `--dry-run` flag:
+* build
+* cp
+* create
+* down
+* exec
+* kill
+* pause
+* pull
+* push
+* remove
+* restart
+* run
+* start
+* stop
+* unpause
+* up
+
