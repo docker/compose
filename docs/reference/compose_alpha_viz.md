@@ -7,6 +7,7 @@ EXPERIMENTAL - Generate a graphviz graph from your compose file
 
 | Name                 | Type  | Default | Description                                                                                        |
 |:---------------------|:------|:--------|:---------------------------------------------------------------------------------------------------|
+| `--dry-run`          |       |         | Execute command in dry run mode                                                                    |
 | `--image`            |       |         | Include service's image name in output graph                                                       |
 | `--indentation-size` | `int` | `1`     | Number of tabs or spaces to use for indentation                                                    |
 | `--networks`         |       |         | Include service's attached networks in output graph                                                |

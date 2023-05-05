@@ -13,6 +13,7 @@ Create and start containers
 | `--attach-dependencies`      |               |           | Attach to dependent containers.                                                                          |
 | `--build`                    |               |           | Build images before starting containers.                                                                 |
 | `-d`, `--detach`             |               |           | Detached mode: Run containers in the background                                                          |
+| `--dry-run`                  |               |           | Execute command in dry run mode                                                                          |
 | `--exit-code-from`           | `string`      |           | Return the exit code of the selected service container. Implies --abort-on-container-exit                |
 | `--force-recreate`           |               |           | Recreate containers even if their configuration and image haven't changed.                               |
 | `--no-attach`                | `stringArray` |           | Don't attach to specified service.                                                                       |

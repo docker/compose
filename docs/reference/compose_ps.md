@@ -8,6 +8,7 @@ List containers
 | Name                  | Type          | Default | Description                                                                                                   |
 |:----------------------|:--------------|:--------|:--------------------------------------------------------------------------------------------------------------|
 | `-a`, `--all`         |               |         | Show all stopped containers (including those created by the run command)                                      |
+| `--dry-run`           |               |         | Execute command in dry run mode                                                                               |
 | [`--filter`](#filter) | `string`      |         | Filter services by a property (supported filters: status).                                                    |
 | [`--format`](#format) | `string`      | `table` | Format the output. Values: [table \| json]                                                                    |
 | `-q`, `--quiet`       |               |         | Only display IDs                                                                                              |

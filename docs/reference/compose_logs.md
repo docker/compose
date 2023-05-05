@@ -7,6 +7,7 @@ View output from containers
 
 | Name                 | Type     | Default | Description                                                                                    |
 |:---------------------|:---------|:--------|:-----------------------------------------------------------------------------------------------|
+| `--dry-run`          |          |         | Execute command in dry run mode                                                                |
 | `-f`, `--follow`     |          |         | Follow log output.                                                                             |
 | `--no-color`         |          |         | Produce monochrome output.                                                                     |
 | `--no-log-prefix`    |          |         | Don't print prefix in logs.                                                                    |

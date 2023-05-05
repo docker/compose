@@ -11,6 +11,7 @@ Parse, resolve and render compose file in canonical format
 
 | Name                      | Type     | Default | Description                                                                 |
 |:--------------------------|:---------|:--------|:----------------------------------------------------------------------------|
+| `--dry-run`               |          |         | Execute command in dry run mode                                             |
 | `--format`                | `string` | `yaml`  | Format the output. Values: [yaml \| json]                                   |
 | `--hash`                  | `string` |         | Print the service config hash, one per line.                                |
 | `--images`                |          |         | Print the image names, one per line.                                        |

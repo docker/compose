@@ -8,6 +8,7 @@ Build or rebuild services
 | Name             | Type          | Default | Description                                                                                                 |
 |:-----------------|:--------------|:--------|:------------------------------------------------------------------------------------------------------------|
 | `--build-arg`    | `stringArray` |         | Set build-time variables for services.                                                                      |
+| `--dry-run`      |               |         | Execute command in dry run mode                                                                             |
 | `-m`, `--memory` | `bytes`       | `0`     | Set memory limit for the build container. Not supported by BuildKit.                                        |
 | `--no-cache`     |               |         | Do not use cache when building the image                                                                    |
 | `--progress`     | `string`      | `auto`  | Set type of progress output (auto, tty, plain, quiet)                                                       |

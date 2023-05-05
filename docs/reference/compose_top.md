@@ -3,6 +3,12 @@
 <!---MARKER_GEN_START-->
 Display the running processes
 
+### Options
+
+| Name        | Type | Default | Description                     |
+|:------------|:-----|:--------|:--------------------------------|
+| `--dry-run` |      |         | Execute command in dry run mode |
+
 
 <!---MARKER_GEN_END-->
 
