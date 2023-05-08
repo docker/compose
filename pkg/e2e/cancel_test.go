@@ -59,8 +59,8 @@ func TestComposeCancel(t *testing.T) {
 		}, 30*time.Second, 1*time.Second)
 
 		err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) // simulate Ctrl-C : send signal to processGroup, children will have same groupId by default
-
 		assert.NilError(t, err)
+
 		c.WaitForCondition(t, func() (bool, string) {
 			out := stdout.String()
 			errors := stderr.String()

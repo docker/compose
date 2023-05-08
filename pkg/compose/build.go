@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/compose-spec/compose-go/types"
@@ -53,67 +54,82 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	}, s.stderr(), "Building")
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
+func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	args := options.Args.Resolve(envResolver(project.Environment))
 
 	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
 	if err != nil {
 		return nil, err
 	}
+
+	// Progress needs its own context that lives longer than the
+	// build one otherwise it won't read all the messages from
+	// build and will lock
+	progressCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w, err := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, options.Progress)
+	if err != nil {
+		return nil, err
+	}
+
 	builtIDs := make([]string, len(project.Services))
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		for i, service := range project.Services {
-			if service.Name != name {
-				continue
-			}
+		service, idx := getServiceIndex(project, name)
 
-			if service.Build == nil {
-				return nil
-			}
-
-			if !buildkitEnabled {
-				if service.Build.Args == nil {
-					service.Build.Args = args
-				} else {
-					service.Build.Args = service.Build.Args.OverrideBy(args)
-				}
-				id, err := s.doBuildClassic(ctx, service, options)
-				if err != nil {
-					return err
-				}
-				builtIDs[i] = id
-
-				if options.Push {
-					return s.push(ctx, project, api.PushOptions{})
-				}
-				return nil
-			}
-
-			if options.Memory != 0 {
-				fmt.Fprintln(s.stderr(), "WARNING: --memory is not supported by BuildKit and will be ignored.")
-			}
-
-			buildOptions, err := s.toBuildOptions(project, service, options)
-			if err != nil {
-				return err
-			}
-			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
-			opts := map[string]build.Options{service.Name: buildOptions}
-
-			ids, err := s.doBuildBuildkit(ctx, opts, options.Progress)
-			if err != nil {
-				return err
-			}
-			builtIDs[i] = ids[service.Name]
+		if service.Build == nil {
 			return nil
 		}
+
+		if !buildkitEnabled {
+			if service.Build.Args == nil {
+				service.Build.Args = args
+			} else {
+				service.Build.Args = service.Build.Args.OverrideBy(args)
+			}
+			id, err := s.doBuildClassic(ctx, service, options)
+			if err != nil {
+				return err
+			}
+			builtIDs[idx] = id
+
+			if options.Push {
+				return s.push(ctx, project, api.PushOptions{})
+			}
+			return nil
+		}
+
+		if options.Memory != 0 {
+			fmt.Fprintln(s.stderr(), "WARNING: --memory is not supported by BuildKit and will be ignored.")
+		}
+
+		buildOptions, err := s.toBuildOptions(project, service, options)
+		if err != nil {
+			return err
+		}
+		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
+
+		ids, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, w)
+		if err != nil {
+			return err
+		}
+		builtIDs[idx] = ids[service.Name]
+
 		return nil
 	}, func(traversal *graphTraversal) {
 		traversal.maxConcurrency = s.maxConcurrency
 	})
+
+	// enforce all build event get consumed
+	if errw := w.Wait(); errw != nil {
+		return nil, errw
+	}
+
+	if err != nil {
+		return nil, err
+	}
 
 	imageIDs := map[string]string{}
 	for i, d := range builtIDs {
@@ -122,6 +138,18 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 	}
 	return imageIDs, err
+}
+
+func getServiceIndex(project *types.Project, name string) (types.ServiceConfig, int) {
+	var service types.ServiceConfig
+	var idx int
+	for i, s := range project.Services {
+		if s.Name == name {
+			idx, service = i, s
+			break
+		}
+	}
+	return service, idx
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, quietPull bool) error {
