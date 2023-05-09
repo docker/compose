@@ -119,7 +119,7 @@ func (o *ProjectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, ar
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *ProjectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
 	return Adapt(func(ctx context.Context, args []string) error {
-		project, err := o.ToProject(args, cli.WithResolvedPaths(true))
+		project, err := o.ToProject(args, cli.WithResolvedPaths(true), cli.WithDiscardEnvFile)
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (o *ProjectOptions) projectOrName(services ...string) (*types.Project, stri
 	name := o.ProjectName
 	var project *types.Project
 	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
-		p, err := o.ToProject(services)
+		p, err := o.ToProject(services, cli.WithDiscardEnvFile)
 		if err != nil {
 			envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
 			if envProjectName != "" {

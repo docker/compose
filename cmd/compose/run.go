@@ -142,7 +142,7 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			project, err := p.ToProject([]string{opts.Service}, cgo.WithResolvedPaths(true))
+			project, err := p.ToProject([]string{opts.Service}, cgo.WithResolvedPaths(true), cgo.WithDiscardEnvFile)
 			if err != nil {
 				return err
 			}
