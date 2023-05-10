@@ -37,6 +37,7 @@ import (
 	"github.com/moby/buildkit/session/sshforward/sshprovider"
 	"github.com/moby/buildkit/util/entitlements"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -247,9 +248,29 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 		images[name] = info.ID
 	}
 
-	for i := range project.Services {
-		imgName := api.GetImageNameOrDefault(project.Services[i], project.Name)
+	for i, service := range project.Services {
+		imgName := api.GetImageNameOrDefault(service, project.Name)
 		digest, ok := images[imgName]
+		if service.Platform != "" {
+			platform, err := platforms.Parse(service.Platform)
+			if err != nil {
+				return nil, err
+			}
+			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, digest)
+			if err != nil {
+				return nil, err
+			}
+			actual := specs.Platform{
+				Architecture: inspect.Architecture,
+				OS:           inspect.Os,
+				Variant:      inspect.Variant,
+			}
+			if !platforms.NewMatcher(platform).Match(actual) {
+				return nil, errors.Errorf("image with reference %s was found but does not match the specified platform: wanted %s, actual: %s",
+					imgName, platforms.Format(platform), platforms.Format(actual))
+			}
+		}
+
 		if ok {
 			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
 		}
