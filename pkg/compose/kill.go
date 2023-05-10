@@ -31,7 +31,7 @@ import (
 func (s *composeService) Kill(ctx context.Context, projectName string, options api.KillOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.kill(ctx, strings.ToLower(projectName), options)
-	}, s.stderr(), "Killing")
+	}, s.stdinfo(), "Killing")
 }
 
 func (s *composeService) kill(ctx context.Context, projectName string, options api.KillOptions) error {
@@ -57,7 +57,8 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		containers = containers.filter(isService(project.ServiceNames()...))
 	}
 	if len(containers) == 0 {
-		fmt.Fprintf(s.stderr(), "no container to kill")
+		fmt.Fprintf(s.stdinfo(), "no container to kill")
+		return nil
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)

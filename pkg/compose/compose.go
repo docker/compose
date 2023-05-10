@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,15 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 )
+
+var stdioToStdout bool
+
+func init() {
+	out, ok := os.LookupEnv("COMPOSE_STATUS_STDOUT")
+	if ok {
+		stdioToStdout, _ = strconv.ParseBool(out)
+	}
+}
 
 // NewComposeService create a local implementation of the compose.Service API
 func NewComposeService(dockerCli command.Cli) api.Service {
@@ -94,6 +104,13 @@ func (s *composeService) stdin() *streams.In {
 }
 
 func (s *composeService) stderr() io.Writer {
+	return s.dockerCli.Err()
+}
+
+func (s *composeService) stdinfo() io.Writer {
+	if stdioToStdout {
+		return s.dockerCli.Out()
+	}
 	return s.dockerCli.Err()
 }
 
