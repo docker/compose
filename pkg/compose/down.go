@@ -44,7 +44,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 	}, s.stdinfo())
 }
 
-func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
+func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error { //golint:nocyclo
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -70,6 +70,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+		if len(options.Services) > 0 && !utils.StringContains(options.Services, service) {
+			return nil
+		}
 		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err

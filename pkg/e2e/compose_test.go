@@ -102,6 +102,14 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-words-1   gtardif/sentences-api   latest`})
 	})
 
+	t.Run("down SERVICE", func(t *testing.T) {
+		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "web")
+
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "ps")
+		assert.Assert(t, !strings.Contains(res.Combined(), "compose-e2e-demo-web-1"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "compose-e2e-demo-db-1"), res.Combined())
+	})
+
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})

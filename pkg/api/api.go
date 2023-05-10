@@ -232,6 +232,8 @@ type DownOptions struct {
 	Images string
 	// Volumes remove volumes, both declared in the `volumes` section and anonymous ones
 	Volumes bool
+	// Services passed in the command line to be stopped
+	Services []string
 }
 
 // ConfigOptions group options of the Config API
