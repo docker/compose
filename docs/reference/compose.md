@@ -1,7 +1,7 @@
 # docker compose
 
 <!---MARKER_GEN_START-->
-Docker Compose
+Define and run multi-container applications with Docker.
 
 ### Subcommands
 
