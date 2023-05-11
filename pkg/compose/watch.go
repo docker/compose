@@ -155,7 +155,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			return err
 		}
 
-		fmt.Fprintf(s.stderr(), "watching %s\n", bc)
+		fmt.Fprintf(s.stdinfo(), "watching %s\n", bc)
 		err = watcher.Start()
 		if err != nil {
 			return err
@@ -207,7 +207,7 @@ WATCH:
 						continue
 					}
 
-					fmt.Fprintf(s.stderr(), "change detected on %s\n", hostPath)
+					fmt.Fprintf(s.stdinfo(), "change detected on %s\n", hostPath)
 
 					f := fileMapping{
 						HostPath: hostPath,
@@ -283,7 +283,7 @@ func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Proje
 		}
 
 		fmt.Fprintf(
-			s.stderr(),
+			s.stdinfo(),
 			"Rebuilding %s after changes were detected:%s\n",
 			strings.Join(serviceNames, ", "),
 			strings.Join(append([]string{""}, allPaths.Elements()...), "\n  - "),
@@ -319,7 +319,7 @@ func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project,
 					if err != nil {
 						return err
 					}
-					fmt.Fprintf(s.stderr(), "%s updated\n", opt.ContainerPath)
+					fmt.Fprintf(s.stdinfo(), "%s updated\n", opt.ContainerPath)
 				} else if errors.Is(statErr, fs.ErrNotExist) {
 					_, err := s.Exec(ctx, project.Name, api.RunOptions{
 						Service: opt.Service,
@@ -329,7 +329,7 @@ func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project,
 					if err != nil {
 						logrus.Warnf("failed to delete %q from %s: %v", opt.ContainerPath, opt.Service, err)
 					}
-					fmt.Fprintf(s.stderr(), "%s deleted from container\n", opt.ContainerPath)
+					fmt.Fprintf(s.stdinfo(), "%s deleted from container\n", opt.ContainerPath)
 				}
 			}
 		}

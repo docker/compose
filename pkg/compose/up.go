@@ -40,7 +40,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil
-	}, s.stderr())
+	}, s.stdinfo())
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	stopFunc := func() error {
-		fmt.Fprintln(s.stderr(), "Aborting on container exit...")
+		fmt.Fprintln(s.stdinfo(), "Aborting on container exit...")
 		ctx := context.Background()
 		return progress.Run(ctx, func(ctx context.Context) error {
 			go func() {
@@ -74,7 +74,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				Services: options.Create.Services,
 				Project:  project,
 			})
-		}, s.stderr())
+		}, s.stdinfo())
 	}
 
 	var isTerminated bool
@@ -83,7 +83,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		<-signalChan
 		isTerminated = true
 		printer.Cancel()
-		fmt.Fprintln(s.stderr(), "Gracefully stopping... (press Ctrl+C again to force)")
+		fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
 		eg.Go(stopFunc)
 	}()
 

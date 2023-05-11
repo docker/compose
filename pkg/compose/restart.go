@@ -31,7 +31,7 @@ import (
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.restart(ctx, strings.ToLower(projectName), options)
-	}, s.stderr(), "Restarting")
+	}, s.stdinfo(), "Restarting")
 }
 
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {

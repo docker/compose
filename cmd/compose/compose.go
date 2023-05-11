@@ -263,6 +263,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 	)
 	c := &cobra.Command{
 		Short:            "Docker Compose",
+		Long:             "Define and run multi-container applications with Docker.",
 		Use:              PluginName,
 		TraverseChildren: true,
 		// By default (no Run/RunE in parent c) for typos in subcommands, cobra displays the help of parent c but exit(0) !
