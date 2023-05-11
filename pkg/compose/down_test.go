@@ -223,6 +223,7 @@ func TestDownRemoveImages(t *testing.T) {
 
 	localImagesToBeRemoved := []string{
 		"testproject-local-anonymous:latest",
+		"local-named-image:latest",
 	}
 	for _, img := range localImagesToBeRemoved {
 		// test calls down --rmi=local then down --rmi=all, so local images
@@ -238,7 +239,6 @@ func TestDownRemoveImages(t *testing.T) {
 	assert.NilError(t, err)
 
 	otherImagesToBeRemoved := []string{
-		"local-named-image:latest",
 		"remote-image:latest",
 		"registry.example.com/remote-image-tagged:v1.0",
 	}
