@@ -46,7 +46,7 @@ const (
 func (s *composeService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.copy(ctx, projectName, options)
-	}, s.stderr(), "Copying")
+	}, s.stdinfo(), "Copying")
 }
 
 func (s *composeService) copy(ctx context.Context, projectName string, options api.CopyOptions) error {

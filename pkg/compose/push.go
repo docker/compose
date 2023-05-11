@@ -42,7 +42,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 	}
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.push(ctx, project, options)
-	}, s.stderr(), "Pushing")
+	}, s.stdinfo(), "Pushing")
 }
 
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
