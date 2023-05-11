@@ -177,26 +177,13 @@ func TestEnvPriority(t *testing.T) {
 func TestEnvInterpolation(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	// No variable defined in the Compose file and nor env variable pass to the run command
-	// 1. Command Line (docker compose run --env <KEY[=VAL]>)
-	// 2. Compose File (service::environment section) <-- Result expected (From environment patched by .env as a default --env-file value)
-	// 3. Compose File (service::env_file section file)
-	// 4. Container Image ENV directive
-	// 5. Variable is not defined
 	t.Run("shell priority from run command", func(t *testing.T) {
 		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-interpolation/compose.yaml", "config")
 		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
 		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{Out: `IMAGE: default_env:EnvFile`})
+		res.Assert(t, icmd.Expected{Out: `IMAGE: default_env:shell`})
 	})
 
-	// No variable defined in the Compose file and env variable pass to the run command
-	// 1. Command Line (docker compose run --env <KEY[=VAL]>)
-	// 2. Compose File (service::environment section) <-- Result expected (From environment patched by .env as a default --env-file value.
-	// This variable has a default value in case of an absent variable in the OS environment)
-	// 3. Compose File (service::env_file section file)
-	// 4. Container Image ENV directive
-	// 5. Variable is not defined
 	t.Run("shell priority from run command using default value fallback", func(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-interpolation-default-value/compose.yaml", "config").
 			Assert(t, icmd.Expected{Out: `IMAGE: default_env:EnvFileDefaultValue`})

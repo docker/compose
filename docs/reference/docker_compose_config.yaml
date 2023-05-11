@@ -69,6 +69,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: no-path-resolution
+      value_type: bool
+      default_value: "false"
+      description: Don't resolve file paths.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: output
       shorthand: o
       value_type: string

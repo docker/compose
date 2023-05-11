@@ -392,7 +392,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		psCommand(&opts, streams, backend),
 		listCommand(streams, backend),
 		logsCommand(&opts, streams, backend),
-		convertCommand(&opts, streams, backend),
+		configCommand(&opts, streams, backend),
 		killCommand(&opts, backend),
 		runCommand(&opts, streams, backend),
 		removeCommand(&opts, backend),
