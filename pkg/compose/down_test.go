@@ -79,6 +79,8 @@ func TestDown(t *testing.T) {
 		{ID: "abc123", Name: "myProject_default"},
 		{ID: "def456", Name: "myProject_default"},
 	}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(moby.NetworkResource{ID: "abc123"}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "def456", gomock.Any()).Return(moby.NetworkResource{ID: "def456"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "def456").Return(nil)
 
@@ -118,6 +120,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", "myProject_default")),
 	}).Return([]moby.NetworkResource{{ID: "abc123", Name: "myProject_default"}}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(moby.NetworkResource{ID: "abc123"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})

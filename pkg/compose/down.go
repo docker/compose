@@ -181,29 +181,43 @@ func (s *composeService) removeNetwork(ctx context.Context, name string, w progr
 	eventName := fmt.Sprintf("Network %s", name)
 	w.Event(progress.RemovingEvent(eventName))
 
-	var removed int
+	var found int
 	for _, net := range networks {
-		if net.Name == name {
-			if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
-				if errdefs.IsNotFound(err) {
-					continue
-				}
-				w.Event(progress.ErrorEvent(eventName))
-				return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
-			}
-			removed++
+		if net.Name != name {
+			continue
 		}
+		network, err := s.apiClient().NetworkInspect(ctx, net.ID, moby.NetworkInspectOptions{})
+		if errdefs.IsNotFound(err) {
+			w.Event(progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if len(network.Containers) > 0 {
+			w.Event(progress.NewEvent(eventName, progress.Warning, "Resource is still in use"))
+			found++
+			continue
+		}
+
+		if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
+			w.Event(progress.ErrorEvent(eventName))
+			return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
+		}
+		w.Event(progress.RemovedEvent(eventName))
+		found++
 	}
 
-	if removed == 0 {
+	if found == 0 {
 		// in practice, it's extremely unlikely for this to ever occur, as it'd
 		// mean the network was present when we queried at the start of this
 		// method but was then deleted by something else in the interim
-		w.Event(progress.NewEvent(eventName, progress.Done, "Warning: No resource found to remove"))
+		w.Event(progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
 		return nil
 	}
-
-	w.Event(progress.RemovedEvent(eventName))
 	return nil
 }
 
