@@ -75,7 +75,6 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	stoppedContainers.forEach(func(c moby.Container) {
 		names = append(names, getCanonicalContainerName(c))
 	})
-	fmt.Fprintln(s.stdinfo(), names)
 
 	if len(names) == 0 {
 		fmt.Fprintln(s.stdinfo(), "No stopped containers")
