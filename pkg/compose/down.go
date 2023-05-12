@@ -44,7 +44,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 	}, s.stdinfo())
 }
 
-func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error { //golint:nocyclo
+func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error { //nolint:gocyclo
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -65,18 +65,21 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
+	// Check requested services exists in model
+	options.Services, err = checkSelectedServices(options, project)
+	if err != nil {
+		return err
+	}
+
 	if len(containers) > 0 {
 		resourceToRemove = true
 	}
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		if len(options.Services) > 0 && !utils.StringContains(options.Services, service) {
-			return nil
-		}
 		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err
-	})
+	}, WithRootNodesAndDown(options.Services))
 	if err != nil {
 		return err
 	}
@@ -112,6 +115,23 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		eg.Go(op)
 	}
 	return eg.Wait()
+}
+
+func checkSelectedServices(options api.DownOptions, project *types.Project) ([]string, error) {
+	var services []string
+	for _, service := range options.Services {
+		_, err := project.GetService(service)
+		if err != nil {
+			if options.Project != nil {
+				// ran with an explicit compose.yaml file, so we should not ignore
+				return nil, err
+			}
+			// ran without an explicit compose.yaml file, so can't distinguish typo vs container already removed
+		} else {
+			services = append(services, service)
+		}
+	}
+	return services, nil
 }
 
 func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
