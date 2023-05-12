@@ -38,8 +38,9 @@ const (
 )
 
 type graphTraversal struct {
-	mu   sync.Mutex
-	seen map[string]struct{}
+	mu      sync.Mutex
+	seen    map[string]struct{}
+	ignored map[string]struct{}
 
 	extremityNodesFn            func(*Graph) []*Vertex                        // leaves or roots
 	adjacentNodesFn             func(*Vertex) []*Vertex                       // getParents or getChildren
@@ -87,13 +88,44 @@ func InDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
-func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error) error {
+func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
 	graph, err := NewGraph(project.Services, ServiceStarted)
 	if err != nil {
 		return err
 	}
 	t := downDirectionTraversal(fn)
+	for _, option := range options {
+		option(t)
+	}
 	return t.visit(ctx, graph)
+}
+
+func WithRootNodesAndDown(nodes []string) func(*graphTraversal) {
+	return func(t *graphTraversal) {
+		if len(nodes) == 0 {
+			return
+		}
+		originalFn := t.extremityNodesFn
+		t.extremityNodesFn = func(graph *Graph) []*Vertex {
+			var want []string
+			for _, node := range nodes {
+				vertex := graph.Vertices[node]
+				want = append(want, vertex.Service)
+				for _, v := range getAncestors(vertex) {
+					want = append(want, v.Service)
+				}
+			}
+
+			t.ignored = map[string]struct{}{}
+			for k := range graph.Vertices {
+				if !utils.Contains(want, k) {
+					t.ignored[k] = struct{}{}
+				}
+			}
+
+			return originalFn(graph)
+		}
+	}
 }
 
 func (t *graphTraversal) visit(ctx context.Context, g *Graph) error {
@@ -142,7 +174,10 @@ func (t *graphTraversal) run(ctx context.Context, graph *Graph, eg *errgroup.Gro
 		}
 
 		eg.Go(func() error {
-			err := t.visitorFn(ctx, node.Service)
+			var err error
+			if _, ignore := t.ignored[node.Service]; !ignore {
+				err = t.visitorFn(ctx, node.Service)
+			}
 			if err == nil {
 				graph.UpdateStatus(node.Key, t.targetServiceStatus)
 			}
@@ -195,6 +230,16 @@ func (v *Vertex) GetParents() []*Vertex {
 
 func getChildren(v *Vertex) []*Vertex {
 	return v.GetChildren()
+}
+
+// getAncestors return all descendents for a vertex, might contain duplicates
+func getAncestors(v *Vertex) []*Vertex {
+	var descendents []*Vertex
+	for _, parent := range v.GetParents() {
+		descendents = append(descendents, parent)
+		descendents = append(descendents, getAncestors(parent)...)
+	}
+	return descendents
 }
 
 // GetChildren returns a slice with the child vertices of the a Vertex
