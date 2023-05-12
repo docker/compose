@@ -306,6 +306,10 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 
+			if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && !cmd.Flags().Changed("ansi") {
+				ansi = v
+			}
+
 			formatter.SetANSIMode(streams, ansi)
 
 			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
