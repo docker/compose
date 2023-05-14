@@ -46,7 +46,7 @@ func killCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	removeOrphans := utils.StringToBool(os.Getenv("COMPOSE_REMOVE_ORPHANS"))
+	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file.")
 	flags.StringVarP(&opts.signal, "signal", "s", "SIGKILL", "SIGNAL to send to the container.")
 

@@ -82,9 +82,9 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			return validateFlags(&up, &create)
 		}),
 		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
-			create.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
+			create.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
 			if create.ignoreOrphans && create.removeOrphans {
-				return fmt.Errorf("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined")
+				return fmt.Errorf("%s and --remove-orphans cannot be combined", ComposeIgnoreOrphans)
 			}
 			return runUp(ctx, streams, backend, create, up, project, services)
 		}),

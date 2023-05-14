@@ -146,7 +146,8 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 			if err != nil {
 				return err
 			}
-			opts.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
+
+			opts.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
 			return runRun(ctx, backend, project, opts, createOpts, streams)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
