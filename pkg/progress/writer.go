@@ -21,6 +21,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/cloudflare/cfssl/log"
 	"github.com/docker/compose/v2/pkg/api"
 
 	"github.com/containerd/console"
@@ -118,11 +119,16 @@ func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer
 	if !ok {
 		dryRun = false
 	}
-	if Mode == ModeAuto && isTerminal {
-		return newTTYWriter(out.(console.File), dryRun, progressTitle)
+	f, isConsole := out.(console.File) // see https://github.com/docker/compose/issues/10560
+	if Mode == ModeAuto && isTerminal && isConsole {
+		return newTTYWriter(f, dryRun, progressTitle)
 	}
 	if Mode == ModeTTY {
-		return newTTYWriter(out.(console.File), dryRun, progressTitle)
+		if !isConsole {
+			log.Warning("Terminal is not a POSIX console")
+		} else {
+			return newTTYWriter(f, dryRun, progressTitle)
+		}
 	}
 	return &plainWriter{
 		out:    out,
