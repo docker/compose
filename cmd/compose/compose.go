@@ -47,6 +47,19 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
+const (
+	// ComposeParallelLimit set the limit running concurrent operation on docker engine
+	ComposeParallelLimit = "COMPOSE_PARALLEL_LIMIT"
+	// ComposeProjectName define the project name to be used, instead of guessing from parent directory
+	ComposeProjectName = "COMPOSE_PROJECT_NAME"
+	// ComposeCompatibility try to mimic compose v1 as much as possible
+	ComposeCompatibility = "COMPOSE_COMPATIBILITY"
+	// ComposeRemoveOrphans remove “orphaned" containers, i.e. containers tagged for current project but not declared as service
+	ComposeRemoveOrphans = "COMPOSE_REMOVE_ORPHANS"
+	// ComposeIgnoreOrphans ignore "orphaned" containers
+	ComposeIgnoreOrphans = "COMPOSE_IGNORE_ORPHANS"
+)
+
 // Command defines a compose CLI command as a func with args
 type Command func(context.Context, []string) error
 
@@ -145,7 +158,7 @@ func (o *ProjectOptions) projectOrName(services ...string) (*types.Project, stri
 	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
 		p, err := o.ToProject(services, cli.WithDiscardEnvFile)
 		if err != nil {
-			envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
+			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
 				return nil, envProjectName, nil
 			}
@@ -162,7 +175,7 @@ func (o *ProjectOptions) toProjectName() (string, error) {
 		return o.ProjectName, nil
 	}
 
-	envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
+	envProjectName := os.Getenv("ComposeProjectName")
 	if envProjectName != "" {
 		return envProjectName, nil
 	}
@@ -180,7 +193,7 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
-	if o.Compatibility || utils.StringToBool(options.Environment["COMPOSE_COMPATIBILITY"]) {
+	if o.Compatibility || utils.StringToBool(options.Environment[ComposeCompatibility]) {
 		api.Separator = "_"
 	}
 
@@ -339,10 +352,22 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 					opts.EnvFiles[i] = file
 				}
 			}
-			if v, ok := os.LookupEnv("COMPOSE_PARALLEL_LIMIT"); ok && !cmd.Flags().Changed("parallel") {
+
+			composeCmd := cmd
+			for {
+				if composeCmd.Name() == PluginName {
+					break
+				}
+				if !composeCmd.HasParent() {
+					return fmt.Errorf("error parsing command line, expected %q", PluginName)
+				}
+				composeCmd = composeCmd.Parent()
+			}
+
+			if v, ok := os.LookupEnv(ComposeParallelLimit); ok && !composeCmd.Flags().Changed("parallel") {
 				i, err := strconv.Atoi(v)
 				if err != nil {
-					return fmt.Errorf("COMPOSE_PARALLEL_LIMIT must be an integer (found: %q)", v)
+					return fmt.Errorf("%s must be an integer (found: %q)", ComposeParallelLimit, v)
 				}
 				parallel = i
 			}
