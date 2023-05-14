@@ -24,6 +24,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
@@ -33,6 +34,7 @@ import (
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -261,4 +263,24 @@ func (s *composeService) actualNetworks(ctx context.Context, projectName string)
 		}
 	}
 	return actual, nil
+}
+
+var swarmEnabled = struct {
+	once sync.Once
+	val  bool
+	err  error
+}{}
+
+func (s *composeService) isSWarmEnabled(ctx context.Context) (bool, error) {
+	swarmEnabled.once.Do(func() {
+		info, err := s.apiClient().Info(ctx)
+		if err != nil {
+			swarmEnabled.err = err
+		}
+		if info.Swarm.LocalNodeState == swarm.LocalNodeStateInactive {
+			swarmEnabled.val = info.Swarm.LocalNodeState == swarm.LocalNodeStateInactive
+		}
+	})
+	return swarmEnabled.val, swarmEnabled.err
+
 }

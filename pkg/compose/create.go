@@ -1103,7 +1103,13 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 				// Here we assume `driver` is relevant for a network we don't manage
 				// which is a non-sense, but this is our legacy ¯\(ツ)/¯
 				// networkAttach will later fail anyway if network actually doesn't exists
-				return nil
+				enabled, err := s.isSWarmEnabled(ctx)
+				if err != nil {
+					return err
+				}
+				if enabled {
+					return nil
+				}
 			}
 			return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
 		}
