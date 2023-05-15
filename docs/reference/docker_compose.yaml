@@ -214,6 +214,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: env-from
+      value_type: string
+      default_value: os,env-file
+      description: Specify sources to use for variables substitution.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: file
       shorthand: f
       value_type: stringArray

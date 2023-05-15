@@ -101,6 +101,7 @@ type ProjectOptions struct {
 	ProjectDir    string
 	EnvFiles      []string
 	Compatibility bool
+	EnvSources    string
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -133,6 +134,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringArrayVar(&o.EnvFiles, "env-file", nil, "Specify an alternate environment file.")
+	f.StringVar(&o.EnvSources, "env-from", "os,env-file", "Specify sources to use for variables substitution.")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
@@ -220,12 +222,21 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 }
 
 func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
+
+	for _, s := range strings.Split(o.EnvSources, ",") {
+		switch s {
+		case "os":
+			po = append(po, cli.WithOsEnv)
+		case "env-file":
+			po = append(po, cli.WithDotEnv)
+		default:
+			return nil, fmt.Errorf("unsupported environmnet source %q", s)
+		}
+	}
 	return cli.NewProjectOptions(o.ConfigPaths,
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
-			cli.WithOsEnv,
 			cli.WithEnvFiles(o.EnvFiles...),
-			cli.WithDotEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
 			cli.WithProfiles(o.Profiles),
@@ -424,6 +435,9 @@ func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
 		return err
 	}
 	for k, v := range envFromFile {
+		if !strings.HasPrefix(k, "COMPOSE_") {
+			continue
+		}
 		if _, ok := os.LookupEnv(k); !ok { // Precedence to OS Env
 			if err := os.Setenv(k, v); err != nil {
 				return err

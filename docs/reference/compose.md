@@ -37,16 +37,17 @@ Define and run multi-container applications with Docker.
 
 ### Options
 
-| Name                   | Type          | Default | Description                                                                                         |
-|:-----------------------|:--------------|:--------|:----------------------------------------------------------------------------------------------------|
-| `--ansi`               | `string`      | `auto`  | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
-| `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
-| `--env-file`           | `stringArray` |         | Specify an alternate environment file.                                                              |
-| `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
-| `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |
-| `--profile`            | `stringArray` |         | Specify a profile to enable                                                                         |
-| `--project-directory`  | `string`      |         | Specify an alternate working directory<br>(default: the path of the, first specified, Compose file) |
-| `-p`, `--project-name` | `string`      |         | Project name                                                                                        |
+| Name                   | Type          | Default       | Description                                                                                         |
+|:-----------------------|:--------------|:--------------|:----------------------------------------------------------------------------------------------------|
+| `--ansi`               | `string`      | `auto`        | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
+| `--compatibility`      |               |               | Run compose in backward compatibility mode                                                          |
+| `--env-file`           | `stringArray` |               | Specify an alternate environment file.                                                              |
+| `--env-from`           | `string`      | `os,env-file` | Specify sources to use for variables substitution.                                                  |
+| `-f`, `--file`         | `stringArray` |               | Compose configuration files                                                                         |
+| `--parallel`           | `int`         | `-1`          | Control max parallelism, -1 for unlimited                                                           |
+| `--profile`            | `stringArray` |               | Specify a profile to enable                                                                         |
+| `--project-directory`  | `string`      |               | Specify an alternate working directory<br>(default: the path of the, first specified, Compose file) |
+| `-p`, `--project-name` | `string`      |               | Project name                                                                                        |
 
 
 <!---MARKER_GEN_END-->
