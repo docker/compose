@@ -251,6 +251,9 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	for i, service := range project.Services {
 		imgName := api.GetImageNameOrDefault(service, project.Name)
 		digest, ok := images[imgName]
+		if !ok {
+			continue
+		}
 		if service.Platform != "" {
 			platform, err := platforms.Parse(service.Platform)
 			if err != nil {
@@ -271,9 +274,8 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 			}
 		}
 
-		if ok {
-			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
-		}
+		project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
+
 	}
 
 	return images, nil
