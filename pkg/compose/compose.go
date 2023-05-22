@@ -277,8 +277,11 @@ func (s *composeService) isSWarmEnabled(ctx context.Context) (bool, error) {
 		if err != nil {
 			swarmEnabled.err = err
 		}
-		if info.Swarm.LocalNodeState == swarm.LocalNodeStateInactive {
-			swarmEnabled.val = info.Swarm.LocalNodeState == swarm.LocalNodeStateInactive
+		switch info.Swarm.LocalNodeState {
+		case swarm.LocalNodeStateInactive, swarm.LocalNodeStateLocked:
+			swarmEnabled.val = false
+		default:
+			swarmEnabled.val = true
 		}
 	})
 	return swarmEnabled.val, swarmEnabled.err
