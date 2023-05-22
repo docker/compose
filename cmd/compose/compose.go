@@ -175,7 +175,7 @@ func (o *ProjectOptions) toProjectName() (string, error) {
 		return o.ProjectName, nil
 	}
 
-	envProjectName := os.Getenv("ComposeProjectName")
+	envProjectName := os.Getenv(ComposeProjectName)
 	if envProjectName != "" {
 		return envProjectName, nil
 	}
