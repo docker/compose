@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -172,6 +173,9 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	eg, _ := errgroup.WithContext(ctx)
 
+	sort.Slice(containers, func(i, j int) bool {
+		return containers[i].Created < containers[j].Created
+	})
 	for i, container := range containers {
 		if i >= expected {
 			// Scale Down
