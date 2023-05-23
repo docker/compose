@@ -23,6 +23,8 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/utils"
@@ -76,7 +78,7 @@ func downDirectionTraversal(visitorFn func(context.Context, string) error) *grap
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
 func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
-	graph, err := NewGraph(project.Services, ServiceStopped)
+	graph, err := NewGraph(project, ServiceStopped)
 	if err != nil {
 		return err
 	}
@@ -89,7 +91,7 @@ func InDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
 func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
-	graph, err := NewGraph(project.Services, ServiceStarted)
+	graph, err := NewGraph(project, ServiceStarted)
 	if err != nil {
 		return err
 	}
@@ -252,19 +254,28 @@ func (v *Vertex) GetChildren() []*Vertex {
 }
 
 // NewGraph returns the dependency graph of the services
-func NewGraph(services types.Services, initialStatus ServiceStatus) (*Graph, error) {
+func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, error) {
 	graph := &Graph{
 		lock:     sync.RWMutex{},
 		Vertices: map[string]*Vertex{},
 	}
 
-	for _, s := range services {
+	for _, s := range project.Services {
 		graph.AddVertex(s.Name, s.Name, initialStatus)
 	}
 
-	for _, s := range services {
+	for _, s := range project.Services {
 		for _, name := range s.GetDependencies() {
-			_ = graph.AddEdge(s.Name, name)
+			err := graph.AddEdge(s.Name, name)
+			if err != nil {
+				if api.IsNotFoundError(err) {
+					ds, err := project.GetDisabledService(name)
+					if err == nil {
+						return nil, fmt.Errorf("service %s is required by %s but is disabled. Can be enabled by profiles %s", name, s.Name, ds.Profiles)
+					}
+				}
+				return nil, err
+			}
 		}
 	}
 
@@ -304,10 +315,10 @@ func (g *Graph) AddEdge(source string, destination string) error {
 	destinationVertex := g.Vertices[destination]
 
 	if sourceVertex == nil {
-		return fmt.Errorf("could not find %s", source)
+		return errors.Wrapf(api.ErrNotFound, "could not find %s", source)
 	}
 	if destinationVertex == nil {
-		return fmt.Errorf("could not find %s", destination)
+		return errors.Wrapf(api.ErrNotFound, "could not find %s", destination)
 	}
 
 	// If they are already connected
