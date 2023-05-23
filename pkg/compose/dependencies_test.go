@@ -270,7 +270,7 @@ func TestBuildGraph(t *testing.T) {
 				Services: tC.services,
 			}
 
-			graph, err := NewGraph(project.Services, ServiceStopped)
+			graph, err := NewGraph(&project, ServiceStopped)
 			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
 
 			for k, vertex := range graph.Vertices {
