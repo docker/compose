@@ -330,6 +330,7 @@ const (
 	ExtractingPhase        = "Extracting"
 	VerifyingChecksumPhase = "Verifying Checksum"
 	AlreadyExistsPhase     = "Already exists"
+	ExistsPhase            = "Exists"
 	PullCompletePhase      = "Pull complete"
 )
 
@@ -359,7 +360,7 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.W
 				percent = int(jm.Progress.Current * 100 / jm.Progress.Total)
 			}
 		}
-	case DownloadCompletePhase, AlreadyExistsPhase, PullCompletePhase:
+	case DownloadCompletePhase, AlreadyExistsPhase, ExistsPhase, PullCompletePhase:
 		status = progress.Done
 		percent = 100
 	}
