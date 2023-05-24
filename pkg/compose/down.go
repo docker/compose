@@ -171,32 +171,30 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 
 func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
-	for _, n := range project.Networks {
+	for key, n := range project.Networks {
 		if n.External.External {
 			continue
 		}
 		// loop capture variable for op closure
-		networkName := n.Name
+		networkKey := key
+		idOrName := n.Name
 		ops = append(ops, func() error {
-			return s.removeNetwork(ctx, networkName, w)
+			return s.removeNetwork(ctx, networkKey, project.Name, idOrName, w)
 		})
 	}
 	return ops
 }
 
-func (s *composeService) removeNetwork(ctx context.Context, name string, w progress.Writer) error {
-	// networks are guaranteed to have unique IDs but NOT names, so it's
-	// possible to get into a situation where a compose down will fail with
-	// an error along the lines of:
-	// 	failed to remove network test: Error response from daemon: network test is ambiguous (2 matches found based on name)
-	// as a workaround here, the delete is done by ID after doing a list using
-	// the name as a filter (99.9% of the time this will return a single result)
+func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName string, projectName string, name string, w progress.Writer) error {
 	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", name)),
+		Filters: filters.NewArgs(
+			projectFilter(projectName),
+			networkFilter(composeNetworkName)),
 	})
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("failed to inspect network %s", name))
+		return errors.Wrapf(err, "failed to list networks")
 	}
+
 	if len(networks) == 0 {
 		return nil
 	}

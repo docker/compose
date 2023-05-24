@@ -31,6 +31,10 @@ func serviceFilter(serviceName string) filters.KeyValuePair {
 	return filters.Arg("label", fmt.Sprintf("%s=%s", api.ServiceLabel, serviceName))
 }
 
+func networkFilter(name string) filters.KeyValuePair {
+	return filters.Arg("label", fmt.Sprintf("%s=%s", api.NetworkLabel, name))
+}
+
 func oneOffFilter(b bool) filters.KeyValuePair {
 	v := "False"
 	if b {

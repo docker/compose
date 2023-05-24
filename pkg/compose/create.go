@@ -214,11 +214,12 @@ func prepareServicesDependsOn(p *types.Project) error {
 }
 
 func (s *composeService) ensureNetworks(ctx context.Context, networks types.Networks) error {
-	for _, network := range networks {
-		err := s.ensureNetwork(ctx, network)
+	for i, network := range networks {
+		err := s.ensureNetwork(ctx, &network)
 		if err != nil {
 			return err
 		}
+		networks[i] = network
 	}
 	return nil
 }
@@ -1077,7 +1078,129 @@ func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
 	return aliases
 }
 
-func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfig) error {
+func (s *composeService) ensureNetwork(ctx context.Context, n *types.NetworkConfig) error {
+	if n.External.External {
+		return s.resolveExternalNetwork(ctx, n)
+	}
+
+	err := s.resolveOrCreateNetwork(ctx, n)
+	if errdefs.IsConflict(err) {
+		// Maybe another execution of `docker compose up|run` created same network
+		// let's retry once
+		return s.resolveOrCreateNetwork(ctx, n)
+	}
+	return err
+}
+
+func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.NetworkConfig) error { //nolint:gocyclo
+	expectedNetworkLabel := n.Labels[api.NetworkLabel]
+	expectedProjectLabel := n.Labels[api.ProjectLabel]
+
+	// First, try to find a unique network matching by name or ID
+	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
+	if err == nil {
+		// NetworkInspect will match on ID prefix, so double check we get the expected one
+		// as looking for network named `db` we could erroneously matched network ID `db9086999caf`
+		if inspect.Name == n.Name || inspect.ID == n.Name {
+			if inspect.Labels[api.ProjectLabel] != expectedProjectLabel {
+				logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
+					"Set `external: true` to use an existing network", n.Name)
+			}
+			if inspect.Labels[api.NetworkLabel] != expectedNetworkLabel {
+				return fmt.Errorf("network %s was found but has incorrect label %s set to %q", n.Name, api.NetworkLabel, inspect.Labels[api.NetworkLabel])
+			}
+			return nil
+		}
+	}
+	// ignore other errors. Typically, an ambiguous request by name results in some generic `invalidParameter` error
+
+	// Either not found, or name is ambiguous - use NetworkList to list by name
+	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
+		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
+	})
+	if err != nil {
+		return err
+	}
+
+	// NetworkList Matches all or part of a network name, so we have to filter for a strict match
+	networks = utils.Filter(networks, func(net moby.NetworkResource) bool {
+		return net.Name == n.Name
+	})
+
+	for _, net := range networks {
+		if net.Labels[api.ProjectLabel] == expectedProjectLabel &&
+			net.Labels[api.NetworkLabel] == expectedNetworkLabel {
+			return nil
+		}
+	}
+
+	// we could have set NetworkList with a projectFilter and networkFilter but not doing so allows to catch this
+	// scenario were a network with same name exists but doesn't have label, and use of `CheckDuplicate: true`
+	// prevents to create another one.
+	if len(networks) > 0 {
+		logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
+			"Set `external: true` to use an existing network", n.Name)
+		return nil
+	}
+
+	var ipam *network.IPAM
+	if n.Ipam.Config != nil {
+		var config []network.IPAMConfig
+		for _, pool := range n.Ipam.Config {
+			config = append(config, network.IPAMConfig{
+				Subnet:     pool.Subnet,
+				IPRange:    pool.IPRange,
+				Gateway:    pool.Gateway,
+				AuxAddress: pool.AuxiliaryAddresses,
+			})
+		}
+		ipam = &network.IPAM{
+			Driver: n.Ipam.Driver,
+			Config: config,
+		}
+	}
+	createOpts := moby.NetworkCreate{
+		CheckDuplicate: true,
+		Labels:         n.Labels,
+		Driver:         n.Driver,
+		Options:        n.DriverOpts,
+		Internal:       n.Internal,
+		Attachable:     n.Attachable,
+		IPAM:           ipam,
+		EnableIPv6:     n.EnableIPv6,
+	}
+
+	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
+		createOpts.IPAM = &network.IPAM{}
+	}
+
+	if n.Ipam.Driver != "" {
+		createOpts.IPAM.Driver = n.Ipam.Driver
+	}
+
+	for _, ipamConfig := range n.Ipam.Config {
+		config := network.IPAMConfig{
+			Subnet:     ipamConfig.Subnet,
+			IPRange:    ipamConfig.IPRange,
+			Gateway:    ipamConfig.Gateway,
+			AuxAddress: ipamConfig.AuxiliaryAddresses,
+		}
+		createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
+	}
+	networkEventName := fmt.Sprintf("Network %s", n.Name)
+	w := progress.ContextWriter(ctx)
+	w.Event(progress.CreatingEvent(networkEventName))
+
+	_, err = s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
+	if err != nil {
+		w.Event(progress.ErrorEvent(networkEventName))
+		return errors.Wrapf(err, "failed to create network %s", n.Name)
+	}
+	w.Event(progress.CreatedEvent(networkEventName))
+	return nil
+}
+
+func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.NetworkConfig) error {
 	// NetworkInspect will match on ID prefix, so NetworkList with a name
 	// filter is used to look for an exact match to prevent e.g. a network
 	// named `db` from getting erroneously matched to a network with an ID
@@ -1088,87 +1211,35 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	if err != nil {
 		return err
 	}
-	networkNotFound := true
-	for _, net := range networks {
-		if net.Name == n.Name {
-			networkNotFound = false
-			break
-		}
-	}
-	if networkNotFound {
-		if n.External.External {
-			if n.Driver == "overlay" {
-				// Swarm nodes do not register overlay networks that were
-				// created on a different node unless they're in use.
-				// Here we assume `driver` is relevant for a network we don't manage
-				// which is a non-sense, but this is our legacy ¯\(ツ)/¯
-				// networkAttach will later fail anyway if network actually doesn't exists
-				enabled, err := s.isSWarmEnabled(ctx)
-				if err != nil {
-					return err
-				}
-				if enabled {
-					return nil
-				}
-			}
-			return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
-		}
-		var ipam *network.IPAM
-		if n.Ipam.Config != nil {
-			var config []network.IPAMConfig
-			for _, pool := range n.Ipam.Config {
-				config = append(config, network.IPAMConfig{
-					Subnet:     pool.Subnet,
-					IPRange:    pool.IPRange,
-					Gateway:    pool.Gateway,
-					AuxAddress: pool.AuxiliaryAddresses,
-				})
-			}
-			ipam = &network.IPAM{
-				Driver: n.Ipam.Driver,
-				Config: config,
-			}
-		}
-		createOpts := moby.NetworkCreate{
-			CheckDuplicate: true,
-			// TODO NameSpace Labels
-			Labels:     n.Labels,
-			Driver:     n.Driver,
-			Options:    n.DriverOpts,
-			Internal:   n.Internal,
-			Attachable: n.Attachable,
-			IPAM:       ipam,
-			EnableIPv6: n.EnableIPv6,
-		}
 
-		if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
-			createOpts.IPAM = &network.IPAM{}
-		}
+	// NetworkList API doesn't return the exact name match, so we can retrieve more than one network with a request
+	networks = utils.Filter(networks, func(net moby.NetworkResource) bool {
+		return net.Name == n.Name
+	})
 
-		if n.Ipam.Driver != "" {
-			createOpts.IPAM.Driver = n.Ipam.Driver
-		}
-
-		for _, ipamConfig := range n.Ipam.Config {
-			config := network.IPAMConfig{
-				Subnet:     ipamConfig.Subnet,
-				IPRange:    ipamConfig.IPRange,
-				Gateway:    ipamConfig.Gateway,
-				AuxAddress: ipamConfig.AuxiliaryAddresses,
-			}
-			createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
-		}
-		networkEventName := fmt.Sprintf("Network %s", n.Name)
-		w := progress.ContextWriter(ctx)
-		w.Event(progress.CreatingEvent(networkEventName))
-		if _, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts); err != nil {
-			w.Event(progress.ErrorEvent(networkEventName))
-			return errors.Wrapf(err, "failed to create network %s", n.Name)
-		}
-		w.Event(progress.CreatedEvent(networkEventName))
+	switch len(networks) {
+	case 1:
+		n.Name = networks[0].ID
 		return nil
+	case 0:
+		if n.Driver == "overlay" {
+			// Swarm nodes do not register overlay networks that were
+			// created on a different node unless they're in use.
+			// Here we assume `driver` is relevant for a network we don't manage
+			// which is a non-sense, but this is our legacy ¯\(ツ)/¯
+			// networkAttach will later fail anyway if network actually doesn't exists
+			enabled, err := s.isSWarmEnabled(ctx)
+			if err != nil {
+				return err
+			}
+			if enabled {
+				return nil
+			}
+		}
+		return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
+	default:
+		return fmt.Errorf("multiple networks with name %q were found. Use network ID as `name` to avoid ambiguity", n.Name)
 	}
-	return nil
 }
 
 func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig, project string) error {
