@@ -252,6 +252,10 @@ func (s *composeService) removeImage(ctx context.Context, image string, w progre
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
 	}
+	if errdefs.IsConflict(err) {
+		w.Event(progress.NewEvent(id, progress.Warning, "Resource is still in use"))
+		return nil
+	}
 	if errdefs.IsNotFound(err) {
 		w.Event(progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
 		return nil
@@ -265,6 +269,10 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 	err := s.apiClient().VolumeRemove(ctx, id, true)
 	if err == nil {
 		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
+		return nil
+	}
+	if errdefs.IsConflict(err) {
+		w.Event(progress.NewEvent(resource, progress.Warning, "Resource is still in use"))
 		return nil
 	}
 	if errdefs.IsNotFound(err) {
