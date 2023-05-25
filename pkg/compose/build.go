@@ -68,6 +68,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	// build and will lock
 	progressCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	w, err := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, options.Progress)
 	if err != nil {
 		return nil, err
@@ -175,20 +176,24 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		mode = xprogress.PrinterModeQuiet
 	}
 
-	err = s.prepareProjectForBuild(project, images)
-	if err != nil {
-		return err
-	}
-	builtImages, err := s.build(ctx, project, api.BuildOptions{
-		Progress: mode,
-	})
+	buildRequired, err := s.prepareProjectForBuild(project, images)
 	if err != nil {
 		return err
 	}
 
-	for name, digest := range builtImages {
-		images[name] = digest
+	if buildRequired {
+		builtImages, err := s.build(ctx, project, api.BuildOptions{
+			Progress: mode,
+		})
+		if err != nil {
+			return err
+		}
+
+		for name, digest := range builtImages {
+			images[name] = digest
+		}
 	}
+
 	// set digest as com.docker.compose.image label so we can detect outdated containers
 	for i, service := range project.Services {
 		image := api.GetImageNameOrDefault(service, project.Name)
@@ -203,10 +208,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	return nil
 }
 
-func (s *composeService) prepareProjectForBuild(project *types.Project, images map[string]string) error {
+func (s *composeService) prepareProjectForBuild(project *types.Project, images map[string]string) (bool, error) {
+	buildRequired := false
 	err := api.BuildOptions{}.Apply(project)
 	if err != nil {
-		return err
+		return false, err
 	}
 	for i, service := range project.Services {
 		if service.Build == nil {
@@ -227,8 +233,9 @@ func (s *composeService) prepareProjectForBuild(project *types.Project, images m
 			service.Build.Platforms = []string{service.Platform}
 		}
 		project.Services[i] = service
+		buildRequired = true
 	}
-	return nil
+	return buildRequired, nil
 }
 
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
