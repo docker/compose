@@ -19,6 +19,7 @@ package cucumber
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -87,6 +88,7 @@ func setup(s *godog.ScenarioContext) {
 	s.Step(`output contains "(.*)"$`, th.outputContains(true))
 	s.Step(`output does not contain "(.*)"$`, th.outputContains(false))
 	s.Step(`exit code is (\d+)$`, th.exitCodeIs)
+	s.Step(`a process listening on port (\d+)$`, th.listenerOnPort)
 }
 
 type testHelper struct {
@@ -172,5 +174,18 @@ func (th *testHelper) setDockerfile(dockerfileString string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (th *testHelper) listenerOnPort(port int) error {
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+
+	th.T.Cleanup(func() {
+		_ = l.Close()
+	})
+
 	return nil
 }
