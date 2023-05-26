@@ -76,6 +76,8 @@ jobs:
 
   bin-image:
     runs-on: ubuntu-22.04
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
       -
         name: Checkout
@@ -107,6 +109,7 @@ jobs:
       -
         name: Build and push image
         uses: docker/bake-action@v2
+        id: bake
         with:
           files: |
             ./docker-bake.hcl
@@ -118,3 +121,30 @@ jobs:
             *.cache-to=type=gha,scope=bin-image,mode=max
             *.attest=type=sbom
             *.attest=type=provenance,mode=max,builder-id=https://github.com/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
+
+  desktop-edge-test:
+    runs-on: ubuntu-latest
+    needs: bin-image
+    steps:
+      -
+        name: Generate Token
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ variables.DOCKERDESKTOP_APPID }}
+          private_key: ${{ secrets.DOCKERDESKTOP_APP_PRIVATEKEY }}
+      -
+        name: Trigger Docker Desktop e2e with edge version
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'docker',
+              repo: 'pinata',
+              workflow_id: 'compose-edge-integration.yml',
+              ref: 'compose-edge-integration'
+              inputs: {
+                "image-tag": '${{ fromJSON(needs.bin-image.bake.outputs.metadata).image-cross["containerimage.digest"] }}'
+              }
+            })
