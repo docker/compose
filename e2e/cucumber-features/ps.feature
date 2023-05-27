@@ -16,6 +16,7 @@ Background:
         """
         FROM golang:1.19-alpine
         """
+    And I run "docker rm -f external-test"
 
 Scenario: external container from compose image exists
     When I run "compose build"
@@ -24,4 +25,5 @@ Scenario: external container from compose image exists
     Then the exit code is 0
     And I run "compose ps -a"
     Then the output does not contain "external-test"
+    And I run "docker rm -f external-test"
 
