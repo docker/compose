@@ -10,7 +10,7 @@ require (
 	github.com/containerd/containerd v1.6.21
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000 // replaced; see replace for the actual version used
 	github.com/distribution/distribution/v3 v3.0.0-20230327091844-0c958010ace2
-	github.com/docker/buildx v0.10.4
+	github.com/docker/buildx v0.10.5
 	github.com/docker/cli v23.0.6+incompatible
 	github.com/docker/cli-docs-tool v0.5.1
 	github.com/docker/docker v23.0.6+incompatible
@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.11.6
+	github.com/moby/buildkit v0.11.7-0.20230519102302-348e79dfed17
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0

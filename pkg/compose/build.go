@@ -112,11 +112,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
 
-		ids, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, w)
+		digest, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, w)
 		if err != nil {
 			return err
 		}
-		builtIDs[idx] = ids[service.Name]
+		builtIDs[idx] = digest
 
 		return nil
 	}, func(traversal *graphTraversal) {
