@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
@@ -37,6 +39,14 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	start.OpenStdin = !opts.Detach && opts.Interactive
 	start.Attach = !opts.Detach
 	start.Containers = []string{containerID}
+
+	// remove cancellable context signal handler so we can forward signals to container without compose to exit
+	signal.Reset()
+
+	sigc := make(chan os.Signal, 128)
+	signal.Notify(sigc)
+	go cmd.ForwardAllSignals(ctx, s.dockerCli, containerID, sigc)
+	defer signal.Stop(sigc)
 
 	err = cmd.RunStart(s.dockerCli, &start)
 	if sterr, ok := err.(cli.StatusError); ok {
