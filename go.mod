@@ -30,7 +30,7 @@ require (
 	github.com/sirupsen/logrus v1.9.2
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	github.com/theupdateframework/notary v0.7.0
 	github.com/tilt-dev/fsnotify v1.4.8-0.20220602155310-fff9c274a375
 	go.opentelemetry.io/otel v1.15.1
