@@ -484,7 +484,7 @@ func (s *composeService) startContainer(ctx context.Context, container moby.Cont
 	return nil
 }
 
-func (s *composeService) createMobyContainer(ctx context.Context,
+func (s *composeService) createMobyContainer(ctx context.Context, //nolint:gocyclo
 	project *types.Project,
 	service types.ServiceConfig,
 	name string,
@@ -513,6 +513,18 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 		}
 		plat = &p
 	}
+
+	links, err := s.getLinks(ctx, project.Name, service, number)
+	if err != nil {
+		return created, err
+	}
+	if networkingConfig != nil {
+		for k, s := range networkingConfig.EndpointsConfig {
+			s.Links = links
+			networkingConfig.EndpointsConfig[k] = s
+		}
+	}
+
 	response, err := s.apiClient().ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, plat, name)
 	if err != nil {
 		return created, err
@@ -535,10 +547,6 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 		NetworkSettings: &moby.SummaryNetworkSettings{
 			Networks: inspectedContainer.NetworkSettings.Networks,
 		},
-	}
-	links, err := s.getLinks(ctx, project.Name, service, number)
-	if err != nil {
-		return created, err
 	}
 	for _, netName := range service.NetworksByPriority() {
 		netwrk := project.Networks[netName]

@@ -60,8 +60,8 @@ func TestDown(t *testing.T) {
 	// cleanup properly if duplicates are inadvertently created
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]moby.NetworkResource{
-			{ID: "abc123", Name: "myProject_default"},
-			{ID: "def456", Name: "myProject_default"},
+			{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
 		}, nil)
 
 	stopOptions := containerType.StopOptions{}
@@ -74,7 +74,9 @@ func TestDown(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "myProject_default")),
+		Filters: filters.NewArgs(
+			projectFilter(strings.ToLower(testProject)),
+			networkFilter("default")),
 	}).Return([]moby.NetworkResource{
 		{ID: "abc123", Name: "myProject_default"},
 		{ID: "def456", Name: "myProject_default"},
@@ -106,7 +108,11 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
 		Return(volume.ListResponse{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]moby.NetworkResource{{Name: "myProject_default"}}, nil)
+		Return([]moby.NetworkResource{
+			{
+				Name:   "myProject_default",
+				Labels: map[string]string{compose.NetworkLabel: "default"},
+			}}, nil)
 
 	stopOptions := containerType.StopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
@@ -118,7 +124,10 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "321", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "myProject_default")),
+		Filters: filters.NewArgs(
+			networkFilter("default"),
+			projectFilter(strings.ToLower(testProject)),
+		),
 	}).Return([]moby.NetworkResource{{ID: "abc123", Name: "myProject_default"}}, nil)
 	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(moby.NetworkResource{ID: "abc123"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
