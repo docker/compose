@@ -153,6 +153,15 @@ func RemovedEvent(id string) Event {
 	return NewEvent(id, Done, "Removed")
 }
 
+// SkippedEvent creates a new Skipped Event
+func SkippedEvent(id string, reason string) Event {
+	return Event{
+		ID:         id,
+		Status:     Warning,
+		StatusText: "Skipped: " + reason,
+	}
+}
+
 // NewEvent new event
 func NewEvent(id string, status EventStatus, statusText string) Event {
 	return Event{

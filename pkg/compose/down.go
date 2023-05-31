@@ -44,7 +44,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 	}, s.stdinfo())
 }
 
-func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
+func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error { //nolint:gocyclo
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -65,6 +65,12 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
+	// Check requested services exists in model
+	options.Services, err = checkSelectedServices(options, project)
+	if err != nil {
+		return err
+	}
+
 	if len(containers) > 0 {
 		resourceToRemove = true
 	}
@@ -73,7 +79,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err
-	})
+	}, WithRootNodesAndDown(options.Services))
 	if err != nil {
 		return err
 	}
@@ -109,6 +115,23 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		eg.Go(op)
 	}
 	return eg.Wait()
+}
+
+func checkSelectedServices(options api.DownOptions, project *types.Project) ([]string, error) {
+	var services []string
+	for _, service := range options.Services {
+		_, err := project.GetService(service)
+		if err != nil {
+			if options.Project != nil {
+				// ran with an explicit compose.yaml file, so we should not ignore
+				return nil, err
+			}
+			// ran without an explicit compose.yaml file, so can't distinguish typo vs container already removed
+		} else {
+			services = append(services, service)
+		}
+	}
+	return services, nil
 }
 
 func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
@@ -229,6 +252,10 @@ func (s *composeService) removeImage(ctx context.Context, image string, w progre
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
 	}
+	if errdefs.IsConflict(err) {
+		w.Event(progress.NewEvent(id, progress.Warning, "Resource is still in use"))
+		return nil
+	}
 	if errdefs.IsNotFound(err) {
 		w.Event(progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
 		return nil
@@ -242,6 +269,10 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 	err := s.apiClient().VolumeRemove(ctx, id, true)
 	if err == nil {
 		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
+		return nil
+	}
+	if errdefs.IsConflict(err) {
+		w.Event(progress.NewEvent(resource, progress.Warning, "Resource is still in use"))
 		return nil
 	}
 	if errdefs.IsNotFound(err) {

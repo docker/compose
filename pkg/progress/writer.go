@@ -21,12 +21,12 @@ import (
 	"io"
 	"sync"
 
-	"github.com/cloudflare/cfssl/log"
-	"github.com/docker/compose/v2/pkg/api"
-
 	"github.com/containerd/console"
 	"github.com/moby/term"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 // Writer can write multiple progress events
@@ -125,7 +125,7 @@ func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer
 	}
 	if Mode == ModeTTY {
 		if !isConsole {
-			log.Warning("Terminal is not a POSIX console")
+			logrus.Warn("Terminal is not a POSIX console")
 		} else {
 			return newTTYWriter(f, dryRun, progressTitle)
 		}

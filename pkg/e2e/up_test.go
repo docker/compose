@@ -23,13 +23,14 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/docker/compose/v2/pkg/utils"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
 
@@ -79,7 +80,7 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	defer cancel()
 
 	cmd, err := StartWithNewGroupID(ctx, testCmd, upOut, nil)
-	assert.NoError(t, err, "Failed to run compose up")
+	assert.NilError(t, err, "Failed to run compose up")
 
 	t.Log("Waiting for containers to be in running state")
 	upOut.RequireEventuallyContains(t, "hello app")
@@ -137,4 +138,18 @@ func TestUpWithDependencyExit(t *testing.T) {
 
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container dependencies-db-1 exited (1)"})
 	})
+}
+
+func TestScaleDoesntRecreate(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-scale"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml", "--project-name", projectName, "up", "-d")
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml", "--project-name", projectName, "up", "--scale", "simple=2", "-d")
+	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
+
 }

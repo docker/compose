@@ -106,11 +106,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		}
 	}
 
-	err = prepareServicesDependsOn(project)
-	if err != nil {
-		return err
-	}
-
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
 }
 
@@ -145,72 +140,6 @@ func prepareNetworks(project *types.Project) {
 		network.Labels = network.Labels.Add(api.VersionLabel, api.ComposeVersion)
 		project.Networks[k] = network
 	}
-}
-
-func prepareServicesDependsOn(p *types.Project) error {
-	allServices := types.Project{}
-	allServices.Services = p.AllServices()
-
-	for i, service := range p.Services {
-		var dependencies []string
-		networkDependency := getDependentServiceFromMode(service.NetworkMode)
-		if networkDependency != "" {
-			dependencies = append(dependencies, networkDependency)
-		}
-
-		ipcDependency := getDependentServiceFromMode(service.Ipc)
-		if ipcDependency != "" {
-			dependencies = append(dependencies, ipcDependency)
-		}
-
-		pidDependency := getDependentServiceFromMode(service.Pid)
-		if pidDependency != "" {
-			dependencies = append(dependencies, pidDependency)
-		}
-
-		for _, vol := range service.VolumesFrom {
-			spec := strings.Split(vol, ":")
-			if len(spec) == 0 {
-				continue
-			}
-			if spec[0] == "container" {
-				continue
-			}
-			dependencies = append(dependencies, spec[0])
-		}
-
-		for _, link := range service.Links {
-			dependencies = append(dependencies, strings.Split(link, ":")[0])
-		}
-
-		for d := range service.DependsOn {
-			dependencies = append(dependencies, d)
-		}
-
-		if len(dependencies) == 0 {
-			continue
-		}
-
-		// Verify dependencies exist in the project, whether disabled or not
-		deps, err := allServices.GetServices(dependencies...)
-		if err != nil {
-			return err
-		}
-
-		if service.DependsOn == nil {
-			service.DependsOn = make(types.DependsOnConfig)
-		}
-
-		for _, d := range deps {
-			if _, ok := service.DependsOn[d.Name]; !ok {
-				service.DependsOn[d.Name] = types.ServiceDependency{
-					Condition: types.ServiceConditionStarted,
-				}
-			}
-		}
-		p.Services[i] = service
-	}
-	return nil
 }
 
 func (s *composeService) ensureNetworks(ctx context.Context, networks types.Networks) error {
@@ -640,8 +569,8 @@ func setLimits(limits *types.Resource, resources *container.Resources) {
 			resources.NanoCPUs = int64(f * 1e9)
 		}
 	}
-	if limits.PIds > 0 {
-		resources.PidsLimit = &limits.PIds
+	if limits.Pids > 0 {
+		resources.PidsLimit = &limits.Pids
 	}
 }
 
@@ -743,7 +672,10 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 }
 
 func getDependentServiceFromMode(mode string) string {
-	if strings.HasPrefix(mode, types.NetworkModeServicePrefix) {
+	if strings.HasPrefix(
+		mode,
+		types.NetworkModeServicePrefix,
+	) {
 		return mode[len(types.NetworkModeServicePrefix):]
 	}
 	return ""

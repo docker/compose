@@ -130,9 +130,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		}
 
 		name := service.Name
-		bc := service.Build.Context
-
-		dockerIgnores, err := watch.LoadDockerIgnore(bc)
+		dockerIgnores, err := watch.LoadDockerIgnore(service.Build.Context)
 		if err != nil {
 			return err
 		}
@@ -150,12 +148,17 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			dotGitIgnore,
 		)
 
-		watcher, err := watch.NewWatcher([]string{bc}, ignore)
+		var paths []string
+		for _, trigger := range config.Watch {
+			paths = append(paths, trigger.Path)
+		}
+
+		watcher, err := watch.NewWatcher(paths, ignore)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintf(s.stdinfo(), "watching %s\n", bc)
+		fmt.Fprintf(s.stdinfo(), "watching %s\n", paths)
 		err = watcher.Start()
 		if err != nil {
 			return err

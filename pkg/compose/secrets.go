@@ -45,7 +45,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		}
 
 		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, moby.CopyToContainerOptions{
-			CopyUIDGID: true,
+			CopyUIDGID: config.UID != "" || config.GID != "",
 		})
 		if err != nil {
 			return err
