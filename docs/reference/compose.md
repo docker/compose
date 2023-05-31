@@ -171,7 +171,6 @@ If flags are explicitly set on the command line, the associated environment vari
 Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
 containers for the project.
 
-
 ### Use Dry Run mode to test your command
 
 Use `--dry-run` flag to test a command without changing your application stack state.
@@ -195,24 +194,4 @@ $ docker compose --dry-run up --build -d
 From the example above, you can see that the first step is to pull the image defined by `db` service, then build the `backend` service.  
 Next, the containers are created. The `db` service is started, and the `backend` and `proxy` wait until the `db` service is healthy before starting.
 
-Dry Run mode does not currently work with all commands. In particular, you cannot use Dry Run mode with a command that doesn't change the state of a Compose stack
-such as `ps`, `ls`, `logs` for example.  
-
-Here the list of commands supporting `--dry-run` flag:
-* build
-* cp
-* create
-* down
-* exec
-* kill
-* pause
-* pull
-* push
-* remove
-* restart
-* run
-* start
-* stop
-* unpause
-* up
-
+Dry Run mode works with almost all commands. You cannot use Dry Run mode with a command that doesn't change the state of a Compose stack such as `ps`, `ls`, `logs` for example.  
