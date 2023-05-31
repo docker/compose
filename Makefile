@@ -17,9 +17,10 @@ VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
 
 GO_LDFLAGS ?= -w -X ${PKG}/internal.Version=${VERSION}
 GO_BUILDTAGS ?= e2e
-
+DRIVE_PREFIX?=
 ifeq ($(OS),Windows_NT)
     DETECTED_OS = Windows
+    DRIVE_PREFIX=C:
 else
     DETECTED_OS = $(shell uname -s)
 endif
@@ -122,8 +123,8 @@ docs: ## generate documentation
 	$(eval $@_TMP_OUT := $(shell mktemp -d -t compose-output.XXXXXXXXXX))
 	$(BUILDX_CMD) bake --set "*.output=type=local,dest=$($@_TMP_OUT)" docs-update
 	rm -rf ./docs/internal
-	cp -R "$($@_TMP_OUT)"/out/* ./docs/
-	rm -rf "$($@_TMP_OUT)"/*
+	cp -R "$(DRIVE_PREFIX)$($@_TMP_OUT)"/out/* ./docs/
+	rm -rf "$(DRIVE_PREFIX)$($@_TMP_OUT)"/*
 
 .PHONY: validate-docs
 validate-docs: ## validate the doc does not change
