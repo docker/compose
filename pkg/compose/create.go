@@ -1034,9 +1034,13 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 		// NetworkInspect will match on ID prefix, so double check we get the expected one
 		// as looking for network named `db` we could erroneously matched network ID `db9086999caf`
 		if inspect.Name == n.Name || inspect.ID == n.Name {
-			if inspect.Labels[api.ProjectLabel] != expectedProjectLabel {
+			p, ok := inspect.Labels[api.ProjectLabel]
+			if !ok {
 				logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
 					"Set `external: true` to use an existing network", n.Name)
+			} else if p != expectedProjectLabel {
+				logrus.Warnf("a network with name %s exists but was not created for project %q.\n"+
+					"Set `external: true` to use an existing network", n.Name, expectedProjectLabel)
 			}
 			if inspect.Labels[api.NetworkLabel] != expectedNetworkLabel {
 				return fmt.Errorf("network %s was found but has incorrect label %s set to %q", n.Name, api.NetworkLabel, inspect.Labels[api.NetworkLabel])
