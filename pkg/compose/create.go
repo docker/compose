@@ -1197,7 +1197,7 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
 	}
 	if ok && p != project {
-		logrus.Warnf("volume %q already exists but was not created for project %q. Use `external: true` to use an existing volume", volume.Name, p)
+		logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, p, project)
 	}
 	return nil
 }
