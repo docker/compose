@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
+	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -45,6 +46,7 @@ type buildOptions struct {
 	noCache  bool
 	memory   cliopts.MemBytes
 	ssh      string
+	outputs  []string
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -58,6 +60,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}
 
 	return api.BuildOptions{
+		Outputs:  opts.outputs,
 		Pull:     opts.pull,
 		Push:     opts.push,
 		Progress: opts.progress,
@@ -76,7 +79,7 @@ var printerModes = []string{
 	buildx.PrinterModeQuiet,
 }
 
-func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -95,6 +98,13 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			if !utils.StringContains(printerModes, opts.progress) {
 				return fmt.Errorf("unsupported --progress value %q", opts.progress)
 			}
+			enabled, err := dockerCli.BuildKitEnabled()
+			if err != nil {
+				return err
+			}
+			if !enabled && len(opts.outputs) > 0 {
+				return fmt.Errorf("--output flag is not supported when BuildKit is disabled")
+			}
 			return nil
 		}),
 		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
@@ -111,6 +121,7 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.push, "push", false, "Push service images.")
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
+	cmd.Flags().StringArrayVar(&opts.outputs, "output", nil, "Output destination (format: \"type=local,dest=path\")")
 	cmd.Flags().StringVar(&opts.progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
 	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")

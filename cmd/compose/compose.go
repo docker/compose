@@ -254,7 +254,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
+func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
 	// filter out useless commandConn.CloseWrite warning message that can occur
 	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
 	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
@@ -285,7 +285,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				return cmd.Help()
 			}
 			if version {
-				return versionCommand(streams).Execute()
+				return versionCommand(dockerCli).Execute()
 			}
 			_ = cmd.Help()
 			return dockercli.StatusError{
@@ -323,11 +323,11 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 				ansi = v
 			}
 
-			formatter.SetANSIMode(streams, ansi)
+			formatter.SetANSIMode(dockerCli, ansi)
 
 			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
 				progress.NoColor()
-				formatter.SetANSIMode(streams, formatter.Never)
+				formatter.SetANSIMode(dockerCli, formatter.Never)
 			}
 
 			switch ansi {
@@ -384,27 +384,27 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 	}
 
 	c.AddCommand(
-		upCommand(&opts, streams, backend),
+		upCommand(&opts, dockerCli, backend),
 		downCommand(&opts, backend),
 		startCommand(&opts, backend),
 		restartCommand(&opts, backend),
 		stopCommand(&opts, backend),
-		psCommand(&opts, streams, backend),
-		listCommand(streams, backend),
-		logsCommand(&opts, streams, backend),
-		configCommand(&opts, streams, backend),
+		psCommand(&opts, dockerCli, backend),
+		listCommand(dockerCli, backend),
+		logsCommand(&opts, dockerCli, backend),
+		configCommand(&opts, dockerCli, backend),
 		killCommand(&opts, backend),
-		runCommand(&opts, streams, backend),
+		runCommand(&opts, dockerCli, backend),
 		removeCommand(&opts, backend),
-		execCommand(&opts, streams, backend),
+		execCommand(&opts, dockerCli, backend),
 		pauseCommand(&opts, backend),
 		unpauseCommand(&opts, backend),
-		topCommand(&opts, streams, backend),
-		eventsCommand(&opts, streams, backend),
-		portCommand(&opts, streams, backend),
-		imagesCommand(&opts, streams, backend),
-		versionCommand(streams),
-		buildCommand(&opts, backend),
+		topCommand(&opts, dockerCli, backend),
+		eventsCommand(&opts, dockerCli, backend),
+		portCommand(&opts, dockerCli, backend),
+		imagesCommand(&opts, dockerCli, backend),
+		versionCommand(dockerCli),
+		buildCommand(&opts, dockerCli, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),

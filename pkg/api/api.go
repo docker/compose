@@ -121,6 +121,8 @@ type BuildOptions struct {
 	SSHs []types.SSHKey
 	// Memory limit for the build container
 	Memory int64
+	// Outputs define custom output. format: "type=local,dest=path"
+	Outputs []string
 }
 
 // Apply mutates project according to build options

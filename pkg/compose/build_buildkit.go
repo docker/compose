@@ -70,7 +70,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, service string, op
 		return digest, nil
 	}
 
-	return "", fmt.Errorf("buildkit response is missing expected result for %s", service)
+	return "", nil
 }
 
 func (s composeService) dryRunBuildResponse(ctx context.Context, name string, options build.Options) map[string]*client.SolveResponse {

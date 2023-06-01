@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
@@ -116,8 +117,13 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
+		if len(options.Outputs) > 0 {
+			return nil
+		}
+		if digest == "" {
+			fmt.Errorf("buildkit response is missing image digest for %s", service)
+		}
 		builtIDs[idx] = digest
-
 		return nil
 	}, func(traversal *graphTraversal) {
 		traversal.maxConcurrency = s.maxConcurrency
@@ -335,17 +341,25 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 
 	imageLabels := getImageBuildLabels(project, service)
 
-	exports := []bclient.ExportEntry{{
-		Type: "docker",
-		Attrs: map[string]string{
-			"load": "true",
-			"push": fmt.Sprint(options.Push),
-		},
-	}}
-	if len(service.Build.Platforms) > 1 {
+	var exports []bclient.ExportEntry
+	switch {
+	case len(options.Outputs) > 0:
+		exports, err = buildflags.ParseOutputs(options.Outputs)
+		if err != nil {
+			return build.Options{}, err
+		}
+	case len(service.Build.Platforms) > 1:
 		exports = []bclient.ExportEntry{{
 			Type: "image",
 			Attrs: map[string]string{
+				"push": fmt.Sprint(options.Push),
+			},
+		}}
+	default:
+		exports = []bclient.ExportEntry{{
+			Type: "docker",
+			Attrs: map[string]string{
+				"load": "true",
 				"push": fmt.Sprint(options.Push),
 			},
 		}}
@@ -457,9 +471,14 @@ func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.
 	}
 
 	for _, buildPlatform := range service.Build.Platforms {
-		p, err := platforms.Parse(buildPlatform)
-		if err != nil {
-			return nil, err
+		var p specs.Platform
+		if strings.EqualFold(buildPlatform, "local") {
+			p = platforms.DefaultSpec()
+		} else {
+			p, err = platforms.Parse(buildPlatform)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if !utils.Contains(plats, p) {
 			plats = append(plats, p)

@@ -77,6 +77,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: output
+      value_type: stringArray
+      default_value: '[]'
+      description: 'Output destination (format: "type=local,dest=path")'
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: parallel
       value_type: bool
       default_value: "true"

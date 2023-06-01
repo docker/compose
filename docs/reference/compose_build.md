@@ -11,6 +11,7 @@ Build or rebuild services
 | `--dry-run`      |               |         | Execute command in dry run mode                                                                             |
 | `-m`, `--memory` | `bytes`       | `0`     | Set memory limit for the build container. Not supported by BuildKit.                                        |
 | `--no-cache`     |               |         | Do not use cache when building the image                                                                    |
+| `--output`       | `stringArray` |         | Output destination (format: "type=local,dest=path")                                                         |
 | `--progress`     | `string`      | `auto`  | Set type of progress output (auto, tty, plain, quiet)                                                       |
 | `--pull`         |               |         | Always attempt to pull a newer version of the image.                                                        |
 | `--push`         |               |         | Push service images.                                                                                        |
