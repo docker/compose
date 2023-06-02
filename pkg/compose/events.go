@@ -25,7 +25,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 
 	"github.com/docker/compose/v2/pkg/api"
-
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
@@ -67,8 +66,8 @@ func (s *composeService) Events(ctx context.Context, projectName string, options
 			err := options.Consumer(api.Event{
 				Timestamp:  timestamp,
 				Service:    service,
-				Container:  event.ID,
-				Status:     event.Status,
+				Container:  event.Actor.ID,
+				Status:     event.Action,
 				Attributes: attributes,
 			})
 			if err != nil {
