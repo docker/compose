@@ -1,247 +1,55 @@
 name: ci
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
-  push:
-    branches:
-      - 'v2'
-    tags:
-      - 'v*'
   pull_request:
-  workflow_dispatch:
-    inputs:
-      debug_enabled:
-        description: 'To run with tmate enter "debug_enabled"'
-        required: false
-        default: "false"
 
-env:
-  DESTDIR: "./bin"
-  DOCKER_CLI_VERSION: "20.10.17"
-
-permissions:
-  contents: read # to fetch code (actions/checkout)
-
+permissions: {}
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.platforms.outputs.matrix }}
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Create matrix
-        id: platforms
-        run: |
-          echo matrix=$(docker buildx bake binary-cross --print | jq -cr '.target."binary-cross".platforms') >> $GITHUB_OUTPUT
-      -
-        name: Show matrix
-        run: |
-          echo ${{ steps.platforms.outputs.matrix }}
+  open-pr:
+    permissions:
+      contents: write # to create branch (peter-evans/create-pull-request)
+      pull-requests: write # to create a PR (peter-evans/create-pull-request)
 
-  validate:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - lint
-          - validate-go-mod
-          - validate-headers
-          - validate-docs
     steps:
       -
-        name: Checkout
+        name: Checkout docs repo
         uses: actions/checkout@v3
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      -
-        name: Run
-        run: |
-          make ${{ matrix.target }}
-
-  binary:
-    runs-on: ubuntu-latest
-    needs:
-      - prepare
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: ${{ fromJson(needs.prepare.outputs.matrix) }}
-    steps:
+        with:
+          token: ${{ secrets.GHPAT_DOCS_DISPATCH }}
+          repository: docker/docs
+          ref: main
       -
         name: Prepare
         run: |
-          platform=${{ matrix.platform }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+          rm -rf ./_data/compose-cli/*
       -
         name: Build
-        uses: docker/bake-action@v2
+        uses: docker/build-push-action@v3
         with:
-          targets: release
-          set: |
-            *.platform=${{ matrix.platform }}
-            *.cache-from=type=gha,scope=binary-${{ env.PLATFORM_PAIR }}
-            *.cache-to=type=gha,scope=binary-${{ env.PLATFORM_PAIR }},mode=max
+          context: ${{ github.server_url }}/${{ github.repository }}.git#some-name
+          target: docs-reference
+          outputs: ./_data/compose-cli
       -
-        name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: compose
-          path: ${{ env.DESTDIR }}/*
-          if-no-files-found: error
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      -
-        name: Test
-        uses: docker/bake-action@v2
-        with:
-          targets: test
-          set: |
-            *.cache-from=type=gha,scope=test
-            *.cache-to=type=gha,scope=test
-      -
-        name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-
-  e2e:
-    runs-on: ubuntu-latest
-    env:
-      DESTDIR: "./bin/build"
-    strategy:
-      fail-fast: false
-      matrix:
-        mode:
-          - plugin
-          - standalone
-          - cucumber
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      -
-        name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version-file: 'go.mod'
-          check-latest: true
-          cache: true
-      -
-        name: Setup docker CLI
+        name: Update compose_version in _config.yml
         run: |
-          curl https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.tgz | tar xz
-          sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
+          sed -i "s|^compose_version\:.*|compose_version\: \"some-name\"|g" _config.yml
+          cat _config.yml | yq .compose_version
       -
-        name: Build
-        uses: docker/bake-action@v2
+        name: Commit changes
+        run: |
+          git add -A .
+      -
+        name: Create PR on docs repo
+        uses: peter-evans/create-pull-request@923ad837f191474af6b1721408744feb989a4c27 # v4.0.4
         with:
-          targets: binary-with-coverage
-          set: |
-            *.cache-from=type=gha,scope=binary-linux-amd64
-            *.cache-from=type=gha,scope=binary-e2e-${{ matrix.mode }}
-            *.cache-to=type=gha,scope=binary-e2e-${{ matrix.mode }},mode=max
-        env:
-          BUILD_TAGS: e2e
-      -
-        name: Setup tmate session
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
-        uses: mxschmitt/action-tmate@8b4e4ac71822ed7e0ad5fb3d1c33483e9e8fb270 # v3.11
-        with:
-          limit-access-to-actor: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      -
-        name: Test plugin mode
-        if: ${{ matrix.mode == 'plugin' }}
-        run: |
-          rm -rf ./covdatafiles
-          mkdir ./covdatafiles
-          make e2e-compose GOCOVERDIR=covdatafiles
-          go tool covdata textfmt -i=covdatafiles -o=coverage.out
-
-      -
-        name: Test standalone mode
-        if: ${{ matrix.mode == 'standalone' }}
-        run: |
-          rm -f /usr/local/bin/docker-compose
-          cp bin/build/docker-compose /usr/local/bin
-          make e2e-compose-standalone
-      -
-        name: Run cucumber tests
-        if: ${{ matrix.mode == 'cucumber'}}
-        run: |
-          make test-cucumber
-      -
-        name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-
-  release:
-    permissions:
-      contents: write # to create a release (ncipollo/release-action)
-
-    runs-on: ubuntu-latest
-    needs:
-      - binary
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Download artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: compose
-          path: ${{ env.DESTDIR }}
-      -
-        name: Create checksums
-        working-directory: ${{ env.DESTDIR }}
-        run: |
-          find . -type f -print0 | sort -z | xargs -r0 shasum -a 256 -b | sed 's# \*\./# *#' > $RUNNER_TEMP/checksums.txt
-          shasum -a 256 -U -c $RUNNER_TEMP/checksums.txt
-          mv $RUNNER_TEMP/checksums.txt .
-          cat checksums.txt | while read sum file; do echo "$sum $file" > ${file#\*}.sha256; done
-      -
-        name: License
-        run: cp packaging/* ${{ env.DESTDIR }}/
-      -
-        name: List artifacts
-        run: |
-          tree -nh ${{ env.DESTDIR }}
-      -
-        name: Check artifacts
-        run: |
-          find ${{ env.DESTDIR }} -type f -exec file -e ascii -- {} +
-      -
-        name: GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: ncipollo/release-action@58ae73b360456532aafd58ee170c045abbeaee37 # v1.10.0
-        with:
-          artifacts: ${{ env.DESTDIR }}/*
-          generateReleaseNotes: true
-          draft: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GHPAT_DOCS_DISPATCH }}
+          push-to-fork: docker-tools-robot/docker.github.io
+          commit-message: Update Compose reference API to some-name
+          signoff: true
+          branch: dispatch/compose-api-reference-some-name
+          delete-branch: true
+          title: Update Compose reference API to some-name
+          body: |
+            Update the Compose reference API documentation to keep in sync with the latest release `some-name`
+          draft: false
