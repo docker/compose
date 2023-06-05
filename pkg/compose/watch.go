@@ -314,25 +314,50 @@ func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project,
 			case <-ctx.Done():
 				return nil
 			case opt := <-needSync:
-				if fi, statErr := os.Stat(opt.HostPath); statErr == nil && !fi.IsDir() {
-					err := s.Copy(ctx, project.Name, api.CopyOptions{
-						Source:      opt.HostPath,
-						Destination: fmt.Sprintf("%s:%s", opt.Service, opt.ContainerPath),
-					})
-					if err != nil {
-						return err
+				service, err := project.GetService(opt.Service)
+				if err != nil {
+					return err
+				}
+				scale := 1
+				if service.Deploy != nil && service.Deploy.Replicas != nil {
+					scale = int(*service.Deploy.Replicas)
+				}
+
+				if fi, statErr := os.Stat(opt.HostPath); statErr == nil {
+					if fi.IsDir() {
+						for i := 1; i <= scale; i++ {
+							_, err := s.Exec(ctx, project.Name, api.RunOptions{
+								Service: opt.Service,
+								Command: []string{"mkdir", "-p", opt.ContainerPath},
+								Index:   i,
+							})
+							if err != nil {
+								logrus.Warnf("failed to create %q from %s: %v", opt.ContainerPath, opt.Service, err)
+							}
+						}
+						fmt.Fprintf(s.stdinfo(), "%s created\n", opt.ContainerPath)
+					} else {
+						err := s.Copy(ctx, project.Name, api.CopyOptions{
+							Source:      opt.HostPath,
+							Destination: fmt.Sprintf("%s:%s", opt.Service, opt.ContainerPath),
+						})
+						if err != nil {
+							return err
+						}
+						fmt.Fprintf(s.stdinfo(), "%s updated\n", opt.ContainerPath)
 					}
-					fmt.Fprintf(s.stdinfo(), "%s updated\n", opt.ContainerPath)
 				} else if errors.Is(statErr, fs.ErrNotExist) {
-					_, err := s.Exec(ctx, project.Name, api.RunOptions{
-						Service: opt.Service,
-						Command: []string{"rm", "-rf", opt.ContainerPath},
-						Index:   1,
-					})
-					if err != nil {
-						logrus.Warnf("failed to delete %q from %s: %v", opt.ContainerPath, opt.Service, err)
+					for i := 1; i <= scale; i++ {
+						_, err := s.Exec(ctx, project.Name, api.RunOptions{
+							Service: opt.Service,
+							Command: []string{"rm", "-rf", opt.ContainerPath},
+							Index:   i,
+						})
+						if err != nil {
+							logrus.Warnf("failed to delete %q from %s: %v", opt.ContainerPath, opt.Service, err)
+						}
 					}
-					fmt.Fprintf(s.stdinfo(), "%s deleted from container\n", opt.ContainerPath)
+					fmt.Fprintf(s.stdinfo(), "%s deleted from service\n", opt.ContainerPath)
 				}
 			}
 		}
