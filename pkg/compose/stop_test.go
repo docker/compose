@@ -50,7 +50,11 @@ func TestStopTimeout(t *testing.T) {
 			testContainer("service1", "456", false),
 			testContainer("service2", "789", false),
 		}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]moby.NetworkResource{}, nil)
