@@ -19,7 +19,6 @@ on:
         default: "false"
 
 env:
-  DESTDIR: "./bin"
   DOCKER_CLI_VERSION: "20.10.17"
 
 permissions:
@@ -103,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: compose
-          path: ${{ env.DESTDIR }}/*
+          path: ./bin/release/*
           if-no-files-found: error
 
   test:
@@ -124,13 +123,15 @@ jobs:
             *.cache-from=type=gha,scope=test
             *.cache-to=type=gha,scope=test
       -
-        name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        name: Gather coverage data
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-data-unit
+          path: bin/coverage/unit/
+          if-no-files-found: error
 
   e2e:
     runs-on: ubuntu-latest
-    env:
-      DESTDIR: "./bin/build"
     strategy:
       fail-fast: false
       matrix:
@@ -179,11 +180,17 @@ jobs:
         name: Test plugin mode
         if: ${{ matrix.mode == 'plugin' }}
         run: |
-          rm -rf ./covdatafiles
-          mkdir ./covdatafiles
-          make e2e-compose GOCOVERDIR=covdatafiles
-          go tool covdata textfmt -i=covdatafiles -o=coverage.out
-
+          rm -rf ./bin/coverage/e2e
+          mkdir -p ./bin/coverage/e2e
+          make e2e-compose GOCOVERDIR=bin/coverage/e2e TEST_FLAGS="-v"
+      -
+        name: Gather coverage data
+        if: ${{ matrix.mode == 'plugin' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-data-e2e
+          path: bin/coverage/e2e/
+          if-no-files-found: error
       -
         name: Test standalone mode
         if: ${{ matrix.mode == 'standalone' }}
@@ -196,9 +203,44 @@ jobs:
         if: ${{ matrix.mode == 'cucumber'}}
         run: |
           make test-cucumber
-      -
-        name: Upload coverage to Codecov
+
+  coverage:
+    runs-on: ubuntu-22.04
+    needs:
+      - test
+      - e2e
+    steps:
+      # codecov won't process the report without the source code available
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          check-latest: true
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-data-unit
+          path: coverage/unit
+      - name: Download E2E test coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-data-e2e
+          path: coverage/e2e
+      - name: Merge coverage reports
+        run: |
+          go tool covdata textfmt -i=./coverage/unit,./coverage/e2e -o ./coverage.txt
+      - name: Store coverage report in GitHub Actions
+        uses: actions/upload-artifact@v3
+        with:
+          name: go-covdata-txt
+          path: ./coverage.txt
+          if-no-files-found: error
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.txt
 
   release:
     permissions:
@@ -216,10 +258,10 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: compose
-          path: ${{ env.DESTDIR }}
+          path: bin/release
       -
         name: Create checksums
-        working-directory: ${{ env.DESTDIR }}
+        working-directory: bin/release
         run: |
           find . -type f -print0 | sort -z | xargs -r0 shasum -a 256 -b | sed 's# \*\./# *#' > $RUNNER_TEMP/checksums.txt
           shasum -a 256 -U -c $RUNNER_TEMP/checksums.txt
@@ -227,21 +269,21 @@ jobs:
           cat checksums.txt | while read sum file; do echo "$sum $file" > ${file#\*}.sha256; done
       -
         name: License
-        run: cp packaging/* ${{ env.DESTDIR }}/
+        run: cp packaging/* bin/release/
       -
         name: List artifacts
         run: |
-          tree -nh ${{ env.DESTDIR }}
+          tree -nh bin/release
       -
         name: Check artifacts
         run: |
-          find ${{ env.DESTDIR }} -type f -exec file -e ascii -- {} +
+          find bin/release -type f -exec file -e ascii -- {} +
       -
         name: GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: ncipollo/release-action@58ae73b360456532aafd58ee170c045abbeaee37 # v1.10.0
         with:
-          artifacts: ${{ env.DESTDIR }}/*
+          artifacts: bin/release/*
           generateReleaseNotes: true
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}

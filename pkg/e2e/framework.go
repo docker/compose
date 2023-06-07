@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -134,7 +135,7 @@ func initializePlugins(t testing.TB, configDir string) {
 	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
 		"Failed to create cli-plugins directory")
 	composePlugin, err := findExecutable(DockerComposeExecutableName)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		t.Logf("WARNING: docker-compose cli-plugin not found")
 	}
 
@@ -161,20 +162,21 @@ func dirContents(dir string) []string {
 }
 
 func findExecutable(executableName string) (string, error) {
-	_, filename, _, _ := runtime.Caller(0)
-	root := filepath.Join(filepath.Dir(filename), "..", "..")
-	buildPath := filepath.Join(root, "bin", "build")
-
-	bin, err := filepath.Abs(filepath.Join(buildPath, executableName))
-	if err != nil {
-		return "", err
+	bin := os.Getenv("COMPOSE_E2E_BIN_PATH")
+	if bin == "" {
+		_, filename, _, _ := runtime.Caller(0)
+		buildPath := filepath.Join(filepath.Dir(filename), "..", "..", "bin", "build")
+		var err error
+		bin, err = filepath.Abs(filepath.Join(buildPath, executableName))
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if _, err := os.Stat(bin); err == nil {
 		return bin, nil
 	}
-
-	return "", errors.Wrap(os.ErrNotExist, "executable not found")
+	return "", fmt.Errorf("looking for %q: %w", bin, fs.ErrNotExist)
 }
 
 func findPluginExecutable(pluginExecutableName string) (string, error) {

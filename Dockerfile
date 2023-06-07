@@ -84,8 +84,8 @@ RUN --mount=type=bind,target=. \
     --mount=type=bind,from=osxcross,src=/osxsdk,target=/xx-sdk \
     xx-go --wrap && \
     if [ "$(xx-info os)" == "darwin" ]; then export CGO_ENABLED=1; fi && \
-    make build GO_BUILDTAGS="$BUILD_TAGS" DESTDIR=/usr/bin && \
-    xx-verify --static /usr/bin/docker-compose
+    make build GO_BUILDTAGS="$BUILD_TAGS" DESTDIR=/out && \
+    xx-verify --static /out/docker-compose
 
 FROM build-base AS lint
 ARG BUILD_TAGS
@@ -100,11 +100,13 @@ ARG BUILD_TAGS
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
-    go test -tags "$BUILD_TAGS" -v -coverprofile=/tmp/coverage.txt -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') && \
-    go tool cover -func=/tmp/coverage.txt
+    rm -rf /tmp/coverage && \
+    mkdir -p /tmp/coverage && \
+    go test -tags "$BUILD_TAGS" -v -cover -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') -args -test.gocoverdir="/tmp/coverage" && \
+    go tool covdata percent -i=/tmp/coverage
 
 FROM scratch AS test-coverage
-COPY --from=test /tmp/coverage.txt /coverage.txt
+COPY --from=test --link /tmp/coverage /
 
 FROM base AS license-set
 ARG LICENSE_FILES
@@ -162,11 +164,11 @@ RUN --mount=target=/context \
 EOT
 
 FROM scratch AS binary-unix
-COPY --link --from=build /usr/bin/docker-compose /
+COPY --link --from=build /out/docker-compose /
 FROM binary-unix AS binary-darwin
 FROM binary-unix AS binary-linux
 FROM scratch AS binary-windows
-COPY --link --from=build /usr/bin/docker-compose /docker-compose.exe
+COPY --link --from=build /out/docker-compose /docker-compose.exe
 FROM binary-$TARGETOS AS binary
 # enable scanning for this stage
 ARG BUILDKIT_SBOM_SCAN_STAGE=true
