@@ -68,6 +68,24 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: cap-add
+      value_type: list
+      description: Add Linux capabilities
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: cap-drop
+      value_type: list
+      description: Drop Linux capabilities
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: detach
       shorthand: d
       value_type: bool

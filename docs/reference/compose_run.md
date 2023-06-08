@@ -8,6 +8,8 @@ Run a one-off command on a service.
 | Name                  | Type          | Default | Description                                                                       |
 |:----------------------|:--------------|:--------|:----------------------------------------------------------------------------------|
 | `--build`             |               |         | Build image before starting container.                                            |
+| `--cap-add`           | `list`        |         | Add Linux capabilities                                                            |
+| `--cap-drop`          | `list`        |         | Drop Linux capabilities                                                           |
 | `-d`, `--detach`      |               |         | Run container in background and print container ID                                |
 | `--dry-run`           |               |         | Execute command in dry run mode                                                   |
 | `--entrypoint`        | `string`      |         | Override the entrypoint of the image                                              |

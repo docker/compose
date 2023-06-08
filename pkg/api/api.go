@@ -305,6 +305,8 @@ type RunOptions struct {
 	WorkingDir        string
 	User              string
 	Environment       []string
+	CapAdd            []string
+	CapDrop           []string
 	Labels            types.Labels
 	Privileged        bool
 	UseNetworkAliases bool
