@@ -28,7 +28,7 @@ Create and start containers
 | `--remove-orphans`           |               |           | Remove containers for services not defined in the Compose file.                                          |
 | `-V`, `--renew-anon-volumes` |               |           | Recreate anonymous volumes instead of retrieving data from the previous containers.                      |
 | `--scale`                    | `stringArray` |           | Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.            |
-| `-t`, `--timeout`            | `int`         | `10`      | Use this timeout in seconds for container shutdown when attached or when containers are already running. |
+| `-t`, `--timeout`            | `int`         | `0`       | Use this timeout in seconds for container shutdown when attached or when containers are already running. |
 | `--timestamps`               |               |           | Show timestamps.                                                                                         |
 | `--wait`                     |               |           | Wait for services to be running\|healthy. Implies detached mode.                                         |
 | `--wait-timeout`             | `int`         | `0`       | timeout waiting for application to be running\|healthy.                                                  |

@@ -47,7 +47,7 @@ func stopCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := cmd.Flags()
-	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
+	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
 
 	return cmd
 }
