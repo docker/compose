@@ -25,13 +25,16 @@ variable "DOCS_FORMATS" {
   default = "md,yaml"
 }
 
-# Defines the output folder
+# Defines the output folder to override the default behavior.
+# See Makefile for details, this is generally only useful for
+# the packaging scripts and care should be taken to not break
+# them.
 variable "DESTDIR" {
   default = ""
 }
-function "bindir" {
+function "outdir" {
   params = [defaultdir]
-  result = DESTDIR != "" ? DESTDIR : "./bin/${defaultdir}"
+  result = DESTDIR != "" ? DESTDIR : "${defaultdir}"
 }
 
 # Special target: https://github.com/docker/metadata-action#bake-definition
@@ -84,23 +87,23 @@ target "vendor-update" {
 target "test" {
   inherits = ["_common"]
   target = "test-coverage"
-  output = [bindir("coverage")]
+  output = [outdir("./bin/coverage/unit")]
 }
 
 target "binary-with-coverage" {
   inherits = ["_common"]
   target = "binary"
   args = {
-    BUILD_FLAGS = "-cover"
+    BUILD_FLAGS = "-cover -covermode=atomic"
   }
-  output = [bindir("build")]
+  output = [outdir("./bin/build")]
   platforms = ["local"]
 }
 
 target "binary" {
   inherits = ["_common"]
   target = "binary"
-  output = [bindir("build")]
+  output = [outdir("./bin/build")]
   platforms = ["local"]
 }
 
@@ -124,7 +127,7 @@ target "binary-cross" {
 target "release" {
   inherits = ["binary-cross"]
   target = "release"
-  output = [bindir("release")]
+  output = [outdir("./bin/release")]
 }
 
 target "docs-validate" {

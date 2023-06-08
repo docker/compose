@@ -1,0 +1,21 @@
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        informational: true
+
+comment:
+  require_changes: true
+
+ignore:
+  - "packaging"
+  - "docs"
+  - "bin"
+  - "e2e"
+  - "pkg/e2e"
+  - "**/*_test.go"
