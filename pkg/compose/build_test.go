@@ -44,7 +44,7 @@ func TestPrepareProjectForBuild(t *testing.T) {
 		}
 
 		s := &composeService{}
-		err := s.prepareProjectForBuild(&project, nil)
+		_, err := s.prepareProjectForBuild(&project, nil)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, project.Services[0].Build.Platforms, types.StringList{"alice/32"})
 	})
@@ -70,7 +70,7 @@ func TestPrepareProjectForBuild(t *testing.T) {
 		}
 
 		s := &composeService{}
-		err := s.prepareProjectForBuild(&project, nil)
+		_, err := s.prepareProjectForBuild(&project, nil)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, project.Services[0].Build.Platforms, types.StringList{"linux/amd64"})
 	})
@@ -89,7 +89,7 @@ func TestPrepareProjectForBuild(t *testing.T) {
 		}
 
 		s := &composeService{}
-		err := s.prepareProjectForBuild(&project, map[string]string{"foo": "exists"})
+		_, err := s.prepareProjectForBuild(&project, map[string]string{"foo": "exists"})
 		assert.NilError(t, err)
 		assert.Check(t, project.Services[0].Build == nil)
 	})
@@ -115,7 +115,7 @@ func TestPrepareProjectForBuild(t *testing.T) {
 		}
 
 		s := &composeService{}
-		err := s.prepareProjectForBuild(&project, nil)
+		_, err := s.prepareProjectForBuild(&project, nil)
 		assert.Check(t, err != nil)
 	})
 }
