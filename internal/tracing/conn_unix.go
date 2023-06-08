@@ -1,3 +1,5 @@
+//go:build !windows
+
 /*
    Copyright 2023 Docker Compose CLI authors
 
@@ -14,9 +16,29 @@
    limitations under the License.
 */
 
-package internal
+package tracing
 
-var (
-	// Version is the version of the CLI injected in compilation time
-	Version = "dev"
+import (
+	"context"
+	"fmt"
+	"net"
+	"strings"
+	"syscall"
 )
+
+const maxUnixSocketPathSize = len(syscall.RawSockaddrUnix{}.Path)
+
+func DialInMemory(ctx context.Context, addr string) (net.Conn, error) {
+	if !strings.HasPrefix(addr, "unix://") {
+		return nil, fmt.Errorf("not a Unix socket address: %s", addr)
+	}
+	addr = strings.TrimPrefix(addr, "unix://")
+
+	if len(addr) > maxUnixSocketPathSize {
+		//goland:noinspection GoErrorStringFormat
+		return nil, fmt.Errorf("Unix socket address is too long: %s", addr)
+	}
+
+	var d net.Dialer
+	return d.DialContext(ctx, "unix", addr)
+}

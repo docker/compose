@@ -14,9 +14,16 @@
    limitations under the License.
 */
 
-package internal
+package tracing
 
-var (
-	// Version is the version of the CLI injected in compilation time
-	Version = "dev"
+import (
+	"go.opentelemetry.io/otel"
 )
+
+// skipErrors is a no-op otel.ErrorHandler.
+type skipErrors struct{}
+
+// Handle does nothing, ignoring any errors passed to it.
+func (skipErrors) Handle(_ error) {}
+
+var _ otel.ErrorHandler = skipErrors{}
