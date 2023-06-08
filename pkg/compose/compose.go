@@ -26,6 +26,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/docker/api/types/volume"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/cli/cli/command"
@@ -230,7 +232,10 @@ SERVICES:
 }
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
-	volumes, err := s.apiClient().VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+	opts := volume.ListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+	}
+	volumes, err := s.apiClient().VolumeList(ctx, opts)
 	if err != nil {
 		return nil, err
 	}

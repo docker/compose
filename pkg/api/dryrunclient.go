@@ -344,7 +344,7 @@ func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, op
 	return d.apiClient.ContainerCommit(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]containerType.ContainerChangeResponseItem, error) {
+func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]containerType.FilesystemChange, error) {
 	return d.apiClient.ContainerDiff(ctx, container)
 }
 
@@ -616,7 +616,7 @@ func (d *DryRunClient) Info(ctx context.Context) (moby.Info, error) {
 	return d.apiClient.Info(ctx)
 }
 
-func (d *DryRunClient) RegistryLogin(ctx context.Context, auth moby.AuthConfig) (registry.AuthenticateOKBody, error) {
+func (d *DryRunClient) RegistryLogin(ctx context.Context, auth registry.AuthConfig) (registry.AuthenticateOKBody, error) {
 	return d.apiClient.RegistryLogin(ctx, auth)
 }
 
@@ -636,8 +636,8 @@ func (d *DryRunClient) VolumeInspectWithRaw(ctx context.Context, volumeID string
 	return d.apiClient.VolumeInspectWithRaw(ctx, volumeID)
 }
 
-func (d *DryRunClient) VolumeList(ctx context.Context, filter filters.Args) (volume.ListResponse, error) {
-	return d.apiClient.VolumeList(ctx, filter)
+func (d *DryRunClient) VolumeList(ctx context.Context, opts volume.ListOptions) (volume.ListResponse, error) {
+	return d.apiClient.VolumeList(ctx, opts)
 }
 
 func (d *DryRunClient) VolumesPrune(ctx context.Context, pruneFilter filters.Args) (moby.VolumesPruneReport, error) {

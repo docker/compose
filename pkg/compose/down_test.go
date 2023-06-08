@@ -53,7 +53,11 @@ func TestDown(t *testing.T) {
 			testContainer("service2", "789", false),
 			testContainer("service_orphan", "321", true),
 		}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
@@ -105,7 +109,11 @@ func TestDownRemoveOrphans(t *testing.T) {
 			testContainer("service2", "789", false),
 			testContainer("service_orphan", "321", true),
 		}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]moby.NetworkResource{
@@ -147,7 +155,11 @@ func TestDownRemoveVolumes(t *testing.T) {
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{testContainer("service1", "123", false)}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{
 			Volumes: []*volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
@@ -280,7 +292,11 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{container}, nil)
 
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{
 			Volumes: []*volume.Volume{{Name: "myProject_volume"}},
 		}, nil)

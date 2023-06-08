@@ -325,5 +325,5 @@ func resolveLocalPath(localPath string) (absPath string, err error) {
 	if absPath, err = filepath.Abs(localPath); err != nil {
 		return
 	}
-	return archive.PreserveTrailingDotOrSeparator(absPath, localPath, filepath.Separator), nil
+	return archive.PreserveTrailingDotOrSeparator(absPath, localPath), nil
 }
