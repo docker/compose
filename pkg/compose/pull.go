@@ -166,11 +166,13 @@ func imageAlreadyPresent(serviceImage string, localImages map[string]string) boo
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig,
 	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
-	w.Event(progress.Event{
-		ID:     service.Name,
-		Status: progress.Working,
-		Text:   "Pulling",
-	})
+	if !quietPull {
+		w.Event(progress.Event{
+			ID:     service.Name,
+			Status: progress.Working,
+			Text:   "Pulling",
+		})
+	}
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
 		return "", err
@@ -227,12 +229,13 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			toPullProgressEvent(service.Name, jm, w)
 		}
 	}
-	w.Event(progress.Event{
-		ID:     service.Name,
-		Status: progress.Done,
-		Text:   "Pulled",
-	})
-
+	if !quietPull {
+		w.Event(progress.Event{
+			ID:     service.Name,
+			Status: progress.Done,
+			Text:   "Pulled",
+		})
+	}
 	inspected, _, err := s.apiClient().ImageInspectWithRaw(ctx, service.Image)
 	if err != nil {
 		return "", err
