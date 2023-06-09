@@ -131,7 +131,7 @@ jobs:
         id: generate_token
         uses: tibdex/github-app-token@v1
         with:
-          app_id: ${{ variables.DOCKERDESKTOP_APPID }}
+          app_id: ${{ env.DOCKERDESKTOP_APPID }}
           private_key: ${{ secrets.DOCKERDESKTOP_APP_PRIVATEKEY }}
       -
         name: Trigger Docker Desktop e2e with edge version
