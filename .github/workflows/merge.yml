@@ -77,7 +77,7 @@ jobs:
   bin-image:
     runs-on: ubuntu-22.04
     outputs:
-      digest: ${{ fromJSON(steps.bake.outputs.metadata).image['containerimage.digest'] }}
+      digest: ${{ fromJSON(steps.bake.outputs.metadata).image-cross['containerimage.digest'] }}
     steps:
       -
         name: Checkout
