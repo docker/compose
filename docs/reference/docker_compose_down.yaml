@@ -41,7 +41,7 @@ options:
     - option: timeout
       shorthand: t
       value_type: int
-      default_value: "10"
+      default_value: "0"
       description: Specify a shutdown timeout in seconds
       deprecated: false
       hidden: false
