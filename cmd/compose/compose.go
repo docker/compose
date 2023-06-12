@@ -26,6 +26,7 @@ import (
 	"strings"
 	"syscall"
 
+	buildx "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
 
 	"github.com/compose-spec/compose-go/cli"
@@ -43,7 +44,7 @@ import (
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
-	"github.com/docker/compose/v2/pkg/progress"
+	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
@@ -273,6 +274,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		version  bool
 		parallel int
 		dryRun   bool
+		progress string
 	)
 	c := &cobra.Command{
 		Short:            "Docker Compose",
@@ -326,16 +328,36 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 			formatter.SetANSIMode(streams, ansi)
 
 			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
-				progress.NoColor()
+				ui.NoColor()
 				formatter.SetANSIMode(streams, formatter.Never)
 			}
 
 			switch ansi {
 			case "never":
-				progress.Mode = progress.ModePlain
+				ui.Mode = ui.ModePlain
 			case "always":
-				progress.Mode = progress.ModeTTY
+				ui.Mode = ui.ModeTTY
 			}
+
+			switch progress {
+			case ui.ModeAuto:
+				ui.Mode = ui.ModeAuto
+			case ui.ModeTTY:
+				if ansi == "never" {
+					return fmt.Errorf("can't use --progress tty while ANSI support is disabled")
+				}
+				ui.Mode = ui.ModeTTY
+			case ui.ModePlain:
+				if ansi == "always" {
+					return fmt.Errorf("can't use --progress plain while ANSI support is forced")
+				}
+				ui.Mode = ui.ModePlain
+			case ui.ModeQuiet, "none":
+				ui.Mode = ui.ModeQuiet
+			default:
+				return fmt.Errorf("unsupported --progress value %q", progress)
+			}
+
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
 					return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
@@ -404,7 +426,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		portCommand(&opts, streams, backend),
 		imagesCommand(&opts, streams, backend),
 		versionCommand(streams),
-		buildCommand(&opts, backend),
+		buildCommand(&opts, &progress, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),
@@ -424,6 +446,8 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 			return []string{"yaml", "yml"}, cobra.ShellCompDirectiveFilterFileExt
 		},
 	)
+
+	c.Flags().StringVar(&progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 
 	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
 	c.Flags().IntVar(&parallel, "parallel", -1, `Control max parallelism, -1 for unlimited`)
@@ -459,4 +483,11 @@ func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
 		}
 	}
 	return nil
+}
+
+var printerModes = []string{
+	ui.ModeAuto,
+	ui.ModeTTY,
+	ui.ModePlain,
+	ui.ModeQuiet,
 }

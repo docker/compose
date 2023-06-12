@@ -107,6 +107,8 @@ const (
 	ModeTTY = "tty"
 	// ModePlain dump raw events to output
 	ModePlain = "plain"
+	// ModeQuiet don't display events
+	ModeQuiet = "quiet"
 )
 
 // Mode define how progress should be rendered, either as ModePlain or ModeTTY
@@ -118,6 +120,9 @@ func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer
 	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
 	if !ok {
 		dryRun = false
+	}
+	if Mode == ModeQuiet {
+		return quiet{}, nil
 	}
 	f, isConsole := out.(console.File) // see https://github.com/docker/compose/issues/10560
 	if Mode == ModeAuto && isTerminal && isConsole {

@@ -46,6 +46,7 @@ Define and run multi-container applications with Docker.
 | `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
 | `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |
 | `--profile`            | `stringArray` |         | Specify a profile to enable                                                                         |
+| `--progress`           | `string`      | `auto`  | Set type of progress output (auto, tty, plain, quiet)                                               |
 | `--project-directory`  | `string`      |         | Specify an alternate working directory<br>(default: the path of the, first specified, Compose file) |
 | `-p`, `--project-name` | `string`      |         | Project name                                                                                        |
 
