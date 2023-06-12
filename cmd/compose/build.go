@@ -27,8 +27,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
 	cliopts "github.com/docker/cli/opts"
-	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
+	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -37,14 +36,13 @@ import (
 type buildOptions struct {
 	*ProjectOptions
 	composeOptions
-	quiet    bool
-	pull     bool
-	push     bool
-	progress string
-	args     []string
-	noCache  bool
-	memory   cliopts.MemBytes
-	ssh      string
+	quiet   bool
+	pull    bool
+	push    bool
+	args    []string
+	noCache bool
+	memory  cliopts.MemBytes
+	ssh     string
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -60,7 +58,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	return api.BuildOptions{
 		Pull:     opts.pull,
 		Push:     opts.push,
-		Progress: opts.progress,
+		Progress: ui.Mode,
 		Args:     types.NewMappingWithEquals(opts.args),
 		NoCache:  opts.noCache,
 		Quiet:    opts.quiet,
@@ -69,14 +67,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}, nil
 }
 
-var printerModes = []string{
-	buildx.PrinterModeAuto,
-	buildx.PrinterModeTty,
-	buildx.PrinterModePlain,
-	buildx.PrinterModeQuiet,
-}
-
-func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -85,15 +76,12 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Short: "Build or rebuild services",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.quiet {
-				opts.progress = buildx.PrinterModeQuiet
+				ui.Mode = ui.ModeQuiet
 				devnull, err := os.Open(os.DevNull)
 				if err != nil {
 					return err
 				}
 				os.Stdout = devnull
-			}
-			if !utils.StringContains(printerModes, opts.progress) {
-				return fmt.Errorf("unsupported --progress value %q", opts.progress)
 			}
 			return nil
 		}),
@@ -101,8 +89,8 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			if cmd.Flags().Changed("ssh") && opts.ssh == "" {
 				opts.ssh = "default"
 			}
-			if progress.Mode == progress.ModePlain && !cmd.Flags().Changed("progress") {
-				opts.progress = buildx.PrinterModePlain
+			if cmd.Flags().Changed("progress") && opts.ssh == "" {
+				fmt.Fprint(os.Stderr, "--progress is a global compose flag, better use `docker compose --progress xx build ...")
 			}
 			return runBuild(ctx, backend, opts, args)
 		}),
@@ -111,7 +99,6 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.push, "push", false, "Push service images.")
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
-	cmd.Flags().StringVar(&opts.progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
 	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
@@ -124,6 +111,8 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
 	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
 	cmd.Flags().VarP(&opts.memory, "memory", "m", "Set memory limit for the build container. Not supported by BuildKit.")
+	cmd.Flags().StringVar(progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
+	cmd.Flags().MarkHidden("progress") //nolint:errcheck
 
 	return cmd
 }
