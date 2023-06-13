@@ -77,7 +77,7 @@ jobs:
   bin-image:
     runs-on: ubuntu-22.04
     outputs:
-      tags: ${{ steps.meta.outputs.tags }}
+      digest: ${{ fromJSON(steps.bake.outputs.metadata).image-cross['containerimage.digest'] }}
     steps:
       -
         name: Checkout
@@ -145,6 +145,6 @@ jobs:
               workflow_id: 'compose-edge-integration.yml',
               ref: 'compose-edge-integration'
               inputs: {
-                "image-tag": '${{ fromJSON(needs.bin-image.bake.outputs.metadata).image-cross["containerimage.digest"] }}'
+                "image-tag": "${{ needs.bin-image.outputs.digest }}"
               }
             })
