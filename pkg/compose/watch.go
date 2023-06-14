@@ -104,7 +104,11 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			return err
 		}
 
-		if config != nil && len(config.Watch) > 0 && service.Build == nil {
+		if config == nil {
+			continue
+		}
+
+		if len(config.Watch) > 0 && service.Build == nil {
 			// service configured with watchers but no build section
 			return fmt.Errorf("can't watch service %q without a build context", service.Name)
 		}
@@ -116,17 +120,6 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 		if len(services) == 0 && service.Build == nil {
 			continue
-		}
-
-		if config == nil {
-			config = &DevelopmentConfig{
-				Watch: []Trigger{
-					{
-						Path:   service.Build.Context,
-						Action: WatchActionRebuild,
-					},
-				},
-			}
 		}
 
 		name := service.Name
