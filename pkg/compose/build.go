@@ -38,6 +38,7 @@ import (
 	"github.com/moby/buildkit/util/entitlements"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -448,6 +449,9 @@ func addSecretsConfig(project *types.Project, service types.ServiceConfig) (sess
 			})
 		default:
 			return nil, fmt.Errorf("build.secrets only supports environment or file-based secrets: %q", secret.Source)
+		}
+		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
+			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported by BuildKit, they will be ignored")
 		}
 	}
 	store, err := secretsprovider.NewStore(sources)
