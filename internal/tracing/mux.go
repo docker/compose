@@ -18,7 +18,6 @@ package tracing
 
 import (
 	"context"
-	"log"
 
 	"github.com/hashicorp/go-multierror"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -36,10 +35,7 @@ func (m MuxExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			return exporter.ExportSpans(ctx, spans)
 		})
 	}
-	if err := eg.Wait(); err != nil {
-		log.Fatal(err)
-	}
-	return nil
+	return eg.Wait()
 }
 
 func (m MuxExporter) Shutdown(ctx context.Context) error {
