@@ -133,6 +133,7 @@ jobs:
         with:
           app_id: ${{ vars.DOCKERDESKTOP_APP_ID }}
           private_key: ${{ secrets.DOCKERDESKTOP_APP_PRIVATEKEY }}
+          repository: docker/${{ secrets.DOCKERDESKTOP_REPO }}
       -
         name: Trigger Docker Desktop e2e with edge version
         uses: actions/github-script@v6
@@ -141,7 +142,7 @@ jobs:
           script: |
             await github.rest.actions.createWorkflowDispatch({
               owner: 'docker',
-              repo: 'pinata',
+              repo: '${{ secrets.DOCKERDESKTOP_REPO }}',
               workflow_id: 'compose-edge-integration.yml',
               ref: 'compose-edge-integration'
               inputs: {
