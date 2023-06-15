@@ -24,6 +24,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/compose/v2/internal"
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/buildkit/util/tracing/detect"
 	_ "github.com/moby/buildkit/util/tracing/detect/delegated" //nolint:blank-imports
@@ -103,6 +106,8 @@ func InitProvider(dockerCli command.Cli) (ShutdownFunc, error) {
 		ctx,
 		resource.WithAttributes(
 			semconv.ServiceName("compose"),
+			semconv.ServiceVersion(internal.Version),
+			attribute.String("docker.context", dockerCli.CurrentContext()),
 		),
 	)
 	if err != nil {

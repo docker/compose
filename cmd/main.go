@@ -17,55 +17,35 @@
 package main
 
 import (
-	"context"
 	"os"
-	"time"
 
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
-	"github.com/pkg/errors"
+	"github.com/docker/compose/v2/cmd/cmdtrace"
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/docker/compose/v2/cmd/compatibility"
 	commands "github.com/docker/compose/v2/cmd/compose"
 	"github.com/docker/compose/v2/internal"
-	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 )
 
 func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
-		var tracingShutdown tracing.ShutdownFunc
-		var cmdSpan trace.Span
-
 		serviceProxy := api.NewServiceProxy().WithService(compose.NewComposeService(dockerCli))
 		cmd := commands.RootCommand(dockerCli, serviceProxy)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+			// initialize the dockerCli instance
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
-			// the call to plugin.PersistentPreRunE is what actually
-			// initializes the command.Cli instance, so this is the earliest
-			// that tracing can be practically initialized (in the future,
-			// this could ideally happen in coordination with docker/cli)
-			tracingShutdown, _ = tracing.InitTracing(dockerCli)
-
-			ctx := cmd.Context()
-			ctx, cmdSpan = tracing.Tracer.Start(
-				ctx, "cli/"+cmd.Name(),
-				trace.WithAttributes(
-					attribute.String("compose.version", internal.Version),
-					attribute.String("docker.context", dockerCli.CurrentContext()),
-				),
-			)
-			cmd.SetContext(ctx)
+			// TODO(milas): add an env var to enable logging from the
+			// OTel components for debugging purposes
+			_ = cmdtrace.Setup(cmd, dockerCli)
 
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
@@ -73,30 +53,6 @@ func pluginMain() {
 			return nil
 		}
 
-		// manually wrap RunE instead of using PersistentPostRunE because the
-		// latter only runs when RunE does _not_ return an error, but the
-		// tracing clean-up logic should always be invoked
-		originalPersistentPostRunE := cmd.PersistentPostRunE
-		cmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) (err error) {
-			defer func() {
-				if cmdSpan != nil {
-					if err != nil && !errors.Is(err, context.Canceled) {
-						cmdSpan.SetStatus(codes.Error, "CLI command returned error")
-						cmdSpan.RecordError(err)
-					}
-					cmdSpan.End()
-				}
-				if tracingShutdown != nil {
-					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-					defer cancel()
-					_ = tracingShutdown(ctx)
-				}
-			}()
-			if originalPersistentPostRunE != nil {
-				return originalPersistentPostRunE(cmd, args)
-			}
-			return nil
-		}
 		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 			return dockercli.StatusError{
 				StatusCode: compose.CommandSyntaxFailure.ExitCode,
