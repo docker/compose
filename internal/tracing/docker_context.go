@@ -94,6 +94,10 @@ func ConfigFromDockerContext(st store.Store, name string) (OTLPConfig, error) {
 	case map[string]interface{}:
 		otelCfg = m[otelConfigFieldName]
 	}
+	if otelCfg == nil {
+		return OTLPConfig{}, nil
+	}
+
 	otelMap, ok := otelCfg.(map[string]interface{})
 	if !ok {
 		return OTLPConfig{}, fmt.Errorf(
