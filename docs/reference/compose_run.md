@@ -34,7 +34,7 @@ Run a one-off command on a service.
 
 Runs a one-time command against a service.
 
-the following command starts the `web` service and runs `bash` as its command:
+The following command starts the `web` service and runs `bash` as its command:
 
 ```console
 $ docker compose run web bash
