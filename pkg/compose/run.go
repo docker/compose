@@ -118,6 +118,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	if len(opts.User) > 0 {
 		service.User = opts.User
 	}
+
 	if len(opts.CapAdd) > 0 {
 		service.CapAdd = append(service.CapAdd, opts.CapAdd...)
 		service.CapDrop = utils.Remove(service.CapDrop, opts.CapAdd...)
