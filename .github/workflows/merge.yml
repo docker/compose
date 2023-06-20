@@ -144,7 +144,7 @@ jobs:
               owner: 'docker',
               repo: '${{ secrets.DOCKERDESKTOP_REPO }}',
               workflow_id: 'compose-edge-integration.yml',
-              ref: 'compose-edge-integration',
+              ref: 'main',
               inputs: {
                 "image-tag": "${{ needs.bin-image.outputs.digest }}"
               }
