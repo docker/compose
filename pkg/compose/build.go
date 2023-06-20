@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/buildx/controller/pb"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
@@ -365,8 +367,8 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 			DockerfilePath:   dockerFilePath(service.Build.Context, service.Build.Dockerfile),
 			NamedContexts:    toBuildContexts(service.Build.AdditionalContexts),
 		},
-		CacheFrom:   cacheFrom,
-		CacheTo:     cacheTo,
+		CacheFrom:   convertCacheOptions(cacheFrom),
+		CacheTo:     convertCacheOptions(cacheTo),
 		NoCache:     service.Build.NoCache,
 		Pull:        service.Build.Pull,
 		BuildArgs:   buildArgs,
@@ -530,4 +532,19 @@ func useDockerDefaultOrServicePlatform(project *types.Project, service types.Ser
 		return plats, err
 	}
 	return plats, nil
+}
+
+func convertCacheOptions(in []*pb.CacheOptionsEntry) []bclient.CacheOptionsEntry {
+	out := make([]bclient.CacheOptionsEntry, len(in))
+	for i := range in {
+		attrs := make(map[string]string, len(in[i].Attrs))
+		for k, v := range in[i].Attrs {
+			attrs[k] = v
+		}
+		out[i] = bclient.CacheOptionsEntry{
+			Type:  in[i].Type,
+			Attrs: attrs,
+		}
+	}
+	return out
 }
