@@ -3,7 +3,7 @@ module github.com/docker/compose/v2
 go 1.20
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.3.6
+	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go v1.14.0
