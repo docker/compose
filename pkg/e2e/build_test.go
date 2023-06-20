@@ -386,7 +386,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 17,
-			Err:      `multiple platforms feature is currently not supported for docker driver. Please switch to a different driver (eg. "docker buildx create --use")`,
+			Err:      `Multiple platforms feature is currently not supported for docker driver. Please switch to a different driver (eg. "docker buildx create --use")`,
 		})
 	})
 
