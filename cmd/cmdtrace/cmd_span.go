@@ -110,7 +110,8 @@ func wrapRunE(c *cobra.Command, cmdSpan trace.Span, tracingShutdown tracing.Shut
 	}
 }
 
-// commandName returns the path components for a given command.
+// commandName returns the path components in reverse order by
+// the given command.
 //
 // The root Compose command and anything before (i.e. "docker")
 // are not included.
@@ -121,10 +122,11 @@ func wrapRunE(c *cobra.Command, cmdSpan trace.Span, tracingShutdown tracing.Shut
 func commandName(cmd *cobra.Command) []string {
 	var name []string
 	for c := cmd; c != nil; c = c.Parent() {
-		if c.Name() == commands.PluginName {
+		if nm := c.Name(); nm == commands.PluginName {
 			break
+		} else {
+			name = append(name, nm)
 		}
-		name = append(name, c.Name())
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(name)))
 	return name
