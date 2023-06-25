@@ -277,7 +277,7 @@ networks:
 	})
 }
 
-func TestStopWithDependeciesAttached(t *testing.T) {
+func TestStopWithDependenciesAttached(t *testing.T) {
 	const projectName = "compose-e2e-stop-with-deps"
 	c := NewParallelCLI(t, WithEnv("COMMAND=echo hello"))
 

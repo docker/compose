@@ -68,7 +68,7 @@ type Notify interface {
 // - Watch /src/repo, but ignore /src/repo/.git
 // - Watch /src/repo, but ignore everything in /src/repo/bazel-bin except /src/repo/bazel-bin/app-binary
 //
-// The PathMatcher inteface helps us manage these ignores.
+// The PathMatcher interface helps us manage these ignores.
 type PathMatcher interface {
 	Matches(file string) (bool, error)
 
