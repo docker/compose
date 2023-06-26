@@ -143,6 +143,10 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 		var paths []string
 		for _, trigger := range config.Watch {
+			if checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
+				continue
+			}
 			paths = append(paths, trigger.Path)
 		}
 
@@ -382,4 +386,13 @@ func debounce(ctx context.Context, clock clockwork.Clock, delay time.Duration, i
 			svc.Add(e.HostPath)
 		}
 	}
+}
+
+func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolumeConfig) bool {
+	for _, volume := range volumes {
+		if volume.Bind != nil && strings.HasPrefix(watchPath, volume.Source) {
+			return true
+		}
+	}
+	return false
 }
