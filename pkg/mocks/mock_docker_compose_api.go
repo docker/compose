@@ -423,6 +423,21 @@ func (mr *MockServiceMockRecorder) Viz(ctx, project, options interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Viz", reflect.TypeOf((*MockService)(nil).Viz), ctx, project, options)
 }
 
+// Wait mocks base method.
+func (m *MockService) Wait(ctx context.Context, projectName string, options api.WaitOptions) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Wait", ctx, projectName, options)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Wait indicates an expected call of Wait.
+func (mr *MockServiceMockRecorder) Wait(ctx, projectName, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockService)(nil).Wait), ctx, projectName, options)
+}
+
 // Watch mocks base method.
 func (m *MockService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
 	m.ctrl.T.Helper()

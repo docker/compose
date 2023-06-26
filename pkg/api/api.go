@@ -84,6 +84,15 @@ type Service interface {
 	Watch(ctx context.Context, project *types.Project, services []string, options WatchOptions) error
 	// Viz generates a graphviz graph of the project services
 	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
+	// Wait blocks until at least one of the services' container exits
+	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
+}
+
+type WaitOptions struct {
+	// Services passed in the command line to be waited
+	Services []string
+	// Executes a down when a container exits
+	DownProjectOnContainerExit bool
 }
 
 type VizOptions struct {

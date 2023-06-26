@@ -431,6 +431,7 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),
 		copyCommand(&opts, backend),
+		waitCommand(&opts, backend),
 		alphaCommand(&opts, backend),
 	)
 

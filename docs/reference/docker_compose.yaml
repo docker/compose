@@ -171,6 +171,7 @@ cname:
     - docker compose unpause
     - docker compose up
     - docker compose version
+    - docker compose wait
 clink:
     - docker_compose_build.yaml
     - docker_compose_config.yaml
@@ -197,6 +198,7 @@ clink:
     - docker_compose_unpause.yaml
     - docker_compose_up.yaml
     - docker_compose_version.yaml
+    - docker_compose_wait.yaml
 options:
     - option: ansi
       value_type: string
