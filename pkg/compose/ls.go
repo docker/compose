@@ -84,7 +84,7 @@ func combinedConfigFiles(containers []moby.Container) (string, error) {
 }
 
 func containerToState(containers []moby.Container) []string {
-	statuses := []string{}
+	statuses := make([]string, 0, len(containers))
 	for _, c := range containers {
 		statuses = append(statuses, c.State)
 	}

@@ -274,7 +274,7 @@ func getContainerProgressName(container moby.Container) string {
 }
 
 func containerEvents(containers Containers, eventFunc func(string) progress.Event) []progress.Event {
-	events := []progress.Event{}
+	events := make([]progress.Event, 0, len(containers))
 	for _, container := range containers {
 		events = append(events, eventFunc(getContainerProgressName(container)))
 	}

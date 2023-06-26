@@ -62,7 +62,7 @@ func (d *naiveNotify) Start() error {
 		return nil
 	}
 
-	pathsToWatch := []string{}
+	pathsToWatch := make([]string{}, 0, len(d.notifyList))
 	for path := range d.notifyList {
 		pathsToWatch = append(pathsToWatch, path)
 	}

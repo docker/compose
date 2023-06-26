@@ -141,7 +141,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			dotGitIgnore,
 		)
 
-		var paths []string
+		paths := make([]string, 0, len(config.Watch))
 		for _, trigger := range config.Watch {
 			paths = append(paths, trigger.Path)
 		}

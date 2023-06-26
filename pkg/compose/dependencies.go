@@ -227,7 +227,7 @@ func getParents(v *Vertex) []*Vertex {
 
 // GetParents returns a slice with the parent vertices of the a Vertex
 func (v *Vertex) GetParents() []*Vertex {
-	var res []*Vertex
+	res := make([]*Vertex, 0, len(v.Parents))
 	for _, p := range v.Parents {
 		res = append(res, p)
 	}
@@ -250,7 +250,7 @@ func getAncestors(v *Vertex) []*Vertex {
 
 // GetChildren returns a slice with the child vertices of the a Vertex
 func (v *Vertex) GetChildren() []*Vertex {
-	var res []*Vertex
+	res := make([]*Vertex, 0, len(v.Children))
 	for _, p := range v.Children {
 		res = append(res, p)
 	}

@@ -66,7 +66,7 @@ func runTop(ctx context.Context, streams api.Streams, backend api.Service, opts 
 		fmt.Fprintf(streams.Out(), "%s\n", container.Name)
 		err := psPrinter(streams.Out(), func(w io.Writer) {
 			for _, proc := range container.Processes {
-				info := []interface{}{}
+				info := make([]interface{}, 0, len(proc))
 				for _, p := range proc {
 					info = append(info, p)
 				}

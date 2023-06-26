@@ -45,7 +45,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 	for i, container := range containers {
 		i, container := i, container
 		eg.Go(func() error {
-			var publishers []api.PortPublisher
+			publishers := make([]api.PortPublisher, 0, len(container.Ports))
 			sort.Slice(container.Ports, func(i, j int) bool {
 				return container.Ports[i].PrivatePort < container.Ports[j].PrivatePort
 			})

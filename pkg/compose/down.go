@@ -159,7 +159,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 		return nil, err
 	}
 
-	var ops []downOp
+	ops := make([]downOp, 0, len(images))
 	for i := range images {
 		img := images[i]
 		ops = append(ops, func() error {

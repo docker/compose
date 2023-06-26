@@ -129,7 +129,7 @@ func (containers Containers) filter(predicate containerPredicate) Containers {
 }
 
 func (containers Containers) names() []string {
-	var names []string
+	names := make([]string, 0, len(containers))
 	for _, c := range containers {
 		names = append(names, getCanonicalContainerName(c))
 	}

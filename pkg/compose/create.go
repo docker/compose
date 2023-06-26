@@ -86,7 +86,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	}
 
 	allServices := project.AllServices()
-	allServiceNames := []string{}
+	allServiceNames := make([]string, 0, len(allServices))
 	for _, service := range allServices {
 		allServiceNames = append(allServiceNames, service.Name)
 	}
@@ -396,7 +396,7 @@ func (s *composeService) prepareLabels(labels types.Labels, service types.Servic
 
 	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
-	var dependencies []string
+	dependencies := make([]string, 0, len(service.DependsOn))
 	for s, d := range service.DependsOn {
 		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", s, d.Condition, d.Restart))
 	}
@@ -1081,7 +1081,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 
 	var ipam *network.IPAM
 	if n.Ipam.Config != nil {
-		var config []network.IPAMConfig
+		config := make([]network.IPAMConfig, 0, len(n.Ipam.Config))
 		for _, pool := range n.Ipam.Config {
 			config = append(config, network.IPAMConfig{
 				Subnet:     pool.Subnet,

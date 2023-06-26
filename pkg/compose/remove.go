@@ -71,7 +71,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 		}
 	}
 
-	var names []string
+	names := make([]string, 0, len(stoppedContainers))
 	stoppedContainers.forEach(func(c moby.Container) {
 		names = append(names, getCanonicalContainerName(c))
 	})

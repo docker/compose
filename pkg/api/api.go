@@ -340,7 +340,7 @@ type PortOptions struct {
 
 func (e Event) String() string {
 	t := e.Timestamp.Format("2006-01-02 15:04:05.000000")
-	var attr []string
+	attr := make([]string, 0, len(e.Attributes))
 	for k, v := range e.Attributes {
 		attr = append(attr, fmt.Sprintf("%s=%s", k, v))
 	}

@@ -56,7 +56,7 @@ func portNotFoundError(protocol string, port uint16, ctr moby.Container) error {
 		return fmt.Sprintf("%d/%s", port, protocol)
 	}
 
-	var containerPorts []string
+	containerPorts := make([]string, 0, len(ctr.Ports))
 	for _, p := range ctr.Ports {
 		containerPorts = append(containerPorts, formatPort(p.Type, p.PublicPort))
 	}
