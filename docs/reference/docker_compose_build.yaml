@@ -24,6 +24,15 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: builder
+      value_type: string
+      description: Set builder to use.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: compress
       value_type: bool
       default_value: "true"
