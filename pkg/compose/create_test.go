@@ -22,6 +22,8 @@ import (
 	"sort"
 	"testing"
 
+	"gotest.tools/v3/assert/cmp"
+
 	"github.com/docker/compose/v2/pkg/api"
 
 	composetypes "github.com/compose-spec/compose-go/types"
@@ -203,7 +205,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[2].Target, "\\\\.\\pipe\\docker_engine")
 }
 
-func TestGetDefaultNetworkMode(t *testing.T) {
+func TestDefaultNetworkSettings(t *testing.T) {
 	t.Run("returns the network with the highest priority when service has multiple networks", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
 			Name: "myService",
@@ -231,7 +233,10 @@ func TestGetDefaultNetworkMode(t *testing.T) {
 			}),
 		}
 
-		assert.Equal(t, getDefaultNetworkMode(&project, service), "myProject_myNetwork2")
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		assert.Equal(t, string(networkMode), "myProject_myNetwork2")
+		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 1))
+		assert.Check(t, cmp.Contains(networkConfig.EndpointsConfig, "myProject_myNetwork2"))
 	})
 
 	t.Run("returns default network when service has no networks", func(t *testing.T) {
@@ -256,7 +261,10 @@ func TestGetDefaultNetworkMode(t *testing.T) {
 			}),
 		}
 
-		assert.Equal(t, getDefaultNetworkMode(&project, service), "myProject_default")
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		assert.Equal(t, string(networkMode), "myProject_default")
+		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 1))
+		assert.Check(t, cmp.Contains(networkConfig.EndpointsConfig, "myProject_default"))
 	})
 
 	t.Run("returns none if project has no networks", func(t *testing.T) {
@@ -270,6 +278,28 @@ func TestGetDefaultNetworkMode(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, getDefaultNetworkMode(&project, service), "none")
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		assert.Equal(t, string(networkMode), "none")
+		assert.Check(t, cmp.Nil(networkConfig))
+	})
+
+	t.Run("returns defined network mode if explicitly set", func(t *testing.T) {
+		service := composetypes.ServiceConfig{
+			Name:        "myService",
+			NetworkMode: "host",
+		}
+		project := composetypes.Project{
+			Name:     "myProject",
+			Services: []composetypes.ServiceConfig{service},
+			Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{
+				"default": {
+					Name: "myProject_default",
+				},
+			}),
+		}
+
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		assert.Equal(t, string(networkMode), "host")
+		assert.Check(t, cmp.Nil(networkConfig))
 	})
 }
