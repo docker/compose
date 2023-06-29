@@ -99,8 +99,14 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 			return "", err
 		}
 	}
-	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1,
-		opts.AutoRemove, opts.UseNetworkAliases, opts.Interactive)
+	createOpts := createOptions{
+		AutoRemove:        opts.AutoRemove,
+		AttachStdin:       opts.Interactive,
+		UseNetworkAliases: opts.UseNetworkAliases,
+		Labels:            mergeLabels(service.Labels, service.CustomLabels),
+	}
+
+	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, createOpts)
 	if err != nil {
 		return "", err
 	}

@@ -48,6 +48,20 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
+type createOptions struct {
+	AutoRemove        bool
+	AttachStdin       bool
+	UseNetworkAliases bool
+	Labels            types.Labels
+}
+
+type createConfigs struct {
+	Container *container.Config
+	Host      *container.HostConfig
+	Network   *network.NetworkingConfig
+	Links     []string
+}
+
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, options)
@@ -166,18 +180,16 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	return nil
 }
 
-func (s *composeService) getCreateOptions(ctx context.Context,
+func (s *composeService) getCreateConfigs(ctx context.Context,
 	p *types.Project,
 	service types.ServiceConfig,
 	number int,
 	inherit *moby.Container,
-	autoRemove, attachStdin bool,
-	labels types.Labels,
-) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
-
-	labels, err := s.prepareLabels(labels, service, number)
+	opts createOptions,
+) (createConfigs, error) {
+	labels, err := s.prepareLabels(opts.Labels, service, number)
 	if err != nil {
-		return nil, nil, nil, err
+		return createConfigs{}, err
 	}
 
 	var (
@@ -196,11 +208,6 @@ func (s *composeService) getCreateOptions(ctx context.Context,
 		stdinOpen = service.StdinOpen
 	)
 
-	binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	proxyConfig := types.MappingWithEquals(s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil))
 	env := proxyConfig.OverrideBy(service.Environment)
 
@@ -211,8 +218,8 @@ func (s *composeService) getCreateOptions(ctx context.Context,
 		ExposedPorts:    buildContainerPorts(service),
 		Tty:             tty,
 		OpenStdin:       stdinOpen,
-		StdinOnce:       attachStdin && stdinOpen,
-		AttachStdin:     attachStdin,
+		StdinOnce:       opts.AttachStdin && stdinOpen,
+		AttachStdin:     opts.AttachStdin,
 		AttachStderr:    true,
 		AttachStdout:    true,
 		Cmd:             runCmd,
@@ -228,20 +235,7 @@ func (s *composeService) getCreateOptions(ctx context.Context,
 		StopTimeout:     ToSeconds(service.StopGracePeriod),
 	}
 
-	portBindings := buildContainerPortBindingOptions(service)
-
-	resources := getDeployResources(service)
-
-	if service.NetworkMode == "" {
-		service.NetworkMode = getDefaultNetworkMode(p, service)
-	}
-
-	var networkConfig *network.NetworkingConfig
-	for _, id := range service.NetworksByPriority() {
-		networkConfig = s.createNetworkConfig(p, service, id)
-		break
-	}
-
+	// VOLUMES/MOUNTS/FILESYSTEMS
 	tmpfs := map[string]string{}
 	for _, t := range service.Tmpfs {
 		if arr := strings.SplitN(t, ":", 2); len(arr) > 1 {
@@ -250,7 +244,28 @@ func (s *composeService) getCreateOptions(ctx context.Context,
 			tmpfs[arr[0]] = ""
 		}
 	}
+	binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
+	if err != nil {
+		return createConfigs{}, err
+	}
+	var volumesFrom []string
+	for _, v := range service.VolumesFrom {
+		if !strings.HasPrefix(v, "container:") {
+			return createConfigs{}, fmt.Errorf("invalid volume_from: %s", v)
+		}
+		volumesFrom = append(volumesFrom, v[len("container:"):])
+	}
 
+	// NETWORKING
+	links, err := s.getLinks(ctx, p.Name, service, number)
+	if err != nil {
+		return createConfigs{}, err
+	}
+	networkMode, networkingConfig := defaultNetworkSettings(p, service, number, links, opts.UseNetworkAliases)
+	portBindings := buildContainerPortBindingOptions(service)
+
+	// MISC
+	resources := getDeployResources(service)
 	var logConfig container.LogConfig
 	if service.Logging != nil {
 		logConfig = container.LogConfig{
@@ -258,31 +273,18 @@ func (s *composeService) getCreateOptions(ctx context.Context,
 			Config: service.Logging.Options,
 		}
 	}
-
-	var volumesFrom []string
-	for _, v := range service.VolumesFrom {
-		if !strings.HasPrefix(v, "container:") {
-			return nil, nil, nil, fmt.Errorf("invalid volume_from: %s", v)
-		}
-		volumesFrom = append(volumesFrom, v[len("container:"):])
-	}
-
-	links, err := s.getLinks(ctx, p.Name, service, number)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	securityOpts, unconfined, err := parseSecurityOpts(p, service.SecurityOpt)
 	if err != nil {
-		return nil, nil, nil, err
+		return createConfigs{}, err
 	}
+
 	hostConfig := container.HostConfig{
-		AutoRemove:     autoRemove,
+		AutoRemove:     opts.AutoRemove,
 		Binds:          binds,
 		Mounts:         mounts,
 		CapAdd:         strslice.StrSlice(service.CapAdd),
 		CapDrop:        strslice.StrSlice(service.CapDrop),
-		NetworkMode:    container.NetworkMode(service.NetworkMode),
+		NetworkMode:    networkMode,
 		Init:           service.Init,
 		IpcMode:        container.IpcMode(service.Ipc),
 		CgroupnsMode:   container.CgroupnsMode(service.Cgroup),
@@ -317,12 +319,28 @@ func (s *composeService) getCreateOptions(ctx context.Context,
 		hostConfig.ReadonlyPaths = []string{}
 	}
 
-	return &containerConfig, &hostConfig, networkConfig, nil
+	cfgs := createConfigs{
+		Container: &containerConfig,
+		Host:      &hostConfig,
+		Network:   networkingConfig,
+		Links:     links,
+	}
+	return cfgs, nil
 }
 
-func (s *composeService) createNetworkConfig(p *types.Project, service types.ServiceConfig, networkID string) *network.NetworkingConfig {
-	net := p.Networks[networkID]
-	config := service.Networks[networkID]
+func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, useNetworkAliases bool) []string {
+	aliases := []string{getContainerName(project.Name, service, serviceIndex)}
+	if useNetworkAliases {
+		aliases = append(aliases, service.Name)
+		if cfg := service.Networks[networkKey]; cfg != nil {
+			aliases = append(aliases, cfg.Aliases...)
+		}
+	}
+	return aliases
+}
+
+func createEndpointSettings(p *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, links []string, useNetworkAliases bool) *network.EndpointSettings {
+	config := service.Networks[networkKey]
 	var ipam *network.EndpointIPAMConfig
 	var (
 		ipv4Address string
@@ -337,15 +355,12 @@ func (s *composeService) createNetworkConfig(p *types.Project, service types.Ser
 			LinkLocalIPs: config.LinkLocalIPs,
 		}
 	}
-	return &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			net.Name: {
-				Aliases:     getAliases(service, config),
-				IPAddress:   ipv4Address,
-				IPv6Gateway: ipv6Address,
-				IPAMConfig:  ipam,
-			},
-		},
+	return &network.EndpointSettings{
+		Aliases:     getAliases(p, service, serviceIndex, networkKey, useNetworkAliases),
+		Links:       links,
+		IPAddress:   ipv4Address,
+		IPv6Gateway: ipv6Address,
+		IPAMConfig:  ipam,
 	}
 }
 
@@ -404,17 +419,39 @@ func (s *composeService) prepareLabels(labels types.Labels, service types.Servic
 	return labels, nil
 }
 
-func getDefaultNetworkMode(project *types.Project, service types.ServiceConfig) string {
+// defaultNetworkSettings determines the container.NetworkMode and corresponding network.NetworkingConfig (nil if not applicable).
+func defaultNetworkSettings(
+	project *types.Project,
+	service types.ServiceConfig,
+	serviceIndex int,
+	links []string,
+	useNetworkAliases bool,
+) (container.NetworkMode, *network.NetworkingConfig) {
+	if service.NetworkMode != "" {
+		return container.NetworkMode(service.NetworkMode), nil
+	}
+
 	if len(project.Networks) == 0 {
-		return "none"
+		return "none", nil
 	}
 
+	var networkKey string
 	if len(service.Networks) > 0 {
-		name := service.NetworksByPriority()[0]
-		return project.Networks[name].Name
+		networkKey = service.NetworksByPriority()[0]
+	} else {
+		networkKey = "default"
 	}
-
-	return project.Networks["default"].Name
+	mobyNetworkName := project.Networks[networkKey].Name
+	epSettings := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
+	networkConfig := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			mobyNetworkName: epSettings,
+		},
+	}
+	// From the Engine API docs:
+	// > Supported standard values are: bridge, host, none, and container:<name|id>.
+	// > Any other value is taken as a custom network's name to which this container should connect to.
+	return container.NetworkMode(mobyNetworkName), networkConfig
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
@@ -1000,14 +1037,6 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 		SizeBytes: int64(tmpfs.Size),
 		Mode:      os.FileMode(tmpfs.Mode),
 	}
-}
-
-func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
-	aliases := []string{s.Name}
-	if c != nil {
-		aliases = append(aliases, c.Aliases...)
-	}
-	return aliases
 }
 
 func (s *composeService) ensureNetwork(ctx context.Context, n *types.NetworkConfig) error {
