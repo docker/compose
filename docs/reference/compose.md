@@ -33,6 +33,7 @@ Define and run multi-container applications with Docker.
 | [`unpause`](compose_unpause.md) | Unpause services                                                        |
 | [`up`](compose_up.md)           | Create and start containers                                             |
 | [`version`](compose_version.md) | Show the Docker Compose version information                             |
+| [`wait`](compose_wait.md)       | Block until the first service container stops                           |
 
 
 ### Options
