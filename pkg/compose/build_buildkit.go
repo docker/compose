@@ -34,8 +34,8 @@ import (
 	"github.com/moby/buildkit/client"
 )
 
-func (s *composeService) doBuildBuildkit(ctx context.Context, service string, opts build.Options, p *buildx.Printer) (string, error) {
-	b, err := builder.New(s.dockerCli)
+func (s *composeService) doBuildBuildkit(ctx context.Context, service string, opts build.Options, p *buildx.Printer, builderName string) (string, error) {
+	b, err := builder.New(s.dockerCli, builder.WithName(builderName))
 	if err != nil {
 		return "", err
 	}

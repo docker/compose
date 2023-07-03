@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
 	"runtime"
 	"strings"
@@ -419,6 +420,33 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit",
+		})
+	})
+
+}
+
+func TestBuildBuilder(t *testing.T) {
+	c := NewParallelCLI(t)
+	builderName := "build-with-builder"
+	// declare builder
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap")
+	assert.NilError(t, result.Error)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/", "down")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", builderName)
+	})
+
+	t.Run("use specific builder to run build command", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test", "build", "--builder", builderName)
+		assert.NilError(t, res.Error, res.Stderr())
+	})
+
+	t.Run("error when using specific builder to run build command", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test", "build", "--builder", "unknown-builder")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      fmt.Sprintf(`no builder %q found`, "unknown-builder"),
 		})
 	})
 

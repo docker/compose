@@ -130,6 +130,8 @@ type BuildOptions struct {
 	SSHs []types.SSHKey
 	// Memory limit for the build container
 	Memory int64
+	// Builder name passed in the command line
+	Builder string
 }
 
 // Apply mutates project according to build options

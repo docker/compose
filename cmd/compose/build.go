@@ -43,6 +43,7 @@ type buildOptions struct {
 	noCache bool
 	memory  cliopts.MemBytes
 	ssh     string
+	builder string
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -54,6 +55,10 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 			return api.BuildOptions{}, err
 		}
 	}
+	builderName := opts.builder
+	if builderName == "" {
+		builderName = os.Getenv("BUILDX_BUILDER")
+	}
 
 	return api.BuildOptions{
 		Pull:     opts.pull,
@@ -64,6 +69,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		Quiet:    opts.quiet,
 		Services: services,
 		SSHs:     SSHKeys,
+		Builder:  builderName,
 	}, nil
 }
 
@@ -101,6 +107,7 @@ func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cob
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
 	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
+	cmd.Flags().StringVar(&opts.builder, "builder", "", "Set builder to use.")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	cmd.Flags().MarkHidden("parallel") //nolint:errcheck
 	cmd.Flags().Bool("compress", true, "Compress the build context using gzip. DEPRECATED")
