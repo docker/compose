@@ -33,9 +33,8 @@ options:
       swarm: false
     - option: index
       value_type: int
-      default_value: "1"
-      description: |
-        index of the container if there are multiple instances of a service [default: 1].
+      default_value: "0"
+      description: index of the container if service has multiple replicas
       deprecated: false
       hidden: false
       experimental: false

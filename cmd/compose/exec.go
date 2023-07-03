@@ -65,7 +65,7 @@ func execCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 
 	runCmd.Flags().BoolVarP(&opts.detach, "detach", "d", false, "Detached mode: Run command in the background.")
 	runCmd.Flags().StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
-	runCmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if there are multiple instances of a service [default: 1].")
+	runCmd.Flags().IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
 	runCmd.Flags().BoolVarP(&opts.privileged, "privileged", "", false, "Give extended privileges to the process.")
 	runCmd.Flags().StringVarP(&opts.user, "user", "u", "", "Run the command as this user.")
 	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", !streams.Out().IsTerminal(), "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
