@@ -70,7 +70,7 @@ type execDetails struct {
 }
 
 // NewDryRunClient produces a DryRunClient
-func NewDryRunClient(apiClient client.APIClient, cli *command.DockerCli) (*DryRunClient, error) {
+func NewDryRunClient(apiClient client.APIClient, cli command.Cli) (*DryRunClient, error) {
 	b, err := builder.New(cli, builder.WithSkippedValidation())
 	if err != nil {
 		return nil, err
