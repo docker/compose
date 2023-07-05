@@ -260,6 +260,7 @@ type ConfigOptions struct {
 // PushOptions group options of the Push API
 type PushOptions struct {
 	Quiet          bool
+	Repository     string
 	IgnoreFailures bool
 }
 

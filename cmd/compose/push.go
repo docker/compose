@@ -31,6 +31,7 @@ type pushOptions struct {
 	IncludeDeps    bool
 	Ignorefailures bool
 	Quiet          bool
+	Repository     string
 }
 
 func pushCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
@@ -48,6 +49,7 @@ func pushCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
 	pushCmd.Flags().BoolVar(&opts.IncludeDeps, "include-deps", false, "Also push images of services declared as dependencies")
 	pushCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Push without printing progress information")
+	pushCmd.Flags().StringVarP(&opts.Repository, "repository", "r", "", "Also publish the compose application in repository")
 
 	return pushCmd
 }
@@ -68,5 +70,6 @@ func runPush(ctx context.Context, backend api.Service, opts pushOptions, service
 	return backend.Push(ctx, project, api.PushOptions{
 		IgnoreFailures: opts.Ignorefailures,
 		Quiet:          opts.Quiet,
+		Repository:     opts.Repository,
 	})
 }

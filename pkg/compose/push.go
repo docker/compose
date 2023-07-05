@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -26,14 +27,17 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/buildx/driver"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
+	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
+	"oras.land/oras-go/v2/content"
+	"oras.land/oras-go/v2/registry/remote"
 )
 
 func (s *composeService) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
@@ -45,8 +49,8 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 	}, s.stdinfo(), "Pushing")
 }
 
-func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
-	eg, ctx := errgroup.WithContext(ctx)
+func (s *composeService) push(upctx context.Context, project *types.Project, options api.PushOptions) error {
+	eg, ctx := errgroup.WithContext(upctx)
 	eg.SetLimit(s.maxConcurrency)
 
 	info, err := s.apiClient().Info(ctx)
@@ -79,7 +83,66 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 			return nil
 		})
 	}
-	return eg.Wait()
+
+	err = eg.Wait()
+	if err != nil {
+		return err
+	}
+	ctx = upctx
+
+	if options.Repository != "" {
+		repository, err := remote.NewRepository(options.Repository)
+		if err != nil {
+			return err
+		}
+
+		yaml, err := project.MarshalYAML()
+		if err != nil {
+			return err
+		}
+		manifests := []v1.Descriptor{
+			{
+				MediaType:    "application/vnd.oci.artifact.manifest.v1+json",
+				Digest:       digest.FromBytes(yaml),
+				Size:         int64(len(yaml)),
+				Data:         yaml,
+				ArtifactType: "application/vnd.docker.compose.yaml",
+			},
+		}
+		for _, service := range project.Services {
+			inspected, _, err := s.dockerCli.Client().ImageInspectWithRaw(ctx, service.Image)
+			if err != nil {
+				return err
+			}
+			manifests = append(manifests, v1.Descriptor{
+				MediaType: v1.MediaTypeImageIndex,
+				Digest:    digest.Digest(inspected.RepoDigests[0]),
+				Size:      inspected.Size,
+				Annotations: map[string]string{
+					"com.docker.compose.service": service.Name,
+				},
+			})
+		}
+
+		manifest := v1.Index{
+			MediaType: v1.MediaTypeImageIndex,
+			Manifests: manifests,
+			Annotations: map[string]string{
+				"com.docker.compose": api.ComposeVersion,
+			},
+		}
+		manifestContent, err := json.Marshal(manifest)
+		if err != nil {
+			return err
+		}
+		manifestDescriptor := content.NewDescriptorFromBytes(v1.MediaTypeImageIndex, manifestContent)
+
+		err = repository.Push(ctx, manifestDescriptor, bytes.NewReader(manifestContent))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *composeService) pushServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPush bool) error {
