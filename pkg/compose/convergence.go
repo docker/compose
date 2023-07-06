@@ -549,13 +549,15 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 	// call via container.NetworkMode & network.NetworkingConfig
 	// any remaining networks are connected one-by-one here after creation (but before start)
 	serviceNetworks := service.NetworksByPriority()
-	if len(serviceNetworks) > 1 {
-		for _, networkKey := range serviceNetworks[1:] {
-			mobyNetworkName := project.Networks[networkKey].Name
-			epSettings := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
-			if err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, created.ID, epSettings); err != nil {
-				return created, err
-			}
+	for _, networkKey := range serviceNetworks {
+		mobyNetworkName := project.Networks[networkKey].Name
+		if string(cfgs.Host.NetworkMode) == mobyNetworkName {
+			// primary network already configured as part of ContainerCreate
+			continue
+		}
+		epSettings := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
+		if err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, created.ID, epSettings); err != nil {
+			return created, err
 		}
 	}
 
