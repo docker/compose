@@ -68,7 +68,7 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 		aborting bool
 		exitCode int
 	)
-	containers := map[string]struct{}{}
+	containers := map[string]api.ContainerDetachFn{}
 	for {
 		select {
 		case <-p.stopCh:
@@ -82,9 +82,18 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 				if _, ok := containers[id]; ok {
 					continue
 				}
-				containers[id] = struct{}{}
+				containers[id] = event.Detach
 				p.consumer.Register(container)
 			case api.ContainerEventExit, api.ContainerEventStopped, api.ContainerEventRecreated:
+				if detach, ok := containers[id]; ok {
+					stdout, stderr := detach()
+					if stdout != "" {
+						p.consumer.Log(container, stdout)
+					}
+					if stderr != "" {
+						p.consumer.Err(container, stderr)
+					}
+				}
 				if !event.Restarting {
 					delete(containers, id)
 				}

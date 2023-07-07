@@ -524,6 +524,9 @@ type LogConsumer interface {
 // ContainerEventListener is a callback to process ContainerEvent from services
 type ContainerEventListener func(event ContainerEvent)
 
+// ContainerDetachFn detach from container stream and return the remaining logs from buffers
+type ContainerDetachFn func() (string, string)
+
 // ContainerEvent notify an event has been collected on source container implementing Service
 type ContainerEvent struct {
 	Type int
@@ -538,6 +541,7 @@ type ContainerEvent struct {
 	// ContainerEventExit only
 	ExitCode   int
 	Restarting bool
+	Detach     ContainerDetachFn
 }
 
 const (

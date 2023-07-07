@@ -63,13 +63,6 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 	serviceName := container.Labels[api.ServiceLabel]
 	containerName := getContainerNameWithoutProject(container)
 
-	listener(api.ContainerEvent{
-		Type:      api.ContainerEventAttach,
-		Container: containerName,
-		ID:        container.ID,
-		Service:   serviceName,
-	})
-
 	wOut := utils.GetWriter(func(line string) {
 		listener(api.ContainerEvent{
 			Type:      api.ContainerEventLog,
@@ -87,6 +80,15 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 			Service:   serviceName,
 			Line:      line,
 		})
+	})
+	listener(api.ContainerEvent{
+		Type:      api.ContainerEventAttach,
+		Container: containerName,
+		ID:        container.ID,
+		Service:   serviceName,
+		Detach: func() (string, string) {
+			return wOut.Flush(), wErr.Flush()
+		},
 	})
 
 	inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)

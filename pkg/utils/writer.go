@@ -21,8 +21,13 @@ import (
 	"io"
 )
 
+type Writer interface {
+	io.Writer
+	Flush() string
+}
+
 // GetWriter creates a io.Writer that will actually split by line and format by LogConsumer
-func GetWriter(consumer func(string)) io.WriteCloser {
+func GetWriter(consumer func(string)) Writer {
 	return &splitWriter{
 		buffer:   bytes.Buffer{},
 		consumer: consumer,
@@ -58,11 +63,10 @@ func (s *splitWriter) Write(b []byte) (int, error) {
 	return n, nil
 }
 
-func (s *splitWriter) Close() error {
+func (s *splitWriter) Flush() string {
 	b := s.buffer.Bytes()
 	if len(b) == 0 {
-		return nil
+		return ""
 	}
-	s.consumer(string(b))
-	return nil
+	return string(b)
 }
