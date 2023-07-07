@@ -57,7 +57,7 @@ func portCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 		ValidArgsFunction: completeServiceNames(p),
 	}
 	cmd.Flags().StringVar(&opts.protocol, "protocol", "tcp", "tcp or udp")
-	cmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if service has multiple replicas")
+	cmd.Flags().IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
 	return cmd
 }
 

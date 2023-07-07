@@ -217,7 +217,7 @@ func (s *ServiceProxy) List(ctx context.Context, options ListOptions) ([]Stack, 
 	return s.ListFn(ctx, options)
 }
 
-// Convert implements Service interface
+// Config implements Service interface
 func (s *ServiceProxy) Config(ctx context.Context, project *types.Project, options ConfigOptions) ([]byte, error) {
 	if s.ConfigFn == nil {
 		return nil, ErrNotImplemented

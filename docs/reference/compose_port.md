@@ -8,7 +8,7 @@ Print the public port for a port binding.
 | Name         | Type     | Default | Description                                             |
 |:-------------|:---------|:--------|:--------------------------------------------------------|
 | `--dry-run`  |          |         | Execute command in dry run mode                         |
-| `--index`    | `int`    | `1`     | index of the container if service has multiple replicas |
+| `--index`    | `int`    | `0`     | index of the container if service has multiple replicas |
 | `--protocol` | `string` | `tcp`   | tcp or udp                                              |
 
 

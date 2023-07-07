@@ -24,25 +24,14 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 )
 
 func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
 	projectName = strings.ToLower(projectName)
-	list, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-			serviceFilter(service),
-			containerNumberFilter(options.Index),
-		),
-	})
+	container, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, service, options.Index)
 	if err != nil {
 		return "", 0, err
 	}
-	if len(list) == 0 {
-		return "", 0, fmt.Errorf("no container found for %s%s%d", service, api.Separator, options.Index)
-	}
-	container := list[0]
 	for _, p := range container.Ports {
 		if p.PrivatePort == port && p.Type == options.Protocol {
 			return p.IP, int(p.PublicPort), nil
