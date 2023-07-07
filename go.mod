@@ -14,7 +14,7 @@ require (
 	github.com/docker/buildx v0.11.0
 	github.com/docker/cli v24.0.2+incompatible
 	github.com/docker/cli-docs-tool v0.5.1
-	github.com/docker/docker v24.0.2+incompatible
+	github.com/docker/docker v24.0.3+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsevents v0.1.1
