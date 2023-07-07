@@ -7,7 +7,6 @@ Define and run multi-container applications with Docker.
 
 | Name                            | Description                                                             |
 |:--------------------------------|:------------------------------------------------------------------------|
-| [`alpha`](compose_alpha.md)     | Experimental commands                                                   |
 | [`build`](compose_build.md)     | Build or rebuild services                                               |
 | [`config`](compose_config.md)   | Parse, resolve and render compose file in canonical format              |
 | [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local filesystem |

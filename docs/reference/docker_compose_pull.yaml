@@ -124,6 +124,7 @@ examples: |-
     `docker compose pull` will try to pull image for services with a build section. If pull fails, it will let
     user know this service image MUST be built. You can skip this by setting `--ignore-buildable` flag
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false

@@ -180,6 +180,7 @@ examples: |-
     The `docker compose ps` command currently only supports the `--filter status=<status>`
     option, but additional filter options may be added in the future.
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false
