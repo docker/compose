@@ -58,7 +58,7 @@ func createTar(env string, config types.ServiceSecretConfig) (bytes.Buffer, erro
 	value := []byte(env)
 	b := bytes.Buffer{}
 	tarWriter := tar.NewWriter(&b)
-	mode := uint32(0o400)
+	mode := uint32(0o444)
 	if config.Mode != nil {
 		mode = *config.Mode
 	}
