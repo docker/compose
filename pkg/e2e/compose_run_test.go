@@ -136,4 +136,12 @@ func TestLocalComposeRun(t *testing.T) {
 
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/deps.yaml", "down", "--remove-orphans")
 	})
+
+	t.Run("run without dependencies", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/deps.yaml", "run", "--no-deps", "service_a")
+		assert.Assert(t, !strings.Contains(res.Combined(), "shared_dep"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "service_b"), res.Combined())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/deps.yaml", "down", "--remove-orphans")
+	})
 }

@@ -63,6 +63,13 @@ type runOptions struct {
 }
 
 func (options runOptions) apply(project *types.Project) error {
+	if options.noDeps {
+		err := project.ForServices([]string{options.Service}, types.IgnoreDependencies)
+		if err != nil {
+			return err
+		}
+	}
+
 	target, err := project.GetService(options.Service)
 	if err != nil {
 		return err
@@ -90,13 +97,6 @@ func (options runOptions) apply(project *types.Project) error {
 				return err
 			}
 			target.Volumes = append(target.Volumes, volume)
-		}
-	}
-
-	if options.noDeps {
-		err := project.ForServices([]string{options.Service}, types.IgnoreDependencies)
-		if err != nil {
-			return err
 		}
 	}
 
