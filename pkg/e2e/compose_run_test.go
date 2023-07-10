@@ -144,4 +144,12 @@ func TestLocalComposeRun(t *testing.T) {
 
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/deps.yaml", "down", "--remove-orphans")
 	})
+
+	t.Run("run with not required dependency", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "run", "foo")
+		assert.Assert(t, strings.Contains(res.Combined(), "foo"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "bar"), res.Combined())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "down", "--remove-orphans")
+	})
 }

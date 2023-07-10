@@ -268,10 +268,15 @@ func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, erro
 		graph.AddVertex(s.Name, s.Name, initialStatus)
 	}
 
-	for _, s := range project.Services {
+	for index, s := range project.Services {
 		for _, name := range s.GetDependencies() {
 			err := graph.AddEdge(s.Name, name)
 			if err != nil {
+				if !s.DependsOn[name].Required {
+					delete(s.DependsOn, name)
+					project.Services[index] = s
+					continue
+				}
 				if api.IsNotFoundError(err) {
 					ds, err := project.GetDisabledService(name)
 					if err == nil {

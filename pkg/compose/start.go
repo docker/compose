@@ -108,6 +108,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		for _, s := range project.Services {
 			depends[s.Name] = types.ServiceDependency{
 				Condition: getDependencyCondition(s, project),
+				Required:  true,
 			}
 		}
 		if options.WaitTimeout > 0 {

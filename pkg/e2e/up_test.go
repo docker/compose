@@ -153,3 +153,16 @@ func TestScaleDoesntRecreate(t *testing.T) {
 	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
 
 }
+
+func TestUpWithDependencyNotRequired(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-dependency-not-required"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "--project-name", projectName,
+		"up", "-d")
+	assert.Assert(t, strings.Contains(res.Combined(), "foo"), res.Combined())
+	assert.Assert(t, !strings.Contains(res.Combined(), "bar"), res.Combined())
+}
