@@ -11,7 +11,7 @@ require (
 	github.com/containerd/containerd v1.7.2
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000 // replaced; see replace for the actual version used
 	github.com/distribution/distribution/v3 v3.0.0-20230601133803-97b1d649c493
-	github.com/docker/buildx v0.11.0
+	github.com/docker/buildx v0.11.1
 	github.com/docker/cli v24.0.2+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
 	github.com/docker/docker v24.0.4+incompatible
@@ -150,7 +150,7 @@ require (
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/tonistiigi/fsutil v0.0.0-20230407161946-9e7a6df48576 // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
-	github.com/tonistiigi/vt100 v0.0.0-20210615222946-8066bb97264f // indirect
+	github.com/tonistiigi/vt100 v0.0.0-20230623042737-f9a4f7ef6531 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
