@@ -21,12 +21,20 @@ import (
 	"testing"
 	"time"
 
+	"gotest.tools/v3/icmd"
+
 	"gotest.tools/v3/assert"
 )
 
 func TestWaitOnFaster(t *testing.T) {
 	const projectName = "e2e-wait-faster"
 	c := NewParallelCLI(t)
+
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
+	}
+	t.Cleanup(cleanup)
+	cleanup()
 
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d")
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "wait", "faster")
@@ -36,6 +44,12 @@ func TestWaitOnSlower(t *testing.T) {
 	const projectName = "e2e-wait-slower"
 	c := NewParallelCLI(t)
 
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
+	}
+	t.Cleanup(cleanup)
+	cleanup()
+
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d")
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "wait", "slower")
 }
@@ -44,12 +58,27 @@ func TestWaitOnInfinity(t *testing.T) {
 	const projectName = "e2e-wait-infinity"
 	c := NewParallelCLI(t)
 
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
+	}
+	t.Cleanup(cleanup)
+	cleanup()
+
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d")
+
+	cmd := c.NewDockerComposeCmd(t, "--project-name", projectName, "wait", "infinity")
+	r := icmd.StartCmd(cmd)
+	assert.NilError(t, r.Error)
+	t.Cleanup(func() {
+		if r.Cmd.Process != nil {
+			_ = r.Cmd.Process.Kill()
+		}
+	})
 
 	finished := make(chan struct{})
 	ticker := time.NewTicker(7 * time.Second)
 	go func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "wait", "infinity")
+		_ = r.Cmd.Wait()
 		finished <- struct{}{}
 	}()
 
@@ -63,6 +92,12 @@ func TestWaitOnInfinity(t *testing.T) {
 func TestWaitAndDrop(t *testing.T) {
 	const projectName = "e2e-wait-and-drop"
 	c := NewParallelCLI(t)
+
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
+	}
+	t.Cleanup(cleanup)
+	cleanup()
 
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d")
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "wait", "--down-project", "faster")
