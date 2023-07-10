@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/compose/v2/cmd/formatter"
-
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -164,17 +163,31 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		consumer = formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 	}
 
-	attachTo := services
+	attachTo := utils.Set[string]{}
 	if len(upOptions.attach) > 0 {
-		attachTo = upOptions.attach
+		attachTo.AddAll(upOptions.attach...)
 	}
 	if upOptions.attachDependencies {
-		attachTo = project.ServiceNames()
+		if err := project.WithServices(attachTo.Elements(), func(s types.ServiceConfig) error {
+			if s.Attach == nil || *s.Attach {
+				attachTo.Add(s.Name)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 	if len(attachTo) == 0 {
-		attachTo = project.ServiceNames()
+		if err := project.WithServices(services, func(s types.ServiceConfig) error {
+			if s.Attach == nil || *s.Attach {
+				attachTo.Add(s.Name)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
-	attachTo = utils.Remove(attachTo, upOptions.noAttach...)
+	attachTo.RemoveAll(upOptions.noAttach...)
 
 	create := api.CreateOptions{
 		Services:             services,
@@ -198,7 +211,7 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		Start: api.StartOptions{
 			Project:      project,
 			Attach:       consumer,
-			AttachTo:     attachTo,
+			AttachTo:     attachTo.Elements(),
 			ExitCodeFrom: upOptions.exitCodeFrom,
 			CascadeStop:  upOptions.cascadeStop,
 			Wait:         upOptions.wait,

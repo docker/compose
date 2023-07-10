@@ -47,3 +47,9 @@ func (s Set[T]) Elements() []T {
 	}
 	return elements
 }
+
+func (s Set[T]) RemoveAll(elements ...T) {
+	for _, e := range elements {
+		s.Remove(e)
+	}
+}
