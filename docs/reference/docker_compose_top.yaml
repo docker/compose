@@ -23,6 +23,7 @@ examples: |-
     root   142353   142331   2    15:33   ?     00:00:00   ping localhost -c 5
     ```
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false
