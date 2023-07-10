@@ -26,6 +26,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/compose-spec/compose-go/dotenv"
 	buildx "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
 
@@ -472,7 +473,7 @@ func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
 		return err
 	}
 
-	envFromFile, err := cli.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), workingDir, options.EnvFiles)
+	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), workingDir, options.EnvFiles)
 	if err != nil {
 		return err
 	}
