@@ -91,6 +91,7 @@ FROM build-base AS lint
 ARG BUILD_TAGS
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=from=golangci-lint,source=/usr/bin/golangci-lint,target=/usr/bin/golangci-lint \
     golangci-lint run --build-tags "$BUILD_TAGS" ./...
 
@@ -129,6 +130,7 @@ FROM base AS docsgen
 WORKDIR /src
 RUN --mount=target=. \
     --mount=target=/root/.cache,type=cache \
+    --mount=type=cache,target=/go/pkg/mod \
     go build -o /out/docsgen ./docs/yaml/main/generate.go
 
 FROM --platform=${BUILDPLATFORM} alpine AS docs-build
