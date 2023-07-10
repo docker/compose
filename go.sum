@@ -167,8 +167,8 @@ github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3/go.mod h1:zA
 github.com/denisenkom/go-mssqldb v0.0.0-20191128021309-1d7a30a10f73/go.mod h1:xbL0rPBG9cCiLr28tMa8zpbdarY27NDyej4t/EjAShU=
 github.com/distribution/distribution/v3 v3.0.0-20230601133803-97b1d649c493 h1:fm5DpBD+A7o0+x9Nf+o9/4/qPGbfxLpr9qIPVuV8vQc=
 github.com/distribution/distribution/v3 v3.0.0-20230601133803-97b1d649c493/go.mod h1:+fqBJ4vPYo4Uu1ZE4d+bUtTLRXfdSL3NvCZIZ9GHv58=
-github.com/docker/buildx v0.11.0 h1:DNCOIYT/7J0sPBlU/ozEhFd4MtbnbFByn45yeTMHXVU=
-github.com/docker/buildx v0.11.0/go.mod h1:Yq7ZNjrwXKzW0uSFMk46dl5Gl903k5+bp6U4apsM5rs=
+github.com/docker/buildx v0.11.1 h1:xfmrAkOJrN+NLRcwhZn1iBgJVAK1dEBEv8lWu1Wxg14=
+github.com/docker/buildx v0.11.1/go.mod h1:qAxs3bsJEfVo7DOc9riES/f9Z187CeGM5nLPmadk8AA=
 github.com/docker/cli v24.0.2+incompatible h1:QdqR7znue1mtkXIJ+ruQMGQhpw2JzMJLRXp6zpzF6tM=
 github.com/docker/cli v24.0.2+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli-docs-tool v0.6.0 h1:Z9x10SaZgFaB6jHgz3OWooynhSa40CsWkpe5hEnG/qA=
@@ -630,8 +630,8 @@ github.com/tonistiigi/fsutil v0.0.0-20230407161946-9e7a6df48576 h1:fZXPQDVh5fm2x
 github.com/tonistiigi/fsutil v0.0.0-20230407161946-9e7a6df48576/go.mod h1:q1CxMSzcAbjUkVGHoZeQUcCaALnaE4XdWk+zJcgMYFw=
 github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea h1:SXhTLE6pb6eld/v/cCndK0AMpt1wiVFb/YYmqB3/QG0=
 github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea/go.mod h1:WPnis/6cRcDZSUvVmezrxJPkiO87ThFYsoUiMwWNDJk=
-github.com/tonistiigi/vt100 v0.0.0-20210615222946-8066bb97264f h1:DLpt6B5oaaS8jyXHa9VA4rrZloBVPVXeCtrOsrFauxc=
-github.com/tonistiigi/vt100 v0.0.0-20210615222946-8066bb97264f/go.mod h1:ulncasL3N9uLrVann0m+CDlJKWsIAP34MPcOJF6VRvc=
+github.com/tonistiigi/vt100 v0.0.0-20230623042737-f9a4f7ef6531 h1:Y/M5lygoNPKwVNLMPXgVfsRT40CSFKXCxuU8LoHySjs=
+github.com/tonistiigi/vt100 v0.0.0-20230623042737-f9a4f7ef6531/go.mod h1:ulncasL3N9uLrVann0m+CDlJKWsIAP34MPcOJF6VRvc=
 github.com/vbatts/tar-split v0.11.2 h1:Via6XqJr0hceW4wff3QRzD5gAk/tatMw/4ZA7cTlIME=
 github.com/weppos/publicsuffix-go v0.15.1-0.20220329081811-9a40b608a236 h1:vMJBP3PQViZsF6cOINtvyMC8ptpLsyJ4EwyFnzuWNxc=
 github.com/weppos/publicsuffix-go v0.15.1-0.20220329081811-9a40b608a236/go.mod h1:HYux0V0Zi04bHNwOHy4cXJVz/TQjYonnF6aoYhj+3QE=
