@@ -249,9 +249,19 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 	if err != nil {
 		return nil, err
 	}
+	// TODO: compose-go should return the canonical path with all symlinks resolved
+	baseDir, err := filepath.EvalSymlinks(project.WorkingDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolving symlink for %q: %w", project.WorkingDir, err)
+	}
 	for i, trigger := range config.Watch {
-		if !filepath.IsAbs(trigger.Path) {
-			trigger.Path = filepath.Join(project.WorkingDir, trigger.Path)
+		if filepath.IsAbs(trigger.Path) {
+			trigger.Path, err = filepath.EvalSymlinks(trigger.Path)
+			if err != nil {
+				return nil, fmt.Errorf("resolving symlink for %q: %w", trigger.Path, err)
+			}
+		} else {
+			trigger.Path = filepath.Join(baseDir, trigger.Path)
 		}
 		trigger.Path = filepath.Clean(trigger.Path)
 		if trigger.Path == "" {

@@ -16,9 +16,12 @@ package compose
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/watch"
 	"github.com/jonboulle/clockwork"
@@ -147,4 +150,46 @@ func Test_sync(t *testing.T) {
 		}
 	})
 
+}
+
+func TestLoadDevelopmentConfig_Symlinks(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Test creates temporary files")
+	}
+
+	tmpdir := t.TempDir()
+	projDir := filepath.Join(tmpdir, "project")
+	assert.NilError(t, os.Mkdir(projDir, 0o700))
+	aliasProjDir := filepath.Join(tmpdir, "proj-symlink")
+	assert.NilError(t, os.Symlink(projDir, aliasProjDir))
+
+	proj := types.Project{
+		WorkingDir: aliasProjDir,
+	}
+
+	svc := types.ServiceConfig{
+		Name: "app",
+		Extensions: types.Extensions{
+			"x-develop": map[string]interface{}{
+				"watch": []map[string]interface{}{
+					{
+						"path":   ".",
+						"action": "sync",
+					},
+				},
+			},
+		},
+	}
+
+	cfg, err := loadDevelopmentConfig(svc, &proj)
+	assert.NilError(t, err)
+
+	realProjDir, err := filepath.EvalSymlinks(projDir)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []Trigger{
+		{
+			Path:   realProjDir,
+			Action: "sync",
+		},
+	}, cfg.Watch)
 }
