@@ -24,7 +24,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.11.0-rc3.0.20230609092854-67a08623b95a
+	github.com/moby/buildkit v0.11.0-rc3.0.20230620112432-2d91ddcceedc
 	github.com/moby/patternmatcher v0.5.0
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0

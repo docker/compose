@@ -465,8 +465,8 @@ github.com/miekg/pkcs11 v1.1.1/go.mod h1:XsNlhZGX73bx86s2hdc/FuaLm2CPZJemRLMA+WT
 github.com/mitchellh/mapstructure v0.0.0-20150613213606-2caf8efc9366/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
-github.com/moby/buildkit v0.11.0-rc3.0.20230609092854-67a08623b95a h1:1k3bAXwxC2N1FncWijq/43sLj2OVIZ11FT0APIXWhMg=
-github.com/moby/buildkit v0.11.0-rc3.0.20230609092854-67a08623b95a/go.mod h1:4sM7BBBqXOQ+vV6LrVAOAMhZI9cVNYV5RhZCl906a64=
+github.com/moby/buildkit v0.11.0-rc3.0.20230620112432-2d91ddcceedc h1:79EnLqFEkPn6sTBXDHE546AHmYeb/QzXgGyIpli8w34=
+github.com/moby/buildkit v0.11.0-rc3.0.20230620112432-2d91ddcceedc/go.mod h1:6Y1HYDrxg3sY5gBY2FVaEvQpswBj3g/ck7aKYCjOkk0=
 github.com/moby/locker v1.0.1 h1:fOXqR41zeveg4fFODix+1Ch4mj/gT0NE1XJbp/epuBg=
 github.com/moby/locker v1.0.1/go.mod h1:S7SDdo5zpBK84bzzVlKr2V0hz+7x9hWbYC/kq7oQppc=
 github.com/moby/patternmatcher v0.5.0 h1:YCZgJOeULcxLw1Q+sVR636pmS7sPEn1Qo2iAN6M7DBo=
