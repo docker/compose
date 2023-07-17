@@ -1,6 +1,7 @@
 services:
   fail:
     image: alpine
+    init: true
     command: sleep infinity
     healthcheck:
       test: "false"
@@ -8,6 +9,7 @@ services:
       retries: 3
   depends:
     image: alpine
+    init: true
     command: sleep infinity
     depends_on:
       fail:

@@ -1,10 +1,12 @@
 services:
   base:
     image: base
+    init: true
     build:
       context: .
       dockerfile: base.dockerfile
   service:
+    init: true
     depends_on:
       - base
     build:

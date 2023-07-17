@@ -1,12 +1,14 @@
 services:
   with-restart:
     image: alpine
+    init: true
     command: tail -f /dev/null
     depends_on:
       nginx: {condition: service_healthy, restart: true}
 
   no-restart:
     image: alpine
+    init: true
     command: tail -f /dev/null
     depends_on:
       nginx: { condition: service_healthy }

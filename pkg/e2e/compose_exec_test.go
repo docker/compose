@@ -35,6 +35,12 @@ func TestLocalComposeExec(t *testing.T) {
 		return ret
 	}
 
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, cmdArgs("down", "--timeout=0")...)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
 	c.RunDockerComposeCmd(t, cmdArgs("up", "-d")...)
 
 	t.Run("exec true", func(t *testing.T) {
