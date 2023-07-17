@@ -52,7 +52,7 @@ func (s *composeService) Viz(_ context.Context, project *types.Project, opts api
 	// dot is the perfect layout for this use case since graph is directed and hierarchical
 	graphBuilder.WriteString(opts.Indentation + "layout=dot;\n")
 
-	addNodes(&graphBuilder, graph, &opts)
+	addNodes(&graphBuilder, graph, project.Name, &opts)
 	graphBuilder.WriteByte('\n')
 
 	addEdges(&graphBuilder, graph, &opts)
@@ -63,7 +63,7 @@ func (s *composeService) Viz(_ context.Context, project *types.Project, opts api
 
 // addNodes adds the corresponding graphviz representation of all the nodes in the given graph to the graphBuilder
 // returns the same graphBuilder
-func addNodes(graphBuilder *strings.Builder, graph vizGraph, opts *api.VizOptions) *strings.Builder {
+func addNodes(graphBuilder *strings.Builder, graph vizGraph, projectName string, opts *api.VizOptions) *strings.Builder {
 	for serviceNode := range graph {
 		// write:
 		// "service name" [style="filled" label<<font point-size="15">service name</font>
@@ -107,7 +107,7 @@ func addNodes(graphBuilder *strings.Builder, graph vizGraph, opts *api.VizOption
 		if opts.IncludeImageName {
 			graphBuilder.WriteString("<font point-size=\"10\">")
 			graphBuilder.WriteString("<br/><br/><b>Image:</b><br/>")
-			graphBuilder.WriteString(serviceNode.Image)
+			graphBuilder.WriteString(api.GetImageNameOrDefault(*serviceNode, projectName))
 			graphBuilder.WriteString("</font>")
 		}
 

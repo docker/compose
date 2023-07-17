@@ -233,11 +233,7 @@ func runConfigImages(streams api.Streams, opts configOptions, services []string)
 		return err
 	}
 	for _, s := range project.Services {
-		if s.Image != "" {
-			fmt.Fprintln(streams.Out(), s.Image)
-		} else {
-			fmt.Fprintf(streams.Out(), "%s%s%s\n", project.Name, api.Separator, s.Name)
-		}
+		fmt.Fprintln(streams.Out(), api.GetImageNameOrDefault(s, project.Name))
 	}
 	return nil
 }
