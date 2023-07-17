@@ -3,6 +3,7 @@ services:
   my-service:
     image: alpine
     command: tail -f /dev/null
+    init: true
     depends_on:
       nginx: {condition: service_healthy}
 

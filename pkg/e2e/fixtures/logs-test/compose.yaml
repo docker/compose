@@ -1,6 +1,7 @@
 services:
   ping:
     image: alpine
+    init: true
     command: ping localhost -c ${REPEAT:-1}
   hello:
     image: alpine

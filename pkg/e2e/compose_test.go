@@ -281,8 +281,12 @@ func TestStopWithDependenciesAttached(t *testing.T) {
 	const projectName = "compose-e2e-stop-with-deps"
 	c := NewParallelCLI(t, WithEnv("COMMAND=echo hello"))
 
-	t.Run("up", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo")
-		res.Assert(t, icmd.Expected{Out: "exited with code 0"})
-	})
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "-p", projectName, "down", "--remove-orphans", "--timeout=0")
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo")
+	res.Assert(t, icmd.Expected{Out: "exited with code 0"})
 }
