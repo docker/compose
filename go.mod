@@ -11,7 +11,7 @@ require (
 	github.com/containerd/containerd v1.7.2
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000 // replaced; see replace for the actual version used
 	github.com/distribution/distribution/v3 v3.0.0-20230601133803-97b1d649c493
-	github.com/docker/buildx v0.11.1
+	github.com/docker/buildx v0.11.2
 	github.com/docker/cli v24.0.4+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
 	github.com/docker/docker v24.0.5-0.20230717072055-8443a06149b5+incompatible // v24.0.5-dev
@@ -24,7 +24,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.12.0
+	github.com/moby/buildkit v0.12.1-0.20230717122532-faa0cc7da353 // v0.12 release branch
 	github.com/moby/patternmatcher v0.5.0
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
@@ -71,7 +71,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/cfssl v1.6.4 // indirect
 	github.com/containerd/continuity v0.4.1 // indirect
-	github.com/containerd/ttrpc v1.2.2 // indirect
 	github.com/containerd/typeurl/v2 v2.1.1 // indirect
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
