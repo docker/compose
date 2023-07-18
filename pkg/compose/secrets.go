@@ -66,7 +66,7 @@ func createTar(env string, config types.ServiceSecretConfig) (bytes.Buffer, erro
 	target := config.Target
 	if config.Target == "" {
 		target = "/run/secrets/" + config.Source
-	} else if !isUnixAbs(config.Target) {
+	} else if !isAbsTarget(config.Target) {
 		target = "/run/secrets/" + config.Target
 	}
 
