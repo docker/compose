@@ -53,7 +53,7 @@ func pushCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runPush(ctx context.Context, backend api.Service, opts pushOptions, services []string) error {
-	project, err := opts.ToProject(services)
+	project, err := opts.ToProject(ctx, services)
 	if err != nil {
 		return err
 	}

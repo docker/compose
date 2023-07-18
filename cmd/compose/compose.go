@@ -26,6 +26,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/docker/compose/v2/internal/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/compose-spec/compose-go/dotenv"
 	buildx "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
@@ -134,7 +139,7 @@ func (o *ProjectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, ar
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *ProjectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
 	return Adapt(func(ctx context.Context, args []string) error {
-		project, err := o.ToProject(args, cli.WithResolvedPaths(true), cli.WithDiscardEnvFile)
+		project, err := o.ToProject(ctx, args, cli.WithResolvedPaths(true), cli.WithDiscardEnvFile)
 		if err != nil {
 			return err
 		}
@@ -154,11 +159,11 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	_ = f.MarkHidden("workdir")
 }
 
-func (o *ProjectOptions) projectOrName(services ...string) (*types.Project, string, error) {
+func (o *ProjectOptions) projectOrName(ctx context.Context, services ...string) (*types.Project, string, error) {
 	name := o.ProjectName
 	var project *types.Project
 	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
-		p, err := o.ToProject(services, cli.WithDiscardEnvFile)
+		p, err := o.ToProject(ctx, services, cli.WithDiscardEnvFile)
 		if err != nil {
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
@@ -172,7 +177,7 @@ func (o *ProjectOptions) projectOrName(services ...string) (*types.Project, stri
 	return project, name, nil
 }
 
-func (o *ProjectOptions) toProjectName() (string, error) {
+func (o *ProjectOptions) toProjectName(ctx context.Context) (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil
 	}
@@ -182,14 +187,53 @@ func (o *ProjectOptions) toProjectName() (string, error) {
 		return envProjectName, nil
 	}
 
-	project, err := o.ToProject(nil)
+	project, err := o.ToProject(ctx, nil)
 	if err != nil {
 		return "", err
 	}
 	return project.Name, nil
 }
 
-func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+func SetAttributesFromProject(span trace.Span, proj *types.Project) {
+	if span == nil || proj == nil {
+		return
+	}
+
+	disabledServiceNames := make([]string, len(proj.DisabledServices))
+	for i := range proj.DisabledServices {
+		disabledServiceNames[i] = proj.DisabledServices[i].Name
+	}
+
+	span.SetAttributes(
+		attribute.String("project.name", proj.Name),
+		attribute.String("project.dir", proj.WorkingDir),
+		attribute.StringSlice("services.active", proj.ServiceNames()),
+		attribute.StringSlice("services.disabled", disabledServiceNames),
+		attribute.StringSlice("volumes", proj.VolumeNames()),
+		attribute.StringSlice("networks", proj.NetworkNames()),
+		attribute.StringSlice("secrets", proj.SecretNames()),
+		attribute.StringSlice("configs", proj.ConfigNames()),
+	)
+}
+
+func (o *ProjectOptions) ToProject(ctx context.Context, services []string, po ...cli.ProjectOptionsFn) (project *types.Project, err error) {
+	//nolint:ineffassign,staticcheck // Span context should replace existing context
+	ctx, span := tracing.Tracer.Start(ctx, "project-load", trace.WithAttributes(
+		attribute.String("project.name", o.ProjectName),
+		attribute.String("project.dir", o.ProjectDir),
+		attribute.StringSlice("project.env_files", o.EnvFiles),
+		attribute.StringSlice("project.config_files", o.ConfigPaths),
+	))
+	defer func() {
+		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+		} else {
+			SetAttributesFromProject(span, project)
+			span.SetStatus(codes.Ok, "")
+		}
+		span.End()
+	}()
+
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
 		return nil, compose.WrapComposeError(err)
@@ -199,7 +243,7 @@ func (o *ProjectOptions) ToProject(services []string, po ...cli.ProjectOptionsFn
 		api.Separator = "_"
 	}
 
-	project, err := cli.ProjectFromOptions(options)
+	project, err = cli.ProjectFromOptions(options)
 	if err != nil {
 		return nil, compose.WrapComposeError(err)
 	}

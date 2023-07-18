@@ -59,7 +59,7 @@ Any data which is not in a volume will be lost.`,
 }
 
 func runRemove(ctx context.Context, backend api.Service, opts removeOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(ctx, services...)
 	if err != nil {
 		return err
 	}

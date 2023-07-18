@@ -125,7 +125,7 @@ func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cob
 }
 
 func runBuild(ctx context.Context, backend api.Service, opts buildOptions, services []string) error {
-	project, err := opts.ToProject(services, cli.WithResolvedPaths(true))
+	project, err := opts.ToProject(ctx, services, cli.WithResolvedPaths(true))
 	if err != nil {
 		return err
 	}

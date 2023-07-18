@@ -77,7 +77,7 @@ func downCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runDown(ctx context.Context, backend api.Service, opts downOptions, services []string) error {
-	project, name, err := opts.projectOrName()
+	project, name, err := opts.projectOrName(ctx)
 	if err != nil {
 		return err
 	}

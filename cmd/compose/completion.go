@@ -34,7 +34,8 @@ func noCompletion() validArgsFn {
 
 func completeServiceNames(p *ProjectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		project, err := p.ToProject(nil)
+		ctx := cmd.Context()
+		project, err := p.ToProject(ctx, nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

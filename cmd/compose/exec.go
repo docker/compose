@@ -81,7 +81,7 @@ func execCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 }
 
 func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
-	projectName, err := opts.toProjectName()
+	projectName, err := opts.toProjectName(ctx)
 	if err != nil {
 		return err
 	}

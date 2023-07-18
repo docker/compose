@@ -52,7 +52,7 @@ func watchCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 
 func runWatch(ctx context.Context, backend api.Service, opts watchOptions, services []string) error {
 	fmt.Fprintln(os.Stderr, "watch command is EXPERIMENTAL")
-	project, err := opts.ToProject(nil)
+	project, err := opts.ToProject(ctx, nil)
 	if err != nil {
 		return err
 	}

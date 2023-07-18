@@ -62,7 +62,7 @@ func portCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 }
 
 func runPort(ctx context.Context, streams api.Streams, backend api.Service, opts portOptions, service string) error {
-	projectName, err := opts.toProjectName()
+	projectName, err := opts.toProjectName(ctx)
 	if err != nil {
 		return err
 	}

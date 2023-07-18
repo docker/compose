@@ -56,7 +56,7 @@ func imagesCommand(p *ProjectOptions, streams api.Streams, backend api.Service) 
 }
 
 func runImages(ctx context.Context, streams api.Streams, backend api.Service, opts imageOptions, services []string) error {
-	projectName, err := opts.toProjectName()
+	projectName, err := opts.toProjectName(ctx)
 	if err != nil {
 		return err
 	}

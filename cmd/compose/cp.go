@@ -75,7 +75,7 @@ func copyCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runCopy(ctx context.Context, backend api.Service, opts copyOptions) error {
-	name, err := opts.toProjectName()
+	name, err := opts.toProjectName(ctx)
 	if err != nil {
 		return err
 	}

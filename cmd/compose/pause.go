@@ -44,7 +44,7 @@ func pauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runPause(ctx context.Context, backend api.Service, opts pauseOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(ctx, services...)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func unpauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runUnPause(ctx context.Context, backend api.Service, opts unpauseOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(ctx, services...)
 	if err != nil {
 		return err
 	}

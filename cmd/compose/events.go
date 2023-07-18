@@ -51,7 +51,7 @@ func eventsCommand(p *ProjectOptions, streams api.Streams, backend api.Service) 
 }
 
 func runEvents(ctx context.Context, streams api.Streams, backend api.Service, opts eventsOpts, services []string) error {
-	name, err := opts.toProjectName()
+	name, err := opts.toProjectName(ctx)
 	if err != nil {
 		return err
 	}

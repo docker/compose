@@ -70,7 +70,7 @@ func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runPull(ctx context.Context, backend api.Service, opts pullOptions, services []string) error {
-	project, err := opts.ToProject(services)
+	project, err := opts.ToProject(ctx, services)
 	if err != nil {
 		return err
 	}

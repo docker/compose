@@ -60,7 +60,7 @@ func waitCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runWait(ctx context.Context, backend api.Service, opts *waitOptions) (int64, error) {
-	_, name, err := opts.projectOrName()
+	_, name, err := opts.projectOrName(ctx)
 	if err != nil {
 		return 0, err
 	}

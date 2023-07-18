@@ -61,7 +61,7 @@ func logsCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 }
 
 func runLogs(ctx context.Context, streams api.Streams, backend api.Service, opts logsOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(ctx, services...)
 	if err != nil {
 		return err
 	}

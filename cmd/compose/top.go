@@ -49,7 +49,7 @@ func topCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 }
 
 func runTop(ctx context.Context, streams api.Streams, backend api.Service, opts topOptions, services []string) error {
-	projectName, err := opts.toProjectName()
+	projectName, err := opts.toProjectName(ctx)
 	if err != nil {
 		return err
 	}

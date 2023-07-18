@@ -64,7 +64,7 @@ func vizCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 
 func runViz(ctx context.Context, backend api.Service, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
-	project, err := opts.ToProject(nil)
+	project, err := opts.ToProject(ctx, nil)
 	if err != nil {
 		return err
 	}

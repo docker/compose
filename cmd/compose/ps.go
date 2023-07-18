@@ -92,7 +92,7 @@ func psCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 }
 
 func runPs(ctx context.Context, streams api.Streams, backend api.Service, services []string, opts psOptions) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(ctx, services...)
 	if err != nil {
 		return err
 	}

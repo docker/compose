@@ -43,7 +43,7 @@ func startCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 }
 
 func runStart(ctx context.Context, backend api.Service, opts startOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(ctx, services...)
 	if err != nil {
 		return err
 	}
