@@ -162,7 +162,7 @@ func TestUpWithDependencyNotRequired(t *testing.T) {
 	})
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "--project-name", projectName,
-		"up", "-d")
+		"--profile", "not-required", "up", "-d")
 	assert.Assert(t, strings.Contains(res.Combined(), "foo"), res.Combined())
-	assert.Assert(t, !strings.Contains(res.Combined(), "bar"), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), " optional dependency \"bar\" failed to start"), res.Combined())
 }

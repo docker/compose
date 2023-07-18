@@ -286,9 +286,18 @@ func containerEvents(containers Containers, eventFunc func(string) progress.Even
 	return events
 }
 
+func containerSkippedEvents(containers Containers, eventFunc func(string, string) progress.Event, reason string) []progress.Event {
+	events := []progress.Event{}
+	for _, container := range containers {
+		events = append(events, eventFunc(getContainerProgressName(container), reason))
+	}
+	return events
+}
+
 // ServiceConditionRunningOrHealthy is a service condition on status running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
+//nolint:gocyclo
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig, containers Containers) error {
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
@@ -312,6 +321,11 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 				case ServiceConditionRunningOrHealthy:
 					healthy, err := s.isServiceHealthy(ctx, waitingFor, true)
 					if err != nil {
+						if !config.Required {
+							w.Events(containerSkippedEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep)))
+							logrus.Warnf("optional dependency %q is not running or is unhealthy: %s", dep, err.Error())
+							return nil
+						}
 						return err
 					}
 					if healthy {
@@ -321,6 +335,11 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 				case types.ServiceConditionHealthy:
 					healthy, err := s.isServiceHealthy(ctx, waitingFor, false)
 					if err != nil {
+						if !config.Required {
+							w.Events(containerSkippedEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q failed to start", dep)))
+							logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
+							return nil
+						}
 						w.Events(containerEvents(waitingFor, progress.ErrorEvent))
 						return errors.Wrap(err, "dependency failed to start")
 					}
@@ -334,6 +353,12 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if exited {
+						logMessageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
+						if !config.Required {
+							w.Events(containerSkippedEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %s", logMessageSuffix)))
+							logrus.Warnf("optional dependency %s", logMessageSuffix)
+							return nil
+						}
 						w.Events(containerEvents(waitingFor, progress.Exited))
 						if code != 0 {
 							return fmt.Errorf("service %q didn't complete successfully: exit %d", dep, code)
@@ -361,9 +386,6 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 				// don't wait for disabled service (--no-deps)
 				return false, nil
 			}
-		}
-		if !dependencyConfig.Required {
-			return false, nil
 		}
 		return false, err
 	} else if service.Scale == 0 {
