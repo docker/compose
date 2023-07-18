@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,10 @@ import (
 )
 
 func TestWatch(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test currently broken on macOS due to symlink issues (see compose-go#436)")
+	}
+
 	services := []string{"alpine", "busybox", "debian"}
 	for _, svcName := range services {
 		t.Run(svcName, func(t *testing.T) {
