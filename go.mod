@@ -11,10 +11,10 @@ require (
 	github.com/containerd/containerd v1.7.2
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000 // replaced; see replace for the actual version used
 	github.com/distribution/distribution/v3 v3.0.0-20230601133803-97b1d649c493
-	github.com/docker/buildx v0.11.1
+	github.com/docker/buildx v0.11.2
 	github.com/docker/cli v24.0.4+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
-	github.com/docker/docker v24.0.5-0.20230717072055-8443a06149b5+incompatible // v24.0.5-dev
+	github.com/docker/docker v24.0.5-0.20230714235725-36e9e796c6fc+incompatible // v24.0.5-dev
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsevents v0.1.1
@@ -24,7 +24,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.11.0-rc3.0.20230620112432-2d91ddcceedc
+	github.com/moby/buildkit v0.12.1-0.20230717122532-faa0cc7da353 // v0.12 release branch
 	github.com/moby/patternmatcher v0.5.0
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
@@ -71,7 +71,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/cfssl v1.6.4 // indirect
 	github.com/containerd/continuity v0.4.1 // indirect
-	github.com/containerd/ttrpc v1.2.2 // indirect
 	github.com/containerd/typeurl/v2 v2.1.1 // indirect
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
@@ -148,7 +147,7 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
-	github.com/tonistiigi/fsutil v0.0.0-20230407161946-9e7a6df48576 // indirect
+	github.com/tonistiigi/fsutil v0.0.0-20230629203738-36ef4d8c0dbb // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20230623042737-f9a4f7ef6531 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
