@@ -68,7 +68,7 @@ func doTest(t *testing.T, svcName string) {
 		"COMPOSE_PROJECT_NAME=" + projName,
 	}
 
-	cli := NewParallelCLI(t, WithEnv(env...))
+	cli := NewCLI(t, WithEnv(env...))
 
 	cleanup := func() {
 		cli.RunDockerComposeCmd(t, "down", svcName, "--timeout=0", "--remove-orphans", "--volumes")
