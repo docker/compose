@@ -1,6 +1,6 @@
 /*
-
    Copyright 2020 Docker Compose CLI authors
+
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -17,12 +17,12 @@ package compose
 import (
 	"context"
 	"fmt"
-	"io/fs"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/docker/compose/v2/internal/sync"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/jonboulle/clockwork"
@@ -54,11 +54,8 @@ type Trigger struct {
 
 const quietPeriod = 2 * time.Second
 
-// fileMapping contains the Compose service and modified host system path.
-//
-// For file sync, the container path is also included.
-// For rebuild, there is no container path, so it is always empty.
-type fileMapping struct {
+// fileEvent contains the Compose service and modified host system path.
+type fileEvent struct {
 	// Service that the file event is for.
 	Service string
 	// HostPath that was created/modified/deleted outside the container.
@@ -67,17 +64,11 @@ type fileMapping struct {
 	// 	- C:\Users\moby\Documents\hello-world\main.go
 	//  - /Users/moby/Documents/hello-world/main.go
 	HostPath string
-	// ContainerPath for the target file inside the container (only populated
-	// for sync events, not rebuild).
-	//
-	// This is the path as used in Docker CLI commands, e.g.
-	//	- /workdir/main.go
-	ContainerPath string
 }
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error { //nolint: gocyclo
-	needRebuild := make(chan fileMapping)
-	needSync := make(chan fileMapping)
+	needRebuild := make(chan fileEvent)
+	needSync := make(chan sync.PathMapping)
 
 	_, err := s.prepareProjectForBuild(project, nil)
 	if err != nil {
@@ -175,7 +166,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	return eg.Wait()
 }
 
-func (s *composeService) watch(ctx context.Context, name string, watcher watch.Notify, triggers []Trigger, needSync chan fileMapping, needRebuild chan fileMapping) error {
+func (s *composeService) watch(ctx context.Context, name string, watcher watch.Notify, triggers []Trigger, needSync chan sync.PathMapping, needRebuild chan fileEvent) error {
 	ignores := make([]watch.PathMatcher, len(triggers))
 	for i, trigger := range triggers {
 		ignore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
@@ -209,11 +200,6 @@ WATCH:
 
 					fmt.Fprintf(s.stdinfo(), "change detected on %s\n", hostPath)
 
-					f := fileMapping{
-						HostPath: hostPath,
-						Service:  name,
-					}
-
 					switch trigger.Action {
 					case WatchActionSync:
 						logrus.Debugf("modified file %s triggered sync", hostPath)
@@ -221,12 +207,18 @@ WATCH:
 						if err != nil {
 							return err
 						}
-						// always use Unix-style paths for inside the container
-						f.ContainerPath = path.Join(trigger.Target, rel)
-						needSync <- f
+						needSync <- sync.PathMapping{
+							Service:  name,
+							HostPath: hostPath,
+							// always use Unix-style paths for inside the container
+							ContainerPath: path.Join(trigger.Target, rel),
+						}
 					case WatchActionRebuild:
 						logrus.Debugf("modified file %s requires image to be rebuilt", hostPath)
-						needRebuild <- f
+						needRebuild <- fileEvent{
+							HostPath: hostPath,
+							Service:  name,
+						}
 					default:
 						return fmt.Errorf("watch action %q is not supported", trigger)
 					}
@@ -304,57 +296,25 @@ func (s *composeService) makeRebuildFn(ctx context.Context, project *types.Proje
 	}
 }
 
-func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project, needSync <-chan fileMapping) func() error {
+func (s *composeService) makeSyncFn(
+	ctx context.Context,
+	project *types.Project,
+	needSync <-chan sync.PathMapping,
+) func() error {
+	syncer := sync.NewDockerCopy(project.Name, s, s.stdinfo())
+
 	return func() error {
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
-			case opt := <-needSync:
-				service, err := project.GetService(opt.Service)
+			case pathMapping := <-needSync:
+				service, err := project.GetService(pathMapping.Service)
 				if err != nil {
 					return err
 				}
-				scale := 1
-				if service.Deploy != nil && service.Deploy.Replicas != nil {
-					scale = int(*service.Deploy.Replicas)
-				}
-
-				if fi, statErr := os.Stat(opt.HostPath); statErr == nil {
-					if fi.IsDir() {
-						for i := 1; i <= scale; i++ {
-							_, err := s.Exec(ctx, project.Name, api.RunOptions{
-								Service: opt.Service,
-								Command: []string{"mkdir", "-p", opt.ContainerPath},
-								Index:   i,
-							})
-							if err != nil {
-								logrus.Warnf("failed to create %q from %s: %v", opt.ContainerPath, opt.Service, err)
-							}
-						}
-						fmt.Fprintf(s.stdinfo(), "%s created\n", opt.ContainerPath)
-					} else {
-						err := s.Copy(ctx, project.Name, api.CopyOptions{
-							Source:      opt.HostPath,
-							Destination: fmt.Sprintf("%s:%s", opt.Service, opt.ContainerPath),
-						})
-						if err != nil {
-							return err
-						}
-						fmt.Fprintf(s.stdinfo(), "%s updated\n", opt.ContainerPath)
-					}
-				} else if errors.Is(statErr, fs.ErrNotExist) {
-					for i := 1; i <= scale; i++ {
-						_, err := s.Exec(ctx, project.Name, api.RunOptions{
-							Service: opt.Service,
-							Command: []string{"rm", "-rf", opt.ContainerPath},
-							Index:   i,
-						})
-						if err != nil {
-							logrus.Warnf("failed to delete %q from %s: %v", opt.ContainerPath, opt.Service, err)
-						}
-					}
-					fmt.Fprintf(s.stdinfo(), "%s deleted from service\n", opt.ContainerPath)
+				if err := syncer.Sync(ctx, service, []sync.PathMapping{pathMapping}); err != nil {
+					return err
 				}
 			}
 		}
@@ -363,7 +323,7 @@ func (s *composeService) makeSyncFn(ctx context.Context, project *types.Project,
 
 type rebuildServices map[string]utils.Set[string]
 
-func debounce(ctx context.Context, clock clockwork.Clock, delay time.Duration, input <-chan fileMapping, fn func(services rebuildServices)) {
+func debounce(ctx context.Context, clock clockwork.Clock, delay time.Duration, input <-chan fileEvent, fn func(services rebuildServices)) {
 	services := make(rebuildServices)
 	t := clock.NewTimer(delay)
 	defer t.Stop()

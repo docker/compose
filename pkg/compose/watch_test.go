@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/compose/v2/internal/sync"
+
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/watch"
 	"github.com/jonboulle/clockwork"
@@ -27,7 +29,7 @@ import (
 )
 
 func Test_debounce(t *testing.T) {
-	ch := make(chan fileMapping)
+	ch := make(chan fileEvent)
 	var (
 		ran int
 		got []string
@@ -47,7 +49,7 @@ func Test_debounce(t *testing.T) {
 		return nil
 	})
 	for i := 0; i < 100; i++ {
-		ch <- fileMapping{Service: "test"}
+		ch <- fileEvent{Service: "test"}
 	}
 	assert.Equal(t, ran, 0)
 	clock.Advance(quietPeriod)
@@ -79,8 +81,8 @@ func (t testWatcher) Errors() chan error {
 }
 
 func Test_sync(t *testing.T) {
-	needSync := make(chan fileMapping)
-	needRebuild := make(chan fileMapping)
+	needSync := make(chan sync.PathMapping)
+	needRebuild := make(chan fileEvent)
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 	defer cancelFunc()
 
@@ -119,7 +121,7 @@ func Test_sync(t *testing.T) {
 		watcher.Events() <- watch.NewFileEvent("/src/changed")
 		select {
 		case actual := <-needSync:
-			assert.DeepEqual(t, fileMapping{Service: "test", HostPath: "/src/changed", ContainerPath: "/work/changed"}, actual)
+			assert.DeepEqual(t, sync.PathMapping{Service: "test", HostPath: "/src/changed", ContainerPath: "/work/changed"}, actual)
 		case <-time.After(100 * time.Millisecond):
 			t.Error("timeout")
 		}
