@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,10 @@ import (
 )
 
 func TestWatch(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Test currently broken on macOS due to symlink issues (see compose-go#436)")
+	}
+
 	services := []string{"alpine", "busybox", "debian"}
 	for _, svcName := range services {
 		t.Run(svcName, func(t *testing.T) {
@@ -63,7 +68,7 @@ func doTest(t *testing.T, svcName string) {
 		"COMPOSE_PROJECT_NAME=" + projName,
 	}
 
-	cli := NewParallelCLI(t, WithEnv(env...))
+	cli := NewCLI(t, WithEnv(env...))
 
 	cleanup := func() {
 		cli.RunDockerComposeCmd(t, "down", svcName, "--timeout=0", "--remove-orphans", "--volumes")
