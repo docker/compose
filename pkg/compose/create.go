@@ -863,7 +863,7 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 		target := config.Target
 		if config.Target == "" {
 			target = configsBaseDir + config.Source
-		} else if !isUnixAbs(config.Target) {
+		} else if !isAbsTarget(config.Target) {
 			target = configsBaseDir + config.Target
 		}
 
@@ -898,7 +898,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		target := secret.Target
 		if secret.Target == "" {
 			target = secretsDir + secret.Source
-		} else if !isUnixAbs(secret.Target) {
+		} else if !isAbsTarget(secret.Target) {
 			target = secretsDir + secret.Target
 		}
 
@@ -929,8 +929,22 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 	return values, nil
 }
 
+func isAbsTarget(p string) bool {
+	return isUnixAbs(p) || isWindowsAbs(p)
+}
+
 func isUnixAbs(p string) bool {
 	return strings.HasPrefix(p, "/")
+}
+
+func isWindowsAbs(p string) bool {
+	if strings.HasPrefix(p, "\\\\") {
+		return true
+	}
+	if len(p) > 2 && p[1] == ':' {
+		return p[2] == '\\'
+	}
+	return false
 }
 
 func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
