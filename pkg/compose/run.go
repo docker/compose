@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -36,11 +37,6 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 
-	start := cmd.NewStartOptions()
-	start.OpenStdin = !opts.Detach && opts.Interactive
-	start.Attach = !opts.Detach
-	start.Containers = []string{containerID}
-
 	// remove cancellable context signal handler so we can forward signals to container without compose to exit
 	signal.Reset()
 
@@ -49,9 +45,14 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	go cmd.ForwardAllSignals(ctx, s.dockerCli, containerID, sigc)
 	defer signal.Stop(sigc)
 
-	err = cmd.RunStart(s.dockerCli, &start)
-	if sterr, ok := err.(cli.StatusError); ok {
-		return sterr.StatusCode, nil
+	err = cmd.RunStart(s.dockerCli, &cmd.StartOptions{
+		OpenStdin:  !opts.Detach && opts.Interactive,
+		Attach:     !opts.Detach,
+		Containers: []string{containerID},
+	})
+	var stErr cli.StatusError
+	if errors.As(err, &stErr) {
+		return stErr.StatusCode, nil
 	}
 	return 0, err
 }
