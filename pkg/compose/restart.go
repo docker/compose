@@ -48,7 +48,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		}
 	}
 
-	// ignore depends_on relations which are not impacted by restarting service
+	// ignore depends_on relations which are not impacted by restarting service or not required
 	for i, service := range project.Services {
 		for name, r := range service.DependsOn {
 			if !r.Restart {

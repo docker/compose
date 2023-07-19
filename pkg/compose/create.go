@@ -139,6 +139,7 @@ func prepareVolumes(p *types.Project) error {
 					p.Services[i].DependsOn[service.Name].Condition == "" {
 					p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
 						Condition: types.ServiceConditionStarted,
+						Required:  true,
 					}
 				}
 			}

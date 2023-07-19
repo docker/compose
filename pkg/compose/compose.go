@@ -203,6 +203,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 				condition := ServiceConditionRunningOrHealthy
 				// Let's restart the dependency by default if we don't have the info stored in the label
 				restart := true
+				required := true
 				dependency := dcArr[0]
 
 				// backward compatibility
@@ -212,7 +213,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 						restart, _ = strconv.ParseBool(dcArr[2])
 					}
 				}
-				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition, Restart: restart}
+				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition, Restart: restart, Required: required}
 			}
 		}
 		project.Services = append(project.Services, *service)

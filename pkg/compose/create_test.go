@@ -124,7 +124,7 @@ func TestPrepareVolumes(t *testing.T) {
 					Name:        "aService",
 					VolumesFrom: []string{"anotherService"},
 					DependsOn: map[string]composetypes.ServiceDependency{
-						"anotherService": {Condition: composetypes.ServiceConditionHealthy},
+						"anotherService": {Condition: composetypes.ServiceConditionHealthy, Required: true},
 					},
 				},
 				{

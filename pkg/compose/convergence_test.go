@@ -236,8 +236,8 @@ func TestWaitDependencies(t *testing.T) {
 		redisService := types.ServiceConfig{Name: "redis", Scale: 1}
 		project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{dbService, redisService}}
 		dependencies := types.DependsOnConfig{
-			"db":    {Condition: types.ServiceConditionStarted},
-			"redis": {Condition: types.ServiceConditionStarted},
+			"db":    {Condition: types.ServiceConditionStarted, Required: true},
+			"redis": {Condition: types.ServiceConditionStarted, Required: true},
 		}
 		assert.NilError(t, tested.waitDependencies(context.Background(), &project, dependencies, nil))
 	})
