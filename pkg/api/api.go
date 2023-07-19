@@ -145,7 +145,6 @@ func (o BuildOptions) Apply(project *types.Project) error {
 		if service.Build == nil {
 			continue
 		}
-		service.Image = GetImageNameOrDefault(service, project.Name)
 		if platform != "" {
 			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, platform) {
 				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", service.Name, platform)

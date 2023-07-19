@@ -77,7 +77,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return nil, err
 	}
 
-	builtIDs := make([]string, len(project.Services))
+	builtDigests := make([]string, len(project.Services))
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
@@ -94,11 +94,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			} else {
 				service.Build.Args = service.Build.Args.OverrideBy(args)
 			}
-			id, err := s.doBuildClassic(ctx, service, options)
+			id, err := s.doBuildClassic(ctx, project.Name, service, options)
 			if err != nil {
 				return err
 			}
-			builtIDs[idx] = id
+			builtDigests[idx] = id
 
 			if options.Push {
 				return s.push(ctx, project, api.PushOptions{})
@@ -120,7 +120,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
-		builtIDs[idx] = digest
+		builtDigests[idx] = digest
 
 		return nil
 	}, func(traversal *graphTraversal) {
@@ -137,9 +137,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	imageIDs := map[string]string{}
-	for i, d := range builtIDs {
-		if d != "" {
-			imageIDs[project.Services[i].Image] = d
+	for i, imageDigest := range builtDigests {
+		if imageDigest != "" {
+			imageRef := api.GetImageNameOrDefault(project.Services[i], project.Name)
+			imageIDs[imageRef] = imageDigest
 		}
 	}
 	return imageIDs, err
@@ -222,7 +223,8 @@ func (s *composeService) prepareProjectForBuild(project *types.Project, images m
 			continue
 		}
 
-		_, localImagePresent := images[service.Image]
+		image := api.GetImageNameOrDefault(service, project.Name)
+		_, localImagePresent := images[image]
 		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 			service.Build = nil
 			project.Services[i] = service
@@ -292,8 +294,6 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 }
 
 func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, options api.BuildOptions) (build.Options, error) {
-	tags := []string{service.Image}
-
 	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
 
 	for k, v := range storeutil.GetProxyConfig(s.dockerCli) {
@@ -335,6 +335,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		sessionConfig = append(sessionConfig, secretsProvider)
 	}
 
+	tags := []string{api.GetImageNameOrDefault(service, project.Name)}
 	if len(service.Build.Tags) > 0 {
 		tags = append(tags, service.Build.Tags...)
 	}
@@ -345,18 +346,19 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 
 	imageLabels := getImageBuildLabels(project, service)
 
+	push := options.Push && service.Image != ""
 	exports := []bclient.ExportEntry{{
 		Type: "docker",
 		Attrs: map[string]string{
 			"load": "true",
-			"push": fmt.Sprint(options.Push),
+			"push": fmt.Sprint(push),
 		},
 	}}
 	if len(service.Build.Platforms) > 1 {
 		exports = []bclient.ExportEntry{{
 			Type: "image",
 			Attrs: map[string]string{
-				"push": fmt.Sprint(options.Push),
+				"push": fmt.Sprint(push),
 			},
 		}}
 	}

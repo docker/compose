@@ -111,7 +111,7 @@ func TestLocalComposeBuild(t *testing.T) {
 		t.Run(env+" no rebuild when up again", func(t *testing.T) {
 			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
 
-			assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"), res.Stdout())
+			assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"))
 		})
 
 		t.Run(env+" rebuild when up --build", func(t *testing.T) {
@@ -119,6 +119,11 @@ func TestLocalComposeBuild(t *testing.T) {
 
 			res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
 			res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
+		})
+
+		t.Run(env+" build --push ignored for unnamed images", func(t *testing.T) {
+			res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "build", "--push", "nginx")
+			assert.Assert(t, !strings.Contains(res.Stdout(), "failed to push"), res.Stdout())
 		})
 
 		t.Run(env+" cleanup build project", func(t *testing.T) {

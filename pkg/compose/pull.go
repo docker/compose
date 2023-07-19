@@ -313,8 +313,15 @@ func isServiceImageToBuild(service types.ServiceConfig, services []types.Service
 		return true
 	}
 
-	for _, depService := range services {
-		if depService.Image == service.Image && depService.Build != nil {
+	if service.Image == "" {
+		// N.B. this should be impossible as service must have either `build` or `image` (or both)
+		return false
+	}
+
+	// look through the other services to see if another has a build definition for the same
+	// image name
+	for _, svc := range services {
+		if svc.Image == service.Image && svc.Build != nil {
 			return true
 		}
 	}
