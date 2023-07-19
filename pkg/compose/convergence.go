@@ -25,8 +25,12 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
+	"github.com/docker/compose/v2/internal/tracing"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -93,17 +97,19 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 			return err
 		}
 
-		strategy := options.RecreateDependencies
-		if utils.StringContains(options.Services, name) {
-			strategy = options.Recreate
-		}
-		err = c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
-		if err != nil {
-			return err
-		}
+		return tracing.SpanWrapFunc("service/apply", tracing.ServiceOptions(service), func(ctx context.Context) error {
+			strategy := options.RecreateDependencies
+			if utils.StringContains(options.Services, name) {
+				strategy = options.Recreate
+			}
+			err = c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
+			if err != nil {
+				return err
+			}
 
-		c.updateProject(project, name)
-		return nil
+			c.updateProject(project, name)
+			return nil
+		})(ctx)
 	})
 }
 
@@ -179,7 +185,8 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		if i >= expected {
 			// Scale Down
 			container := container
-			eg.Go(func() error {
+			traceOpts := append(tracing.ServiceOptions(service), tracing.ContainerOptions(container)...)
+			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "service/scale/down", traceOpts, func(ctx context.Context) error {
 				timeoutInSecond := utils.DurationSecondToInt(timeout)
 				err := c.service.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{
 					Timeout: timeoutInSecond,
@@ -188,7 +195,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 					return err
 				}
 				return c.service.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
-			})
+			}))
 			continue
 		}
 
@@ -198,11 +205,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		}
 		if mustRecreate {
 			i, container := i, container
-			eg.Go(func() error {
+			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "container/recreate", tracing.ContainerOptions(container), func(ctx context.Context) error {
 				recreated, err := c.service.recreateContainer(ctx, project, service, container, inherit, timeout)
 				updated[i] = recreated
 				return err
-			})
+			}))
 			continue
 		}
 
@@ -218,9 +225,9 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			w.Event(progress.CreatedEvent(name))
 		default:
 			container := container
-			eg.Go(func() error {
+			eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/start", tracing.ContainerOptions(container), func(ctx context.Context) error {
 				return c.service.startContainer(ctx, container)
-			})
+			}))
 		}
 		updated[i] = container
 	}
@@ -231,7 +238,8 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		number := next + i
 		name := getContainerName(project.Name, service, number)
 		i := i
-		eg.Go(func() error {
+		eventOpts := tracing.SpanOptions{trace.WithAttributes(attribute.String("container.name", name))}
+		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/scale/up", eventOpts, func(ctx context.Context) error {
 			opts := createOptions{
 				AutoRemove:        false,
 				AttachStdin:       false,
@@ -241,7 +249,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			container, err := c.service.createContainer(ctx, project, service, name, number, opts)
 			updated[actual+i] = container
 			return err
-		})
+		}))
 		continue
 	}
 

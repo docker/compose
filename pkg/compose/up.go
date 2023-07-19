@@ -23,6 +23,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/docker/compose/v2/internal/tracing"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/pkg/api"
@@ -31,7 +33,7 @@ import (
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
-	err := progress.Run(ctx, func(ctx context.Context) error {
+	err := progress.Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
 			return err
@@ -40,7 +42,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil
-	}, s.stdinfo())
+	}), s.stdinfo())
 	if err != nil {
 		return err
 	}

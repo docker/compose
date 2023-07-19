@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/compose/v2/internal/tracing"
+
 	"github.com/docker/buildx/controller/pb"
 
 	"github.com/compose-spec/compose-go/types"
@@ -170,7 +172,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		return err
 	}
 
-	err = s.pullRequiredImages(ctx, project, images, quietPull)
+	err = tracing.SpanWrapFunc("project/pull", tracing.ProjectOptions(project),
+		func(ctx context.Context) error {
+			return s.pullRequiredImages(ctx, project, images, quietPull)
+		},
+	)(ctx)
 	if err != nil {
 		return err
 	}
@@ -186,15 +192,23 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	}
 
 	if buildRequired {
-		builtImages, err := s.build(ctx, project, api.BuildOptions{
-			Progress: mode,
-		})
+		err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(project),
+			func(ctx context.Context) error {
+				builtImages, err := s.build(ctx, project, api.BuildOptions{
+					Progress: mode,
+				})
+				if err != nil {
+					return err
+				}
+
+				for name, digest := range builtImages {
+					images[name] = digest
+				}
+				return nil
+			},
+		)(ctx)
 		if err != nil {
 			return err
-		}
-
-		for name, digest := range builtImages {
-			images[name] = digest
 		}
 	}
 
