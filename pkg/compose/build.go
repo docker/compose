@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/buildx/builder"
 	"github.com/docker/compose/v2/internal/tracing"
 
 	"github.com/docker/buildx/controller/pb"
@@ -66,6 +67,27 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
 	if err != nil {
 		return nil, err
+	}
+
+	// Initialize buildkit nodes
+	var (
+		b     *builder.Builder
+		nodes []builder.Node
+	)
+	if buildkitEnabled {
+		builderName := options.Builder
+		if builderName == "" {
+			builderName = os.Getenv("BUILDX_BUILDER")
+		}
+		b, err = builder.New(s.dockerCli, builder.WithName(builderName))
+		if err != nil {
+			return nil, err
+		}
+
+		nodes, err = b.LoadNodes(ctx, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Progress needs its own context that lives longer than the
@@ -118,7 +140,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
 
-		digest, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, w, options.Builder)
+		digest, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, w, nodes)
 		if err != nil {
 			return err
 		}
