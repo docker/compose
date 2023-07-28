@@ -26,6 +26,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/docker/docker/api/types/volume"
 
 	"github.com/compose-spec/compose-go/types"
@@ -58,6 +60,7 @@ func init() {
 func NewComposeService(dockerCli command.Cli) api.Service {
 	return &composeService{
 		dockerCli:      dockerCli,
+		clock:          clockwork.NewRealClock(),
 		maxConcurrency: -1,
 		dryRun:         false,
 	}
@@ -65,6 +68,7 @@ func NewComposeService(dockerCli command.Cli) api.Service {
 
 type composeService struct {
 	dockerCli      command.Cli
+	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
 }

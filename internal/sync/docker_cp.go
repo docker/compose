@@ -71,19 +71,19 @@ func (d *DockerCopy) sync(ctx context.Context, service types.ServiceConfig, path
 		if fi.IsDir() {
 			for i := 1; i <= scale; i++ {
 				_, err := d.client.Exec(ctx, d.projectName, api.RunOptions{
-					Service: pathMapping.Service,
+					Service: service.Name,
 					Command: []string{"mkdir", "-p", pathMapping.ContainerPath},
 					Index:   i,
 				})
 				if err != nil {
-					logrus.Warnf("failed to create %q from %s: %v", pathMapping.ContainerPath, pathMapping.Service, err)
+					logrus.Warnf("failed to create %q from %s: %v", pathMapping.ContainerPath, service.Name, err)
 				}
 			}
 			fmt.Fprintf(d.infoWriter, "%s created\n", pathMapping.ContainerPath)
 		} else {
 			err := d.client.Copy(ctx, d.projectName, api.CopyOptions{
 				Source:      pathMapping.HostPath,
-				Destination: fmt.Sprintf("%s:%s", pathMapping.Service, pathMapping.ContainerPath),
+				Destination: fmt.Sprintf("%s:%s", service.Name, pathMapping.ContainerPath),
 			})
 			if err != nil {
 				return err
@@ -93,12 +93,12 @@ func (d *DockerCopy) sync(ctx context.Context, service types.ServiceConfig, path
 	} else if errors.Is(statErr, fs.ErrNotExist) {
 		for i := 1; i <= scale; i++ {
 			_, err := d.client.Exec(ctx, d.projectName, api.RunOptions{
-				Service: pathMapping.Service,
+				Service: service.Name,
 				Command: []string{"rm", "-rf", pathMapping.ContainerPath},
 				Index:   i,
 			})
 			if err != nil {
-				logrus.Warnf("failed to delete %q from %s: %v", pathMapping.ContainerPath, pathMapping.Service, err)
+				logrus.Warnf("failed to delete %q from %s: %v", pathMapping.ContainerPath, service.Name, err)
 			}
 		}
 		fmt.Fprintf(d.infoWriter, "%s deleted from service\n", pathMapping.ContainerPath)
