@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
@@ -68,12 +69,19 @@ type Command func(context.Context, []string) error
 // CobraCommand defines a cobra command function
 type CobraCommand func(context.Context, *cobra.Command, []string) error
 
+var typeCancelCtx reflect.Type // check Cancel context
+
+func init() {
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	typeCancelCtx = reflect.TypeOf(ctx)
+}
+
 // AdaptCmd adapt a CobraCommand func to cobra library
 func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		contextString := fmt.Sprintf("%s", ctx)
-		if !strings.HasSuffix(contextString, ".WithCancel") { // need to handle cancel
+		if reflect.TypeOf(ctx) != typeCancelCtx { // need to handle cancel
 			cancellableCtx, cancel := context.WithCancel(cmd.Context())
 			ctx = cancellableCtx
 			s := make(chan os.Signal, 1)
