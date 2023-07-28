@@ -136,8 +136,8 @@ github.com/compose-spec/compose-go v1.17.0/go.mod h1:zR2tP1+kZHi5vJz7PjpW6oMoDji
 github.com/containerd/cgroups v1.1.0 h1:v8rEWFl6EoqHB+swVNjVoCJE8o3jX7e8nqBGPLaDFBM=
 github.com/containerd/console v1.0.3 h1:lIr7SlA5PxZyMV30bDW0MGbiOPXwc63yRuCP0ARubLw=
 github.com/containerd/console v1.0.3/go.mod h1:7LqA/THxQ86k76b8c/EMSiaJ3h1eZkMkXar0TQ1gf3U=
-github.com/containerd/containerd v1.7.2 h1:UF2gdONnxO8I6byZXDi5sXWiWvlW3D/sci7dTQimEJo=
-github.com/containerd/containerd v1.7.2/go.mod h1:afcz74+K10M/+cjGHIVQrCt3RAQhUSCAjJ9iMYhhkuI=
+github.com/containerd/containerd v1.7.3 h1:cKwYKkP1eTj54bP3wCdXXBymmKRQMrWjkLSWZZJDa8o=
+github.com/containerd/containerd v1.7.3/go.mod h1:32FOM4/O0RkNg7AjQj3hDzN9cUGtu+HMvaKUNiqCZB8=
 github.com/containerd/continuity v0.4.1 h1:wQnVrjIyQ8vhU2sgOiL5T07jo+ouqc2bnKsv5/EqGhU=
 github.com/containerd/continuity v0.4.1/go.mod h1:F6PTNCKepoxEaXLQp3wDAjygEnImnZ/7o4JzpodfroQ=
 github.com/containerd/fifo v1.1.0 h1:4I2mbh5stb1u6ycIABlBw9zgtlK8viPI9QkQNRQEEmY=
