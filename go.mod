@@ -12,7 +12,7 @@ require (
 	github.com/cucumber/godog v0.0.0-00010101000000-000000000000 // replaced; see replace for the actual version used
 	github.com/distribution/distribution/v3 v3.0.0-20230601133803-97b1d649c493
 	github.com/docker/buildx v0.11.2
-	github.com/docker/cli v24.0.4+incompatible
+	github.com/docker/cli v24.0.5+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
 	github.com/docker/docker v24.0.5-0.20230714235725-36e9e796c6fc+incompatible // v24.0.5-dev
 	github.com/docker/go-connections v0.4.0
