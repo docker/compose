@@ -17,10 +17,15 @@ package compose
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
+
+	moby "github.com/docker/docker/api/types"
 
 	"github.com/docker/compose/v2/internal/sync"
 
@@ -185,11 +190,11 @@ WATCH:
 			hostPath := event.Path()
 
 			for i, trigger := range triggers {
-				logrus.Debugf("change detected on %s - comparing with %s", hostPath, trigger.Path)
+				logrus.Debugf("change for %s - comparing with %s", hostPath, trigger.Path)
 				if watch.IsChild(trigger.Path, hostPath) {
-
 					match, err := ignores[i].Matches(hostPath)
 					if err != nil {
+						logrus.Warnf("error ignore matching %q: %v", hostPath, err)
 						return err
 					}
 
@@ -198,6 +203,7 @@ WATCH:
 						continue
 					}
 
+					logrus.Infof("change for %q", hostPath)
 					fmt.Fprintf(s.stdinfo(), "change detected on %s\n", hostPath)
 
 					switch trigger.Action {
@@ -241,9 +247,18 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 	if err != nil {
 		return nil, err
 	}
+	baseDir, err := filepath.EvalSymlinks(project.WorkingDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolving symlink for %q: %w", project.WorkingDir, err)
+	}
+
 	for i, trigger := range config.Watch {
 		if !filepath.IsAbs(trigger.Path) {
-			trigger.Path = filepath.Join(project.WorkingDir, trigger.Path)
+			trigger.Path = filepath.Join(baseDir, trigger.Path)
+		}
+		if p, err := filepath.EvalSymlinks(trigger.Path); err == nil {
+			// this might fail because the path doesn't exist, etc.
+			trigger.Path = p
 		}
 		trigger.Path = filepath.Clean(trigger.Path)
 		if trigger.Path == "" {
@@ -301,19 +316,24 @@ func (s *composeService) makeSyncFn(
 	project *types.Project,
 	needSync <-chan sync.PathMapping,
 ) func() error {
-	syncer := sync.NewDockerCopy(project.Name, s, s.stdinfo())
+	var syncer sync.Syncer
+	if useTar, _ := strconv.ParseBool(os.Getenv("COMPOSE_EXPERIMENTAL_WATCH_TAR")); useTar {
+		syncer = sync.NewTar(project.Name, tarDockerClient{s: s})
+	} else {
+		syncer = sync.NewDockerCopy(project.Name, s, s.stdinfo())
+	}
 
 	return func() error {
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
-			case pathMapping := <-needSync:
-				service, err := project.GetService(pathMapping.Service)
+			case op := <-needSync:
+				service, err := project.GetService(op.Service)
 				if err != nil {
 					return err
 				}
-				if err := syncer.Sync(ctx, service, []sync.PathMapping{pathMapping}); err != nil {
+				if err := syncer.Sync(ctx, service, []sync.PathMapping{op}); err != nil {
 					return err
 				}
 			}
@@ -355,4 +375,73 @@ func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolu
 		}
 	}
 	return false
+}
+
+type tarDockerClient struct {
+	s *composeService
+}
+
+func (t tarDockerClient) ContainersForService(ctx context.Context, projectName string, serviceName string) ([]moby.Container, error) {
+	containers, err := t.s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	return containers, nil
+}
+
+func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
+	execCfg := moby.ExecConfig{
+		Cmd:          cmd,
+		AttachStdout: false,
+		AttachStderr: true,
+		AttachStdin:  in != nil,
+		Tty:          false,
+	}
+	execCreateResp, err := t.s.apiClient().ContainerExecCreate(ctx, containerID, execCfg)
+	if err != nil {
+		return err
+	}
+
+	startCheck := moby.ExecStartCheck{Tty: false, Detach: false}
+	conn, err := t.s.apiClient().ContainerExecAttach(ctx, execCreateResp.ID, startCheck)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	var eg errgroup.Group
+	if in != nil {
+		eg.Go(func() error {
+			defer func() {
+				_ = conn.CloseWrite()
+			}()
+			_, err := io.Copy(conn.Conn, in)
+			return err
+		})
+	}
+	eg.Go(func() error {
+		_, err := io.Copy(t.s.stdinfo(), conn.Reader)
+		return err
+	})
+
+	err = t.s.apiClient().ContainerExecStart(ctx, execCreateResp.ID, startCheck)
+	if err != nil {
+		return err
+	}
+
+	// although the errgroup is not tied directly to the context, the operations
+	// in it are reading/writing to the connection, which is tied to the context,
+	// so they won't block indefinitely
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	execResult, err := t.s.apiClient().ContainerExecInspect(ctx, execCreateResp.ID)
+	if err != nil {
+		return err
+	}
+	if execResult.ExitCode != 0 {
+		return fmt.Errorf("exit code %d", execResult.ExitCode)
+	}
+	return nil
 }

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -34,21 +33,28 @@ import (
 )
 
 func TestWatch(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Test currently broken on macOS due to symlink issues (see compose-go#436)")
-	}
-
 	services := []string{"alpine", "busybox", "debian"}
-	for _, svcName := range services {
-		t.Run(svcName, func(t *testing.T) {
-			t.Helper()
-			doTest(t, svcName)
-		})
-	}
+	t.Run("docker cp", func(t *testing.T) {
+		for _, svcName := range services {
+			t.Run(svcName, func(t *testing.T) {
+				t.Helper()
+				doTest(t, svcName, false)
+			})
+		}
+	})
+
+	t.Run("tar", func(t *testing.T) {
+		for _, svcName := range services {
+			t.Run(svcName, func(t *testing.T) {
+				t.Helper()
+				doTest(t, svcName, true)
+			})
+		}
+	})
 }
 
 // NOTE: these tests all share a single Compose file but are safe to run concurrently
-func doTest(t *testing.T, svcName string) {
+func doTest(t *testing.T, svcName string, tarSync bool) {
 	tmpdir := t.TempDir()
 	dataDir := filepath.Join(tmpdir, "data")
 	writeDataFile := func(name string, contents string) {
@@ -66,6 +72,9 @@ func doTest(t *testing.T, svcName string) {
 	env := []string{
 		"COMPOSE_FILE=" + composeFilePath,
 		"COMPOSE_PROJECT_NAME=" + projName,
+	}
+	if tarSync {
+		env = append(env, "COMPOSE_EXPERIMENTAL_WATCH_TAR=1")
 	}
 
 	cli := NewCLI(t, WithEnv(env...))
@@ -93,7 +102,7 @@ func doTest(t *testing.T, svcName string) {
 	var testComplete atomic.Bool
 	go func() {
 		// if the process exits abnormally before the test is done, fail the test
-		if err := r.Cmd.Wait(); err != nil && !testComplete.Load() {
+		if err := r.Cmd.Wait(); err != nil && !t.Failed() && !testComplete.Load() {
 			assert.Check(t, cmp.Nil(err))
 		}
 	}()
@@ -136,8 +145,7 @@ func doTest(t *testing.T, svcName string) {
 		Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "No such file or directory",
-		},
-		)
+		})
 
 	t.Logf("Writing to ignored paths")
 	writeDataFile("data.foo", "ignored")
