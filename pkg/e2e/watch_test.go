@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -73,9 +74,7 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 	env := []string{
 		"COMPOSE_FILE=" + composeFilePath,
 		"COMPOSE_PROJECT_NAME=" + projName,
-	}
-	if tarSync {
-		env = append(env, "COMPOSE_EXPERIMENTAL_WATCH_TAR=1")
+		"COMPOSE_EXPERIMENTAL_WATCH_TAR=" + strconv.FormatBool(tarSync),
 	}
 
 	cli := NewCLI(t, WithEnv(env...))

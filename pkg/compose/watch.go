@@ -67,22 +67,32 @@ type fileEvent struct {
 	Action WatchAction
 }
 
+// getSyncImplementation returns the the tar-based syncer unless it has been explicitly
+// disabled with `COMPOSE_EXPERIMENTAL_WATCH_TAR=0`. Note that the absence of the env
+// var means enabled.
+func (s *composeService) getSyncImplementation(project *types.Project) sync.Syncer {
+	var useTar bool
+	if useTarEnv, ok := os.LookupEnv("COMPOSE_EXPERIMENTAL_WATCH_TAR"); ok {
+		useTar, _ = strconv.ParseBool(useTarEnv)
+	} else {
+		useTar = true
+	}
+	if useTar {
+		return sync.NewTar(project.Name, tarDockerClient{s: s})
+	}
+
+	return sync.NewDockerCopy(project.Name, s, s.stdinfo())
+}
+
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error { //nolint: gocyclo
 	_, err := s.prepareProjectForBuild(project, nil)
 	if err != nil {
 		return err
 	}
-	var syncer sync.Syncer
-	if useTar, _ := strconv.ParseBool(os.Getenv("COMPOSE_EXPERIMENTAL_WATCH_TAR")); useTar {
-		syncer = sync.NewTar(project.Name, tarDockerClient{s: s})
-	} else {
-		syncer = sync.NewDockerCopy(project.Name, s, s.stdinfo())
-	}
-
 	if err := project.ForServices(services); err != nil {
 		return err
 	}
-
+	syncer := s.getSyncImplementation(project)
 	eg, ctx := errgroup.WithContext(ctx)
 	watching := false
 	for i := range project.Services {
