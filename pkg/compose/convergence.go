@@ -294,7 +294,7 @@ func containerEvents(containers Containers, eventFunc func(string) progress.Even
 	return events
 }
 
-func containerSkippedEvents(containers Containers, eventFunc func(string, string) progress.Event, reason string) []progress.Event {
+func containerReasonEvents(containers Containers, eventFunc func(string, string) progress.Event, reason string) []progress.Event {
 	events := []progress.Event{}
 	for _, container := range containers {
 		events = append(events, eventFunc(getContainerProgressName(container), reason))
@@ -334,7 +334,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 					healthy, err := s.isServiceHealthy(ctx, waitingFor, true)
 					if err != nil {
 						if !config.Required {
-							w.Events(containerSkippedEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep)))
+							w.Events(containerReasonEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep)))
 							logrus.Warnf("optional dependency %q is not running or is unhealthy: %s", dep, err.Error())
 							return nil
 						}
@@ -348,7 +348,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 					healthy, err := s.isServiceHealthy(ctx, waitingFor, false)
 					if err != nil {
 						if !config.Required {
-							w.Events(containerSkippedEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q failed to start", dep)))
+							w.Events(containerReasonEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q failed to start", dep)))
 							logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
 							return nil
 						}
@@ -365,17 +365,22 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if exited {
-						logMessageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
-						if !config.Required {
-							w.Events(containerSkippedEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %s", logMessageSuffix)))
-							logrus.Warnf("optional dependency %s", logMessageSuffix)
+						if code == 0 {
+							w.Events(containerEvents(waitingFor, progress.Exited))
 							return nil
 						}
-						w.Events(containerEvents(waitingFor, progress.Exited))
-						if code != 0 {
-							return fmt.Errorf("service %q didn't complete successfully: exit %d", dep, code)
+
+						messageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
+						if !config.Required {
+							// optional -> mark as skipped & don't propagate error
+							w.Events(containerReasonEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %s", messageSuffix)))
+							logrus.Warnf("optional dependency %s", messageSuffix)
+							return nil
 						}
-						return nil
+
+						msg := fmt.Sprintf("service %s", messageSuffix)
+						w.Events(containerReasonEvents(waitingFor, progress.ErrorMessageEvent, msg))
+						return errors.New(msg)
 					}
 				default:
 					logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
