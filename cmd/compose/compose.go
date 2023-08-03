@@ -448,6 +448,10 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 			return []string{"yaml", "yml"}, cobra.ShellCompDirectiveFilterFileExt
 		},
 	)
+	c.RegisterFlagCompletionFunc( //nolint:errcheck
+		"profile",
+		completeProfileNames(&opts),
+	)
 
 	c.Flags().StringVar(&progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 
