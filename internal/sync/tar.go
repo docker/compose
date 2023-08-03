@@ -80,9 +80,6 @@ func (t *Tar) Sync(ctx context.Context, service types.ServiceConfig, paths []Pat
 		}
 	}
 
-	// TODO: this can't be read from multiple times
-	tarReader := tarArchive(pathsToCopy)
-
 	var deleteCmd []string
 	if len(pathsToDelete) != 0 {
 		deleteCmd = append([]string{"rm", "-rf"}, pathsToDelete...)
@@ -90,20 +87,36 @@ func (t *Tar) Sync(ctx context.Context, service types.ServiceConfig, paths []Pat
 	copyCmd := []string{"tar", "-v", "-C", "/", "-x", "-f", "-"}
 
 	var eg multierror.Group
+	writers := make([]*io.PipeWriter, len(containers))
 	for i := range containers {
 		containerID := containers[i].ID
+		r, w := io.Pipe()
+		writers[i] = w
 		eg.Go(func() error {
 			if len(deleteCmd) != 0 {
 				if err := t.client.Exec(ctx, containerID, deleteCmd, nil); err != nil {
 					return fmt.Errorf("deleting paths in %s: %w", containerID, err)
 				}
 			}
-			if err := t.client.Exec(ctx, containerID, copyCmd, tarReader); err != nil {
+			if err := t.client.Exec(ctx, containerID, copyCmd, r); err != nil {
 				return fmt.Errorf("copying files to %s: %w", containerID, err)
 			}
 			return nil
 		})
 	}
+
+	multiWriter := newLossyMultiWriter(writers...)
+	tarReader := tarArchive(pathsToCopy)
+	defer func() {
+		_ = tarReader.Close()
+		multiWriter.Close()
+	}()
+	_, err = io.Copy(multiWriter, tarReader)
+	if err != nil {
+		return err
+	}
+	multiWriter.Close()
+
 	return eg.Wait().ErrorOrNil()
 }
 
