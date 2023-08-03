@@ -19,7 +19,9 @@ package e2e
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -366,10 +368,21 @@ func TestBuildPrivileged(t *testing.T) {
 	})
 
 	t.Run("use build privileged mode to run insecure build command", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/privileged", "build")
-		assert.NilError(t, res.Error, res.Stderr())
-		res.Assert(t, icmd.Expected{Out: "CapEff:\t0000003fffffffff"})
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/privileged", "build")
+		capEffRe := regexp.MustCompile("CapEff:\t([0-9a-f]+)")
+		matches := capEffRe.FindStringSubmatch(res.Stdout())
+		assert.Equal(t, 2, len(matches), "Did not match CapEff in output, matches: %v", matches)
 
+		capEff, err := strconv.ParseUint(matches[1], 16, 64)
+		assert.NilError(t, err, "Parsing CapEff: %s", matches[1])
+
+		// NOTE: can't use constant from x/sys/unix or tests won't compile on macOS/Windows
+		// #define CAP_SYS_ADMIN        21
+		// https://github.com/torvalds/linux/blob/v6.1/include/uapi/linux/capability.h#L278
+		const capSysAdmin = 0x15
+		if capEff&capSysAdmin != capSysAdmin {
+			t.Fatalf("CapEff %s is missing CAP_SYS_ADMIN", matches[1])
+		}
 	})
 }
 
