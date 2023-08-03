@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/distribution/distribution/v3/uuid"
 	"github.com/stretchr/testify/require"
@@ -132,7 +133,7 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 	poll.WaitOn(t, func(t poll.LogT) poll.Result {
 		writeDataFile("hello.txt", "hello world")
 		return checkFileContents("/app/data/hello.txt", "hello world")(t)
-	})
+	}, poll.WithDelay(time.Second))
 
 	t.Logf("Modifying file contents")
 	writeDataFile("hello.txt", "hello watch")

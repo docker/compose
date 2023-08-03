@@ -16,47 +16,60 @@ package compose
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/mocks"
+	moby "github.com/docker/docker/api/types"
+	"github.com/golang/mock/gomock"
+
+	"github.com/jonboulle/clockwork"
+	"github.com/stretchr/testify/require"
+
 	"github.com/docker/compose/v2/internal/sync"
 
-	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/watch"
-	"github.com/jonboulle/clockwork"
-	"golang.org/x/sync/errgroup"
 	"gotest.tools/v3/assert"
 )
 
-func Test_debounce(t *testing.T) {
+func TestDebounceBatching(t *testing.T) {
 	ch := make(chan fileEvent)
-	var (
-		ran int
-		got []string
-	)
 	clock := clockwork.NewFakeClock()
 	ctx, stop := context.WithCancel(context.Background())
 	t.Cleanup(stop)
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		debounce(ctx, clock, quietPeriod, ch, func(services rebuildServices) {
-			for svc := range services {
-				got = append(got, svc)
-			}
-			ran++
-			stop()
-		})
-		return nil
-	})
+
+	eventBatchCh := batchDebounceEvents(ctx, clock, quietPeriod, ch)
 	for i := 0; i < 100; i++ {
-		ch <- fileEvent{Service: "test"}
+		var action WatchAction = "a"
+		if i%2 == 0 {
+			action = "b"
+		}
+		ch <- fileEvent{Action: action}
 	}
-	assert.Equal(t, ran, 0)
+	// we sent 100 events + the debouncer
+	clock.BlockUntil(101)
 	clock.Advance(quietPeriod)
-	err := eg.Wait()
-	assert.NilError(t, err)
-	assert.Equal(t, ran, 1)
-	assert.DeepEqual(t, got, []string{"test"})
+	select {
+	case batch := <-eventBatchCh:
+		require.ElementsMatch(t, batch, []fileEvent{
+			{Action: "a"},
+			{Action: "b"},
+		})
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timed out waiting for events")
+	}
+	clock.BlockUntil(1)
+	clock.Advance(quietPeriod)
+
+	// there should only be a single batch
+	select {
+	case batch := <-eventBatchCh:
+		t.Fatalf("unexpected events: %v", batch)
+	case <-time.After(50 * time.Millisecond):
+		// channel is empty
+	}
 }
 
 type testWatcher struct {
@@ -80,73 +93,106 @@ func (t testWatcher) Errors() chan error {
 	return t.errors
 }
 
-func Test_sync(t *testing.T) {
-	needSync := make(chan sync.PathMapping)
-	needRebuild := make(chan fileEvent)
-	ctx, cancelFunc := context.WithCancel(context.TODO())
-	defer cancelFunc()
+func TestWatch_Sync(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return([]moby.Container{
+		testContainer("test", "123", false),
+	}, nil).AnyTimes()
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
-	run := func() watch.Notify {
-		watcher := testWatcher{
-			events: make(chan watch.FileEvent, 1),
-			errors: make(chan error),
-		}
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	t.Cleanup(cancelFunc)
 
-		go func() {
-			cli, err := command.NewDockerCli()
-			assert.NilError(t, err)
-
-			service := composeService{
-				dockerCli: cli,
-			}
-			err = service.watch(ctx, "test", watcher, []Trigger{
-				{
-					Path:   "/src",
-					Action: "sync",
-					Target: "/work",
-					Ignore: []string{"ignore"},
-				},
-				{
-					Path:   "/",
-					Action: "rebuild",
-				},
-			}, needSync, needRebuild)
-			assert.NilError(t, err)
-		}()
-		return watcher
+	proj := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name: "test",
+			},
+		},
 	}
 
-	t.Run("synchronize file", func(t *testing.T) {
-		watcher := run()
-		watcher.Events() <- watch.NewFileEvent("/src/changed")
-		select {
-		case actual := <-needSync:
-			assert.DeepEqual(t, sync.PathMapping{Service: "test", HostPath: "/src/changed", ContainerPath: "/work/changed"}, actual)
-		case <-time.After(100 * time.Millisecond):
-			t.Error("timeout")
-		}
-	})
+	watcher := testWatcher{
+		events: make(chan watch.FileEvent),
+		errors: make(chan error),
+	}
 
-	t.Run("ignore", func(t *testing.T) {
-		watcher := run()
-		watcher.Events() <- watch.NewFileEvent("/src/ignore")
-		select {
-		case <-needSync:
-			t.Error("file event should have been ignored")
-		case <-time.After(100 * time.Millisecond):
-			// expected
+	syncer := newFakeSyncer()
+	clock := clockwork.NewFakeClock()
+	go func() {
+		service := composeService{
+			dockerCli: cli,
+			clock:     clock,
 		}
-	})
+		err := service.watch(ctx, &proj, "test", watcher, syncer, []Trigger{
+			{
+				Path:   "/sync",
+				Action: "sync",
+				Target: "/work",
+				Ignore: []string{"ignore"},
+			},
+			{
+				Path:   "/rebuild",
+				Action: "rebuild",
+			},
+		})
+		assert.NilError(t, err)
+	}()
 
-	t.Run("rebuild", func(t *testing.T) {
-		watcher := run()
-		watcher.Events() <- watch.NewFileEvent("/dependencies.yaml")
-		select {
-		case event := <-needRebuild:
-			assert.Equal(t, "test", event.Service)
-		case <-time.After(100 * time.Millisecond):
-			t.Error("timeout")
-		}
-	})
+	watcher.Events() <- watch.NewFileEvent("/sync/changed")
+	watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
+	clock.BlockUntil(3)
+	clock.Advance(quietPeriod)
+	select {
+	case actual := <-syncer.synced:
+		require.ElementsMatch(t, []sync.PathMapping{
+			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
+			{HostPath: "/sync/changed/sub", ContainerPath: "/work/changed/sub"},
+		}, actual)
+	case <-time.After(100 * time.Millisecond):
+		t.Error("timeout")
+	}
 
+	watcher.Events() <- watch.NewFileEvent("/sync/ignore")
+	watcher.Events() <- watch.NewFileEvent("/sync/ignore/sub")
+	watcher.Events() <- watch.NewFileEvent("/sync/changed")
+	clock.BlockUntil(4)
+	clock.Advance(quietPeriod)
+	select {
+	case actual := <-syncer.synced:
+		require.ElementsMatch(t, []sync.PathMapping{
+			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
+		}, actual)
+	case <-time.After(100 * time.Millisecond):
+		t.Error("timed out waiting for events")
+	}
+
+	watcher.Events() <- watch.NewFileEvent("/rebuild")
+	watcher.Events() <- watch.NewFileEvent("/sync/changed")
+	clock.BlockUntil(4)
+	clock.Advance(quietPeriod)
+	select {
+	case batch := <-syncer.synced:
+		t.Fatalf("received unexpected events: %v", batch)
+	case <-time.After(100 * time.Millisecond):
+		// expected
+	}
+	// TODO: there's not a great way to assert that the rebuild attempt happened
+}
+
+type fakeSyncer struct {
+	synced chan []sync.PathMapping
+}
+
+func newFakeSyncer() *fakeSyncer {
+	return &fakeSyncer{
+		synced: make(chan []sync.PathMapping),
+	}
+}
+
+func (f *fakeSyncer) Sync(_ context.Context, _ types.ServiceConfig, paths []sync.PathMapping) error {
+	f.synced <- paths
+	return nil
 }

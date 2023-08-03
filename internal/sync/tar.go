@@ -121,9 +121,7 @@ func (t *Tar) Sync(ctx context.Context, service types.ServiceConfig, paths []Pat
 }
 
 type ArchiveBuilder struct {
-	tw    *tar.Writer
-	paths []string // local paths archived
-
+	tw *tar.Writer
 	// A shared I/O buffer to help with file copying.
 	copyBuf *bytes.Buffer
 }
@@ -168,7 +166,6 @@ func (a *ArchiveBuilder) ArchivePathsIfExist(paths []PathMapping) error {
 		if err != nil {
 			return fmt.Errorf("archiving %q: %w", entry.path, err)
 		}
-		a.paths = append(a.paths, entry.path)
 	}
 	return nil
 }
