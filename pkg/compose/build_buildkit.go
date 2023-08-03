@@ -34,18 +34,11 @@ import (
 	"github.com/moby/buildkit/client"
 )
 
-func (s *composeService) doBuildBuildkit(ctx context.Context, service string, opts build.Options, p *buildx.Printer, builderName string) (string, error) {
-	b, err := builder.New(s.dockerCli, builder.WithName(builderName))
-	if err != nil {
-		return "", err
-	}
-
-	nodes, err := b.LoadNodes(ctx, false)
-	if err != nil {
-		return "", err
-	}
-
-	var response map[string]*client.SolveResponse
+func (s *composeService) doBuildBuildkit(ctx context.Context, service string, opts build.Options, p *buildx.Printer, nodes []builder.Node) (string, error) {
+	var (
+		response map[string]*client.SolveResponse
+		err      error
+	)
 	if s.dryRun {
 		response = s.dryRunBuildResponse(ctx, service, opts)
 	} else {
