@@ -38,8 +38,8 @@ func TestLocalComposeBuild(t *testing.T) {
 
 		t.Run(env+" build named and unnamed images", func(t *testing.T) {
 			// ensure local test run does not reuse previously build image
-			c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-			c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 
 			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build")
 
@@ -50,8 +50,8 @@ func TestLocalComposeBuild(t *testing.T) {
 
 		t.Run(env+" build with build-arg", func(t *testing.T) {
 			// ensure local test run does not reuse previously build image
-			c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-			c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 
 			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build", "--build-arg", "FOO=BAR")
 
@@ -61,8 +61,8 @@ func TestLocalComposeBuild(t *testing.T) {
 
 		t.Run(env+" build with build-arg set by env", func(t *testing.T) {
 			// ensure local test run does not reuse previously build image
-			c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-			c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 
 			icmd.RunCmd(c.NewDockerComposeCmd(t,
 				"--project-directory",
@@ -72,7 +72,7 @@ func TestLocalComposeBuild(t *testing.T) {
 				"FOO"),
 				func(cmd *icmd.Cmd) {
 					cmd.Env = append(cmd.Env, "FOO=BAR")
-				})
+				}).Assert(t, icmd.Success)
 
 			res := c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
 			res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
@@ -92,8 +92,9 @@ func TestLocalComposeBuild(t *testing.T) {
 		})
 
 		t.Run(env+" build as part of up", func(t *testing.T) {
-			c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-			c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+			// ensure local test run does not reuse previously build image
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 
 			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
 			t.Cleanup(func() {
@@ -130,8 +131,8 @@ func TestLocalComposeBuild(t *testing.T) {
 
 		t.Run(env+" cleanup build project", func(t *testing.T) {
 			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
-			c.RunDockerCmd(t, "rmi", "build-test-nginx")
-			c.RunDockerCmd(t, "rmi", "custom-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 		})
 	}
 
