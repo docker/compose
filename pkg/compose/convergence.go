@@ -324,7 +324,11 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			ticker := time.NewTicker(500 * time.Millisecond)
 			defer ticker.Stop()
 			for {
-				<-ticker.C
+				select {
+				case <-ticker.C:
+				case <-ctx.Done():
+					return nil
+				}
 				switch config.Condition {
 				case ServiceConditionRunningOrHealthy:
 					healthy, err := s.isServiceHealthy(ctx, waitingFor, true)
