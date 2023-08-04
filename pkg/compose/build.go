@@ -73,6 +73,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	var (
 		b     *builder.Builder
 		nodes []builder.Node
+		w     *xprogress.Printer
 	)
 	if buildkitEnabled {
 		builderName := options.Builder
@@ -88,17 +89,22 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	// Progress needs its own context that lives longer than the
-	// build one otherwise it won't read all the messages from
-	// build and will lock
-	progressCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+		// Progress needs its own context that lives longer than the
+		// build one otherwise it won't read all the messages from
+		// build and will lock
+		progressCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	w, err := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, options.Progress)
-	if err != nil {
-		return nil, err
+		w, err = xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, options.Progress,
+			xprogress.WithDesc(
+				fmt.Sprintf("building with %q instance using %s driver", b.Name, b.Driver),
+				fmt.Sprintf("%s:%s", b.Driver, b.Name),
+			))
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	builtDigests := make([]string, len(project.Services))
@@ -152,8 +158,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	})
 
 	// enforce all build event get consumed
-	if errw := w.Wait(); errw != nil {
-		return nil, errw
+	if buildkitEnabled {
+		if errw := w.Wait(); errw != nil {
+			return nil, errw
+		}
 	}
 
 	if err != nil {
