@@ -69,7 +69,6 @@ func traceClientFromDockerContext(dockerCli command.Cli, otelEnv envMap) (otlptr
 		cfg.Endpoint,
 		grpc.WithContextDialer(DialInMemory),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing otel connection from docker context metadata: %v", err)
