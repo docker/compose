@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -60,6 +61,26 @@ func completeProjectNames(backend api.Service) func(cmd *cobra.Command, args []s
 		for _, stack := range list {
 			if strings.HasPrefix(stack.Name, toComplete) {
 				values = append(values, stack.Name)
+			}
+		}
+		return values, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func completeProfileNames(p *ProjectOptions) validArgsFn {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		project, err := p.ToProject(nil)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		allProfileNames := project.AllServices().GetProfiles()
+		sort.Strings(allProfileNames)
+
+		var values []string
+		for _, profileName := range allProfileNames {
+			if strings.HasPrefix(profileName, toComplete) {
+				values = append(values, profileName)
 			}
 		}
 		return values, cobra.ShellCompDirectiveNoFileComp
