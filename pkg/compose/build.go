@@ -22,18 +22,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/buildx/builder"
-	"github.com/docker/compose/v2/internal/tracing"
-
-	"github.com/docker/buildx/controller/pb"
-
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
-	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
+	"github.com/docker/buildx/builder"
+	"github.com/docker/buildx/controller/pb"
 	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/internal/tracing"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
@@ -45,9 +46,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
+	// required to get default driver registered
+	_ "github.com/docker/buildx/driver/docker"
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
@@ -61,9 +61,8 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	}, s.stdinfo(), "Building")
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
-	args := options.Args.Resolve(envResolver(project.Environment))
-
+//nolint:gocyclo
+func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
 	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
 	if err != nil {
 		return nil, err
@@ -119,12 +118,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 
 		if !buildkitEnabled {
-			if service.Build.Args == nil {
-				service.Build.Args = args
-			} else {
-				service.Build.Args = service.Build.Args.OverrideBy(args)
-			}
-			id, err := s.doBuildClassic(ctx, project.Name, service, options)
+			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
 				return err
 			}
@@ -144,7 +138,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
-		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, flatten(args))
 
 		digest, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, w, nodes)
 		if err != nil {
@@ -337,15 +330,37 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	return images, nil
 }
 
-func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, options api.BuildOptions) (build.Options, error) {
-	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
+// resolveAndMergeBuildArgs returns the final set of build arguments to use for the service image build.
+//
+// First, args directly defined via `build.args` in YAML are considered.
+// Then, any explicitly passed args in opts (e.g. via `--build-arg` on the CLI) are merged, overwriting any
+// keys that already exist.
+// Next, any keys without a value are resolved using the project environment.
+//
+// Finally, standard proxy variables based on the Docker client configuration are added, but will not overwrite
+// any values if already present.
+func resolveAndMergeBuildArgs(
+	dockerCli command.Cli,
+	project *types.Project,
+	service types.ServiceConfig,
+	opts api.BuildOptions,
+) types.MappingWithEquals {
+	result := make(types.MappingWithEquals).
+		OverrideBy(service.Build.Args).
+		OverrideBy(opts.Args).
+		Resolve(envResolver(project.Environment))
 
-	for k, v := range storeutil.GetProxyConfig(s.dockerCli) {
-		if _, ok := buildArgs[k]; !ok {
-			buildArgs[k] = v
+	// proxy arguments do NOT override and should NOT have env resolution applied,
+	// so they're handled last
+	for k, v := range storeutil.GetProxyConfig(dockerCli) {
+		if _, ok := result[k]; !ok {
+			result[k] = &v
 		}
 	}
+	return result
+}
 
+func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, options api.BuildOptions) (build.Options, error) {
 	plats, err := addPlatforms(project, service)
 	if err != nil {
 		return build.Options{}, err
@@ -418,7 +433,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		CacheTo:     pb.CreateCaches(cacheTo),
 		NoCache:     service.Build.NoCache,
 		Pull:        service.Build.Pull,
-		BuildArgs:   buildArgs,
+		BuildArgs:   flatten(resolveAndMergeBuildArgs(s.dockerCli, project, service, options)),
 		Tags:        tags,
 		Target:      service.Build.Target,
 		Exports:     exports,
@@ -443,16 +458,6 @@ func flatten(in types.MappingWithEquals) types.Mapping {
 		out[k] = *v
 	}
 	return out
-}
-
-func mergeArgs(m ...types.Mapping) types.Mapping {
-	merged := types.Mapping{}
-	for _, mapping := range m {
-		for key, val := range mapping {
-			merged[key] = val
-		}
-	}
-	return merged
 }
 
 func dockerFilePath(ctxName string, dockerfile string) string {

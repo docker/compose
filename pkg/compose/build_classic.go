@@ -26,6 +26,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/docker/cli/cli/command"
+
 	"github.com/docker/docker/api/types/registry"
 
 	"github.com/compose-spec/compose-go/types"
@@ -45,7 +47,7 @@ import (
 )
 
 //nolint:gocyclo
-func (s *composeService) doBuildClassic(ctx context.Context, projectName string, service types.ServiceConfig, options api.BuildOptions) (string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, service types.ServiceConfig, options api.BuildOptions) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
 		dockerfileCtx io.ReadCloser
@@ -159,8 +161,8 @@ func (s *composeService) doBuildClassic(ctx context.Context, projectName string,
 	for k, auth := range creds {
 		authConfigs[k] = registry.AuthConfig(auth)
 	}
-	buildOptions := imageBuildOptions(service.Build)
-	imageName := api.GetImageNameOrDefault(service, projectName)
+	buildOptions := imageBuildOptions(s.dockerCli, project, service, options)
+	imageName := api.GetImageNameOrDefault(service, project.Name)
 	buildOptions.Tags = append(buildOptions.Tags, imageName)
 	buildOptions.Dockerfile = relDockerfile
 	buildOptions.AuthConfigs = authConfigs
@@ -215,14 +217,15 @@ func isLocalDir(c string) bool {
 	return err == nil
 }
 
-func imageBuildOptions(config *types.BuildConfig) dockertypes.ImageBuildOptions {
+func imageBuildOptions(dockerCli command.Cli, project *types.Project, service types.ServiceConfig, options api.BuildOptions) dockertypes.ImageBuildOptions {
+	config := service.Build
 	return dockertypes.ImageBuildOptions{
 		Version:     dockertypes.BuilderV1,
 		Tags:        config.Tags,
 		NoCache:     config.NoCache,
 		Remove:      true,
 		PullParent:  config.Pull,
-		BuildArgs:   config.Args,
+		BuildArgs:   resolveAndMergeBuildArgs(dockerCli, project, service, options),
 		Labels:      config.Labels,
 		NetworkMode: config.Network,
 		ExtraHosts:  config.ExtraHosts.AsList(),
