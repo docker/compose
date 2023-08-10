@@ -443,6 +443,12 @@ func RootCommand(streams command.Cli, backend api.Service) *cobra.Command { //no
 		completeProjectNames(backend),
 	)
 	c.RegisterFlagCompletionFunc( //nolint:errcheck
+		"project-directory",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveFilterDirs
+		},
+	)
+	c.RegisterFlagCompletionFunc( //nolint:errcheck
 		"file",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return []string{"yaml", "yml"}, cobra.ShellCompDirectiveFilterFileExt
