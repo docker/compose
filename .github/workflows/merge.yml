@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     branches:
-      - 'v2'
+      - 'main'
     tags:
       - 'v*'
 
