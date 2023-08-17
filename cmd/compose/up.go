@@ -18,7 +18,9 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -83,7 +85,10 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
 			create.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
 			if create.ignoreOrphans && create.removeOrphans {
-				return fmt.Errorf("%s and --remove-orphans cannot be combined", ComposeIgnoreOrphans)
+				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
+			}
+			if len(up.attach) != 0 && up.attachDependencies {
+				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
 			return runUp(ctx, streams, backend, create, up, project, services)
 		}),
@@ -108,12 +113,12 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 	flags.BoolVar(&up.noDeps, "no-deps", false, "Don't start linked services.")
 	flags.BoolVar(&create.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
 	flags.BoolVarP(&create.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
-	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
 	flags.BoolVar(&create.quietPull, "quiet-pull", false, "Pull without printing progress information.")
-	flags.StringArrayVar(&up.attach, "attach", []string{}, "Attach to service output.")
-	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Don't attach to specified service.")
+	flags.StringArrayVar(&up.attach, "attach", []string{}, "Restrict attaching to the specified services. Incompatible with --attach-dependencies.")
+	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services.")
+	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services.")
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
-	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "timeout waiting for application to be running|healthy.")
+	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration to wait for the project to be running|healthy.")
 
 	return upCmd
 }
@@ -158,37 +163,6 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		return err
 	}
 
-	var consumer api.LogConsumer
-	if !upOptions.Detach {
-		consumer = formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
-	}
-
-	attachTo := utils.Set[string]{}
-	if len(upOptions.attach) > 0 {
-		attachTo.AddAll(upOptions.attach...)
-	}
-	if upOptions.attachDependencies {
-		if err := project.WithServices(attachTo.Elements(), func(s types.ServiceConfig) error {
-			if s.Attach == nil || *s.Attach {
-				attachTo.Add(s.Name)
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	if len(attachTo) == 0 {
-		if err := project.WithServices(services, func(s types.ServiceConfig) error {
-			if s.Attach == nil || *s.Attach {
-				attachTo.Add(s.Name)
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	attachTo.RemoveAll(upOptions.noAttach...)
-
 	create := api.CreateOptions{
 		Services:             services,
 		RemoveOrphans:        createOptions.removeOrphans,
@@ -204,14 +178,48 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		return backend.Create(ctx, project, create)
 	}
 
-	timeout := time.Duration(upOptions.waitTimeout) * time.Second
+	var consumer api.LogConsumer
+	var attach []string
+	if !upOptions.Detach {
+		consumer = formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 
+		var attachSet utils.Set[string]
+		if len(upOptions.attach) != 0 {
+			// services are passed explicitly with --attach, verify they're valid and then use them as-is
+			attachSet = utils.NewSet(upOptions.attach...)
+			unexpectedSvcs := attachSet.Diff(utils.NewSet(project.ServiceNames()...))
+			if len(unexpectedSvcs) != 0 {
+				return fmt.Errorf("cannot attach to services not included in up: %s", strings.Join(unexpectedSvcs.Elements(), ", "))
+			}
+		} else {
+			// mark services being launched (and potentially their deps) for attach
+			// if they didn't opt-out via Compose YAML
+			attachSet = utils.NewSet[string]()
+			var dependencyOpt types.DependencyOption = types.IgnoreDependencies
+			if upOptions.attachDependencies {
+				dependencyOpt = types.IncludeDependencies
+			}
+			if err := project.WithServices(services, func(s types.ServiceConfig) error {
+				if s.Attach == nil || *s.Attach {
+					attachSet.Add(s.Name)
+				}
+				return nil
+			}, dependencyOpt); err != nil {
+				return err
+			}
+		}
+		// filter out any services that have been explicitly marked for ignore with `--no-attach`
+		attachSet.RemoveAll(upOptions.noAttach...)
+		attach = attachSet.Elements()
+	}
+
+	timeout := time.Duration(upOptions.waitTimeout) * time.Second
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
 			Project:      project,
 			Attach:       consumer,
-			AttachTo:     attachTo.Elements(),
+			AttachTo:     attach,
 			ExitCodeFrom: upOptions.exitCodeFrom,
 			CascadeStop:  upOptions.cascadeStop,
 			Wait:         upOptions.wait,

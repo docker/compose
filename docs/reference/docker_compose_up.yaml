@@ -48,7 +48,8 @@ options:
     - option: attach
       value_type: stringArray
       default_value: '[]'
-      description: Attach to service output.
+      description: |
+        Restrict attaching to the specified services. Incompatible with --attach-dependencies.
       deprecated: false
       hidden: false
       experimental: false
@@ -58,7 +59,7 @@ options:
     - option: attach-dependencies
       value_type: bool
       default_value: "false"
-      description: Attach to dependent containers.
+      description: Automatically attach to log output of dependent services.
       deprecated: false
       hidden: false
       experimental: false
@@ -110,7 +111,7 @@ options:
     - option: no-attach
       value_type: stringArray
       default_value: '[]'
-      description: Don't attach to specified service.
+      description: Do not attach (stream logs) to the specified services.
       deprecated: false
       hidden: false
       experimental: false
@@ -266,7 +267,7 @@ options:
     - option: wait-timeout
       value_type: int
       default_value: "0"
-      description: timeout waiting for application to be running|healthy.
+      description: Maximum duration to wait for the project to be running|healthy.
       deprecated: false
       hidden: false
       experimental: false
