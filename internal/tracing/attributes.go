@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/compose/v2/pkg/utils"
+
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"go.opentelemetry.io/otel/attribute"
@@ -73,6 +75,7 @@ func ProjectOptions(proj *types.Project) SpanOptions {
 		attribute.StringSlice("project.secrets", proj.SecretNames()),
 		attribute.StringSlice("project.configs", proj.ConfigNames()),
 		attribute.StringSlice("project.extensions", keys(proj.Extensions)),
+		attribute.StringSlice("project.includes", flattenIncludeReferences(proj.IncludeReferences)),
 	}
 	return []trace.SpanStartEventOption{
 		trace.WithAttributes(attrs...),
@@ -149,4 +152,14 @@ func timeAttr(key string, value time.Time) attribute.KeyValue {
 
 func unixTimeAttr(key string, value int64) attribute.KeyValue {
 	return timeAttr(key, time.Unix(value, 0).UTC())
+}
+
+func flattenIncludeReferences(includeRefs map[string][]types.IncludeConfig) []string {
+	ret := utils.NewSet[string]()
+	for _, included := range includeRefs {
+		for i := range included {
+			ret.AddAll(included[i].Path...)
+		}
+	}
+	return ret.Elements()
 }
