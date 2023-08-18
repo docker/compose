@@ -29,6 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/dotenv"
 	buildx "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/remote"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
@@ -134,7 +135,25 @@ func (o *ProjectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, ar
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *ProjectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
 	return Adapt(func(ctx context.Context, args []string) error {
-		project, err := o.ToProject(args, cli.WithResolvedPaths(true), cli.WithDiscardEnvFile)
+		options := []cli.ProjectOptionsFn{
+			cli.WithResolvedPaths(true),
+			cli.WithDiscardEnvFile,
+			cli.WithContext(ctx),
+		}
+
+		enabled, err := remote.GitRemoteLoaderEnabled()
+		if err != nil {
+			return err
+		}
+		if enabled {
+			git, err := remote.NewGitRemoteLoader()
+			if err != nil {
+				return err
+			}
+			options = append(options, cli.WithResourceLoader(git))
+		}
+
+		project, err := o.ToProject(args, options...)
 		if err != nil {
 			return err
 		}
