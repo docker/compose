@@ -17,7 +17,7 @@
 
 ARG GO_VERSION=1.21.0
 ARG XX_VERSION=1.2.1
-ARG GOLANGCI_LINT_VERSION=v1.53.2
+ARG GOLANGCI_LINT_VERSION=v1.54.2
 ARG ADDLICENSE_VERSION=v1.0.0
 
 ARG BUILD_TAGS="e2e"
@@ -89,10 +89,13 @@ RUN --mount=type=bind,target=. \
 
 FROM build-base AS lint
 ARG BUILD_TAGS
+ENV GOLANGCI_LINT_CACHE=/cache/golangci-lint
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/cache/golangci-lint \
     --mount=from=golangci-lint,source=/usr/bin/golangci-lint,target=/usr/bin/golangci-lint \
+    golangci-lint cache status && \
     golangci-lint run --build-tags "$BUILD_TAGS" ./...
 
 FROM build-base AS test
