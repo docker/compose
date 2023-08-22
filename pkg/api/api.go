@@ -392,7 +392,7 @@ type PortPublisher struct {
 type ContainerSummary struct {
 	ID         string
 	Name       string
-	Image      any
+	Image      string
 	Command    string
 	Project    string
 	Service    string

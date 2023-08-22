@@ -361,13 +361,14 @@ func IsHealthy(service string) func(res *icmd.Result) bool {
 			Health string `json:"health"`
 		}
 
-		ps := []state{}
-		err := json.Unmarshal([]byte(res.Stdout()), &ps)
-		if err != nil {
-			return false
-		}
-		for _, state := range ps {
-			if state.Name == service && state.Health == "healthy" {
+		decoder := json.NewDecoder(strings.NewReader(res.Stdout()))
+		for decoder.More() {
+			ps := state{}
+			err := decoder.Decode(&ps)
+			if err != nil {
+				return false
+			}
+			if ps.Name == service && ps.Health == "healthy" {
 				return true
 			}
 		}

@@ -138,16 +138,14 @@ func urlForService(t testing.TB, cli *CLI, service string, targetPort int) strin
 func publishedPortForService(t testing.TB, cli *CLI, service string, targetPort int) int {
 	t.Helper()
 	res := cli.RunDockerComposeCmd(t, "ps", "--format=json", service)
-	var psOut []struct {
+	var svc struct {
 		Publishers []struct {
 			TargetPort    int
 			PublishedPort int
 		}
 	}
-	require.NoError(t, json.Unmarshal([]byte(res.Stdout()), &psOut),
+	require.NoError(t, json.Unmarshal([]byte(res.Stdout()), &svc),
 		"Failed to parse `%s` output", res.Cmd.String())
-	require.Len(t, psOut, 1, "Expected exactly 1 service")
-	svc := psOut[0]
 	for _, pp := range svc.Publishers {
 		if pp.TargetPort == targetPort {
 			return pp.PublishedPort
