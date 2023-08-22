@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/dockerignore"
 	"github.com/moby/patternmatcher"
+	"github.com/moby/patternmatcher/ignorefile"
 )
 
 type dockerPathMatcher struct {
@@ -133,13 +133,17 @@ func readDockerignorePatterns(repoRoot string) ([]string, error) {
 	}
 	defer func() { _ = f.Close() }()
 
-	return dockerignore.ReadAll(f)
+	patterns, err := ignorefile.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("error reading .dockerignore: %w", err)
+	}
+	return patterns, nil
 }
 
 func DockerIgnoreTesterFromContents(repoRoot string, contents string) (*dockerPathMatcher, error) {
-	patterns, err := dockerignore.ReadAll(strings.NewReader(contents))
+	patterns, err := ignorefile.ReadAll(strings.NewReader(contents))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading .dockerignore: %w", err)
 	}
 
 	return NewDockerPatternMatcher(repoRoot, patterns)
