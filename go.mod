@@ -14,7 +14,7 @@ require (
 	github.com/docker/buildx v0.11.2
 	github.com/docker/cli v24.0.5+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
-	github.com/docker/docker v24.0.5+incompatible // v24.0.5-dev
+	github.com/docker/docker v24.0.5+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsevents v0.1.1
@@ -24,8 +24,8 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.12.1 // v0.12 release branch
-	github.com/moby/patternmatcher v0.5.0
+	github.com/moby/buildkit v0.12.1
+	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
