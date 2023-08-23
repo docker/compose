@@ -71,9 +71,9 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	c1Stdout := stdcopy.NewStdWriter(c1Writer, stdcopy.Stdout)
 	c1Stderr := stdcopy.NewStdWriter(c1Writer, stdcopy.Stderr)
 	go func() {
-		_, err := c1Stdout.Write([]byte("hello\n stdout"))
+		_, err := c1Stdout.Write([]byte("hello stdout\n"))
 		assert.NoError(t, err, "Writing to fake stdout")
-		_, err = c1Stderr.Write([]byte("hello\n stderr"))
+		_, err = c1Stderr.Write([]byte("hello stderr\n"))
 		assert.NoError(t, err, "Writing to fake stderr")
 		_ = c1Writer.Close()
 	}()
@@ -94,7 +94,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	require.Equal(
 		t,
-		[]string{"hello", " stdout", "hello", " stderr"},
+		[]string{"hello stdout", "hello stderr"},
 		consumer.LogsForContainer("c"),
 	)
 }
