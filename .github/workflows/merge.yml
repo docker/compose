@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [desktop-windows, desktop-macos, desktop-m1]
+        os: [desktop-windows, macos-latest]
         # mode: [plugin, standalone]
         mode: [plugin]
     env:
@@ -38,6 +38,10 @@ jobs:
           go-version-file: go.mod
           cache: true
           check-latest: true
+
+      - name: Install and start Docker Desktop
+        uses: docker/desktop-action/start@v0.1.0
+        if: ${{ matrix.os == 'macos-latest' }}
 
       - name: List Docker resources on machine
         run: |
