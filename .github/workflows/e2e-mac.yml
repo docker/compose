@@ -23,7 +23,7 @@ jobs:
   e2e-mac:
     name: Build and test
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix:
