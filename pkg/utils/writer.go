@@ -43,17 +43,11 @@ func (s *splitWriter) Write(b []byte) (int, error) {
 	for {
 		b = s.buffer.Bytes()
 		index := bytes.Index(b, []byte{'\n'})
-		if index > 0 {
-			line := s.buffer.Next(index + 1)
-			s.consumer(string(line[:len(line)-1]))
-		} else {
-			line := s.buffer.String()
-			s.buffer.Reset()
-			if len(line) > 0 {
-				s.consumer(line)
-			}
+		if index < 0 {
 			break
 		}
+		line := s.buffer.Next(index + 1)
+		s.consumer(string(line[:len(line)-1]))
 	}
 	return n, nil
 }

@@ -28,21 +28,13 @@ func TestSplitWriter(t *testing.T) {
 	w := GetWriter(func(line string) {
 		lines = append(lines, line)
 	})
-	w.Write([]byte("hello\n"))
-	w.Write([]byte("world\n"))
-	w.Write([]byte("!"))
-	assert.DeepEqual(t, lines, []string{"hello", "world", "!"})
-
-}
-
-//nolint:errcheck
-func TestSplitWriterNoEOL(t *testing.T) {
-	var lines []string
-	w := GetWriter(func(line string) {
-		lines = append(lines, line)
-	})
-	w.Write([]byte("hello\n"))
-	w.Write([]byte("world!"))
+	w.Write([]byte("h"))
+	w.Write([]byte("e"))
+	w.Write([]byte("l"))
+	w.Write([]byte("l"))
+	w.Write([]byte("o"))
+	w.Write([]byte("\n"))
+	w.Write([]byte("world!\n"))
 	assert.DeepEqual(t, lines, []string{"hello", "world!"})
 
 }
