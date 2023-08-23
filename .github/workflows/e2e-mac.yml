@@ -1,0 +1,80 @@
+name: merge
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - 'v*'
+  pull_request:
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+env:
+  REPO_SLUG: "docker/compose-bin"
+
+jobs:
+  e2e-mac:
+    name: Build and test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [desktop-windows, macos-latest]
+        # mode: [plugin, standalone]
+        mode: [plugin]
+    env:
+      GO111MODULE: "on"
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
+          cache: true
+          check-latest: true
+
+      - name: Install and start Docker Desktop
+        uses: docker/desktop-action/start@v0.1.0
+        if: ${{ matrix.os == 'macos-latest' }}
+
+      - name: List Docker resources on machine
+        run: |
+          docker ps --all
+          docker volume ls
+          docker network ls
+          docker image ls
+      - name: Remove Docker resources on machine
+        continue-on-error: true
+        run: |
+          docker kill $(docker ps -q)
+          docker rm -f $(docker ps -aq)
+          docker volume rm -f $(docker volume ls -q)
+          docker ps --all
+
+      - name: Unit tests
+        run: make test
+
+      - name: Build binaries
+        run: |
+          make
+      - name: Check arch of go compose binary
+        run: |
+          file ./bin/build/docker-compose
+        if: ${{ !contains(matrix.os, 'desktop-windows') }}
+      -
+        name: Test plugin mode
+        if: ${{ matrix.mode == 'plugin' }}
+        run: |
+          make e2e-compose
+      -
+        name: Test standalone mode
+        if: ${{ matrix.mode == 'standalone' }}
+        run: |
+          make e2e-compose-standalone
