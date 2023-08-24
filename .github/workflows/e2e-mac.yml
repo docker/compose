@@ -1,4 +1,4 @@
-name: merge
+name: e2e-mac
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
