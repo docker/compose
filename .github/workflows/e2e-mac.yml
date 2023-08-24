@@ -43,7 +43,7 @@ jobs:
 
       - name: Install and start Docker Desktop
         uses: docker/desktop-action/start@v0.1.0
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ contains(matrix.os, 'macos-latest') }}
 
       - name: List Docker resources on machine
         run: |
