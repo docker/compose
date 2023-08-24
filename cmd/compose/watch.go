@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/docker/compose/v2/internal/locker"
+
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -55,6 +57,14 @@ func runWatch(ctx context.Context, backend api.Service, opts watchOptions, servi
 	project, err := opts.ToProject(nil)
 	if err != nil {
 		return err
+	}
+
+	l, err := locker.NewPidfile(project.Name)
+	if err != nil {
+		return fmt.Errorf("cannot take exclusive lock for project %q: %v", project.Name, err)
+	}
+	if err := l.Lock(); err != nil {
+		return fmt.Errorf("cannot take exclusive lock for project %q: %v", project.Name, err)
 	}
 
 	return backend.Watch(ctx, project, services, api.WatchOptions{})
