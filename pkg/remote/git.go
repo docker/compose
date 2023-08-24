@@ -25,6 +25,8 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/adrg/xdg"
+
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
@@ -45,19 +47,15 @@ func GitRemoteLoaderEnabled() (bool, error) {
 }
 
 func NewGitRemoteLoader() (loader.ResourceLoader, error) {
-	var base string
-	if cacheHome := os.Getenv("XDG_CACHE_HOME"); cacheHome != "" {
-		base = cacheHome
-	} else {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		base = filepath.Join(home, ".cache")
+	// xdg.CacheFile creates the parent directories for the target file path
+	// and returns the fully qualified path, so use "git" as a filename and
+	// then chop it off after, i.e. no ~/.cache/docker-compose/git file will
+	// ever be created
+	cache, err := xdg.CacheFile(filepath.Join("docker-compose", "git"))
+	if err != nil {
+		return nil, fmt.Errorf("initializing git cache: %w", err)
 	}
-	cache := filepath.Join(base, "docker-compose")
-
-	err := os.MkdirAll(cache, 0o700)
+	cache = filepath.Dir(cache)
 	return gitRemoteLoader{
 		cache: cache,
 	}, err

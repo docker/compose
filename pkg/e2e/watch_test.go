@@ -71,6 +71,9 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 	CopyFile(t, filepath.Join("fixtures", "watch", "compose.yaml"), composeFilePath)
 
 	projName := "e2e-watch-" + svcName
+	if tarSync {
+		projName += "-tar"
+	}
 	env := []string{
 		"COMPOSE_FILE=" + composeFilePath,
 		"COMPOSE_PROJECT_NAME=" + projName,
@@ -96,6 +99,7 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 	t.Cleanup(func() {
 		// IMPORTANT: watch doesn't exit on its own, don't leak processes!
 		if r.Cmd.Process != nil {
+			t.Logf("Killing watch process: pid[%d]", r.Cmd.Process.Pid)
 			_ = r.Cmd.Process.Kill()
 		}
 	})

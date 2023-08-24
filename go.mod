@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.1
+	github.com/adrg/xdg v0.4.0
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go v1.18.2
 	github.com/containerd/console v1.0.3
