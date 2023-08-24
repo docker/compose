@@ -17,6 +17,9 @@
 package formatter
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/cli/cli/command/formatter"
@@ -141,6 +144,22 @@ func (c *ContainerContext) Name() string {
 	return c.c.Name
 }
 
+// Names returns a comma-separated string of the container's names, with their
+// slash (/) prefix stripped. Additional names for the container (related to the
+// legacy `--link` feature) are omitted.
+func (c *ContainerContext) Names() string {
+	names := formatter.StripNamePrefix(c.c.Names)
+	if c.trunc {
+		for _, name := range names {
+			if len(strings.Split(name, "/")) == 1 {
+				names = []string{name}
+				break
+			}
+		}
+	}
+	return strings.Join(names, ",")
+}
+
 func (c *ContainerContext) Service() string {
 	return c.c.Service
 }
@@ -150,7 +169,11 @@ func (c *ContainerContext) Image() string {
 }
 
 func (c *ContainerContext) Command() string {
-	return c.c.Command
+	command := c.c.Command
+	if c.trunc {
+		command = formatter.Ellipsis(command, 20)
+	}
+	return strconv.Quote(command)
 }
 
 func (c *ContainerContext) CreatedAt() string {
@@ -193,4 +216,66 @@ func (c *ContainerContext) Ports() string {
 		})
 	}
 	return formatter.DisplayablePorts(ports)
+}
+
+// Labels returns a comma-separated string of labels present on the container.
+func (c *ContainerContext) Labels() string {
+	if c.c.Labels == nil {
+		return ""
+	}
+
+	var joinLabels []string
+	for k, v := range c.c.Labels {
+		joinLabels = append(joinLabels, fmt.Sprintf("%s=%s", k, v))
+	}
+	return strings.Join(joinLabels, ",")
+}
+
+// Label returns the value of the label with the given name or an empty string
+// if the given label does not exist.
+func (c *ContainerContext) Label(name string) string {
+	if c.c.Labels == nil {
+		return ""
+	}
+	return c.c.Labels[name]
+}
+
+// Mounts returns a comma-separated string of mount names present on the container.
+// If the trunc option is set, names can be truncated (ellipsized).
+func (c *ContainerContext) Mounts() string {
+	var mounts []string
+	for _, name := range c.c.Mounts {
+		if c.trunc {
+			name = formatter.Ellipsis(name, 15)
+		}
+		mounts = append(mounts, name)
+	}
+	return strings.Join(mounts, ",")
+}
+
+// LocalVolumes returns the number of volumes using the "local" volume driver.
+func (c *ContainerContext) LocalVolumes() string {
+	return fmt.Sprintf("%d", c.c.LocalVolumes)
+}
+
+// Networks returns a comma-separated string of networks that the container is
+// attached to.
+func (c *ContainerContext) Networks() string {
+	return strings.Join(c.c.Networks, ",")
+}
+
+// Size returns the container's size and virtual size (e.g. "2B (virtual 21.5MB)")
+func (c *ContainerContext) Size() string {
+	if c.FieldsUsed == nil {
+		c.FieldsUsed = map[string]interface{}{}
+	}
+	c.FieldsUsed["Size"] = struct{}{}
+	srw := units.HumanSizeWithPrecision(float64(c.c.SizeRw), 3)
+	sv := units.HumanSizeWithPrecision(float64(c.c.SizeRootFs), 3)
+
+	sf := srw
+	if c.c.SizeRootFs > 0 {
+		sf = fmt.Sprintf("%s (virtual %s)", srw, sv)
+	}
+	return sf
 }
