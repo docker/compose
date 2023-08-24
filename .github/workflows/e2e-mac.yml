@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [desktop-windows, macos-latest]
+        os: [macos-latest-xl]
         # mode: [plugin, standalone]
         mode: [plugin]
     env:
