@@ -54,13 +54,34 @@ func TestPs(t *testing.T) {
 	containers, err := tested.Ps(ctx, strings.ToLower(testProject), compose.PsOptions{})
 
 	expected := []compose.ContainerSummary{
-		{ID: "123", Name: "123", Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
-			State: "running", Health: "healthy", Publishers: nil},
-		{ID: "456", Name: "456", Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
+		{ID: "123", Name: "123", Names: []string{"/123"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
+			State: "running", Health: "healthy", Publishers: nil,
+			Labels: map[string]string{
+				compose.ProjectLabel:     strings.ToLower(testProject),
+				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
+				compose.WorkingDirLabel:  "/src/pkg/compose/testdata",
+				compose.ServiceLabel:     "service1",
+			},
+		},
+		{ID: "456", Name: "456", Names: []string{"/456"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
 			State: "running", Health: "",
-			Publishers: []compose.PortPublisher{{URL: "localhost", TargetPort: 90, PublishedPort: 80}}},
-		{ID: "789", Name: "789", Image: "foo", Project: strings.ToLower(testProject), Service: "service2",
-			State: "exited", Health: "", ExitCode: 130, Publishers: nil},
+			Publishers: []compose.PortPublisher{{URL: "localhost", TargetPort: 90, PublishedPort: 80}},
+			Labels: map[string]string{
+				compose.ProjectLabel:     strings.ToLower(testProject),
+				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
+				compose.WorkingDirLabel:  "/src/pkg/compose/testdata",
+				compose.ServiceLabel:     "service1",
+			},
+		},
+		{ID: "789", Name: "789", Names: []string{"/789"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service2",
+			State: "exited", Health: "", ExitCode: 130, Publishers: nil,
+			Labels: map[string]string{
+				compose.ProjectLabel:     strings.ToLower(testProject),
+				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
+				compose.WorkingDirLabel:  "/src/pkg/compose/testdata",
+				compose.ServiceLabel:     "service2",
+			},
+		},
 	}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, containers, expected)

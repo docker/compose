@@ -78,19 +78,48 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 				}
 			}
 
+			var (
+				local  int
+				mounts []string
+			)
+			for _, m := range container.Mounts {
+				name := m.Name
+				if name == "" {
+					name = m.Source
+				}
+				if m.Driver == "local" {
+					local++
+				}
+				mounts = append(mounts, name)
+			}
+
+			var networks []string
+			if container.NetworkSettings != nil {
+				for k := range container.NetworkSettings.Networks {
+					networks = append(networks, k)
+				}
+			}
+
 			summary[i] = api.ContainerSummary{
-				ID:         container.ID,
-				Name:       getCanonicalContainerName(container),
-				Image:      container.Image,
-				Project:    container.Labels[api.ProjectLabel],
-				Service:    container.Labels[api.ServiceLabel],
-				Command:    container.Command,
-				State:      container.State,
-				Status:     container.Status,
-				Created:    container.Created,
-				Health:     health,
-				ExitCode:   exitCode,
-				Publishers: publishers,
+				ID:           container.ID,
+				Name:         getCanonicalContainerName(container),
+				Names:        container.Names,
+				Image:        container.Image,
+				Project:      container.Labels[api.ProjectLabel],
+				Service:      container.Labels[api.ServiceLabel],
+				Command:      container.Command,
+				State:        container.State,
+				Status:       container.Status,
+				Created:      container.Created,
+				Labels:       container.Labels,
+				SizeRw:       container.SizeRw,
+				SizeRootFs:   container.SizeRootFs,
+				Mounts:       mounts,
+				LocalVolumes: local,
+				Networks:     networks,
+				Health:       health,
+				ExitCode:     exitCode,
+				Publishers:   publishers,
 			}
 			return nil
 		})
