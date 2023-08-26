@@ -84,4 +84,4 @@ If you find an issue, please report it on the
 Legacy
 -------------
 
-The Python version of Compose is available under the `v1` [branch](https://github.com/docker/compose/tree/v1)
+The Python version of Compose is available under the `v1` [branch](https://github.com/docker/compose/tree/v1).
