@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/compose-spec/compose-go/types"
@@ -57,12 +58,14 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	// if we get a second signal during shutdown, we kill the services
 	// immediately, so the channel needs to have sufficient capacity or
 	// we might miss a signal while setting up the second channel read
+	// (this is also why signal.Notify is used vs signal.NotifyContext)
 	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	defer func() {
+	signalCancel := sync.OnceFunc(func() {
 		signal.Stop(signalChan)
 		close(signalChan)
-	}()
+	})
+	defer signalCancel()
 
 	printer := newLogPrinter(options.Start.Attach)
 	stopFunc := func() error {
@@ -119,6 +122,8 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	}
 
+	// signal for the goroutines to stop & wait for them to finish any remaining work
+	signalCancel()
 	printer.Stop()
 	err = eg.Wait().ErrorOrNil()
 	if exitCode != 0 {
