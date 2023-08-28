@@ -17,11 +17,14 @@
 package compose
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/versions"
 )
 
 // ToMobyEnv convert into []string
@@ -38,9 +41,9 @@ func ToMobyEnv(environment compose.MappingWithEquals) []string {
 }
 
 // ToMobyHealthCheck convert into container.HealthConfig
-func ToMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig {
+func (s *composeService) ToMobyHealthCheck(ctx context.Context, check *compose.HealthCheckConfig) (*container.HealthConfig, error) {
 	if check == nil {
-		return nil
+		return nil, nil
 	}
 	var (
 		interval time.Duration
@@ -64,13 +67,26 @@ func ToMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig
 	if check.Disable {
 		test = []string{"NONE"}
 	}
-	return &container.HealthConfig{
-		Test:        test,
-		Interval:    interval,
-		Timeout:     timeout,
-		StartPeriod: period,
-		Retries:     retries,
+	var startInterval time.Duration
+	if check.StartInterval != nil {
+		version, err := s.RuntimeVersion(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if versions.LessThan(version, "1.44") {
+			return nil, errors.New("can't set healthcheck.start_interval as feature require Docker Engine 1.25 or later")
+		} else {
+			startInterval = time.Duration(*check.StartInterval)
+		}
 	}
+	return &container.HealthConfig{
+		Test:          test,
+		Interval:      interval,
+		Timeout:       timeout,
+		StartPeriod:   period,
+		StartInterval: startInterval,
+		Retries:       retries,
+	}, nil
 }
 
 // ToSeconds convert into seconds

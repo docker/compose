@@ -178,7 +178,11 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	proxyConfig := types.MappingWithEquals(s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil))
 	env := proxyConfig.OverrideBy(service.Environment)
 
-	containerConfig := container.Config{
+	healthcheck, err := s.ToMobyHealthCheck(ctx, service.HealthCheck)
+	if err != nil {
+		return createConfigs{}, err
+	}
+	var containerConfig = container.Config{
 		Hostname:        service.Hostname,
 		Domainname:      service.DomainName,
 		User:            service.User,
@@ -198,11 +202,9 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		Labels:          labels,
 		StopSignal:      service.StopSignal,
 		Env:             ToMobyEnv(env),
-		Healthcheck:     ToMobyHealthCheck(service.HealthCheck),
+		Healthcheck:     healthcheck,
 		StopTimeout:     ToSeconds(service.StopGracePeriod),
-	}
-
-	// VOLUMES/MOUNTS/FILESYSTEMS
+	} // VOLUMES/MOUNTS/FILESYSTEMS
 	tmpfs := map[string]string{}
 	for _, t := range service.Tmpfs {
 		if arr := strings.SplitN(t, ":", 2); len(arr) > 1 {
