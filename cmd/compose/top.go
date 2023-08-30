@@ -24,6 +24,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -33,7 +34,7 @@ type topOptions struct {
 	*ProjectOptions
 }
 
-func topCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := topOptions{
 		ProjectOptions: p,
 	}
@@ -41,15 +42,15 @@ func topCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 		Use:   "top [SERVICES...]",
 		Short: "Display the running processes",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runTop(ctx, streams, backend, opts, args)
+			return runTop(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	return topCmd
 }
 
-func runTop(ctx context.Context, streams api.Streams, backend api.Service, opts topOptions, services []string) error {
-	projectName, err := opts.toProjectName()
+func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opts topOptions, services []string) error {
+	projectName, err := opts.toProjectName(dockerCli)
 	if err != nil {
 		return err
 	}
@@ -63,8 +64,8 @@ func runTop(ctx context.Context, streams api.Streams, backend api.Service, opts 
 	})
 
 	for _, container := range containers {
-		fmt.Fprintf(streams.Out(), "%s\n", container.Name)
-		err := psPrinter(streams.Out(), func(w io.Writer) {
+		fmt.Fprintf(dockerCli.Out(), "%s\n", container.Name)
+		err := psPrinter(dockerCli.Out(), func(w io.Writer) {
 			for _, proc := range container.Processes {
 				info := []interface{}{}
 				for _, p := range proc {

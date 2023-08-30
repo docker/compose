@@ -267,17 +267,17 @@ func (mr *MockServiceMockRecorder) Ps(ctx, projectName, options interface{}) *go
 }
 
 // Publish mocks base method.
-func (m *MockService) Publish(ctx context.Context, project *types.Project, repository string) error {
+func (m *MockService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Publish", ctx, project, repository)
+	ret := m.ctrl.Call(m, "Publish", ctx, project, repository, options)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Publish indicates an expected call of Publish.
-func (mr *MockServiceMockRecorder) Publish(ctx, project, repository interface{}) *gomock.Call {
+func (mr *MockServiceMockRecorder) Publish(ctx, project, repository, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockService)(nil).Publish), ctx, project, repository)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockService)(nil).Publish), ctx, project, repository, options)
 }
 
 // Pull mocks base method.

@@ -21,6 +21,7 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
@@ -42,7 +43,7 @@ type execOpts struct {
 	interactive bool
 }
 
-func execCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := execOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -58,9 +59,9 @@ func execCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runExec(ctx, backend, opts)
+			return runExec(ctx, dockerCli, backend, opts)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 
 	runCmd.Flags().BoolVarP(&opts.detach, "detach", "d", false, "Detached mode: Run command in the background.")
@@ -68,7 +69,7 @@ func execCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 	runCmd.Flags().IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
 	runCmd.Flags().BoolVarP(&opts.privileged, "privileged", "", false, "Give extended privileges to the process.")
 	runCmd.Flags().StringVarP(&opts.user, "user", "u", "", "Run the command as this user.")
-	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", !streams.Out().IsTerminal(), "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
+	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
 	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command.")
 
 	runCmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
@@ -80,8 +81,8 @@ func execCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 	return runCmd
 }
 
-func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
-	projectName, err := opts.toProjectName()
+func runExec(ctx context.Context, dockerCli command.Cli, backend api.Service, opts execOpts) error {
+	projectName, err := opts.toProjectName(dockerCli)
 	if err != nil {
 		return err
 	}

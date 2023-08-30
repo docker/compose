@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -38,7 +39,7 @@ type imageOptions struct {
 	Format string
 }
 
-func imagesCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := imageOptions{
 		ProjectOptions: p,
 	}
@@ -46,17 +47,17 @@ func imagesCommand(p *ProjectOptions, streams api.Streams, backend api.Service) 
 		Use:   "images [OPTIONS] [SERVICE...]",
 		Short: "List images used by the created containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runImages(ctx, streams, backend, opts, args)
+			return runImages(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	imgCmd.Flags().StringVar(&opts.Format, "format", "table", "Format the output. Values: [table | json].")
 	imgCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return imgCmd
 }
 
-func runImages(ctx context.Context, streams api.Streams, backend api.Service, opts imageOptions, services []string) error {
-	projectName, err := opts.toProjectName()
+func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, opts imageOptions, services []string) error {
+	projectName, err := opts.toProjectName(dockerCli)
 	if err != nil {
 		return err
 	}
@@ -80,7 +81,7 @@ func runImages(ctx context.Context, streams api.Streams, backend api.Service, op
 			}
 		}
 		for _, img := range ids {
-			fmt.Fprintln(streams.Out(), img)
+			fmt.Fprintln(dockerCli.Out(), img)
 		}
 		return nil
 	}
@@ -89,7 +90,7 @@ func runImages(ctx context.Context, streams api.Streams, backend api.Service, op
 		return images[i].ContainerName < images[j].ContainerName
 	})
 
-	return formatter.Print(images, opts.Format, streams.Out(),
+	return formatter.Print(images, opts.Format, dockerCli.Out(),
 		func(w io.Writer) {
 			for _, img := range images {
 				id := stringid.TruncateID(img.ID)

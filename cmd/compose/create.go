@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -46,7 +47,7 @@ type createOptions struct {
 	scale         []string
 }
 
-func createCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := createOptions{}
 	cmd := &cobra.Command{
 		Use:   "create [OPTIONS] [SERVICE...]",
@@ -74,8 +75,8 @@ func createCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 				Timeout:              opts.GetTimeout(),
 				QuietPull:            false,
 			})
-		}),
-		ValidArgsFunction: completeServiceNames(p),
+		}, dockerCli),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")

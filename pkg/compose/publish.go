@@ -20,11 +20,11 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/distribution/distribution/v3/reference"
+	"github.com/distribution/reference"
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string) error {
+func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	err := s.Push(ctx, project, api.PushOptions{})
 	if err != nil {
 		return err

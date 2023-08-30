@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/locker"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -32,7 +33,7 @@ type watchOptions struct {
 	quiet bool
 }
 
-func watchCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := watchOptions{
 		ProjectOptions: p,
 	}
@@ -43,18 +44,18 @@ func watchCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runWatch(ctx, backend, opts, args)
+			return runWatch(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 
 	cmd.Flags().BoolVar(&opts.quiet, "quiet", false, "hide build output")
 	return cmd
 }
 
-func runWatch(ctx context.Context, backend api.Service, opts watchOptions, services []string) error {
+func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, opts watchOptions, services []string) error {
 	fmt.Fprintln(os.Stderr, "watch command is EXPERIMENTAL")
-	project, err := opts.ToProject(nil)
+	project, err := opts.ToProject(dockerCli, nil)
 	if err != nil {
 		return err
 	}

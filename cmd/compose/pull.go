@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
@@ -39,7 +40,7 @@ type pullOptions struct {
 	noBuildable        bool
 }
 
-func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := pullOptions{
 		ProjectOptions: p,
 	}
@@ -53,9 +54,9 @@ func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPull(ctx, backend, opts, args)
+			return runPull(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information.")
@@ -69,8 +70,8 @@ func pullCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func runPull(ctx context.Context, backend api.Service, opts pullOptions, services []string) error {
-	project, err := opts.ToProject(services)
+func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pullOptions, services []string) error {
+	project, err := opts.ToProject(dockerCli, services)
 	if err != nil {
 		return err
 	}

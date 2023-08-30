@@ -46,7 +46,7 @@ func GitRemoteLoaderEnabled() (bool, error) {
 	return false, nil
 }
 
-func NewGitRemoteLoader() (loader.ResourceLoader, error) {
+func NewGitRemoteLoader(offline bool) (loader.ResourceLoader, error) {
 	// xdg.CacheFile creates the parent directories for the target file path
 	// and returns the fully qualified path, so use "git" as a filename and
 	// then chop it off after, i.e. no ~/.cache/docker-compose/git file will
@@ -57,12 +57,14 @@ func NewGitRemoteLoader() (loader.ResourceLoader, error) {
 	}
 	cache = filepath.Dir(cache)
 	return gitRemoteLoader{
-		cache: cache,
+		cache:   cache,
+		offline: offline,
 	}, err
 }
 
 type gitRemoteLoader struct {
-	cache string
+	cache   string
+	offline bool
 }
 
 func (g gitRemoteLoader) Accept(path string) bool {
@@ -104,6 +106,9 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 
 	local := filepath.Join(g.cache, ref.Commit)
 	if _, err := os.Stat(local); os.IsNotExist(err) {
+		if g.offline {
+			return "", nil
+		}
 		err = g.checkout(ctx, local, ref)
 		if err != nil {
 			return "", err
@@ -167,7 +172,7 @@ func (g gitRemoteLoader) gitCommandEnv() []string {
 		// Disable any ssh connection pooling by Git and do not attempt to prompt the user.
 		env["GIT_SSH_COMMAND"] = "ssh -o ControlMaster=no -o BatchMode=yes"
 	}
-	v := values(env)
+	v := env.Values()
 	return v
 }
 
@@ -182,11 +187,3 @@ func findFile(names []string, pwd string) (string, error) {
 }
 
 var _ loader.ResourceLoader = gitRemoteLoader{}
-
-func values(m types.Mapping) []string {
-	values := make([]string, 0, len(m))
-	for k, v := range m {
-		values = append(values, fmt.Sprintf("%s=%s", k, v))
-	}
-	return values
-}
