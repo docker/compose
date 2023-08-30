@@ -71,10 +71,14 @@ func TestPortRange(t *testing.T) {
 	c := NewParallelCLI(t)
 	const projectName = "e2e-port-range"
 
+	reset := func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans", "--timeout=0")
+	}
+	reset()
+	t.Cleanup(reset)
+
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/port-range/compose.yaml", "--project-name", projectName, "up", "-d")
 	res.Assert(t, icmd.Success)
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
 }
 
 func TestStdoutStderr(t *testing.T) {
