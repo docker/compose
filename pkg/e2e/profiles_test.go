@@ -31,7 +31,7 @@ const (
 
 func TestExplicitProfileUsage(t *testing.T) {
 	c := NewParallelCLI(t)
-	const projectName = "compose-e2e-profiles"
+	const projectName = "compose-e2e-explicit-profiles"
 	const profileName = "test-profile"
 
 	t.Run("compose up with profile", func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestNoProfileUsage(t *testing.T) {
 
 func TestActiveProfileViaTargetedService(t *testing.T) {
 	c := NewParallelCLI(t)
-	const projectName = "compose-e2e-profiles-via-target-service"
+	const projectName = "compose-e2e-via-target-service-profiles"
 	const profileName = "test-profile"
 
 	t.Run("compose up with service name", func(t *testing.T) {
