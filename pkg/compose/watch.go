@@ -85,10 +85,6 @@ func (s *composeService) getSyncImplementation(project *types.Project) sync.Sync
 }
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error { //nolint: gocyclo
-	_, err := s.prepareProjectForBuild(project, nil)
-	if err != nil {
-		return err
-	}
 	if err := project.ForServices(services); err != nil {
 		return err
 	}
@@ -458,6 +454,12 @@ func (s *composeService) handleWatchBatch(
 			)
 			err := s.Up(ctx, project, api.UpOptions{
 				Create: api.CreateOptions{
+					Build: &api.BuildOptions{
+						Pull: false,
+						Push: false,
+						// restrict the build to ONLY this service, not any of its dependencies
+						Services: []string{serviceName},
+					},
 					Services: []string{serviceName},
 					Inherit:  true,
 				},

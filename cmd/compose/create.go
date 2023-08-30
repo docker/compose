@@ -123,6 +123,9 @@ func (opts createOptions) Apply(project *types.Project) error {
 			project.Services[i] = service
 		}
 	}
+	// N.B. opts.Build means "force build all", but images can still be built
+	// when this is false
+	// e.g. if a service has pull_policy: build or its local image is missing
 	if opts.Build {
 		for i, service := range project.Services {
 			if service.Build == nil {
@@ -132,6 +135,7 @@ func (opts createOptions) Apply(project *types.Project) error {
 			project.Services[i] = service
 		}
 	}
+	// opts.noBuild, however, means do not perform ANY builds
 	if opts.noBuild {
 		for i, service := range project.Services {
 			service.Build = nil
@@ -141,6 +145,11 @@ func (opts createOptions) Apply(project *types.Project) error {
 			project.Services[i] = service
 		}
 	}
+
+	if err := applyPlatforms(project, true); err != nil {
+		return err
+	}
+
 	for _, scale := range opts.scale {
 		split := strings.Split(scale, "=")
 		if len(split) != 2 {

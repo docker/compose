@@ -167,6 +167,7 @@ func (o BuildOptions) Apply(project *types.Project) error {
 
 // CreateOptions group options of the Create API
 type CreateOptions struct {
+	Build *BuildOptions
 	// Services defines the services user interacts with
 	Services []string
 	// Remove legacy containers for services that are not defined in the project
@@ -302,6 +303,7 @@ type RemoveOptions struct {
 
 // RunOptions group options of the Run API
 type RunOptions struct {
+	Build *BuildOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
 	Name              string

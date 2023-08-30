@@ -62,9 +62,9 @@ type createConfigs struct {
 	Links     []string
 }
 
-func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, options)
+		return s.create(ctx, project, createOpts)
 	}, s.stdinfo(), "Creating")
 }
 
@@ -79,7 +79,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	err = s.ensureImagesExists(ctx, project, options.QuietPull)
+	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
 	if err != nil {
 		return err
 	}
