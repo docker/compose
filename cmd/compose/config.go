@@ -61,7 +61,7 @@ func (o *configOptions) ToProject(ctx context.Context, services []string) (*type
 		cli.WithResolvedPaths(!o.noResolvePath),
 		cli.WithNormalization(!o.noNormalize),
 		cli.WithConsistency(!o.noConsistency),
-		cli.WithProfiles(o.Profiles),
+		cli.WithDefaultProfiles(o.Profiles...),
 		cli.WithDiscardEnvFile,
 		cli.WithContext(ctx),
 		cli.WithResourceLoader(git))
