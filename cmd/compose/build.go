@@ -35,7 +35,6 @@ import (
 
 type buildOptions struct {
 	*ProjectOptions
-	composeOptions
 	quiet   bool
 	pull    bool
 	push    bool
@@ -73,7 +72,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}, nil
 }
 
-func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -118,7 +117,7 @@ func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cob
 	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
 	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
 	cmd.Flags().VarP(&opts.memory, "memory", "m", "Set memory limit for the build container. Not supported by BuildKit.")
-	cmd.Flags().StringVar(progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
+	cmd.Flags().StringVar(&p.Progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().MarkHidden("progress") //nolint:errcheck
 
 	return cmd
@@ -127,6 +126,10 @@ func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cob
 func runBuild(ctx context.Context, backend api.Service, opts buildOptions, services []string) error {
 	project, err := opts.ToProject(services, cli.WithResolvedPaths(true))
 	if err != nil {
+		return err
+	}
+
+	if err := applyPlatforms(project, false); err != nil {
 		return err
 	}
 

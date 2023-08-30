@@ -26,8 +26,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/compose-spec/compose-go/dotenv"
 	buildx "github.com/docker/buildx/util/progress"
+
+	"github.com/compose-spec/compose-go/dotenv"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/remote"
 
@@ -117,6 +118,7 @@ type ProjectOptions struct {
 	ProjectDir    string
 	EnvFiles      []string
 	Compatibility bool
+	Progress      string
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -170,6 +172,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
+	f.StringVar(&o.Progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	_ = f.MarkHidden("workdir")
 }
 
@@ -294,7 +297,6 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		version  bool
 		parallel int
 		dryRun   bool
-		progress string
 	)
 	c := &cobra.Command{
 		Short:            "Docker Compose",
@@ -359,7 +361,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 				ui.Mode = ui.ModeTTY
 			}
 
-			switch progress {
+			switch opts.Progress {
 			case ui.ModeAuto:
 				ui.Mode = ui.ModeAuto
 			case ui.ModeTTY:
@@ -375,7 +377,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 			case ui.ModeQuiet, "none":
 				ui.Mode = ui.ModeQuiet
 			default:
-				return fmt.Errorf("unsupported --progress value %q", progress)
+				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
 
 			if opts.WorkDir != "" {
@@ -446,7 +448,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		portCommand(&opts, dockerCli, backend),
 		imagesCommand(&opts, dockerCli, backend),
 		versionCommand(dockerCli),
-		buildCommand(&opts, &progress, backend),
+		buildCommand(&opts, backend),
 		pushCommand(&opts, backend),
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),
@@ -477,8 +479,6 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		"profile",
 		completeProfileNames(&opts),
 	)
-
-	c.Flags().StringVar(&progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 
 	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
 	c.Flags().IntVar(&parallel, "parallel", -1, `Control max parallelism, -1 for unlimited`)

@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	xprogress "github.com/docker/buildx/util/progress"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/spf13/cobra"
@@ -74,6 +76,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
+	build := buildOptions{ProjectOptions: p}
 	upCmd := &cobra.Command{
 		Use:   "up [OPTIONS] [SERVICE...]",
 		Short: "Create and start containers",
@@ -90,7 +93,7 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			if len(up.attach) != 0 && up.attachDependencies {
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
-			return runUp(ctx, streams, backend, create, up, project, services)
+			return runUp(ctx, streams, backend, create, up, build, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -148,7 +151,16 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
-func runUp(ctx context.Context, streams api.Streams, backend api.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
+func runUp(
+	ctx context.Context,
+	streams api.Streams,
+	backend api.Service,
+	createOptions createOptions,
+	upOptions upOptions,
+	buildOptions buildOptions,
+	project *types.Project,
+	services []string,
+) error {
 	if len(project.Services) == 0 {
 		return fmt.Errorf("no service selected")
 	}
@@ -163,7 +175,26 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		return err
 	}
 
+	var build *api.BuildOptions
+	// this check is technically redundant as createOptions::apply()
+	// already removed all the build sections
+	if !createOptions.noBuild {
+		if createOptions.quietPull {
+			buildOptions.Progress = xprogress.PrinterModeQuiet
+		}
+		// BuildOptions here is nested inside CreateOptions, so
+		// no service list is passed, it will implicitly pick all
+		// services being created, which includes any explicitly
+		// specified via "services" arg here as well as deps
+		bo, err := buildOptions.toAPIBuildOptions(nil)
+		if err != nil {
+			return err
+		}
+		build = &bo
+	}
+
 	create := api.CreateOptions{
+		Build:                build,
 		Services:             services,
 		RemoveOrphans:        createOptions.removeOrphans,
 		IgnoreOrphans:        createOptions.ignoreOrphans,

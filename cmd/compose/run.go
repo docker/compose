@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	xprogress "github.com/docker/buildx/util/progress"
+
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
@@ -118,6 +120,9 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 		capDrop: opts.NewListOpts(nil),
 	}
 	createOpts := createOptions{}
+	buildOpts := buildOptions{
+		ProjectOptions: p,
+	}
 	cmd := &cobra.Command{
 		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
@@ -152,8 +157,12 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 				return err
 			}
 
+			if createOpts.quietPull {
+				buildOpts.Progress = xprogress.PrinterModeQuiet
+			}
+
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-			return runRun(ctx, backend, project, options, createOpts, streams)
+			return runRun(ctx, backend, project, options, createOpts, buildOpts, streams)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
 	}
@@ -197,7 +206,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Service, project *types.Project, options runOptions, createOpts createOptions, streams api.Streams) error {
+func runRun(ctx context.Context, backend api.Service, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, streams api.Streams) error {
 	err := options.apply(project)
 	if err != nil {
 		return err
@@ -209,7 +218,16 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	}
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
-		return startDependencies(ctx, backend, *project, options.Service, options.ignoreOrphans)
+		var buildForDeps *api.BuildOptions
+		if !createOpts.noBuild {
+			// allow dependencies needing build to be implicitly selected
+			bo, err := buildOpts.toAPIBuildOptions(nil)
+			if err != nil {
+				return err
+			}
+			buildForDeps = &bo
+		}
+		return startDependencies(ctx, backend, *project, buildForDeps, options.Service, options.ignoreOrphans)
 	}, streams.Err())
 	if err != nil {
 		return err
@@ -224,8 +242,20 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		labels[parts[0]] = parts[1]
 	}
 
+	var buildForRun *api.BuildOptions
+	if !createOpts.noBuild {
+		// dependencies have already been started above, so only the service
+		// being run might need to be built at this point
+		bo, err := buildOpts.toAPIBuildOptions([]string{options.Service})
+		if err != nil {
+			return err
+		}
+		buildForRun = &bo
+	}
+
 	// start container and attach to container streams
 	runOpts := api.RunOptions{
+		Build:             buildForRun,
 		Name:              options.name,
 		Service:           options.Service,
 		Command:           options.Command,
@@ -264,7 +294,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	return err
 }
 
-func startDependencies(ctx context.Context, backend api.Service, project types.Project, requestedServiceName string, ignoreOrphans bool) error {
+func startDependencies(ctx context.Context, backend api.Service, project types.Project, buildOpts *api.BuildOptions, requestedServiceName string, ignoreOrphans bool) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for _, service := range project.Services {
@@ -278,6 +308,7 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 	project.Services = dependencies
 	project.DisabledServices = append(project.DisabledServices, requestedService)
 	err := backend.Create(ctx, &project, api.CreateOptions{
+		Build:         buildOpts,
 		IgnoreOrphans: ignoreOrphans,
 	})
 	if err != nil {
