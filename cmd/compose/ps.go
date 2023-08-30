@@ -75,7 +75,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPs(ctx, dockerCli, backend, args, opts)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := psCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
@@ -88,7 +88,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 }
 
 func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, opts psOptions) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}

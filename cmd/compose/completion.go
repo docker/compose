@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -33,9 +34,10 @@ func noCompletion() validArgsFn {
 	}
 }
 
-func completeServiceNames(p *ProjectOptions) validArgsFn {
+func completeServiceNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		project, err := p.ToProject(nil)
+		p.Offline = true
+		project, err := p.ToProject(dockerCli, nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -67,9 +69,10 @@ func completeProjectNames(backend api.Service) func(cmd *cobra.Command, args []s
 	}
 }
 
-func completeProfileNames(p *ProjectOptions) validArgsFn {
+func completeProfileNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		project, err := p.ToProject(nil)
+		p.Offline = true
+		project, err := p.ToProject(dockerCli, nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

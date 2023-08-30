@@ -55,7 +55,7 @@ type ServiceProxy struct {
 	DryRunModeFn         func(ctx context.Context, dryRun bool) (context.Context, error)
 	VizFn                func(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	WaitFn               func(ctx context.Context, projectName string, options WaitOptions) (int64, error)
-	PublishFn            func(ctx context.Context, project *types.Project, repository string) error
+	PublishFn            func(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	interceptors         []Interceptor
 }
 
@@ -313,8 +313,8 @@ func (s *ServiceProxy) Port(ctx context.Context, projectName string, service str
 	return s.PortFn(ctx, projectName, service, port, options)
 }
 
-func (s *ServiceProxy) Publish(ctx context.Context, project *types.Project, repository string) error {
-	return s.PublishFn(ctx, project, repository)
+func (s *ServiceProxy) Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error {
+	return s.PublishFn(ctx, project, repository, options)
 }
 
 // Images implements Service interface

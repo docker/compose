@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	"github.com/docker/cli/cli"
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -37,7 +38,7 @@ type copyOptions struct {
 	copyUIDGID  bool
 }
 
-func copyCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := copyOptions{
 		ProjectOptions: p,
 	}
@@ -58,9 +59,9 @@ func copyCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.source = args[0]
 			opts.destination = args[1]
-			return runCopy(ctx, backend, opts)
+			return runCopy(ctx, dockerCli, backend, opts)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 
 	flags := copyCmd.Flags()
@@ -74,8 +75,8 @@ func copyCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return copyCmd
 }
 
-func runCopy(ctx context.Context, backend api.Service, opts copyOptions) error {
-	name, err := opts.toProjectName()
+func runCopy(ctx context.Context, dockerCli command.Cli, backend api.Service, opts copyOptions) error {
+	name, err := opts.toProjectName(dockerCli)
 	if err != nil {
 		return err
 	}

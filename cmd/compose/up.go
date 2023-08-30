@@ -26,6 +26,7 @@ import (
 	xprogress "github.com/docker/buildx/util/progress"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/spf13/cobra"
 
@@ -73,7 +74,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 	return nil
 }
 
-func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	build := buildOptions{ProjectOptions: p}
@@ -85,7 +86,7 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			create.timeChanged = cmd.Flags().Changed("timeout")
 			return validateFlags(&up, &create)
 		}),
-		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
+		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
 			create.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
 			if create.ignoreOrphans && create.removeOrphans {
 				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
@@ -93,9 +94,9 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			if len(up.attach) != 0 && up.attachDependencies {
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
-			return runUp(ctx, streams, backend, create, up, build, project, services)
+			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := upCmd.Flags()
 	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
@@ -153,7 +154,7 @@ func validateFlags(up *upOptions, create *createOptions) error {
 
 func runUp(
 	ctx context.Context,
-	streams api.Streams,
+	dockerCli command.Cli,
 	backend api.Service,
 	createOptions createOptions,
 	upOptions upOptions,
@@ -212,7 +213,7 @@ func runUp(
 	var consumer api.LogConsumer
 	var attach []string
 	if !upOptions.Detach {
-		consumer = formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
+		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 
 		var attachSet utils.Set[string]
 		if len(upOptions.attach) != 0 {

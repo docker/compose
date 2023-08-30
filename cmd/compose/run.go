@@ -26,6 +26,7 @@ import (
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/opts"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
@@ -111,7 +112,7 @@ func (options runOptions) apply(project *types.Project) error {
 	return nil
 }
 
-func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	options := runOptions{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -152,7 +153,7 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			project, err := p.ToProject([]string{options.Service}, cgo.WithResolvedPaths(true), cgo.WithDiscardEnvFile)
+			project, err := p.ToProject(dockerCli, []string{options.Service}, cgo.WithResolvedPaths(true), cgo.WithDiscardEnvFile)
 			if err != nil {
 				return err
 			}
@@ -162,16 +163,16 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 			}
 
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-			return runRun(ctx, backend, project, options, createOpts, buildOpts, streams)
+			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
 	flags.BoolVarP(&options.Detach, "detach", "d", false, "Run container in background and print container ID")
 	flags.StringArrayVarP(&options.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&options.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&options.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&options.noTty, "no-TTY", "T", !streams.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
+	flags.BoolVarP(&options.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
 	flags.StringVar(&options.name, "name", "", "Assign a name to the container")
 	flags.StringVarP(&options.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&options.workdir, "workdir", "w", "", "Working directory inside the container")
@@ -206,7 +207,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Service, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, streams api.Streams) error {
+func runRun(ctx context.Context, backend api.Service, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
 	err := options.apply(project)
 	if err != nil {
 		return err
@@ -228,7 +229,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 			buildForDeps = &bo
 		}
 		return startDependencies(ctx, backend, *project, buildForDeps, options.Service, options.ignoreOrphans)
-	}, streams.Err())
+	}, dockerCli.Err())
 	if err != nil {
 		return err
 	}

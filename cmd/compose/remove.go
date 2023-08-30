@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +31,7 @@ type removeOptions struct {
 	volumes bool
 }
 
-func removeCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func removeCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := removeOptions{
 		ProjectOptions: p,
 	}
@@ -44,9 +45,9 @@ can override this with -v. To list all volumes, use "docker volume ls".
 
 Any data which is not in a volume will be lost.`,
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runRemove(ctx, backend, opts, args)
+			return runRemove(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	f := cmd.Flags()
 	f.BoolVarP(&opts.force, "force", "f", false, "Don't ask to confirm removal")
@@ -58,8 +59,8 @@ Any data which is not in a volume will be lost.`,
 	return cmd
 }
 
-func runRemove(ctx context.Context, backend api.Service, opts removeOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+func runRemove(ctx context.Context, dockerCli command.Cli, backend api.Service, opts removeOptions, services []string) error {
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}

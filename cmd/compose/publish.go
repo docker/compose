@@ -19,12 +19,13 @@ package compose
 import (
 	"context"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-func publishCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := pushOptions{
 		ProjectOptions: p,
 	}
@@ -32,18 +33,18 @@ func publishCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Use:   "publish [OPTIONS] [REPOSITORY]",
 		Short: "Publish compose application",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPublish(ctx, backend, opts, args[0])
+			return runPublish(ctx, dockerCli, backend, opts, args[0])
 		}),
 		Args: cobra.ExactArgs(1),
 	}
 	return publishCmd
 }
 
-func runPublish(ctx context.Context, backend api.Service, opts pushOptions, repository string) error {
-	project, err := opts.ToProject(nil)
+func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pushOptions, repository string) error {
+	project, err := opts.ToProject(dockerCli, nil)
 	if err != nil {
 		return err
 	}
 
-	return backend.Publish(ctx, project, repository)
+	return backend.Publish(ctx, project, repository, api.PublishOptions{})
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
+	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
@@ -72,7 +73,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}, nil
 }
 
-func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -97,9 +98,9 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			if cmd.Flags().Changed("progress") && opts.ssh == "" {
 				fmt.Fprint(os.Stderr, "--progress is a global compose flag, better use `docker compose --progress xx build ...")
 			}
-			return runBuild(ctx, backend, opts, args)
+			return runBuild(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	cmd.Flags().BoolVar(&opts.push, "push", false, "Push service images.")
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
@@ -123,8 +124,8 @@ func buildCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func runBuild(ctx context.Context, backend api.Service, opts buildOptions, services []string) error {
-	project, err := opts.ToProject(services, cli.WithResolvedPaths(true))
+func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, opts buildOptions, services []string) error {
+	project, err := opts.ToProject(dockerCli, services, cli.WithResolvedPaths(true))
 	if err != nil {
 		return err
 	}

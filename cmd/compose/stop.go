@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -31,7 +32,7 @@ type stopOptions struct {
 	timeout     int
 }
 
-func stopCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func stopCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := stopOptions{
 		ProjectOptions: p,
 	}
@@ -42,9 +43,9 @@ func stopCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runStop(ctx, backend, opts, args)
+			return runStop(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
@@ -52,8 +53,8 @@ func stopCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func runStop(ctx context.Context, backend api.Service, opts stopOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+func runStop(ctx context.Context, dockerCli command.Cli, backend api.Service, opts stopOptions, services []string) error {
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}

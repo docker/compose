@@ -33,14 +33,14 @@ type versionOptions struct {
 	short  bool
 }
 
-func versionCommand(streams command.Cli) *cobra.Command {
+func versionCommand(dockerCli command.Cli) *cobra.Command {
 	opts := versionOptions{}
 	cmd := &cobra.Command{
 		Use:   "version [OPTIONS]",
 		Short: "Show the Docker Compose version information",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			runVersion(opts, streams)
+			runVersion(opts, dockerCli)
 			return nil
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -57,14 +57,14 @@ func versionCommand(streams command.Cli) *cobra.Command {
 	return cmd
 }
 
-func runVersion(opts versionOptions, streams command.Cli) {
+func runVersion(opts versionOptions, dockerCli command.Cli) {
 	if opts.short {
-		fmt.Fprintln(streams.Out(), strings.TrimPrefix(internal.Version, "v"))
+		fmt.Fprintln(dockerCli.Out(), strings.TrimPrefix(internal.Version, "v"))
 		return
 	}
 	if opts.format == formatter.JSON {
-		fmt.Fprintf(streams.Out(), "{\"version\":%q}\n", internal.Version)
+		fmt.Fprintf(dockerCli.Out(), "{\"version\":%q}\n", internal.Version)
 		return
 	}
-	fmt.Fprintln(streams.Out(), "Docker Compose version", internal.Version)
+	fmt.Fprintln(dockerCli.Out(), "Docker Compose version", internal.Version)
 }
