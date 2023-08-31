@@ -82,13 +82,12 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 
 	cli := NewCLI(t, WithEnv(env...))
 
+	// important that --rmi is used to prune the images and ensure that watch builds on launch
 	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", svcName, "--timeout=0", "--remove-orphans", "--volumes")
+		cli.RunDockerComposeCmd(t, "down", svcName, "--timeout=0", "--remove-orphans", "--volumes", "--rmi=local")
 	}
 	cleanup()
 	t.Cleanup(cleanup)
-
-	cli.RunDockerComposeCmd(t, "up", svcName, "--wait", "--build")
 
 	cmd := cli.NewDockerComposeCmd(t, "--verbose", "alpha", "watch", svcName)
 	// stream output since watch runs in the background
@@ -161,14 +160,12 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 		Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "No such file or directory",
-		},
-		)
+		})
 	cli.RunDockerComposeCmdNoCheck(t, "exec", svcName, "stat", "/app/data/ignored").
 		Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "No such file or directory",
-		},
-		)
+		})
 
 	t.Logf("Creating subdirectory")
 	require.NoError(t, os.Mkdir(filepath.Join(dataDir, "subdir"), 0o700))
@@ -196,8 +193,7 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 		Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "No such file or directory",
-		},
-		)
+		})
 
 	testComplete.Store(true)
 }

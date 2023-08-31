@@ -21,16 +21,14 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/internal/sync"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
+	"github.com/docker/compose/v2/pkg/watch"
 	moby "github.com/docker/docker/api/types"
 	"github.com/golang/mock/gomock"
-
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
-
-	"github.com/docker/compose/v2/internal/sync"
-
-	"github.com/docker/compose/v2/pkg/watch"
 	"gotest.tools/v3/assert"
 )
 
@@ -126,7 +124,7 @@ func TestWatch_Sync(t *testing.T) {
 			dockerCli: cli,
 			clock:     clock,
 		}
-		err := service.watch(ctx, &proj, "test", watcher, syncer, []Trigger{
+		err := service.watch(ctx, &proj, "test", api.WatchOptions{}, watcher, syncer, []Trigger{
 			{
 				Path:   "/sync",
 				Action: "sync",
