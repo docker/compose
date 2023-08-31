@@ -213,6 +213,8 @@ type RestartOptions struct {
 	Timeout *time.Duration
 	// Services passed in the command line to be restarted
 	Services []string
+	// NoDeps ignores services dependencies
+	NoDeps bool
 }
 
 // StopOptions group options of the Stop API

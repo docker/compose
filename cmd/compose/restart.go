@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -61,22 +60,23 @@ func runRestart(ctx context.Context, backend api.Service, opts restartOptions, s
 		return err
 	}
 
+	if project != nil && len(services) > 0 {
+		err := project.EnableServices(services...)
+		if err != nil {
+			return err
+		}
+	}
+
 	var timeout *time.Duration
 	if opts.timeChanged {
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
 
-	if opts.noDeps {
-		err := project.ForServices(services, types.IgnoreDependencies)
-		if err != nil {
-			return err
-		}
-	}
-
 	return backend.Restart(ctx, name, api.RestartOptions{
 		Timeout:  timeout,
 		Services: services,
 		Project:  project,
+		NoDeps:   opts.noDeps,
 	})
 }

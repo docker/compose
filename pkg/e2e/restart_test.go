@@ -84,3 +84,19 @@ func TestRestartWithDependencies(t *testing.T) {
 	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), res.Combined())
 	assert.Assert(t, !strings.Contains(res.Combined(), depNoRestart), res.Combined())
 }
+
+func TestRestartWithProfiles(t *testing.T) {
+	c := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-restart-profiles",
+	))
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "down", "--remove-orphans")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose.yaml", "--profile", "test", "up", "-d")
+
+	res := c.RunDockerComposeCmd(t, "restart", "test")
+	fmt.Println(res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-profiles-test-1  Started"), res.Combined())
+}
