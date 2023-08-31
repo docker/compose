@@ -3,3 +3,10 @@ services:
     image: alpine
     init: true
     command: ash -c "if [[ -f /tmp/restart.lock ]] ; then sleep infinity; else touch /tmp/restart.lock; fi"
+
+  test:
+    profiles:
+      - test
+    image: alpine
+    init: true
+    command: ash -c "if [[ -f /tmp/restart.lock ]] ; then sleep infinity; else touch /tmp/restart.lock; fi"

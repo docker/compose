@@ -48,6 +48,13 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		}
 	}
 
+	if options.NoDeps {
+		err := project.ForServices(options.Services, types.IgnoreDependencies)
+		if err != nil {
+			return err
+		}
+	}
+
 	// ignore depends_on relations which are not impacted by restarting service or not required
 	for i, service := range project.Services {
 		for name, r := range service.DependsOn {
