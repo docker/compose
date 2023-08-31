@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/distribution/distribution/v3/uuid"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
@@ -127,7 +127,9 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 	}
 
 	waitForFlush := func() {
-		sentinelVal := uuid.Generate().String()
+		b := make([]byte, 32)
+		_, _ = rand.Read(b)
+		sentinelVal := fmt.Sprintf("%x", b)
 		writeDataFile("wait.txt", sentinelVal)
 		poll.WaitOn(t, checkFileContents("/app/data/wait.txt", sentinelVal))
 	}
