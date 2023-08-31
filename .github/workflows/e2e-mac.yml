@@ -123,25 +123,11 @@ jobs:
       - name: Wait for Docker to be up and running
         shell: bash
         run: |
-          sleep 60
-          echo wait another minute
-          sleep 60
-          echo wait another minute
-          sleep 60
-          echo wait another minute
-          sleep 60
-          echo wait another minute
-          sleep 60
-
-      - name: Docker PS
-        continue-on-error: true
-        run: |
-          docker ps --all
-
-      - name: Wait for Docker to be up and running
-        shell: bash
-        run: |
-          sleep 60
+          echo wait a minute
+          sleep 30
+          echo ...
+          sleep 30
+          echo ok
 
       - name: Upload diagnostics
         continue-on-error: true
