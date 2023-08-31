@@ -41,9 +41,120 @@ jobs:
           cache: true
           check-latest: true
 
-      - name: Install and start Docker Desktop
-        uses: docker/desktop-action/start@v0.1.0
-        if: ${{ contains(matrix.os, 'macos-latest') }}
+      # - name: Install and start Docker Desktop
+      #   uses: docker/desktop-action/start@v0.1.0
+      #   if: ${{ contains(matrix.os, 'macos-latest') }}
+
+      # Debugging why DD start fails, importing all steps from desktop-action/start
+      - name: Get Date
+        id: get-date
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
+        shell: bash
+
+      - name: Get Docker app cache
+        id: cache-docker-desktop-app
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-docker-desktop-app
+        with:
+          path: /Applications/Docker.app
+          key: docker-desktop-app-mac-amd64-${{ steps.get-date.outputs.date }}
+
+      - name: Get Docker install settings cache
+        id: cache-docker-desktop-install-settings
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-docker-desktop-install-settings
+        with:
+          path: ./cache/desktopInstallSettings/
+          key: docker-desktop-install-settings-mac-${{ steps.get-date.outputs.date }}
+
+      - name: Block calls to segment.io
+        id: redirect-segment
+        shell: bash
+        run: |
+          echo '127.0.0.2 api.segment.io' | sudo tee -a /etc/hosts
+
+      - name: Copy Desktop install settings in /Library
+        if: steps.cache-docker-desktop-install-settings.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          echo "ls ./cache/desktopInstallSettings/"
+          ls ./cache/desktopInstallSettings/
+          sudo mkdir -p "/Library/Application Support/com.docker.docker"
+          sudo cp ./cache/desktopInstallSettings/* "/Library/Application Support/com.docker.docker/"
+          echo "/Library/Application Support/com.docker.docker/"
+          ls "/Library/Application Support/com.docker.docker/"
+
+      - name: Install Docker Desktop dmg
+        if: steps.cache-docker-desktop-install-settings.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          sw_vers
+          mkdir ./temp
+          mkdir ./mount
+          wget -q -O ./temp/DockerDesktop.dmg https://desktop.docker.com/mac/main/amd64/Docker.dmg
+          /usr/bin/hdiutil attach -noverify ./temp/DockerDesktop.dmg -mountpoint ./mount/desktop -nobrowse
+          echo "dmg mounted"
+          sudo ./mount/desktop/Docker.app/Contents/MacOS/install --accept-license
+          echo "dmg installed"
+
+          echo "ls /Library/Application Support/com.docker.docker"
+          ls "/Library/Application Support/com.docker.docker" || true
+          mkdir -p ./cache/desktopInstallSettings
+          cp "/Library/Application Support/com.docker.docker/"* ./cache/desktopInstallSettings/
+          echo "ls ./cache/desktopInstallSettings/"
+          ls ./cache/desktopInstallSettings/ || true
+
+          /usr/bin/hdiutil detach ./mount/desktop
+          echo "dmg unmounted"
+
+      - name: Install Docker Desktop app
+        shell: bash
+        run: |
+          sudo mkdir /Library/PrivilegedHelperTools
+          sudo /Applications/Docker.app/Contents/MacOS/install config --user runner
+          sudo /Applications/Docker.app/Contents/MacOS/install vmnetd
+          echo "app installed"
+          /usr/bin/open /Applications/Docker.app --args --unattended --add-host-docker-internal-registry
+          echo "Docker starting..."
+
+      - name: Wait for Docker to be up and running
+        shell: bash
+        run: |
+          sleep 60
+
+      - name: Wait for Docker to be up and running
+        shell: bash
+        run: |
+          sleep 60
+
+      - name: Wait for Docker to be up and running
+        shell: bash
+        run: |
+          sleep 60
+
+      - name: Wait for Docker to be up and running
+        shell: bash
+        run: |
+          sleep 60
+
+        - name: Docker PS
+        continue-on-error: true
+        run: |
+          docker ps --all
+
+      - name: Wait for Docker to be up and running
+        shell: bash
+        run: |
+          sleep 60
+
+      - name: Upload diagnostics
+        continue-on-error: true
+        run: |
+          /Applications/Docker.app/Contents/MacOS/com.docker.diagnose gather -upload
+
 
       - name: List Docker resources on machine
         run: |
