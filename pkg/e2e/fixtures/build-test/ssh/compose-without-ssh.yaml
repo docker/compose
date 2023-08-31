@@ -1,5 +1,0 @@
-services:
-  ssh:
-    image: build-test-ssh
-    build:
-      context: .

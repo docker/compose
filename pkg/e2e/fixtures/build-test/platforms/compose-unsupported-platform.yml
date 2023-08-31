@@ -1,8 +1,0 @@
-services:
-  platforms:
-    image: build-test-platform:test
-    build:
-      context: .
-      platforms:
-        - unsupported/unsupported
-        - linux/amd64

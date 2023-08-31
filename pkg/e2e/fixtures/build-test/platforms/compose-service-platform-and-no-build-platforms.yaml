@@ -1,6 +1,0 @@
-services:
-  platforms:
-    image: build-test-platform:test
-    platform: linux/386
-    build:
-      context: .

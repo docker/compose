@@ -1,7 +1,0 @@
-services:
-  ssh:
-    image: build-test-ssh
-    build:
-      context: .
-      ssh:
-        - fake-ssh=./fixtures/build-test/ssh/fake_rsa

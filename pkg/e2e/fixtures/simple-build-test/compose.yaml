@@ -1,5 +1,0 @@
-services:
-  nginx:
-    build:
-      context: nginx-build
-      dockerfile: Dockerfile

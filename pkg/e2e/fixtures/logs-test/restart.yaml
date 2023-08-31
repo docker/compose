@@ -1,5 +1,0 @@
-services:
-  ping:
-    image: alpine
-    command: "sh -c 'ping -c 2 localhost && exit 1'"
-    restart: "on-failure:2"

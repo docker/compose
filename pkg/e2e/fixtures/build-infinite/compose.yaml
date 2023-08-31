@@ -1,3 +1,0 @@
-services:
-    service1:
-        build: service1

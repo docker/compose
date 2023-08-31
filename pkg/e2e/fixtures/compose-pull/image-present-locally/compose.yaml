@@ -1,9 +1,0 @@
-services:
-  simple:
-    image: alpine:3.13.12
-    pull_policy: missing
-    command: top
-  latest:
-    image: alpine:latest
-    pull_policy: missing
-    command: top

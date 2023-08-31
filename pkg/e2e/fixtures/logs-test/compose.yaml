@@ -1,7 +1,0 @@
-services:
-  ping:
-    image: alpine
-    command: ping localhost -c 1
-  hello:
-    image: alpine
-    command: echo hello
