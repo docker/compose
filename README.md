@@ -1,6 +1,5 @@
 # Table of Contents
 - [Docker Compose v2](#docker-compose-v2)
-- [About update and backward compatibility](#about-update-and-backward-compatibility)
 - [Where to get Docker Compose](#where-to-get-docker-compose)
     + [Windows and macOS](#windows-and-macos)
     + [Linux](#linux)
