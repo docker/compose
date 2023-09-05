@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -42,7 +43,7 @@ import (
 // vars, creates a root span for the command, and wraps the actual
 // command invocation to ensure the span is properly finalized and
 // exported before exit.
-func Setup(cmd *cobra.Command, dockerCli command.Cli) error {
+func Setup(cmd *cobra.Command, dockerCli command.Cli, args []string) error {
 	tracingShutdown, err := tracing.InitTracing(dockerCli)
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
@@ -53,6 +54,9 @@ func Setup(cmd *cobra.Command, dockerCli command.Cli) error {
 		ctx,
 		"cli/"+strings.Join(commandName(cmd), "-"),
 	)
+	cmdSpan.SetAttributes(attribute.StringSlice("cliArgs", args))
+	cmdSpan.SetAttributes(attribute.StringSlice("cliFlags", filterForFlags(args)))
+
 	cmd.SetContext(ctx)
 	wrapRunE(cmd, cmdSpan, tracingShutdown)
 	return nil
@@ -128,4 +132,19 @@ func commandName(cmd *cobra.Command) []string {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(name)))
 	return name
+}
+
+func filterForFlags(args []string) []string {
+	var flags []string
+	// cli flags will never contain special characters or integers
+	// ensure these are not parsed
+	invalidChars := regexp.MustCompile("[0-9!@#$%^&*()_+={}\\[\\]:;\"'<>,.?/\\\\|~]")
+	for _, item := range args {
+		if strings.HasPrefix(item, "--") || strings.HasPrefix(item, "-") {
+			if !invalidChars.MatchString(item) {
+				flags = append(flags, item)
+			}
+		}
+	}
+	return flags
 }
