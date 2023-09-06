@@ -1,0 +1,55 @@
+services:
+  docker:
+    image: ${DIND_IMAGE:-docker.io/docker}:${DIND_TAG:-git}
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - type: volume
+        source: dind-sock
+        target: /var/run
+      - type: volume
+        source: dind-certs-ca
+        target: /certs/ca
+      - type: volume
+        source: dind-certs-client
+        target: /certs/client
+    networks: [dind]
+    healthcheck:
+      test: ["CMD", "docker", "version", "--format='{{ .Server.Version }}'"]
+      interval: 1s
+      # start_interval: 1s
+      start_period: 15s
+      timeout: 5s
+
+  cli-sock:
+    image: ${DIND_IMAGE:-docker.io/docker}:${DIND_CLI_TAG:-cli}
+    command: ["docker", "version"]
+    volumes:
+      - type: volume
+        source: dind-sock
+        target: /var/run
+    depends_on:
+      docker:
+        condition: service_healthy
+  cli-tls:
+    image: ${DIND_IMAGE:-docker.io/docker}:${DIND_CLI_TAG:-cli}
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - type: volume
+        source: dind-certs-client
+        target: /certs/client
+    command: [ "docker", "version" ]
+    depends_on:
+      docker:
+        condition: service_healthy
+    networks: [dind]
+
+volumes:
+  dind-certs-ca:
+  dind-certs-client:
+  dind-sock:
+
+networks:
+  dind:

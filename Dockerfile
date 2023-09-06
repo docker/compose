@@ -32,6 +32,15 @@ FROM crazymax/osxcross:11.3-alpine AS osxcross
 
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
 FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
+FROM docker.io/curlimages/curl AS curl
+
+FROM --platform=${BUILDPLATFORM} alpine AS gotestsum
+
+ARG TARGETARCH
+ARG GOTESTSUM_VERSION=1.10.1
+ADD https://github.com/gotestyourself/gotestsum/releases/download/v${GOTESTSUM_VERSION}/gotestsum_${GOTESTSUM_VERSION}_linux_${TARGETARCH}.tar.gz /tmp/
+RUN mkdir /out && \
+    tar xzf /tmp/gotestsum_${GOTESTSUM_VERSION}_linux_arm64.tar.gz -C /out
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS base
 COPY --from=xx / /
@@ -111,6 +120,27 @@ RUN --mount=type=bind,target=. \
 
 FROM scratch AS test-coverage
 COPY --from=test --link /tmp/coverage /
+
+FROM build-base AS e2e-build
+
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg/mod \
+    go test -c -o /out/compose.e2e.test --tags=standalone ./pkg/e2e
+
+FROM base AS e2e
+
+COPY --link --from=curl /usr/bin/curl /usr/local/bin/
+COPY --link --from=gotestsum /out/gotestsum /usr/local/bin/
+
+USER 1000
+ENV USER=moby
+COPY --link --from=build /out/docker-compose /src/bin/build/
+COPY ./pkg/e2e /src/pkg/e2e
+COPY --link --from=e2e-build /out/compose.e2e.test /src/pkg/e2e/
+
+WORKDIR /src/pkg/e2e
+CMD gotestsum --format=testname --raw-command -- go tool test2json -t -p e2e ./compose.e2e.test -test.v -test.count=1 -test.parallel=1
 
 FROM base AS license-set
 ARG LICENSE_FILES
