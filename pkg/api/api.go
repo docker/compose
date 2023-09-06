@@ -88,6 +88,12 @@ type Service interface {
 	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	// Wait blocks until at least one of the services' container exits
 	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
+	// Scale manages numbers of container instances running per service
+	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
+}
+
+type ScaleOptions struct {
+	Services []string
 }
 
 type WaitOptions struct {

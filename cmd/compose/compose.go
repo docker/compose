@@ -476,6 +476,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		createCommand(&opts, dockerCli, backend),
 		copyCommand(&opts, dockerCli, backend),
 		waitCommand(&opts, dockerCli, backend),
+		scaleCommand(&opts, dockerCli, backend),
 		alphaCommand(&opts, dockerCli, backend),
 	)
 

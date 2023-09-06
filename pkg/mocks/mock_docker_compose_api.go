@@ -351,6 +351,20 @@ func (mr *MockServiceMockRecorder) RunOneOffContainer(ctx, project, opts interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunOneOffContainer", reflect.TypeOf((*MockService)(nil).RunOneOffContainer), ctx, project, opts)
 }
 
+// Scale mocks base method.
+func (m *MockService) Scale(ctx context.Context, project *types.Project, options api.ScaleOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Scale", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Scale indicates an expected call of Scale.
+func (mr *MockServiceMockRecorder) Scale(ctx, project, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scale", reflect.TypeOf((*MockService)(nil).Scale), ctx, project, options)
+}
+
 // Start mocks base method.
 func (m *MockService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	m.ctrl.T.Helper()
