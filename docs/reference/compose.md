@@ -26,6 +26,7 @@ Define and run multi-container applications with Docker.
 | [`restart`](compose_restart.md) | Restart service containers                                              |
 | [`rm`](compose_rm.md)           | Removes stopped service containers                                      |
 | [`run`](compose_run.md)         | Run a one-off command on a service.                                     |
+| [`scale`](compose_scale.md)     | Scale services                                                          |
 | [`start`](compose_start.md)     | Start services                                                          |
 | [`stop`](compose_stop.md)       | Stop services                                                           |
 | [`top`](compose_top.md)         | Display the running processes                                           |

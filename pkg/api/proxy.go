@@ -56,6 +56,7 @@ type ServiceProxy struct {
 	VizFn                func(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	WaitFn               func(ctx context.Context, projectName string, options WaitOptions) (int64, error)
 	PublishFn            func(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
+	ScaleFn              func(ctx context.Context, project *types.Project, options ScaleOptions) error
 	interceptors         []Interceptor
 }
 
@@ -99,6 +100,7 @@ func (s *ServiceProxy) WithService(service Service) *ServiceProxy {
 	s.DryRunModeFn = service.DryRunMode
 	s.VizFn = service.Viz
 	s.WaitFn = service.Wait
+	s.ScaleFn = service.Scale
 	return s
 }
 
@@ -347,6 +349,13 @@ func (s *ServiceProxy) Wait(ctx context.Context, projectName string, options Wai
 		return 0, ErrNotImplemented
 	}
 	return s.WaitFn(ctx, projectName, options)
+}
+
+func (s *ServiceProxy) Scale(ctx context.Context, project *types.Project, options ScaleOptions) error {
+	if s.ScaleFn == nil {
+		return ErrNotImplemented
+	}
+	return s.ScaleFn(ctx, project, options)
 }
 
 func (s *ServiceProxy) MaxConcurrency(i int) {
