@@ -1,41 +1,43 @@
 package cmdtrace
 
 import (
+	flag "github.com/spf13/pflag"
 	"reflect"
 	"testing"
 )
 
-func TestFilterForFlags(t *testing.T) {
+func TestGetFlags(t *testing.T) {
+	// Initialize flagSet with flags
+	fs := flag.NewFlagSet("up", flag.ContinueOnError)
+	var (
+		detach  string
+		timeout string
+	)
+	fs.StringVar(&detach, "detach", "d", "")
+	fs.StringVar(&timeout, "timeout", "t", "")
+	_ = fs.Set("detach", "detach")
+	_ = fs.Set("timeout", "timeout")
+
 	tests := []struct {
 		name     string
-		input    []string
+		input    *flag.FlagSet
 		expected []string
 	}{
 		{
 			name:     "NoFlags",
-			input:    []string{"compose", "up"},
+			input:    flag.NewFlagSet("NoFlags", flag.ContinueOnError),
 			expected: nil,
 		},
 		{
 			name:     "Flags",
-			input:    []string{"compose", "up", "-d", "--timeout", "100"},
-			expected: []string{"-d", "--timeout"},
-		},
-		{
-			name:     "Empty",
-			input:    []string{},
-			expected: nil,
-		},
-		{
-			name:     "SpecialCharacters",
-			input:    []string{"--timeout100", "-d**", "123456789&^%$#@!"},
-			expected: nil,
+			input:    fs,
+			expected: []string{"detach", "timeout"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := filterForFlags(test.input)
+			result := getFlags(test.input)
 			if !reflect.DeepEqual(result, test.expected) {
 				t.Errorf("Expected %v, but got %v", test.expected, result)
 			}

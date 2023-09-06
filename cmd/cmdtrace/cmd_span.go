@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
+	flag "github.com/spf13/pflag"
 	"sort"
 	"strings"
 	"time"
@@ -55,7 +55,7 @@ func Setup(cmd *cobra.Command, dockerCli command.Cli, args []string) error {
 		"cli/"+strings.Join(commandName(cmd), "-"),
 	)
 	cmdSpan.SetAttributes(attribute.StringSlice("cliArgs", args))
-	cmdSpan.SetAttributes(attribute.StringSlice("cliFlags", filterForFlags(args)))
+	cmdSpan.SetAttributes(attribute.StringSlice("cliFlags", getFlags(cmd.Flags())))
 
 	cmd.SetContext(ctx)
 	wrapRunE(cmd, cmdSpan, tracingShutdown)
@@ -134,17 +134,10 @@ func commandName(cmd *cobra.Command) []string {
 	return name
 }
 
-func filterForFlags(args []string) []string {
-	var flags []string
-	// cli flags will never contain special characters or integers
-	// ensure these are not parsed
-	invalidChars := regexp.MustCompile("[0-9!@#$%^&*()_+={}\\[\\]:;\"'<>,.?/\\\\|~]")
-	for _, item := range args {
-		if strings.HasPrefix(item, "--") || strings.HasPrefix(item, "-") {
-			if !invalidChars.MatchString(item) {
-				flags = append(flags, item)
-			}
-		}
-	}
-	return flags
+func getFlags(fs *flag.FlagSet) []string {
+	var result []string
+	fs.Visit(func(flag *flag.Flag) {
+		result = append(result, flag.Name)
+	})
+	return result
 }
