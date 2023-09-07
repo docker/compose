@@ -5,10 +5,11 @@ EXPERIMENTAL - Watch build context for service and rebuild/refresh containers wh
 
 ### Options
 
-| Name        | Type | Default | Description                     |
-|:------------|:-----|:--------|:--------------------------------|
-| `--dry-run` |      |         | Execute command in dry run mode |
-| `--quiet`   |      |         | hide build output               |
+| Name        | Type | Default | Description                                   |
+|:------------|:-----|:--------|:----------------------------------------------|
+| `--dry-run` |      |         | Execute command in dry run mode               |
+| `--no-up`   |      |         | Do not build & start services before watching |
+| `--quiet`   |      |         | hide build output                             |
 
 
 <!---MARKER_GEN_END-->

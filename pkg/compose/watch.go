@@ -26,19 +26,16 @@ import (
 	"strings"
 	"time"
 
-	moby "github.com/docker/docker/api/types"
-
-	"github.com/docker/compose/v2/internal/sync"
-
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/internal/sync"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/watch"
+	moby "github.com/docker/docker/api/types"
 	"github.com/jonboulle/clockwork"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/watch"
 )
 
 type DevelopmentConfig struct {
@@ -84,7 +81,7 @@ func (s *composeService) getSyncImplementation(project *types.Project) sync.Sync
 	return sync.NewDockerCopy(project.Name, s, s.stdinfo())
 }
 
-func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error { //nolint: gocyclo
+func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
 	if err := project.ForServices(services); err != nil {
 		return err
 	}
@@ -161,7 +158,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 		eg.Go(func() error {
 			defer watcher.Close() //nolint:errcheck
-			return s.watch(ctx, project, service.Name, watcher, syncer, config.Watch)
+			return s.watch(ctx, project, service.Name, options, watcher, syncer, config.Watch)
 		})
 	}
 
@@ -172,14 +169,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	return eg.Wait()
 }
 
-func (s *composeService) watch(
-	ctx context.Context,
-	project *types.Project,
-	name string,
-	watcher watch.Notify,
-	syncer sync.Syncer,
-	triggers []Trigger,
-) error {
+func (s *composeService) watch(ctx context.Context, project *types.Project, name string, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, triggers []Trigger) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -202,7 +192,7 @@ func (s *composeService) watch(
 			case batch := <-batchEvents:
 				start := time.Now()
 				logrus.Debugf("batch start: service[%s] count[%d]", name, len(batch))
-				if err := s.handleWatchBatch(ctx, project, name, batch, syncer); err != nil {
+				if err := s.handleWatchBatch(ctx, project, name, options.Build, batch, syncer); err != nil {
 					logrus.Warnf("Error handling changed files for service %s: %v", name, err)
 				}
 				logrus.Debugf("batch complete: service[%s] duration[%s] count[%d]",
@@ -436,13 +426,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 	return nil
 }
 
-func (s *composeService) handleWatchBatch(
-	ctx context.Context,
-	project *types.Project,
-	serviceName string,
-	batch []fileEvent,
-	syncer sync.Syncer,
-) error {
+func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, build api.BuildOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
 	for i := range batch {
 		if batch[i].Action == WatchActionRebuild {
@@ -452,14 +436,11 @@ func (s *composeService) handleWatchBatch(
 				serviceName,
 				strings.Join(append([]string{""}, batch[i].HostPath), "\n  - "),
 			)
+			// restrict the build to ONLY this service, not any of its dependencies
+			build.Services = []string{serviceName}
 			err := s.Up(ctx, project, api.UpOptions{
 				Create: api.CreateOptions{
-					Build: &api.BuildOptions{
-						Pull: false,
-						Push: false,
-						// restrict the build to ONLY this service, not any of its dependencies
-						Services: []string{serviceName},
-					},
+					Build:    &build,
 					Services: []string{serviceName},
 					Inherit:  true,
 				},

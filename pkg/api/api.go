@@ -110,6 +110,7 @@ type VizOptions struct {
 
 // WatchOptions group options of the Watch API
 type WatchOptions struct {
+	Build BuildOptions
 }
 
 // BuildOptions group options of the Build API
