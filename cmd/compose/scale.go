@@ -95,12 +95,12 @@ func parseServicesReplicasArgs(args []string) (map[string]int, error) {
 	for _, arg := range args {
 		key, val, ok := strings.Cut(arg, "=")
 		if !ok || key == "" || val == "" {
-			return nil, errors.Errorf("Invalide scale specifier %q.", arg)
+			return nil, errors.Errorf("invalid scale specifier: %s", arg)
 		}
 		intValue, err := strconv.Atoi(val)
 
 		if err != nil {
-			return nil, errors.Errorf("Invalide scale specifier, can't parse replicate value to int %q.", arg)
+			return nil, errors.Errorf("invalid scale specifier: can't parse replica value as int: %v", arg)
 		}
 		serviceReplicaTuples[key] = intValue
 	}
