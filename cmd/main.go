@@ -45,7 +45,7 @@ func pluginMain() {
 			}
 			// TODO(milas): add an env var to enable logging from the
 			// OTel components for debugging purposes
-			_ = cmdtrace.Setup(cmd, dockerCli)
+			_ = cmdtrace.Setup(cmd, dockerCli, os.Args[1:])
 
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
