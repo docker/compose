@@ -72,8 +72,8 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
-	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
-	flags.StringVar(&opts.Pull, "pull", "missing", `Pull image before running ("always"|"missing"|"never")`)
+	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's policy.")
+	flags.StringVar(&opts.Pull, "pull", "policy", `Pull image before running ("always"|"policy"|"never")`)
 	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
@@ -145,7 +145,7 @@ func (opts createOptions) Apply(project *types.Project) error {
 	}
 	// N.B. opts.Build means "force build all", but images can still be built
 	// when this is false
-	// e.g. if a service has pull_policy: build or its local image is missing
+	// e.g. if a service has pull_policy: build or its local image is policy
 	if opts.Build {
 		for i, service := range project.Services {
 			if service.Build == nil {
