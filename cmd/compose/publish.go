@@ -20,38 +20,31 @@ import (
 	"context"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
-type startOptions struct {
-	*ProjectOptions
-}
-
-func startCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
-	opts := startOptions{
+func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	opts := pushOptions{
 		ProjectOptions: p,
 	}
-	startCmd := &cobra.Command{
-		Use:   "start [SERVICE...]",
-		Short: "Start services",
+	publishCmd := &cobra.Command{
+		Use:   "publish [OPTIONS] [REPOSITORY]",
+		Short: "Publish compose application",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runStart(ctx, dockerCli, backend, opts, args)
+			return runPublish(ctx, dockerCli, backend, opts, args[0])
 		}),
-		ValidArgsFunction: completeServiceNames(dockerCli, p),
+		Args: cobra.ExactArgs(1),
 	}
-	return startCmd
+	return publishCmd
 }
 
-func runStart(ctx context.Context, dockerCli command.Cli, backend api.Service, opts startOptions, services []string) error {
-	project, name, err := opts.projectOrName(dockerCli, services...)
+func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pushOptions, repository string) error {
+	project, err := opts.ToProject(dockerCli, nil)
 	if err != nil {
 		return err
 	}
 
-	return backend.Start(ctx, name, api.StartOptions{
-		AttachTo: services,
-		Project:  project,
-		Services: services,
-	})
+	return backend.Publish(ctx, project, repository, api.PublishOptions{})
 }

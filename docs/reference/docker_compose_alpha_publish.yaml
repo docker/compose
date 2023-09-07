@@ -1,16 +1,9 @@
-command: docker compose alpha
-short: Experimental commands
-long: Experimental commands
-pname: docker compose
-plink: docker_compose.yaml
-cname:
-    - docker compose alpha publish
-    - docker compose alpha viz
-    - docker compose alpha watch
-clink:
-    - docker_compose_alpha_publish.yaml
-    - docker_compose_alpha_viz.yaml
-    - docker_compose_alpha_watch.yaml
+command: docker compose alpha publish
+short: Publish compose application
+long: Publish compose application
+usage: docker compose alpha publish [OPTIONS] [REPOSITORY]
+pname: docker compose alpha
+plink: docker_compose_alpha.yaml
 inherited_options:
     - option: dry-run
       value_type: bool
@@ -23,7 +16,7 @@ inherited_options:
       kubernetes: false
       swarm: false
 deprecated: false
-hidden: true
+hidden: false
 experimental: false
 experimentalcli: true
 kubernetes: false

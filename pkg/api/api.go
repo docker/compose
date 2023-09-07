@@ -74,6 +74,8 @@ type Service interface {
 	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
 	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
+	// Publish executes the equivalent to a `compose publish`
+	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 	// MaxConcurrency defines upper limit for concurrent operations against engine API
@@ -350,6 +352,10 @@ type Event struct {
 type PortOptions struct {
 	Protocol string
 	Index    int
+}
+
+// PublishOptions group options of the Publish API
+type PublishOptions struct {
 }
 
 func (e Event) String() string {

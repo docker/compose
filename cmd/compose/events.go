@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 
 	"github.com/spf13/cobra"
@@ -31,7 +32,7 @@ type eventsOpts struct {
 	json bool
 }
 
-func eventsCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := eventsOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -41,17 +42,17 @@ func eventsCommand(p *ProjectOptions, streams api.Streams, backend api.Service) 
 		Use:   "events [OPTIONS] [SERVICE...]",
 		Short: "Receive real time events from containers.",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runEvents(ctx, streams, backend, opts, args)
+			return runEvents(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Output events as a stream of json objects")
 	return cmd
 }
 
-func runEvents(ctx context.Context, streams api.Streams, backend api.Service, opts eventsOpts, services []string) error {
-	name, err := opts.toProjectName()
+func runEvents(ctx context.Context, dockerCli command.Cli, backend api.Service, opts eventsOpts, services []string) error {
+	name, err := opts.toProjectName(dockerCli)
 	if err != nil {
 		return err
 	}
@@ -71,9 +72,9 @@ func runEvents(ctx context.Context, streams api.Streams, backend api.Service, op
 				if err != nil {
 					return err
 				}
-				fmt.Fprintln(streams.Out(), string(marshal))
+				fmt.Fprintln(dockerCli.Out(), string(marshal))
 			} else {
-				fmt.Fprintln(streams.Out(), event)
+				fmt.Fprintln(dockerCli.Out(), event)
 			}
 			return nil
 		},
