@@ -54,8 +54,8 @@ func Setup(cmd *cobra.Command, dockerCli command.Cli, args []string) error {
 		ctx,
 		"cli/"+strings.Join(commandName(cmd), "-"),
 	)
-	cmdSpan.SetAttributes(attribute.StringSlice("cliArgs", args))
-	cmdSpan.SetAttributes(attribute.StringSlice("cliFlags", getFlags(cmd.Flags())))
+	cmdSpan.SetAttributes(attribute.StringSlice("cli.args", args))
+	cmdSpan.SetAttributes(attribute.StringSlice("cli.flags", getFlags(cmd.Flags())))
 
 	cmd.SetContext(ctx)
 	wrapRunE(cmd, cmdSpan, tracingShutdown)
