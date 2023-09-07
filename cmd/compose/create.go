@@ -49,6 +49,9 @@ type createOptions struct {
 
 func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := createOptions{}
+	buildOpts := buildOptions{
+		ProjectOptions: p,
+	}
 	cmd := &cobra.Command{
 		Use:   "create [OPTIONS] [SERVICE...]",
 		Short: "Creates containers for a service.",
@@ -62,20 +65,9 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 			}
 			return nil
 		}),
-		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
-			if err := opts.Apply(project); err != nil {
-				return err
-			}
-			return backend.Create(ctx, project, api.CreateOptions{
-				RemoveOrphans:        opts.removeOrphans,
-				IgnoreOrphans:        opts.ignoreOrphans,
-				Recreate:             opts.recreateStrategy(),
-				RecreateDependencies: opts.dependenciesRecreateStrategy(),
-				Inherit:              !opts.noInherit,
-				Timeout:              opts.GetTimeout(),
-				QuietPull:            false,
-			})
-		}, dockerCli),
+		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
+			return runCreate(ctx, dockerCli, backend, opts, buildOpts, project, services)
+		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
@@ -87,6 +79,33 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	return cmd
+}
+
+func runCreate(ctx context.Context, _ command.Cli, backend api.Service, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
+	if err := createOpts.Apply(project); err != nil {
+		return err
+	}
+
+	var build *api.BuildOptions
+	if !createOpts.noBuild {
+		bo, err := buildOpts.toAPIBuildOptions(services)
+		if err != nil {
+			return err
+		}
+		build = &bo
+	}
+
+	return backend.Create(ctx, project, api.CreateOptions{
+		Build:                build,
+		Services:             services,
+		RemoveOrphans:        createOpts.removeOrphans,
+		IgnoreOrphans:        createOpts.ignoreOrphans,
+		Recreate:             createOpts.recreateStrategy(),
+		RecreateDependencies: createOpts.dependenciesRecreateStrategy(),
+		Inherit:              !createOpts.noInherit,
+		Timeout:              createOpts.GetTimeout(),
+		QuietPull:            false,
+	})
 }
 
 func (opts createOptions) recreateStrategy() string {
