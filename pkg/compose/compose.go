@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -36,15 +35,13 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-
-	"github.com/docker/compose/v2/pkg/api"
 )
 
 var stdioToStdout bool
@@ -169,9 +166,9 @@ func (s *composeService) Config(ctx context.Context, project *types.Project, opt
 
 	switch options.Format {
 	case "json":
-		return json.MarshalIndent(project, "", "  ")
+		return project.MarshalJSON()
 	case "yaml":
-		return yaml.Marshal(project)
+		return project.MarshalYAML()
 	default:
 		return nil, fmt.Errorf("unsupported format %q", options.Format)
 	}
