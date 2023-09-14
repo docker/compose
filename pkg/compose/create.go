@@ -86,11 +86,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	prepareNetworks(project)
 
-	err = prepareVolumes(project)
-	if err != nil {
-		return err
-	}
-
 	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
 		return err
 	}
@@ -121,31 +116,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	}
 
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
-}
-
-func prepareVolumes(p *types.Project) error {
-	for i := range p.Services {
-		volumesFrom, dependServices, err := getVolumesFrom(p, p.Services[i].VolumesFrom)
-		if err != nil {
-			return err
-		}
-		p.Services[i].VolumesFrom = volumesFrom
-		if len(dependServices) > 0 {
-			if p.Services[i].DependsOn == nil {
-				p.Services[i].DependsOn = make(types.DependsOnConfig, len(dependServices))
-			}
-			for _, service := range p.Services {
-				if utils.StringContains(dependServices, service.Name) &&
-					p.Services[i].DependsOn[service.Name].Condition == "" {
-					p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
-						Condition: types.ServiceConditionStarted,
-						Required:  true,
-					}
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -249,13 +219,6 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	var volumesFrom []string
-	for _, v := range service.VolumesFrom {
-		if !strings.HasPrefix(v, "container:") {
-			return createConfigs{}, fmt.Errorf("invalid volume_from: %s", v)
-		}
-		volumesFrom = append(volumesFrom, v[len("container:"):])
-	}
 
 	// NETWORKING
 	links, err := s.getLinks(ctx, p.Name, service, number)
@@ -296,7 +259,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		PortBindings:   portBindings,
 		Resources:      resources,
 		VolumeDriver:   service.VolumeDriver,
-		VolumesFrom:    volumesFrom,
+		VolumesFrom:    service.VolumesFrom,
 		DNS:            service.DNS,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
@@ -674,40 +637,6 @@ func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
 		bindings[p] = append(bindings[p], binding)
 	}
 	return bindings
-}
-
-func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []string, error) {
-	var volumes = []string{}
-	var services = []string{}
-	// parse volumes_from
-	if len(volumesFrom) == 0 {
-		return volumes, services, nil
-	}
-	for _, vol := range volumesFrom {
-		spec := strings.Split(vol, ":")
-		if len(spec) == 0 {
-			continue
-		}
-		if spec[0] == "container" {
-			volumes = append(volumes, vol)
-			continue
-		}
-		serviceName := spec[0]
-		services = append(services, serviceName)
-		service, err := project.GetService(serviceName)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		firstContainer := getContainerName(project.Name, service, 1)
-		v := fmt.Sprintf("container:%s", firstContainer)
-		if len(spec) > 2 {
-			v = fmt.Sprintf("container:%s:%s", firstContainer, strings.Join(spec[1:], ":"))
-		}
-		volumes = append(volumes, v)
-	}
-	return volumes, services, nil
-
 }
 
 func getDependentServiceFromMode(mode string) string {

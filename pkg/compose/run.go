@@ -58,9 +58,6 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
-	if err := prepareVolumes(project); err != nil { // all dependencies already checked, but might miss service img
-		return "", err
-	}
 	service, err := project.GetService(opts.Service)
 	if err != nil {
 		return "", err

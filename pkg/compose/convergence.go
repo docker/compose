@@ -178,6 +178,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	eg, _ := errgroup.WithContext(ctx)
 
+	err = c.resolveVolumeFrom(&service)
+	if err != nil {
+		return err
+	}
+
 	sort.Slice(containers, func(i, j int) bool {
 		return containers[i].Created < containers[j].Created
 	})
@@ -256,6 +261,26 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	err = eg.Wait()
 	c.setObservedState(service.Name, updated)
 	return err
+}
+
+func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
+	for i, vol := range service.VolumesFrom {
+		spec := strings.Split(vol, ":")
+		if len(spec) == 0 {
+			continue
+		}
+		if spec[0] == "container" {
+			service.VolumesFrom[i] = spec[1]
+			continue
+		}
+		name := spec[0]
+		dependencies := c.getObservedState(name)
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share volume with service %s: container missing", name)
+		}
+		service.VolumesFrom[i] = dependencies.sorted()[0].ID
+	}
+	return nil
 }
 
 func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
