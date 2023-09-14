@@ -102,70 +102,12 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 			if utils.StringContains(options.Services, name) {
 				strategy = options.Recreate
 			}
-			err = c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
-			if err != nil {
-				return err
-			}
-
-			c.updateProject(project, name)
-			return nil
+			return c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
 		})(ctx)
 	})
 }
 
 var mu sync.Mutex
-
-// updateProject updates project after service converged, so dependent services relying on `service:xx` can refer to actual containers.
-func (c *convergence) updateProject(project *types.Project, serviceName string) {
-	// operation is protected by a Mutex so that we can safely update project.Services while running concurrent convergence on services
-	mu.Lock()
-	defer mu.Unlock()
-
-	cnts := c.getObservedState(serviceName)
-	for i, s := range project.Services {
-		updateServices(&s, cnts)
-		project.Services[i] = s
-	}
-}
-
-func updateServices(service *types.ServiceConfig, cnts Containers) {
-	if len(cnts) == 0 {
-		return
-	}
-
-	for _, str := range []*string{&service.NetworkMode, &service.Ipc, &service.Pid} {
-		if d := getDependentServiceFromMode(*str); d != "" {
-			if serviceContainers := cnts.filter(isService(d)); len(serviceContainers) > 0 {
-				*str = types.NetworkModeContainerPrefix + serviceContainers[0].ID
-			}
-		}
-	}
-	var links []string
-	for _, serviceLink := range service.Links {
-		parts := strings.Split(serviceLink, ":")
-		serviceName := serviceLink
-		serviceAlias := ""
-		if len(parts) == 2 {
-			serviceName = parts[0]
-			serviceAlias = parts[1]
-		}
-		if serviceName != service.Name {
-			links = append(links, serviceLink)
-			continue
-		}
-		for _, container := range cnts {
-			name := getCanonicalContainerName(container)
-			if serviceAlias != "" {
-				links = append(links,
-					fmt.Sprintf("%s:%s", name, serviceAlias))
-			}
-			links = append(links,
-				fmt.Sprintf("%s:%s", name, name),
-				fmt.Sprintf("%s:%s", name, getContainerNameWithoutProject(container)))
-		}
-		service.Links = links
-	}
-}
 
 func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error {
 	expected, err := getScale(service)
@@ -178,7 +120,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	eg, _ := errgroup.WithContext(ctx)
 
-	err = c.resolveVolumeFrom(&service)
+	err = c.resolveServiceReferences(&service)
 	if err != nil {
 		return err
 	}
@@ -263,6 +205,20 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	return err
 }
 
+// resolveServiceReferences replaces reference to another service with reference to an actual container
+func (c *convergence) resolveServiceReferences(service *types.ServiceConfig) error {
+	err := c.resolveVolumeFrom(service)
+	if err != nil {
+		return err
+	}
+
+	err = c.resolveSharedNamespaces(service)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
 	for i, vol := range service.VolumesFrom {
 		spec := strings.Split(vol, ":")
@@ -280,6 +236,37 @@ func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
 		}
 		service.VolumesFrom[i] = dependencies.sorted()[0].ID
 	}
+	return nil
+}
+
+func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) error {
+	str := service.NetworkMode
+	if name := getDependentServiceFromMode(str); name != "" {
+		dependencies := c.getObservedState(name)
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
+		}
+		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
+	}
+
+	str = service.Ipc
+	if name := getDependentServiceFromMode(str); name != "" {
+		dependencies := c.getObservedState(name)
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
+		}
+		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
+	}
+
+	str = service.Pid
+	if name := getDependentServiceFromMode(str); name != "" {
+		dependencies := c.getObservedState(name)
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
+		}
+		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
+	}
+
 	return nil
 }
 
