@@ -42,3 +42,20 @@ func TestNoDepsVolumeFrom(t *testing.T) {
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/no-deps/volume-from.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "app")
 	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot share volume with service db: container missing"})
 }
+
+func TestNoDepsNetworkMode(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "e2e-no-deps-network-mode"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "fixtures/no-deps/network-mode.yaml", "--project-name", projectName, "up", "-d")
+
+	c.RunDockerComposeCmd(t, "-f", "fixtures/no-deps/network-mode.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "app")
+
+	c.RunDockerCmd(t, "rm", "-f", fmt.Sprintf("%s-db-1", projectName))
+
+	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/no-deps/network-mode.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "app")
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot share network namespace with service db: container missing"})
+}

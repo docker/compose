@@ -90,7 +90,6 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err != nil {
 		return "", err
 	}
-	updateServices(&service, observedState)
 
 	if !opts.NoDeps {
 		if err := s.waitDependencies(ctx, project, service.DependsOn, observedState); err != nil {
@@ -102,6 +101,11 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		AttachStdin:       opts.Interactive,
 		UseNetworkAliases: opts.UseNetworkAliases,
 		Labels:            mergeLabels(service.Labels, service.CustomLabels),
+	}
+
+	err = newConvergence(project.ServiceNames(), observedState, s).resolveServiceReferences(&service)
+	if err != nil {
+		return "", err
 	}
 
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, createOpts)

@@ -1,0 +1,7 @@
+services:
+  app:
+    image: nginx:alpine
+    network_mode: service:db
+
+  db:
+    image: nginx:alpine
