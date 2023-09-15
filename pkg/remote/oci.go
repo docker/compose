@@ -70,7 +70,7 @@ type ociRemoteLoader struct {
 	offline   bool
 }
 
-const prefix = "oci:"
+const prefix = "oci://"
 
 func (g ociRemoteLoader) Accept(path string) bool {
 	return strings.HasPrefix(path, prefix)
@@ -117,6 +117,11 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		if err != nil {
 			return "", err
 		}
+
+		if descriptor.Config.MediaType != "application/vnd.docker.compose.project" {
+			return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), descriptor.Config.MediaType)
+		}
+
 		for i, layer := range descriptor.Layers {
 			digested, err := reference.WithDigest(ref, layer.Digest)
 			if err != nil {
