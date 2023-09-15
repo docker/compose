@@ -186,6 +186,10 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		return err
 	}
 
+	if err := applyPlatforms(project, true); err != nil {
+		return err
+	}
+
 	if len(services) > 0 {
 		err = project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
