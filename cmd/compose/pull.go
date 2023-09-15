@@ -38,6 +38,7 @@ type pullOptions struct {
 	includeDeps        bool
 	ignorePullFailures bool
 	noBuildable        bool
+	policy             string
 }
 
 func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -67,7 +68,28 @@ func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	flags.MarkHidden("no-parallel") //nolint:errcheck
 	cmd.Flags().BoolVar(&opts.ignorePullFailures, "ignore-pull-failures", false, "Pull what it can and ignores images with pull failures.")
 	cmd.Flags().BoolVar(&opts.noBuildable, "ignore-buildable", false, "Ignore images that can be built.")
+	cmd.Flags().StringVar(&opts.policy, "policy", "", `Apply pull policy ("missing"|"always").`)
 	return cmd
+}
+
+func (opts pullOptions) apply(project *types.Project, services []string) error {
+	if !opts.includeDeps {
+		err := project.ForServices(services, types.IgnoreDependencies)
+		if err != nil {
+			return err
+		}
+	}
+
+	if opts.policy != "" {
+		for i, service := range project.Services {
+			if service.Image == "" {
+				continue
+			}
+			service.PullPolicy = opts.policy
+			project.Services[i] = service
+		}
+	}
+	return nil
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pullOptions, services []string) error {
@@ -76,11 +98,9 @@ func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		return err
 	}
 
-	if !opts.includeDeps {
-		err := project.ForServices(services, types.IgnoreDependencies)
-		if err != nil {
-			return err
-		}
+	err = opts.apply(project, services)
+	if err != nil {
+		return err
 	}
 
 	return backend.Pull(ctx, project, api.PullOptions{
