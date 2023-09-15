@@ -18,24 +18,136 @@ package compose
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/reference"
+	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
+	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
+		return s.publish(ctx, project, repository, options)
+	}, s.stdinfo(), "Publishing")
+}
+
+func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	err := s.Push(ctx, project, api.PushOptions{})
 	if err != nil {
 		return err
 	}
 
-	_, err = reference.ParseDockerRef(repository)
+	w := progress.ContextWriter(ctx)
+
+	named, err := reference.ParseDockerRef(repository)
 	if err != nil {
 		return err
 	}
 
-	// TODO publish project.ComposeFiles
+	resolver := imagetools.New(imagetools.Opt{
+		Auth: s.configFile(),
+	})
 
-	return api.ErrNotImplemented
+	var layers []v1.Descriptor
+	for _, file := range project.ComposeFiles {
+		f, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
+
+		w.Event(progress.Event{
+			ID:     file,
+			Text:   "publishing",
+			Status: progress.Working,
+		})
+		layer := v1.Descriptor{
+			MediaType: "application/vnd.docker.compose.file+yaml",
+			Digest:    digest.FromString(string(f)),
+			Size:      int64(len(f)),
+			Annotations: map[string]string{
+				"com.docker.compose": api.ComposeVersion,
+			},
+		}
+		layers = append(layers, layer)
+		err = resolver.Push(ctx, named, layer, f)
+		if err != nil {
+			w.Event(progress.Event{
+				ID:     file,
+				Text:   "publishing",
+				Status: progress.Error,
+			})
+
+			return err
+		}
+
+		w.Event(progress.Event{
+			ID:     file,
+			Text:   "published",
+			Status: progress.Done,
+		})
+	}
+
+	emptyConfig, err := json.Marshal(v1.ImageConfig{})
+	if err != nil {
+		return err
+	}
+	configDescriptor := v1.Descriptor{
+		MediaType: "application/vnd.docker.compose.project",
+		Digest:    digest.FromBytes(emptyConfig),
+		Size:      int64(len(emptyConfig)),
+		Annotations: map[string]string{
+			"com.docker.compose.version": api.ComposeVersion,
+		},
+	}
+	err = resolver.Push(ctx, named, configDescriptor, emptyConfig)
+	if err != nil {
+		return err
+	}
+
+	imageManifest, err := json.Marshal(v1.Manifest{
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    v1.MediaTypeImageManifest,
+		ArtifactType: "application/vnd.docker.compose.project",
+		Config:       configDescriptor,
+		Layers:       layers,
+	})
+	if err != nil {
+		return err
+	}
+
+	w.Event(progress.Event{
+		ID:     repository,
+		Text:   "publishing",
+		Status: progress.Working,
+	})
+
+	err = resolver.Push(ctx, named, v1.Descriptor{
+		MediaType: v1.MediaTypeImageManifest,
+		Digest:    digest.FromString(string(imageManifest)),
+		Size:      int64(len(imageManifest)),
+		Annotations: map[string]string{
+			"com.docker.compose.version": api.ComposeVersion,
+		},
+		ArtifactType: "application/vnd.docker.compose.project",
+	}, imageManifest)
+	if err != nil {
+		w.Event(progress.Event{
+			ID:     repository,
+			Text:   "publishing",
+			Status: progress.Error,
+		})
+		return err
+	}
+	w.Event(progress.Event{
+		ID:     repository,
+		Text:   "published",
+		Status: progress.Done,
+	})
+	return nil
 }
