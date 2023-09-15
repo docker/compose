@@ -29,7 +29,7 @@ options:
     - option: no-build
       value_type: bool
       default_value: "false"
-      description: Don't build an image, even if it's missing.
+      description: Don't build an image, even if it's policy.
       deprecated: false
       hidden: false
       experimental: false
@@ -49,8 +49,8 @@ options:
       swarm: false
     - option: pull
       value_type: string
-      default_value: missing
-      description: Pull image before running ("always"|"missing"|"never")
+      default_value: policy
+      description: Pull image before running ("always"|"policy"|"never")
       deprecated: false
       hidden: false
       experimental: false

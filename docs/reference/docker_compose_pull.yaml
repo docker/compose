@@ -57,6 +57,15 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: policy
+      value_type: string
+      description: Apply pull policy ("missing"|"always").
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: quiet
       shorthand: q
       value_type: bool
