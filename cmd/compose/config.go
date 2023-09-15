@@ -190,20 +190,19 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		return err
 	}
 
-	if len(services) > 0 {
-		err = project.ForServices(services, types.IgnoreDependencies)
+	sorted := services
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i] < sorted[j]
+	})
+
+	for _, name := range sorted {
+		s, err := project.GetService(name)
 		if err != nil {
 			return err
 		}
-	}
 
-	sorted := project.Services
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Name < sorted[j].Name
-	})
-
-	for _, s := range sorted {
 		hash, err := compose.ServiceHash(s)
+
 		if err != nil {
 			return err
 		}
