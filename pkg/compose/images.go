@@ -90,7 +90,7 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 				if errdefs.IsNotFound(err) {
 					return nil
 				}
-				return err
+				return fmt.Errorf("unable to get image '%s': %w", img, err)
 			}
 			tag := ""
 			repository := ""
