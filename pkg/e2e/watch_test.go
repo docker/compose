@@ -84,7 +84,7 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 
 	// important that --rmi is used to prune the images and ensure that watch builds on launch
 	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", svcName, "--timeout=0", "--remove-orphans", "--volumes", "--rmi=local")
+		cli.RunDockerComposeCmd(t, "down", svcName, "--remove-orphans", "--volumes", "--rmi=local")
 	}
 	cleanup()
 	t.Cleanup(cleanup)
