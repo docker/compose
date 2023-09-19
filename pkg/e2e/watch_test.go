@@ -89,7 +89,7 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 	cleanup()
 	t.Cleanup(cleanup)
 
-	cmd := cli.NewDockerComposeCmd(t, "--verbose", "alpha", "watch", svcName)
+	cmd := cli.NewDockerComposeCmd(t, "--verbose", "watch", svcName)
 	// stream output since watch runs in the background
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
