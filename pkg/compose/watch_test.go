@@ -40,7 +40,7 @@ func TestDebounceBatching(t *testing.T) {
 
 	eventBatchCh := batchDebounceEvents(ctx, clock, quietPeriod, ch)
 	for i := 0; i < 100; i++ {
-		var action WatchAction = "a"
+		var action types.WatchAction = "a"
 		if i%2 == 0 {
 			action = "b"
 		}
@@ -124,7 +124,7 @@ func TestWatch_Sync(t *testing.T) {
 			dockerCli: cli,
 			clock:     clock,
 		}
-		err := service.watch(ctx, &proj, "test", api.WatchOptions{}, watcher, syncer, []Trigger{
+		err := service.watch(ctx, &proj, "test", api.WatchOptions{}, watcher, syncer, []types.Trigger{
 			{
 				Path:   "/sync",
 				Action: "sync",
