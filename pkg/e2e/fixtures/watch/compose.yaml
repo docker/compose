@@ -15,7 +15,7 @@ services:
         RUN mkdir -p /app/data
     init: true
     command: sleep infinity
-    x-develop: *x-dev
+    develop: *x-dev
   busybox:
     build:
       dockerfile_inline: |-
@@ -23,7 +23,7 @@ services:
         RUN mkdir -p /app/data
     init: true
     command: sleep infinity
-    x-develop: *x-dev
+    develop: *x-dev
   debian:
     build:
       dockerfile_inline: |-
@@ -31,4 +31,4 @@ services:
         RUN mkdir -p /app/data
     init: true
     command: sleep infinity
-    x-develop: *x-dev
+    develop: *x-dev
