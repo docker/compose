@@ -38,30 +38,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type DevelopmentConfig struct {
-	Watch []Trigger `json:"watch,omitempty"`
-}
-
-type WatchAction string
-
-const (
-	WatchActionSync    WatchAction = "sync"
-	WatchActionRebuild WatchAction = "rebuild"
-)
-
-type Trigger struct {
-	Path   string   `json:"path,omitempty"`
-	Action string   `json:"action,omitempty"`
-	Target string   `json:"target,omitempty"`
-	Ignore []string `json:"ignore,omitempty"`
-}
-
 const quietPeriod = 500 * time.Millisecond
 
 // fileEvent contains the Compose service and modified host system path.
 type fileEvent struct {
 	sync.PathMapping
-	Action WatchAction
+	Action types.WatchAction
 }
 
 // getSyncImplementation returns the the tar-based syncer unless it has been explicitly
@@ -93,6 +75,10 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		config, err := loadDevelopmentConfig(service, project)
 		if err != nil {
 			return err
+		}
+
+		if service.Develop != nil {
+			config = service.Develop
 		}
 
 		if config == nil {
@@ -169,7 +155,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	return eg.Wait()
 }
 
-func (s *composeService) watch(ctx context.Context, project *types.Project, name string, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, triggers []Trigger) error {
+func (s *composeService) watch(ctx context.Context, project *types.Project, name string, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, triggers []types.Trigger) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -223,7 +209,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, name
 // rules.
 //
 // Any errors are logged as warnings and nil (no file event) is returned.
-func maybeFileEvent(trigger Trigger, hostPath string, ignore watch.PathMatcher) *fileEvent {
+func maybeFileEvent(trigger types.Trigger, hostPath string, ignore watch.PathMatcher) *fileEvent {
 	if !watch.IsChild(trigger.Path, hostPath) {
 		return nil
 	}
@@ -250,7 +236,7 @@ func maybeFileEvent(trigger Trigger, hostPath string, ignore watch.PathMatcher) 
 	}
 
 	return &fileEvent{
-		Action: WatchAction(trigger.Action),
+		Action: trigger.Action,
 		PathMapping: sync.PathMapping{
 			HostPath:      hostPath,
 			ContainerPath: containerPath,
@@ -258,12 +244,13 @@ func maybeFileEvent(trigger Trigger, hostPath string, ignore watch.PathMatcher) 
 	}
 }
 
-func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (*DevelopmentConfig, error) {
-	var config DevelopmentConfig
+func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (*types.DevelopConfig, error) {
+	var config types.DevelopConfig
 	y, ok := service.Extensions["x-develop"]
 	if !ok {
 		return nil, nil
 	}
+	logrus.Warnf("x-develop is DEPRECATED, please use the official `develop` attribute")
 	err := mapstructure.Decode(y, &config)
 	if err != nil {
 		return nil, err
@@ -286,7 +273,7 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 			return nil, errors.New("watch rules MUST define a path")
 		}
 
-		if trigger.Action == string(WatchActionRebuild) && service.Build == nil {
+		if trigger.Action == types.WatchActionRebuild && service.Build == nil {
 			return nil, fmt.Errorf("service %s doesn't have a build section, can't apply 'rebuild' on watch", service.Name)
 		}
 
@@ -429,7 +416,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, build api.BuildOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
 	for i := range batch {
-		if batch[i].Action == WatchActionRebuild {
+		if batch[i].Action == types.WatchActionRebuild {
 			fmt.Fprintf(
 				s.stdinfo(),
 				"Rebuilding %s after changes were detected:%s\n",
