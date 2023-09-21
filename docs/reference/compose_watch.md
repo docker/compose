@@ -1,4 +1,4 @@
-# docker compose alpha watch
+# docker compose watch
 
 <!---MARKER_GEN_START-->
 Watch build context for service and rebuild/refresh containers when files are updated

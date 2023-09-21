@@ -19,12 +19,11 @@ package compose
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/locker"
-
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -43,11 +42,14 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	}
 	cmd := &cobra.Command{
 		Use:   "watch [SERVICE...]",
-		Short: "EXPERIMENTAL - Watch build context for service and rebuild/refresh containers when files are updated",
+		Short: "Watch build context for service and rebuild/refresh containers when files are updated",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			return nil
 		}),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+			if cmd.Parent().Name() == "alpha" {
+				logrus.Warn("watch command is now available as a top level command")
+			}
 			return runWatch(ctx, dockerCli, backend, watchOpts, buildOpts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
@@ -59,7 +61,6 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 }
 
 func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
-	fmt.Fprintln(os.Stderr, "watch command is EXPERIMENTAL")
 	project, err := watchOpts.ToProject(dockerCli, nil)
 	if err != nil {
 		return err
