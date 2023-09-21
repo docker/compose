@@ -50,8 +50,8 @@ type configOptions struct {
 	noConsistency       bool
 }
 
-func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string) (*types.Project, error) {
-	return o.ProjectOptions.ToProject(dockerCli, services,
+func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+	po = append(po,
 		cli.WithInterpolation(!o.noInterpolate),
 		cli.WithResolvedPaths(!o.noResolvePath),
 		cli.WithNormalization(!o.noNormalize),
@@ -59,6 +59,7 @@ func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, se
 		cli.WithDefaultProfiles(o.Profiles...),
 		cli.WithDiscardEnvFile,
 		cli.WithContext(ctx))
+	return o.ProjectOptions.ToProject(dockerCli, services, po...)
 }
 
 func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -154,7 +155,7 @@ func runConfig(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 }
 
 func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	project, err := opts.ToProject(ctx, dockerCli, nil)
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -165,7 +166,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 }
 
 func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	project, err := opts.ToProject(ctx, dockerCli, nil)
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -180,7 +181,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
 	}
-	project, err := opts.ToProject(ctx, dockerCli, nil)
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -209,7 +210,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 
 func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
 	set := map[string]struct{}{}
-	project, err := opts.ToProject(ctx, dockerCli, services)
+	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -230,7 +231,7 @@ func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions,
 }
 
 func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
-	project, err := opts.ToProject(ctx, dockerCli, services)
+	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
