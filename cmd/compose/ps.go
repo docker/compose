@@ -41,6 +41,7 @@ type psOptions struct {
 	Services bool
 	Filter   string
 	Status   []string
+	noTrunc  bool
 }
 
 func (p *psOptions) parseFilter() error {
@@ -84,6 +85,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	flags.BoolVar(&opts.Services, "services", false, "Display services")
 	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
+	flags.BoolVar(&opts.noTrunc, "no-trunc", false, "Don't truncate output")
 	return psCmd
 }
 
@@ -145,6 +147,7 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 	containerCtx := cliformatter.Context{
 		Output: dockerCli.Out(),
 		Format: formatter.NewContainerFormat(opts.Format, opts.Quiet, false),
+		Trunc:  !opts.noTrunc,
 	}
 	return formatter.ContainerWrite(containerCtx, containers)
 }
