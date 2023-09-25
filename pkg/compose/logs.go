@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"time"
@@ -56,7 +57,8 @@ func (s *composeService) Logs(
 		c := c
 		eg.Go(func() error {
 			err := s.logContainers(ctx, consumer, c, options)
-			if _, ok := err.(errdefs.ErrNotImplemented); ok {
+			var notImplErr errdefs.ErrNotImplemented
+			if errors.As(err, &notImplErr) {
 				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(c), err.Error())
 				return nil
 			}
@@ -97,7 +99,8 @@ func (s *composeService) Logs(
 						Tail:       options.Tail,
 						Timestamps: options.Timestamps,
 					})
-					if _, ok := err.(errdefs.ErrNotImplemented); ok {
+					var notImplErr errdefs.ErrNotImplemented
+					if errors.As(err, &notImplErr) {
 						// ignore
 						return nil
 					}

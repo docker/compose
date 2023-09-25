@@ -125,12 +125,12 @@ func inotifyNodes() (int, error) {
 	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf(
 		"find /proc/%d/fd -lname anon_inode:inotify -printf '%%hinfo/%%f\n' | xargs cat | grep -c '^inotify'", pid)).Output()
 	if err != nil {
-		return 0, fmt.Errorf("error running command to determine number of watched files: %v\n %s", err, output)
+		return 0, fmt.Errorf("error running command to determine number of watched files: %w\n %s", err, output)
 	}
 
 	n, err := strconv.Atoi(strings.TrimSpace(string(output)))
 	if err != nil {
-		return 0, fmt.Errorf("couldn't parse number of watched files: %v", err)
+		return 0, fmt.Errorf("couldn't parse number of watched files: %w", err)
 	}
 	return n, nil
 }

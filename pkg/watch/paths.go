@@ -21,8 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 func greatestExistingAncestor(path string) (string, error) {
@@ -33,7 +31,7 @@ func greatestExistingAncestor(path string) (string, error) {
 
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
-		return "", errors.Wrapf(err, "os.Stat(%q)", path)
+		return "", fmt.Errorf("os.Stat(%q): %w", path, err)
 	}
 
 	if os.IsNotExist(err) {

@@ -78,10 +78,10 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 	// validation done -- ensure we have the lockfile for this project before doing work
 	l, err := locker.NewPidfile(project.Name)
 	if err != nil {
-		return fmt.Errorf("cannot take exclusive lock for project %q: %v", project.Name, err)
+		return fmt.Errorf("cannot take exclusive lock for project %q: %w", project.Name, err)
 	}
 	if err := l.Lock(); err != nil {
-		return fmt.Errorf("cannot take exclusive lock for project %q: %v", project.Name, err)
+		return fmt.Errorf("cannot take exclusive lock for project %q: %w", project.Name, err)
 	}
 
 	if !watchOpts.noUp {

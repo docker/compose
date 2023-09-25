@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -61,7 +62,9 @@ func TestPause(t *testing.T) {
 		_ = resp.Body.Close()
 	}
 	require.Error(t, err, "a should no longer respond")
-	require.True(t, err.(net.Error).Timeout(), "Error should have indicated a timeout")
+	var netErr net.Error
+	errors.As(err, &netErr)
+	require.True(t, netErr.Timeout(), "Error should have indicated a timeout")
 	HTTPGetWithRetry(t, urls["b"], http.StatusOK, 50*time.Millisecond, 5*time.Second)
 
 	// unpause a and verify that both containers work again

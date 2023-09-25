@@ -41,7 +41,6 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 )
 
 var stdioToStdout bool
@@ -180,7 +179,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		Name: projectName,
 	}
 	if len(containers) == 0 {
-		return project, errors.Wrap(api.ErrNotFound, fmt.Sprintf("no container found for project %q", projectName))
+		return project, fmt.Errorf("no container found for project %q: %w", projectName, api.ErrNotFound)
 	}
 	set := map[string]*types.ServiceConfig{}
 	for _, c := range containers {
@@ -226,7 +225,7 @@ SERVICES:
 				continue SERVICES
 			}
 		}
-		return project, errors.Wrapf(api.ErrNotFound, "no such service: %q", qs)
+		return project, fmt.Errorf("no such service: %q: %w", qs, api.ErrNotFound)
 	}
 	err := project.ForServices(services)
 	if err != nil {
