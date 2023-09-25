@@ -23,8 +23,6 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-
-	"github.com/pkg/errors"
 )
 
 // Print prints formatted lists in different formats
@@ -67,7 +65,7 @@ func Print(toJSON interface{}, format string, outWriter io.Writer, writerFn func
 			_, _ = fmt.Fprintln(outWriter, outJSON)
 		}
 	default:
-		return errors.Wrapf(api.ErrParsingFailed, "format value %q could not be parsed", format)
+		return fmt.Errorf("format value %q could not be parsed: %w", format, api.ErrParsingFailed)
 	}
 	return nil
 }

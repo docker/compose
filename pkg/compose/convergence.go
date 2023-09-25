@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -34,7 +35,6 @@ import (
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -365,7 +365,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 							return nil
 						}
 						w.Events(containerEvents(waitingFor, progress.ErrorEvent))
-						return errors.Wrap(err, "dependency failed to start")
+						return fmt.Errorf("dependency failed to start: %w", err)
 					}
 					if healthy {
 						w.Events(containerEvents(waitingFor, progress.Healthy))

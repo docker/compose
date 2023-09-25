@@ -33,14 +33,13 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/compose-spec/compose-go/loader"
-	"github.com/pkg/errors"
 )
 
 func OCIRemoteLoaderEnabled() (bool, error) {
 	if v := os.Getenv("COMPOSE_EXPERIMENTAL_OCI_REMOTE"); v != "" {
 		enabled, err := strconv.ParseBool(v)
 		if err != nil {
-			return false, errors.Wrap(err, "COMPOSE_EXPERIMENTAL_OCI_REMOTE environment variable expects boolean value")
+			return false, fmt.Errorf("COMPOSE_EXPERIMENTAL_OCI_REMOTE environment variable expects boolean value: %w", err)
 		}
 		return enabled, err
 	}

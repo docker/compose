@@ -32,14 +32,13 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/buildkit/util/gitutil"
-	"github.com/pkg/errors"
 )
 
 func GitRemoteLoaderEnabled() (bool, error) {
 	if v := os.Getenv("COMPOSE_EXPERIMENTAL_GIT_REMOTE"); v != "" {
 		enabled, err := strconv.ParseBool(v)
 		if err != nil {
-			return false, errors.Wrap(err, "COMPOSE_EXPERIMENTAL_GIT_REMOTE environment variable expects boolean value")
+			return false, fmt.Errorf("COMPOSE_EXPERIMENTAL_GIT_REMOTE environment variable expects boolean value: %w", err)
 		}
 		return enabled, err
 	}
@@ -90,7 +89,7 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		out, err := cmd.Output()
 		if err != nil {
 			if cmd.ProcessState.ExitCode() == 2 {
-				return "", errors.Wrapf(err, "repository does not contain ref %s, output: %q", path, string(out))
+				return "", fmt.Errorf("repository does not contain ref %s, output: %q: %w", path, string(out), err)
 			}
 			return "", err
 		}

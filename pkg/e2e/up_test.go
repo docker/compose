@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -90,7 +91,8 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	t.Log("Waiting for `compose up` to exit")
 	err = cmd.Wait()
 	if err != nil {
-		exitErr := err.(*exec.ExitError)
+		var exitErr *exec.ExitError
+		errors.As(err, &exitErr)
 		if exitErr.ExitCode() == -1 {
 			t.Fatalf("`compose up` was killed: %v", err)
 		}

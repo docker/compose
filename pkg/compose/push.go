@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -29,7 +30,6 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -117,7 +117,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, service types.Ser
 	for {
 		var jm jsonmessage.JSONMessage
 		if err := dec.Decode(&jm); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err

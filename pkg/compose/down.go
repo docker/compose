@@ -29,7 +29,6 @@ import (
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -192,7 +191,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 			networkFilter(composeNetworkName)),
 	})
 	if err != nil {
-		return errors.Wrapf(err, "failed to list networks")
+		return fmt.Errorf("failed to list networks: %w", err)
 	}
 
 	if len(networks) == 0 {
@@ -226,7 +225,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 				continue
 			}
 			w.Event(progress.ErrorEvent(eventName))
-			return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
+			return fmt.Errorf("failed to remove network %s: %w", name, err)
 		}
 		w.Event(progress.RemovedEvent(eventName))
 		found++

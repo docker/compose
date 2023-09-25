@@ -18,13 +18,13 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/docker/cli/cli/command"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -95,12 +95,12 @@ func parseServicesReplicasArgs(args []string) (map[string]int, error) {
 	for _, arg := range args {
 		key, val, ok := strings.Cut(arg, "=")
 		if !ok || key == "" || val == "" {
-			return nil, errors.Errorf("invalid scale specifier: %s", arg)
+			return nil, fmt.Errorf("invalid scale specifier: %s", arg)
 		}
 		intValue, err := strconv.Atoi(val)
 
 		if err != nil {
-			return nil, errors.Errorf("invalid scale specifier: can't parse replica value as int: %v", arg)
+			return nil, fmt.Errorf("invalid scale specifier: can't parse replica value as int: %v", arg)
 		}
 		serviceReplicaTuples[key] = intValue
 	}

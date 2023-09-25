@@ -17,7 +17,7 @@
 package api
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 )
 
 const (

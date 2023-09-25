@@ -17,9 +17,8 @@
 package compose
 
 import (
+	"errors"
 	"io/fs"
-
-	"github.com/pkg/errors"
 
 	"github.com/compose-spec/compose-go/errdefs"
 )

@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -29,7 +30,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	cliformatter "github.com/docker/cli/cli/command/formatter"
 	cliflags "github.com/docker/cli/cli/flags"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 

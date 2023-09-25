@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,7 +33,6 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/system"
-	"github.com/pkg/errors"
 )
 
 type copyDirection int
@@ -175,7 +175,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 
 	// Validate the destination path
 	if err := command.ValidateOutputPathFileMode(dstStat.Mode); err != nil {
-		return errors.Wrapf(err, `destination "%s:%s" must be a directory or a regular file`, containerID, dstPath)
+		return fmt.Errorf(`destination "%s:%s" must be a directory or a regular file: %w`, containerID, dstPath, err)
 	}
 
 	// Ignore any error and assume that the parent directory of the destination
@@ -197,7 +197,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		content = s.stdin()
 		resolvedDstPath = dstInfo.Path
 		if !dstInfo.IsDir {
-			return errors.Errorf("destination \"%s:%s\" must be a directory", containerID, dstPath)
+			return fmt.Errorf("destination \"%s:%s\" must be a directory", containerID, dstPath)
 		}
 	} else {
 		// Prepare source copy info.

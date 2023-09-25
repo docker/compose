@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -37,7 +38,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/remote"
 	"github.com/morikuni/aec"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
