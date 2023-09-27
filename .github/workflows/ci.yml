@@ -211,6 +211,52 @@ jobs:
         with:
           paths: /tmp/report/report.xml       
         if: always()
+
+  e2e-containerd-docker:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      -
+        name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+          check-latest: true
+          cache: true
+      -
+        name: Build
+        uses: docker/bake-action@v2
+        with:
+          targets: binary-with-coverage
+          set: |
+            *.cache-from=type=gha,scope=binary-linux-amd64
+            *.cache-from=type=gha,scope=c8d-binary-e2e
+            *.cache-to=type=gha,scope=c8d-binary-e2e,mode=max
+        env:
+          BUILD_TAGS: e2e
+      -
+        name: Set up Docker
+        uses: crazy-max/ghaction-setup-docker@v2
+        with:
+          daemon-config: |
+            {
+              "debug": true,
+              "features": {
+                "containerd-snapshotter": true
+              }
+            }
+      -
+        name: Test standalone mode
+        run: |
+          rm -f /usr/local/bin/docker-compose
+          cp bin/build/docker-compose /usr/local/bin
+          make e2e-compose-standalone
+
   coverage:
     runs-on: ubuntu-22.04
     needs:
