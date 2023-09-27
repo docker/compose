@@ -149,7 +149,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	}
 
 	if !watching {
-		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'x-develop' section")
+		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'develop' section")
 	}
 
 	return eg.Wait()
