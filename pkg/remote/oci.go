@@ -118,8 +118,8 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", err
 		}
 
-		if manifest.Config.MediaType != "application/vnd.docker.compose.project" {
-			return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.Config.MediaType)
+		if manifest.ArtifactType != "application/vnd.docker.compose.project" {
+			return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.ArtifactType)
 		}
 
 		for i, layer := range manifest.Layers {
