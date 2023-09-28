@@ -71,7 +71,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			Digest:    digest.FromString(string(f)),
 			Size:      int64(len(f)),
 			Annotations: map[string]string{
-				"com.docker.compose": api.ComposeVersion,
+				"com.docker.compose.version": api.ComposeVersion,
 			},
 		}
 		layers = append(layers, layer)
@@ -98,12 +98,9 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 	configDescriptor := v1.Descriptor{
-		MediaType: "application/vnd.docker.compose.project",
+		MediaType: "application/vnd.oci.empty.v1+json",
 		Digest:    digest.FromBytes(emptyConfig),
 		Size:      int64(len(emptyConfig)),
-		Annotations: map[string]string{
-			"com.docker.compose.version": api.ComposeVersion,
-		},
 	}
 	err = resolver.Push(ctx, named, configDescriptor, emptyConfig)
 	if err != nil {
