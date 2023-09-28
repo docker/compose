@@ -112,17 +112,17 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		}
 		defer f.Close() //nolint:errcheck
 
-		var descriptor v1.Manifest
-		err = json.Unmarshal(content, &descriptor)
+		var manifest v1.Manifest
+		err = json.Unmarshal(content, &manifest)
 		if err != nil {
 			return "", err
 		}
 
-		if descriptor.Config.MediaType != "application/vnd.docker.compose.project" {
-			return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), descriptor.Config.MediaType)
+		if manifest.Config.MediaType != "application/vnd.docker.compose.project" {
+			return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.Config.MediaType)
 		}
 
-		for i, layer := range descriptor.Layers {
+		for i, layer := range manifest.Layers {
 			digested, err := reference.WithDigest(ref, layer.Digest)
 			if err != nil {
 				return "", err
