@@ -31,7 +31,6 @@ import (
 
 type pullOptions struct {
 	*ProjectOptions
-	composeOptions
 	quiet              bool
 	parallel           bool
 	noParallel         bool
@@ -42,6 +41,7 @@ type pullOptions struct {
 }
 
 func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := pullOptions{
 		ProjectOptions: p,
 	}

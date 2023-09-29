@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
@@ -35,6 +36,7 @@ type waitOptions struct {
 }
 
 func waitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := waitOptions{
 		ProjectOptions: p,
 	}

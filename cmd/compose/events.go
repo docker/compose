@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 
@@ -28,15 +29,14 @@ import (
 )
 
 type eventsOpts struct {
-	*composeOptions
+	*ProjectOptions
 	json bool
 }
 
 func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := eventsOpts{
-		composeOptions: &composeOptions{
-			ProjectOptions: p,
-		},
+		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "events [OPTIONS] [SERVICE...]",

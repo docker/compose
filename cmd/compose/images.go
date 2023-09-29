@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
@@ -40,6 +41,7 @@ type imageOptions struct {
 }
 
 func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := imageOptions{
 		ProjectOptions: p,
 	}

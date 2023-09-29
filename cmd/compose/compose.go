@@ -118,6 +118,7 @@ type ProjectOptions struct {
 	Compatibility bool
 	Progress      string
 	Offline       bool
+	Dependencies  types.DependencyOption
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -247,7 +248,7 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 
 	project.WithoutUnnecessaryResources()
 
-	err = project.ForServices(services)
+	err = project.ForServices(services, o.Dependencies)
 	return project, err
 }
 
@@ -311,7 +312,9 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		"commandConn.CloseRead:",
 	))
 
-	opts := ProjectOptions{}
+	opts := ProjectOptions{
+		Dependencies: types.IncludeDependencies,
+	}
 	var (
 		ansi     string
 		noAnsi   bool

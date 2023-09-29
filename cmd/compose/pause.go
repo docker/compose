@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
@@ -30,6 +31,7 @@ type pauseOptions struct {
 }
 
 func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := pauseOptions{
 		ProjectOptions: p,
 	}
@@ -61,6 +63,7 @@ type unpauseOptions struct {
 }
 
 func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := unpauseOptions{
 		ProjectOptions: p,
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
@@ -39,6 +40,7 @@ type copyOptions struct {
 }
 
 func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := copyOptions{
 		ProjectOptions: p,
 	}

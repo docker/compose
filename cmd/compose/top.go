@@ -24,6 +24,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
@@ -35,6 +36,7 @@ type topOptions struct {
 }
 
 func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := topOptions{
 		ProjectOptions: p,
 	}

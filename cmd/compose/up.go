@@ -34,13 +34,7 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
-// composeOptions hold options common to `up` and `run` to run compose project
-type composeOptions struct {
-	*ProjectOptions
-}
-
 type upOptions struct {
-	*composeOptions
 	Detach             bool
 	noStart            bool
 	noDeps             bool

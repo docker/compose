@@ -37,6 +37,7 @@ type scaleOptions struct {
 }
 
 func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := scaleOptions{
 		ProjectOptions: p,
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
@@ -34,6 +35,7 @@ type killOptions struct {
 }
 
 func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := killOptions{
 		ProjectOptions: p,
 	}

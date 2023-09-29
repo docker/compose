@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
@@ -36,6 +37,7 @@ type portOptions struct {
 }
 
 func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := portOptions{
 		ProjectOptions: p,
 	}

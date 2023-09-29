@@ -63,6 +63,7 @@ func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, se
 }
 
 func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := configOptions{
 		ProjectOptions: p,
 	}

@@ -28,7 +28,7 @@ import (
 )
 
 type execOpts struct {
-	*composeOptions
+	*ProjectOptions
 
 	service     string
 	command     []string
@@ -44,10 +44,9 @@ type execOpts struct {
 }
 
 func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := execOpts{
-		composeOptions: &composeOptions{
-			ProjectOptions: p,
-		},
+		ProjectOptions: p,
 	}
 	runCmd := &cobra.Command{
 		Use:   "exec [OPTIONS] SERVICE COMMAND [ARGS...]",
@@ -86,7 +85,7 @@ func runExec(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 	if err != nil {
 		return err
 	}
-	projectOptions, err := opts.composeOptions.toProjectOptions()
+	projectOptions, err := opts.toProjectOptions()
 	if err != nil {
 		return err
 	}

@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
@@ -32,6 +33,7 @@ type removeOptions struct {
 }
 
 func removeCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := removeOptions{
 		ProjectOptions: p,
 	}

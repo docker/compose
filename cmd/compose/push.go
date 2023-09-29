@@ -28,13 +28,13 @@ import (
 
 type pushOptions struct {
 	*ProjectOptions
-	composeOptions
 	IncludeDeps    bool
 	Ignorefailures bool
 	Quiet          bool
 }
 
 func pushCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	p.Dependencies = types.IgnoreDependencies
 	opts := pushOptions{
 		ProjectOptions: p,
 	}
