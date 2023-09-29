@@ -26,17 +26,18 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
+	"github.com/compose-spec/compose-go/loader"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-
-	"github.com/compose-spec/compose-go/loader"
 )
 
-func OCIRemoteLoaderEnabled() (bool, error) {
-	if v := os.Getenv("COMPOSE_EXPERIMENTAL_OCI_REMOTE"); v != "" {
+const OCI_REMOTE_ENABLED = "COMPOSE_EXPERIMENTAL_OCI_REMOTE"
+
+func ociRemoteLoaderEnabled() (bool, error) {
+	if v := os.Getenv(OCI_REMOTE_ENABLED); v != "" {
 		enabled, err := strconv.ParseBool(v)
 		if err != nil {
 			return false, fmt.Errorf("COMPOSE_EXPERIMENTAL_OCI_REMOTE environment variable expects boolean value: %w", err)
@@ -76,6 +77,14 @@ func (g ociRemoteLoader) Accept(path string) bool {
 }
 
 func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) {
+	enabled, err := ociRemoteLoaderEnabled()
+	if err != nil {
+		return "", err
+	}
+	if !enabled {
+		return "", fmt.Errorf("experimental OCI remote resource is disabled. %q must be set", OCI_REMOTE_ENABLED)
+	}
+
 	if g.offline {
 		return "", nil
 	}

@@ -252,29 +252,17 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 }
 
 func (o *ProjectOptions) configureRemoteLoaders(dockerCli command.Cli, po []cli.ProjectOptionsFn) ([]cli.ProjectOptionsFn, error) {
-	enabled, err := remote.GitRemoteLoaderEnabled()
+	git, err := remote.NewGitRemoteLoader(o.Offline)
 	if err != nil {
 		return nil, err
-	}
-	if enabled {
-		git, err := remote.NewGitRemoteLoader(o.Offline)
-		if err != nil {
-			return nil, err
-		}
-		po = append(po, cli.WithResourceLoader(git))
 	}
 
-	enabled, err = remote.OCIRemoteLoaderEnabled()
+	oci, err := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
 	if err != nil {
 		return nil, err
 	}
-	if enabled {
-		git, err := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
-		if err != nil {
-			return nil, err
-		}
-		po = append(po, cli.WithResourceLoader(git))
-	}
+
+	po = append(po, cli.WithResourceLoader(git), cli.WithResourceLoader(oci))
 	return po, nil
 }
 
