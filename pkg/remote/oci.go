@@ -108,50 +108,57 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 	local := filepath.Join(g.cache, descriptor.Digest.Hex())
 	composeFile := filepath.Join(local, "compose.yaml")
 	if _, err = os.Stat(local); os.IsNotExist(err) {
-
-		err = os.MkdirAll(local, 0o700)
-		if err != nil {
-			return "", err
-		}
-
-		f, err := os.Create(composeFile)
-		if err != nil {
-			return "", err
-		}
-		defer f.Close() //nolint:errcheck
-
 		var manifest v1.Manifest
 		err = json.Unmarshal(content, &manifest)
 		if err != nil {
 			return "", err
 		}
 
-		if manifest.ArtifactType != "application/vnd.docker.compose.project" {
-			return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.ArtifactType)
-		}
-
-		for i, layer := range manifest.Layers {
-			digested, err := reference.WithDigest(ref, layer.Digest)
-			if err != nil {
-				return "", err
-			}
-			content, _, err := resolver.Get(ctx, digested.String())
-			if err != nil {
-				return "", err
-			}
-			if i > 0 {
-				_, err = f.Write([]byte("\n---\n"))
-				if err != nil {
-					return "", err
-				}
-			}
-			_, err = f.Write(content)
-			if err != nil {
-				return "", err
-			}
+		s, err2 := g.pullComposeFiles(ctx, local, composeFile, manifest, ref, resolver)
+		if err2 != nil {
+			return s, err2
 		}
 	}
 	return composeFile, nil
+}
+
+func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, composeFile string, manifest v1.Manifest, ref reference.Named, resolver *imagetools.Resolver) (string, error) {
+	err := os.MkdirAll(local, 0o700)
+	if err != nil {
+		return "", err
+	}
+
+	f, err := os.Create(composeFile)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close() //nolint:errcheck
+
+	if manifest.ArtifactType != "application/vnd.docker.compose.project" {
+		return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.ArtifactType)
+	}
+
+	for i, layer := range manifest.Layers {
+		digested, err := reference.WithDigest(ref, layer.Digest)
+		if err != nil {
+			return "", err
+		}
+		content, _, err := resolver.Get(ctx, digested.String())
+		if err != nil {
+			return "", err
+		}
+		if i > 0 {
+			_, err = f.Write([]byte("\n---\n"))
+			if err != nil {
+				return "", err
+			}
+		}
+		_, err = f.Write(content)
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", nil
 }
 
 var _ loader.ResourceLoader = ociRemoteLoader{}
