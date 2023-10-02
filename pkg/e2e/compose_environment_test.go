@@ -106,6 +106,20 @@ func TestEnvPriority(t *testing.T) {
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "EnvFileDefaultValue")
 	})
 
+	// No Compose file, all other options with env variable from OS environment
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment default value from file in COMPOSE_ENV_FILES)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
+	// 5. Variable is not defined
+	t.Run("shell priority from COMPOSE_ENV_FILES variable", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		cmd.Env = append(cmd.Env, "COMPOSE_ENV_FILES=./fixtures/environment/env-priority/.env.override.with.default")
+		res := icmd.RunCmd(cmd)
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "EnvFileDefaultValue")
+	})
+
 	// No Compose file and env variable pass to the run command
 	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected
 	// 2. Compose File (service::environment section)
