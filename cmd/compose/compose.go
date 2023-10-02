@@ -60,6 +60,8 @@ const (
 	ComposeRemoveOrphans = "COMPOSE_REMOVE_ORPHANS"
 	// ComposeIgnoreOrphans ignore "orphaned" containers
 	ComposeIgnoreOrphans = "COMPOSE_IGNORE_ORPHANS"
+	// ComposeEnvFiles defines the env files to use if --env-file isn't used
+	ComposeEnvFiles = "COMPOSE_ENV_FILES"
 )
 
 // Command defines a compose CLI command as a func with args
@@ -517,6 +519,11 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 }
 
 func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
+	if len(prjOpts.EnvFiles) == 0 {
+		if envFiles := os.Getenv(ComposeEnvFiles); envFiles != "" {
+			prjOpts.EnvFiles = strings.Split(envFiles, ",")
+		}
+	}
 	options, err := prjOpts.toProjectOptions()
 	if err != nil {
 		return compose.WrapComposeError(err)
