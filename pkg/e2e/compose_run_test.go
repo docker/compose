@@ -96,10 +96,18 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --publish", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "--publish", "8081:80", "-d", "back",
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/ports.yaml", "run", "--publish", "8081:80", "-d", "back",
 			"/bin/sh", "-c", "sleep 1")
 		res := c.RunDockerCmd(t, "ps")
 		assert.Assert(t, strings.Contains(res.Stdout(), "8081->80/tcp"), res.Stdout())
+		assert.Assert(t, !strings.Contains(res.Stdout(), "8082->80/tcp"), res.Stdout())
+	})
+
+	t.Run("compose run --service-ports", func(t *testing.T) {
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/ports.yaml", "run", "--service-ports", "-d", "back",
+			"/bin/sh", "-c", "sleep 1")
+		res := c.RunDockerCmd(t, "ps")
+		assert.Assert(t, strings.Contains(res.Stdout(), "8082->80/tcp"), res.Stdout())
 	})
 
 	t.Run("compose run orphan", func(t *testing.T) {
