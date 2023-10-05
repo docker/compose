@@ -102,20 +102,22 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Digest:    digest.FromBytes(emptyConfig),
 		Size:      int64(len(emptyConfig)),
 	}
-	err = resolver.Push(ctx, named, configDescriptor, emptyConfig)
-	if err != nil {
-		return err
-	}
-
-	imageManifest, err := json.Marshal(v1.Manifest{
-		Versioned:    specs.Versioned{SchemaVersion: 2},
-		MediaType:    v1.MediaTypeImageManifest,
-		ArtifactType: "application/vnd.docker.compose.project",
-		Config:       configDescriptor,
-		Layers:       layers,
-	})
-	if err != nil {
-		return err
+	var imageManifest []byte
+	if !s.dryRun {
+		err = resolver.Push(ctx, named, configDescriptor, emptyConfig)
+		if err != nil {
+			return err
+		}
+		imageManifest, err = json.Marshal(v1.Manifest{
+			Versioned:    specs.Versioned{SchemaVersion: 2},
+			MediaType:    v1.MediaTypeImageManifest,
+			ArtifactType: "application/vnd.docker.compose.project",
+			Config:       configDescriptor,
+			Layers:       layers,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	w.Event(progress.Event{
@@ -123,23 +125,24 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Text:   "publishing",
 		Status: progress.Working,
 	})
-
-	err = resolver.Push(ctx, named, v1.Descriptor{
-		MediaType: v1.MediaTypeImageManifest,
-		Digest:    digest.FromString(string(imageManifest)),
-		Size:      int64(len(imageManifest)),
-		Annotations: map[string]string{
-			"com.docker.compose.version": api.ComposeVersion,
-		},
-		ArtifactType: "application/vnd.docker.compose.project",
-	}, imageManifest)
-	if err != nil {
-		w.Event(progress.Event{
-			ID:     repository,
-			Text:   "publishing",
-			Status: progress.Error,
-		})
-		return err
+	if !s.dryRun {
+		err = resolver.Push(ctx, named, v1.Descriptor{
+			MediaType: v1.MediaTypeImageManifest,
+			Digest:    digest.FromString(string(imageManifest)),
+			Size:      int64(len(imageManifest)),
+			Annotations: map[string]string{
+				"com.docker.compose.version": api.ComposeVersion,
+			},
+			ArtifactType: "application/vnd.docker.compose.project",
+		}, imageManifest)
+		if err != nil {
+			w.Event(progress.Event{
+				ID:     repository,
+				Text:   "publishing",
+				Status: progress.Error,
+			})
+			return err
+		}
 	}
 	w.Event(progress.Event{
 		ID:     repository,
