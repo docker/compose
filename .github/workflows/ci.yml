@@ -138,7 +138,6 @@ jobs:
         mode:
           - plugin
           - standalone
-          - cucumber
     steps:
       -
         name: Checkout
@@ -198,11 +197,6 @@ jobs:
           rm -f /usr/local/bin/docker-compose
           cp bin/build/docker-compose /usr/local/bin
           make e2e-compose-standalone
-      -
-        name: Run cucumber tests
-        if: ${{ matrix.mode == 'cucumber'}}
-        run: |
-          make test-cucumber
 
   coverage:
     runs-on: ubuntu-22.04

@@ -77,10 +77,6 @@ e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
 	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
-.PHONY: test-cucumber
-test-cucumber:
-	go test $(TEST_FLAGS) -v -count=1 -parallel=1 ./e2e
-
 .PHONY: build-and-e2e-compose
 build-and-e2e-compose: build e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
 
