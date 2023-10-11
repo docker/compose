@@ -20,7 +20,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsevents v0.1.1
 	github.com/golang/mock v1.6.0
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/jonboulle/clockwork v0.4.0
