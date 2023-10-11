@@ -192,9 +192,3 @@ RUN --mount=from=binary \
 
 FROM scratch AS release
 COPY --from=releaser /out/ /
-
-# docs-reference is a target used as remote context to update docs on release
-# with latest changes on docs.docker.com.
-# see open-pr job in .github/workflows/docs.yml for more details
-FROM scratch AS docs-reference
-COPY docs/reference/*.yaml .
