@@ -46,7 +46,7 @@ require (
 	go.uber.org/goleak v1.2.1
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/sync v0.3.0
-	google.golang.org/grpc v1.58.2
+	google.golang.org/grpc v1.58.3
 	gotest.tools/v3 v3.5.1
 )
 
