@@ -415,6 +415,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 
 func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, build api.BuildOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
+	restartService := false
 	for i := range batch {
 		if batch[i].Action == types.WatchActionRebuild {
 			fmt.Fprintf(
@@ -441,6 +442,9 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 			}
 			return nil
 		}
+		if batch[i].Action == types.WatchActionSyncRestart {
+			restartService = true
+		}
 		pathMappings[i] = batch[i].PathMapping
 	}
 
@@ -452,6 +456,13 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 	}
 	if err := syncer.Sync(ctx, service, pathMappings); err != nil {
 		return err
+	}
+	if restartService {
+		return s.Restart(ctx, project.Name, api.RestartOptions{
+			Services: []string{serviceName},
+			Project:  project,
+			NoDeps:   false,
+		})
 	}
 	return nil
 }
