@@ -1124,13 +1124,26 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
 	})
+
 	if err != nil {
 		return err
 	}
 
+	if len(networks) == 0 {
+		networks, err = s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
+			Filters: filters.NewArgs(filters.Arg("id", n.Name)),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	// NetworkList API doesn't return the exact name match, so we can retrieve more than one network with a request
 	networks = utils.Filter(networks, func(net moby.NetworkResource) bool {
-		return net.Name == n.Name
+		// later in this function, the name is changed the to ID.
+		// this function is called during the rebuild stage of `compose watch`.
+		// we still require just one network back, but we need to run the search on the ID
+		return net.Name == n.Name || net.ID == n.Name
 	})
 
 	switch len(networks) {

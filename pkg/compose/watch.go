@@ -438,7 +438,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 				},
 			})
 			if err != nil {
-				fmt.Fprintf(s.stderr(), "Application failed to start after update\n")
+				fmt.Fprintf(s.stderr(), "Application failed to start after update. Error: %v\n", err)
 			}
 			return nil
 		}

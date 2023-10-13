@@ -1,0 +1,19 @@
+
+services:
+  ext-alpine:
+    build:
+      dockerfile_inline: |-
+        FROM alpine
+    init: true
+    command: sleep infinity
+    develop: 
+      watch:
+        - action: rebuild
+          path: .env
+    networks:
+      - external_network_test
+
+networks:
+  external_network_test:
+    name: e2e-watch-external_network_test
+    external: true
