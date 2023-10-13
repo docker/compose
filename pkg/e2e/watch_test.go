@@ -55,6 +55,97 @@ func TestWatch(t *testing.T) {
 	})
 }
 
+func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
+	const projectName = "test_rebuild_on_dotenv_with_external_network"
+	const svcName = "ext-alpine"
+	containerName := strings.Join([]string{projectName, svcName, "1"}, "-")
+	const networkName = "e2e-watch-external_network_test"
+	const dotEnvFilepath = "./fixtures/watch/.env"
+
+	c := NewCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME="+projectName,
+		"COMPOSE_FILE=./fixtures/watch/with-external-network.yaml",
+	))
+
+	cleanup := func() {
+		c.RunDockerComposeCmdNoCheck(t, "down", "--remove-orphans", "--volumes", "--rmi=local")
+		c.RunDockerOrExitError(t, "network", "rm", networkName)
+		os.Remove(dotEnvFilepath) //nolint:errcheck
+	}
+	cleanup()
+
+	t.Log("create network that is referenced by the container we're testing")
+	c.RunDockerCmd(t, "network", "create", networkName)
+	res := c.RunDockerCmd(t, "network", "ls")
+	assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
+
+	t.Log("create a dotenv file that will be used to trigger the rebuild")
+	os.WriteFile(dotEnvFilepath, []byte("HELLO=WORLD"), 0666)
+	_, err := os.ReadFile(dotEnvFilepath)
+	assert.NilError(t, err)
+
+	// TODO: refactor this duplicated code into frameworks? Maybe?
+	t.Log("starting docker compose watch")
+	cmd := c.NewDockerComposeCmd(t, "--verbose", "watch", svcName)
+	// stream output since watch runs in the background
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	r := icmd.StartCmd(cmd)
+	require.NoError(t, r.Error)
+	var testComplete atomic.Bool
+	go func() {
+		// if the process exits abnormally before the test is done, fail the test
+		if err := r.Cmd.Wait(); err != nil && !t.Failed() && !testComplete.Load() {
+			assert.Check(t, cmp.Nil(err))
+		}
+	}()
+
+	t.Log("wait for watch to start watching")
+	c.WaitForCondition(t, func() (bool, string) {
+		out := r.String()
+		errors := r.String()
+		return strings.Contains(out,
+				"watching"), fmt.Sprintf("'watching' not found in : \n%s\nStderr: \n%s\n", out,
+				errors)
+	}, 30*time.Second, 1*time.Second)
+
+	n := c.RunDockerCmd(t, "network", "inspect", networkName, "-f", "{{ .Id }}")
+	pn := c.RunDockerCmd(t, "inspect", containerName, "-f", "{{ .HostConfig.NetworkMode }}")
+	assert.Equal(t, pn.Stdout(), n.Stdout())
+
+	t.Log("create a dotenv file that will be used to trigger the rebuild")
+	os.WriteFile(dotEnvFilepath, []byte("HELLO=WORLD\nTEST=REBUILD"), 0666)
+	_, err = os.ReadFile(dotEnvFilepath)
+	assert.NilError(t, err)
+
+	// NOTE: are there any other ways to check if the container has been rebuilt?
+	t.Log("check if the container has been rebuild")
+	c.WaitForCondition(t, func() (bool, string) {
+		out := r.String()
+		if strings.Count(out, "batch complete: service["+svcName+"]") != 1 {
+			return false, fmt.Sprintf("container %s was not rebuilt", containerName)
+		}
+		return true, fmt.Sprintf("container %s was rebuilt", containerName)
+	}, 30*time.Second, 1*time.Second)
+
+	n2 := c.RunDockerCmd(t, "network", "inspect", networkName, "-f", "{{ .Id }}")
+	pn2 := c.RunDockerCmd(t, "inspect", containerName, "-f", "{{ .HostConfig.NetworkMode }}")
+	assert.Equal(t, pn2.Stdout(), n2.Stdout())
+
+	assert.Check(t, !strings.Contains(r.Combined(), "Application failed to start after update"))
+
+	t.Cleanup(cleanup)
+	t.Cleanup(func() {
+		// IMPORTANT: watch doesn't exit on its own, don't leak processes!
+		if r.Cmd.Process != nil {
+			t.Logf("Killing watch process: pid[%d]", r.Cmd.Process.Pid)
+			_ = r.Cmd.Process.Kill()
+		}
+	})
+	testComplete.Store(true)
+
+}
+
 // NOTE: these tests all share a single Compose file but are safe to run concurrently
 func doTest(t *testing.T, svcName string, tarSync bool) {
 	tmpdir := t.TempDir()
