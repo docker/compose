@@ -6,6 +6,9 @@ x-dev: &x-dev
       ignore:
         - '*.foo'
         - ./ignored
+    - action: sync+restart
+      path: ./config
+      target: /app/config
 
 services:
   alpine:
@@ -13,6 +16,7 @@ services:
       dockerfile_inline: |-
         FROM alpine
         RUN mkdir -p /app/data
+        RUN mkdir -p /app/config
     init: true
     command: sleep infinity
     develop: *x-dev
@@ -21,6 +25,7 @@ services:
       dockerfile_inline: |-
         FROM busybox
         RUN mkdir -p /app/data
+        RUN mkdir -p /app/config
     init: true
     command: sleep infinity
     develop: *x-dev
@@ -29,6 +34,7 @@ services:
       dockerfile_inline: |-
         FROM debian
         RUN mkdir -p /app/data
+        RUN mkdir -p /app/config
     init: true
     command: sleep infinity
     develop: *x-dev

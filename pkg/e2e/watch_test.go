@@ -59,12 +59,17 @@ func TestWatch(t *testing.T) {
 func doTest(t *testing.T, svcName string, tarSync bool) {
 	tmpdir := t.TempDir()
 	dataDir := filepath.Join(tmpdir, "data")
-	writeDataFile := func(name string, contents string) {
+	configDir := filepath.Join(tmpdir, "config")
+
+	writeTestFile := func(name, contents, sourceDir string) {
 		t.Helper()
-		dest := filepath.Join(dataDir, name)
+		dest := filepath.Join(sourceDir, name)
 		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o700))
 		t.Logf("writing %q to %q", contents, dest)
 		require.NoError(t, os.WriteFile(dest, []byte(contents+"\n"), 0o600))
+	}
+	writeDataFile := func(name, contents string) {
+		writeTestFile(name, contents, dataDir)
 	}
 
 	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
@@ -194,6 +199,21 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 			ExitCode: 1,
 			Err:      "No such file or directory",
 		})
+
+	t.Logf("Sync and restart use case")
+	require.NoError(t, os.Mkdir(configDir, 0o700))
+	writeTestFile("file.config", "This is an updated config file", configDir)
+	checkRestart := func(state string) poll.Check {
+		return func(pollLog poll.LogT) poll.Result {
+			if strings.Contains(r.Combined(), state) {
+				return poll.Success()
+			}
+			return poll.Continue(r.Combined())
+		}
+	}
+	poll.WaitOn(t, checkRestart(fmt.Sprintf("%s-1  Restarting", svcName)))
+	poll.WaitOn(t, checkRestart(fmt.Sprintf("%s-1  Started", svcName)))
+	poll.WaitOn(t, checkFileContents("/app/config/file.config", "This is an updated config file"))
 
 	testComplete.Store(true)
 }
