@@ -114,51 +114,51 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", err
 		}
 
-		s, err2 := g.pullComposeFiles(ctx, local, composeFile, manifest, ref, resolver)
+		err2 := g.pullComposeFiles(ctx, local, composeFile, manifest, ref, resolver)
 		if err2 != nil {
-			return s, err2
+			return "", err2
 		}
 	}
 	return composeFile, nil
 }
 
-func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, composeFile string, manifest v1.Manifest, ref reference.Named, resolver *imagetools.Resolver) (string, error) {
+func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, composeFile string, manifest v1.Manifest, ref reference.Named, resolver *imagetools.Resolver) error {
 	err := os.MkdirAll(local, 0o700)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	f, err := os.Create(composeFile)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer f.Close() //nolint:errcheck
 
 	if manifest.ArtifactType != "application/vnd.docker.compose.project" {
-		return "", fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.ArtifactType)
+		return fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.ArtifactType)
 	}
 
 	for i, layer := range manifest.Layers {
 		digested, err := reference.WithDigest(ref, layer.Digest)
 		if err != nil {
-			return "", err
+			return err
 		}
 		content, _, err := resolver.Get(ctx, digested.String())
 		if err != nil {
-			return "", err
+			return err
 		}
 		if i > 0 {
 			_, err = f.Write([]byte("\n---\n"))
 			if err != nil {
-				return "", err
+				return err
 			}
 		}
 		_, err = f.Write(content)
 		if err != nil {
-			return "", err
+			return err
 		}
 	}
-	return "", nil
+	return nil
 }
 
 var _ loader.ResourceLoader = ociRemoteLoader{}
