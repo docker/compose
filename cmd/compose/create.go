@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -138,6 +139,9 @@ func (opts createOptions) GetTimeout() *time.Duration {
 
 func (opts createOptions) Apply(project *types.Project) error {
 	if opts.pullChanged {
+		if !opts.isPullPolicyValid() {
+			return fmt.Errorf("invalid --pull option %q", opts.Pull)
+		}
 		for i, service := range project.Services {
 			service.PullPolicy = opts.Pull
 			project.Services[i] = service
@@ -186,4 +190,10 @@ func (opts createOptions) Apply(project *types.Project) error {
 		}
 	}
 	return nil
+}
+
+func (opts createOptions) isPullPolicyValid() bool {
+	pullPolicies := []string{types.PullPolicyAlways, types.PullPolicyNever, types.PullPolicyBuild,
+		types.PullPolicyMissing, types.PullPolicyIfNotPresent}
+	return slices.Contains(pullPolicies, opts.Pull)
 }
