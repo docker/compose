@@ -318,7 +318,7 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 //nolint:gocyclo
-func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig, containers Containers) error {
+func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers) error {
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 	for dep, config := range dependencies {
@@ -330,6 +330,13 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 
 		waitingFor := containers.filter(isService(dep))
 		w.Events(containerEvents(waitingFor, progress.Waiting))
+		if len(waitingFor) == 0 {
+			if config.Required {
+				return fmt.Errorf("%s is missing dependency %s", dependant, dep)
+			}
+			logrus.Warnf("%s is missing dependency %s", dependant, dep)
+			continue
+		}
 
 		dep, config := dep, config
 		eg.Go(func() error {
@@ -729,7 +736,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		return nil
 	}
 
-	err := s.waitDependencies(ctx, project, service.DependsOn, containers)
+	err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, containers)
 	if err != nil {
 		return err
 	}
