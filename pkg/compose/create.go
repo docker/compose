@@ -1130,9 +1130,9 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 
 	if len(networks) == 0 {
-		networks, err = s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
-			Filters: filters.NewArgs(filters.Arg("id", n.Name)),
-		})
+		// in this instance, n.Name is really an ID
+		network, err := s.apiClient().NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
+		networks = append(networks, network)
 		if err != nil {
 			return err
 		}
