@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adrg/xdg"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/store/storeutil"
@@ -48,15 +47,11 @@ func ociRemoteLoaderEnabled() (bool, error) {
 }
 
 func NewOCIRemoteLoader(dockerCli command.Cli, offline bool) (loader.ResourceLoader, error) {
-	// xdg.CacheFile creates the parent directories for the target file path
-	// and returns the fully qualified path, so use "git" as a filename and
-	// then chop it off after, i.e. no ~/.cache/docker-compose/git file will
-	// ever be created
-	cache, err := xdg.CacheFile(filepath.Join("docker-compose", "oci"))
+	cache, err := cacheDir()
 	if err != nil {
-		return nil, fmt.Errorf("initializing git cache: %w", err)
+		return nil, fmt.Errorf("initializing remote resource cache: %w", err)
 	}
-	cache = filepath.Dir(cache)
+
 	return ociRemoteLoader{
 		cache:     cache,
 		dockerCli: dockerCli,
