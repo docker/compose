@@ -122,8 +122,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	}
 
-	// signal for the goroutines to stop & wait for them to finish any remaining work
-	signalCancel()
 	printer.Stop()
 	err = eg.Wait().ErrorOrNil()
 	if exitCode != 0 {
