@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/reference"
@@ -67,11 +69,12 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			Status: progress.Working,
 		})
 		layer := v1.Descriptor{
-			MediaType: "application/vnd.docker.compose.file+yaml",
+			MediaType: v1.MediaTypeImageLayer,
 			Digest:    digest.FromString(string(f)),
 			Size:      int64(len(f)),
 			Annotations: map[string]string{
 				"com.docker.compose.version": api.ComposeVersion,
+				"com.docker.compose.file":    filepath.Base(file),
 			},
 		}
 		layers = append(layers, layer)
@@ -114,6 +117,9 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			ArtifactType: "application/vnd.docker.compose.project",
 			Config:       configDescriptor,
 			Layers:       layers,
+			Annotations: map[string]string{
+				"org.opencontainers.image.created": time.Now().Format(time.RFC3339),
+			},
 		})
 		if err != nil {
 			return err
