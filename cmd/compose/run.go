@@ -80,10 +80,9 @@ func (options runOptions) apply(project *types.Project) error {
 
 	target.Tty = !options.noTty
 	target.StdinOpen = options.interactive
+
+	// --service-ports and --publish are incompatible
 	if !options.servicePorts {
-		target.Ports = []types.ServicePortConfig{}
-	}
-	if len(options.publish) > 0 {
 		target.Ports = []types.ServicePortConfig{}
 		for _, p := range options.publish {
 			config, err := types.ParsePortConfig(p)
@@ -93,14 +92,13 @@ func (options runOptions) apply(project *types.Project) error {
 			target.Ports = append(target.Ports, config...)
 		}
 	}
-	if len(options.volumes) > 0 {
-		for _, v := range options.volumes {
-			volume, err := loader.ParseVolume(v)
-			if err != nil {
-				return err
-			}
-			target.Volumes = append(target.Volumes, volume)
+
+	for _, v := range options.volumes {
+		volume, err := loader.ParseVolume(v)
+		if err != nil {
+			return err
 		}
+		target.Volumes = append(target.Volumes, volume)
 	}
 
 	for i, s := range project.Services {
