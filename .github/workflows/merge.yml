@@ -7,13 +7,15 @@ concurrency:
 on:
   push:
     branches:
-      - 'v2'
+      - 'main'
     tags:
       - 'v*'
-  workflow_dispatch:
 
 permissions:
   contents: read # to fetch code (actions/checkout)
+
+env:
+  REPO_SLUG: "docker/compose-bin"
 
 jobs:
   e2e:
@@ -72,3 +74,78 @@ jobs:
         run: |
           make e2e-compose-standalone
 
+  bin-image:
+    runs-on: ubuntu-22.04
+    outputs:
+      digest: ${{ fromJSON(steps.bake.outputs.metadata).image-cross['containerimage.digest'] }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      -
+        name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.REPO_SLUG }}
+          tags: |
+            type=ref,event=tag
+            type=edge
+          bake-target: meta-helper
+      -
+        name: Login to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
+      -
+        name: Build and push image
+        uses: docker/bake-action@v2
+        id: bake
+        with:
+          files: |
+            ./docker-bake.hcl
+            ${{ steps.meta.outputs.bake-file }}
+          targets: image-cross
+          push: ${{ github.event_name != 'pull_request' }}
+          set: |
+            *.cache-from=type=gha,scope=bin-image
+            *.cache-to=type=gha,scope=bin-image,mode=max
+            *.attest=type=sbom
+            *.attest=type=provenance,mode=max,builder-id=https://github.com/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
+
+  desktop-edge-test:
+    runs-on: ubuntu-latest
+    needs: bin-image
+    steps:
+      -
+        name: Generate Token
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ vars.DOCKERDESKTOP_APP_ID }}
+          private_key: ${{ secrets.DOCKERDESKTOP_APP_PRIVATEKEY }}
+          repository: docker/${{ secrets.DOCKERDESKTOP_REPO }}
+      -
+        name: Trigger Docker Desktop e2e with edge version
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'docker',
+              repo: '${{ secrets.DOCKERDESKTOP_REPO }}',
+              workflow_id: 'compose-edge-integration.yml',
+              ref: 'main',
+              inputs: {
+                "image-tag": "${{ needs.bin-image.outputs.digest }}"
+              }
+            })

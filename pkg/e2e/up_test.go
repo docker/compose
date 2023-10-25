@@ -21,15 +21,16 @@ package e2e
 
 import (
 	"context"
-	"os"
+	"errors"
 	"os/exec"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/docker/compose/v2/pkg/utils"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
 
@@ -38,15 +39,12 @@ func TestUpServiceUnhealthy(t *testing.T) {
 	const projectName = "e2e-start-fail"
 
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container for service "fail" is unhealthy`})
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container e2e-start-fail-fail-1 is unhealthy`})
 
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 }
 
 func TestUpDependenciesNotStopped(t *testing.T) {
-	if _, ok := os.LookupEnv("CI"); ok {
-		t.Skip("Skipping test on CI... flaky")
-	}
 	c := NewParallelCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=up-deps-stop",
 	))
@@ -75,11 +73,11 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 		"app",
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	t.Cleanup(cancel)
 
 	cmd, err := StartWithNewGroupID(ctx, testCmd, upOut, nil)
-	assert.NoError(t, err, "Failed to run compose up")
+	assert.NilError(t, err, "Failed to run compose up")
 
 	t.Log("Waiting for containers to be in running state")
 	upOut.RequireEventuallyContains(t, "hello app")
@@ -90,12 +88,14 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	require.NoError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT),
 		"Failed to send SIGINT to compose up process")
 
-	time.AfterFunc(5*time.Second, cancel)
-
 	t.Log("Waiting for `compose up` to exit")
 	err = cmd.Wait()
 	if err != nil {
-		exitErr := err.(*exec.ExitError)
+		var exitErr *exec.ExitError
+		errors.As(err, &exitErr)
+		if exitErr.ExitCode() == -1 {
+			t.Fatalf("`compose up` was killed: %v", err)
+		}
 		require.EqualValues(t, exitErr.ExitCode(), 130)
 	}
 
@@ -135,6 +135,33 @@ func TestUpWithDependencyExit(t *testing.T) {
 			c.RunDockerComposeCmd(t, "--project-name", "dependencies", "down")
 		})
 
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container for service \"db\" exited (1)"})
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container dependencies-db-1 exited (1)"})
 	})
+}
+
+func TestScaleDoesntRecreate(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-scale"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml", "--project-name", projectName, "up", "-d")
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml", "--project-name", projectName, "up", "--scale", "simple=2", "-d")
+	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
+
+}
+
+func TestUpWithDependencyNotRequired(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-dependency-not-required"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "--project-name", projectName,
+		"--profile", "not-required", "up", "-d")
+	assert.Assert(t, strings.Contains(res.Combined(), "foo"), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), " optional dependency \"bar\" failed to start"), res.Combined())
 }

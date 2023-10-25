@@ -38,7 +38,7 @@ type ServiceProxy struct {
 	LogsFn               func(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
 	PsFn                 func(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	ListFn               func(ctx context.Context, options ListOptions) ([]Stack, error)
-	ConvertFn            func(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
+	ConfigFn             func(ctx context.Context, project *types.Project, options ConfigOptions) ([]byte, error)
 	KillFn               func(ctx context.Context, project string, options KillOptions) error
 	RunOneOffContainerFn func(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	RemoveFn             func(ctx context.Context, project string, options RemoveOptions) error
@@ -50,7 +50,13 @@ type ServiceProxy struct {
 	EventsFn             func(ctx context.Context, project string, options EventsOptions) error
 	PortFn               func(ctx context.Context, project string, service string, port uint16, options PortOptions) (string, int, error)
 	ImagesFn             func(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	WatchFn              func(ctx context.Context, project *types.Project, services []string, options WatchOptions) error
 	MaxConcurrencyFn     func(parallel int)
+	DryRunModeFn         func(ctx context.Context, dryRun bool) (context.Context, error)
+	VizFn                func(ctx context.Context, project *types.Project, options VizOptions) (string, error)
+	WaitFn               func(ctx context.Context, projectName string, options WaitOptions) (int64, error)
+	PublishFn            func(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
+	ScaleFn              func(ctx context.Context, project *types.Project, options ScaleOptions) error
 	interceptors         []Interceptor
 }
 
@@ -76,7 +82,7 @@ func (s *ServiceProxy) WithService(service Service) *ServiceProxy {
 	s.LogsFn = service.Logs
 	s.PsFn = service.Ps
 	s.ListFn = service.List
-	s.ConvertFn = service.Convert
+	s.ConfigFn = service.Config
 	s.KillFn = service.Kill
 	s.RunOneOffContainerFn = service.RunOneOffContainer
 	s.RemoveFn = service.Remove
@@ -87,8 +93,14 @@ func (s *ServiceProxy) WithService(service Service) *ServiceProxy {
 	s.TopFn = service.Top
 	s.EventsFn = service.Events
 	s.PortFn = service.Port
+	s.PublishFn = service.Publish
 	s.ImagesFn = service.Images
+	s.WatchFn = service.Watch
 	s.MaxConcurrencyFn = service.MaxConcurrency
+	s.DryRunModeFn = service.DryRunMode
+	s.VizFn = service.Viz
+	s.WaitFn = service.Wait
+	s.ScaleFn = service.Scale
 	return s
 }
 
@@ -209,15 +221,15 @@ func (s *ServiceProxy) List(ctx context.Context, options ListOptions) ([]Stack, 
 	return s.ListFn(ctx, options)
 }
 
-// Convert implements Service interface
-func (s *ServiceProxy) Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error) {
-	if s.ConvertFn == nil {
+// Config implements Service interface
+func (s *ServiceProxy) Config(ctx context.Context, project *types.Project, options ConfigOptions) ([]byte, error) {
+	if s.ConfigFn == nil {
 		return nil, ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
 	}
-	return s.ConvertFn(ctx, project, options)
+	return s.ConfigFn(ctx, project, options)
 }
 
 // Kill implements Service interface
@@ -303,6 +315,10 @@ func (s *ServiceProxy) Port(ctx context.Context, projectName string, service str
 	return s.PortFn(ctx, projectName, service, port, options)
 }
 
+func (s *ServiceProxy) Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error {
+	return s.PublishFn(ctx, project, repository, options)
+}
+
 // Images implements Service interface
 func (s *ServiceProxy) Images(ctx context.Context, project string, options ImagesOptions) ([]ImageSummary, error) {
 	if s.ImagesFn == nil {
@@ -311,6 +327,41 @@ func (s *ServiceProxy) Images(ctx context.Context, project string, options Image
 	return s.ImagesFn(ctx, project, options)
 }
 
+// Watch implements Service interface
+func (s *ServiceProxy) Watch(ctx context.Context, project *types.Project, services []string, options WatchOptions) error {
+	if s.WatchFn == nil {
+		return ErrNotImplemented
+	}
+	return s.WatchFn(ctx, project, services, options)
+}
+
+// Viz implements Service interface
+func (s *ServiceProxy) Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error) {
+	if s.VizFn == nil {
+		return "", ErrNotImplemented
+	}
+	return s.VizFn(ctx, project, options)
+}
+
+// Wait implements Service interface
+func (s *ServiceProxy) Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error) {
+	if s.WaitFn == nil {
+		return 0, ErrNotImplemented
+	}
+	return s.WaitFn(ctx, projectName, options)
+}
+
+func (s *ServiceProxy) Scale(ctx context.Context, project *types.Project, options ScaleOptions) error {
+	if s.ScaleFn == nil {
+		return ErrNotImplemented
+	}
+	return s.ScaleFn(ctx, project, options)
+}
+
 func (s *ServiceProxy) MaxConcurrency(i int) {
 	s.MaxConcurrencyFn(i)
+}
+
+func (s *ServiceProxy) DryRunMode(ctx context.Context, dryRun bool) (context.Context, error) {
+	return s.DryRunModeFn(ctx, dryRun)
 }

@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     branches:
-      - 'v2'
+      - 'main'
     tags:
       - 'v*'
   pull_request:
@@ -19,7 +19,6 @@ on:
         default: "false"
 
 env:
-  DESTDIR: "./bin"
   DOCKER_CLI_VERSION: "20.10.17"
 
 permissions:
@@ -38,7 +37,7 @@ jobs:
         name: Create matrix
         id: platforms
         run: |
-          echo ::set-output name=matrix::$(docker buildx bake binary-cross --print | jq -cr '.target."binary-cross".platforms')
+          echo matrix=$(docker buildx bake binary-cross --print | jq -cr '.target."binary-cross".platforms') >> $GITHUB_OUTPUT
       -
         name: Show matrix
         run: |
@@ -103,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: compose
-          path: ${{ env.DESTDIR }}/*
+          path: ./bin/release/*
           if-no-files-found: error
 
   test:
@@ -123,11 +122,16 @@ jobs:
           set: |
             *.cache-from=type=gha,scope=test
             *.cache-to=type=gha,scope=test
+      -
+        name: Gather coverage data
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-data-unit
+          path: bin/coverage/unit/
+          if-no-files-found: error
 
   e2e:
     runs-on: ubuntu-latest
-    env:
-      DESTDIR: "./bin/build"
     strategy:
       fail-fast: false
       matrix:
@@ -157,7 +161,7 @@ jobs:
         name: Build
         uses: docker/bake-action@v2
         with:
-          targets: binary
+          targets: binary-with-coverage
           set: |
             *.cache-from=type=gha,scope=binary-linux-amd64
             *.cache-from=type=gha,scope=binary-e2e-${{ matrix.mode }}
@@ -175,10 +179,17 @@ jobs:
         name: Test plugin mode
         if: ${{ matrix.mode == 'plugin' }}
         run: |
-          make e2e-compose
+          rm -rf ./bin/coverage/e2e
+          mkdir -p ./bin/coverage/e2e
+          make e2e-compose GOCOVERDIR=bin/coverage/e2e TEST_FLAGS="-v"
       -
-        name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        name: Gather coverage data
+        if: ${{ matrix.mode == 'plugin' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-data-e2e
+          path: bin/coverage/e2e/
+          if-no-files-found: error
       -
         name: Test standalone mode
         if: ${{ matrix.mode == 'standalone' }}
@@ -186,6 +197,44 @@ jobs:
           rm -f /usr/local/bin/docker-compose
           cp bin/build/docker-compose /usr/local/bin
           make e2e-compose-standalone
+
+  coverage:
+    runs-on: ubuntu-22.04
+    needs:
+      - test
+      - e2e
+    steps:
+      # codecov won't process the report without the source code available
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          check-latest: true
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-data-unit
+          path: coverage/unit
+      - name: Download E2E test coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-data-e2e
+          path: coverage/e2e
+      - name: Merge coverage reports
+        run: |
+          go tool covdata textfmt -i=./coverage/unit,./coverage/e2e -o ./coverage.txt
+      - name: Store coverage report in GitHub Actions
+        uses: actions/upload-artifact@v3
+        with:
+          name: go-covdata-txt
+          path: ./coverage.txt
+          if-no-files-found: error
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.txt
 
   release:
     permissions:
@@ -203,10 +252,10 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: compose
-          path: ${{ env.DESTDIR }}
+          path: bin/release
       -
         name: Create checksums
-        working-directory: ${{ env.DESTDIR }}
+        working-directory: bin/release
         run: |
           find . -type f -print0 | sort -z | xargs -r0 shasum -a 256 -b | sed 's# \*\./# *#' > $RUNNER_TEMP/checksums.txt
           shasum -a 256 -U -c $RUNNER_TEMP/checksums.txt
@@ -214,21 +263,21 @@ jobs:
           cat checksums.txt | while read sum file; do echo "$sum $file" > ${file#\*}.sha256; done
       -
         name: License
-        run: cp packaging/* ${{ env.DESTDIR }}/
+        run: cp packaging/* bin/release/
       -
         name: List artifacts
         run: |
-          tree -nh ${{ env.DESTDIR }}
+          tree -nh bin/release
       -
         name: Check artifacts
         run: |
-          find ${{ env.DESTDIR }} -type f -exec file -e ascii -- {} +
+          find bin/release -type f -exec file -e ascii -- {} +
       -
         name: GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: ncipollo/release-action@58ae73b360456532aafd58ee170c045abbeaee37 # v1.10.0
         with:
-          artifacts: ${{ env.DESTDIR }}/*
+          artifacts: bin/release/*
           generateReleaseNotes: true
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}

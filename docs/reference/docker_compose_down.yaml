@@ -14,7 +14,7 @@ long: |-
     Anonymous volumes are not removed by default. However, as they don’t have a stable name, they will not be automatically
     mounted by a subsequent `up`. For data that needs to persist between updates, use explicit paths as bind mounts or
     named volumes.
-usage: docker compose down [OPTIONS]
+usage: docker compose down [OPTIONS] [SERVICES]
 pname: docker compose
 plink: docker_compose.yaml
 options:
@@ -41,7 +41,7 @@ options:
     - option: timeout
       shorthand: t
       value_type: int
-      default_value: "10"
+      default_value: "0"
       description: Specify a shutdown timeout in seconds
       deprecated: false
       hidden: false
@@ -54,7 +54,18 @@ options:
       value_type: bool
       default_value: "false"
       description: |
-        Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.
+        Remove named volumes declared in the "volumes" section of the Compose file and anonymous volumes attached to containers.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
       deprecated: false
       hidden: false
       experimental: false
@@ -62,6 +73,7 @@ options:
       kubernetes: false
       swarm: false
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false

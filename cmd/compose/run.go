@@ -21,9 +21,13 @@ import (
 	"fmt"
 	"strings"
 
+	xprogress "github.com/docker/buildx/util/progress"
+
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/opts"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -42,11 +46,14 @@ type runOptions struct {
 	Detach        bool
 	Remove        bool
 	noTty         bool
+	tty           bool
 	interactive   bool
 	user          string
 	workdir       string
 	entrypoint    string
 	entrypointCmd []string
+	capAdd        opts.ListOpts
+	capDrop       opts.ListOpts
 	labels        []string
 	volumes       []string
 	publish       []string
@@ -58,20 +65,26 @@ type runOptions struct {
 	quietPull     bool
 }
 
-func (opts runOptions) apply(project *types.Project) error {
-	target, err := project.GetService(opts.Service)
+func (options runOptions) apply(project *types.Project) error {
+	if options.noDeps {
+		err := project.ForServices([]string{options.Service}, types.IgnoreDependencies)
+		if err != nil {
+			return err
+		}
+	}
+
+	target, err := project.GetService(options.Service)
 	if err != nil {
 		return err
 	}
 
-	target.Tty = !opts.noTty
-	target.StdinOpen = opts.interactive
-	if !opts.servicePorts {
+	target.Tty = !options.noTty
+	target.StdinOpen = options.interactive
+
+	// --service-ports and --publish are incompatible
+	if !options.servicePorts {
 		target.Ports = []types.ServicePortConfig{}
-	}
-	if len(opts.publish) > 0 {
-		target.Ports = []types.ServicePortConfig{}
-		for _, p := range opts.publish {
+		for _, p := range options.publish {
 			config, err := types.ParsePortConfig(p)
 			if err != nil {
 				return err
@@ -79,27 +92,17 @@ func (opts runOptions) apply(project *types.Project) error {
 			target.Ports = append(target.Ports, config...)
 		}
 	}
-	if len(opts.volumes) > 0 {
-		for _, v := range opts.volumes {
-			volume, err := loader.ParseVolume(v)
-			if err != nil {
-				return err
-			}
-			target.Volumes = append(target.Volumes, volume)
-		}
-	}
 
-	if opts.noDeps {
-		for _, s := range project.Services {
-			if s.Name != opts.Service {
-				project.DisabledServices = append(project.DisabledServices, s)
-			}
+	for _, v := range options.volumes {
+		volume, err := loader.ParseVolume(v)
+		if err != nil {
+			return err
 		}
-		project.Services = types.Services{target}
+		target.Volumes = append(target.Volumes, volume)
 	}
 
 	for i, s := range project.Services {
-		if s.Name == opts.Service {
+		if s.Name == options.Service {
 			project.Services[i] = target
 			break
 		}
@@ -107,64 +110,84 @@ func (opts runOptions) apply(project *types.Project) error {
 	return nil
 }
 
-func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
-	opts := runOptions{
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+	options := runOptions{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
 		},
+		capAdd:  opts.NewListOpts(nil),
+		capDrop: opts.NewListOpts(nil),
 	}
 	createOpts := createOptions{}
+	buildOpts := buildOptions{
+		ProjectOptions: p,
+	}
 	cmd := &cobra.Command{
 		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
 		Args:  cobra.MinimumNArgs(1),
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
-			opts.Service = args[0]
+			options.Service = args[0]
 			if len(args) > 1 {
-				opts.Command = args[1:]
+				options.Command = args[1:]
 			}
-			if len(opts.publish) > 0 && opts.servicePorts {
+			if len(options.publish) > 0 && options.servicePorts {
 				return fmt.Errorf("--service-ports and --publish are incompatible")
 			}
 			if cmd.Flags().Changed("entrypoint") {
-				command, err := shellwords.Parse(opts.entrypoint)
+				command, err := shellwords.Parse(options.entrypoint)
 				if err != nil {
 					return err
 				}
-				opts.entrypointCmd = command
+				options.entrypointCmd = command
+			}
+			if cmd.Flags().Changed("tty") {
+				if cmd.Flags().Changed("no-TTY") {
+					return fmt.Errorf("--tty and --no-TTY can't be used together")
+				} else {
+					options.noTty = !options.tty
+				}
 			}
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			project, err := p.ToProject([]string{opts.Service}, cgo.WithResolvedPaths(true))
+			project, err := p.ToProject(dockerCli, []string{options.Service}, cgo.WithResolvedPaths(true), cgo.WithDiscardEnvFile)
 			if err != nil {
 				return err
 			}
-			opts.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
-			return runRun(ctx, backend, project, opts, createOpts)
+
+			if createOpts.quietPull {
+				buildOpts.Progress = xprogress.PrinterModeQuiet
+			}
+
+			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
+			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
-	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
-	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
-	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
-	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&opts.noTty, "no-TTY", "T", !streams.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
-	flags.StringVar(&opts.name, "name", "", "Assign a name to the container")
-	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
-	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
-	flags.StringVar(&opts.entrypoint, "entrypoint", "", "Override the entrypoint of the image")
-	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
-	flags.StringArrayVarP(&opts.volumes, "volume", "v", []string{}, "Bind mount a volume.")
-	flags.StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
-	flags.BoolVar(&opts.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
-	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
-	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
+	flags.BoolVarP(&options.Detach, "detach", "d", false, "Run container in background and print container ID")
+	flags.StringArrayVarP(&options.environment, "env", "e", []string{}, "Set environment variables")
+	flags.StringArrayVarP(&options.labels, "label", "l", []string{}, "Add or override a label")
+	flags.BoolVar(&options.Remove, "rm", false, "Automatically remove the container when it exits")
+	flags.BoolVarP(&options.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
+	flags.StringVar(&options.name, "name", "", "Assign a name to the container")
+	flags.StringVarP(&options.user, "user", "u", "", "Run as specified username or uid")
+	flags.StringVarP(&options.workdir, "workdir", "w", "", "Working directory inside the container")
+	flags.StringVar(&options.entrypoint, "entrypoint", "", "Override the entrypoint of the image")
+	flags.Var(&options.capAdd, "cap-add", "Add Linux capabilities")
+	flags.Var(&options.capDrop, "cap-drop", "Drop Linux capabilities")
+	flags.BoolVar(&options.noDeps, "no-deps", false, "Don't start linked services.")
+	flags.StringArrayVarP(&options.volumes, "volume", "v", []string{}, "Bind mount a volume.")
+	flags.StringArrayVarP(&options.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
+	flags.BoolVar(&options.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
+	flags.BoolVar(&options.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
+	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container.")
+	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 
-	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
-	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
+	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
+	cmd.Flags().BoolVarP(&options.tty, "tty", "t", true, "Allocate a pseudo-TTY.")
 	cmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	flags.SetNormalizeFunc(normalizeRunFlags)
@@ -182,23 +205,35 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions, createOpts createOptions) error {
-	err := opts.apply(project)
+func runRun(ctx context.Context, backend api.Service, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
+	err := options.apply(project)
 	if err != nil {
 		return err
 	}
 
-	createOpts.Apply(project)
+	err = createOpts.Apply(project)
+	if err != nil {
+		return err
+	}
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
-		return startDependencies(ctx, backend, *project, opts.Service, opts.ignoreOrphans)
-	})
+		var buildForDeps *api.BuildOptions
+		if !createOpts.noBuild {
+			// allow dependencies needing build to be implicitly selected
+			bo, err := buildOpts.toAPIBuildOptions(nil)
+			if err != nil {
+				return err
+			}
+			buildForDeps = &bo
+		}
+		return startDependencies(ctx, backend, *project, buildForDeps, options.Service, options.ignoreOrphans)
+	}, dockerCli.Err())
 	if err != nil {
 		return err
 	}
 
 	labels := types.Labels{}
-	for _, s := range opts.labels {
+	for _, s := range options.labels {
 		parts := strings.SplitN(s, "=", 2)
 		if len(parts) != 2 {
 			return fmt.Errorf("label must be set as KEY=VALUE")
@@ -206,29 +241,43 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		labels[parts[0]] = parts[1]
 	}
 
+	var buildForRun *api.BuildOptions
+	if !createOpts.noBuild {
+		// dependencies have already been started above, so only the service
+		// being run might need to be built at this point
+		bo, err := buildOpts.toAPIBuildOptions([]string{options.Service})
+		if err != nil {
+			return err
+		}
+		buildForRun = &bo
+	}
+
 	// start container and attach to container streams
 	runOpts := api.RunOptions{
-		Name:              opts.name,
-		Service:           opts.Service,
-		Command:           opts.Command,
-		Detach:            opts.Detach,
-		AutoRemove:        opts.Remove,
-		Tty:               !opts.noTty,
-		Interactive:       opts.interactive,
-		WorkingDir:        opts.workdir,
-		User:              opts.user,
-		Environment:       opts.environment,
-		Entrypoint:        opts.entrypointCmd,
+		Build:             buildForRun,
+		Name:              options.name,
+		Service:           options.Service,
+		Command:           options.Command,
+		Detach:            options.Detach,
+		AutoRemove:        options.Remove,
+		Tty:               !options.noTty,
+		Interactive:       options.interactive,
+		WorkingDir:        options.workdir,
+		User:              options.user,
+		CapAdd:            options.capAdd.GetAll(),
+		CapDrop:           options.capDrop.GetAll(),
+		Environment:       options.environment,
+		Entrypoint:        options.entrypointCmd,
 		Labels:            labels,
-		UseNetworkAliases: opts.useAliases,
-		NoDeps:            opts.noDeps,
+		UseNetworkAliases: options.useAliases,
+		NoDeps:            options.noDeps,
 		Index:             0,
-		QuietPull:         opts.quietPull,
+		QuietPull:         options.quietPull,
 	}
 
 	for i, service := range project.Services {
-		if service.Name == opts.Service {
-			service.StdinOpen = opts.interactive
+		if service.Name == options.Service {
+			service.StdinOpen = options.interactive
 			project.Services[i] = service
 		}
 	}
@@ -244,7 +293,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	return err
 }
 
-func startDependencies(ctx context.Context, backend api.Service, project types.Project, requestedServiceName string, ignoreOrphans bool) error {
+func startDependencies(ctx context.Context, backend api.Service, project types.Project, buildOpts *api.BuildOptions, requestedServiceName string, ignoreOrphans bool) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for _, service := range project.Services {
@@ -258,6 +307,7 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 	project.Services = dependencies
 	project.DisabledServices = append(project.DisabledServices, requestedService)
 	err := backend.Create(ctx, &project, api.CreateOptions{
+		Build:         buildOpts,
 		IgnoreOrphans: ignoreOrphans,
 	})
 	if err != nil {

@@ -15,25 +15,21 @@
 PKG := github.com/docker/compose/v2
 VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
 
-GO_LDFLAGS ?= -s -w -X ${PKG}/internal.Version=${VERSION}
-GO_BUILDTAGS ?= e2e,kube
-
+GO_LDFLAGS ?= -w -X ${PKG}/internal.Version=${VERSION}
+GO_BUILDTAGS ?= e2e
+DRIVE_PREFIX?=
 ifeq ($(OS),Windows_NT)
     DETECTED_OS = Windows
+    DRIVE_PREFIX=C:
 else
     DETECTED_OS = $(shell uname -s)
 endif
-ifeq ($(DETECTED_OS),Linux)
-	MOBY_DOCKER=/usr/bin/docker
-endif
-ifeq ($(DETECTED_OS),Darwin)
-	MOBY_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
-endif
+
 ifeq ($(DETECTED_OS),Windows)
 	BINARY_EXT=.exe
 endif
 
-TEST_COVERAGE_FLAGS = -race -coverprofile=coverage.out -covermode=atomic
+BUILD_FLAGS?=
 TEST_FLAGS?=
 E2E_TEST?=
 ifeq ($(E2E_TEST),)
@@ -42,26 +38,40 @@ else
 endif
 
 BUILDX_CMD ?= docker buildx
-DESTDIR ?= ./bin/build
+
+# DESTDIR overrides the output path for binaries and other artifacts
+# this is used by docker/docker-ce-packaging for the apt/rpm builds,
+# so it's important that the resulting binary ends up EXACTLY at the
+# path $DESTDIR/docker-compose when specified.
+#
+# See https://github.com/docker/docker-ce-packaging/blob/e43fbd37e48fde49d907b9195f23b13537521b94/rpm/SPECS/docker-compose-plugin.spec#L47
+#
+# By default, all artifacts go to subdirectories under ./bin/ in the
+# repo root, e.g. ./bin/build, ./bin/coverage, ./bin/release.
+DESTDIR ?=
 
 all: build
 
 .PHONY: build ## Build the compose cli-plugin
 build:
-	CGO_ENABLED=0 GO111MODULE=on go build -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose$(BINARY_EXT)" ./cmd
+	GO111MODULE=on go build $(BUILD_FLAGS) -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(or $(DESTDIR),./bin/build)/docker-compose$(BINARY_EXT)" ./cmd
 
 .PHONY: binary
 binary:
 	$(BUILDX_CMD) bake binary
 
+.PHONY: binary-with-coverage
+binary-with-coverage:
+	$(BUILDX_CMD) bake binary-with-coverage
+
 .PHONY: install
 install: binary
 	mkdir -p ~/.docker/cli-plugins
-	install bin/build/docker-compose ~/.docker/cli-plugins/docker-compose
+	install $(or $(DESTDIR),./bin/build)/docker-compose ~/.docker/cli-plugins/docker-compose
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) $(TEST_COVERAGE_FLAGS) -count=1 ./pkg/e2e
+	go test -v $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
@@ -107,8 +117,8 @@ docs: ## generate documentation
 	$(eval $@_TMP_OUT := $(shell mktemp -d -t compose-output.XXXXXXXXXX))
 	$(BUILDX_CMD) bake --set "*.output=type=local,dest=$($@_TMP_OUT)" docs-update
 	rm -rf ./docs/internal
-	cp -R "$($@_TMP_OUT)"/out/* ./docs/
-	rm -rf "$($@_TMP_OUT)"/*
+	cp -R "$(DRIVE_PREFIX)$($@_TMP_OUT)"/out/* ./docs/
+	rm -rf "$(DRIVE_PREFIX)$($@_TMP_OUT)"/*
 
 .PHONY: validate-docs
 validate-docs: ## validate the doc does not change

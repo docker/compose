@@ -24,6 +24,15 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: builder
+      value_type: string
+      description: Set builder to use.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: compress
       value_type: bool
       default_value: "true"
@@ -46,11 +55,12 @@ options:
       swarm: false
     - option: memory
       shorthand: m
-      value_type: string
+      value_type: bytes
+      default_value: "0"
       description: |
-        Set memory limit for the build container. Not supported on buildkit yet.
+        Set memory limit for the build container. Not supported by BuildKit.
       deprecated: false
-      hidden: true
+      hidden: false
       experimental: false
       experimentalcli: false
       kubernetes: false
@@ -89,9 +99,9 @@ options:
     - option: progress
       value_type: string
       default_value: auto
-      description: Set type of progress output (auto, tty, plain, quiet)
+      description: Set type of ui output (auto, tty, plain, quiet)
       deprecated: false
-      hidden: false
+      hidden: true
       experimental: false
       experimentalcli: false
       kubernetes: false
@@ -100,6 +110,16 @@ options:
       value_type: bool
       default_value: "false"
       description: Always attempt to pull a newer version of the image.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: push
+      value_type: bool
+      default_value: "false"
+      description: Push service images.
       deprecated: false
       hidden: false
       experimental: false
@@ -127,7 +147,19 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false

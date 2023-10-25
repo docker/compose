@@ -62,9 +62,18 @@ func TestPs(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps",
 			"--format", "json")
-		var output []api.ContainerSummary
-		err := json.Unmarshal([]byte(res.Stdout()), &output)
-		require.NoError(t, err, "Failed to unmarshal ps JSON output")
+		type element struct {
+			Name       string
+			Publishers api.PortPublishers
+		}
+		var output []element
+		out := res.Stdout()
+		dec := json.NewDecoder(strings.NewReader(out))
+		for dec.More() {
+			var s element
+			require.NoError(t, dec.Decode(&s), "Failed to unmarshal ps JSON output")
+			output = append(output, s)
+		}
 
 		count := 0
 		assert.Equal(t, 2, len(output))

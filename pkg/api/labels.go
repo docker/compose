@@ -55,6 +55,8 @@ const (
 	VersionLabel = "com.docker.compose.version"
 	// ImageBuilderLabel stores the builder (classic or BuildKit) used to produce the image.
 	ImageBuilderLabel = "com.docker.compose.image.builder"
+	// ContainerReplaceLabel is set when container is created to replace another container (recreated)
+	ContainerReplaceLabel = "com.docker.compose.replace"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel

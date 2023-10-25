@@ -24,14 +24,14 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
-
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {
 	list, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(hasProjectLabelFilter()),
+		Filters: filters.NewArgs(hasProjectLabelFilter(), hasConfigHashLabel()),
 		All:     opts.All,
 	})
 	if err != nil {
@@ -50,7 +50,8 @@ func containersToStacks(containers []moby.Container) ([]api.Stack, error) {
 	for _, project := range keys {
 		configFiles, err := combinedConfigFiles(containersByLabel[project])
 		if err != nil {
-			return nil, err
+			logrus.Warn(err.Error())
+			configFiles = "N/A"
 		}
 
 		projects = append(projects, api.Stack{

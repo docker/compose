@@ -62,10 +62,6 @@ func Convert(args []string) []string {
 			continue
 		}
 		if len(arg) > 0 && arg[0] != '-' {
-			// not a top-level flag anymore, keep the rest of the command unmodified
-			if arg == compose.PluginName {
-				i++
-			}
 			command = append(command, args[i:]...)
 			break
 		}

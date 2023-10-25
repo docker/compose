@@ -31,6 +31,17 @@ import (
 
 func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
 	projectName = strings.ToLower(projectName)
+
+	if options.Stop {
+		err := s.Stop(ctx, projectName, api.StopOptions{
+			Services: options.Services,
+			Project:  options.Project,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 	if err != nil {
 		if api.IsNotFoundError(err) {
@@ -44,9 +55,21 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	stoppedContainers := containers.filter(func(c moby.Container) bool {
-		return c.State != ContainerRunning
-	})
+	var stoppedContainers Containers
+	for _, container := range containers {
+		// We have to inspect containers, as State reported by getContainers suffers a race condition
+		inspected, err := s.apiClient().ContainerInspect(ctx, container.ID)
+		if api.IsNotFoundError(err) {
+			// Already removed. Maybe configured with auto-remove
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !inspected.State.Running || (options.Stop && s.dryRun) {
+			stoppedContainers = append(stoppedContainers, container)
+		}
+	}
 
 	var names []string
 	stoppedContainers.forEach(func(c moby.Container) {
@@ -54,14 +77,14 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	})
 
 	if len(names) == 0 {
-		fmt.Fprintln(s.stderr(), "No stopped containers")
+		fmt.Fprintln(s.stdinfo(), "No stopped containers")
 		return nil
 	}
 	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
 	if options.Force {
 		fmt.Fprintln(s.stdout(), msg)
 	} else {
-		confirm, err := prompt.User{}.Confirm(msg, false)
+		confirm, err := prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)
 		if err != nil {
 			return err
 		}
@@ -69,9 +92,9 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 			return nil
 		}
 	}
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.remove(ctx, stoppedContainers, options)
-	})
+	}, s.stdinfo(), "Removing")
 }
 
 func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {

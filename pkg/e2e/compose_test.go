@@ -102,6 +102,14 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-words-1   gtardif/sentences-api   latest`})
 	})
 
+	t.Run("down SERVICE", func(t *testing.T) {
+		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "web")
+
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "ps")
+		assert.Assert(t, !strings.Contains(res.Combined(), "compose-e2e-demo-web-1"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "compose-e2e-demo-db-1"), res.Combined())
+	})
+
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
@@ -169,21 +177,32 @@ func TestRm(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
 	})
 
-	t.Run("rm -sf", func(t *testing.T) {
+	t.Run("rm --stop --force simple", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm",
-			"-sf", "simple")
+			"--stop", "--force", "simple")
 		res.Assert(t, icmd.Expected{Err: "Removed", ExitCode: 0})
 	})
 
-	t.Run("check containers after rm -sf", func(t *testing.T) {
+	t.Run("check containers after rm", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"_simple"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-simple"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), projectName+"-another"), res.Combined())
 	})
 
-	t.Run("rm -sf <none>", func(t *testing.T) {
+	t.Run("up (again)", func(t *testing.T) {
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
+	})
+
+	t.Run("rm ---stop --force <none>", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm",
-			"-sf", "simple")
+			"--stop", "--force")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
+	})
+
+	t.Run("check containers after rm", func(t *testing.T) {
+		res := c.RunDockerCmd(t, "ps", "--all")
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-simple"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-another"), res.Combined())
 	})
 
 	t.Run("down", func(t *testing.T) {
@@ -258,12 +277,16 @@ networks:
 	})
 }
 
-func TestStopWithDependeciesAttached(t *testing.T) {
+func TestStopWithDependenciesAttached(t *testing.T) {
 	const projectName = "compose-e2e-stop-with-deps"
 	c := NewParallelCLI(t, WithEnv("COMMAND=echo hello"))
 
-	t.Run("up", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo")
-		res.Assert(t, icmd.Expected{Out: "exited with code 0"})
-	})
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "-p", projectName, "down", "--remove-orphans", "--timeout=0")
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo")
+	res.Assert(t, icmd.Expected{Out: "exited with code 0"})
 }

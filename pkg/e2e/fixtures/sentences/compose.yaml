@@ -1,12 +1,15 @@
 services:
   db:
     image: gtardif/sentences-db
+    init: true
   words:
     image: gtardif/sentences-api
+    init: true
     ports:
       - "95:8080"
   web:
     image: gtardif/sentences-web
+    init: true
     ports:
       - "90:80"
     labels:

@@ -28,3 +28,24 @@ func Contains[T any](origin []T, element T) bool {
 	}
 	return false
 }
+
+// Remove removes all elements from origin slice
+func Remove[T any](origin []T, elements ...T) []T {
+	var filtered []T
+	for _, v := range origin {
+		if !Contains(elements, v) {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}
+
+func Filter[T any](elements []T, predicate func(T) bool) []T {
+	var filtered []T
+	for _, v := range elements {
+		if predicate(v) {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}

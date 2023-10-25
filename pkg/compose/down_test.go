@@ -19,10 +19,12 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -39,12 +41,10 @@ func TestDown(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{
@@ -53,15 +53,19 @@ func TestDown(t *testing.T) {
 			testContainer("service2", "789", false),
 			testContainer("service_orphan", "321", true),
 		}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
 	// cleanup properly if duplicates are inadvertently created
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]moby.NetworkResource{
-			{ID: "abc123", Name: "myProject_default"},
-			{ID: "def456", Name: "myProject_default"},
+			{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
 		}, nil)
 
 	stopOptions := containerType.StopOptions{}
@@ -74,11 +78,15 @@ func TestDown(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "myProject_default")),
+		Filters: filters.NewArgs(
+			projectFilter(strings.ToLower(testProject)),
+			networkFilter("default")),
 	}).Return([]moby.NetworkResource{
 		{ID: "abc123", Name: "myProject_default"},
 		{ID: "def456", Name: "myProject_default"},
 	}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(moby.NetworkResource{ID: "abc123"}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "def456", gomock.Any()).Return(moby.NetworkResource{ID: "def456"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "def456").Return(nil)
 
@@ -90,12 +98,10 @@ func TestDownRemoveOrphans(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(true)).Return(
 		[]moby.Container{
@@ -103,10 +109,18 @@ func TestDownRemoveOrphans(t *testing.T) {
 			testContainer("service2", "789", false),
 			testContainer("service_orphan", "321", true),
 		}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]moby.NetworkResource{{Name: "myProject_default"}}, nil)
+		Return([]moby.NetworkResource{
+			{
+				Name:   "myProject_default",
+				Labels: map[string]string{compose.NetworkLabel: "default"},
+			}}, nil)
 
 	stopOptions := containerType.StopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
@@ -118,8 +132,12 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "321", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", "myProject_default")),
+		Filters: filters.NewArgs(
+			networkFilter("default"),
+			projectFilter(strings.ToLower(testProject)),
+		),
 	}).Return([]moby.NetworkResource{{ID: "abc123", Name: "myProject_default"}}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(moby.NetworkResource{ID: "abc123"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})
@@ -130,16 +148,18 @@ func TestDownRemoveVolumes(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{testContainer("service1", "123", false)}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{
 			Volumes: []*volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
@@ -173,12 +193,10 @@ func TestDownRemoveImages(t *testing.T) {
 		},
 	}
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).
 		Return([]moby.Container{
@@ -229,6 +247,7 @@ func TestDownRemoveImages(t *testing.T) {
 
 	localImagesToBeRemoved := []string{
 		"testproject-local-anonymous:latest",
+		"local-named-image:latest",
 	}
 	for _, img := range localImagesToBeRemoved {
 		// test calls down --rmi=local then down --rmi=all, so local images
@@ -244,7 +263,6 @@ func TestDownRemoveImages(t *testing.T) {
 	assert.NilError(t, err)
 
 	otherImagesToBeRemoved := []string{
-		"local-named-image:latest",
 		"remote-image:latest",
 		"registry.example.com/remote-image-tagged:v1.0",
 	}
@@ -264,19 +282,21 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	container := testContainer("service1", "123", false)
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{container}, nil)
 
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{
 			Volumes: []*volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
@@ -302,4 +322,13 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Images: "local"})
 	assert.NilError(t, err)
+}
+
+func prepareMocks(mockCtrl *gomock.Controller) (*mocks.MockAPIClient, *mocks.MockCli) {
+	api := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(api).AnyTimes()
+	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+	return api, cli
 }

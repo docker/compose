@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 
+	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -32,7 +34,7 @@ type pushOptions struct {
 	Quiet          bool
 }
 
-func pushCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func pushCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := pushOptions{
 		ProjectOptions: p,
 	}
@@ -40,9 +42,9 @@ func pushCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Use:   "push [OPTIONS] [SERVICE...]",
 		Short: "Push service images",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPush(ctx, backend, opts, args)
+			return runPush(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
 	pushCmd.Flags().BoolVar(&opts.IncludeDeps, "include-deps", false, "Also push images of services declared as dependencies")
@@ -51,14 +53,14 @@ func pushCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return pushCmd
 }
 
-func runPush(ctx context.Context, backend api.Service, opts pushOptions, services []string) error {
-	project, err := opts.ToProject(services)
+func runPush(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pushOptions, services []string) error {
+	project, err := opts.ToProject(dockerCli, services)
 	if err != nil {
 		return err
 	}
 
 	if !opts.IncludeDeps {
-		err := withSelectedServicesOnly(project, services)
+		err := project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}

@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/api"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/utils"
@@ -38,8 +39,9 @@ const (
 )
 
 type graphTraversal struct {
-	mu   sync.Mutex
-	seen map[string]struct{}
+	mu      sync.Mutex
+	seen    map[string]struct{}
+	ignored map[string]struct{}
 
 	extremityNodesFn            func(*Graph) []*Vertex                        // leaves or roots
 	adjacentNodesFn             func(*Vertex) []*Vertex                       // getParents or getChildren
@@ -47,7 +49,8 @@ type graphTraversal struct {
 	targetServiceStatus         ServiceStatus
 	adjacentServiceStatusToSkip ServiceStatus
 
-	visitorFn func(context.Context, string) error
+	visitorFn      func(context.Context, string) error
+	maxConcurrency int
 }
 
 func upDirectionTraversal(visitorFn func(context.Context, string) error) *graphTraversal {
@@ -74,35 +77,94 @@ func downDirectionTraversal(visitorFn func(context.Context, string) error) *grap
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
 func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
-	graph, err := NewGraph(project.Services, ServiceStopped)
+	graph, err := NewGraph(project, ServiceStopped)
 	if err != nil {
 		return err
 	}
 	t := upDirectionTraversal(fn)
+	for _, option := range options {
+		option(t)
+	}
 	return t.visit(ctx, graph)
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
-func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error) error {
-	graph, err := NewGraph(project.Services, ServiceStarted)
+func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
+	graph, err := NewGraph(project, ServiceStarted)
 	if err != nil {
 		return err
 	}
 	t := downDirectionTraversal(fn)
+	for _, option := range options {
+		option(t)
+	}
 	return t.visit(ctx, graph)
 }
 
+func WithRootNodesAndDown(nodes []string) func(*graphTraversal) {
+	return func(t *graphTraversal) {
+		if len(nodes) == 0 {
+			return
+		}
+		originalFn := t.extremityNodesFn
+		t.extremityNodesFn = func(graph *Graph) []*Vertex {
+			var want []string
+			for _, node := range nodes {
+				vertex := graph.Vertices[node]
+				want = append(want, vertex.Service)
+				for _, v := range getAncestors(vertex) {
+					want = append(want, v.Service)
+				}
+			}
+
+			t.ignored = map[string]struct{}{}
+			for k := range graph.Vertices {
+				if !utils.Contains(want, k) {
+					t.ignored[k] = struct{}{}
+				}
+			}
+
+			return originalFn(graph)
+		}
+	}
+}
+
 func (t *graphTraversal) visit(ctx context.Context, g *Graph) error {
-	nodes := t.extremityNodesFn(g)
+	expect := len(g.Vertices)
+	if expect == 0 {
+		return nil
+	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	t.run(ctx, g, eg, nodes)
+	if t.maxConcurrency > 0 {
+		eg.SetLimit(t.maxConcurrency + 1)
+	}
+	nodeCh := make(chan *Vertex, expect)
+	defer close(nodeCh)
+	// nodeCh need to allow n=expect writers while reader goroutine could have returner after ctx.Done
+	eg.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case node := <-nodeCh:
+				expect--
+				if expect == 0 {
+					return nil
+				}
+				t.run(ctx, g, eg, t.adjacentNodesFn(node), nodeCh)
+			}
+		}
+	})
+
+	nodes := t.extremityNodesFn(g)
+	t.run(ctx, g, eg, nodes, nodeCh)
 
 	return eg.Wait()
 }
 
 // Note: this could be `graph.walk` or whatever
-func (t *graphTraversal) run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex) {
+func (t *graphTraversal) run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex, nodeCh chan *Vertex) {
 	for _, node := range nodes {
 		// Don't start this service yet if all of its children have
 		// not been started yet.
@@ -117,15 +179,15 @@ func (t *graphTraversal) run(ctx context.Context, graph *Graph, eg *errgroup.Gro
 		}
 
 		eg.Go(func() error {
-			err := t.visitorFn(ctx, node.Service)
-			if err != nil {
-				return err
+			var err error
+			if _, ignore := t.ignored[node.Service]; !ignore {
+				err = t.visitorFn(ctx, node.Service)
 			}
-
-			graph.UpdateStatus(node.Key, t.targetServiceStatus)
-
-			t.run(ctx, graph, eg, t.adjacentNodesFn(node))
-			return nil
+			if err == nil {
+				graph.UpdateStatus(node.Key, t.targetServiceStatus)
+			}
+			nodeCh <- node
+			return err
 		})
 	}
 }
@@ -175,6 +237,16 @@ func getChildren(v *Vertex) []*Vertex {
 	return v.GetChildren()
 }
 
+// getAncestors return all descendents for a vertex, might contain duplicates
+func getAncestors(v *Vertex) []*Vertex {
+	var descendents []*Vertex
+	for _, parent := range v.GetParents() {
+		descendents = append(descendents, parent)
+		descendents = append(descendents, getAncestors(parent)...)
+	}
+	return descendents
+}
+
 // GetChildren returns a slice with the child vertices of the a Vertex
 func (v *Vertex) GetChildren() []*Vertex {
 	var res []*Vertex
@@ -185,19 +257,33 @@ func (v *Vertex) GetChildren() []*Vertex {
 }
 
 // NewGraph returns the dependency graph of the services
-func NewGraph(services types.Services, initialStatus ServiceStatus) (*Graph, error) {
+func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, error) {
 	graph := &Graph{
 		lock:     sync.RWMutex{},
 		Vertices: map[string]*Vertex{},
 	}
 
-	for _, s := range services {
+	for _, s := range project.Services {
 		graph.AddVertex(s.Name, s.Name, initialStatus)
 	}
 
-	for _, s := range services {
+	for index, s := range project.Services {
 		for _, name := range s.GetDependencies() {
-			_ = graph.AddEdge(s.Name, name)
+			err := graph.AddEdge(s.Name, name)
+			if err != nil {
+				if !s.DependsOn[name].Required {
+					delete(s.DependsOn, name)
+					project.Services[index] = s
+					continue
+				}
+				if api.IsNotFoundError(err) {
+					ds, err := project.GetDisabledService(name)
+					if err == nil {
+						return nil, fmt.Errorf("service %s is required by %s but is disabled. Can be enabled by profiles %s", name, s.Name, ds.Profiles)
+					}
+				}
+				return nil, err
+			}
 		}
 	}
 
@@ -237,10 +323,10 @@ func (g *Graph) AddEdge(source string, destination string) error {
 	destinationVertex := g.Vertices[destination]
 
 	if sourceVertex == nil {
-		return fmt.Errorf("could not find %s", source)
+		return fmt.Errorf("could not find %s: %w", source, api.ErrNotFound)
 	}
 	if destinationVertex == nil {
-		return fmt.Errorf("could not find %s", destination)
+		return fmt.Errorf("could not find %s: %w", destination, api.ErrNotFound)
 	}
 
 	// If they are already connected

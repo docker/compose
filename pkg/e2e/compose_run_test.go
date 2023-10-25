@@ -48,11 +48,11 @@ func TestLocalComposeRun(t *testing.T) {
 		for _, line := range lines {
 			fields := strings.Fields(line)
 			containerID := fields[len(fields)-1]
-			assert.Assert(t, !strings.HasPrefix(containerID, "run-test_front"))
-			if strings.HasPrefix(containerID, "run-test_back") {
+			assert.Assert(t, !strings.HasPrefix(containerID, "run-test-front"))
+			if strings.HasPrefix(containerID, "run-test-back") {
 				// only the one-off container for back service
-				assert.Assert(t, strings.HasPrefix(containerID, "run-test_back_run_"), containerID)
-				truncatedSlug = strings.Replace(containerID, "run-test_back_run_", "", 1)
+				assert.Assert(t, strings.HasPrefix(containerID, "run-test-back-run-"), containerID)
+				truncatedSlug = strings.Replace(containerID, "run-test-back-run-", "", 1)
 				runContainerID = containerID
 			}
 			if strings.HasPrefix(containerID, "run-test-db-1") {
@@ -75,7 +75,7 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
 
 		res = c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, strings.Contains(res.Stdout(), "run-test_back"), res.Stdout())
+		assert.Assert(t, strings.Contains(res.Stdout(), "run-test-back"), res.Stdout())
 	})
 
 	t.Run("down", func(t *testing.T) {
@@ -92,14 +92,22 @@ func TestLocalComposeRun(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: "compose_run_test.go"})
 
 		res = c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, strings.Contains(res.Stdout(), "run-test_back"), res.Stdout())
+		assert.Assert(t, strings.Contains(res.Stdout(), "run-test-back"), res.Stdout())
 	})
 
 	t.Run("compose run --publish", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "--publish", "8081:80", "-d", "back",
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/ports.yaml", "run", "--publish", "8081:80", "-d", "back",
 			"/bin/sh", "-c", "sleep 1")
 		res := c.RunDockerCmd(t, "ps")
 		assert.Assert(t, strings.Contains(res.Stdout(), "8081->80/tcp"), res.Stdout())
+		assert.Assert(t, !strings.Contains(res.Stdout(), "8082->80/tcp"), res.Stdout())
+	})
+
+	t.Run("compose run --service-ports", func(t *testing.T) {
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/ports.yaml", "run", "--service-ports", "-d", "back",
+			"/bin/sh", "-c", "sleep 1")
+		res := c.RunDockerCmd(t, "ps")
+		assert.Assert(t, strings.Contains(res.Stdout(), "8082->80/tcp"), res.Stdout())
 	})
 
 	t.Run("compose run orphan", func(t *testing.T) {
@@ -135,5 +143,21 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Assert(t, !strings.Contains(res.Combined(), "service_b"), res.Combined())
 
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/deps.yaml", "down", "--remove-orphans")
+	})
+
+	t.Run("run without dependencies", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/deps.yaml", "run", "--no-deps", "service_a")
+		assert.Assert(t, !strings.Contains(res.Combined(), "shared_dep"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "service_b"), res.Combined())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/deps.yaml", "down", "--remove-orphans")
+	})
+
+	t.Run("run with not required dependency", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "run", "foo")
+		assert.Assert(t, strings.Contains(res.Combined(), "foo"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "bar"), res.Combined())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "down", "--remove-orphans")
 	})
 }

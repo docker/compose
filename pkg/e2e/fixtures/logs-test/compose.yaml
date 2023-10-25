@@ -1,7 +1,8 @@
 services:
   ping:
     image: alpine
-    command: ping localhost -c 1
+    init: true
+    command: ping localhost -c ${REPEAT:-1}
   hello:
     image: alpine
     command: echo hello

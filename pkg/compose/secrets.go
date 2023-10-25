@@ -45,7 +45,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		}
 
 		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, moby.CopyToContainerOptions{
-			CopyUIDGID: true,
+			CopyUIDGID: config.UID != "" || config.GID != "",
 		})
 		if err != nil {
 			return err
@@ -58,7 +58,7 @@ func createTar(env string, config types.ServiceSecretConfig) (bytes.Buffer, erro
 	value := []byte(env)
 	b := bytes.Buffer{}
 	tarWriter := tar.NewWriter(&b)
-	mode := uint32(0o400)
+	mode := uint32(0o444)
 	if config.Mode != nil {
 		mode = *config.Mode
 	}
@@ -66,7 +66,7 @@ func createTar(env string, config types.ServiceSecretConfig) (bytes.Buffer, erro
 	target := config.Target
 	if config.Target == "" {
 		target = "/run/secrets/" + config.Source
-	} else if !isUnixAbs(config.Target) {
+	} else if !isAbsTarget(config.Target) {
 		target = "/run/secrets/" + config.Target
 	}
 

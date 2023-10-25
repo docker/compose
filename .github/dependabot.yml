@@ -5,14 +5,20 @@ updates:
     schedule:
       interval: daily
     ignore:
-      # docker/buildx + docker/cli + docker/docker require coordination to
-      # ensure compatibility between them
+      # docker + moby deps require coordination
       - dependency-name: "github.com/docker/buildx"
         # buildx is still 0.x
         update-types: ["version-update:semver-minor"]
+      - dependency-name: "github.com/moby/buildkit"
+        # buildkit is still 0.x
+        update-types: [ "version-update:semver-minor" ]
       - dependency-name: "github.com/docker/cli"
-        # docker/cli uses CalVer rather than SemVer
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+        update-types: ["version-update:semver-major"]
       - dependency-name: "github.com/docker/docker"
-        # docker/docker uses CalVer rather than SemVer
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "github.com/containerd/containerd"
+        # containerd major/minor must be kept in sync with moby
+        update-types: [ "version-update:semver-major", "version-update:semver-minor" ]
+      - dependency-name: "go.opentelemetry.io/otel/*"
+        # OTEL is v1.x but has some parts that are not API stable yet
+        update-types: [ "version-update:semver-major", "version-update:semver-minor"]

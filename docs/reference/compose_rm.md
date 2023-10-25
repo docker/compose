@@ -12,6 +12,7 @@ Any data which is not in a volume will be lost.
 
 | Name              | Type | Default | Description                                         |
 |:------------------|:-----|:--------|:----------------------------------------------------|
+| `--dry-run`       |      |         | Execute command in dry run mode                     |
 | `-f`, `--force`   |      |         | Don't ask to confirm removal                        |
 | `-s`, `--stop`    |      |         | Stop the containers, if required, before removing   |
 | `-v`, `--volumes` |      |         | Remove any anonymous volumes attached to containers |

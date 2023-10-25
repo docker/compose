@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -28,7 +29,7 @@ type pauseOptions struct {
 	*ProjectOptions
 }
 
-func pauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := pauseOptions{
 		ProjectOptions: p,
 	}
@@ -36,15 +37,15 @@ func pauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Use:   "pause [SERVICE...]",
 		Short: "Pause services",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPause(ctx, backend, opts, args)
+			return runPause(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	return cmd
 }
 
-func runPause(ctx context.Context, backend api.Service, opts pauseOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+func runPause(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pauseOptions, services []string) error {
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ type unpauseOptions struct {
 	*ProjectOptions
 }
 
-func unpauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := unpauseOptions{
 		ProjectOptions: p,
 	}
@@ -67,15 +68,15 @@ func unpauseCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		Use:   "unpause [SERVICE...]",
 		Short: "Unpause services",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runUnPause(ctx, backend, opts, args)
+			return runUnPause(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	return cmd
 }
 
-func runUnPause(ctx context.Context, backend api.Service, opts unpauseOptions, services []string) error {
-	project, name, err := opts.projectOrName(services...)
+func runUnPause(ctx context.Context, dockerCli command.Cli, backend api.Service, opts unpauseOptions, services []string) error {
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}

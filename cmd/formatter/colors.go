@@ -19,6 +19,7 @@ package formatter
 import (
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -86,12 +87,17 @@ func makeColorFunc(code string) colorFunc {
 }
 
 var nextColor = rainbowColor
+var rainbow []colorFunc
+var currentIndex = 0
+var mutex sync.Mutex
 
 func rainbowColor() colorFunc {
-	return <-loop
+	mutex.Lock()
+	defer mutex.Unlock()
+	result := rainbow[currentIndex]
+	currentIndex = (currentIndex + 1) % len(rainbow)
+	return result
 }
-
-var loop = make(chan colorFunc)
 
 func init() {
 	colors := map[string]colorFunc{}
@@ -99,25 +105,16 @@ func init() {
 		colors[name] = makeColorFunc(strconv.Itoa(30 + i))
 		colors["intense_"+name] = makeColorFunc(strconv.Itoa(30+i) + ";1")
 	}
-
-	go func() {
-		i := 0
-		rainbow := []colorFunc{
-			colors["cyan"],
-			colors["yellow"],
-			colors["green"],
-			colors["magenta"],
-			colors["blue"],
-			colors["intense_cyan"],
-			colors["intense_yellow"],
-			colors["intense_green"],
-			colors["intense_magenta"],
-			colors["intense_blue"],
-		}
-
-		for {
-			loop <- rainbow[i]
-			i = (i + 1) % len(rainbow)
-		}
-	}()
+	rainbow = []colorFunc{
+		colors["cyan"],
+		colors["yellow"],
+		colors["green"],
+		colors["magenta"],
+		colors["blue"],
+		colors["intense_cyan"],
+		colors["intense_yellow"],
+		colors["intense_green"],
+		colors["intense_magenta"],
+		colors["intense_blue"],
+	}
 }

@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -34,7 +35,7 @@ type portOptions struct {
 	index    int
 }
 
-func portCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := portOptions{
 		ProjectOptions: p,
 	}
@@ -52,17 +53,17 @@ func portCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *c
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPort(ctx, streams, backend, opts, args[0])
+			return runPort(ctx, dockerCli, backend, opts, args[0])
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	cmd.Flags().StringVar(&opts.protocol, "protocol", "tcp", "tcp or udp")
-	cmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if service has multiple replicas")
+	cmd.Flags().IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
 	return cmd
 }
 
-func runPort(ctx context.Context, streams api.Streams, backend api.Service, opts portOptions, service string) error {
-	projectName, err := opts.toProjectName()
+func runPort(ctx context.Context, dockerCli command.Cli, backend api.Service, opts portOptions, service string) error {
+	projectName, err := opts.toProjectName(dockerCli)
 	if err != nil {
 		return err
 	}
@@ -74,6 +75,6 @@ func runPort(ctx context.Context, streams api.Streams, backend api.Service, opts
 		return err
 	}
 
-	fmt.Fprintf(streams.Out(), "%s:%d\n", ip, port)
+	fmt.Fprintf(dockerCli.Out(), "%s:%d\n", ip, port)
 	return nil
 }

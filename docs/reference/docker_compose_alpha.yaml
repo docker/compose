@@ -1,0 +1,31 @@
+command: docker compose alpha
+short: Experimental commands
+long: Experimental commands
+pname: docker compose
+plink: docker_compose.yaml
+cname:
+    - docker compose alpha publish
+    - docker compose alpha viz
+    - docker compose alpha watch
+clink:
+    - docker_compose_alpha_publish.yaml
+    - docker_compose_alpha_viz.yaml
+    - docker_compose_alpha_watch.yaml
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+hidden: true
+experimental: false
+experimentalcli: true
+kubernetes: false
+swarm: false
+

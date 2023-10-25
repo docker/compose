@@ -6,12 +6,14 @@ services:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
   db:
     image: gtardif/sentences-db
+    init: true
     networks:
       - dbnet
       - closesnetworkname1
       - closesnetworkname2
   words:
     image: gtardif/sentences-api
+    init: true
     ports:
       - "8080:8080"
     networks:
@@ -19,6 +21,7 @@ services:
       - servicenet
   web:
     image: gtardif/sentences-web
+    init: true
     ports:
       - "80:80"
     labels:

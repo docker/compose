@@ -31,8 +31,10 @@ func TestFilterServices(t *testing.T) {
 				Links: []string{"bar"},
 			},
 			{
-				Name:        "bar",
-				NetworkMode: types.NetworkModeServicePrefix + "zot",
+				Name: "bar",
+				DependsOn: map[string]types.ServiceDependency{
+					"zot": {},
+				},
 			},
 			{
 				Name: "zot",

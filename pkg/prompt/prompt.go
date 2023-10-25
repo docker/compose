@@ -17,42 +17,58 @@
 package prompt
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 //go:generate mockgen -destination=./prompt_mock.go -self_package "github.com/docker/compose/v2/pkg/prompt" -package=prompt . UI
 
 // UI - prompt user input
 type UI interface {
-	Select(message string, options []string) (int, error)
-	Input(message string, defaultValue string) (string, error)
 	Confirm(message string, defaultValue bool) (bool, error)
-	Password(message string) (string, error)
 }
 
-// User - aggregates prompt methods
-type User struct{}
-
-// Select - displays a list
-func (u User) Select(message string, options []string) (int, error) {
-	qs := &survey.Select{
-		Message: message,
-		Options: options,
+func NewPrompt(stdin *streams.In, stdout *streams.Out) UI {
+	if stdin.IsTerminal() {
+		return User{stdin: streamsFileReader{stdin}, stdout: streamsFileWriter{stdout}}
 	}
-	var selected int
-	err := survey.AskOne(qs, &selected, nil)
-	return selected, err
+	return Pipe{stdin: stdin, stdout: stdout}
 }
 
-// Input text with default value
-func (u User) Input(message string, defaultValue string) (string, error) {
-	qs := &survey.Input{
-		Message: message,
-		Default: defaultValue,
-	}
-	var s string
-	err := survey.AskOne(qs, &s, nil)
-	return s, err
+// User - in a terminal
+type User struct {
+	stdout streamsFileWriter
+	stdin  streamsFileReader
+}
+
+// adapt streams.Out to terminal.FileWriter
+type streamsFileWriter struct {
+	stream *streams.Out
+}
+
+func (s streamsFileWriter) Write(p []byte) (n int, err error) {
+	return s.stream.Write(p)
+}
+
+func (s streamsFileWriter) Fd() uintptr {
+	return s.stream.FD()
+}
+
+// adapt streams.In to terminal.FileReader
+type streamsFileReader struct {
+	stream *streams.In
+}
+
+func (s streamsFileReader) Read(p []byte) (n int, err error) {
+	return s.stream.Read(p)
+}
+
+func (s streamsFileReader) Fd() uintptr {
+	return s.stream.FD()
 }
 
 // Confirm asks for yes or no input
@@ -62,17 +78,24 @@ func (u User) Confirm(message string, defaultValue bool) (bool, error) {
 		Default: defaultValue,
 	}
 	var b bool
-	err := survey.AskOne(qs, &b, nil)
+	err := survey.AskOne(qs, &b, func(options *survey.AskOptions) error {
+		options.Stdio.In = u.stdin
+		options.Stdio.Out = u.stdout
+		return nil
+	})
 	return b, err
 }
 
-// Password implements a text input with masked characters.
-func (u User) Password(message string) (string, error) {
-	qs := &survey.Password{
-		Message: message,
-	}
-	var p string
-	err := survey.AskOne(qs, &p, nil)
-	return p, err
+// Pipe - aggregates prompt methods
+type Pipe struct {
+	stdout io.Writer
+	stdin  io.Reader
+}
 
+// Confirm asks for yes or no input
+func (u Pipe) Confirm(message string, defaultValue bool) (bool, error) {
+	fmt.Fprint(u.stdout, message)
+	var answer string
+	fmt.Scanln(&answer)
+	return utils.StringToBool(answer), nil
 }

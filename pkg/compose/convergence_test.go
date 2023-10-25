@@ -68,6 +68,7 @@ func TestServiceLinks(t *testing.T) {
 			projectFilter(testProject),
 			serviceFilter("db"),
 			oneOffFilter(false),
+			hasConfigHashLabel(),
 		),
 		All: true,
 	}
@@ -193,6 +194,7 @@ func TestServiceLinks(t *testing.T) {
 				projectFilter(testProject),
 				serviceFilter("web"),
 				oneOffFilter(false),
+				hasConfigHashLabel(),
 			),
 			All: true,
 		}
@@ -227,16 +229,16 @@ func TestWaitDependencies(t *testing.T) {
 			"db":    {Condition: ServiceConditionRunningOrHealthy},
 			"redis": {Condition: ServiceConditionRunningOrHealthy},
 		}
-		assert.NilError(t, tested.waitDependencies(context.Background(), &project, dependencies))
+		assert.NilError(t, tested.waitDependencies(context.Background(), &project, "", dependencies, nil))
 	})
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: 1}
 		redisService := types.ServiceConfig{Name: "redis", Scale: 1}
 		project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{dbService, redisService}}
 		dependencies := types.DependsOnConfig{
-			"db":    {Condition: types.ServiceConditionStarted},
-			"redis": {Condition: types.ServiceConditionStarted},
+			"db":    {Condition: types.ServiceConditionStarted, Required: true},
+			"redis": {Condition: types.ServiceConditionStarted, Required: true},
 		}
-		assert.NilError(t, tested.waitDependencies(context.Background(), &project, dependencies))
+		assert.NilError(t, tested.waitDependencies(context.Background(), &project, "", dependencies, nil))
 	})
 }

@@ -5,9 +5,10 @@ Receive real time events from containers.
 
 ### Options
 
-| Name     | Type | Default | Description                               |
-|:---------|:-----|:--------|:------------------------------------------|
-| `--json` |      |         | Output events as a stream of json objects |
+| Name        | Type | Default | Description                               |
+|:------------|:-----|:--------|:------------------------------------------|
+| `--dry-run` |      |         | Execute command in dry run mode           |
+| `--json`    |      |         | Output events as a stream of json objects |
 
 
 <!---MARKER_GEN_END-->

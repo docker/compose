@@ -15,17 +15,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.19.4
-ARG XX_VERSION=1.1.2
-ARG GOLANGCI_LINT_VERSION=v1.49.0
+ARG GO_VERSION=1.21.1
+ARG XX_VERSION=1.2.1
+ARG GOLANGCI_LINT_VERSION=v1.54.2
 ARG ADDLICENSE_VERSION=v1.0.0
 
-ARG BUILD_TAGS="e2e,kube"
+ARG BUILD_TAGS="e2e"
 ARG DOCS_FORMATS="md,yaml"
 ARG LICENSE_FILES=".*\(Dockerfile\|Makefile\|\.go\|\.hcl\|\.sh\)"
 
 # xx is a helper for cross-compilation
 FROM --platform=${BUILDPLATFORM} tonistiigi/xx:${XX_VERSION} AS xx
+
+# osxcross contains the MacOSX cross toolchain for xx
+FROM crazymax/osxcross:11.3-alpine AS osxcross
 
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
 FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
@@ -33,8 +36,10 @@ FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS base
 COPY --from=xx / /
 RUN apk add --no-cache \
+      clang \
       docker \
       file \
+      findutils \
       git \
       make \
       protoc \
@@ -71,19 +76,26 @@ EOT
 
 FROM build-base AS build
 ARG BUILD_TAGS
+ARG BUILD_FLAGS
 ARG TARGETPLATFORM
-RUN xx-go --wrap
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
-    make build GO_BUILDTAGS="$BUILD_TAGS" DESTDIR=/usr/bin && \
-    xx-verify --static /usr/bin/docker-compose
+    --mount=type=bind,from=osxcross,src=/osxsdk,target=/xx-sdk \
+    xx-go --wrap && \
+    if [ "$(xx-info os)" == "darwin" ]; then export CGO_ENABLED=1; fi && \
+    make build GO_BUILDTAGS="$BUILD_TAGS" DESTDIR=/out && \
+    xx-verify --static /out/docker-compose
 
 FROM build-base AS lint
 ARG BUILD_TAGS
+ENV GOLANGCI_LINT_CACHE=/cache/golangci-lint
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/cache/golangci-lint \
     --mount=from=golangci-lint,source=/usr/bin/golangci-lint,target=/usr/bin/golangci-lint \
+    golangci-lint cache status && \
     golangci-lint run --build-tags "$BUILD_TAGS" ./...
 
 FROM build-base AS test
@@ -92,11 +104,13 @@ ARG BUILD_TAGS
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
-    go test -tags "$BUILD_TAGS" -v -coverprofile=/tmp/coverage.txt -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') && \
-    go tool cover -func=/tmp/coverage.txt
+    rm -rf /tmp/coverage && \
+    mkdir -p /tmp/coverage && \
+    go test -tags "$BUILD_TAGS" -v -cover -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') -args -test.gocoverdir="/tmp/coverage" && \
+    go tool covdata percent -i=/tmp/coverage
 
 FROM scratch AS test-coverage
-COPY --from=test /tmp/coverage.txt /coverage.txt
+COPY --from=test --link /tmp/coverage /
 
 FROM base AS license-set
 ARG LICENSE_FILES
@@ -119,6 +133,7 @@ FROM base AS docsgen
 WORKDIR /src
 RUN --mount=target=. \
     --mount=target=/root/.cache,type=cache \
+    --mount=type=cache,target=/go/pkg/mod \
     go build -o /out/docsgen ./docs/yaml/main/generate.go
 
 FROM --platform=${BUILDPLATFORM} alpine AS docs-build
@@ -154,12 +169,14 @@ RUN --mount=target=/context \
 EOT
 
 FROM scratch AS binary-unix
-COPY --link --from=build /usr/bin/docker-compose /
+COPY --link --from=build /out/docker-compose /
 FROM binary-unix AS binary-darwin
 FROM binary-unix AS binary-linux
 FROM scratch AS binary-windows
-COPY --link --from=build /usr/bin/docker-compose /docker-compose.exe
+COPY --link --from=build /out/docker-compose /docker-compose.exe
 FROM binary-$TARGETOS AS binary
+# enable scanning for this stage
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
 
 FROM --platform=$BUILDPLATFORM alpine AS releaser
 WORKDIR /work
@@ -175,9 +192,3 @@ RUN --mount=from=binary \
 
 FROM scratch AS release
 COPY --from=releaser /out/ /
-
-# docs-reference is a target used as remote context to update docs on release
-# with latest changes on docs.docker.com.
-# see open-pr job in .github/workflows/docs.yml for more details
-FROM scratch AS docs-reference
-COPY docs/reference/*.yaml .

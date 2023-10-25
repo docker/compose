@@ -147,6 +147,20 @@ func (mr *MockCliMockRecorder) CurrentContext() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CurrentContext", reflect.TypeOf((*MockCli)(nil).CurrentContext))
 }
 
+// CurrentVersion mocks base method.
+func (m *MockCli) CurrentVersion() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CurrentVersion")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// CurrentVersion indicates an expected call of CurrentVersion.
+func (mr *MockCliMockRecorder) CurrentVersion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CurrentVersion", reflect.TypeOf((*MockCli)(nil).CurrentVersion))
+}
+
 // DefaultVersion mocks base method.
 func (m *MockCli) DefaultVersion() string {
 	m.ctrl.T.Helper()

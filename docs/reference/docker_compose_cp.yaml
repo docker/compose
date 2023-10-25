@@ -10,7 +10,7 @@ options:
     - option: all
       value_type: bool
       default_value: "false"
-      description: Copy to all the containers of the service.
+      description: copy to all the containers of the service.
       deprecated: true
       hidden: true
       experimental: false
@@ -42,8 +42,18 @@ options:
     - option: index
       value_type: int
       default_value: "0"
-      description: |
-        Index of the container if there are multiple instances of a service .
+      description: index of the container if service has multiple replicas
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
       deprecated: false
       hidden: false
       experimental: false
@@ -51,6 +61,7 @@ options:
       kubernetes: false
       swarm: false
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false

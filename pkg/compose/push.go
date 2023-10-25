@@ -20,16 +20,16 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/distribution/distribution/v3/reference"
+	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -40,9 +40,9 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 	if options.Quiet {
 		return s.push(ctx, project, options)
 	}
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.push(ctx, project, options)
-	})
+	}, s.stdinfo(), "Pushing")
 }
 
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
@@ -117,7 +117,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, service types.Ser
 	for {
 		var jm jsonmessage.JSONMessage
 		if err := dec.Decode(&jm); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err
@@ -139,11 +139,15 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.W
 		return
 	}
 	var (
-		text   string
-		status = progress.Working
+		text    string
+		status  = progress.Working
+		total   int64
+		current int64
+		percent int
 	)
-	if jm.Status == "Pull complete" || jm.Status == "Already exists" {
+	if jm.Status == "Pushed" || jm.Status == "Already exists" {
 		status = progress.Done
+		percent = 100
 	}
 	if jm.Error != nil {
 		status = progress.Error
@@ -151,11 +155,22 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.W
 	}
 	if jm.Progress != nil {
 		text = jm.Progress.String()
+		if jm.Progress.Total != 0 {
+			current = jm.Progress.Current
+			total = jm.Progress.Total
+			if jm.Progress.Total > 0 {
+				percent = int(jm.Progress.Current * 100 / jm.Progress.Total)
+			}
+		}
 	}
+
 	w.Event(progress.Event{
 		ID:         fmt.Sprintf("Pushing %s: %s", prefix, jm.ID),
 		Text:       jm.Status,
 		Status:     status,
+		Current:    current,
+		Total:      total,
+		Percent:    percent,
 		StatusText: text,
 	})
 }

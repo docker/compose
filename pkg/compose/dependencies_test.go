@@ -19,32 +19,37 @@ package compose
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/utils"
 	testify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 )
 
-var project = types.Project{
-	Services: []types.ServiceConfig{
-		{
-			Name: "test1",
-			DependsOn: map[string]types.ServiceDependency{
-				"test2": {},
+func createTestProject() *types.Project {
+	return &types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name: "test1",
+				DependsOn: map[string]types.ServiceDependency{
+					"test2": {},
+				},
+			},
+			{
+				Name: "test2",
+				DependsOn: map[string]types.ServiceDependency{
+					"test3": {},
+				},
+			},
+			{
+				Name: "test3",
 			},
 		},
-		{
-			Name: "test2",
-			DependsOn: map[string]types.ServiceDependency{
-				"test3": {},
-			},
-		},
-		{
-			Name: "test3",
-		},
-	},
+	}
 }
 
 func TestTraversalWithMultipleParents(t *testing.T) {
@@ -97,7 +102,7 @@ func TestInDependencyUpCommandOrder(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var order []string
-	err := InDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+	err := InDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
 		order = append(order, service)
 		return nil
 	})
@@ -110,7 +115,7 @@ func TestInDependencyReverseDownCommandOrder(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var order []string
-	err := InReverseDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+	err := InReverseDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
 		order = append(order, service)
 		return nil
 	})
@@ -265,7 +270,7 @@ func TestBuildGraph(t *testing.T) {
 				Services: tC.services,
 			}
 
-			graph, err := NewGraph(project.Services, ServiceStopped)
+			graph, err := NewGraph(&project, ServiceStopped)
 			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
 
 			for k, vertex := range graph.Vertices {
@@ -294,4 +299,89 @@ func isVertexEqual(a, b Vertex) bool {
 		a.Service == b.Service &&
 		childrenEquality &&
 		parentEquality
+}
+
+func TestWith_RootNodesAndUp(t *testing.T) {
+	graph := &Graph{
+		lock:     sync.RWMutex{},
+		Vertices: map[string]*Vertex{},
+	}
+
+	/** graph topology:
+	           A   B
+		      / \ / \
+		     G   C   E
+		          \ /
+		           D
+		           |
+		           F
+	*/
+
+	graph.AddVertex("A", "A", 0)
+	graph.AddVertex("B", "B", 0)
+	graph.AddVertex("C", "C", 0)
+	graph.AddVertex("D", "D", 0)
+	graph.AddVertex("E", "E", 0)
+	graph.AddVertex("F", "F", 0)
+	graph.AddVertex("G", "G", 0)
+
+	_ = graph.AddEdge("C", "A")
+	_ = graph.AddEdge("C", "B")
+	_ = graph.AddEdge("E", "B")
+	_ = graph.AddEdge("D", "C")
+	_ = graph.AddEdge("D", "E")
+	_ = graph.AddEdge("F", "D")
+	_ = graph.AddEdge("G", "A")
+
+	tests := []struct {
+		name  string
+		nodes []string
+		want  []string
+	}{
+		{
+			name:  "whole graph",
+			nodes: []string{"A", "B"},
+			want:  []string{"A", "B", "C", "D", "E", "F", "G"},
+		},
+		{
+			name:  "only leaves",
+			nodes: []string{"F", "G"},
+			want:  []string{"F", "G"},
+		},
+		{
+			name:  "simple dependent",
+			nodes: []string{"D"},
+			want:  []string{"D", "F"},
+		},
+		{
+			name:  "diamond dependents",
+			nodes: []string{"B"},
+			want:  []string{"B", "C", "D", "E", "F"},
+		},
+		{
+			name:  "partial graph",
+			nodes: []string{"A"},
+			want:  []string{"A", "C", "D", "F", "G"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mx := sync.Mutex{}
+			expected := utils.Set[string]{}
+			expected.AddAll("C", "G", "D", "F")
+			var visited []string
+
+			gt := downDirectionTraversal(func(ctx context.Context, s string) error {
+				mx.Lock()
+				defer mx.Unlock()
+				visited = append(visited, s)
+				return nil
+			})
+			WithRootNodesAndDown(tt.nodes)(gt)
+			err := gt.visit(context.TODO(), graph)
+			assert.NilError(t, err)
+			sort.Strings(visited)
+			assert.DeepEqual(t, tt.want, visited)
+		})
+	}
 }

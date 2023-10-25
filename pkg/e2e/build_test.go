@@ -17,8 +17,11 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -29,100 +32,110 @@ import (
 )
 
 func TestLocalComposeBuild(t *testing.T) {
-	c := NewParallelCLI(t)
 
-	t.Run("build named and unnamed images", func(t *testing.T) {
-		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+	for _, env := range []string{"DOCKER_BUILDKIT=0", "DOCKER_BUILDKIT=1"} {
+		c := NewCLI(t, WithEnv(env))
 
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build")
+		t.Run(env+" build named and unnamed images", func(t *testing.T) {
+			// ensure local test run does not reuse previously build image
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 
-		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
-		c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
-		c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
-	})
+			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build")
 
-	t.Run("build with build-arg", func(t *testing.T) {
-		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+			res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+			c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
+			c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
+		})
 
-		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build", "--build-arg", "FOO=BAR")
+		t.Run(env+" build with build-arg", func(t *testing.T) {
+			// ensure local test run does not reuse previously build image
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 
-		res := c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
-		res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
-	})
+			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build", "--build-arg", "FOO=BAR")
 
-	t.Run("build with build-arg set by env", func(t *testing.T) {
-		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+			res := c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
+			res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
+		})
 
-		icmd.RunCmd(c.NewDockerComposeCmd(t,
-			"--project-directory",
-			"fixtures/build-test",
-			"build",
-			"--build-arg",
-			"FOO"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "FOO=BAR")
+		t.Run(env+" build with build-arg set by env", func(t *testing.T) {
+			// ensure local test run does not reuse previously build image
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
+
+			icmd.RunCmd(c.NewDockerComposeCmd(t,
+				"--project-directory",
+				"fixtures/build-test",
+				"build",
+				"--build-arg",
+				"FOO"),
+				func(cmd *icmd.Cmd) {
+					cmd.Env = append(cmd.Env, "FOO=BAR")
+				}).Assert(t, icmd.Success)
+
+			res := c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
+			res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
+		})
+
+		t.Run(env+" build with multiple build-args ", func(t *testing.T) {
+			// ensure local test run does not reuse previously build image
+			c.RunDockerOrExitError(t, "rmi", "-f", "multi-args-multiargs")
+			cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/multi-args", "build")
+
+			icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+				cmd.Env = append(cmd.Env, "DOCKER_BUILDKIT=0")
 			})
 
-		res := c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
-		res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
-	})
-
-	t.Run("build with multiple build-args ", func(t *testing.T) {
-		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "-f", "multi-args-multiargs")
-		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/multi-args", "build")
-
-		icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
-			cmd.Env = append(cmd.Env, "DOCKER_BUILDKIT=0")
+			res := c.RunDockerCmd(t, "image", "inspect", "multi-args-multiargs")
+			res.Assert(t, icmd.Expected{Out: `"RESULT": "SUCCESS"`})
 		})
 
-		res := c.RunDockerCmd(t, "image", "inspect", "multi-args-multiargs")
-		res.Assert(t, icmd.Expected{Out: `"RESULT": "SUCCESS"`})
-	})
+		t.Run(env+" build as part of up", func(t *testing.T) {
+			// ensure local test run does not reuse previously build image
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 
-	t.Run("build as part of up", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
+			t.Cleanup(func() {
+				c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
+			})
 
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
-		t.Cleanup(func() {
+			res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+			res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
+
+			output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
+			assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
+
+			c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
+			c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
+		})
+
+		t.Run(env+" no rebuild when up again", func(t *testing.T) {
+			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
+
+			assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"))
+		})
+
+		t.Run(env+" rebuild when up --build", func(t *testing.T) {
+			res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "up", "-d", "--build")
+
+			res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+			res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
+		})
+
+		t.Run(env+" build --push ignored for unnamed images", func(t *testing.T) {
+			res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "build", "--push", "nginx")
+			assert.Assert(t, !strings.Contains(res.Stdout(), "failed to push"), res.Stdout())
+		})
+
+		t.Run(env+" cleanup build project", func(t *testing.T) {
 			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
+			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")
+			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 		})
+	}
 
-		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
-		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
-
-		output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
-		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
-
-		c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
-		c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
-	})
-
-	t.Run("no rebuild when up again", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
-
-		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"), res.Stdout())
-	})
-
-	t.Run("rebuild when up --build", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "up", "-d", "--build")
-
-		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
-		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
-	})
-
-	t.Run("cleanup build project", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
-		c.RunDockerCmd(t, "rmi", "build-test-nginx")
-		c.RunDockerCmd(t, "rmi", "custom-nginx")
-	})
 }
 
 func TestBuildSSH(t *testing.T) {
@@ -163,7 +176,7 @@ func TestBuildSSH(t *testing.T) {
 			"wrong-ssh=./fixtures/build-test/ssh/fake_rsa")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 17,
-			Err:      "failed to solve: rpc error: code = Unknown desc = unset ssh forward key fake-ssh",
+			Err:      "unset ssh forward key fake-ssh",
 		})
 	})
 
@@ -225,7 +238,7 @@ func TestBuildImageDependencies(t *testing.T) {
 			cli.RunDockerComposeCmd(t, "down", "--rmi=all", "-t=0")
 			res := cli.RunDockerOrExitError(t, "image", "rm", "build-dependencies-service")
 			if res.Error != nil {
-				require.Contains(t, res.Stderr(), `Error: No such image: build-dependencies-service`)
+				require.Contains(t, res.Stderr(), `No such image: build-dependencies-service`)
 			}
 		}
 		resetState()
@@ -235,7 +248,7 @@ func TestBuildImageDependencies(t *testing.T) {
 		res := cli.RunDockerOrExitError(t, "image", "inspect", "build-dependencies-service")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "Error: No such image: build-dependencies-service",
+			Err:      "No such image: build-dependencies-service",
 		})
 
 		res = cli.RunDockerComposeCmd(t, "build")
@@ -252,12 +265,12 @@ func TestBuildImageDependencies(t *testing.T) {
 		res = cli.RunDockerOrExitError(t, "image", "inspect", "build-dependencies-service")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "Error: No such image: build-dependencies-service",
+			Err:      "No such image: build-dependencies-service",
 		})
 	}
 
 	t.Run("ClassicBuilder", func(t *testing.T) {
-		cli := NewParallelCLI(t, WithEnv(
+		cli := NewCLI(t, WithEnv(
 			"DOCKER_BUILDKIT=0",
 			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
 		))
@@ -265,7 +278,11 @@ func TestBuildImageDependencies(t *testing.T) {
 	})
 
 	t.Run("BuildKit", func(t *testing.T) {
-		t.Skip("See https://github.com/docker/compose/issues/9232")
+		cli := NewCLI(t, WithEnv(
+			"DOCKER_BUILDKIT=1",
+			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
+		))
+		doTest(t, cli)
 	})
 }
 
@@ -352,10 +369,21 @@ func TestBuildPrivileged(t *testing.T) {
 	})
 
 	t.Run("use build privileged mode to run insecure build command", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/privileged", "build")
-		assert.NilError(t, res.Error, res.Stderr())
-		res.Assert(t, icmd.Expected{Out: "CapEff:\t0000003fffffffff"})
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/privileged", "build")
+		capEffRe := regexp.MustCompile("CapEff:\t([0-9a-f]+)")
+		matches := capEffRe.FindStringSubmatch(res.Stdout())
+		assert.Equal(t, 2, len(matches), "Did not match CapEff in output, matches: %v", matches)
 
+		capEff, err := strconv.ParseUint(matches[1], 16, 64)
+		assert.NilError(t, err, "Parsing CapEff: %s", matches[1])
+
+		// NOTE: can't use constant from x/sys/unix or tests won't compile on macOS/Windows
+		// #define CAP_SYS_ADMIN        21
+		// https://github.com/torvalds/linux/blob/v6.1/include/uapi/linux/capability.h#L278
+		const capSysAdmin = 0x15
+		if capEff&capSysAdmin != capSysAdmin {
+			t.Fatalf("CapEff %s is missing CAP_SYS_ADMIN", matches[1])
+		}
 	})
 }
 
@@ -370,7 +398,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "this builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use multi-arch builder",
+			Err:      "the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit",
 		})
 	})
 
@@ -378,7 +406,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 17,
-			Err:      `multiple platforms feature is currently not supported for docker driver. Please switch to a different driver (eg. "docker buildx create --use")`,
+			Err:      `Multiple platforms feature is currently not supported for docker driver. Please switch to a different driver (eg. "docker buildx create --use")`,
 		})
 	})
 
@@ -386,8 +414,8 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
 			"-f", "fixtures/build-test/platforms/compose-service-platform-not-in-build-platforms.yaml", "build")
 		res.Assert(t, icmd.Expected{
-			ExitCode: 1,
-			Err:      `service.platform "linux/riscv64" should be part of the service.build.platforms: ["linux/amd64" "linux/arm64"]`,
+			ExitCode: 15,
+			Err:      `service.build.platforms MUST include service.platform "linux/riscv64"`,
 		})
 	})
 
@@ -398,7 +426,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      `DOCKER_DEFAULT_PLATFORM "windows/amd64" value should be part of the service.build.platforms: ["linux/amd64" "linux/arm64"]`,
+			Err:      `service "platforms" build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: windows/amd64`,
 		})
 	})
 
@@ -410,7 +438,34 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "this builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use builder supporting privileged mode",
+			Err:      "the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit",
+		})
+	})
+
+}
+
+func TestBuildBuilder(t *testing.T) {
+	c := NewParallelCLI(t)
+	builderName := "build-with-builder"
+	// declare builder
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap")
+	assert.NilError(t, result.Error)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/", "down")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", builderName)
+	})
+
+	t.Run("use specific builder to run build command", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test", "build", "--builder", builderName)
+		assert.NilError(t, res.Error, res.Stderr())
+	})
+
+	t.Run("error when using specific builder to run build command", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test", "build", "--builder", "unknown-builder")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      fmt.Sprintf(`no builder %q found`, "unknown-builder"),
 		})
 	})
 

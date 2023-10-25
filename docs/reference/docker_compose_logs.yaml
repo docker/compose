@@ -47,6 +47,7 @@ options:
       kubernetes: false
       swarm: false
     - option: tail
+      shorthand: "n"
       value_type: string
       default_value: all
       description: |
@@ -78,7 +79,19 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false

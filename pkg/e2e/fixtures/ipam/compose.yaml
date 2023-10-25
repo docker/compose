@@ -1,6 +1,7 @@
 services:
   foo:
     image: alpine
+    init: true
     entrypoint: ["sleep", "600"]
     networks:
       default:

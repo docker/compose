@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/distribution/distribution/v3/reference"
+	"github.com/distribution/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -107,14 +107,8 @@ func (p *ImagePruner) ImagesToPrune(ctx context.Context, opts ImagePruneOptions)
 			// removed from YAML)
 			shouldPrune = true
 		} else {
-			// only prune the image if it belongs to a known service for the
-			// project AND is either an implicitly-named, locally-built image
-			// or `--rmi=all` has been specified.
-			// TODO(milas): now that Compose labels the images it builds, this
-			// makes less sense; arguably, locally-built but explicitly-named
-			// images should be removed with `--rmi=local` as well.
-			service, err := p.project.GetService(img.Labels[api.ServiceLabel])
-			if err == nil && (opts.Mode == ImagePruneAll || service.Image == "") {
+			// only prune the image if it belongs to a known service for the project.
+			if _, err := p.project.GetService(img.Labels[api.ServiceLabel]); err == nil {
 				shouldPrune = true
 			}
 		}

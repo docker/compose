@@ -30,7 +30,6 @@ import (
 	"gotest.tools/v3/assert"
 
 	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/mocks"
 )
 
 const testProject = "testProject"
@@ -39,21 +38,23 @@ func TestKillAll(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	name := strings.ToLower(testProject)
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(name)),
+		Filters: filters.NewArgs(projectFilter(name), hasConfigHashLabel()),
 	}).Return(
 		[]moby.Container{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]moby.NetworkResource{
@@ -72,21 +73,23 @@ func TestKillSignal(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	api := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
+	api, cli := prepareMocks(mockCtrl)
 	tested := composeService{
 		dockerCli: cli,
 	}
-	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	name := strings.ToLower(testProject)
 	listOptions := moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName)),
+		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName), hasConfigHashLabel()),
 	}
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, listOptions).Return([]moby.Container{testContainer(serviceName, "123", false)}, nil)
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
 		Return(volume.ListResponse{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]moby.NetworkResource{
@@ -133,6 +136,7 @@ func anyCancellableContext() gomock.Matcher {
 func projectFilterListOpt(withOneOff bool) moby.ContainerListOptions {
 	filter := filters.NewArgs(
 		projectFilter(strings.ToLower(testProject)),
+		hasConfigHashLabel(),
 	)
 	if !withOneOff {
 		filter.Add("label", fmt.Sprintf("%s=False", compose.OneoffLabel))

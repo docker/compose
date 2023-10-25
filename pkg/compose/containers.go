@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -59,6 +60,7 @@ func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...st
 	if len(selectedServices) == 1 {
 		f = append(f, serviceFilter(selectedServices[0]))
 	}
+	f = append(f, hasConfigHashLabel())
 	switch oneOff {
 	case oneOffOnly:
 		f = append(f, oneOffFilter(true))
@@ -71,7 +73,9 @@ func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...st
 
 func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName string, oneOff oneOff, stopped bool, serviceName string, containerIndex int) (moby.Container, error) {
 	defaultFilters := getDefaultFilters(projectName, oneOff, serviceName)
-	defaultFilters = append(defaultFilters, containerNumberFilter(containerIndex))
+	if containerIndex > 0 {
+		defaultFilters = append(defaultFilters, containerNumberFilter(containerIndex))
+	}
 	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			defaultFilters...,
@@ -82,8 +86,16 @@ func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName 
 		return moby.Container{}, err
 	}
 	if len(containers) < 1 {
-		return moby.Container{}, fmt.Errorf("service %q is not running container #%d", serviceName, containerIndex)
+		if containerIndex > 0 {
+			return moby.Container{}, fmt.Errorf("service %q is not running container #%d", serviceName, containerIndex)
+		}
+		return moby.Container{}, fmt.Errorf("service %q is not running", serviceName)
 	}
+	sort.Slice(containers, func(i, j int) bool {
+		x, _ := strconv.Atoi(containers[i].Labels[api.ContainerNumberLabel])
+		y, _ := strconv.Atoi(containers[j].Labels[api.ContainerNumberLabel])
+		return x < y
+	})
 	container := containers[0]
 	return container, nil
 }
@@ -95,6 +107,12 @@ func isService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
 		service := c.Labels[api.ServiceLabel]
 		return utils.StringContains(services, service)
+	}
+}
+
+func isRunning() containerPredicate {
+	return func(c moby.Container) bool {
+		return c.State == "running"
 	}
 }
 
@@ -139,16 +157,5 @@ func (containers Containers) sorted() Containers {
 	sort.Slice(containers, func(i, j int) bool {
 		return getCanonicalContainerName(containers[i]) < getCanonicalContainerName(containers[j])
 	})
-	return containers
-}
-
-func (containers Containers) remove(id string) Containers {
-	for i, c := range containers {
-		if c.ID == id {
-			l := len(containers) - 1
-			containers[i] = containers[l]
-			return containers[:l]
-		}
-	}
 	return containers
 }

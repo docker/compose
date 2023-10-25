@@ -1,0 +1,77 @@
+command: docker compose alpha viz
+short: EXPERIMENTAL - Generate a graphviz graph from your compose file
+long: EXPERIMENTAL - Generate a graphviz graph from your compose file
+usage: docker compose alpha viz [OPTIONS]
+pname: docker compose alpha
+plink: docker_compose_alpha.yaml
+options:
+    - option: image
+      value_type: bool
+      default_value: "false"
+      description: Include service's image name in output graph
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: indentation-size
+      value_type: int
+      default_value: "1"
+      description: Number of tabs or spaces to use for indentation
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: networks
+      value_type: bool
+      default_value: "false"
+      description: Include service's attached networks in output graph
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: ports
+      value_type: bool
+      default_value: "false"
+      description: Include service's exposed ports in output graph
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: spaces
+      value_type: bool
+      default_value: "false"
+      description: |-
+        If given, space character ' ' will be used to indent,
+        otherwise tab character '\t' will be used
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+hidden: false
+experimental: false
+experimentalcli: true
+kubernetes: false
+swarm: false
+

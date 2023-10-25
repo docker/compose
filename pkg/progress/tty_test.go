@@ -41,23 +41,20 @@ func TestLineText(t *testing.T) {
 
 	lineWidth := len(fmt.Sprintf("%s %s", ev.ID, ev.Text))
 
-	out := lineText(ev, "", 50, lineWidth, true)
-	assert.Equal(t, out, "\x1b[37m . id Text Status                            0.0s\n\x1b[0m")
-
-	out = lineText(ev, "", 50, lineWidth, false)
-	assert.Equal(t, out, " . id Text Status                            0.0s\n")
+	out := tty().lineText(ev, "", 50, lineWidth, false)
+	assert.Equal(t, out, " . id Text Status                            \x1b[34m0.0s \x1b[0m\n")
 
 	ev.Status = Done
-	out = lineText(ev, "", 50, lineWidth, true)
-	assert.Equal(t, out, "\x1b[34m . id Text Status                            0.0s\n\x1b[0m")
+	out = tty().lineText(ev, "", 50, lineWidth, false)
+	assert.Equal(t, out, " \x1b[32m✔\x1b[0m id Text \x1b[32mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 
 	ev.Status = Error
-	out = lineText(ev, "", 50, lineWidth, true)
-	assert.Equal(t, out, "\x1b[31m . id Text Status                            0.0s\n\x1b[0m")
+	out = tty().lineText(ev, "", 50, lineWidth, false)
+	assert.Equal(t, out, " \x1b[31m\x1b[1m✘\x1b[0m id Text \x1b[31m\x1b[1mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 
 	ev.Status = Warning
-	out = lineText(ev, "", 50, lineWidth, true)
-	assert.Equal(t, out, "\x1b[33m . id Text Status                            0.0s\n\x1b[0m")
+	out = tty().lineText(ev, "", 50, lineWidth, false)
+	assert.Equal(t, out, " \x1b[33m\x1b[1m!\x1b[0m id Text \x1b[33m\x1b[1mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 }
 
 func TestLineTextSingleEvent(t *testing.T) {
@@ -75,8 +72,8 @@ func TestLineTextSingleEvent(t *testing.T) {
 
 	lineWidth := len(fmt.Sprintf("%s %s", ev.ID, ev.Text))
 
-	out := lineText(ev, "", 50, lineWidth, true)
-	assert.Equal(t, out, "\x1b[34m . id Text Status                            0.0s\n\x1b[0m")
+	out := tty().lineText(ev, "", 50, lineWidth, false)
+	assert.Equal(t, out, " \x1b[32m✔\x1b[0m id Text \x1b[32mStatus\x1b[0m                            \x1b[34m0.0s \x1b[0m\n")
 }
 
 func TestErrorEvent(t *testing.T) {
@@ -135,4 +132,14 @@ func TestWarningEvent(t *testing.T) {
 	event, ok = w.events[e.ID]
 	assert.Assert(t, ok)
 	assert.Assert(t, event.endTime.After(time.Now().Add(-10*time.Second)))
+}
+
+func tty() *ttyWriter {
+	tty := &ttyWriter{
+		eventIDs: []string{},
+		events:   map[string]Event{},
+		done:     make(chan bool),
+		mtx:      &sync.Mutex{},
+	}
+	return tty
 }

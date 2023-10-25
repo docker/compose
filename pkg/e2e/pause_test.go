@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -61,7 +62,9 @@ func TestPause(t *testing.T) {
 		_ = resp.Body.Close()
 	}
 	require.Error(t, err, "a should no longer respond")
-	require.True(t, err.(net.Error).Timeout(), "Error should have indicated a timeout")
+	var netErr net.Error
+	errors.As(err, &netErr)
+	require.True(t, netErr.Timeout(), "Error should have indicated a timeout")
 	HTTPGetWithRetry(t, urls["b"], http.StatusOK, 50*time.Millisecond, 5*time.Second)
 
 	// unpause a and verify that both containers work again
@@ -101,7 +104,7 @@ func TestPauseServiceAlreadyPaused(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	// launch a and wait for it to come up
-	cli.RunDockerComposeCmd(t, "up", "-d", "a")
+	cli.RunDockerComposeCmd(t, "up", "--wait", "a")
 	HTTPGetWithRetry(t, urlForService(t, cli, "a", 80), http.StatusOK, 50*time.Millisecond, 10*time.Second)
 
 	// pause a twice - first time should pass, second time fail
@@ -138,16 +141,14 @@ func urlForService(t testing.TB, cli *CLI, service string, targetPort int) strin
 func publishedPortForService(t testing.TB, cli *CLI, service string, targetPort int) int {
 	t.Helper()
 	res := cli.RunDockerComposeCmd(t, "ps", "--format=json", service)
-	var psOut []struct {
+	var svc struct {
 		Publishers []struct {
 			TargetPort    int
 			PublishedPort int
 		}
 	}
-	require.NoError(t, json.Unmarshal([]byte(res.Stdout()), &psOut),
+	require.NoError(t, json.Unmarshal([]byte(res.Stdout()), &svc),
 		"Failed to parse `%s` output", res.Cmd.String())
-	require.Len(t, psOut, 1, "Expected exactly 1 service")
-	svc := psOut[0]
 	for _, pp := range svc.Publishers {
 		if pp.TargetPort == targetPort {
 			return pp.PublishedPort

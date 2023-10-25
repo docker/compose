@@ -29,47 +29,34 @@ import (
 
 func TestNetworks(t *testing.T) {
 	// fixture is shared with TestNetworkModes and is not safe to run concurrently
-	c := NewCLI(t)
-
 	const projectName = "network-e2e"
+	c := NewCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME="+projectName,
+		"COMPOSE_FILE=./fixtures/network-test/compose.yaml",
+	))
 
-	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"-dbnet")
-		c.RunDockerOrExitError(t, "network", "rm", "microservices")
-	})
+	c.RunDockerComposeCmd(t, "down", "-t0", "-v")
 
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "up",
-			"-d")
-	})
+	c.RunDockerComposeCmd(t, "up", "-d")
 
-	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: `web`})
+	res := c.RunDockerComposeCmd(t, "ps")
+	res.Assert(t, icmd.Expected{Out: `web`})
 
-		endpoint := "http://localhost:80"
-		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
-		assert.Assert(t, strings.Contains(output, `"word":`))
+	endpoint := "http://localhost:80"
+	output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
+	assert.Assert(t, strings.Contains(output, `"word":`))
 
-		res = c.RunDockerCmd(t, "network", "ls")
-		res.Assert(t, icmd.Expected{Out: projectName + "_dbnet"})
-		res.Assert(t, icmd.Expected{Out: "microservices"})
-	})
+	res = c.RunDockerCmd(t, "network", "ls")
+	res.Assert(t, icmd.Expected{Out: projectName + "_dbnet"})
+	res.Assert(t, icmd.Expected{Out: "microservices"})
 
-	t.Run("port", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "port", "words", "8080")
-		res.Assert(t, icmd.Expected{Out: `0.0.0.0:8080`})
-	})
+	res = c.RunDockerComposeCmd(t, "port", "words", "8080")
+	res.Assert(t, icmd.Expected{Out: `0.0.0.0:8080`})
 
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	t.Run("check networks after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "network", "ls")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
-		assert.Assert(t, !strings.Contains(res.Combined(), "microservices"), res.Combined())
-	})
+	c.RunDockerComposeCmd(t, "down", "-t0", "-v")
+	res = c.RunDockerCmd(t, "network", "ls")
+	assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
+	assert.Assert(t, !strings.Contains(res.Combined(), "microservices"), res.Combined())
 }
 
 func TestNetworkAliases(t *testing.T) {

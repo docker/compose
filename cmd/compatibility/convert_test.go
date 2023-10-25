@@ -83,6 +83,11 @@ func Test_convert(t *testing.T) {
 			args: []string{"--project-directory", "", "ps"},
 			want: []string{"compose", "--project-directory", "", "ps"},
 		},
+		{
+			name: "compose as project name",
+			args: []string{"--project-name", "compose", "down", "--remove-orphans"},
+			want: []string{"compose", "--project-name", "compose", "down", "--remove-orphans"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

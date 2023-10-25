@@ -18,13 +18,16 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strconv"
 	"strings"
+	"time"
 
-	"github.com/docker/compose/v2/cmd/formatter"
+	xprogress "github.com/docker/buildx/util/progress"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -43,18 +46,19 @@ type upOptions struct {
 	noDeps             bool
 	cascadeStop        bool
 	exitCodeFrom       string
-	scale              []string
 	noColor            bool
 	noPrefix           bool
 	attachDependencies bool
 	attach             []string
+	noAttach           []string
 	timestamp          bool
 	wait               bool
+	waitTimeout        int
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) error {
 	if opts.noDeps {
-		err := withSelectedServicesOnly(project, services)
+		err := project.ForServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}
@@ -67,28 +71,13 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 		}
 	}
 
-	for _, scale := range opts.scale {
-		split := strings.Split(scale, "=")
-		if len(split) != 2 {
-			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
-		}
-		name := split[0]
-		replicas, err := strconv.Atoi(split[1])
-		if err != nil {
-			return err
-		}
-		err = setServiceScale(project, name, uint64(replicas))
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
+	build := buildOptions{ProjectOptions: p}
 	upCmd := &cobra.Command{
 		Use:   "up [OPTIONS] [SERVICE...]",
 		Short: "Create and start containers",
@@ -97,22 +86,25 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			create.timeChanged = cmd.Flags().Changed("timeout")
 			return validateFlags(&up, &create)
 		}),
-		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
-			create.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
+		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
+			create.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
 			if create.ignoreOrphans && create.removeOrphans {
-				return fmt.Errorf("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined")
+				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
 			}
-			return runUp(ctx, streams, backend, create, up, project, services)
+			if len(up.attach) != 0 && up.attachDependencies {
+				return errors.New("cannot combine --attach and --attach-dependencies")
+			}
+			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := upCmd.Flags()
 	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	flags.BoolVar(&create.Build, "build", false, "Build images before starting containers.")
-	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
-	flags.StringVar(&create.Pull, "pull", "missing", `Pull image before running ("always"|"missing"|"never")`)
+	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's policy.")
+	flags.StringVar(&create.Pull, "pull", "policy", `Pull image before running ("always"|"policy"|"never")`)
 	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
-	flags.StringArrayVar(&up.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
+	flags.StringArrayVar(&create.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output.")
 	flags.BoolVar(&up.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 	flags.BoolVar(&create.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
@@ -120,15 +112,17 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 	flags.BoolVar(&up.noStart, "no-start", false, "Don't start the services after creating them.")
 	flags.BoolVar(&up.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
 	flags.StringVar(&up.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
-	flags.IntVarP(&create.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
+	flags.IntVarP(&create.timeout, "timeout", "t", 0, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
 	flags.BoolVar(&up.timestamp, "timestamps", false, "Show timestamps.")
 	flags.BoolVar(&up.noDeps, "no-deps", false, "Don't start linked services.")
 	flags.BoolVar(&create.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
 	flags.BoolVarP(&create.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
-	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
 	flags.BoolVar(&create.quietPull, "quiet-pull", false, "Pull without printing progress information.")
-	flags.StringArrayVar(&up.attach, "attach", []string{}, "Attach to service output.")
+	flags.StringArrayVar(&up.attach, "attach", []string{}, "Restrict attaching to the specified services. Incompatible with --attach-dependencies.")
+	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services.")
+	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services.")
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
+	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration to wait for the project to be running|healthy.")
 
 	return upCmd
 }
@@ -158,35 +152,50 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
-func runUp(ctx context.Context, streams api.Streams, backend api.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
+func runUp(
+	ctx context.Context,
+	dockerCli command.Cli,
+	backend api.Service,
+	createOptions createOptions,
+	upOptions upOptions,
+	buildOptions buildOptions,
+	project *types.Project,
+	services []string,
+) error {
 	if len(project.Services) == 0 {
 		return fmt.Errorf("no service selected")
 	}
 
-	createOptions.Apply(project)
-
-	err := upOptions.apply(project, services)
+	err := createOptions.Apply(project)
 	if err != nil {
 		return err
 	}
 
-	var consumer api.LogConsumer
-	if !upOptions.Detach {
-		consumer = formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
+	err = upOptions.apply(project, services)
+	if err != nil {
+		return err
 	}
 
-	attachTo := services
-	if len(upOptions.attach) > 0 {
-		attachTo = upOptions.attach
-	}
-	if upOptions.attachDependencies {
-		attachTo = project.ServiceNames()
-	}
-	if len(attachTo) == 0 {
-		attachTo = project.ServiceNames()
+	var build *api.BuildOptions
+	// this check is technically redundant as createOptions::apply()
+	// already removed all the build sections
+	if !createOptions.noBuild {
+		if createOptions.quietPull {
+			buildOptions.Progress = xprogress.PrinterModeQuiet
+		}
+		// BuildOptions here is nested inside CreateOptions, so
+		// no service list is passed, it will implicitly pick all
+		// services being created, which includes any explicitly
+		// specified via "services" arg here as well as deps
+		bo, err := buildOptions.toAPIBuildOptions(nil)
+		if err != nil {
+			return err
+		}
+		build = &bo
 	}
 
 	create := api.CreateOptions{
+		Build:                build,
 		Services:             services,
 		RemoveOrphans:        createOptions.removeOrphans,
 		IgnoreOrphans:        createOptions.ignoreOrphans,
@@ -201,15 +210,52 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		return backend.Create(ctx, project, create)
 	}
 
+	var consumer api.LogConsumer
+	var attach []string
+	if !upOptions.Detach {
+		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
+
+		var attachSet utils.Set[string]
+		if len(upOptions.attach) != 0 {
+			// services are passed explicitly with --attach, verify they're valid and then use them as-is
+			attachSet = utils.NewSet(upOptions.attach...)
+			unexpectedSvcs := attachSet.Diff(utils.NewSet(project.ServiceNames()...))
+			if len(unexpectedSvcs) != 0 {
+				return fmt.Errorf("cannot attach to services not included in up: %s", strings.Join(unexpectedSvcs.Elements(), ", "))
+			}
+		} else {
+			// mark services being launched (and potentially their deps) for attach
+			// if they didn't opt-out via Compose YAML
+			attachSet = utils.NewSet[string]()
+			var dependencyOpt types.DependencyOption = types.IgnoreDependencies
+			if upOptions.attachDependencies {
+				dependencyOpt = types.IncludeDependencies
+			}
+			if err := project.WithServices(services, func(s types.ServiceConfig) error {
+				if s.Attach == nil || *s.Attach {
+					attachSet.Add(s.Name)
+				}
+				return nil
+			}, dependencyOpt); err != nil {
+				return err
+			}
+		}
+		// filter out any services that have been explicitly marked for ignore with `--no-attach`
+		attachSet.RemoveAll(upOptions.noAttach...)
+		attach = attachSet.Elements()
+	}
+
+	timeout := time.Duration(upOptions.waitTimeout) * time.Second
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
 			Project:      project,
 			Attach:       consumer,
-			AttachTo:     attachTo,
+			AttachTo:     attach,
 			ExitCodeFrom: upOptions.exitCodeFrom,
 			CascadeStop:  upOptions.cascadeStop,
 			Wait:         upOptions.wait,
+			WaitTimeout:  timeout,
 			Services:     services,
 		},
 	})

@@ -20,26 +20,30 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/buger/goterm"
+	"github.com/docker/go-units"
 	"github.com/morikuni/aec"
 )
 
 type ttyWriter struct {
-	out        io.Writer
-	events     map[string]Event
-	eventIDs   []string
-	repeated   bool
-	numLines   int
-	done       chan bool
-	mtx        *sync.Mutex
-	tailEvents []string
+	out             io.Writer
+	events          map[string]Event
+	eventIDs        []string
+	repeated        bool
+	numLines        int
+	done            chan bool
+	mtx             *sync.Mutex
+	tailEvents      []string
+	dryRun          bool
+	skipChildEvents bool
+	progressTitle   string
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -69,6 +73,10 @@ func (w *ttyWriter) Stop() {
 func (w *ttyWriter) Event(e Event) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
+	w.event(e)
+}
+
+func (w *ttyWriter) event(e Event) {
 	if !utils.StringContains(w.eventIDs, e.ID) {
 		w.eventIDs = append(w.eventIDs, e.ID)
 	}
@@ -76,13 +84,21 @@ func (w *ttyWriter) Event(e Event) {
 		last := w.events[e.ID]
 		switch e.Status {
 		case Done, Error, Warning:
-			if last.Status != e.Status {
+			if last.endTime.IsZero() {
 				last.stop()
+			}
+		case Working:
+			if !last.endTime.IsZero() {
+				// already done, don't overwrite
+				return
 			}
 		}
 		last.Status = e.Status
 		last.Text = e.Text
 		last.StatusText = e.StatusText
+		last.Total = e.Total
+		last.Current = e.Current
+		last.Percent = e.Percent
 		// allow set/unset of parent, but not swapping otherwise prompt is flickering
 		if last.ParentID == "" || e.ParentID == "" {
 			last.ParentID = e.ParentID
@@ -99,15 +115,21 @@ func (w *ttyWriter) Event(e Event) {
 }
 
 func (w *ttyWriter) Events(events []Event) {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
 	for _, e := range events {
-		w.Event(e)
+		w.event(e)
 	}
 }
 
 func (w *ttyWriter) TailMsgf(msg string, args ...interface{}) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	w.tailEvents = append(w.tailEvents, fmt.Sprintf(msg, args...))
+	msgWithPrefix := msg
+	if w.dryRun {
+		msgWithPrefix = strings.TrimSpace(api.DRYRUN_PREFIX + msg)
+	}
+	w.tailEvents = append(w.tailEvents, fmt.Sprintf(msgWithPrefix, args...))
 }
 
 func (w *ttyWriter) printTailEvents() {
@@ -118,7 +140,7 @@ func (w *ttyWriter) printTailEvents() {
 	}
 }
 
-func (w *ttyWriter) print() {
+func (w *ttyWriter) print() { //nolint:gocyclo
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	if len(w.eventIDs) == 0 {
@@ -139,9 +161,9 @@ func (w *ttyWriter) print() {
 	fmt.Fprint(w.out, aec.Hide)
 	defer fmt.Fprint(w.out, aec.Show)
 
-	firstLine := fmt.Sprintf("[+] Running %d/%d", numDone(w.events), w.numLines)
+	firstLine := fmt.Sprintf("[+] %s %d/%d", w.progressTitle, numDone(w.events), w.numLines)
 	if w.numLines != 0 && numDone(w.events) == w.numLines {
-		firstLine = aec.Apply(firstLine, aec.BlueF)
+		firstLine = DoneColor(firstLine)
 	}
 	fmt.Fprintln(w.out, firstLine)
 
@@ -157,29 +179,40 @@ func (w *ttyWriter) print() {
 		}
 	}
 
+	if len(w.eventIDs) > goterm.Height()-2 {
+		w.skipChildEvents = true
+	}
 	numLines := 0
 	for _, v := range w.eventIDs {
 		event := w.events[v]
 		if event.ParentID != "" {
 			continue
 		}
-		line := lineText(event, "", terminalWidth, statusPadding, runtime.GOOS != "windows")
+		line := w.lineText(event, "", terminalWidth, statusPadding, w.dryRun)
 		fmt.Fprint(w.out, line)
 		numLines++
 		for _, v := range w.eventIDs {
 			ev := w.events[v]
 			if ev.ParentID == event.ID {
-				line := lineText(ev, "  ", terminalWidth, statusPadding, runtime.GOOS != "windows")
+				if w.skipChildEvents {
+					continue
+				}
+				line := w.lineText(ev, "  ", terminalWidth, statusPadding, w.dryRun)
 				fmt.Fprint(w.out, line)
 				numLines++
 			}
 		}
 	}
-
+	for i := numLines; i < w.numLines; i++ {
+		if numLines < goterm.Height()-2 {
+			fmt.Fprintln(w.out, strings.Repeat(" ", terminalWidth))
+			numLines++
+		}
+	}
 	w.numLines = numLines
 }
 
-func lineText(event Event, pad string, terminalWidth, statusPadding int, color bool) string {
+func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPadding int, dryRun bool) string {
 	endTime := time.Now()
 	if event.Status != Working {
 		endTime = event.startTime
@@ -187,10 +220,40 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 			endTime = event.endTime
 		}
 	}
+	prefix := ""
+	if dryRun {
+		prefix = PrefixColor(api.DRYRUN_PREFIX)
+	}
 
 	elapsed := endTime.Sub(event.startTime).Seconds()
 
-	textLen := len(fmt.Sprintf("%s %s", event.ID, event.Text))
+	var (
+		total      int64
+		current    int64
+		completion []string
+	)
+
+	for _, v := range w.eventIDs {
+		ev := w.events[v]
+		if ev.ParentID == event.ID {
+			total += ev.Total
+			current += ev.Current
+			completion = append(completion, percentChars[(len(percentChars)-1)*ev.Percent/100])
+		}
+	}
+
+	var txt string
+	if len(completion) > 0 {
+		txt = fmt.Sprintf("%s %s [%s] %7s/%-7s %s",
+			event.ID,
+			CountColor(fmt.Sprintf("%d layers", len(completion))),
+			SuccessColor(strings.Join(completion, "")),
+			units.HumanSize(float64(current)), units.HumanSize(float64(total)),
+			event.Text)
+	} else {
+		txt = fmt.Sprintf("%s %s", event.ID, event.Text)
+	}
+	textLen := len(txt)
 	padding := statusPadding - textLen
 	if padding < 0 {
 		padding = 0
@@ -203,30 +266,16 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 	if maxStatusLen > 0 && len(status) > maxStatusLen {
 		status = status[:maxStatusLen] + "..."
 	}
-	text := fmt.Sprintf("%s %s %s %s%s %s",
+	text := fmt.Sprintf("%s %s%s %s%s %s",
 		pad,
-		event.spinner.String(),
-		event.ID,
-		event.Text,
+		event.Spinner(),
+		prefix,
+		txt,
 		strings.Repeat(" ", padding),
-		status,
+		event.Status.colorFn()(status),
 	)
-	timer := fmt.Sprintf("%.1fs\n", elapsed)
-	o := align(text, timer, terminalWidth)
-
-	if color {
-		color := aec.WhiteF
-		if event.Status == Done {
-			color = aec.BlueF
-		}
-		if event.Status == Error {
-			color = aec.RedF
-		}
-		if event.Status == Warning {
-			color = aec.YellowF
-		}
-		return aec.Apply(o, color)
-	}
+	timer := fmt.Sprintf("%.1fs ", elapsed)
+	o := align(text, TimerColor(timer), terminalWidth)
 
 	return o
 }
@@ -234,7 +283,7 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 func numDone(events map[string]Event) int {
 	i := 0
 	for _, e := range events {
-		if e.Status == Done {
+		if e.Status != Working {
 			i++
 		}
 	}
@@ -242,5 +291,36 @@ func numDone(events map[string]Event) int {
 }
 
 func align(l, r string, w int) string {
-	return fmt.Sprintf("%-[2]*[1]s %[3]s", l, w-len(r)-1, r)
+	ll := lenAnsi(l)
+	lr := lenAnsi(r)
+	pad := ""
+	count := w - ll - lr
+	if count > 0 {
+		pad = strings.Repeat(" ", count)
+	}
+	return fmt.Sprintf("%s%s%s\n", l, pad, r)
 }
+
+// lenAnsi count of user-perceived characters in ANSI string.
+func lenAnsi(s string) int {
+	length := 0
+	ansiCode := false
+	for _, r := range s {
+		if r == '\x1b' {
+			ansiCode = true
+			continue
+		}
+		if ansiCode && r == 'm' {
+			ansiCode = false
+			continue
+		}
+		if !ansiCode {
+			length++
+		}
+	}
+	return length
+}
+
+var (
+	percentChars = strings.Split("⠀⡀⣀⣄⣤⣦⣶⣷⣿", "")
+)

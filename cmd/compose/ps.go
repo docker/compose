@@ -18,23 +18,19 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/pkg/utils"
-	"github.com/docker/docker/api/types"
-
-	formatter2 "github.com/docker/cli/cli/command/formatter"
-	"github.com/docker/go-units"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
+
+	"github.com/docker/cli/cli/command"
+	cliformatter "github.com/docker/cli/cli/command/formatter"
+	cliflags "github.com/docker/cli/cli/flags"
+	"github.com/spf13/cobra"
 )
 
 type psOptions struct {
@@ -45,6 +41,7 @@ type psOptions struct {
 	Services bool
 	Filter   string
 	Status   []string
+	noTrunc  bool
 }
 
 func (p *psOptions) parseFilter() error {
@@ -66,7 +63,7 @@ func (p *psOptions) parseFilter() error {
 	return nil
 }
 
-func psCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := psOptions{
 		ProjectOptions: p,
 	}
@@ -77,22 +74,23 @@ func psCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			return opts.parseFilter()
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPs(ctx, streams, backend, args, opts)
+			return runPs(ctx, dockerCli, backend, args, opts)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := psCmd.Flags()
-	flags.StringVar(&opts.Format, "format", "table", "Format the output. Values: [table | json]")
+	flags.StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
 	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property (supported filters: status).")
 	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	flags.BoolVar(&opts.Services, "services", false, "Display services")
 	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
+	flags.BoolVar(&opts.noTrunc, "no-trunc", false, "Don't truncate output")
 	return psCmd
 }
 
-func runPs(ctx context.Context, streams api.Streams, backend api.Service, services []string, opts psOptions) error {
-	project, name, err := opts.projectOrName(services...)
+func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, opts psOptions) error {
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}
@@ -125,38 +123,33 @@ func runPs(ctx context.Context, streams api.Streams, backend api.Service, servic
 
 	if opts.Quiet {
 		for _, c := range containers {
-			fmt.Fprintln(streams.Out(), c.ID)
+			fmt.Fprintln(dockerCli.Out(), c.ID)
 		}
 		return nil
 	}
 
 	if opts.Services {
 		services := []string{}
-		for _, s := range containers {
-			if !utils.StringContains(services, s.Service) {
-				services = append(services, s.Service)
+		for _, c := range containers {
+			s := c.Service
+			if !utils.StringContains(services, s) {
+				services = append(services, s)
 			}
 		}
-		fmt.Fprintln(streams.Out(), strings.Join(services, "\n"))
+		fmt.Fprintln(dockerCli.Out(), strings.Join(services, "\n"))
 		return nil
 	}
 
-	return formatter.Print(containers, opts.Format, streams.Out(),
-		writer(containers),
-		"NAME", "IMAGE", "COMMAND", "SERVICE", "CREATED", "STATUS", "PORTS")
-}
-
-func writer(containers []api.ContainerSummary) func(w io.Writer) {
-	return func(w io.Writer) {
-		for _, container := range containers {
-			ports := displayablePorts(container)
-			createdAt := time.Unix(container.Created, 0)
-			created := units.HumanDuration(time.Now().UTC().Sub(createdAt)) + " ago"
-			status := container.Status
-			command := formatter2.Ellipsis(container.Command, 20)
-			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", container.Name, container.Image, strconv.Quote(command), container.Service, created, status, ports)
-		}
+	if opts.Format == "" {
+		opts.Format = dockerCli.ConfigFile().PsFormat
 	}
+
+	containerCtx := cliformatter.Context{
+		Output: dockerCli.Out(),
+		Format: formatter.NewContainerFormat(opts.Format, opts.Quiet, false),
+		Trunc:  !opts.noTrunc,
+	}
+	return formatter.ContainerWrite(containerCtx, containers)
 }
 
 func filterByStatus(containers []api.ContainerSummary, statuses []string) []api.ContainerSummary {
@@ -176,22 +169,4 @@ func hasStatus(c api.ContainerSummary, statuses []string) bool {
 		}
 	}
 	return false
-}
-
-func displayablePorts(c api.ContainerSummary) string {
-	if c.Publishers == nil {
-		return ""
-	}
-
-	ports := make([]types.Port, len(c.Publishers))
-	for i, pub := range c.Publishers {
-		ports[i] = types.Port{
-			IP:          pub.URL,
-			PrivatePort: uint16(pub.TargetPort),
-			PublicPort:  uint16(pub.PublishedPort),
-			Type:        pub.Protocol,
-		}
-	}
-
-	return formatter2.DisplayablePorts(ports)
 }

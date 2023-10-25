@@ -50,19 +50,19 @@ func (mr *MockServiceMockRecorder) Build(ctx, project, options interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Build", reflect.TypeOf((*MockService)(nil).Build), ctx, project, options)
 }
 
-// Convert mocks base method.
-func (m *MockService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
+// Config mocks base method.
+func (m *MockService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Convert", ctx, project, options)
+	ret := m.ctrl.Call(m, "Config", ctx, project, options)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Convert indicates an expected call of Convert.
-func (mr *MockServiceMockRecorder) Convert(ctx, project, options interface{}) *gomock.Call {
+// Config indicates an expected call of Config.
+func (mr *MockServiceMockRecorder) Config(ctx, project, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Convert", reflect.TypeOf((*MockService)(nil).Convert), ctx, project, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockService)(nil).Config), ctx, project, options)
 }
 
 // Copy mocks base method.
@@ -105,6 +105,21 @@ func (m *MockService) Down(ctx context.Context, projectName string, options api.
 func (mr *MockServiceMockRecorder) Down(ctx, projectName, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Down", reflect.TypeOf((*MockService)(nil).Down), ctx, projectName, options)
+}
+
+// DryRunMode mocks base method.
+func (m *MockService) DryRunMode(ctx context.Context, dryRun bool) (context.Context, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DryRunMode", ctx, dryRun)
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DryRunMode indicates an expected call of DryRunMode.
+func (mr *MockServiceMockRecorder) DryRunMode(ctx, dryRun interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DryRunMode", reflect.TypeOf((*MockService)(nil).DryRunMode), ctx, dryRun)
 }
 
 // Events mocks base method.
@@ -251,6 +266,20 @@ func (mr *MockServiceMockRecorder) Ps(ctx, projectName, options interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ps", reflect.TypeOf((*MockService)(nil).Ps), ctx, projectName, options)
 }
 
+// Publish mocks base method.
+func (m *MockService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Publish", ctx, project, repository, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Publish indicates an expected call of Publish.
+func (mr *MockServiceMockRecorder) Publish(ctx, project, repository, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockService)(nil).Publish), ctx, project, repository, options)
+}
+
 // Pull mocks base method.
 func (m *MockService) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
 	m.ctrl.T.Helper()
@@ -322,6 +351,20 @@ func (mr *MockServiceMockRecorder) RunOneOffContainer(ctx, project, opts interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunOneOffContainer", reflect.TypeOf((*MockService)(nil).RunOneOffContainer), ctx, project, opts)
 }
 
+// Scale mocks base method.
+func (m *MockService) Scale(ctx context.Context, project *types.Project, options api.ScaleOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Scale", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Scale indicates an expected call of Scale.
+func (mr *MockServiceMockRecorder) Scale(ctx, project, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scale", reflect.TypeOf((*MockService)(nil).Scale), ctx, project, options)
+}
+
 // Start mocks base method.
 func (m *MockService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	m.ctrl.T.Helper()
@@ -391,6 +434,50 @@ func (m *MockService) Up(ctx context.Context, project *types.Project, options ap
 func (mr *MockServiceMockRecorder) Up(ctx, project, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Up", reflect.TypeOf((*MockService)(nil).Up), ctx, project, options)
+}
+
+// Viz mocks base method.
+func (m *MockService) Viz(ctx context.Context, project *types.Project, options api.VizOptions) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Viz", ctx, project, options)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Viz indicates an expected call of Viz.
+func (mr *MockServiceMockRecorder) Viz(ctx, project, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Viz", reflect.TypeOf((*MockService)(nil).Viz), ctx, project, options)
+}
+
+// Wait mocks base method.
+func (m *MockService) Wait(ctx context.Context, projectName string, options api.WaitOptions) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Wait", ctx, projectName, options)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Wait indicates an expected call of Wait.
+func (mr *MockServiceMockRecorder) Wait(ctx, projectName, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockService)(nil).Wait), ctx, projectName, options)
+}
+
+// Watch mocks base method.
+func (m *MockService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Watch", ctx, project, services, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Watch indicates an expected call of Watch.
+func (mr *MockServiceMockRecorder) Watch(ctx, project, services, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockService)(nil).Watch), ctx, project, services, options)
 }
 
 // MockLogConsumer is a mock of LogConsumer interface.

@@ -3,7 +3,7 @@ short: Run a one-off command on a service.
 long: |-
     Runs a one-time command against a service.
 
-    the following command starts the `web` service and runs `bash` as its command:
+    The following command starts the `web` service and runs `bash` as its command:
 
     ```console
     $ docker compose run web bash
@@ -62,6 +62,24 @@ options:
       value_type: bool
       default_value: "false"
       description: Build image before starting container.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: cap-add
+      value_type: list
+      description: Add Linux capabilities
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: cap-drop
+      value_type: list
+      description: Drop Linux capabilities
       deprecated: false
       hidden: false
       experimental: false
@@ -172,6 +190,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: remove-orphans
+      value_type: bool
+      default_value: "false"
+      description: Remove containers for services not defined in the Compose file.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: rm
       value_type: bool
       default_value: "false"
@@ -246,7 +274,19 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
+hidden: false
 experimental: false
 experimentalcli: false
 kubernetes: false

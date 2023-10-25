@@ -23,6 +23,7 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/cmdtrace"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/compatibility"
@@ -38,14 +39,20 @@ func pluginMain() {
 		cmd := commands.RootCommand(dockerCli, serviceProxy)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+			// initialize the dockerCli instance
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
+			// TODO(milas): add an env var to enable logging from the
+			// OTel components for debugging purposes
+			_ = cmdtrace.Setup(cmd, dockerCli, os.Args[1:])
+
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
 			}
 			return nil
 		}
+
 		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 			return dockercli.StatusError{
 				StatusCode: compose.CommandSyntaxFailure.ExitCode,

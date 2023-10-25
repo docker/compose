@@ -16,20 +16,35 @@
 
 package progress
 
-import "time"
+import (
+	"time"
+)
 
 // EventStatus indicates the status of an action
 type EventStatus int
+
+func (s EventStatus) colorFn() colorFunc {
+	switch s {
+	case Done:
+		return SuccessColor
+	case Warning:
+		return WarningColor
+	case Error:
+		return ErrorColor
+	default:
+		return nocolor
+	}
+}
 
 const (
 	// Working means that the current task is working
 	Working EventStatus = iota
 	// Done means that the current task is done
 	Done
-	// Error means that the current task has errored
-	Error
 	// Warning means that the current task has warning
 	Warning
+	// Error means that the current task has errored
+	Error
 )
 
 // Event represents a progress event.
@@ -39,7 +54,10 @@ type Event struct {
 	Text       string
 	Status     EventStatus
 	StatusText string
+	Current    int64
+	Percent    int
 
+	Total     int64
 	startTime time.Time
 	endTime   time.Time
 	spinner   *spinner
@@ -135,6 +153,15 @@ func RemovedEvent(id string) Event {
 	return NewEvent(id, Done, "Removed")
 }
 
+// SkippedEvent creates a new Skipped Event
+func SkippedEvent(id string, reason string) Event {
+	return Event{
+		ID:         id,
+		Status:     Warning,
+		StatusText: "Skipped: " + reason,
+	}
+}
+
 // NewEvent new event
 func NewEvent(id string, status EventStatus, statusText string) Event {
 	return Event{
@@ -147,4 +174,23 @@ func NewEvent(id string, status EventStatus, statusText string) Event {
 func (e *Event) stop() {
 	e.endTime = time.Now()
 	e.spinner.Stop()
+}
+
+var (
+	spinnerDone    = "✔"
+	spinnerWarning = "!"
+	spinnerError   = "✘"
+)
+
+func (e *Event) Spinner() any {
+	switch e.Status {
+	case Done:
+		return SuccessColor(spinnerDone)
+	case Warning:
+		return WarningColor(spinnerWarning)
+	case Error:
+		return ErrorColor(spinnerError)
+	default:
+		return e.spinner.String()
+	}
 }

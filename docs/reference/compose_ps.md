@@ -5,14 +5,16 @@ List containers
 
 ### Options
 
-| Name                  | Type          | Default | Description                                                                                                   |
-|:----------------------|:--------------|:--------|:--------------------------------------------------------------------------------------------------------------|
-| `-a`, `--all`         |               |         | Show all stopped containers (including those created by the run command)                                      |
-| [`--filter`](#filter) | `string`      |         | Filter services by a property (supported filters: status).                                                    |
-| [`--format`](#format) | `string`      | `table` | Format the output. Values: [table \| json]                                                                    |
-| `-q`, `--quiet`       |               |         | Only display IDs                                                                                              |
-| `--services`          |               |         | Display services                                                                                              |
-| [`--status`](#status) | `stringArray` |         | Filter services by status. Values: [paused \| restarting \| removing \| running \| dead \| created \| exited] |
+| Name                  | Type          | Default | Description                                                                                                                                                                                                                                                                                                                                                                                                                          |
+|:----------------------|:--------------|:--------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-a`, `--all`         |               |         | Show all stopped containers (including those created by the run command)                                                                                                                                                                                                                                                                                                                                                             |
+| `--dry-run`           |               |         | Execute command in dry run mode                                                                                                                                                                                                                                                                                                                                                                                                      |
+| [`--filter`](#filter) | `string`      |         | Filter services by a property (supported filters: status).                                                                                                                                                                                                                                                                                                                                                                           |
+| [`--format`](#format) | `string`      | `table` | Format output using a custom template:<br>'table':            Print output in table format with column headers (default)<br>'table TEMPLATE':   Print output in table format using the given Go template<br>'json':             Print in JSON format<br>'TEMPLATE':         Print output using the given Go template.<br>Refer to https://docs.docker.com/go/formatting/ for more information about formatting output with templates |
+| `--no-trunc`          |               |         | Don't truncate output                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `-q`, `--quiet`       |               |         | Only display IDs                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `--services`          |               |         | Display services                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| [`--status`](#status) | `stringArray` |         | Filter services by status. Values: [paused \| restarting \| removing \| running \| dead \| created \| exited]                                                                                                                                                                                                                                                                                                                        |
 
 
 <!---MARKER_GEN_END-->
@@ -20,13 +22,20 @@ List containers
 ## Description
 
 Lists containers for a Compose project, with current status and exposed ports.
-By default, both running and stopped containers are shown:
 
 ```console
 $ docker compose ps
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
-example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->80/tcp
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
+```
+
+By default, only running containers are shown. `--all` flag can be used to include stopped containers
+
+```console
+$ docker compose ps --all
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
+example-bar-1   alpine    "/entrypoint.…"   bar        4 seconds ago   exited (0)
 ```
 
 ## Examples
@@ -89,12 +98,12 @@ to show only containers that are running or only containers that have exited:
 
 ```console
 $ docker compose ps --status=running
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->80/tcp
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
 
 $ docker compose ps --status=exited
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-bar-1   alpine    "/entrypoint.…"   bar        4 seconds ago   exited (0)
 ```
 
 ### <a name="filter"></a> Filter containers by status (--filter)
@@ -105,12 +114,8 @@ this time using the `--filter` flag:
 
 ```console
 $ docker compose ps --filter status=running
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->80/tcp
-
-$ docker compose ps --filter status=running
-NAME           COMMAND                  SERVICE   STATUS       PORTS
-example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
+NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS          PORTS
+example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
 ```
 
 The `docker compose ps` command currently only supports the `--filter status=<status>`

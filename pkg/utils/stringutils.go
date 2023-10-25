@@ -33,6 +33,10 @@ func StringContains(array []string, needle string) bool {
 
 // StringToBool converts a string to a boolean ignoring errors
 func StringToBool(s string) bool {
-	b, _ := strconv.ParseBool(strings.ToLower(strings.TrimSpace(s)))
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "y" {
+		return true
+	}
+	b, _ := strconv.ParseBool(s)
 	return b
 }

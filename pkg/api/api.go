@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 // Service manages a compose project
@@ -51,8 +52,8 @@ type Service interface {
 	Ps(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context, options ListOptions) ([]Stack, error)
-	// Convert translate compose model into backend's native format
-	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
+	// Config executes the equivalent to a `compose config`
+	Config(ctx context.Context, project *types.Project, options ConfigOptions) ([]byte, error)
 	// Kill executes the equivalent to a `compose kill`
 	Kill(ctx context.Context, projectName string, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
@@ -73,16 +74,57 @@ type Service interface {
 	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
 	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
+	// Publish executes the equivalent to a `compose publish`
+	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 	// MaxConcurrency defines upper limit for concurrent operations against engine API
 	MaxConcurrency(parallel int)
+	// DryRunMode defines if dry run applies to the command
+	DryRunMode(ctx context.Context, dryRun bool) (context.Context, error)
+	// Watch services' development context and sync/notify/rebuild/restart on changes
+	Watch(ctx context.Context, project *types.Project, services []string, options WatchOptions) error
+	// Viz generates a graphviz graph of the project services
+	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
+	// Wait blocks until at least one of the services' container exits
+	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
+	// Scale manages numbers of container instances running per service
+	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
+}
+
+type ScaleOptions struct {
+	Services []string
+}
+
+type WaitOptions struct {
+	// Services passed in the command line to be waited
+	Services []string
+	// Executes a down when a container exits
+	DownProjectOnContainerExit bool
+}
+
+type VizOptions struct {
+	// IncludeNetworks if true, network names a container is attached to should appear in the graph node
+	IncludeNetworks bool
+	// IncludePorts if true, ports a container exposes should appear in the graph node
+	IncludePorts bool
+	// IncludeImageName if true, name of the image used to create a container should appear in the graph node
+	IncludeImageName bool
+	// Indentation string to be used to indent graphviz code, e.g. "\t", "    "
+	Indentation string
+}
+
+// WatchOptions group options of the Watch API
+type WatchOptions struct {
+	Build BuildOptions
 }
 
 // BuildOptions group options of the Build API
 type BuildOptions struct {
 	// Pull always attempt to pull a newer version of the image
 	Pull bool
+	// Push pushes service images
+	Push bool
 	// Progress set type of progress output ("auto", "plain", "tty")
 	Progress string
 	// Args set build-time args
@@ -95,10 +137,46 @@ type BuildOptions struct {
 	Services []string
 	// Ssh authentications passed in the command line
 	SSHs []types.SSHKey
+	// Memory limit for the build container
+	Memory int64
+	// Builder name passed in the command line
+	Builder string
+}
+
+// Apply mutates project according to build options
+func (o BuildOptions) Apply(project *types.Project) error {
+	platform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	for i, service := range project.Services {
+		if service.Image == "" && service.Build == nil {
+			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+		}
+
+		if service.Build == nil {
+			continue
+		}
+		if platform != "" {
+			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, platform) {
+				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", service.Name, platform)
+			}
+			service.Platform = platform
+		}
+		if service.Platform != "" {
+			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, service.Platform) {
+				return fmt.Errorf("service %q build configuration does not support platform: %s", service.Name, service.Platform)
+			}
+		}
+
+		service.Build.Pull = service.Build.Pull || o.Pull
+		service.Build.NoCache = service.Build.NoCache || o.NoCache
+
+		project.Services[i] = service
+	}
+	return nil
 }
 
 // CreateOptions group options of the Create API
 type CreateOptions struct {
+	Build *BuildOptions
 	// Services defines the services user interacts with
 	Services []string
 	// Remove legacy containers for services that are not defined in the project
@@ -130,7 +208,8 @@ type StartOptions struct {
 	// ExitCodeFrom return exit code from specified service
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
-	Wait bool
+	Wait        bool
+	WaitTimeout time.Duration
 	// Services passed in the command line to be started
 	Services []string
 }
@@ -143,6 +222,8 @@ type RestartOptions struct {
 	Timeout *time.Duration
 	// Services passed in the command line to be restarted
 	Services []string
+	// NoDeps ignores services dependencies
+	NoDeps bool
 }
 
 // StopOptions group options of the Stop API
@@ -173,10 +254,12 @@ type DownOptions struct {
 	Images string
 	// Volumes remove volumes, both declared in the `volumes` section and anonymous ones
 	Volumes bool
+	// Services passed in the command line to be stopped
+	Services []string
 }
 
-// ConvertOptions group options of the Convert API
-type ConvertOptions struct {
+// ConfigOptions group options of the Config API
+type ConfigOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
 	// Output defines the path to save the application model
@@ -193,8 +276,9 @@ type PushOptions struct {
 
 // PullOptions group options of the Pull API
 type PullOptions struct {
-	Quiet          bool
-	IgnoreFailures bool
+	Quiet           bool
+	IgnoreFailures  bool
+	IgnoreBuildable bool
 }
 
 // ImagesOptions group options of the Images API
@@ -218,8 +302,8 @@ type KillOptions struct {
 type RemoveOptions struct {
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project *types.Project
-	// DryRun just list removable resources
-	DryRun bool
+	// Stop option passed in the command line
+	Stop bool
 	// Volumes remove anonymous volumes
 	Volumes bool
 	// Force don't ask to confirm removal
@@ -230,6 +314,7 @@ type RemoveOptions struct {
 
 // RunOptions group options of the Run API
 type RunOptions struct {
+	Build *BuildOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
 	Name              string
@@ -243,6 +328,8 @@ type RunOptions struct {
 	WorkingDir        string
 	User              string
 	Environment       []string
+	CapAdd            []string
+	CapDrop           []string
 	Labels            types.Labels
 	Privileged        bool
 	UseNetworkAliases bool
@@ -272,6 +359,10 @@ type Event struct {
 type PortOptions struct {
 	Protocol string
 	Index    int
+}
+
+// PublishOptions group options of the Publish API
+type PublishOptions struct {
 }
 
 func (e Event) String() string {
@@ -316,18 +407,25 @@ type PortPublisher struct {
 
 // ContainerSummary hold high-level description of a container
 type ContainerSummary struct {
-	ID         string
-	Name       string
-	Image      any
-	Command    string
-	Project    string
-	Service    string
-	Created    int64
-	State      string
-	Status     string
-	Health     string
-	ExitCode   int
-	Publishers PortPublishers
+	ID           string
+	Name         string
+	Names        []string
+	Image        string
+	Command      string
+	Project      string
+	Service      string
+	Created      int64
+	State        string
+	Status       string
+	Health       string
+	ExitCode     int
+	Publishers   PortPublishers
+	Labels       map[string]string
+	SizeRw       int64 `json:",omitempty"`
+	SizeRootFs   int64 `json:",omitempty"`
+	Mounts       []string
+	Networks     []string
+	LocalVolumes int
 }
 
 // PortPublishers is a slice of PortPublisher
@@ -457,6 +555,7 @@ type ContainerEvent struct {
 	// This is only suitable for display purposes within Compose, as it's
 	// not guaranteed to be unique across services.
 	Container string
+	ID        string
 	Service   string
 	Line      string
 	// ContainerEventExit only
@@ -473,6 +572,8 @@ const (
 	ContainerEventAttach
 	// ContainerEventStopped is a ContainerEvent of type stopped.
 	ContainerEventStopped
+	// ContainerEventRecreated let consumer know container stopped but his being replaced
+	ContainerEventRecreated
 	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
 	ContainerEventExit
 	// UserCancel user cancelled compose up, we are stopping containers

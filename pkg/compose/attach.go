@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -66,6 +67,7 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 	listener(api.ContainerEvent{
 		Type:      api.ContainerEventAttach,
 		Container: containerName,
+		ID:        container.ID,
 		Service:   serviceName,
 	})
 
@@ -73,6 +75,7 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 		listener(api.ContainerEvent{
 			Type:      api.ContainerEventLog,
 			Container: containerName,
+			ID:        container.ID,
 			Service:   serviceName,
 			Line:      line,
 		})
@@ -81,12 +84,13 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 		listener(api.ContainerEvent{
 			Type:      api.ContainerEventErr,
 			Container: containerName,
+			ID:        container.ID,
 			Service:   serviceName,
 			Line:      line,
 		})
 	})
 
-	inspect, err := s.dockerCli.Client().ContainerInspect(ctx, container.ID)
+	inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)
 	if err != nil {
 		return err
 	}
@@ -95,7 +99,7 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 	return err
 }
 
-func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (func(), chan bool, error) {
+func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (func(), chan bool, error) {
 	detached := make(chan bool)
 	var (
 		restore = func() { /* noop */ }
@@ -129,7 +133,8 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 	if streamIn != nil && stdin != nil {
 		go func() {
 			_, err := io.Copy(streamIn, stdin)
-			if _, ok := err.(term.EscapeError); ok {
+			var escapeErr term.EscapeError
+			if errors.As(err, &escapeErr) {
 				close(detached)
 			}
 		}()
@@ -137,6 +142,8 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 
 	if stdout != nil {
 		go func() {
+			defer stdout.Close() //nolint:errcheck
+			defer stderr.Close() //nolint:errcheck
 			if tty {
 				io.Copy(stdout, streamOut) //nolint:errcheck
 			} else {

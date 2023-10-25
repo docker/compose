@@ -18,23 +18,27 @@ package compose
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose/v2/pkg/utils"
-	moby "github.com/docker/docker/api/types"
-	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
+	"github.com/docker/docker/errdefs"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
+
+	"github.com/compose-spec/compose-go/types"
+	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.start(ctx, strings.ToLower(projectName), options, nil)
-	})
+	}, s.stdinfo())
 }
 
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
@@ -52,28 +56,79 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	// use an independent context tied to the errgroup for background attach operations
+	// the primary context is still used for other operations
+	// this means that once any attach operation fails, all other attaches are cancelled,
+	// but an attach failing won't interfere with the rest of the start
+	eg, attachCtx := errgroup.WithContext(ctx)
 	if listener != nil {
-		attached, err := s.attach(ctx, project, listener, options.AttachTo)
+		_, err := s.attach(attachCtx, project, listener, options.AttachTo)
 		if err != nil {
 			return err
 		}
 
 		eg.Go(func() error {
-			return s.watchContainers(context.Background(), project.Name, options.AttachTo, options.Services, listener, attached,
+			// it's possible to have a required service whose log output is not desired
+			// (i.e. it's not in the attach set), so watch everything and then filter
+			// calls to attach; this ensures that `watchContainers` blocks until all
+			// required containers have exited, even if their output is not being shown
+			attachTo := utils.NewSet[string](options.AttachTo...)
+			required := utils.NewSet[string](options.Services...)
+			toWatch := attachTo.Union(required).Elements()
+
+			containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, toWatch...)
+			if err != nil {
+				return err
+			}
+
+			// N.B. this uses the parent context (instead of attachCtx) so that the watch itself can
+			// continue even if one of the log streams fails
+			return s.watchContainers(ctx, project.Name, toWatch, required.Elements(), listener, containers,
 				func(container moby.Container, _ time.Time) error {
-					return s.attachContainer(ctx, container, listener)
+					svc := container.Labels[api.ServiceLabel]
+					if attachTo.Has(svc) {
+						return s.attachContainer(attachCtx, container, listener)
+					}
+
+					// HACK: simulate an "attach" event
+					listener(api.ContainerEvent{
+						Type:      api.ContainerEventAttach,
+						Container: getContainerNameWithoutProject(container),
+						ID:        container.ID,
+						Service:   svc,
+					})
+					return nil
+				}, func(container moby.Container, _ time.Time) error {
+					listener(api.ContainerEvent{
+						Type:      api.ContainerEventAttach,
+						Container: "", // actual name will be set by start event
+						ID:        container.ID,
+						Service:   container.Labels[api.ServiceLabel],
+					})
+					return nil
 				})
 		})
 	}
 
-	err := InDependencyOrder(ctx, project, func(c context.Context, name string) error {
+	var containers Containers
+	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+			oneOffFilter(false),
+		),
+		All: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err
 		}
 
-		return s.startService(ctx, project, service)
+		return s.startService(ctx, project, service, containers)
 	})
 	if err != nil {
 		return err
@@ -84,10 +139,20 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		for _, s := range project.Services {
 			depends[s.Name] = types.ServiceDependency{
 				Condition: getDependencyCondition(s, project),
+				Required:  true,
 			}
 		}
-		err = s.waitDependencies(ctx, project, depends)
+		if options.WaitTimeout > 0 {
+			withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
+			ctx = withTimeout
+			defer cancel()
+		}
+
+		err = s.waitDependencies(ctx, project, project.Name, depends, containers)
 		if err != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
+			}
 			return err
 		}
 	}
@@ -114,7 +179,7 @@ type containerWatchFn func(container moby.Container, t time.Time) error
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
 func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 	projectName string, services, required []string,
-	listener api.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
+	listener api.ContainerEventListener, containers Containers, onStart, onRecreate containerWatchFn) error {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -122,13 +187,39 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 		required = services
 	}
 
+	unexpected := utils.NewSet[string](required...).Diff(utils.NewSet[string](services...))
+	if len(unexpected) != 0 {
+		return fmt.Errorf(`required service(s) "%s" not present in watched service(s) "%s"`,
+			strings.Join(unexpected.Elements(), ", "),
+			strings.Join(services, ", "))
+	}
+
+	// predicate to tell if a container we receive event for should be considered or ignored
+	ofInterest := func(c moby.Container) bool {
+		if len(services) > 0 {
+			// we only watch some services
+			return utils.Contains(services, c.Labels[api.ServiceLabel])
+		}
+		return true
+	}
+
+	// predicate to tell if a container we receive event for should be watched until termination
+	isRequired := func(c moby.Container) bool {
+		if len(services) > 0 && len(required) > 0 {
+			// we only watch some services
+			return utils.Contains(required, c.Labels[api.ServiceLabel])
+		}
+		return true
+	}
+
 	var (
-		expected Containers
+		expected []string
 		watched  = map[string]int{}
+		replaced []string
 	)
 	for _, c := range containers {
-		if utils.Contains(required, c.Labels[api.ServiceLabel]) {
-			expected = append(expected, c)
+		if isRequired(c) {
+			expected = append(expected, c.ID)
 		}
 		watched[c.ID] = 0
 	}
@@ -137,14 +228,22 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 	err := s.Events(ctx, projectName, api.EventsOptions{
 		Services: services,
 		Consumer: func(event api.Event) error {
-			if event.Status == "destroy" {
-				// This container can't be inspected, because it's gone.
-				// It's already been removed from the watched map.
-				return nil
-			}
-
+			defer func() {
+				// after consuming each event, check to see if we're done
+				if len(expected) == 0 {
+					stop()
+				}
+			}()
 			inspected, err := s.apiClient().ContainerInspect(ctx, event.Container)
 			if err != nil {
+				if errdefs.IsNotFound(err) {
+					// it's possible to get "destroy" or "kill" events but not
+					// be able to inspect in time before they're gone from the
+					// API, so just remove the watch without erroring
+					delete(watched, event.Container)
+					expected = utils.Remove(expected, event.Container)
+					return nil
+				}
 				return err
 			}
 			container := moby.Container{
@@ -157,23 +256,38 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 			service := container.Labels[api.ServiceLabel]
 			switch event.Status {
 			case "stop":
-				listener(api.ContainerEvent{
-					Type:      api.ContainerEventStopped,
-					Container: name,
-					Service:   service,
-				})
+				if _, ok := watched[container.ID]; ok {
+					eType := api.ContainerEventStopped
+					if utils.Contains(replaced, container.ID) {
+						utils.Remove(replaced, container.ID)
+						eType = api.ContainerEventRecreated
+					}
+					listener(api.ContainerEvent{
+						Type:      eType,
+						Container: name,
+						ID:        container.ID,
+						Service:   service,
+					})
+				}
 
 				delete(watched, container.ID)
-				expected = expected.remove(container.ID)
+				expected = utils.Remove(expected, container.ID)
 			case "die":
 				restarted := watched[container.ID]
 				watched[container.ID] = restarted + 1
 				// Container terminated.
 				willRestart := inspected.State.Restarting
 
+				eType := api.ContainerEventExit
+				if utils.Contains(replaced, container.ID) {
+					utils.Remove(replaced, container.ID)
+					eType = api.ContainerEventRecreated
+				}
+
 				listener(api.ContainerEvent{
-					Type:       api.ContainerEventExit,
+					Type:       eType,
 					Container:  name,
+					ID:         container.ID,
 					Service:    service,
 					ExitCode:   inspected.State.ExitCode,
 					Restarting: willRestart,
@@ -182,7 +296,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				if !willRestart {
 					// we're done with this one
 					delete(watched, container.ID)
-					expected = expected.remove(container.ID)
+					expected = utils.Remove(expected, container.ID)
 				}
 			case "start":
 				count, ok := watched[container.ID]
@@ -190,7 +304,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				if !ok {
 					// A new container has just been added to service by scale
 					watched[container.ID] = 0
-					expected = append(expected, container)
+					expected = append(expected, container.ID)
 					mustAttach = true
 				}
 				if mustAttach {
@@ -200,9 +314,26 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 						return err
 					}
 				}
-			}
-			if len(expected) == 0 {
-				stop()
+			case "create":
+				if id, ok := container.Labels[api.ContainerReplaceLabel]; ok {
+					replaced = append(replaced, id)
+					err = onRecreate(container, event.Timestamp)
+					if err != nil {
+						return err
+					}
+					if utils.StringContains(expected, id) {
+						expected = append(expected, inspected.ID)
+					}
+					watched[container.ID] = 1
+					if utils.Contains(expected, id) {
+						expected = append(expected, container.ID)
+					}
+				} else if ofInterest(container) {
+					watched[container.ID] = 1
+					if isRequired(container) {
+						expected = append(expected, container.ID)
+					}
+				}
 			}
 			return nil
 		},

@@ -18,8 +18,10 @@ package e2e
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,7 +30,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
@@ -103,7 +104,7 @@ func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
 	for _, opt := range opts {
 		opt(c)
 	}
-	t.Log(c.RunDockerComposeCmdNoCheck(t, "version").Combined())
+	c.RunDockerComposeCmdNoCheck(t, "version")
 	return c
 }
 
@@ -134,7 +135,7 @@ func initializePlugins(t testing.TB, configDir string) {
 	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
 		"Failed to create cli-plugins directory")
 	composePlugin, err := findExecutable(DockerComposeExecutableName)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		t.Logf("WARNING: docker-compose cli-plugin not found")
 	}
 
@@ -161,20 +162,21 @@ func dirContents(dir string) []string {
 }
 
 func findExecutable(executableName string) (string, error) {
-	_, filename, _, _ := runtime.Caller(0)
-	root := filepath.Join(filepath.Dir(filename), "..", "..")
-	buildPath := filepath.Join(root, "bin", "build")
-
-	bin, err := filepath.Abs(filepath.Join(buildPath, executableName))
-	if err != nil {
-		return "", err
+	bin := os.Getenv("COMPOSE_E2E_BIN_PATH")
+	if bin == "" {
+		_, filename, _, _ := runtime.Caller(0)
+		buildPath := filepath.Join(filepath.Dir(filename), "..", "..", "bin", "build")
+		var err error
+		bin, err = filepath.Abs(filepath.Join(buildPath, executableName))
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if _, err := os.Stat(bin); err == nil {
 		return bin, nil
 	}
-
-	return "", errors.Wrap(os.ErrNotExist, "executable not found")
+	return "", fmt.Errorf("looking for %q: %w", bin, fs.ErrNotExist)
 }
 
 func findPluginExecutable(pluginExecutableName string) (string, error) {
@@ -190,7 +192,7 @@ func findPluginExecutable(pluginExecutableName string) (string, error) {
 	if _, err := os.Stat(bin); err == nil {
 		return bin, nil
 	}
-	return "", errors.Wrap(os.ErrNotExist, fmt.Sprintf("plugin not found %s", pluginExecutableName))
+	return "", fmt.Errorf("plugin not found %s: %w", pluginExecutableName, os.ErrNotExist)
 }
 
 // CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
@@ -214,12 +216,19 @@ func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
 // BaseEnvironment provides the minimal environment variables used across all
 // Docker / Compose commands.
 func (c *CLI) BaseEnvironment() []string {
-	return []string{
+	env := []string{
 		"HOME=" + c.HomeDir,
 		"USER=" + os.Getenv("USER"),
 		"DOCKER_CONFIG=" + c.ConfigDir,
 		"KUBECONFIG=invalid",
 	}
+	if coverdir, ok := os.LookupEnv("GOCOVERDIR"); ok {
+		_, filename, _, _ := runtime.Caller(0)
+		root := filepath.Join(filepath.Dir(filename), "..", "..")
+		coverdir = filepath.Join(root, coverdir)
+		env = append(env, fmt.Sprintf("GOCOVERDIR=%s", coverdir))
+	}
+	return env
 }
 
 // NewCmd creates a cmd object configured with the test environment set
@@ -305,7 +314,10 @@ func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
 // RunDockerComposeCmdNoCheck runs a docker compose command, don't presume of any expectation and returns a result
 func (c *CLI) RunDockerComposeCmdNoCheck(t testing.TB, args ...string) *icmd.Result {
 	t.Helper()
-	return icmd.RunCmd(c.NewDockerComposeCmd(t, args...))
+	cmd := c.NewDockerComposeCmd(t, args...)
+	cmd.Stdout = os.Stdout
+	t.Logf("Running command: %s", strings.Join(cmd.Command, " "))
+	return icmd.RunCmd(cmd)
 }
 
 // NewDockerComposeCmd creates a command object for Compose, either in plugin
@@ -349,13 +361,14 @@ func IsHealthy(service string) func(res *icmd.Result) bool {
 			Health string `json:"health"`
 		}
 
-		ps := []state{}
-		err := json.Unmarshal([]byte(res.Stdout()), &ps)
-		if err != nil {
-			return false
-		}
-		for _, state := range ps {
-			if state.Name == service && state.Health == "healthy" {
+		decoder := json.NewDecoder(strings.NewReader(res.Stdout()))
+		for decoder.More() {
+			ps := state{}
+			err := decoder.Decode(&ps)
+			if err != nil {
+				return false
+			}
+			if ps.Name == service && ps.Health == "healthy" {
 				return true
 			}
 		}

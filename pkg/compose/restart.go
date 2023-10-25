@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -28,9 +29,9 @@ import (
 )
 
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.restart(ctx, strings.ToLower(projectName), options)
-	})
+	}, s.stdinfo(), "Restarting")
 }
 
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {
@@ -47,15 +48,32 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		}
 	}
 
-	if len(options.Services) == 0 {
-		options.Services = project.ServiceNames()
+	if options.NoDeps {
+		err := project.ForServices(options.Services, types.IgnoreDependencies)
+		if err != nil {
+			return err
+		}
+	}
+
+	// ignore depends_on relations which are not impacted by restarting service or not required
+	for i, service := range project.Services {
+		for name, r := range service.DependsOn {
+			if !r.Restart {
+				delete(service.DependsOn, name)
+			}
+		}
+		project.Services[i] = service
+	}
+
+	if len(options.Services) != 0 {
+		err = project.ForServices(options.Services, types.IncludeDependents)
+		if err != nil {
+			return err
+		}
 	}
 
 	w := progress.ContextWriter(ctx)
 	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		if !utils.StringContains(options.Services, service) {
-			return nil
-		}
 		eg, ctx := errgroup.WithContext(ctx)
 		for _, container := range containers.filter(isService(service)) {
 			container := container

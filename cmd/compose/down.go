@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -39,12 +40,12 @@ type downOptions struct {
 	images        string
 }
 
-func downCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func downCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := downOptions{
 		ProjectOptions: p,
 	}
 	downCmd := &cobra.Command{
-		Use:   "down [OPTIONS]",
+		Use:   "down [OPTIONS] [SERVICES]",
 		Short: "Stop and remove containers, networks",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
@@ -56,16 +57,15 @@ func downCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runDown(ctx, backend, opts)
+			return runDown(ctx, dockerCli, backend, opts, args)
 		}),
-		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
 	flags := downCmd.Flags()
-	removeOrphans := utils.StringToBool(os.Getenv("COMPOSE_REMOVE_ORPHANS"))
+	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file.")
-	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
-	flags.BoolVarP(&opts.volumes, "volumes", "v", false, "Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
+	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
+	flags.BoolVarP(&opts.volumes, "volumes", "v", false, `Remove named volumes declared in the "volumes" section of the Compose file and anonymous volumes attached to containers.`)
 	flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		if name == "volume" {
@@ -77,8 +77,8 @@ func downCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return downCmd
 }
 
-func runDown(ctx context.Context, backend api.Service, opts downOptions) error {
-	project, name, err := opts.projectOrName()
+func runDown(ctx context.Context, dockerCli command.Cli, backend api.Service, opts downOptions, services []string) error {
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}
@@ -94,5 +94,6 @@ func runDown(ctx context.Context, backend api.Service, opts downOptions) error {
 		Timeout:       timeout,
 		Images:        opts.images,
 		Volumes:       opts.volumes,
+		Services:      services,
 	})
 }

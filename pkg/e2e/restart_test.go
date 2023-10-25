@@ -63,3 +63,40 @@ func TestRestart(t *testing.T) {
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
 }
+
+func TestRestartWithDependencies(t *testing.T) {
+	c := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-restart-deps",
+	))
+	baseService := "nginx"
+	depWithRestart := "with-restart"
+	depNoRestart := "no-restart"
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "down", "--remove-orphans")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose-depends-on.yaml", "up", "-d")
+
+	res := c.RunDockerComposeCmd(t, "restart", baseService)
+	fmt.Println(res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", baseService)), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), res.Combined())
+	assert.Assert(t, !strings.Contains(res.Combined(), depNoRestart), res.Combined())
+}
+
+func TestRestartWithProfiles(t *testing.T) {
+	c := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-restart-profiles",
+	))
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "down", "--remove-orphans")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose.yaml", "--profile", "test", "up", "-d")
+
+	res := c.RunDockerComposeCmd(t, "restart", "test")
+	fmt.Println(res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-profiles-test-1  Started"), res.Combined())
+}
