@@ -10,6 +10,8 @@ on:
       - '**/*.yaml'
       - '**/*_test.go'
   pull_request:
+    branches:
+        - 'main'
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
@@ -33,13 +35,14 @@ jobs:
         
     steps:
     -
-      name: Checkout repository
+      name: Checkout
       uses: actions/checkout@v4
     -
-      name: Update Go
+      name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version-file: go.mod
+        check-latest: true
     -
       name: Initialize CodeQL
       uses: github/codeql-action/init@v2
