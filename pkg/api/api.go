@@ -363,6 +363,7 @@ type PortOptions struct {
 
 // PublishOptions group options of the Publish API
 type PublishOptions struct {
+	ResolveImageDigests bool
 }
 
 func (e Event) String() string {
