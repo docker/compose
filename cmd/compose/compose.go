@@ -83,6 +83,8 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 			go func() {
 				<-s
 				cancel()
+				signal.Stop(s)
+				close(s)
 			}()
 		}
 		err := fn(ctx, cmd, args)
