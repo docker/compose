@@ -63,37 +63,24 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			return err
 		}
 
-		w.Event(progress.Event{
-			ID:     file,
-			Text:   "publishing",
-			Status: progress.Working,
-		})
-		layer := v1.Descriptor{
-			MediaType: "application/vnd.docker.compose.file+yaml",
-			Digest:    digest.FromString(string(f)),
-			Size:      int64(len(f)),
-			Annotations: map[string]string{
-				"com.docker.compose.version": api.ComposeVersion,
-				"com.docker.compose.file":    filepath.Base(file),
-			},
+		layer, err := s.pushComposeFile(ctx, file, f, resolver, named)
+		if err != nil {
+			return err
 		}
 		layers = append(layers, layer)
-		err = resolver.Push(ctx, named, layer, f)
-		if err != nil {
-			w.Event(progress.Event{
-				ID:     file,
-				Text:   "publishing",
-				Status: progress.Error,
-			})
+	}
 
+	if options.ResolveImageDigests {
+		yaml, err := s.generateImageDigestsOverride(ctx, project)
+		if err != nil {
 			return err
 		}
 
-		w.Event(progress.Event{
-			ID:     file,
-			Text:   "published",
-			Status: progress.Done,
-		})
+		layer, err := s.pushComposeFile(ctx, "image-digests.yaml", yaml, resolver, named)
+		if err != nil {
+			return err
+		}
+		layers = append(layers, layer)
 	}
 
 	emptyConfig, err := json.Marshal(v1.ImageConfig{})
@@ -156,4 +143,62 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Status: progress.Done,
 	})
 	return nil
+}
+
+func (s *composeService) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
+	project.ApplyProfiles([]string{"*"})
+	err := project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+		auth, err := encodedAuth(named, s.configFile())
+		if err != nil {
+			return "", err
+		}
+		inspect, err := s.apiClient().DistributionInspect(ctx, named.String(), auth)
+		if err != nil {
+			return "", err
+		}
+		return inspect.Descriptor.Digest, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	override := types.Project{}
+	for _, service := range project.Services {
+		override.Services = append(override.Services, types.ServiceConfig{
+			Name:  service.Name,
+			Image: service.Image,
+		})
+	}
+	return override.MarshalYAML()
+}
+
+func (s *composeService) pushComposeFile(ctx context.Context, file string, content []byte, resolver *imagetools.Resolver, named reference.Named) (v1.Descriptor, error) {
+	w := progress.ContextWriter(ctx)
+	w.Event(progress.Event{
+		ID:     file,
+		Text:   "publishing",
+		Status: progress.Working,
+	})
+	layer := v1.Descriptor{
+		MediaType: "application/vnd.docker.compose.file+yaml",
+		Digest:    digest.FromString(string(content)),
+		Size:      int64(len(content)),
+		Annotations: map[string]string{
+			"com.docker.compose.version": api.ComposeVersion,
+			"com.docker.compose.file":    filepath.Base(file),
+		},
+	}
+	err := resolver.Push(ctx, named, layer, content)
+	w.Event(progress.Event{
+		ID:     file,
+		Text:   "published",
+		Status: statusFor(err),
+	})
+	return layer, err
+}
+
+func statusFor(err error) progress.EventStatus {
+	if err != nil {
+		return progress.Error
+	}
+	return progress.Done
 }
