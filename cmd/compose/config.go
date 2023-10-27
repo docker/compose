@@ -190,6 +190,10 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		return err
 	}
 
+	if len(services) == 0 {
+		services = project.ServiceNames()
+	}
+
 	sorted := services
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i] < sorted[j]
