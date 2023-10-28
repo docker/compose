@@ -80,8 +80,9 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 	assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 
 	t.Log("create a dotenv file that will be used to trigger the rebuild")
-	os.WriteFile(dotEnvFilepath, []byte("HELLO=WORLD"), 0666)
-	_, err := os.ReadFile(dotEnvFilepath)
+	err := os.WriteFile(dotEnvFilepath, []byte("HELLO=WORLD"), 0o666)
+	assert.NilError(t, err)
+	_, err = os.ReadFile(dotEnvFilepath)
 	assert.NilError(t, err)
 
 	// TODO: refactor this duplicated code into frameworks? Maybe?
@@ -114,7 +115,8 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 	assert.Equal(t, pn.Stdout(), n.Stdout())
 
 	t.Log("create a dotenv file that will be used to trigger the rebuild")
-	os.WriteFile(dotEnvFilepath, []byte("HELLO=WORLD\nTEST=REBUILD"), 0666)
+	err = os.WriteFile(dotEnvFilepath, []byte("HELLO=WORLD\nTEST=REBUILD"), 0o666)
+	assert.NilError(t, err)
 	_, err = os.ReadFile(dotEnvFilepath)
 	assert.NilError(t, err)
 

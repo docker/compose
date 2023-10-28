@@ -1131,11 +1131,12 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 
 	if len(networks) == 0 {
 		// in this instance, n.Name is really an ID
-		network, err := s.apiClient().NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
-		networks = append(networks, network)
+		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
 		if err != nil {
 			return err
 		}
+		networks = append(networks, sn)
+
 	}
 
 	// NetworkList API doesn't return the exact name match, so we can retrieve more than one network with a request
