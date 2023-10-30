@@ -1,5 +1,7 @@
+//go:build linux
+
 /*
-   Copyright 2023 Docker Compose CLI authors
+   Copyright 2020 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,26 +19,21 @@
 package locker
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/docker/docker/pkg/pidfile"
+	"strconv"
 )
 
-type Pidfile struct {
-	path string
-}
-
-func NewPidfile(projectName string) (*Pidfile, error) {
-	run, err := runDir()
-	if err != nil {
-		return nil, err
+func osDependentRunDir() (string, error) {
+	run := filepath.Join("run", "user", strconv.Itoa(os.Getuid()))
+	if _, err := os.Stat(run); err == nil {
+		return run
 	}
-	path := filepath.Join(run, fmt.Sprintf("%s.pid", projectName))
-	return &Pidfile{path: path}, nil
-}
 
-func (f *Pidfile) Lock() error {
-	return pidfile.Write(f.path, os.Getpid())
+	// /run/user/$uid is set by pam_systemd, but might not be present, especially in containerized environments
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".docker", "docker-compose"), nil
 }

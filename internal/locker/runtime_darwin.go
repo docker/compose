@@ -1,5 +1,5 @@
 /*
-   Copyright 2023 Docker Compose CLI authors
+   Copyright 2020 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,26 +17,14 @@
 package locker
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/docker/docker/pkg/pidfile"
 )
 
-type Pidfile struct {
-	path string
-}
-
-func NewPidfile(projectName string) (*Pidfile, error) {
-	run, err := runDir()
+func osDependentRunDir() (string, error) {
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	path := filepath.Join(run, fmt.Sprintf("%s.pid", projectName))
-	return &Pidfile{path: path}, nil
-}
-
-func (f *Pidfile) Lock() error {
-	return pidfile.Write(f.path, os.Getpid())
+	return filepath.Join(home, "Library", "Application Support", "com.docker.compose"), nil
 }
