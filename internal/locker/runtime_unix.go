@@ -24,10 +24,14 @@ import (
 	"strconv"
 )
 
+// Based on https://github.com/adrg/xdg
+// Licensed under MIT License (MIT)
+// Copyright (c) 2014 Adrian-George Bostan <adrg@epistack.com>
+
 func osDependentRunDir() (string, error) {
 	run := filepath.Join("run", "user", strconv.Itoa(os.Getuid()))
 	if _, err := os.Stat(run); err == nil {
-		return run
+		return run, nil
 	}
 
 	// /run/user/$uid is set by pam_systemd, but might not be present, especially in containerized environments

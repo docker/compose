@@ -23,6 +23,10 @@ import (
 	"path/filepath"
 )
 
+// Based on https://github.com/adrg/xdg
+// Licensed under MIT License (MIT)
+// Copyright (c) 2014 Adrian-George Bostan <adrg@epistack.com>
+
 func osDependentCacheDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
