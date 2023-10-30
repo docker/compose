@@ -23,6 +23,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// Based on https://github.com/adrg/xdg
+// Licensed under MIT License (MIT)
+// Copyright (c) 2014 Adrian-George Bostan <adrg@epistack.com>
+
 func osDependentCacheDir() (string, error) {
 	flags := []uint32{windows.KF_FLAG_DEFAULT, windows.KF_FLAG_DEFAULT_PATH}
 	for _, flag := range flags {
