@@ -1,7 +1,7 @@
 # docker compose watch
 
 <!---MARKER_GEN_START-->
-Watch build context for service and rebuild orrefresh containers when files are updated.
+Watch build context for service and rebuild or refresh containers when files are updated.
 
 ### Options
 
