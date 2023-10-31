@@ -1,7 +1,7 @@
 # docker compose unpause
 
 <!---MARKER_GEN_START-->
-Unpause services.
+Unpause services
 
 ### Options
 

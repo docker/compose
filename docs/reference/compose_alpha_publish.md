@@ -1,7 +1,7 @@
 # docker compose alpha publish
 
 <!---MARKER_GEN_START-->
-Publish a Compose application.
+Publish compose application
 
 ### Options
 

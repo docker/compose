@@ -1,7 +1,7 @@
 # docker compose top
 
 <!---MARKER_GEN_START-->
-Display the running processes.
+Display the running processes
 
 ### Options
 

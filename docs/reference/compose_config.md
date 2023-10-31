@@ -1,7 +1,7 @@
 # docker compose convert
 
 <!---MARKER_GEN_START-->
-Parse, resolve and render Compose files in canonical format.
+Parse, resolve and render compose file in canonical format
 
 ### Aliases
 

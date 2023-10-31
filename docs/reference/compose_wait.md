@@ -1,7 +1,7 @@
 # docker compose wait
 
 <!---MARKER_GEN_START-->
-Block until the first service container stops.
+Block until the first service container stops
 
 ### Options
 

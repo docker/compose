@@ -1,7 +1,7 @@
 # docker compose stop
 
 <!---MARKER_GEN_START-->
-Stop services.
+Stop services
 
 ### Options
 

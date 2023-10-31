@@ -1,7 +1,7 @@
 # docker compose ps
 
 <!---MARKER_GEN_START-->
-List containers.
+List containers
 
 ### Options
 

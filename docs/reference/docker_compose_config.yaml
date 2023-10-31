@@ -2,8 +2,8 @@ command: docker compose config
 aliases: docker compose config, docker compose convert
 short: Parse, resolve and render compose file in canonical format
 long: |-
-    `docker compose config` renders the actual data model to be applied on the Docker engine.
-    it merges the Compose files set by `-f` flags, resolves variables in the Compose file, and expands short-notation into
+    `docker compose config` renders the actual data model to be applied on the Docker Engine.
+    It merges the Compose files set by `-f` flags, resolves variables in the Compose file, and expands short-notation into
     the canonical format.
 usage: docker compose config [OPTIONS] [SERVICE...]
 pname: docker compose
