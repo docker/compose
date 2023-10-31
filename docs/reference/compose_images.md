@@ -1,7 +1,7 @@
 # docker compose images
 
 <!---MARKER_GEN_START-->
-List images used by the created containers
+List images used by the created containers.
 
 ### Options
 

@@ -57,7 +57,7 @@ Define and run multi-container applications with Docker.
 
 ## Description
 
-You can use compose subcommand, `docker compose [-f <arg>...] [options] [COMMAND] [ARGS...]`, to build and manage
+You can use the compose subcommand, `docker compose [-f <arg>...] [options] [COMMAND] [ARGS...]`, to build and manage
 multiple services in Docker containers.
 
 ### Use `-f` to specify the name and path of one or more Compose files
@@ -146,16 +146,16 @@ demo_1  | 64 bytes from 127.0.0.1: seq=0 ttl=64 time=0.095 ms
 ### Use profiles to enable optional services
 
 Use `--profile` to specify one or more active profiles
-Calling `docker compose --profile frontend up` will start the services with the profile `frontend` and services
+Calling `docker compose --profile frontend up` starts the services with the profile `frontend` and services
 without any specified profiles.
-You can also enable multiple profiles, e.g. with `docker compose --profile frontend --profile debug up` the profiles `frontend` and `debug` will be enabled.
+You can also enable multiple profiles, e.g. with `docker compose --profile frontend --profile debug up` the profiles `frontend` and `debug` is enabled.
 
 Profiles can also be set by `COMPOSE_PROFILES` environment variable.
 
 ### Configuring parallelism
 
 Use `--parallel` to specify the maximum level of parallelism for concurrent engine calls.
-Calling `docker compose --parallel 1 pull` will pull the pullable images defined in the Compose file
+Calling `docker compose --parallel 1 pull` pulls the pullable images defined in the Compose file
 one at a time. This can also be used to control build concurrency.
 
 Parallelism can also be set by the `COMPOSE_PARALLEL_LIMIT` environment variable.
@@ -171,7 +171,7 @@ and `COMPOSE_PARALLEL_LIMIT` does the same as the `--parallel` flag.
 
 If flags are explicitly set on the command line, the associated environment variable is ignored.
 
-Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
+Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` stops docker compose from detecting orphaned
 containers for the project.
 
 ### Use Dry Run mode to test your command

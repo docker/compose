@@ -1,7 +1,7 @@
 # docker compose start
 
 <!---MARKER_GEN_START-->
-Start services
+Start services.
 
 ### Options
 

@@ -1,7 +1,7 @@
 # docker compose cp
 
 <!---MARKER_GEN_START-->
-Copy files/folders between a service container and the local filesystem
+Copy files or folders between a service container and the local filesystem.
 
 ### Options
 

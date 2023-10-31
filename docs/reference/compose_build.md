@@ -1,7 +1,7 @@
 # docker compose build
 
 <!---MARKER_GEN_START-->
-Build or rebuild services
+Build or rebuild services.
 
 ### Options
 

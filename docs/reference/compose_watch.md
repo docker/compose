@@ -1,7 +1,7 @@
 # docker compose watch
 
 <!---MARKER_GEN_START-->
-Watch build context for service and rebuild/refresh containers when files are updated
+Watch build context for service and rebuild orrefresh containers when files are updated.
 
 ### Options
 
@@ -9,7 +9,7 @@ Watch build context for service and rebuild/refresh containers when files are up
 |:------------|:-----|:--------|:----------------------------------------------|
 | `--dry-run` |      |         | Execute command in dry run mode               |
 | `--no-up`   |      |         | Do not build & start services before watching |
-| `--quiet`   |      |         | hide build output                             |
+| `--quiet`   |      |         | Hide build output                             |
 
 
 <!---MARKER_GEN_END-->

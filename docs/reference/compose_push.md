@@ -1,7 +1,7 @@
 # docker compose push
 
 <!---MARKER_GEN_START-->
-Push service images
+Push service images.
 
 ### Options
 
