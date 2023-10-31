@@ -45,19 +45,13 @@ func gitRemoteLoaderEnabled() (bool, error) {
 	return false, nil
 }
 
-func NewGitRemoteLoader(offline bool) (loader.ResourceLoader, error) {
-	cache, err := cacheDir()
-	if err != nil {
-		return nil, fmt.Errorf("initializing remote resource cache: %w", err)
-	}
+func NewGitRemoteLoader(offline bool) loader.ResourceLoader {
 	return gitRemoteLoader{
-		cache:   cache,
 		offline: offline,
-	}, err
+	}
 }
 
 type gitRemoteLoader struct {
-	cache   string
 	offline bool
 }
 
@@ -106,7 +100,12 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		ref.Commit = sha
 	}
 
-	local := filepath.Join(g.cache, ref.Commit)
+	cache, err := cacheDir()
+	if err != nil {
+		return "", fmt.Errorf("initializing remote resource cache: %w", err)
+	}
+
+	local := filepath.Join(cache, ref.Commit)
 	if _, err := os.Stat(local); os.IsNotExist(err) {
 		if g.offline {
 			return "", nil

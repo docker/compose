@@ -46,21 +46,14 @@ func ociRemoteLoaderEnabled() (bool, error) {
 	return false, nil
 }
 
-func NewOCIRemoteLoader(dockerCli command.Cli, offline bool) (loader.ResourceLoader, error) {
-	cache, err := cacheDir()
-	if err != nil {
-		return nil, fmt.Errorf("initializing remote resource cache: %w", err)
-	}
-
+func NewOCIRemoteLoader(dockerCli command.Cli, offline bool) loader.ResourceLoader {
 	return ociRemoteLoader{
-		cache:     cache,
 		dockerCli: dockerCli,
 		offline:   offline,
-	}, err
+	}
 }
 
 type ociRemoteLoader struct {
-	cache     string
 	dockerCli command.Cli
 	offline   bool
 }
@@ -100,7 +93,12 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		return "", err
 	}
 
-	local := filepath.Join(g.cache, descriptor.Digest.Hex())
+	cache, err := cacheDir()
+	if err != nil {
+		return "", fmt.Errorf("initializing remote resource cache: %w", err)
+	}
+
+	local := filepath.Join(cache, descriptor.Digest.Hex())
 	composeFile := filepath.Join(local, "compose.yaml")
 	if _, err = os.Stat(local); os.IsNotExist(err) {
 		var manifest v1.Manifest
