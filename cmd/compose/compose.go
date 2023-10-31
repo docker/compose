@@ -204,11 +204,7 @@ func (o *ProjectOptions) toProjectName(dockerCli command.Cli) (string, error) {
 
 func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
 	if !o.Offline {
-		var err error
-		po, err = o.configureRemoteLoaders(dockerCli, po)
-		if err != nil {
-			return nil, err
-		}
+		po = o.configureRemoteLoaders(dockerCli, po)
 	}
 
 	options, err := o.toProjectOptions(po...)
@@ -255,12 +251,12 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 	return project, err
 }
 
-func (o *ProjectOptions) configureRemoteLoaders(dockerCli command.Cli, po []cli.ProjectOptionsFn) ([]cli.ProjectOptionsFn, error) {
+func (o *ProjectOptions) configureRemoteLoaders(dockerCli command.Cli, po []cli.ProjectOptionsFn) []cli.ProjectOptionsFn {
 	git := remote.NewGitRemoteLoader(o.Offline)
 	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
 
 	po = append(po, cli.WithResourceLoader(git), cli.WithResourceLoader(oci))
-	return po, nil
+	return po
 }
 
 func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {

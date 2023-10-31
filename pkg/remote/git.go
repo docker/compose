@@ -80,24 +80,9 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		ref.Commit = "HEAD" // default branch
 	}
 
-	if !commitSHA.MatchString(ref.Commit) {
-		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", ref.Remote, ref.Commit)
-		cmd.Env = g.gitCommandEnv()
-		out, err := cmd.Output()
-		if err != nil {
-			if cmd.ProcessState.ExitCode() == 2 {
-				return "", fmt.Errorf("repository does not contain ref %s, output: %q: %w", path, string(out), err)
-			}
-			return "", err
-		}
-		if len(out) < 40 {
-			return "", fmt.Errorf("unexpected git command output: %q", string(out))
-		}
-		sha := string(out[:40])
-		if !commitSHA.MatchString(sha) {
-			return "", fmt.Errorf("invalid commit sha %q", sha)
-		}
-		ref.Commit = sha
+	err = g.resolveGitRef(ctx, path, ref)
+	if err != nil {
+		return "", err
 	}
 
 	cache, err := cacheDir()
@@ -127,6 +112,29 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		local, err = findFile(cli.DefaultFileNames, local)
 	}
 	return local, err
+}
+
+func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gitutil.GitRef) error {
+	if !commitSHA.MatchString(ref.Commit) {
+		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", ref.Remote, ref.Commit)
+		cmd.Env = g.gitCommandEnv()
+		out, err := cmd.Output()
+		if err != nil {
+			if cmd.ProcessState.ExitCode() == 2 {
+				return fmt.Errorf("repository does not contain ref %s, output: %q: %w", path, string(out), err)
+			}
+			return err
+		}
+		if len(out) < 40 {
+			return fmt.Errorf("unexpected git command output: %q", string(out))
+		}
+		sha := string(out[:40])
+		if !commitSHA.MatchString(sha) {
+			return fmt.Errorf("invalid commit sha %q", sha)
+		}
+		ref.Commit = sha
+	}
+	return nil
 }
 
 func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil.GitRef) error {
