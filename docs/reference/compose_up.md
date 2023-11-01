@@ -51,7 +51,7 @@ background and leaves them running.
 
 If there are existing containers for a service, and the service’s configuration or image was changed after the
 container’s creation, `docker compose up` picks up the changes by stopping and recreating the containers
-(preserving mounted volumes). To prevent Compose from picking up changes, use the `--no-recreate` flag.
+(preserving mounted volumes). To prevent Compose of picking up changes, use the `--no-recreate` flag.
 
 If you want to force Compose to stop and recreate all containers, use the `--force-recreate` flag.
 
