@@ -48,7 +48,7 @@ func generateDocs(opts *options) error {
 	if err != nil {
 		return err
 	}
-	return tool.GenAllTree()
+	return tool.GenAllTreeAndRemoveOldFiles()
 }
 
 func disableFlagsInUseLine(cmd *cobra.Command) {
@@ -77,7 +77,7 @@ func main() {
 	cwd, _ := os.Getwd()
 	opts := &options{
 		source: filepath.Join(cwd, "docs", "reference"),
-		target: filepath.Join(cwd, "docs", "reference"),
+		target: filepath.Join(cwd, "docs", "tmp"),
 	}
 	fmt.Printf("Project root: %s\n", opts.source)
 	fmt.Printf("Generating yaml files into %s\n", opts.target)

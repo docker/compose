@@ -116,7 +116,7 @@ lint: ## run linter(s)
 docs: ## generate documentation
 	$(eval $@_TMP_OUT := $(shell mktemp -d -t compose-output.XXXXXXXXXX))
 	$(BUILDX_CMD) bake --set "*.output=type=local,dest=$($@_TMP_OUT)" docs-update
-	rm -rf ./docs/internal
+	rm -rf ./docs/reference/*
 	cp -R "$(DRIVE_PREFIX)$($@_TMP_OUT)"/out/* ./docs/
 	rm -rf "$(DRIVE_PREFIX)$($@_TMP_OUT)"/*
 

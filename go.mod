@@ -178,3 +178,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace github.com/docker/cli-docs-tool v0.6.0 => github.com/glours/cli-docs-tool v0.6.1-0.20231102180605-fea6905ab3d0
