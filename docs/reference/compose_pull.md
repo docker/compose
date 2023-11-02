@@ -25,7 +25,7 @@ those images.
 
 ## Examples
 
-suppose you have this `compose.yaml`:
+Consider the following `compose.yaml`:
 
 ```yaml
 services:
@@ -66,5 +66,4 @@ $ docker compose pull db
    ⠹ c8752d5b785c Waiting                                                  9.3s
 ```
 
-`docker compose pull` will try to pull image for services with a build section. If pull fails, it will let
-user know this service image MUST be built. You can skip this by setting `--ignore-buildable` flag
+`docker compose pull` tries to pull image for services with a build section. If pull fails, it lets you know this service image must be built. You can skip this by setting `--ignore-buildable` flag.

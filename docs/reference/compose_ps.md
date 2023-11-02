@@ -29,7 +29,7 @@ NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS   
 example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
 ```
 
-By default, only running containers are shown. `--all` flag can be used to include stopped containers
+By default, only running containers are shown. `--all` flag can be used to include stopped containers.
 
 ```console
 $ docker compose ps --all
@@ -53,7 +53,7 @@ $ docker compose ps --format json
 ```
 
 The JSON output allows you to use the information in other tools for further
-processing, for example, using the [`jq` utility](https://stedolan.github.io/jq/){:target="_blank" rel="noopener" class="_"}
+processing, for example, using the [`jq` utility](https://stedolan.github.io/jq/)
 to pretty-print the JSON:
 
 ```console

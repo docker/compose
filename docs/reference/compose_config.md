@@ -31,6 +31,6 @@ Parse, resolve and render compose file in canonical format
 
 ## Description
 
-`docker compose config` renders the actual data model to be applied on the Docker engine.
-it merges the Compose files set by `-f` flags, resolves variables in the Compose file, and expands short-notation into
+`docker compose config` renders the actual data model to be applied on the Docker Engine.
+It merges the Compose files set by `-f` flags, resolves variables in the Compose file, and expands short-notation into
 the canonical format.
