@@ -121,13 +121,14 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			dotGitIgnore,
 		)
 
-		var paths []string
+		var paths, pathLogs []string
 		for _, trigger := range config.Watch {
 			if checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
 				continue
 			}
 			paths = append(paths, trigger.Path)
+			pathLogs = append(pathLogs, fmt.Sprintf("Action %s for path %q", trigger.Action, trigger.Path))
 		}
 
 		watcher, err := watch.NewWatcher(paths, ignore)
@@ -135,7 +136,12 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			return err
 		}
 
-		fmt.Fprintf(s.stdinfo(), "watching %s\n", paths)
+		fmt.Fprintf(
+			s.stdinfo(),
+			"Watch configuration for service %q:%s\n",
+			service.Name,
+			strings.Join(append([]string{""}, pathLogs...), "\n  - "),
+		)
 		err = watcher.Start()
 		if err != nil {
 			return err
@@ -420,7 +426,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 		if batch[i].Action == types.WatchActionRebuild {
 			fmt.Fprintf(
 				s.stdinfo(),
-				"Rebuilding %s after changes were detected:%s\n",
+				"Rebuilding service %q after changes were detected:%s\n",
 				serviceName,
 				strings.Join(append([]string{""}, batch[i].HostPath), "\n  - "),
 			)
@@ -477,7 +483,7 @@ func writeWatchSyncMessage(w io.Writer, serviceName string, pathMappings []sync.
 		}
 		fmt.Fprintf(
 			w,
-			"Syncing %s after changes were detected:%s\n",
+			"Syncing %q after changes were detected:%s\n",
 			serviceName,
 			strings.Join(append([]string{""}, hostPathsToSync...), "\n  - "),
 		)
@@ -488,7 +494,7 @@ func writeWatchSyncMessage(w io.Writer, serviceName string, pathMappings []sync.
 		}
 		fmt.Fprintf(
 			w,
-			"Syncing %s after %d changes were detected\n",
+			"Syncing service %q after %d changes were detected\n",
 			serviceName,
 			len(pathMappings),
 		)
