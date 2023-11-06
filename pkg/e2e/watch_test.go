@@ -106,7 +106,7 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 		out := r.String()
 		errors := r.String()
 		return strings.Contains(out,
-				"watching"), fmt.Sprintf("'watching' not found in : \n%s\nStderr: \n%s\n", out,
+				"Watch configuration"), fmt.Sprintf("'Watch configuration' not found in : \n%s\nStderr: \n%s\n", out,
 				errors)
 	}, 30*time.Second, 1*time.Second)
 
