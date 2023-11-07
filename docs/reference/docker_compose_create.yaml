@@ -50,7 +50,7 @@ options:
     - option: pull
       value_type: string
       default_value: policy
-      description: Pull image before running ("always"|"policy"|"never")
+      description: Pull image before running ("always"|"missing"|"never"|"build")
       deprecated: false
       hidden: false
       experimental: false
