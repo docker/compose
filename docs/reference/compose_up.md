@@ -23,7 +23,7 @@ Create and start containers
 | `--no-log-prefix`            |               |          | Don't print prefix in logs.                                                                              |
 | `--no-recreate`              |               |          | If containers already exist, don't recreate them. Incompatible with --force-recreate.                    |
 | `--no-start`                 |               |          | Don't start the services after creating them.                                                            |
-| `--pull`                     | `string`      | `policy` | Pull image before running ("always"\|"policy"\|"never")                                                  |
+| `--pull`                     | `string`      | `policy` | Pull image before running ("always"\|"missing"\|"never")                                                 |
 | `--quiet-pull`               |               |          | Pull without printing progress information.                                                              |
 | `--remove-orphans`           |               |          | Remove containers for services not defined in the Compose file.                                          |
 | `-V`, `--renew-anon-volumes` |               |          | Recreate anonymous volumes instead of retrieving data from the previous containers.                      |
