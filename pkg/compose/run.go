@@ -23,7 +23,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
@@ -73,7 +73,8 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if service.ContainerName == "" {
 		service.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, service.Name, stringid.TruncateID(slug), api.Separator)
 	}
-	service.Scale = 1
+	one := 1
+	service.Scale = &one
 	service.Restart = ""
 	if service.Deploy != nil {
 		service.Deploy.RestartPolicy = nil

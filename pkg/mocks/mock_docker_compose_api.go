@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	types "github.com/compose-spec/compose-go/types"
+	types "github.com/compose-spec/compose-go/v2/types"
 	api "github.com/docker/compose/v2/pkg/api"
 	gomock "github.com/golang/mock/gomock"
 )

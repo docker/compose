@@ -22,7 +22,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/sirupsen/logrus"
 )
@@ -63,8 +63,8 @@ func (d *DockerCopy) Sync(ctx context.Context, service types.ServiceConfig, path
 
 func (d *DockerCopy) sync(ctx context.Context, service types.ServiceConfig, pathMapping PathMapping) error {
 	scale := 1
-	if service.Deploy != nil && service.Deploy.Replicas != nil {
-		scale = int(*service.Deploy.Replicas)
+	if service.Scale != nil {
+		scale = *service.Scale
 	}
 
 	if fi, statErr := os.Stat(pathMapping.HostPath); statErr == nil {

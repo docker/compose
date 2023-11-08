@@ -19,7 +19,7 @@ package compose
 import (
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"gotest.tools/v3/assert"
 )
 
@@ -31,9 +31,9 @@ func TestServiceHash(t *testing.T) {
 	assert.Equal(t, hash1, hash2)
 }
 
-func serviceConfig(replicas uint64) types.ServiceConfig {
+func serviceConfig(replicas int) types.ServiceConfig {
 	return types.ServiceConfig{
-		Scale: int(replicas),
+		Scale: &replicas,
 		Deploy: &types.DeployConfig{
 			Replicas: &replicas,
 		},

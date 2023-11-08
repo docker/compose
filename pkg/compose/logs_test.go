@@ -23,7 +23,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"

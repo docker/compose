@@ -19,7 +19,7 @@ package compose
 import (
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"gotest.tools/v3/assert"
 )
 
@@ -31,13 +31,21 @@ func TestApplyScaleOpt(t *testing.T) {
 			},
 			{
 				Name: "bar",
+				Deploy: &types.DeployConfig{
+					Mode: "test",
+				},
 			},
 		},
 	}
-	opt := createOptions{scale: []string{"foo=2"}}
-	err := opt.Apply(&p)
+	err := applyScaleOpts(&p, []string{"foo=2", "bar=3"})
 	assert.NilError(t, err)
 	foo, err := p.GetService("foo")
 	assert.NilError(t, err)
-	assert.Equal(t, *foo.Deploy.Replicas, uint64(2))
+	assert.Equal(t, *foo.Scale, 2)
+
+	bar, err := p.GetService("bar")
+	assert.NilError(t, err)
+	assert.Equal(t, *bar.Scale, 3)
+	assert.Equal(t, *bar.Deploy.Replicas, 3)
+
 }

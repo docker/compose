@@ -19,7 +19,7 @@ package api
 import (
 	"context"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 var _ Service = &ServiceProxy{}

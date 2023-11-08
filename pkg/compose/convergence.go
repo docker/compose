@@ -29,7 +29,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/compose/v2/internal/tracing"
 	moby "github.com/docker/docker/api/types"
@@ -428,7 +428,7 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 			}
 		}
 		return false, err
-	} else if service.Scale == 0 {
+	} else if service.Scale != nil && *service.Scale == 0 {
 		// don't wait for the dependency which configured to have 0 containers running
 		return false, nil
 	}
@@ -457,8 +457,11 @@ func nextContainerNumber(containers []moby.Container) int {
 
 func getScale(config types.ServiceConfig) (int, error) {
 	scale := 1
-	if config.Deploy != nil && config.Deploy.Replicas != nil {
-		scale = int(*config.Deploy.Replicas)
+	if config.Scale != nil {
+		scale = *config.Scale
+	} else if config.Deploy != nil && config.Deploy.Replicas != nil {
+		// this should not be required as compose-go enforce consistency between scale anr replicas
+		scale = *config.Deploy.Replicas
 	}
 	if scale > 1 && config.ContainerName != "" {
 		return 0, fmt.Errorf(doubledContainerNameWarning,

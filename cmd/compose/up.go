@@ -25,7 +25,7 @@ import (
 
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/spf13/cobra"
@@ -259,7 +259,7 @@ func runUp(
 	})
 }
 
-func setServiceScale(project *types.Project, name string, replicas uint64) error {
+func setServiceScale(project *types.Project, name string, replicas int) error {
 	for i, s := range project.Services {
 		if s.Name != name {
 			continue
@@ -269,10 +269,10 @@ func setServiceScale(project *types.Project, name string, replicas uint64) error
 		if err != nil {
 			return err
 		}
-		if service.Deploy == nil {
-			service.Deploy = &types.DeployConfig{}
+		service.Scale = &replicas
+		if service.Deploy != nil {
+			service.Deploy.Replicas = &replicas
 		}
-		service.Deploy.Replicas = &replicas
 		project.Services[i] = service
 		return nil
 	}

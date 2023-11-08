@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -37,23 +37,25 @@ func TestContainerName(t *testing.T) {
 	s := types.ServiceConfig{
 		Name:          "testservicename",
 		ContainerName: "testcontainername",
-		Scale:         1,
+		Scale:         intPtr(1),
 		Deploy:        &types.DeployConfig{},
 	}
 	ret, err := getScale(s)
 	assert.NilError(t, err)
-	assert.Equal(t, ret, s.Scale)
+	assert.Equal(t, ret, *s.Scale)
 
-	var zero uint64 // = 0
-	s.Deploy.Replicas = &zero
+	s.Scale = intPtr(0)
 	ret, err = getScale(s)
 	assert.NilError(t, err)
-	assert.Equal(t, ret, int(*s.Deploy.Replicas))
+	assert.Equal(t, ret, *s.Scale)
 
-	var two uint64 = 2
-	s.Deploy.Replicas = &two
+	s.Scale = intPtr(2)
 	_, err = getScale(s)
 	assert.Error(t, err, fmt.Sprintf(doubledContainerNameWarning, s.Name, s.ContainerName))
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 func TestServiceLinks(t *testing.T) {
@@ -61,7 +63,7 @@ func TestServiceLinks(t *testing.T) {
 	const webContainerName = "/" + testProject + "-web-1"
 	s := types.ServiceConfig{
 		Name:  "web",
-		Scale: 1,
+		Scale: intPtr(1),
 	}
 
 	containerListOptions := containerType.ListOptions{
@@ -223,8 +225,8 @@ func TestWaitDependencies(t *testing.T) {
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 	t.Run("should skip dependencies with scale 0", func(t *testing.T) {
-		dbService := types.ServiceConfig{Name: "db", Scale: 0}
-		redisService := types.ServiceConfig{Name: "redis", Scale: 0}
+		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(0)}
+		redisService := types.ServiceConfig{Name: "redis", Scale: intPtr(0)}
 		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{dbService, redisService}}
 		dependencies := types.DependsOnConfig{
 			"db":    {Condition: ServiceConditionRunningOrHealthy},
@@ -233,8 +235,8 @@ func TestWaitDependencies(t *testing.T) {
 		assert.NilError(t, tested.waitDependencies(context.Background(), &project, "", dependencies, nil))
 	})
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
-		dbService := types.ServiceConfig{Name: "db", Scale: 1}
-		redisService := types.ServiceConfig{Name: "redis", Scale: 1}
+		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(1)}
+		redisService := types.ServiceConfig{Name: "redis", Scale: intPtr(1)}
 		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{dbService, redisService}}
 		dependencies := types.DependsOnConfig{
 			"db":    {Condition: types.ServiceConditionStarted, Required: true},

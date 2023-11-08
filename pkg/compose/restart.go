@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"

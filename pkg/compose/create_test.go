@@ -26,7 +26,7 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 
-	composetypes "github.com/compose-spec/compose-go/types"
+	composetypes "github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
 	mountTypes "github.com/docker/docker/api/types/mount"
 

@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/compose/v2/pkg/api"
@@ -161,12 +161,13 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	if err != nil {
 		return nil, err
 	}
-	override := types.Project{}
-	for _, service := range project.Services {
-		override.Services = append(override.Services, types.ServiceConfig{
-			Name:  service.Name,
+	override := types.Project{
+		Services: types.Services{},
+	}
+	for name, service := range project.Services {
+		override.Services[name] = types.ServiceConfig{
 			Image: service.Image,
-		})
+		}
 	}
 	return override.MarshalYAML()
 }

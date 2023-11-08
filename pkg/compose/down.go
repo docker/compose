@@ -24,7 +24,7 @@ import (
 
 	"github.com/docker/compose/v2/pkg/utils"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -136,7 +136,7 @@ func checkSelectedServices(options api.DownOptions, project *types.Project) ([]s
 func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
 	for _, vol := range project.Volumes {
-		if vol.External.External {
+		if vol.External {
 			continue
 		}
 		volumeName := vol.Name
@@ -171,7 +171,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
 	for key, n := range project.Networks {
-		if n.External.External {
+		if n.External {
 			continue
 		}
 		// loop capture variable for op closure

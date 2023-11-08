@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"

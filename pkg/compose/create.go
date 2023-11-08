@@ -41,7 +41,7 @@ import (
 	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -810,7 +810,7 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 		}
 
 		definedConfig := p.Configs[config.Source]
-		if definedConfig.External.External {
+		if definedConfig.External {
 			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
 		}
 
@@ -860,7 +860,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		}
 
 		definedSecret := p.Secrets[secret.Source]
-		if definedSecret.External.External {
+		if definedSecret.External {
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
 		}
 
@@ -1019,7 +1019,7 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 }
 
 func (s *composeService) ensureNetwork(ctx context.Context, n *types.NetworkConfig) error {
-	if n.External.External {
+	if n.External {
 		return s.resolveExternalNetwork(ctx, n)
 	}
 
@@ -1206,14 +1206,14 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		if !errdefs.IsNotFound(err) {
 			return err
 		}
-		if volume.External.External {
+		if volume.External {
 			return fmt.Errorf("external volume %q not found", volume.Name)
 		}
 		err := s.createVolume(ctx, volume)
 		return err
 	}
 
-	if volume.External.External {
+	if volume.External {
 		return nil
 	}
 

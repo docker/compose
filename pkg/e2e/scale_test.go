@@ -40,18 +40,21 @@ func TestScaleBasicCases(t *testing.T) {
 
 	t.Log("scale up one service")
 	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "scale", "dbadmin=2")
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-dbadmin", "Started", 2)
+	out := res.Combined()
+	checkServiceContainer(t, out, "scale-basic-tests-dbadmin", "Started", 2)
 
 	t.Log("scale up 2 services")
 	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "scale", "front=3", "back=2")
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-front", "Running", 2)
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-front", "Started", 1)
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-back", "Running", 1)
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-back", "Started", 1)
+	out = res.Combined()
+	checkServiceContainer(t, out, "scale-basic-tests-front", "Running", 2)
+	checkServiceContainer(t, out, "scale-basic-tests-front", "Started", 1)
+	checkServiceContainer(t, out, "scale-basic-tests-back", "Running", 1)
+	checkServiceContainer(t, out, "scale-basic-tests-back", "Started", 1)
 
 	t.Log("scale down one service")
 	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "scale", "dbadmin=1")
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-dbadmin", "Running", 1)
+	out = res.Combined()
+	checkServiceContainer(t, out, "scale-basic-tests-dbadmin", "Running", 1)
 
 	t.Log("scale to 0 a service")
 	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "scale", "dbadmin=0")
@@ -59,9 +62,10 @@ func TestScaleBasicCases(t *testing.T) {
 
 	t.Log("scale down 2 services")
 	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "scale", "front=2", "back=1")
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-front", "Running", 2)
-	assert.Check(t, !strings.Contains(res.Combined(), "Container scale-basic-tests-front-3  Running"), res.Combined())
-	checkServiceContainer(t, res.Combined(), "scale-basic-tests-back", "Running", 1)
+	out = res.Combined()
+	checkServiceContainer(t, out, "scale-basic-tests-front", "Running", 2)
+	assert.Check(t, !strings.Contains(out, "Container scale-basic-tests-front-3  Running"), res.Combined())
+	checkServiceContainer(t, out, "scale-basic-tests-back", "Running", 1)
 }
 
 func TestScaleWithDepsCases(t *testing.T) {
