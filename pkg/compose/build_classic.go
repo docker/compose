@@ -31,7 +31,7 @@ import (
 
 	"github.com/docker/docker/api/types/registry"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
 	dockertypes "github.com/docker/docker/api/types"

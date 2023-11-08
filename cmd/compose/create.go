@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
@@ -164,7 +164,15 @@ func (opts createOptions) Apply(project *types.Project) error {
 		return err
 	}
 
-	for _, scale := range opts.scale {
+	err := applyScaleOpts(project, opts.scale)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func applyScaleOpts(project *types.Project, opts []string) error {
+	for _, scale := range opts {
 		split := strings.Split(scale, "=")
 		if len(split) != 2 {
 			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
@@ -174,7 +182,7 @@ func (opts createOptions) Apply(project *types.Project) error {
 		if err != nil {
 			return err
 		}
-		err = setServiceScale(project, name, uint64(replicas))
+		err = setServiceScale(project, name, replicas)
 		if err != nil {
 			return err
 		}

@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 

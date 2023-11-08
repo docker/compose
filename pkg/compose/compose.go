@@ -29,7 +29,7 @@ import (
 
 	"github.com/docker/docker/api/types/volume"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
@@ -177,23 +177,25 @@ func (s *composeService) Config(ctx context.Context, project *types.Project, opt
 // projectFromName builds a types.Project based on actual resources with compose labels set
 func (s *composeService) projectFromName(containers Containers, projectName string, services ...string) (*types.Project, error) {
 	project := &types.Project{
-		Name: projectName,
+		Name:     projectName,
+		Services: types.Services{},
 	}
 	if len(containers) == 0 {
 		return project, fmt.Errorf("no container found for project %q: %w", projectName, api.ErrNotFound)
 	}
-	set := map[string]*types.ServiceConfig{}
+	set := map[string]types.ServiceConfig{}
 	for _, c := range containers {
 		serviceLabel := c.Labels[api.ServiceLabel]
-		_, ok := set[serviceLabel]
+		service, ok := set[serviceLabel]
 		if !ok {
-			set[serviceLabel] = &types.ServiceConfig{
+			service = types.ServiceConfig{
 				Name:   serviceLabel,
 				Image:  c.Image,
 				Labels: c.Labels,
 			}
+			set[serviceLabel] = service
 		}
-		set[serviceLabel].Scale++
+		service.Scale = increment(service.Scale)
 	}
 	for _, service := range set {
 		dependencies := service.Labels[api.DependenciesLabel]
@@ -217,7 +219,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition, Restart: restart, Required: required}
 			}
 		}
-		project.Services = append(project.Services, *service)
+		project.Services = append(project.Services, service)
 	}
 SERVICES:
 	for _, qs := range services {
@@ -234,6 +236,14 @@ SERVICES:
 	}
 
 	return project, nil
+}
+
+func increment(scale *int) *int {
+	i := 1
+	if scale != nil {
+		i = *scale + 1
+	}
+	return &i
 }
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {

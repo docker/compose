@@ -25,7 +25,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	moby "github.com/docker/docker/api/types"

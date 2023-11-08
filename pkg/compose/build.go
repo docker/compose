@@ -26,7 +26,7 @@ import (
 
 	"github.com/moby/buildkit/util/progress/progressui"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/builder"

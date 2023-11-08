@@ -22,9 +22,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/compose-spec/compose-go/cli"
-	"github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	ui "github.com/docker/compose/v2/pkg/progress"
@@ -50,7 +50,14 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	var SSHKeys []types.SSHKey
 	var err error
 	if opts.ssh != "" {
-		SSHKeys, err = loader.ParseShortSSHSyntax(opts.ssh)
+		id, path, found := strings.Cut(opts.ssh, "=")
+		if !found && id != "default" {
+			return api.BuildOptions{}, fmt.Errorf("invalid ssh key %q", opts.ssh)
+		}
+		SSHKeys = append(SSHKeys, types.SSHKey{
+			ID:   id,
+			Path: path,
+		})
 		if err != nil {
 			return api.BuildOptions{}, err
 		}

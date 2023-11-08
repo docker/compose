@@ -17,7 +17,7 @@ package sync
 import (
 	"context"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 )
 
 // PathMapping contains the Compose service and modified host system path.

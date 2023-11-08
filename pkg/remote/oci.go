@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/loader"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/imagetools"

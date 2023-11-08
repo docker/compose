@@ -22,7 +22,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"

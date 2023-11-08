@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/format"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 
-	cgo "github.com/compose-spec/compose-go/cli"
-	"github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
+	cgo "github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/opts"
 	"github.com/mattn/go-shellwords"
@@ -98,7 +98,7 @@ func (options runOptions) apply(project *types.Project) error {
 	}
 
 	for _, v := range options.volumes {
-		volume, err := loader.ParseVolume(v)
+		volume, err := format.ParseVolume(v)
 		if err != nil {
 			return err
 		}

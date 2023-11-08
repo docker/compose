@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	compose "github.com/compose-spec/compose-go/types"
+	compose "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
 )
 

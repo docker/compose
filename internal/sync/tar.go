@@ -32,7 +32,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/archive"
 )

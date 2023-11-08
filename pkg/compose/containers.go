@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
