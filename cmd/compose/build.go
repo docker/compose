@@ -96,7 +96,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 				opts.ssh = "default"
 			}
 			if cmd.Flags().Changed("progress") && opts.ssh == "" {
-				fmt.Fprint(os.Stderr, "--progress is a global compose flag, better use `docker compose --progress xx build ...")
+				fmt.Fprint(os.Stderr, "--progress is a global compose flag, better use `docker compose --progress xx build ...\n")
 			}
 			return runBuild(ctx, dockerCli, backend, opts, args)
 		}),
