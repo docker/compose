@@ -72,12 +72,6 @@ func runList(ctx context.Context, dockerCli command.Cli, backend api.Service, ls
 	if err != nil {
 		return err
 	}
-	if lsOpts.Quiet {
-		for _, s := range stackList {
-			fmt.Fprintln(dockerCli.Out(), s.Name)
-		}
-		return nil
-	}
 
 	if filters.Len() > 0 {
 		var filtered []api.Stack
@@ -88,6 +82,13 @@ func runList(ctx context.Context, dockerCli command.Cli, backend api.Service, ls
 			filtered = append(filtered, s)
 		}
 		stackList = filtered
+	}
+
+	if lsOpts.Quiet {
+		for _, s := range stackList {
+			fmt.Fprintln(dockerCli.Out(), s.Name)
+		}
+		return nil
 	}
 
 	view := viewFromStackList(stackList)
