@@ -1,0 +1,29 @@
+services:
+  from_env:
+    image: alpine
+    configs:
+      - source: from_env
+        target: /from_env
+    command: cat /from_env
+
+  from_file:
+    image: alpine
+    configs:
+      - source: from_file
+        target: /from_file
+    command: cat /from_file
+
+  inlined:
+    image: alpine
+    configs:
+      - source: inlined
+        target: /inlined
+    command: cat /inlined
+
+configs:
+  from_env:
+    environment: CONFIG
+  from_file:
+    file: config.txt
+  inlined:
+    content: This is my $CONFIG

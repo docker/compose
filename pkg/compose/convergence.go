@@ -623,6 +623,11 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 	}
 
 	err = s.injectSecrets(ctx, project, service, created.ID)
+	if err != nil {
+		return created, err
+	}
+
+	err = s.injectConfigs(ctx, project, service, created.ID)
 	return created, err
 }
 
