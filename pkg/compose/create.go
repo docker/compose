@@ -521,7 +521,14 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		})
 	}
 
-	for name, u := range s.Ulimits {
+	ulimits := toUlimits(s.Ulimits)
+	resources.Ulimits = ulimits
+	return resources
+}
+
+func toUlimits(m map[string]*types.UlimitsConfig) []*units.Ulimit {
+	var ulimits []*units.Ulimit
+	for name, u := range m {
 		soft := u.Single
 		if u.Soft != 0 {
 			soft = u.Soft
@@ -530,13 +537,13 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		if u.Hard != 0 {
 			hard = u.Hard
 		}
-		resources.Ulimits = append(resources.Ulimits, &units.Ulimit{
+		ulimits = append(ulimits, &units.Ulimit{
 			Name: name,
 			Hard: int64(hard),
 			Soft: int64(soft),
 		})
 	}
-	return resources
+	return ulimits
 }
 
 func setReservations(reservations *types.Resource, resources *container.Resources) {
@@ -810,6 +817,10 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 		}
 		if definedConfig.TemplateDriver != "" {
 			return nil, errors.New("Docker Compose does not support configs.*.template_driver")
+		}
+
+		if definedConfig.Environment != "" || definedConfig.Content != "" {
+			continue
 		}
 
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{

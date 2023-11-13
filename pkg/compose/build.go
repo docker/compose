@@ -32,11 +32,9 @@ import (
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/internal/tracing"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
+	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
+	"github.com/docker/go-units"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
@@ -45,6 +43,11 @@ import (
 	"github.com/moby/buildkit/util/entitlements"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+
+	"github.com/docker/compose/v2/internal/tracing"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 
 	// required to get default driver registered
 	_ "github.com/docker/buildx/driver/docker"
@@ -407,9 +410,22 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Labels:      imageLabels,
 		NetworkMode: service.Build.Network,
 		ExtraHosts:  service.Build.ExtraHosts.AsList(),
+		Ulimits:     toUlimitOpt(service.Build.Ulimits),
 		Session:     sessionConfig,
 		Allow:       allow,
 	}, nil
+}
+
+func toUlimitOpt(ulimits map[string]*types.UlimitsConfig) *cliopts.UlimitOpt {
+	ref := map[string]*units.Ulimit{}
+	for _, limit := range toUlimits(ulimits) {
+		ref[limit.Name] = &units.Ulimit{
+			Name: limit.Name,
+			Hard: limit.Hard,
+			Soft: limit.Soft,
+		}
+	}
+	return cliopts.NewUlimitOpt(&ref)
 }
 
 func flatten(in types.MappingWithEquals) types.Mapping {

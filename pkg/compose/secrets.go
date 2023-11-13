@@ -39,7 +39,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		if !ok {
 			return fmt.Errorf("environment variable %q required by secret %q is not set", secret.Environment, secret.Name)
 		}
-		b, err := createTar(env, config)
+		b, err := createTar(env, types.FileReferenceConfig(config))
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,37 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 	return nil
 }
 
-func createTar(env string, config types.ServiceSecretConfig) (bytes.Buffer, error) {
+func (s *composeService) injectConfigs(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
+	for _, config := range service.Configs {
+		secret := project.Configs[config.Source]
+		content := secret.Content
+		if secret.Environment != "" {
+			env, ok := project.Environment[secret.Environment]
+			if !ok {
+				return fmt.Errorf("environment variable %q required by secret %q is not set", secret.Environment, secret.Name)
+			}
+			content = env
+		}
+		if content == "" {
+			continue
+		}
+
+		b, err := createTar(content, types.FileReferenceConfig(config))
+		if err != nil {
+			return err
+		}
+
+		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, moby.CopyToContainerOptions{
+			CopyUIDGID: config.UID != "" || config.GID != "",
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createTar(env string, config types.FileReferenceConfig) (bytes.Buffer, error) {
 	value := []byte(env)
 	b := bytes.Buffer{}
 	tarWriter := tar.NewWriter(&b)
