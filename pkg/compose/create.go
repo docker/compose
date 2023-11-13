@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -804,6 +805,13 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
 		}
 
+		if definedConfig.Driver != "" {
+			return nil, errors.New("Docker Compose does not support configs.*.driver")
+		}
+		if definedConfig.TemplateDriver != "" {
+			return nil, errors.New("Docker Compose does not support configs.*.template_driver")
+		}
+
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedConfig.File,
@@ -841,6 +849,13 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		definedSecret := p.Secrets[secret.Source]
 		if definedSecret.External.External {
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
+		}
+
+		if definedSecret.Driver != "" {
+			return nil, errors.New("Docker Compose does not support secrets.*.driver")
+		}
+		if definedSecret.TemplateDriver != "" {
+			return nil, errors.New("Docker Compose does not support secrets.*.template_driver")
 		}
 
 		if definedSecret.Environment != "" {
