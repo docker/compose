@@ -31,6 +31,7 @@ require (
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc5
+	github.com/otiai10/copy v1.14.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
@@ -44,8 +45,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.14.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
-	golang.org/x/sync v0.4.0
-	golang.org/x/sys v0.11.0
+	golang.org/x/sync v0.5.0
+	golang.org/x/sys v0.14.0
 	google.golang.org/grpc v1.59.0
 	gotest.tools/v3 v3.5.1
 )
