@@ -287,11 +287,15 @@ func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy st
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
-	name := strings.Join([]string{projectName, service.Name, strconv.Itoa(number)}, api.Separator)
+	name := getDefaultContainerName(projectName, service.Name, strconv.Itoa(number))
 	if service.ContainerName != "" {
 		name = service.ContainerName
 	}
 	return name
+}
+
+func getDefaultContainerName(projectName, serviceName, index string) string {
+	return strings.Join([]string{projectName, serviceName, index}, api.Separator)
 }
 
 func getContainerProgressName(container moby.Container) string {
