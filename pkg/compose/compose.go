@@ -136,13 +136,14 @@ func getCanonicalContainerName(c moby.Container) string {
 }
 
 func getContainerNameWithoutProject(c moby.Container) string {
-	name := getCanonicalContainerName(c)
 	project := c.Labels[api.ProjectLabel]
-	prefix := fmt.Sprintf("%s_%s_", project, c.Labels[api.ServiceLabel])
-	if strings.HasPrefix(name, prefix) {
-		return name[len(project)+1:]
+	defaultName := getDefaultContainerName(project, c.Labels[api.ServiceLabel], c.Labels[api.ContainerNumberLabel])
+	name := getCanonicalContainerName(c)
+	if name != defaultName {
+		// service declares a custom container_name
+		return name
 	}
-	return name
+	return name[len(project)+1:]
 }
 
 func (s *composeService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {

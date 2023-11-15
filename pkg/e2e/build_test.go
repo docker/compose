@@ -333,7 +333,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 	t.Run("multi-arch up --build", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "up", "--build")
 		assert.NilError(t, res.Error, res.Stderr())
-		res.Assert(t, icmd.Expected{Out: "platforms-platforms-1 exited with code 0"})
+		res.Assert(t, icmd.Expected{Out: "platforms-1 exited with code 0"})
 	})
 
 	t.Run("use DOCKER_DEFAULT_PLATFORM value when up --build", func(t *testing.T) {
