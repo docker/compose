@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	cp "github.com/otiai10/copy"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
@@ -95,6 +96,7 @@ func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
 
 	configDir := t.TempDir()
 	initializePlugins(t, configDir)
+	initializeContextDir(t, configDir)
 
 	c := &CLI{
 		ConfigDir: configDir,
@@ -150,6 +152,22 @@ func initializePlugins(t testing.TB, configDir string) {
 		// We don't need a functional scan plugin, but a valid plugin binary
 		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerScanExecutableName))
 	}
+}
+
+func initializeContextDir(t testing.TB, configDir string) {
+	dockerUserDir := ".docker/contexts"
+	userDir, err := os.UserHomeDir()
+	require.NoError(t, err, "Failed to get user home directory")
+	userContextsDir := filepath.Join(userDir, dockerUserDir)
+	if checkExists(userContextsDir) {
+		dstContexts := filepath.Join(configDir, "contexts")
+		require.NoError(t, cp.Copy(userContextsDir, dstContexts), "Failed to copy contexts directory")
+	}
+}
+
+func checkExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func dirContents(dir string) []string {
@@ -221,7 +239,13 @@ func (c *CLI) BaseEnvironment() []string {
 		"USER=" + os.Getenv("USER"),
 		"DOCKER_CONFIG=" + c.ConfigDir,
 		"KUBECONFIG=invalid",
+		"PATH=" + os.Getenv("PATH"),
 	}
+	dockerContextEnv, ok := os.LookupEnv("DOCKER_CONTEXT")
+	if ok {
+		env = append(env, "DOCKER_CONTEXT="+dockerContextEnv)
+	}
+
 	if coverdir, ok := os.LookupEnv("GOCOVERDIR"); ok {
 		_, filename, _, _ := runtime.Caller(0)
 		root := filepath.Join(filepath.Dir(filename), "..", "..")

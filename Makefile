@@ -32,9 +32,13 @@ endif
 BUILD_FLAGS?=
 TEST_FLAGS?=
 E2E_TEST?=
-ifeq ($(E2E_TEST),)
-else
-	TEST_FLAGS=-run $(E2E_TEST)
+ifneq ($(E2E_TEST),)
+	TEST_FLAGS:=$(TEST_FLAGS) -run '$(E2E_TEST)'
+endif
+
+EXCLUDE_E2E_TESTS?=
+ifneq ($(EXCLUDE_E2E_TESTS),)
+	TEST_FLAGS:=$(TEST_FLAGS) -skip '$(EXCLUDE_E2E_TESTS)'
 endif
 
 BUILDX_CMD ?= docker buildx
