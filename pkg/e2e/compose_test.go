@@ -292,3 +292,24 @@ func TestStopWithDependenciesAttached(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo")
 	res.Assert(t, icmd.Expected{Out: "exited with code 0"})
 }
+
+func TestRemoveOrphaned(t *testing.T) {
+	const projectName = "compose-e2e-remove-orphaned"
+	c := NewParallelCLI(t)
+
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "-p", projectName, "down", "--remove-orphans", "--timeout=0")
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// run stack
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/sentences/compose.yaml", "-p", projectName, "up", "-d")
+
+	// down "web" service with orphaned removed
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/sentences/compose.yaml", "-p", projectName, "down", "--remove-orphans", "web")
+
+	// check "words" service has not been considered orphaned
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/sentences/compose.yaml", "-p", projectName, "ps", "--format", "{{.Name}}")
+	res.Assert(t, icmd.Expected{Out: fmt.Sprintf("%s-words-1", projectName)})
+}
