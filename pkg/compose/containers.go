@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
@@ -117,6 +118,21 @@ func isRunning() containerPredicate {
 }
 
 func isNotService(services ...string) containerPredicate {
+	return func(c moby.Container) bool {
+		service := c.Labels[api.ServiceLabel]
+		return !utils.StringContains(services, service)
+	}
+}
+
+// isOrphaned is a predicate to select containers without a matching service definition in compose project
+func isOrphaned(project *types.Project) containerPredicate {
+	var services []string
+	for _, s := range project.Services {
+		services = append(services, s.Name)
+	}
+	for _, s := range project.DisabledServices {
+		services = append(services, s.Name)
+	}
 	return func(c moby.Container) bool {
 		service := c.Labels[api.ServiceLabel]
 		return !utils.StringContains(services, service)
