@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
@@ -33,6 +34,10 @@ import (
 	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
+	"github.com/docker/compose/v2/internal/tracing"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/docker/go-units"
 	bclient "github.com/moby/buildkit/client"
@@ -43,11 +48,6 @@ import (
 	"github.com/moby/buildkit/util/entitlements"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-
-	"github.com/docker/compose/v2/internal/tracing"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 
 	// required to get default driver registered
 	_ "github.com/docker/buildx/driver/docker"
@@ -64,11 +64,46 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	}, s.stdinfo(), "Building")
 }
 
+type serviceToBuild struct {
+	idx     int
+	service types.ServiceConfig
+}
+
 //nolint:gocyclo
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions, localImages map[string]string) (map[string]string, error) {
 	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
 	if err != nil {
 		return nil, err
+	}
+
+	imageIDs := map[string]string{}
+	serviceToBeBuild := map[string]serviceToBuild{}
+	mapServiceMutx := sync.Mutex{}
+	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
+			return nil
+		}
+		service, idx := getServiceIndex(project, name)
+
+		if service.Build == nil {
+			return nil
+		}
+
+		image := api.GetImageNameOrDefault(service, project.Name)
+		_, localImagePresent := localImages[image]
+		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
+			return nil
+		}
+		mapServiceMutx.Lock()
+		serviceToBeBuild[name] = serviceToBuild{idx: idx, service: service}
+		mapServiceMutx.Unlock()
+		return nil
+	}, func(traversal *graphTraversal) {
+		traversal.maxConcurrency = s.maxConcurrency
+	})
+
+	if err != nil || len(serviceToBeBuild) == 0 {
+		return imageIDs, err
 	}
 
 	// Initialize buildkit nodes
@@ -114,17 +149,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		service, idx := getServiceIndex(project, name)
-
-		if service.Build == nil {
+		serviceToBuild, ok := serviceToBeBuild[name]
+		if !ok {
 			return nil
 		}
-
-		image := api.GetImageNameOrDefault(service, project.Name)
-		_, localImagePresent := localImages[image]
-		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
-			return nil
-		}
+		service := serviceToBuild.service
+		idx := serviceToBuild.idx
 
 		if !buildkitEnabled {
 			id, err := s.doBuildClassic(ctx, project, service, options)
@@ -170,7 +200,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return nil, err
 	}
 
-	imageIDs := map[string]string{}
 	for i, imageDigest := range builtDigests {
 		if imageDigest != "" {
 			imageRef := api.GetImageNameOrDefault(project.Services[i], project.Name)
