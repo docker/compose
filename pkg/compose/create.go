@@ -35,6 +35,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
+	"github.com/docker/docker/api/types/versions"
 	volume_api "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
@@ -178,6 +179,18 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	proxyConfig := types.MappingWithEquals(s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil))
 	env := proxyConfig.OverrideBy(service.Environment)
 
+	var mainNwName string
+	var mainNw *types.ServiceNetworkConfig
+	if len(service.Networks) > 0 {
+		mainNwName = service.NetworksByPriority()[0]
+		mainNw = service.Networks[mainNwName]
+	}
+
+	macAddress, err := s.prepareContainerMACAddress(ctx, service, mainNw, mainNwName)
+	if err != nil {
+		return createConfigs{}, err
+	}
+
 	healthcheck, err := s.ToMobyHealthCheck(ctx, service.HealthCheck)
 	if err != nil {
 		return createConfigs{}, err
@@ -198,7 +211,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: service.NetworkMode == "disabled",
-		MacAddress:      service.MacAddress,
+		MacAddress:      macAddress,
 		Labels:          labels,
 		StopSignal:      service.StopSignal,
 		Env:             ToMobyEnv(env),
@@ -290,6 +303,58 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	return cfgs, nil
 }
 
+// prepareContainerMACAddress handles the service-level mac_address field and the newer mac_address field added to service
+// network config. This newer field is only compatible with the Engine API v1.44 (and onwards), and this API version
+// also deprecates the container-wide mac_address field. Thus, this method will validate service config and mutate the
+// passed mainNw to provide backward-compatibility whenever possible.
+//
+// It returns the container-wide MAC address, but this value will be kept empty for newer API versions.
+func (s *composeService) prepareContainerMACAddress(ctx context.Context, service types.ServiceConfig, mainNw *types.ServiceNetworkConfig, nwName string) (string, error) {
+	version, err := s.RuntimeVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Engine API 1.44 added support for endpoint-specific MAC address and now returns a warning when a MAC address is
+	// set in container.Config. Thus, we have to jump through a number of hoops:
+	//
+	// 1. Top-level mac_address and main endpoint's MAC address should be the same ;
+	// 2. If supported by the API, top-level mac_address should be migrated to the main endpoint and container.Config
+	//    should be kept empty ;
+	// 3. Otherwise, the endpoint mac_address should be set in container.Config and no other endpoint-specific
+	//    mac_address can be specified. If that's the case, use top-level mac_address ;
+	//
+	// After that, if an endpoint mac_address is set, it's either user-defined or migrated by the code below, so
+	// there's no need to check for API version in defaultNetworkSettings.
+	macAddress := service.MacAddress
+	if macAddress != "" && mainNw != nil && mainNw.MacAddress != "" && mainNw.MacAddress != macAddress {
+		return "", fmt.Errorf("the service-level mac_address should have the same value as network %s", nwName)
+	}
+	if versions.GreaterThanOrEqualTo(version, "1.44") {
+		if mainNw != nil && mainNw.MacAddress == "" {
+			mainNw.MacAddress = macAddress
+		}
+		macAddress = ""
+	} else if len(service.Networks) > 0 {
+		var withMacAddress []string
+		for nwName, nw := range service.Networks {
+			if nw != nil && nw.MacAddress != "" {
+				withMacAddress = append(withMacAddress, nwName)
+			}
+		}
+
+		if len(withMacAddress) > 1 {
+			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine 1.44 or later (currently: %s)", strings.Join(withMacAddress, ", "), version)
+		}
+
+		if mainNw != nil {
+			macAddress = mainNw.MacAddress
+		}
+	}
+
+	return macAddress, nil
+}
+
 func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, useNetworkAliases bool) []string {
 	aliases := []string{getContainerName(project.Name, service, serviceIndex)}
 	if useNetworkAliases {
@@ -307,6 +372,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 	var (
 		ipv4Address string
 		ipv6Address string
+		macAddress  string
 	)
 	if config != nil {
 		ipv4Address = config.Ipv4Address
@@ -316,6 +382,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 			IPv6Address:  ipv6Address,
 			LinkLocalIPs: config.LinkLocalIPs,
 		}
+		macAddress = config.MacAddress
 	}
 	return &network.EndpointSettings{
 		Aliases:     getAliases(p, service, serviceIndex, networkKey, useNetworkAliases),
@@ -323,6 +390,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		IPAddress:   ipv4Address,
 		IPv6Gateway: ipv6Address,
 		IPAMConfig:  ipam,
+		MacAddress:  macAddress,
 	}
 }
 
