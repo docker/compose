@@ -26,7 +26,7 @@ import (
 func TestApplyPlatforms_InferFromRuntime(t *testing.T) {
 	makeProject := func() *types.Project {
 		return &types.Project{
-			Services: []types.ServiceConfig{
+			Services: types.Services{
 				{
 					Name:  "test",
 					Image: "foo",
@@ -64,7 +64,7 @@ func TestApplyPlatforms_DockerDefaultPlatform(t *testing.T) {
 			Environment: map[string]string{
 				"DOCKER_DEFAULT_PLATFORM": "linux/amd64",
 			},
-			Services: []types.ServiceConfig{
+			Services: types.Services{
 				{
 					Name:  "test",
 					Image: "foo",
@@ -100,7 +100,7 @@ func TestApplyPlatforms_UnsupportedPlatform(t *testing.T) {
 			Environment: map[string]string{
 				"DOCKER_DEFAULT_PLATFORM": "commodore/64",
 			},
-			Services: []types.ServiceConfig{
+			Services: types.Services{
 				{
 					Name:  "test",
 					Image: "foo",

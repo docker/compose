@@ -33,7 +33,7 @@ func TestViz(t *testing.T) {
 	project := types.Project{
 		Name:       "viz-test",
 		WorkingDir: "/home",
-		Services: []types.ServiceConfig{
+		Services: types.Services{
 			{
 				Name:  "service1",
 				Image: "image-for-service1",
