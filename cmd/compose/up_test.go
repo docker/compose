@@ -25,7 +25,7 @@ import (
 
 func TestApplyScaleOpt(t *testing.T) {
 	p := types.Project{
-		Services: []types.ServiceConfig{
+		Services: types.Services{
 			{
 				Name: "foo",
 			},

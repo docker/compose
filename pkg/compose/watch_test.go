@@ -105,7 +105,7 @@ func TestWatch_Sync(t *testing.T) {
 	t.Cleanup(cancelFunc)
 
 	proj := types.Project{
-		Services: []types.ServiceConfig{
+		Services: types.Services{
 			{
 				Name: "test",
 			},
