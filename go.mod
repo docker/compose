@@ -33,7 +33,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc5
 	github.com/otiai10/copy v1.14.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/theupdateframework/notary v0.7.0
