@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	xprogress "github.com/docker/buildx/util/progress"
+	xprogress "github.com/moby/buildkit/util/progress/progressui"
 
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
@@ -157,7 +157,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 			}
 
 			if createOpts.quietPull {
-				buildOpts.Progress = xprogress.PrinterModeQuiet
+				buildOpts.Progress = string(xprogress.QuietMode)
 			}
 
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])

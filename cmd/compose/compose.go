@@ -32,11 +32,11 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	composegoutils "github.com/compose-spec/compose-go/utils"
 	"github.com/docker/buildx/util/logutil"
-	buildx "github.com/docker/buildx/util/progress"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/remote"
+	buildkit "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/morikuni/aec"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -163,7 +163,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
-	f.StringVar(&o.Progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
+	f.StringVar(&o.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	_ = f.MarkHidden("workdir")
 }
 
