@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/moby/buildkit/util/progress/progressui"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
@@ -122,7 +124,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return nil, err
 		}
 
-		nodes, err = b.LoadNodes(ctx, false)
+		nodes, err = b.LoadNodes(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +135,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		progressCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		w, err = xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, options.Progress,
+		w, err = xprogress.NewPrinter(progressCtx, os.Stdout, progressui.DisplayMode(options.Progress),
 			xprogress.WithDesc(
 				fmt.Sprintf("building with %q instance using %s driver", b.Name, b.Driver),
 				fmt.Sprintf("%s:%s", b.Driver, b.Name),
@@ -374,7 +376,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	sessionConfig := []session.Attachable{
-		authprovider.NewDockerAuthProvider(s.configFile()),
+		authprovider.NewDockerAuthProvider(s.configFile(), nil),
 	}
 	if len(options.SSHs) > 0 || len(service.Build.SSH) > 0 {
 		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, options.SSHs...))

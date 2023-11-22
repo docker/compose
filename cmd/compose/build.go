@@ -25,10 +25,10 @@ import (
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
-	buildx "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	ui "github.com/docker/compose/v2/pkg/progress"
+	buildkit "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -118,7 +118,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
 	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
 	cmd.Flags().VarP(&opts.memory, "memory", "m", "Set memory limit for the build container. Not supported by BuildKit.")
-	cmd.Flags().StringVar(&p.Progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
+	cmd.Flags().StringVar(&p.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().MarkHidden("progress") //nolint:errcheck
 
 	return cmd
