@@ -42,6 +42,7 @@ type psOptions struct {
 	Filter   string
 	Status   []string
 	noTrunc  bool
+	Orphans  bool
 }
 
 func (p *psOptions) parseFilter() error {
@@ -84,6 +85,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	flags.BoolVar(&opts.Services, "services", false, "Display services")
+	flags.BoolVar(&opts.Orphans, "orphans", true, "Include orphaned services (not declared by project)")
 	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
 	flags.BoolVar(&opts.noTrunc, "no-trunc", false, "Don't truncate output")
 	return psCmd
@@ -95,12 +97,17 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 		return err
 	}
 
-	if project != nil && len(services) > 0 {
+	if project != nil {
 		names := project.ServiceNames()
-		for _, service := range services {
-			if !utils.StringContains(names, service) {
-				return fmt.Errorf("no such service: %s", service)
+		if len(services) > 0 {
+			for _, service := range services {
+				if !utils.StringContains(names, service) {
+					return fmt.Errorf("no such service: %s", service)
+				}
 			}
+		} else if !opts.Orphans {
+			// until user asks to list orphaned services, we only include those declared in project
+			services = names
 		}
 	}
 
