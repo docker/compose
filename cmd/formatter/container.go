@@ -33,6 +33,7 @@ const (
 	defaultContainerTableFormat = "table {{.Name}}\t{{.Image}}\t{{.Command}}\t{{.Service}}\t{{.RunningFor}}\t{{.Status}}\t{{.Ports}}"
 
 	nameHeader       = "NAME"
+	projectHeader    = "PROJECT"
 	serviceHeader    = "SERVICE"
 	commandHeader    = "COMMAND"
 	runningForHeader = "CREATED"
@@ -112,6 +113,7 @@ func NewContainerContext() *ContainerContext {
 	containerCtx.Header = formatter.SubHeaderContext{
 		"ID":         formatter.ContainerIDHeader,
 		"Name":       nameHeader,
+		"Project":    projectHeader,
 		"Service":    serviceHeader,
 		"Image":      formatter.ImageHeader,
 		"Command":    commandHeader,
@@ -162,6 +164,10 @@ func (c *ContainerContext) Names() string {
 
 func (c *ContainerContext) Service() string {
 	return c.c.Service
+}
+
+func (c *ContainerContext) Project() string {
+	return c.c.Project
 }
 
 func (c *ContainerContext) Image() string {

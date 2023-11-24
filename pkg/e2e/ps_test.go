@@ -64,6 +64,7 @@ func TestPs(t *testing.T) {
 			"--format", "json")
 		type element struct {
 			Name       string
+			Project    string
 			Publishers api.PortPublishers
 		}
 		var output []element
@@ -78,6 +79,7 @@ func TestPs(t *testing.T) {
 		count := 0
 		assert.Equal(t, 2, len(output))
 		for _, service := range output {
+			assert.Equal(t, projectName, service.Project)
 			publishers := service.Publishers
 			if service.Name == "e2e-ps-busybox-1" {
 				assert.Equal(t, 1, len(publishers))
