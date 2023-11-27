@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,7 +42,6 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
-	"github.com/pkg/errors"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -64,19 +64,19 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	buildBuff := s.stdout()
 
 	if len(service.Build.Platforms) > 1 {
-		return "", errors.Errorf("the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit")
+		return "", fmt.Errorf("the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
 	if service.Build.Privileged {
-		return "", errors.Errorf("the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit")
+		return "", fmt.Errorf("the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
 	if len(service.Build.AdditionalContexts) > 0 {
-		return "", errors.Errorf("the classic builder doesn't support additional contexts, set DOCKER_BUILDKIT=1 to use BuildKit")
+		return "", fmt.Errorf("the classic builder doesn't support additional contexts, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
 	if len(service.Build.SSH) > 0 {
-		return "", errors.Errorf("the classic builder doesn't support SSH keys, set DOCKER_BUILDKIT=1 to use BuildKit")
+		return "", fmt.Errorf("the classic builder doesn't support SSH keys, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
 	if len(service.Build.Secrets) > 0 {
-		return "", errors.Errorf("the classic builder doesn't support secrets, set DOCKER_BUILDKIT=1 to use BuildKit")
+		return "", fmt.Errorf("the classic builder doesn't support secrets, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
 
 	if service.Build.Labels == nil {
@@ -91,7 +91,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 			// Dockerfile is outside of build-context; read the Dockerfile and pass it as dockerfileCtx
 			dockerfileCtx, err = os.Open(dockerfileName)
 			if err != nil {
-				return "", errors.Errorf("unable to open Dockerfile: %v", err)
+				return "", fmt.Errorf("unable to open Dockerfile: %w", err)
 			}
 			defer dockerfileCtx.Close() //nolint:errcheck
 		}
@@ -100,11 +100,11 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	case urlutil.IsURL(specifiedContext):
 		buildCtx, relDockerfile, err = build.GetContextFromURL(progBuff, specifiedContext, dockerfileName)
 	default:
-		return "", errors.Errorf("unable to prepare context: path %q not found", specifiedContext)
+		return "", fmt.Errorf("unable to prepare context: path %q not found", specifiedContext)
 	}
 
 	if err != nil {
-		return "", errors.Errorf("unable to prepare context: %s", err)
+		return "", fmt.Errorf("unable to prepare context: %w", err)
 	}
 
 	if tempDir != "" {
@@ -120,7 +120,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		}
 
 		if err := build.ValidateContextDirectory(contextDir, excludes); err != nil {
-			return "", errors.Wrap(err, "checking context")
+			return "", fmt.Errorf("checking context: %w", err)
 		}
 
 		// And canonicalize dockerfile name to a platform-independent one
@@ -188,7 +188,8 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 
 	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.FD(), true, aux)
 	if err != nil {
-		if jerr, ok := err.(*jsonmessage.JSONError); ok {
+		var jerr *jsonmessage.JSONError
+		if errors.As(err, &jerr) {
 			// If no error code is set, default to 1
 			if jerr.Code == 0 {
 				jerr.Code = 1

@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -29,7 +30,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	cliformatter "github.com/docker/cli/cli/command/formatter"
 	cliflags "github.com/docker/cli/cli/flags"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +41,7 @@ type psOptions struct {
 	Services bool
 	Filter   string
 	Status   []string
+	noTrunc  bool
 }
 
 func (p *psOptions) parseFilter() error {
@@ -75,7 +76,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPs(ctx, dockerCli, backend, args, opts)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := psCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
@@ -84,11 +85,12 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	flags.BoolVar(&opts.Services, "services", false, "Display services")
 	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
+	flags.BoolVar(&opts.noTrunc, "no-trunc", false, "Don't truncate output")
 	return psCmd
 }
 
 func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, opts psOptions) error {
-	project, name, err := opts.projectOrName(services...)
+	project, name, err := opts.projectOrName(dockerCli, services...)
 	if err != nil {
 		return err
 	}
@@ -145,6 +147,7 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 	containerCtx := cliformatter.Context{
 		Output: dockerCli.Out(),
 		Format: formatter.NewContainerFormat(opts.Format, opts.Quiet, false),
+		Trunc:  !opts.noTrunc,
 	}
 	return formatter.ContainerWrite(containerCtx, containers)
 }

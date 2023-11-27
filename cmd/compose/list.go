@@ -22,6 +22,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
 
 	"github.com/docker/cli/opts"
@@ -37,13 +38,13 @@ type lsOptions struct {
 	Filter opts.FilterOpt
 }
 
-func listCommand(streams api.Streams, backend api.Service) *cobra.Command {
+func listCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	lsOpts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls [OPTIONS]",
 		Short: "List running compose projects",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runList(ctx, streams, backend, lsOpts)
+			return runList(ctx, dockerCli, backend, lsOpts)
 		}),
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
@@ -60,7 +61,7 @@ var acceptedListFilters = map[string]bool{
 	"name": true,
 }
 
-func runList(ctx context.Context, streams api.Streams, backend api.Service, lsOpts lsOptions) error {
+func runList(ctx context.Context, dockerCli command.Cli, backend api.Service, lsOpts lsOptions) error {
 	filters := lsOpts.Filter.Value()
 	err := filters.Validate(acceptedListFilters)
 	if err != nil {
@@ -70,12 +71,6 @@ func runList(ctx context.Context, streams api.Streams, backend api.Service, lsOp
 	stackList, err := backend.List(ctx, api.ListOptions{All: lsOpts.All})
 	if err != nil {
 		return err
-	}
-	if lsOpts.Quiet {
-		for _, s := range stackList {
-			fmt.Fprintln(streams.Out(), s.Name)
-		}
-		return nil
 	}
 
 	if filters.Len() > 0 {
@@ -89,8 +84,15 @@ func runList(ctx context.Context, streams api.Streams, backend api.Service, lsOp
 		stackList = filtered
 	}
 
+	if lsOpts.Quiet {
+		for _, s := range stackList {
+			fmt.Fprintln(dockerCli.Out(), s.Name)
+		}
+		return nil
+	}
+
 	view := viewFromStackList(stackList)
-	return formatter.Print(view, lsOpts.Format, streams.Out(), func(w io.Writer) {
+	return formatter.Print(view, lsOpts.Format, dockerCli.Out(), func(w io.Writer) {
 		for _, stack := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", stack.Name, stack.Status, stack.ConfigFiles)
 		}

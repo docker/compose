@@ -39,7 +39,7 @@ func traceClientFromDockerContext(dockerCli command.Cli, otelEnv envMap) (otlptr
 	// automatic integration with Docker Desktop;
 	cfg, err := ConfigFromDockerContext(dockerCli.ContextStore(), dockerCli.CurrentContext())
 	if err != nil {
-		return nil, fmt.Errorf("loading otel config from docker context metadata: %v", err)
+		return nil, fmt.Errorf("loading otel config from docker context metadata: %w", err)
 	}
 
 	if cfg.Endpoint == "" {
@@ -52,13 +52,13 @@ func traceClientFromDockerContext(dockerCli command.Cli, otelEnv envMap) (otlptr
 	defer func() {
 		for k, v := range otelEnv {
 			if err := os.Setenv(k, v); err != nil {
-				panic(fmt.Errorf("restoring env for %q: %v", k, err))
+				panic(fmt.Errorf("restoring env for %q: %w", k, err))
 			}
 		}
 	}()
 	for k := range otelEnv {
 		if err := os.Unsetenv(k); err != nil {
-			return nil, fmt.Errorf("stashing env for %q: %v", k, err)
+			return nil, fmt.Errorf("stashing env for %q: %w", k, err)
 		}
 	}
 
@@ -71,7 +71,7 @@ func traceClientFromDockerContext(dockerCli command.Cli, otelEnv envMap) (otlptr
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing otel connection from docker context metadata: %v", err)
+		return nil, fmt.Errorf("initializing otel connection from docker context metadata: %w", err)
 	}
 
 	client := otlptracegrpc.NewClient(otlptracegrpc.WithGRPCConn(conn))

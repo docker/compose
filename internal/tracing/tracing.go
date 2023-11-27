@@ -111,7 +111,7 @@ func InitProvider(dockerCli command.Cli) (ShutdownFunc, error) {
 		),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create resource: %v", err)
+		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
 	muxExporter := MuxExporter{exporters: exporters}

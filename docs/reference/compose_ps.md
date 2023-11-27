@@ -11,6 +11,7 @@ List containers
 | `--dry-run`           |               |         | Execute command in dry run mode                                                                                                                                                                                                                                                                                                                                                                                                      |
 | [`--filter`](#filter) | `string`      |         | Filter services by a property (supported filters: status).                                                                                                                                                                                                                                                                                                                                                                           |
 | [`--format`](#format) | `string`      | `table` | Format output using a custom template:<br>'table':            Print output in table format with column headers (default)<br>'table TEMPLATE':   Print output in table format using the given Go template<br>'json':             Print in JSON format<br>'TEMPLATE':         Print output using the given Go template.<br>Refer to https://docs.docker.com/go/formatting/ for more information about formatting output with templates |
+| `--no-trunc`          |               |         | Don't truncate output                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `-q`, `--quiet`       |               |         | Only display IDs                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `--services`          |               |         | Display services                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`--status`](#status) | `stringArray` |         | Filter services by status. Values: [paused \| restarting \| removing \| running \| dead \| created \| exited]                                                                                                                                                                                                                                                                                                                        |
@@ -28,7 +29,7 @@ NAME            IMAGE     COMMAND           SERVICE    CREATED         STATUS   
 example-foo-1   alpine    "/entrypoint.…"   foo        4 seconds ago   Up 2 seconds    0.0.0.0:8080->80/tcp
 ```
 
-By default, only running containers are shown. `--all` flag can be used to include stopped containers
+By default, only running containers are shown. `--all` flag can be used to include stopped containers.
 
 ```console
 $ docker compose ps --all
@@ -52,7 +53,7 @@ $ docker compose ps --format json
 ```
 
 The JSON output allows you to use the information in other tools for further
-processing, for example, using the [`jq` utility](https://stedolan.github.io/jq/){:target="_blank" rel="noopener" class="_"}
+processing, for example, using the [`jq` utility](https://stedolan.github.io/jq/)
 to pretty-print the JSON:
 
 ```console

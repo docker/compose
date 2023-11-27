@@ -17,35 +17,36 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
-	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 )
 
 func TestIsNotFound(t *testing.T) {
-	err := errors.Wrap(ErrNotFound, `object "name"`)
+	err := fmt.Errorf(`object "name": %w`, ErrNotFound)
 	assert.Assert(t, IsNotFoundError(err))
 
 	assert.Assert(t, !IsNotFoundError(errors.New("another error")))
 }
 
 func TestIsAlreadyExists(t *testing.T) {
-	err := errors.Wrap(ErrAlreadyExists, `object "name"`)
+	err := fmt.Errorf(`object "name": %w`, ErrAlreadyExists)
 	assert.Assert(t, IsAlreadyExistsError(err))
 
 	assert.Assert(t, !IsAlreadyExistsError(errors.New("another error")))
 }
 
 func TestIsForbidden(t *testing.T) {
-	err := errors.Wrap(ErrForbidden, `object "name"`)
+	err := fmt.Errorf(`object "name": %w`, ErrForbidden)
 	assert.Assert(t, IsForbiddenError(err))
 
 	assert.Assert(t, !IsForbiddenError(errors.New("another error")))
 }
 
 func TestIsUnknown(t *testing.T) {
-	err := errors.Wrap(ErrUnknown, `object "name"`)
+	err := fmt.Errorf(`object "name": %w`, ErrUnknown)
 	assert.Assert(t, IsUnknownError(err))
 
 	assert.Assert(t, !IsUnknownError(errors.New("another error")))

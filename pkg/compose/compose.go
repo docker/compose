@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -31,20 +30,17 @@ import (
 	"github.com/docker/docker/api/types/volume"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/distribution/distribution/v3/reference"
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-
-	"github.com/docker/compose/v2/pkg/api"
 )
 
 var stdioToStdout bool
@@ -140,13 +136,14 @@ func getCanonicalContainerName(c moby.Container) string {
 }
 
 func getContainerNameWithoutProject(c moby.Container) string {
-	name := getCanonicalContainerName(c)
 	project := c.Labels[api.ProjectLabel]
-	prefix := fmt.Sprintf("%s_%s_", project, c.Labels[api.ServiceLabel])
-	if strings.HasPrefix(name, prefix) {
-		return name[len(project)+1:]
+	defaultName := getDefaultContainerName(project, c.Labels[api.ServiceLabel], c.Labels[api.ContainerNumberLabel])
+	name := getCanonicalContainerName(c)
+	if name != defaultName {
+		// service declares a custom container_name
+		return name
 	}
-	return name
+	return name[len(project)+1:]
 }
 
 func (s *composeService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {
@@ -169,9 +166,9 @@ func (s *composeService) Config(ctx context.Context, project *types.Project, opt
 
 	switch options.Format {
 	case "json":
-		return json.MarshalIndent(project, "", "  ")
+		return project.MarshalJSON()
 	case "yaml":
-		return yaml.Marshal(project)
+		return project.MarshalYAML()
 	default:
 		return nil, fmt.Errorf("unsupported format %q", options.Format)
 	}
@@ -183,7 +180,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		Name: projectName,
 	}
 	if len(containers) == 0 {
-		return project, errors.Wrap(api.ErrNotFound, fmt.Sprintf("no container found for project %q", projectName))
+		return project, fmt.Errorf("no container found for project %q: %w", projectName, api.ErrNotFound)
 	}
 	set := map[string]*types.ServiceConfig{}
 	for _, c := range containers {
@@ -229,7 +226,7 @@ SERVICES:
 				continue SERVICES
 			}
 		}
-		return project, errors.Wrapf(api.ErrNotFound, "no such service: %q", qs)
+		return project, fmt.Errorf("no such service: %q: %w", qs, api.ErrNotFound)
 	}
 	err := project.ForServices(services)
 	if err != nil {

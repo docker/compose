@@ -74,6 +74,8 @@ type Service interface {
 	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
 	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
+	// Publish executes the equivalent to a `compose publish`
+	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 	// MaxConcurrency defines upper limit for concurrent operations against engine API
@@ -86,6 +88,12 @@ type Service interface {
 	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	// Wait blocks until at least one of the services' container exits
 	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
+	// Scale manages numbers of container instances running per service
+	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
+}
+
+type ScaleOptions struct {
+	Services []string
 }
 
 type WaitOptions struct {
@@ -108,6 +116,7 @@ type VizOptions struct {
 
 // WatchOptions group options of the Watch API
 type WatchOptions struct {
+	Build BuildOptions
 }
 
 // BuildOptions group options of the Build API
@@ -167,6 +176,7 @@ func (o BuildOptions) Apply(project *types.Project) error {
 
 // CreateOptions group options of the Create API
 type CreateOptions struct {
+	Build *BuildOptions
 	// Services defines the services user interacts with
 	Services []string
 	// Remove legacy containers for services that are not defined in the project
@@ -212,6 +222,8 @@ type RestartOptions struct {
 	Timeout *time.Duration
 	// Services passed in the command line to be restarted
 	Services []string
+	// NoDeps ignores services dependencies
+	NoDeps bool
 }
 
 // StopOptions group options of the Stop API
@@ -302,6 +314,7 @@ type RemoveOptions struct {
 
 // RunOptions group options of the Run API
 type RunOptions struct {
+	Build *BuildOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
 	Name              string
@@ -346,6 +359,11 @@ type Event struct {
 type PortOptions struct {
 	Protocol string
 	Index    int
+}
+
+// PublishOptions group options of the Publish API
+type PublishOptions struct {
+	ResolveImageDigests bool
 }
 
 func (e Event) String() string {

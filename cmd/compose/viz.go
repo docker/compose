@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +35,7 @@ type vizOptions struct {
 	indentationStr   string
 }
 
-func vizCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func vizCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := vizOptions{
 		ProjectOptions: p,
 	}
@@ -50,7 +51,7 @@ func vizCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			return err
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runViz(ctx, backend, &opts)
+			return runViz(ctx, dockerCli, backend, &opts)
 		}),
 	}
 
@@ -62,9 +63,9 @@ func vizCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func runViz(ctx context.Context, backend api.Service, opts *vizOptions) error {
+func runViz(ctx context.Context, dockerCli command.Cli, backend api.Service, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
-	project, err := opts.ToProject(nil)
+	project, err := opts.ToProject(dockerCli, nil)
 	if err != nil {
 		return err
 	}

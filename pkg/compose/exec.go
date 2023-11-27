@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/docker/cli/cli"
@@ -50,7 +51,8 @@ func (s *composeService) Exec(ctx context.Context, projectName string, options a
 	}
 
 	err = container.RunExec(s.dockerCli, exec)
-	if sterr, ok := err.(cli.StatusError); ok {
+	var sterr cli.StatusError
+	if errors.As(err, &sterr) {
 		return sterr.StatusCode, nil
 	}
 	return 0, err

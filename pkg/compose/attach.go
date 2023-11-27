@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -132,7 +133,8 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 	if streamIn != nil && stdin != nil {
 		go func() {
 			_, err := io.Copy(streamIn, stdin)
-			if _, ok := err.(term.EscapeError); ok {
+			var escapeErr term.EscapeError
+			if errors.As(err, &escapeErr) {
 				close(detached)
 			}
 		}()

@@ -26,7 +26,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose/v2/pkg/remote"
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -50,24 +50,19 @@ type configOptions struct {
 	noConsistency       bool
 }
 
-func (o *configOptions) ToProject(ctx context.Context, services []string) (*types.Project, error) {
-	git, err := remote.NewGitRemoteLoader()
-	if err != nil {
-		return nil, err
-	}
-
-	return o.ProjectOptions.ToProject(services,
+func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+	po = append(po,
 		cli.WithInterpolation(!o.noInterpolate),
 		cli.WithResolvedPaths(!o.noResolvePath),
 		cli.WithNormalization(!o.noNormalize),
 		cli.WithConsistency(!o.noConsistency),
 		cli.WithDefaultProfiles(o.Profiles...),
 		cli.WithDiscardEnvFile,
-		cli.WithContext(ctx),
-		cli.WithResourceLoader(git))
+		cli.WithContext(ctx))
+	return o.ProjectOptions.ToProject(dockerCli, services, po...)
 }
 
-func configCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := configOptions{
 		ProjectOptions: p,
 	}
@@ -90,24 +85,24 @@ func configCommand(p *ProjectOptions, streams api.Streams, backend api.Service) 
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.services {
-				return runServices(ctx, streams, opts)
+				return runServices(ctx, dockerCli, opts)
 			}
 			if opts.volumes {
-				return runVolumes(ctx, streams, opts)
+				return runVolumes(ctx, dockerCli, opts)
 			}
 			if opts.hash != "" {
-				return runHash(ctx, streams, opts)
+				return runHash(ctx, dockerCli, opts)
 			}
 			if opts.profiles {
-				return runProfiles(ctx, streams, opts, args)
+				return runProfiles(ctx, dockerCli, opts, args)
 			}
 			if opts.images {
-				return runConfigImages(ctx, streams, opts, args)
+				return runConfigImages(ctx, dockerCli, opts, args)
 			}
 
-			return runConfig(ctx, streams, backend, opts, args)
+			return runConfig(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
@@ -128,9 +123,9 @@ func configCommand(p *ProjectOptions, streams api.Streams, backend api.Service) 
 	return cmd
 }
 
-func runConfig(ctx context.Context, streams api.Streams, backend api.Service, opts configOptions, services []string) error {
+func runConfig(ctx context.Context, dockerCli command.Cli, backend api.Service, opts configOptions, services []string) error {
 	var content []byte
-	project, err := opts.ToProject(ctx, services)
+	project, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
@@ -155,67 +150,74 @@ func runConfig(ctx context.Context, streams api.Streams, backend api.Service, op
 	if opts.Output != "" && len(content) > 0 {
 		return os.WriteFile(opts.Output, content, 0o666)
 	}
-	_, err = fmt.Fprint(streams.Out(), string(content))
+	_, err = fmt.Fprint(dockerCli.Out(), string(content))
 	return err
 }
 
-func runServices(ctx context.Context, streams api.Streams, opts configOptions) error {
-	project, err := opts.ToProject(ctx, nil)
+func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
 	return project.WithServices(project.ServiceNames(), func(s types.ServiceConfig) error {
-		fmt.Fprintln(streams.Out(), s.Name)
+		fmt.Fprintln(dockerCli.Out(), s.Name)
 		return nil
 	})
 }
 
-func runVolumes(ctx context.Context, streams api.Streams, opts configOptions) error {
-	project, err := opts.ToProject(ctx, nil)
+func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
 	for n := range project.Volumes {
-		fmt.Fprintln(streams.Out(), n)
+		fmt.Fprintln(dockerCli.Out(), n)
 	}
 	return nil
 }
 
-func runHash(ctx context.Context, streams api.Streams, opts configOptions) error {
+func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
 	var services []string
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
 	}
-	project, err := opts.ToProject(ctx, nil)
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
 
-	if len(services) > 0 {
-		err = project.ForServices(services, types.IgnoreDependencies)
-		if err != nil {
-			return err
-		}
+	if err := applyPlatforms(project, true); err != nil {
+		return err
 	}
 
-	sorted := project.Services
+	if len(services) == 0 {
+		services = project.ServiceNames()
+	}
+
+	sorted := services
 	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Name < sorted[j].Name
+		return sorted[i] < sorted[j]
 	})
 
-	for _, s := range sorted {
-		hash, err := compose.ServiceHash(s)
+	for _, name := range sorted {
+		s, err := project.GetService(name)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(streams.Out(), "%s %s\n", s.Name, hash)
+
+		hash, err := compose.ServiceHash(s)
+
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(dockerCli.Out(), "%s %s\n", s.Name, hash)
 	}
 	return nil
 }
 
-func runProfiles(ctx context.Context, streams api.Streams, opts configOptions, services []string) error {
+func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
 	set := map[string]struct{}{}
-	project, err := opts.ToProject(ctx, services)
+	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -230,18 +232,18 @@ func runProfiles(ctx context.Context, streams api.Streams, opts configOptions, s
 	}
 	sort.Strings(profiles)
 	for _, p := range profiles {
-		fmt.Fprintln(streams.Out(), p)
+		fmt.Fprintln(dockerCli.Out(), p)
 	}
 	return nil
 }
 
-func runConfigImages(ctx context.Context, streams api.Streams, opts configOptions, services []string) error {
-	project, err := opts.ToProject(ctx, services)
+func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
+	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
 	for _, s := range project.Services {
-		fmt.Fprintln(streams.Out(), api.GetImageNameOrDefault(s, project.Name))
+		fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
 	}
 	return nil
 }

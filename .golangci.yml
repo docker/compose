@@ -7,6 +7,7 @@ linters:
   enable:
     - depguard
     - errcheck
+    - errorlint
     - gocritic
     - gocyclo
     - gofmt
@@ -36,9 +37,18 @@ linters-settings:
         deny:
           - pkg: io/ioutil
             desc: 'io/ioutil package has been deprecated'
+          - pkg: gopkg.in/yaml.v2
+            desc: 'compose-go uses yaml.v3'
   gomodguard:
     blocked:
+      modules:
+        - github.com/pkg/errors:
+            recommendations:
+              - errors
+              - fmt
       versions:
+        - github.com/distribution/distribution:
+            reason: "use distribution/reference"
         - gotest.tools:
             version: "< 3.0.0"
             reason: "deprecated, pre-modules version"
@@ -61,5 +71,3 @@ issues:
   # golangci hides some golint warnings (the warning about exported things
   # withtout documentation for example), this will make it show them anyway.
   exclude-use-default: false
-  exclude:
-    - should not use dot imports

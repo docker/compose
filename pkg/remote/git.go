@@ -25,44 +25,34 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/adrg/xdg"
-
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/buildkit/util/gitutil"
-	"github.com/pkg/errors"
 )
 
-func GitRemoteLoaderEnabled() (bool, error) {
-	if v := os.Getenv("COMPOSE_EXPERIMENTAL_GIT_REMOTE"); v != "" {
+const GIT_REMOTE_ENABLED = "COMPOSE_EXPERIMENTAL_GIT_REMOTE"
+
+func gitRemoteLoaderEnabled() (bool, error) {
+	if v := os.Getenv(GIT_REMOTE_ENABLED); v != "" {
 		enabled, err := strconv.ParseBool(v)
 		if err != nil {
-			return false, errors.Wrap(err, "COMPOSE_EXPERIMENTAL_GIT_REMOTE environment variable expects boolean value")
+			return false, fmt.Errorf("COMPOSE_EXPERIMENTAL_GIT_REMOTE environment variable expects boolean value: %w", err)
 		}
 		return enabled, err
 	}
 	return false, nil
 }
 
-func NewGitRemoteLoader() (loader.ResourceLoader, error) {
-	// xdg.CacheFile creates the parent directories for the target file path
-	// and returns the fully qualified path, so use "git" as a filename and
-	// then chop it off after, i.e. no ~/.cache/docker-compose/git file will
-	// ever be created
-	cache, err := xdg.CacheFile(filepath.Join("docker-compose", "git"))
-	if err != nil {
-		return nil, fmt.Errorf("initializing git cache: %w", err)
-	}
-	cache = filepath.Dir(cache)
+func NewGitRemoteLoader(offline bool) loader.ResourceLoader {
 	return gitRemoteLoader{
-		cache: cache,
-	}, err
+		offline: offline,
+	}
 }
 
 type gitRemoteLoader struct {
-	cache string
+	offline bool
 }
 
 func (g gitRemoteLoader) Accept(path string) bool {
@@ -73,6 +63,14 @@ func (g gitRemoteLoader) Accept(path string) bool {
 var commitSHA = regexp.MustCompile(`^[a-f0-9]{40}$`)
 
 func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) {
+	enabled, err := gitRemoteLoaderEnabled()
+	if err != nil {
+		return "", err
+	}
+	if !enabled {
+		return "", fmt.Errorf("experimental git remote resource is disabled. %q must be set", GIT_REMOTE_ENABLED)
+	}
+
 	ref, err := gitutil.ParseGitRef(path)
 	if err != nil {
 		return "", err
@@ -82,28 +80,21 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		ref.Commit = "HEAD" // default branch
 	}
 
-	if !commitSHA.MatchString(ref.Commit) {
-		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", ref.Remote, ref.Commit)
-		cmd.Env = g.gitCommandEnv()
-		out, err := cmd.Output()
-		if err != nil {
-			if cmd.ProcessState.ExitCode() == 2 {
-				return "", errors.Wrapf(err, "repository does not contain ref %s, output: %q", path, string(out))
-			}
-			return "", err
-		}
-		if len(out) < 40 {
-			return "", fmt.Errorf("unexpected git command output: %q", string(out))
-		}
-		sha := string(out[:40])
-		if !commitSHA.MatchString(sha) {
-			return "", fmt.Errorf("invalid commit sha %q", sha)
-		}
-		ref.Commit = sha
+	err = g.resolveGitRef(ctx, path, ref)
+	if err != nil {
+		return "", err
 	}
 
-	local := filepath.Join(g.cache, ref.Commit)
+	cache, err := cacheDir()
+	if err != nil {
+		return "", fmt.Errorf("initializing remote resource cache: %w", err)
+	}
+
+	local := filepath.Join(cache, ref.Commit)
 	if _, err := os.Stat(local); os.IsNotExist(err) {
+		if g.offline {
+			return "", nil
+		}
 		err = g.checkout(ctx, local, ref)
 		if err != nil {
 			return "", err
@@ -121,6 +112,29 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		local, err = findFile(cli.DefaultFileNames, local)
 	}
 	return local, err
+}
+
+func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gitutil.GitRef) error {
+	if !commitSHA.MatchString(ref.Commit) {
+		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", ref.Remote, ref.Commit)
+		cmd.Env = g.gitCommandEnv()
+		out, err := cmd.Output()
+		if err != nil {
+			if cmd.ProcessState.ExitCode() == 2 {
+				return fmt.Errorf("repository does not contain ref %s, output: %q: %w", path, string(out), err)
+			}
+			return err
+		}
+		if len(out) < 40 {
+			return fmt.Errorf("unexpected git command output: %q", string(out))
+		}
+		sha := string(out[:40])
+		if !commitSHA.MatchString(sha) {
+			return fmt.Errorf("invalid commit sha %q", sha)
+		}
+		ref.Commit = sha
+	}
+	return nil
 }
 
 func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil.GitRef) error {
@@ -167,7 +181,7 @@ func (g gitRemoteLoader) gitCommandEnv() []string {
 		// Disable any ssh connection pooling by Git and do not attempt to prompt the user.
 		env["GIT_SSH_COMMAND"] = "ssh -o ControlMaster=no -o BatchMode=yes"
 	}
-	v := values(env)
+	v := env.Values()
 	return v
 }
 
@@ -182,11 +196,3 @@ func findFile(names []string, pwd string) (string, error) {
 }
 
 var _ loader.ResourceLoader = gitRemoteLoader{}
-
-func values(m types.Mapping) []string {
-	values := make([]string, 0, len(m))
-	for k, v := range m {
-		values = append(values, fmt.Sprintf("%s=%s", k, v))
-	}
-	return values
-}

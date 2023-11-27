@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/distribution/distribution/v3/reference"
+	"github.com/distribution/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
@@ -90,7 +90,7 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 				if errdefs.IsNotFound(err) {
 					return nil
 				}
-				return err
+				return fmt.Errorf("unable to get image '%s': %w", img, err)
 			}
 			tag := ""
 			repository := ""

@@ -32,9 +32,13 @@ endif
 BUILD_FLAGS?=
 TEST_FLAGS?=
 E2E_TEST?=
-ifeq ($(E2E_TEST),)
-else
-	TEST_FLAGS=-run $(E2E_TEST)
+ifneq ($(E2E_TEST),)
+	TEST_FLAGS:=$(TEST_FLAGS) -run '$(E2E_TEST)'
+endif
+
+EXCLUDE_E2E_TESTS?=
+ifneq ($(EXCLUDE_E2E_TESTS),)
+	TEST_FLAGS:=$(TEST_FLAGS) -skip '$(EXCLUDE_E2E_TESTS)'
 endif
 
 BUILDX_CMD ?= docker buildx
@@ -71,15 +75,11 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) -count=1 ./pkg/e2e
+	go test -v $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
 	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
-
-.PHONY: test-cucumber
-test-cucumber:
-	go test $(TEST_FLAGS) -v -count=1 -parallel=1 ./e2e
 
 .PHONY: build-and-e2e-compose
 build-and-e2e-compose: build e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test

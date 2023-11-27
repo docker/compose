@@ -18,12 +18,12 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -115,7 +115,7 @@ func (b *bufReader) consume() {
 			b.data = append(b.data, buf[:n]...)
 			b.mu.Unlock()
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return
 		}
 		if err != nil {

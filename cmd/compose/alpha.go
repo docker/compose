@@ -15,12 +15,13 @@
 package compose
 
 import (
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
 
 // alphaCommand groups all experimental subcommands
-func alphaCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func alphaCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Short:  "Experimental commands",
 		Use:    "alpha [COMMAND]",
@@ -30,8 +31,9 @@ func alphaCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(
-		watchCommand(p, backend),
-		vizCommand(p, backend),
+		watchCommand(p, dockerCli, backend),
+		vizCommand(p, dockerCli, backend),
+		publishCommand(p, dockerCli, backend),
 	)
 	return cmd
 }

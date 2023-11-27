@@ -23,7 +23,10 @@ import (
 	"strings"
 	"time"
 
+	xprogress "github.com/docker/buildx/util/progress"
+
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/spf13/cobra"
 
@@ -71,9 +74,10 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 	return nil
 }
 
-func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
+	build := buildOptions{ProjectOptions: p}
 	upCmd := &cobra.Command{
 		Use:   "up [OPTIONS] [SERVICE...]",
 		Short: "Create and start containers",
@@ -82,7 +86,7 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			create.timeChanged = cmd.Flags().Changed("timeout")
 			return validateFlags(&up, &create)
 		}),
-		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
+		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
 			create.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
 			if create.ignoreOrphans && create.removeOrphans {
 				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
@@ -90,15 +94,15 @@ func upCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *cob
 			if len(up.attach) != 0 && up.attachDependencies {
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
-			return runUp(ctx, streams, backend, create, up, project, services)
+			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := upCmd.Flags()
 	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	flags.BoolVar(&create.Build, "build", false, "Build images before starting containers.")
-	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
-	flags.StringVar(&create.Pull, "pull", "missing", `Pull image before running ("always"|"missing"|"never")`)
+	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's policy.")
+	flags.StringVar(&create.Pull, "pull", "policy", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.StringArrayVar(&create.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output.")
@@ -148,7 +152,16 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
-func runUp(ctx context.Context, streams api.Streams, backend api.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
+func runUp(
+	ctx context.Context,
+	dockerCli command.Cli,
+	backend api.Service,
+	createOptions createOptions,
+	upOptions upOptions,
+	buildOptions buildOptions,
+	project *types.Project,
+	services []string,
+) error {
 	if len(project.Services) == 0 {
 		return fmt.Errorf("no service selected")
 	}
@@ -163,7 +176,26 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 		return err
 	}
 
+	var build *api.BuildOptions
+	// this check is technically redundant as createOptions::apply()
+	// already removed all the build sections
+	if !createOptions.noBuild {
+		if createOptions.quietPull {
+			buildOptions.Progress = xprogress.PrinterModeQuiet
+		}
+		// BuildOptions here is nested inside CreateOptions, so
+		// no service list is passed, it will implicitly pick all
+		// services being created, which includes any explicitly
+		// specified via "services" arg here as well as deps
+		bo, err := buildOptions.toAPIBuildOptions(nil)
+		if err != nil {
+			return err
+		}
+		build = &bo
+	}
+
 	create := api.CreateOptions{
+		Build:                build,
 		Services:             services,
 		RemoveOrphans:        createOptions.removeOrphans,
 		IgnoreOrphans:        createOptions.ignoreOrphans,
@@ -181,7 +213,7 @@ func runUp(ctx context.Context, streams api.Streams, backend api.Service, create
 	var consumer api.LogConsumer
 	var attach []string
 	if !upOptions.Detach {
-		consumer = formatter.NewLogConsumer(ctx, streams.Out(), streams.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
+		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 
 		var attachSet utils.Set[string]
 		if len(upOptions.attach) != 0 {

@@ -21,6 +21,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -30,7 +31,6 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -212,7 +212,7 @@ func (a *ArchiveBuilder) writeEntry(entry archiveEntry) error {
 	if useBuf {
 		a.copyBuf.Reset()
 		_, err = io.Copy(a.copyBuf, file)
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return fmt.Errorf("copying %q: %w", pathInTar, err)
 		}
 		header.Size = int64(len(a.copyBuf.Bytes()))
@@ -232,7 +232,7 @@ func (a *ArchiveBuilder) writeEntry(entry archiveEntry) error {
 		_, err = io.Copy(a.tw, file)
 	}
 
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("copying %q: %w", pathInTar, err)
 	}
 

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -38,7 +39,6 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/compose-spec/compose-go/types"
@@ -62,9 +62,9 @@ type createConfigs struct {
 	Links     []string
 }
 
-func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, options)
+		return s.create(ctx, project, createOpts)
 	}, s.stdinfo(), "Creating")
 }
 
@@ -79,17 +79,12 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	err = s.ensureImagesExists(ctx, project, options.QuietPull)
+	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
 	if err != nil {
 		return err
 	}
 
 	prepareNetworks(project)
-
-	err = prepareVolumes(project)
-	if err != nil {
-		return err
-	}
 
 	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
 		return err
@@ -121,31 +116,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	}
 
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
-}
-
-func prepareVolumes(p *types.Project) error {
-	for i := range p.Services {
-		volumesFrom, dependServices, err := getVolumesFrom(p, p.Services[i].VolumesFrom)
-		if err != nil {
-			return err
-		}
-		p.Services[i].VolumesFrom = volumesFrom
-		if len(dependServices) > 0 {
-			if p.Services[i].DependsOn == nil {
-				p.Services[i].DependsOn = make(types.DependsOnConfig, len(dependServices))
-			}
-			for _, service := range p.Services {
-				if utils.StringContains(dependServices, service.Name) &&
-					p.Services[i].DependsOn[service.Name].Condition == "" {
-					p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
-						Condition: types.ServiceConditionStarted,
-						Required:  true,
-					}
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -249,13 +219,6 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	var volumesFrom []string
-	for _, v := range service.VolumesFrom {
-		if !strings.HasPrefix(v, "container:") {
-			return createConfigs{}, fmt.Errorf("invalid volume_from: %s", v)
-		}
-		volumesFrom = append(volumesFrom, v[len("container:"):])
-	}
 
 	// NETWORKING
 	links, err := s.getLinks(ctx, p.Name, service, number)
@@ -296,7 +259,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		PortBindings:   portBindings,
 		Resources:      resources,
 		VolumeDriver:   service.VolumeDriver,
-		VolumesFrom:    volumesFrom,
+		VolumesFrom:    service.VolumesFrom,
 		DNS:            service.DNS,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
@@ -382,17 +345,17 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 			if strings.Contains(opt, ":") {
 				con = strings.SplitN(opt, ":", 2)
 			} else {
-				return securityOpts, false, errors.Errorf("Invalid security-opt: %q", opt)
+				return securityOpts, false, fmt.Errorf("Invalid security-opt: %q", opt)
 			}
 		}
 		if con[0] == "seccomp" && con[1] != "unconfined" {
 			f, err := os.ReadFile(p.RelativePath(con[1]))
 			if err != nil {
-				return securityOpts, false, errors.Errorf("opening seccomp profile (%s) failed: %v", con[1], err)
+				return securityOpts, false, fmt.Errorf("opening seccomp profile (%s) failed: %w", con[1], err)
 			}
 			b := bytes.NewBuffer(nil)
 			if err := json.Compact(b, f); err != nil {
-				return securityOpts, false, errors.Errorf("compacting json for seccomp profile (%s) failed: %v", con[1], err)
+				return securityOpts, false, fmt.Errorf("compacting json for seccomp profile (%s) failed: %w", con[1], err)
 			}
 			parsed = append(parsed, fmt.Sprintf("seccomp=%s", b.Bytes()))
 		} else {
@@ -558,7 +521,14 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		})
 	}
 
-	for name, u := range s.Ulimits {
+	ulimits := toUlimits(s.Ulimits)
+	resources.Ulimits = ulimits
+	return resources
+}
+
+func toUlimits(m map[string]*types.UlimitsConfig) []*units.Ulimit {
+	var ulimits []*units.Ulimit
+	for name, u := range m {
 		soft := u.Single
 		if u.Soft != 0 {
 			soft = u.Soft
@@ -567,13 +537,13 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		if u.Hard != 0 {
 			hard = u.Hard
 		}
-		resources.Ulimits = append(resources.Ulimits, &units.Ulimit{
+		ulimits = append(ulimits, &units.Ulimit{
 			Name: name,
 			Hard: int64(hard),
 			Soft: int64(soft),
 		})
 	}
-	return resources
+	return ulimits
 }
 
 func setReservations(reservations *types.Resource, resources *container.Resources) {
@@ -674,40 +644,6 @@ func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
 		bindings[p] = append(bindings[p], binding)
 	}
 	return bindings
-}
-
-func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []string, error) {
-	var volumes = []string{}
-	var services = []string{}
-	// parse volumes_from
-	if len(volumesFrom) == 0 {
-		return volumes, services, nil
-	}
-	for _, vol := range volumesFrom {
-		spec := strings.Split(vol, ":")
-		if len(spec) == 0 {
-			continue
-		}
-		if spec[0] == "container" {
-			volumes = append(volumes, vol)
-			continue
-		}
-		serviceName := spec[0]
-		services = append(services, serviceName)
-		service, err := project.GetService(serviceName)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		firstContainer := getContainerName(project.Name, service, 1)
-		v := fmt.Sprintf("container:%s", firstContainer)
-		if len(spec) > 2 {
-			v = fmt.Sprintf("container:%s:%s", firstContainer, strings.Join(spec[1:], ":"))
-		}
-		volumes = append(volumes, v)
-	}
-	return volumes, services, nil
-
 }
 
 func getDependentServiceFromMode(mode string) string {
@@ -876,6 +812,17 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
 		}
 
+		if definedConfig.Driver != "" {
+			return nil, errors.New("Docker Compose does not support configs.*.driver")
+		}
+		if definedConfig.TemplateDriver != "" {
+			return nil, errors.New("Docker Compose does not support configs.*.template_driver")
+		}
+
+		if definedConfig.Environment != "" || definedConfig.Content != "" {
+			continue
+		}
+
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedConfig.File,
@@ -913,6 +860,13 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		definedSecret := p.Secrets[secret.Source]
 		if definedSecret.External.External {
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
+		}
+
+		if definedSecret.Driver != "" {
+			return nil, errors.New("Docker Compose does not support secrets.*.driver")
+		}
+		if definedSecret.TemplateDriver != "" {
+			return nil, errors.New("Docker Compose does not support secrets.*.template_driver")
 		}
 
 		if definedSecret.Environment != "" {
@@ -1182,7 +1136,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 	_, err = s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
 	if err != nil {
 		w.Event(progress.ErrorEvent(networkEventName))
-		return errors.Wrapf(err, "failed to create network %s", n.Name)
+		return fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
 	w.Event(progress.CreatedEvent(networkEventName))
 	return nil
@@ -1196,13 +1150,27 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
 	})
+
 	if err != nil {
 		return err
 	}
 
+	if len(networks) == 0 {
+		// in this instance, n.Name is really an ID
+		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
+		if err != nil {
+			return err
+		}
+		networks = append(networks, sn)
+
+	}
+
 	// NetworkList API doesn't return the exact name match, so we can retrieve more than one network with a request
 	networks = utils.Filter(networks, func(net moby.NetworkResource) bool {
-		return net.Name == n.Name
+		// later in this function, the name is changed the to ID.
+		// this function is called during the rebuild stage of `compose watch`.
+		// we still require just one network back, but we need to run the search on the ID
+		return net.Name == n.Name || net.ID == n.Name
 	})
 
 	switch len(networks) {

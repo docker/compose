@@ -1,0 +1,10 @@
+services:
+  app:
+    image: nginx:alpine
+    volumes_from:
+      - db
+
+  db:
+    image: nginx:alpine
+    volumes:
+      - /var/data

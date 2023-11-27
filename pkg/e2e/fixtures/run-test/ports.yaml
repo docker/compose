@@ -1,0 +1,6 @@
+version: '3.8'
+services:
+  back:
+    image: alpine
+    ports:
+      - 8082:80

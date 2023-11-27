@@ -21,7 +21,7 @@ package e2e
 
 import (
 	"context"
-	"os"
+	"errors"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -45,9 +45,6 @@ func TestUpServiceUnhealthy(t *testing.T) {
 }
 
 func TestUpDependenciesNotStopped(t *testing.T) {
-	if _, ok := os.LookupEnv("CI"); ok {
-		t.Skip("Skipping test on CI... flaky")
-	}
 	c := NewParallelCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=up-deps-stop",
 	))
@@ -76,8 +73,8 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 		"app",
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	t.Cleanup(cancel)
 
 	cmd, err := StartWithNewGroupID(ctx, testCmd, upOut, nil)
 	assert.NilError(t, err, "Failed to run compose up")
@@ -91,12 +88,14 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	require.NoError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT),
 		"Failed to send SIGINT to compose up process")
 
-	time.AfterFunc(5*time.Second, cancel)
-
 	t.Log("Waiting for `compose up` to exit")
 	err = cmd.Wait()
 	if err != nil {
-		exitErr := err.(*exec.ExitError)
+		var exitErr *exec.ExitError
+		errors.As(err, &exitErr)
+		if exitErr.ExitCode() == -1 {
+			t.Fatalf("`compose up` was killed: %v", err)
+		}
 		require.EqualValues(t, exitErr.ExitCode(), 130)
 	}
 

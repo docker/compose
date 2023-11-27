@@ -17,6 +17,7 @@
 package watch
 
 import (
+	"errors"
 	"expvar"
 	"fmt"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/pkg/errors"
 	"github.com/tilt-dev/fsnotify"
 )
 

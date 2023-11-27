@@ -16,6 +16,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,45 +27,23 @@ import (
 	"strings"
 	"time"
 
-	moby "github.com/docker/docker/api/types"
-
-	"github.com/docker/compose/v2/internal/sync"
-
 	"github.com/compose-spec/compose-go/types"
-	"github.com/jonboulle/clockwork"
-	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
-
+	"github.com/docker/compose/v2/internal/sync"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/watch"
+	moby "github.com/docker/docker/api/types"
+	"github.com/jonboulle/clockwork"
+	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
-
-type DevelopmentConfig struct {
-	Watch []Trigger `json:"watch,omitempty"`
-}
-
-type WatchAction string
-
-const (
-	WatchActionSync    WatchAction = "sync"
-	WatchActionRebuild WatchAction = "rebuild"
-)
-
-type Trigger struct {
-	Path   string   `json:"path,omitempty"`
-	Action string   `json:"action,omitempty"`
-	Target string   `json:"target,omitempty"`
-	Ignore []string `json:"ignore,omitempty"`
-}
 
 const quietPeriod = 500 * time.Millisecond
 
 // fileEvent contains the Compose service and modified host system path.
 type fileEvent struct {
 	sync.PathMapping
-	Action WatchAction
+	Action types.WatchAction
 }
 
 // getSyncImplementation returns the the tar-based syncer unless it has been explicitly
@@ -84,11 +63,7 @@ func (s *composeService) getSyncImplementation(project *types.Project) sync.Sync
 	return sync.NewDockerCopy(project.Name, s, s.stdinfo())
 }
 
-func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, _ api.WatchOptions) error { //nolint: gocyclo
-	_, err := s.prepareProjectForBuild(project, nil)
-	if err != nil {
-		return err
-	}
+func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
 	if err := project.ForServices(services); err != nil {
 		return err
 	}
@@ -100,6 +75,10 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		config, err := loadDevelopmentConfig(service, project)
 		if err != nil {
 			return err
+		}
+
+		if service.Develop != nil {
+			config = service.Develop
 		}
 
 		if config == nil {
@@ -142,13 +121,14 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			dotGitIgnore,
 		)
 
-		var paths []string
+		var paths, pathLogs []string
 		for _, trigger := range config.Watch {
 			if checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
 				continue
 			}
 			paths = append(paths, trigger.Path)
+			pathLogs = append(pathLogs, fmt.Sprintf("Action %s for path %q", trigger.Action, trigger.Path))
 		}
 
 		watcher, err := watch.NewWatcher(paths, ignore)
@@ -156,7 +136,12 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			return err
 		}
 
-		fmt.Fprintf(s.stdinfo(), "watching %s\n", paths)
+		fmt.Fprintf(
+			s.stdinfo(),
+			"Watch configuration for service %q:%s\n",
+			service.Name,
+			strings.Join(append([]string{""}, pathLogs...), "\n  - "),
+		)
 		err = watcher.Start()
 		if err != nil {
 			return err
@@ -165,25 +150,18 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 		eg.Go(func() error {
 			defer watcher.Close() //nolint:errcheck
-			return s.watch(ctx, project, service.Name, watcher, syncer, config.Watch)
+			return s.watch(ctx, project, service.Name, options, watcher, syncer, config.Watch)
 		})
 	}
 
 	if !watching {
-		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'x-develop' section")
+		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'develop' section")
 	}
 
 	return eg.Wait()
 }
 
-func (s *composeService) watch(
-	ctx context.Context,
-	project *types.Project,
-	name string,
-	watcher watch.Notify,
-	syncer sync.Syncer,
-	triggers []Trigger,
-) error {
+func (s *composeService) watch(ctx context.Context, project *types.Project, name string, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, triggers []types.Trigger) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -206,7 +184,7 @@ func (s *composeService) watch(
 			case batch := <-batchEvents:
 				start := time.Now()
 				logrus.Debugf("batch start: service[%s] count[%d]", name, len(batch))
-				if err := s.handleWatchBatch(ctx, project, name, batch, syncer); err != nil {
+				if err := s.handleWatchBatch(ctx, project, name, options.Build, batch, syncer); err != nil {
 					logrus.Warnf("Error handling changed files for service %s: %v", name, err)
 				}
 				logrus.Debugf("batch complete: service[%s] duration[%s] count[%d]",
@@ -237,7 +215,7 @@ func (s *composeService) watch(
 // rules.
 //
 // Any errors are logged as warnings and nil (no file event) is returned.
-func maybeFileEvent(trigger Trigger, hostPath string, ignore watch.PathMatcher) *fileEvent {
+func maybeFileEvent(trigger types.Trigger, hostPath string, ignore watch.PathMatcher) *fileEvent {
 	if !watch.IsChild(trigger.Path, hostPath) {
 		return nil
 	}
@@ -264,7 +242,7 @@ func maybeFileEvent(trigger Trigger, hostPath string, ignore watch.PathMatcher) 
 	}
 
 	return &fileEvent{
-		Action: WatchAction(trigger.Action),
+		Action: trigger.Action,
 		PathMapping: sync.PathMapping{
 			HostPath:      hostPath,
 			ContainerPath: containerPath,
@@ -272,12 +250,13 @@ func maybeFileEvent(trigger Trigger, hostPath string, ignore watch.PathMatcher) 
 	}
 }
 
-func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (*DevelopmentConfig, error) {
-	var config DevelopmentConfig
+func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (*types.DevelopConfig, error) {
+	var config types.DevelopConfig
 	y, ok := service.Extensions["x-develop"]
 	if !ok {
 		return nil, nil
 	}
+	logrus.Warnf("x-develop is DEPRECATED, please use the official `develop` attribute")
 	err := mapstructure.Decode(y, &config)
 	if err != nil {
 		return nil, err
@@ -300,7 +279,7 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 			return nil, errors.New("watch rules MUST define a path")
 		}
 
-		if trigger.Action == string(WatchActionRebuild) && service.Build == nil {
+		if trigger.Action == types.WatchActionRebuild && service.Build == nil {
 			return nil, fmt.Errorf("service %s doesn't have a build section, can't apply 'rebuild' on watch", service.Name)
 		}
 
@@ -440,24 +419,22 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 	return nil
 }
 
-func (s *composeService) handleWatchBatch(
-	ctx context.Context,
-	project *types.Project,
-	serviceName string,
-	batch []fileEvent,
-	syncer sync.Syncer,
-) error {
+func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, build api.BuildOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
+	restartService := false
 	for i := range batch {
-		if batch[i].Action == WatchActionRebuild {
+		if batch[i].Action == types.WatchActionRebuild {
 			fmt.Fprintf(
 				s.stdinfo(),
-				"Rebuilding %s after changes were detected:%s\n",
+				"Rebuilding service %q after changes were detected:%s\n",
 				serviceName,
 				strings.Join(append([]string{""}, batch[i].HostPath), "\n  - "),
 			)
+			// restrict the build to ONLY this service, not any of its dependencies
+			build.Services = []string{serviceName}
 			err := s.Up(ctx, project, api.UpOptions{
 				Create: api.CreateOptions{
+					Build:    &build,
 					Services: []string{serviceName},
 					Inherit:  true,
 				},
@@ -467,9 +444,12 @@ func (s *composeService) handleWatchBatch(
 				},
 			})
 			if err != nil {
-				fmt.Fprintf(s.stderr(), "Application failed to start after update\n")
+				fmt.Fprintf(s.stderr(), "Application failed to start after update. Error: %v\n", err)
 			}
 			return nil
+		}
+		if batch[i].Action == types.WatchActionSyncRestart {
+			restartService = true
 		}
 		pathMappings[i] = batch[i].PathMapping
 	}
@@ -482,6 +462,13 @@ func (s *composeService) handleWatchBatch(
 	}
 	if err := syncer.Sync(ctx, service, pathMappings); err != nil {
 		return err
+	}
+	if restartService {
+		return s.Restart(ctx, project.Name, api.RestartOptions{
+			Services: []string{serviceName},
+			Project:  project,
+			NoDeps:   false,
+		})
 	}
 	return nil
 }
@@ -496,7 +483,7 @@ func writeWatchSyncMessage(w io.Writer, serviceName string, pathMappings []sync.
 		}
 		fmt.Fprintf(
 			w,
-			"Syncing %s after changes were detected:%s\n",
+			"Syncing %q after changes were detected:%s\n",
 			serviceName,
 			strings.Join(append([]string{""}, hostPathsToSync...), "\n  - "),
 		)
@@ -507,7 +494,7 @@ func writeWatchSyncMessage(w io.Writer, serviceName string, pathMappings []sync.
 		}
 		fmt.Fprintf(
 			w,
-			"Syncing %s after %d changes were detected\n",
+			"Syncing service %q after %d changes were detected\n",
 			serviceName,
 			len(pathMappings),
 		)

@@ -1,0 +1,15 @@
+services:
+  back:
+    image: nginx:alpine
+    depends_on:
+      - db
+  db:
+    image: nginx:alpine
+  front:
+    image: nginx:alpine
+    deploy:
+      replicas: 2
+  dbadmin:
+    image: nginx:alpine
+    deploy:
+      replicas: 0

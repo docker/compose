@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
+	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
@@ -35,7 +36,6 @@ import (
 
 type buildOptions struct {
 	*ProjectOptions
-	composeOptions
 	quiet   bool
 	pull    bool
 	push    bool
@@ -73,7 +73,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}, nil
 }
 
-func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -96,11 +96,11 @@ func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cob
 				opts.ssh = "default"
 			}
 			if cmd.Flags().Changed("progress") && opts.ssh == "" {
-				fmt.Fprint(os.Stderr, "--progress is a global compose flag, better use `docker compose --progress xx build ...")
+				fmt.Fprint(os.Stderr, "--progress is a global compose flag, better use `docker compose --progress xx build ...\n")
 			}
-			return runBuild(ctx, backend, opts, args)
+			return runBuild(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	cmd.Flags().BoolVar(&opts.push, "push", false, "Push service images.")
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
@@ -118,15 +118,19 @@ func buildCommand(p *ProjectOptions, progress *string, backend api.Service) *cob
 	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
 	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
 	cmd.Flags().VarP(&opts.memory, "memory", "m", "Set memory limit for the build container. Not supported by BuildKit.")
-	cmd.Flags().StringVar(progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
+	cmd.Flags().StringVar(&p.Progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().MarkHidden("progress") //nolint:errcheck
 
 	return cmd
 }
 
-func runBuild(ctx context.Context, backend api.Service, opts buildOptions, services []string) error {
-	project, err := opts.ToProject(services, cli.WithResolvedPaths(true))
+func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, opts buildOptions, services []string) error {
+	project, err := opts.ToProject(dockerCli, services, cli.WithResolvedPaths(true))
 	if err != nil {
+		return err
+	}
+
+	if err := applyPlatforms(project, false); err != nil {
 		return err
 	}
 

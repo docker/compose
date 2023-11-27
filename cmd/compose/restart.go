@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -33,7 +33,7 @@ type restartOptions struct {
 	noDeps      bool
 }
 
-func restartCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := restartOptions{
 		ProjectOptions: p,
 	}
@@ -44,9 +44,9 @@ func restartCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runRestart(ctx, backend, opts, args)
+			return runRestart(ctx, dockerCli, backend, opts, args)
 		}),
-		ValidArgsFunction: completeServiceNames(p),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := restartCmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
@@ -55,10 +55,17 @@ func restartCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return restartCmd
 }
 
-func runRestart(ctx context.Context, backend api.Service, opts restartOptions, services []string) error {
-	project, name, err := opts.projectOrName()
+func runRestart(ctx context.Context, dockerCli command.Cli, backend api.Service, opts restartOptions, services []string) error {
+	project, name, err := opts.projectOrName(dockerCli)
 	if err != nil {
 		return err
+	}
+
+	if project != nil && len(services) > 0 {
+		err := project.EnableServices(services...)
+		if err != nil {
+			return err
+		}
 	}
 
 	var timeout *time.Duration
@@ -67,16 +74,10 @@ func runRestart(ctx context.Context, backend api.Service, opts restartOptions, s
 		timeout = &timeoutValue
 	}
 
-	if opts.noDeps {
-		err := project.ForServices(services, types.IgnoreDependencies)
-		if err != nil {
-			return err
-		}
-	}
-
 	return backend.Restart(ctx, name, api.RestartOptions{
 		Timeout:  timeout,
 		Services: services,
 		Project:  project,
+		NoDeps:   opts.noDeps,
 	})
 }

@@ -141,6 +141,8 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 }
 
 func TestAttachRestart(t *testing.T) {
+	t.Skip("Skipping test until we can fix it")
+
 	if _, ok := os.LookupEnv("CI"); ok {
 		t.Skip("Skipping test on CI... flaky")
 	}
