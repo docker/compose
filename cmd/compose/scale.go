@@ -73,18 +73,12 @@ func runScale(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	for key, value := range serviceReplicaTuples {
-		for i, service := range project.Services {
-			if service.Name != key {
-				continue
-			}
-			value := value
-			service.Scale = &value
-			if service.Deploy != nil {
-				service.Deploy.Replicas = &value
-			}
-			project.Services[i] = service
-			break
+		service, err := project.GetService(key)
+		if err != nil {
+			return err
 		}
+		service.SetScale(value)
+		project.Services[key] = service
 	}
 
 	return backend.Scale(ctx, project, api.ScaleOptions{Services: services})

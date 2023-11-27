@@ -146,9 +146,9 @@ type BuildOptions struct {
 // Apply mutates project according to build options
 func (o BuildOptions) Apply(project *types.Project) error {
 	platform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
-	for i, service := range project.Services {
+	for name, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
-			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
 		}
 
 		if service.Build == nil {
@@ -156,20 +156,20 @@ func (o BuildOptions) Apply(project *types.Project) error {
 		}
 		if platform != "" {
 			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, platform) {
-				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", service.Name, platform)
+				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", name, platform)
 			}
 			service.Platform = platform
 		}
 		if service.Platform != "" {
 			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, service.Platform) {
-				return fmt.Errorf("service %q build configuration does not support platform: %s", service.Name, service.Platform)
+				return fmt.Errorf("service %q build configuration does not support platform: %s", name, service.Platform)
 			}
 		}
 
 		service.Build.Pull = service.Build.Pull || o.Pull
 		service.Build.NoCache = service.Build.NoCache || o.NoCache
 
-		project.Services[i] = service
+		project.Services[name] = service
 	}
 	return nil
 }

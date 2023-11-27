@@ -193,9 +193,10 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 				Image:  c.Image,
 				Labels: c.Labels,
 			}
-			set[serviceLabel] = service
+
 		}
 		service.Scale = increment(service.Scale)
+		set[serviceLabel] = service
 	}
 	for name, service := range set {
 		dependencies := service.Labels[api.DependenciesLabel]

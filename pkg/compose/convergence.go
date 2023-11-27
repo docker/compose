@@ -205,6 +205,16 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	return err
 }
 
+func getScale(config types.ServiceConfig) (int, error) {
+	scale := config.GetScale()
+	if scale > 1 && config.ContainerName != "" {
+		return 0, fmt.Errorf(doubledContainerNameWarning,
+			config.Name,
+			config.ContainerName)
+	}
+	return scale, nil
+}
+
 // resolveServiceReferences replaces reference to another service with reference to an actual container
 func (c *convergence) resolveServiceReferences(service *types.ServiceConfig) error {
 	err := c.resolveVolumeFrom(service)
@@ -428,7 +438,7 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 			}
 		}
 		return false, err
-	} else if service.Scale != nil && *service.Scale == 0 {
+	} else if service.GetScale() == 0 {
 		// don't wait for the dependency which configured to have 0 containers running
 		return false, nil
 	}
@@ -453,22 +463,6 @@ func nextContainerNumber(containers []moby.Container) int {
 	}
 	return max + 1
 
-}
-
-func getScale(config types.ServiceConfig) (int, error) {
-	scale := 1
-	if config.Scale != nil {
-		scale = *config.Scale
-	} else if config.Deploy != nil && config.Deploy.Replicas != nil {
-		// this should not be required as compose-go enforce consistency between scale anr replicas
-		scale = *config.Deploy.Replicas
-	}
-	if scale > 1 && config.ContainerName != "" {
-		return 0, fmt.Errorf(doubledContainerNameWarning,
-			config.Name,
-			config.ContainerName)
-	}
-	return scale, nil
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
@@ -754,7 +748,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	}
 
 	if len(containers) == 0 {
-		if scale, err := getScale(service); err != nil && scale == 0 {
+		if service.GetScale() == 0 {
 			return nil
 		}
 		return fmt.Errorf("service %q has no container to start", service.Name)

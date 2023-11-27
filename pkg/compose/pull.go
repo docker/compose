@@ -64,10 +64,10 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	)
 
 	i := 0
-	for _, service := range project.Services {
+	for name, service := range project.Services {
 		if service.Image == "" {
 			w.Event(progress.Event{
-				ID:     service.Name,
+				ID:     name,
 				Status: progress.Done,
 				Text:   "Skipped - No image to be pulled",
 			})
@@ -77,7 +77,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		switch service.PullPolicy {
 		case types.PullPolicyNever, types.PullPolicyBuild:
 			w.Event(progress.Event{
-				ID:     service.Name,
+				ID:     name,
 				Status: progress.Done,
 				Text:   "Skipped",
 			})
@@ -85,7 +85,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
 			if imageAlreadyPresent(service.Image, images) {
 				w.Event(progress.Event{
-					ID:     service.Name,
+					ID:     name,
 					Status: progress.Done,
 					Text:   "Skipped - Image is already present locally",
 				})
@@ -95,7 +95,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		if service.Build != nil && opts.IgnoreBuildable {
 			w.Event(progress.Event{
-				ID:     service.Name,
+				ID:     name,
 				Status: progress.Done,
 				Text:   "Skipped - Image can be built",
 			})
@@ -104,7 +104,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		if s, ok := imagesBeingPulled[service.Image]; ok {
 			w.Event(progress.Event{
-				ID:     service.Name,
+				ID:     name,
 				Status: progress.Done,
 				Text:   fmt.Sprintf("Skipped - Image is already being pulled by %v", s),
 			})
@@ -113,7 +113,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		imagesBeingPulled[service.Image] = service.Name
 
-		idx, service := i, service
+		idx, name, service := i, name, service
 		eg.Go(func() error {
 			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
@@ -124,7 +124,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				if !opts.IgnoreFailures && service.Build == nil {
 					if s.dryRun {
 						w.Event(progress.Event{
-							ID:     service.Name,
+							ID:     name,
 							Status: progress.Error,
 							Text:   fmt.Sprintf(" - Pull error for image: %s", service.Image),
 						})

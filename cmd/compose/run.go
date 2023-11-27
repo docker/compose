@@ -105,9 +105,9 @@ func (options runOptions) apply(project *types.Project) error {
 		target.Volumes = append(target.Volumes, volume)
 	}
 
-	for i, s := range project.Services {
-		if s.Name == options.Service {
-			project.Services[i] = target
+	for name := range project.Services {
+		if name == options.Service {
+			project.Services[name] = target
 			break
 		}
 	}
@@ -279,10 +279,10 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		QuietPull:         options.quietPull,
 	}
 
-	for i, service := range project.Services {
-		if service.Name == options.Service {
+	for name, service := range project.Services {
+		if name == options.Service {
 			service.StdinOpen = options.interactive
-			project.Services[i] = service
+			project.Services[name] = service
 		}
 	}
 
@@ -301,7 +301,7 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for name, service := range project.Services {
-		if service.Name != requestedServiceName {
+		if name != requestedServiceName {
 			dependencies[name] = service
 		} else {
 			requestedService = service
