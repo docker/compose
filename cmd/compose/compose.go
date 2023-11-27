@@ -230,10 +230,10 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 		return nil, err
 	}
 
-	for i, s := range project.Services {
+	for name, s := range project.Services {
 		s.CustomLabels = map[string]string{
 			api.ProjectLabel:     project.Name,
-			api.ServiceLabel:     s.Name,
+			api.ServiceLabel:     name,
 			api.VersionLabel:     api.ComposeVersion,
 			api.WorkingDirLabel:  project.WorkingDir,
 			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
@@ -242,7 +242,7 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 		if len(o.EnvFiles) != 0 {
 			s.CustomLabels[api.EnvironmentFileLabel] = strings.Join(o.EnvFiles, ",")
 		}
-		project.Services[i] = s
+		project.Services[name] = s
 	}
 
 	project.WithoutUnnecessaryResources()

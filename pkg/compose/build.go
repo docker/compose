@@ -189,7 +189,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return err
 		}
 
-		digest, err := s.doBuildBuildkit(ctx, service.Name, buildOptions, w, nodes)
+		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
 		if err != nil {
 			return err
 		}
@@ -221,9 +221,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool) error {
-	for _, service := range project.Services {
+	for name, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
-			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
 		}
 	}
 
@@ -261,7 +261,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	}
 
 	// set digest as com.docker.compose.image label so we can detect outdated containers
-	for _, service := range project.Services {
+	for name, service := range project.Services {
 		image := api.GetImageNameOrDefault(service, project.Name)
 		digest, ok := images[image]
 		if ok {
@@ -270,6 +270,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			}
 			service.CustomLabels.Add(api.ImageDigestLabel, digest)
 		}
+		project.Services[name] = service
 	}
 	return nil
 }

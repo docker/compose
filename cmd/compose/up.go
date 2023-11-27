@@ -260,21 +260,11 @@ func runUp(
 }
 
 func setServiceScale(project *types.Project, name string, replicas int) error {
-	for i, s := range project.Services {
-		if s.Name != name {
-			continue
-		}
-
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-		service.Scale = &replicas
-		if service.Deploy != nil {
-			service.Deploy.Replicas = &replicas
-		}
-		project.Services[i] = service
-		return nil
+	service, err := project.GetService(name)
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("unknown service %q", name)
+	service.SetScale(replicas)
+	project.Services[name] = service
+	return nil
 }

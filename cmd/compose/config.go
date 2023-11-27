@@ -210,7 +210,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(dockerCli.Out(), "%s %s\n", s.Name, hash)
+		fmt.Fprintf(dockerCli.Out(), "%s %s\n", name, hash)
 	}
 	return nil
 }

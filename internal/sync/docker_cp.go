@@ -62,10 +62,7 @@ func (d *DockerCopy) Sync(ctx context.Context, service types.ServiceConfig, path
 }
 
 func (d *DockerCopy) sync(ctx context.Context, service types.ServiceConfig, pathMapping PathMapping) error {
-	scale := 1
-	if service.Scale != nil {
-		scale = *service.Scale
-	}
+	scale := service.GetScale()
 
 	if fi, statErr := os.Stat(pathMapping.HostPath); statErr == nil {
 		if fi.IsDir() {

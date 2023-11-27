@@ -101,7 +101,7 @@ func TestApplyPlatforms_UnsupportedPlatform(t *testing.T) {
 				"DOCKER_DEFAULT_PLATFORM": "commodore/64",
 			},
 			Services: types.Services{
-				"foo": {
+				"test": {
 					Name:  "test",
 					Image: "foo",
 					Build: &types.BuildConfig{

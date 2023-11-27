@@ -149,11 +149,12 @@ func TestViz(t *testing.T) {
 
 		// check edges that SHOULD exist in the generated graph
 		allowedEdges := make(map[string][]string)
-		for _, service := range project.Services {
-			allowedEdges[service.Name] = make([]string, 0, len(service.DependsOn))
+		for name, service := range project.Services {
+			allowed := make([]string, 0, len(service.DependsOn))
 			for depName := range service.DependsOn {
-				allowedEdges[service.Name] = append(allowedEdges[service.Name], depName)
+				allowed = append(allowed, depName)
 			}
+			allowedEdges[name] = allowed
 		}
 		for serviceName, dependencies := range allowedEdges {
 			for _, dependencyName := range dependencies {
@@ -163,12 +164,12 @@ func TestViz(t *testing.T) {
 
 		// check edges that SHOULD NOT exist in the generated graph
 		forbiddenEdges := make(map[string][]string)
-		for _, service := range project.Services {
-			forbiddenEdges[service.Name] = make([]string, 0, len(project.ServiceNames())-len(service.DependsOn))
+		for name, service := range project.Services {
+			forbiddenEdges[name] = make([]string, 0, len(project.ServiceNames())-len(service.DependsOn))
 			for _, serviceName := range project.ServiceNames() {
 				_, edgeExists := service.DependsOn[serviceName]
 				if !edgeExists {
-					forbiddenEdges[service.Name] = append(forbiddenEdges[service.Name], serviceName)
+					forbiddenEdges[name] = append(forbiddenEdges[name], serviceName)
 				}
 			}
 		}
