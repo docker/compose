@@ -106,7 +106,7 @@ func TestWatch_Sync(t *testing.T) {
 
 	proj := types.Project{
 		Services: types.Services{
-			{
+			"test": {
 				Name: "test",
 			},
 		},

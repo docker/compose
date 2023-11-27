@@ -86,7 +86,7 @@ func sampleProject() *types.Project {
 	return &types.Project{
 		Name: "test",
 		Services: types.Services{
-			{
+			"svc": {
 				Name: "svc",
 				Build: &types.BuildConfig{
 					Context: ".",

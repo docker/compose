@@ -67,7 +67,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 }
 
 type serviceToBuild struct {
-	idx     int
+	name    string
 	service types.ServiceConfig
 }
 
@@ -85,7 +85,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		service, idx := getServiceIndex(project, name)
+		service := project.Services[name]
 
 		if service.Build == nil {
 			return nil
@@ -97,7 +97,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return nil
 		}
 		mapServiceMutx.Lock()
-		serviceToBeBuild[name] = serviceToBuild{idx: idx, service: service}
+		serviceToBeBuild[name] = serviceToBuild{name: name, service: service}
 		mapServiceMutx.Unlock()
 		return nil
 	}, func(traversal *graphTraversal) {
@@ -146,7 +146,17 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
+	// we use a pre-allocated []string to collect build digest by service index while running concurrent goroutines
 	builtDigests := make([]string, len(project.Services))
+	names := project.ServiceNames()
+	getServiceIndex := func(name string) int {
+		for idx, n := range names {
+			if n == name {
+				return idx
+			}
+		}
+		return -1
+	}
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
@@ -156,14 +166,13 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return nil
 		}
 		service := serviceToBuild.service
-		idx := serviceToBuild.idx
 
 		if !buildkitEnabled {
 			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
 				return err
 			}
-			builtDigests[idx] = id
+			builtDigests[getServiceIndex(name)] = id
 
 			if options.Push {
 				return s.push(ctx, project, api.PushOptions{})
@@ -184,7 +193,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
-		builtDigests[idx] = digest
+		builtDigests[getServiceIndex(name)] = digest
 
 		return nil
 	}, func(traversal *graphTraversal) {
@@ -204,23 +213,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 	for i, imageDigest := range builtDigests {
 		if imageDigest != "" {
-			imageRef := api.GetImageNameOrDefault(project.Services[i], project.Name)
+			imageRef := api.GetImageNameOrDefault(project.Services[names[i]], project.Name)
 			imageIDs[imageRef] = imageDigest
 		}
 	}
 	return imageIDs, err
-}
-
-func getServiceIndex(project *types.Project, name string) (types.ServiceConfig, int) {
-	var service types.ServiceConfig
-	var idx int
-	for i, s := range project.Services {
-		if s.Name == name {
-			idx, service = i, s
-			break
-		}
-	}
-	return service, idx
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool) error {
@@ -264,14 +261,14 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	}
 
 	// set digest as com.docker.compose.image label so we can detect outdated containers
-	for i, service := range project.Services {
+	for _, service := range project.Services {
 		image := api.GetImageNameOrDefault(service, project.Name)
 		digest, ok := images[image]
 		if ok {
-			if project.Services[i].Labels == nil {
-				project.Services[i].Labels = types.Labels{}
+			if service.Labels == nil {
+				service.Labels = types.Labels{}
 			}
-			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
+			service.CustomLabels.Add(api.ImageDigestLabel, digest)
 		}
 	}
 	return nil
@@ -440,7 +437,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Platforms:   plats,
 		Labels:      imageLabels,
 		NetworkMode: service.Build.Network,
-		ExtraHosts:  service.Build.ExtraHosts.AsList(),
+		ExtraHosts:  service.Build.ExtraHosts.AsList(":"),
 		Ulimits:     toUlimitOpt(service.Build.Ulimits),
 		Session:     sessionConfig,
 		Allow:       allow,

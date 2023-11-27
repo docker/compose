@@ -227,7 +227,10 @@ func TestWaitDependencies(t *testing.T) {
 	t.Run("should skip dependencies with scale 0", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(0)}
 		redisService := types.ServiceConfig{Name: "redis", Scale: intPtr(0)}
-		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{dbService, redisService}}
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db":    dbService,
+			"redis": redisService,
+		}}
 		dependencies := types.DependsOnConfig{
 			"db":    {Condition: ServiceConditionRunningOrHealthy},
 			"redis": {Condition: ServiceConditionRunningOrHealthy},
@@ -237,7 +240,10 @@ func TestWaitDependencies(t *testing.T) {
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(1)}
 		redisService := types.ServiceConfig{Name: "redis", Scale: intPtr(1)}
-		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{dbService, redisService}}
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db":    dbService,
+			"redis": redisService,
+		}}
 		dependencies := types.DependsOnConfig{
 			"db":    {Condition: types.ServiceConditionStarted, Required: true},
 			"redis": {Condition: types.ServiceConditionStarted, Required: true},

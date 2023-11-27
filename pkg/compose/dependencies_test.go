@@ -33,19 +33,19 @@ import (
 func createTestProject() *types.Project {
 	return &types.Project{
 		Services: types.Services{
-			{
+			"test1": {
 				Name: "test1",
 				DependsOn: map[string]types.ServiceDependency{
 					"test2": {},
 				},
 			},
-			{
+			"test2": {
 				Name: "test2",
 				DependsOn: map[string]types.ServiceDependency{
 					"test3": {},
 				},
 			},
-			{
+			"test3": {
 				Name: "test3",
 			},
 		},
@@ -59,7 +59,7 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 	}
 
 	project := types.Project{
-		Services: types.Services{dependent},
+		Services: types.Services{"dependent": dependent},
 	}
 
 	for i := 1; i <= 100; i++ {
@@ -67,7 +67,7 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 		dependent.DependsOn[name] = types.ServiceDependency{}
 
 		svc := types.ServiceConfig{Name: name}
-		project.Services = append(project.Services, svc)
+		project.Services[name] = svc
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -132,7 +132,7 @@ func TestBuildGraph(t *testing.T) {
 		{
 			desc: "builds graph with single service",
 			services: types.Services{
-				{
+				"test": {
 					Name:      "test",
 					DependsOn: types.DependsOnConfig{},
 				},
@@ -150,11 +150,11 @@ func TestBuildGraph(t *testing.T) {
 		{
 			desc: "builds graph with two separate services",
 			services: types.Services{
-				{
+				"test": {
 					Name:      "test",
 					DependsOn: types.DependsOnConfig{},
 				},
-				{
+				"another": {
 					Name:      "another",
 					DependsOn: types.DependsOnConfig{},
 				},
@@ -179,13 +179,13 @@ func TestBuildGraph(t *testing.T) {
 		{
 			desc: "builds graph with a service and a dependency",
 			services: types.Services{
-				{
+				"test": {
 					Name: "test",
 					DependsOn: types.DependsOnConfig{
 						"another": types.ServiceDependency{},
 					},
 				},
-				{
+				"another": {
 					Name:      "another",
 					DependsOn: types.DependsOnConfig{},
 				},
@@ -214,19 +214,19 @@ func TestBuildGraph(t *testing.T) {
 		{
 			desc: "builds graph with multiple dependency levels",
 			services: types.Services{
-				{
+				"test": {
 					Name: "test",
 					DependsOn: types.DependsOnConfig{
 						"another": types.ServiceDependency{},
 					},
 				},
-				{
+				"another": {
 					Name: "another",
 					DependsOn: types.DependsOnConfig{
 						"another_dep": types.ServiceDependency{},
 					},
 				},
-				{
+				"another_dep": {
 					Name:      "another_dep",
 					DependsOn: types.DependsOnConfig{},
 				},

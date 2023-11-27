@@ -25,10 +25,7 @@ import (
 
 func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {
 	defaultPlatform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
-	for i := range project.Services {
-		// mutable reference so platform fields can be updated
-		service := &project.Services[i]
-
+	for _, service := range project.Services {
 		if service.Build == nil {
 			continue
 		}

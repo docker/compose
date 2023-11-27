@@ -34,7 +34,7 @@ func TestViz(t *testing.T) {
 		Name:       "viz-test",
 		WorkingDir: "/home",
 		Services: types.Services{
-			{
+			"service1": {
 				Name:  "service1",
 				Image: "image-for-service1",
 				Ports: []types.ServicePortConfig{
@@ -53,12 +53,12 @@ func TestViz(t *testing.T) {
 					"internal": nil,
 				},
 			},
-			{
+			"service2": {
 				Name:  "service2",
 				Image: "image-for-service2",
 				Ports: []types.ServicePortConfig{},
 			},
-			{
+			"service3": {
 				Name:  "service3",
 				Image: "some-image",
 				DependsOn: map[string]types.ServiceDependency{
@@ -66,7 +66,7 @@ func TestViz(t *testing.T) {
 					"service1": {},
 				},
 			},
-			{
+			"service4": {
 				Name:  "service4",
 				Image: "another-image",
 				DependsOn: map[string]types.ServiceDependency{
@@ -82,7 +82,7 @@ func TestViz(t *testing.T) {
 					"external": nil,
 				},
 			},
-			{
+			"With host IP": {
 				Name:  "With host IP",
 				Image: "user/image-name",
 				DependsOn: map[string]types.ServiceDependency{

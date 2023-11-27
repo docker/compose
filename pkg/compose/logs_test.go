@@ -83,7 +83,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	opts := compose.LogOptions{
 		Project: &types.Project{
 			Services: types.Services{
-				{Name: "service"},
+				"service": {Name: "service"},
 			},
 		},
 	}
@@ -153,8 +153,8 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	// reference `serviceB` even though it has running services for this proj
 	proj := &types.Project{
 		Services: types.Services{
-			{Name: "serviceA"},
-			{Name: "serviceC"},
+			"serviceA": {Name: "serviceA"},
+			"serviceC": {Name: "serviceC"},
 		},
 	}
 	consumer := &testLogConsumer{}

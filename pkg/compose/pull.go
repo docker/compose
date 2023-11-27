@@ -63,8 +63,8 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		imagesBeingPulled = map[string]string{}
 	)
 
-	for i, service := range project.Services {
-		i, service := i, service
+	i := 0
+	for _, service := range project.Services {
 		if service.Image == "" {
 			w.Event(progress.Event{
 				ID:     service.Name,
@@ -113,10 +113,11 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		imagesBeingPulled[service.Image] = service.Name
 
+		idx, service := i, service
 		eg.Go(func() error {
 			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
-				pullErrors[i] = err
+				pullErrors[idx] = err
 				if service.Build != nil {
 					mustBuild = append(mustBuild, service.Name)
 				}
@@ -134,6 +135,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			}
 			return nil
 		})
+		i++
 	}
 
 	err = eg.Wait()
@@ -260,7 +262,7 @@ func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
-	var needPull types.Services
+	var needPull []types.ServiceConfig
 	for _, service := range project.Services {
 		if service.Image == "" {
 			continue

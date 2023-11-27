@@ -229,7 +229,7 @@ func imageBuildOptions(dockerCli command.Cli, project *types.Project, service ty
 		BuildArgs:   resolveAndMergeBuildArgs(dockerCli, project, service, options),
 		Labels:      config.Labels,
 		NetworkMode: config.Network,
-		ExtraHosts:  config.ExtraHosts.AsList(),
+		ExtraHosts:  config.ExtraHosts.AsList(":"),
 		Target:      config.Target,
 		Isolation:   container.Isolation(config.Isolation),
 	}

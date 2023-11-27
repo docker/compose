@@ -26,21 +26,21 @@ import (
 func TestApplyPullOptions(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
-			{
+			"must-build": {
 				Name: "must-build",
 				// No image, local build only
 				Build: &types.BuildConfig{
 					Context: ".",
 				},
 			},
-			{
+			"has-build": {
 				Name:  "has-build",
 				Image: "registry.example.com/myservice",
 				Build: &types.BuildConfig{
 					Context: ".",
 				},
 			},
-			{
+			"must-pull": {
 				Name:  "must-pull",
 				Image: "registry.example.com/another-service",
 			},
@@ -51,7 +51,7 @@ func TestApplyPullOptions(t *testing.T) {
 	}.apply(project, nil)
 	assert.NilError(t, err)
 
-	assert.Equal(t, project.Services[0].PullPolicy, "") // still default
-	assert.Equal(t, project.Services[1].PullPolicy, types.PullPolicyMissing)
-	assert.Equal(t, project.Services[2].PullPolicy, types.PullPolicyMissing)
+	assert.Equal(t, project.Services["must-build"].PullPolicy, "") // still default
+	assert.Equal(t, project.Services["has-build"].PullPolicy, types.PullPolicyMissing)
+	assert.Equal(t, project.Services["must-pull"].PullPolicy, types.PullPolicyMissing)
 }

@@ -79,10 +79,10 @@ func TestRestartWithDependencies(t *testing.T) {
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose-depends-on.yaml", "up", "-d")
 
 	res := c.RunDockerComposeCmd(t, "restart", baseService)
-	fmt.Println(res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", baseService)), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), res.Combined())
-	assert.Assert(t, !strings.Contains(res.Combined(), depNoRestart), res.Combined())
+	out := res.Combined()
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), out)
+	assert.Assert(t, !strings.Contains(out, depNoRestart), out)
 }
 
 func TestRestartWithProfiles(t *testing.T) {

@@ -183,7 +183,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	if len(containers) == 0 {
 		return project, fmt.Errorf("no container found for project %q: %w", projectName, api.ErrNotFound)
 	}
-	set := map[string]types.ServiceConfig{}
+	set := types.Services{}
 	for _, c := range containers {
 		serviceLabel := c.Labels[api.ServiceLabel]
 		service, ok := set[serviceLabel]
@@ -197,7 +197,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		}
 		service.Scale = increment(service.Scale)
 	}
-	for _, service := range set {
+	for name, service := range set {
 		dependencies := service.Labels[api.DependenciesLabel]
 		if len(dependencies) > 0 {
 			service.DependsOn = types.DependsOnConfig{}
@@ -218,9 +218,11 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 				}
 				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition, Restart: restart, Required: required}
 			}
+			set[name] = service
 		}
-		project.Services = append(project.Services, service)
 	}
+	project.Services = set
+
 SERVICES:
 	for _, qs := range services {
 		for _, es := range project.Services {
