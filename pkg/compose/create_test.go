@@ -101,8 +101,8 @@ func TestPrepareNetworkLabels(t *testing.T) {
 func TestBuildContainerMountOptions(t *testing.T) {
 	project := composetypes.Project{
 		Name: "myProject",
-		Services: []composetypes.ServiceConfig{
-			{
+		Services: composetypes.Services{
+			"myService": {
 				Name: "myService",
 				Volumes: []composetypes.ServiceVolumeConfig{
 					{
@@ -144,7 +144,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		},
 	}
 
-	mounts, err := buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
+	mounts, err := buildContainerMountOptions(project, project.Services["myService"], moby.ImageInspect{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -154,7 +154,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
 	assert.Equal(t, mounts[2].Target, "\\\\.\\pipe\\docker_engine")
 
-	mounts, err = buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
+	mounts, err = buildContainerMountOptions(project, project.Services["myService"], moby.ImageInspect{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -180,8 +180,8 @@ func TestDefaultNetworkSettings(t *testing.T) {
 		}
 		project := composetypes.Project{
 			Name: "myProject",
-			Services: []composetypes.ServiceConfig{
-				service,
+			Services: composetypes.Services{
+				"myService": service,
 			},
 			Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{
 				"myNetwork1": {
@@ -205,8 +205,8 @@ func TestDefaultNetworkSettings(t *testing.T) {
 		}
 		project := composetypes.Project{
 			Name: "myProject",
-			Services: []composetypes.ServiceConfig{
-				service,
+			Services: composetypes.Services{
+				"myService": service,
 			},
 			Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{
 				"myNetwork1": {
@@ -233,8 +233,8 @@ func TestDefaultNetworkSettings(t *testing.T) {
 		}
 		project := composetypes.Project{
 			Name: "myProject",
-			Services: []composetypes.ServiceConfig{
-				service,
+			Services: composetypes.Services{
+				"myService": service,
 			},
 		}
 
@@ -250,7 +250,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 		}
 		project := composetypes.Project{
 			Name:     "myProject",
-			Services: []composetypes.ServiceConfig{service},
+			Services: composetypes.Services{"myService": service},
 			Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{
 				"default": {
 					Name: "myProject_default",

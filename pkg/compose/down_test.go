@@ -184,12 +184,12 @@ func TestDownRemoveImages(t *testing.T) {
 		Project: &types.Project{
 			Name: strings.ToLower(testProject),
 			Services: types.Services{
-				{Name: "local-anonymous"},
-				{Name: "local-named", Image: "local-named-image"},
-				{Name: "remote", Image: "remote-image"},
-				{Name: "remote-tagged", Image: "registry.example.com/remote-image-tagged:v1.0"},
-				{Name: "no-images-anonymous"},
-				{Name: "no-images-named", Image: "missing-named-image"},
+				"local-anonymous":     {Name: "local-anonymous"},
+				"local-named":         {Name: "local-named", Image: "local-named-image"},
+				"remote":              {Name: "remote", Image: "remote-image"},
+				"remote-tagged":       {Name: "remote-tagged", Image: "registry.example.com/remote-image-tagged:v1.0"},
+				"no-images-anonymous": {Name: "no-images-anonymous"},
+				"no-images-named":     {Name: "no-images-named", Image: "missing-named-image"},
 			},
 		},
 	}

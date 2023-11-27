@@ -132,8 +132,8 @@ github.com/cncf/xds/go v0.0.0-20230607035331-e9ce68804cb4 h1:/inchEIKaYC1Akx+H+g
 github.com/cncf/xds/go v0.0.0-20230607035331-e9ce68804cb4/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb h1:EDmT6Q9Zs+SbUoc7Ik9EfrFqcylYqgPZ9ANSbTAntnE=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb/go.mod h1:ZjrT6AXHbDs86ZSdt/osfBi5qfexBrKUdONk989Wnk4=
-github.com/compose-spec/compose-go/v2 v2.0.0-20231121074112-593b77722992 h1:0BM7GPtSRK7djjvG3h67aJYH8eRikBgxkrEG7wNtgaU=
-github.com/compose-spec/compose-go/v2 v2.0.0-20231121074112-593b77722992/go.mod h1:uAthZuC/GWStR8mxGMRaQyaOeSqA4V+MZIiAIfuBoIU=
+github.com/compose-spec/compose-go/v2 v2.0.0-20231123162526-11ef9572f1a4 h1:Lr78By808iuG+2gTyxIDslRpKQCk/lcRqElKsrhzp+U=
+github.com/compose-spec/compose-go/v2 v2.0.0-20231123162526-11ef9572f1a4/go.mod h1:PWCgeD8cxiI/DmdpBM407CuLDrZ2W4xuS6/Z9jAi0YQ=
 github.com/containerd/cgroups v1.1.0 h1:v8rEWFl6EoqHB+swVNjVoCJE8o3jX7e8nqBGPLaDFBM=
 github.com/containerd/cgroups v1.1.0/go.mod h1:6ppBcbh/NOOUU+dMKrykgaBnK9lCIBxHqJDGwsa1mIw=
 github.com/containerd/console v1.0.3 h1:lIr7SlA5PxZyMV30bDW0MGbiOPXwc63yRuCP0ARubLw=

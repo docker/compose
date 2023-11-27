@@ -300,16 +300,16 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 func startDependencies(ctx context.Context, backend api.Service, project types.Project, buildOpts *api.BuildOptions, requestedServiceName string, ignoreOrphans bool) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
-	for _, service := range project.Services {
+	for name, service := range project.Services {
 		if service.Name != requestedServiceName {
-			dependencies = append(dependencies, service)
+			dependencies[name] = service
 		} else {
 			requestedService = service
 		}
 	}
 
 	project.Services = dependencies
-	project.DisabledServices = append(project.DisabledServices, requestedService)
+	project.DisabledServices[requestedServiceName] = requestedService
 	err := backend.Create(ctx, &project, api.CreateOptions{
 		Build:         buildOpts,
 		IgnoreOrphans: ignoreOrphans,

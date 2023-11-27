@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"

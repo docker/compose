@@ -26,20 +26,20 @@ import (
 func TestFilterServices(t *testing.T) {
 	p := &types.Project{
 		Services: types.Services{
-			{
+			"foo": {
 				Name:  "foo",
 				Links: []string{"bar"},
 			},
-			{
+			"bar": {
 				Name: "bar",
 				DependsOn: map[string]types.ServiceDependency{
 					"zot": {},
 				},
 			},
-			{
+			"zot": {
 				Name: "zot",
 			},
-			{
+			"qix": {
 				Name: "qix",
 			},
 		},

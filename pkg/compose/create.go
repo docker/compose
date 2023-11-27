@@ -94,11 +94,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	allServices := project.AllServices()
-	allServiceNames := []string{}
-	for _, service := range allServices {
-		allServiceNames = append(allServiceNames, service.Name)
-	}
+	allServiceNames := append(project.ServiceNames(), project.DisabledServiceNames()...)
 	orphans := observedState.filter(isNotService(allServiceNames...))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
@@ -263,7 +259,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		DNS:            service.DNS,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
-		ExtraHosts:     service.ExtraHosts.AsList(),
+		ExtraHosts:     service.ExtraHosts.AsList(":"),
 		SecurityOpt:    securityOpts,
 		UsernsMode:     container.UsernsMode(service.UserNSMode),
 		UTSMode:        container.UTSMode(service.Uts),
