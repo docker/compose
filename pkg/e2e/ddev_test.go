@@ -29,7 +29,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-const ddevVersion = "v1.19.1"
+const ddevVersion = "v1.21.1"
 
 func TestComposeRunDdev(t *testing.T) {
 	if !composeStandaloneMode {
@@ -73,7 +73,7 @@ func TestComposeRunDdev(t *testing.T) {
 	}
 
 	compressedFilename := fmt.Sprintf("ddev_%s-%s.%s.tar.gz", osName, runtime.GOARCH, ddevVersion)
-	c.RunCmdInDir(t, ddevDir, "curl", "-LO", fmt.Sprintf("https://github.com/drud/ddev/releases/download/%s/%s",
+	c.RunCmdInDir(t, ddevDir, "curl", "-LO", fmt.Sprintf("https://github.com/ddev/ddev/releases/download/%s/%s",
 		ddevVersion,
 		compressedFilename))
 
