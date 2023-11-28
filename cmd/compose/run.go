@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
+	"github.com/sirupsen/logrus"
 
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
@@ -83,6 +84,9 @@ func (options runOptions) apply(project *types.Project) error {
 
 	// --service-ports and --publish are incompatible
 	if !options.servicePorts {
+		if len(target.Ports) > 0 {
+			logrus.Debug("Running service without ports exposed as --service-ports=false")
+		}
 		target.Ports = []types.ServicePortConfig{}
 		for _, p := range options.publish {
 			config, err := types.ParsePortConfig(p)
@@ -181,7 +185,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.StringArrayVarP(&options.volumes, "volume", "v", []string{}, "Bind mount a volume.")
 	flags.StringArrayVarP(&options.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
 	flags.BoolVar(&options.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
-	flags.BoolVar(&options.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
+	flags.BoolVarP(&options.servicePorts, "service-ports", "P", false, "Run command with all service's ports enabled and mapped to the host.")
 	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container.")
 	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
