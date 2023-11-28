@@ -64,6 +64,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	defer close(signalChan)
 	var isTerminated bool
+	printer := newLogPrinter(options.Start.Attach)
 
 	doneCh := make(chan bool)
 	eg.Go(func() error {
@@ -74,6 +75,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				return nil
 			case <-signalChan:
 				if first {
+					printer.Cancel()
 					fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
 					eg.Go(func() error {
 						err := s.Stop(context.Background(), project.Name, api.StopOptions{
@@ -97,8 +99,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			}
 		}
 	})
-
-	printer := newLogPrinter(options.Start.Attach)
 
 	var exitCode int
 	eg.Go(func() error {
