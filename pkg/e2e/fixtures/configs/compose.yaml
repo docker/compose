@@ -3,22 +3,26 @@ services:
     image: alpine
     configs:
       - source: from_env
-        target: /from_env
     command: cat /from_env
 
   from_file:
     image: alpine
     configs:
       - source: from_file
-        target: /from_file
     command: cat /from_file
 
   inlined:
     image: alpine
     configs:
       - source: inlined
-        target: /inlined
     command: cat /inlined
+
+  target:
+    image: alpine
+    configs:
+      - source: inlined
+        target: /target
+    command: cat /target
 
 configs:
   from_env:
