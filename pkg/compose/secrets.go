@@ -30,14 +30,20 @@ import (
 
 func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
 	for _, config := range service.Secrets {
-		secret := project.Secrets[config.Source]
-		if secret.Environment == "" {
+		file := project.Secrets[config.Source]
+		if file.Environment == "" {
 			continue
 		}
 
-		env, ok := project.Environment[secret.Environment]
+		if config.Target == "" {
+			config.Target = "/run/secrets/" + config.Source
+		} else if !isAbsTarget(config.Target) {
+			config.Target = "/run/secrets/" + config.Target
+		}
+
+		env, ok := project.Environment[file.Environment]
 		if !ok {
-			return fmt.Errorf("environment variable %q required by secret %q is not set", secret.Environment, secret.Name)
+			return fmt.Errorf("environment variable %q required by file %q is not set", file.Environment, file.Name)
 		}
 		b, err := createTar(env, types.FileReferenceConfig(config))
 		if err != nil {
@@ -56,17 +62,21 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 
 func (s *composeService) injectConfigs(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
 	for _, config := range service.Configs {
-		secret := project.Configs[config.Source]
-		content := secret.Content
-		if secret.Environment != "" {
-			env, ok := project.Environment[secret.Environment]
+		file := project.Configs[config.Source]
+		content := file.Content
+		if file.Environment != "" {
+			env, ok := project.Environment[file.Environment]
 			if !ok {
-				return fmt.Errorf("environment variable %q required by secret %q is not set", secret.Environment, secret.Name)
+				return fmt.Errorf("environment variable %q required by file %q is not set", file.Environment, file.Name)
 			}
 			content = env
 		}
 		if content == "" {
 			continue
+		}
+
+		if config.Target == "" {
+			config.Target = "/" + config.Source
 		}
 
 		b, err := createTar(content, types.FileReferenceConfig(config))
@@ -93,13 +103,6 @@ func createTar(env string, config types.FileReferenceConfig) (bytes.Buffer, erro
 		mode = *config.Mode
 	}
 
-	target := config.Target
-	if config.Target == "" {
-		target = "/run/secrets/" + config.Source
-	} else if !isAbsTarget(config.Target) {
-		target = "/run/secrets/" + config.Target
-	}
-
 	var uid, gid int
 	if config.UID != "" {
 		v, err := strconv.Atoi(config.UID)
@@ -117,7 +120,7 @@ func createTar(env string, config types.FileReferenceConfig) (bytes.Buffer, erro
 	}
 
 	header := &tar.Header{
-		Name:    target,
+		Name:    config.Target,
 		Size:    int64(len(value)),
 		Mode:    int64(mode),
 		ModTime: time.Now(),
