@@ -83,7 +83,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	orphans := containers.filter(isNotService(project.ServiceNames()...))
+	orphans := containers.filter(isOrphaned(project))
 	if options.RemoveOrphans && len(orphans) > 0 {
 		err := s.removeContainers(ctx, w, orphans, options.Timeout, false)
 		if err != nil {

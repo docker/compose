@@ -488,6 +488,7 @@ type ServiceStatus struct {
 // LogOptions defines optional parameters for the `Log` API
 type LogOptions struct {
 	Project    *types.Project
+	Index      int
 	Services   []string
 	Tail       string
 	Since      string

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	xprogress "github.com/docker/buildx/util/progress"
+	xprogress "github.com/moby/buildkit/util/progress/progressui"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
@@ -181,7 +181,7 @@ func runUp(
 	// already removed all the build sections
 	if !createOptions.noBuild {
 		if createOptions.quietPull {
-			buildOptions.Progress = xprogress.PrinterModeQuiet
+			buildOptions.Progress = string(xprogress.QuietMode)
 		}
 		// BuildOptions here is nested inside CreateOptions, so
 		// no service list is passed, it will implicitly pick all

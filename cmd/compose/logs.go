@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
@@ -30,6 +31,7 @@ type logsOptions struct {
 	*ProjectOptions
 	composeOptions
 	follow     bool
+	index      int
 	tail       string
 	since      string
 	until      string
@@ -48,10 +50,17 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runLogs(ctx, dockerCli, backend, opts, args)
 		}),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if opts.index > 0 && len(args) != 1 {
+				return errors.New("--index requires one service to be selected")
+			}
+			return nil
+		},
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := logsCmd.Flags()
 	flags.BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")
+	flags.IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
 	flags.StringVar(&opts.since, "since", "", "Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
 	flags.StringVar(&opts.until, "until", "", "Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
@@ -71,6 +80,7 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		Project:    project,
 		Services:   services,
 		Follow:     opts.follow,
+		Index:      opts.index,
 		Tail:       opts.tail,
 		Since:      opts.since,
 		Until:      opts.until,

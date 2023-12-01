@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/locker"
 	"github.com/docker/compose/v2/pkg/api"
@@ -85,6 +87,12 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 	}
 
 	if !watchOpts.noUp {
+		for index, service := range project.Services {
+			if service.Build != nil && service.Develop != nil {
+				service.PullPolicy = types.PullPolicyBuild
+			}
+			project.Services[index] = service
+		}
 		upOpts := api.UpOptions{
 			Create: api.CreateOptions{
 				Build:                &build,

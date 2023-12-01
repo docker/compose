@@ -54,6 +54,17 @@ func TestLocalComposeLogs(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `hello`})
 	})
 
+	t.Run("logs hello index", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "--index", "2", "hello")
+
+		//  docker-compose logs hello
+		// logs-test-hello-2  | hello
+		// logs-test-hello-1  | hello
+		t.Log(res.Stdout())
+		assert.Assert(t, !strings.Contains(res.Stdout(), "hello-1"))
+		assert.Assert(t, strings.Contains(res.Stdout(), "hello-2"))
+	})
+
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})

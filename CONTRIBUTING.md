@@ -66,6 +66,11 @@ When sending lengthy log files, consider posting them as a gist
 Don't forget to remove sensitive data from your log files before posting (you
 can replace those parts with "REDACTED").
 
+_Note:_ 
+Maintainers might request additional information to diagnose an issue,
+if initial reporter doesn't answer within a reasonable delay (a few weeks),
+issue will be closed.
+
 ## Quick contribution tips and guidelines
 
 This section gives the experienced contributor some tips and guidelines.

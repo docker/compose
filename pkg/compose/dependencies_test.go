@@ -32,7 +32,7 @@ import (
 
 func createTestProject() *types.Project {
 	return &types.Project{
-		Services: []types.ServiceConfig{
+		Services: types.Services{
 			{
 				Name: "test1",
 				DependsOn: map[string]types.ServiceDependency{
@@ -59,7 +59,7 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 	}
 
 	project := types.Project{
-		Services: []types.ServiceConfig{dependent},
+		Services: types.Services{dependent},
 	}
 
 	for i := 1; i <= 100; i++ {

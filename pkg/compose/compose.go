@@ -295,5 +295,22 @@ func (s *composeService) isSWarmEnabled(ctx context.Context) (bool, error) {
 		}
 	})
 	return swarmEnabled.val, swarmEnabled.err
+}
+
+var runtimeVersion = struct {
+	once sync.Once
+	val  string
+	err  error
+}{}
+
+func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
+	runtimeVersion.once.Do(func() {
+		version, err := s.dockerCli.Client().ServerVersion(ctx)
+		if err != nil {
+			runtimeVersion.err = err
+		}
+		runtimeVersion.val = version.APIVersion
+	})
+	return runtimeVersion.val, runtimeVersion.err
 
 }

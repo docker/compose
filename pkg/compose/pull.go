@@ -260,7 +260,7 @@ func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
-	var needPull []types.ServiceConfig
+	var needPull types.Services
 	for _, service := range project.Services {
 		if service.Image == "" {
 			continue
@@ -308,7 +308,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 	}, s.stdinfo())
 }
 
-func isServiceImageToBuild(service types.ServiceConfig, services []types.ServiceConfig) bool {
+func isServiceImageToBuild(service types.ServiceConfig, services types.Services) bool {
 	if service.Build != nil {
 		return true
 	}

@@ -25,7 +25,7 @@ import (
 
 func TestApplyPullOptions(t *testing.T) {
 	project := &types.Project{
-		Services: []types.ServiceConfig{
+		Services: types.Services{
 			{
 				Name: "must-build",
 				// No image, local build only
