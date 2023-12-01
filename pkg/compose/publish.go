@@ -19,8 +19,10 @@ package compose
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -31,6 +33,23 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+// ociCompatibilityMode controls manifest generation to ensure compatibility
+// with different registries.
+//
+// Currently, this is not exposed as an option to the user – Compose uses
+// OCI 1.0 mode automatically for ECR registries based on domain and OCI 1.1
+// for all other registries.
+//
+// There are likely other popular registries that do not support the OCI 1.1
+// format, so it might make sense to expose this as a CLI flag or see if
+// there's a way to generically probe the registry for support level.
+type ociCompatibilityMode string
+
+const (
+	ociCompatibility1_0 ociCompatibilityMode = "1.0"
+	ociCompatibility1_1 ociCompatibilityMode = "1.1"
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
@@ -44,8 +63,6 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 	if err != nil {
 		return err
 	}
-
-	w := progress.ContextWriter(ctx)
 
 	named, err := reference.ParseDockerRef(repository)
 	if err != nil {
@@ -83,51 +100,25 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		layers = append(layers, layer)
 	}
 
-	emptyConfig, err := json.Marshal(v1.ImageConfig{})
+	ociCompat := inferOCIVersion(named)
+	toPush, err := s.generateManifest(layers, ociCompat)
 	if err != nil {
 		return err
 	}
-	configDescriptor := v1.Descriptor{
-		MediaType: "application/vnd.oci.empty.v1+json",
-		Digest:    digest.FromBytes(emptyConfig),
-		Size:      int64(len(emptyConfig)),
-	}
-	var imageManifest []byte
-	if !s.dryRun {
-		err = resolver.Push(ctx, named, configDescriptor, emptyConfig)
-		if err != nil {
-			return err
-		}
-		imageManifest, err = json.Marshal(v1.Manifest{
-			Versioned:    specs.Versioned{SchemaVersion: 2},
-			MediaType:    v1.MediaTypeImageManifest,
-			ArtifactType: "application/vnd.docker.compose.project",
-			Config:       configDescriptor,
-			Layers:       layers,
-			Annotations: map[string]string{
-				"org.opencontainers.image.created": time.Now().Format(time.RFC3339),
-			},
-		})
-		if err != nil {
-			return err
-		}
-	}
 
+	w := progress.ContextWriter(ctx)
 	w.Event(progress.Event{
 		ID:     repository,
 		Text:   "publishing",
 		Status: progress.Working,
 	})
 	if !s.dryRun {
-		err = resolver.Push(ctx, named, v1.Descriptor{
-			MediaType: v1.MediaTypeImageManifest,
-			Digest:    digest.FromString(string(imageManifest)),
-			Size:      int64(len(imageManifest)),
-			Annotations: map[string]string{
-				"com.docker.compose.version": api.ComposeVersion,
-			},
-			ArtifactType: "application/vnd.docker.compose.project",
-		}, imageManifest)
+		for _, p := range toPush {
+			err = resolver.Push(ctx, named, p.Descriptor, p.Data)
+			if err != nil {
+				return err
+			}
+		}
 		if err != nil {
 			w.Event(progress.Event{
 				ID:     repository,
@@ -143,6 +134,66 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Status: progress.Done,
 	})
 	return nil
+}
+
+type push struct {
+	Descriptor v1.Descriptor
+	Data       []byte
+}
+
+func (s *composeService) generateManifest(layers []v1.Descriptor, ociCompat ociCompatibilityMode) ([]push, error) {
+	var toPush []push
+	var config v1.Descriptor
+	var artifactType string
+	switch ociCompat {
+	case ociCompatibility1_0:
+		configData, err := json.Marshal(v1.ImageConfig{})
+		if err != nil {
+			return nil, err
+		}
+		config = v1.Descriptor{
+			MediaType: v1.MediaTypeImageConfig,
+			Digest:    digest.FromBytes(configData),
+			Size:      int64(len(configData)),
+		}
+		// N.B. OCI 1.0 does NOT support specifying the artifact type, so it's
+		//		left as an empty string to omit it from the marshaled JSON
+		artifactType = ""
+		toPush = append(toPush, push{Descriptor: config, Data: configData})
+	case ociCompatibility1_1:
+		config = v1.DescriptorEmptyJSON
+		artifactType = "application/vnd.docker.compose.project"
+		// N.B. the descriptor has the data embedded in it
+		toPush = append(toPush, push{Descriptor: config, Data: nil})
+	default:
+		return nil, fmt.Errorf("unsupported OCI version: %s", ociCompat)
+	}
+
+	manifest, err := json.Marshal(v1.Manifest{
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    v1.MediaTypeImageManifest,
+		ArtifactType: artifactType,
+		Config:       config,
+		Layers:       layers,
+		Annotations: map[string]string{
+			"org.opencontainers.image.created": time.Now().Format(time.RFC3339),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	manifestDescriptor := v1.Descriptor{
+		MediaType: v1.MediaTypeImageManifest,
+		Digest:    digest.FromString(string(manifest)),
+		Size:      int64(len(manifest)),
+		Annotations: map[string]string{
+			"com.docker.compose.version": api.ComposeVersion,
+		},
+		ArtifactType: artifactType,
+	}
+	toPush = append(toPush, push{Descriptor: manifestDescriptor, Data: manifest})
+	return toPush, nil
 }
 
 func (s *composeService) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
@@ -201,4 +252,19 @@ func statusFor(err error) progress.EventStatus {
 		return progress.Error
 	}
 	return progress.Done
+}
+
+// inferOCIVersion uses OCI 1.1 by default but falls back to OCI 1.0 if the
+// registry domain is known to require it.
+//
+// This is not ideal - with private registries, there isn't a bounded set of
+// domains. As it stands, it's primarily intended for compatibility with AWS
+// Elastic Container Registry (ECR) due to its ubiquity.
+func inferOCIVersion(named reference.Named) ociCompatibilityMode {
+	domain := reference.Domain(named)
+	if strings.HasSuffix(domain, "amazonaws.com") {
+		return ociCompatibility1_0
+	} else {
+		return ociCompatibility1_1
+	}
 }
