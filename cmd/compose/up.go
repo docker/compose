@@ -177,8 +177,6 @@ func runUp(
 	}
 
 	var build *api.BuildOptions
-	// this check is technically redundant as createOptions::apply()
-	// already removed all the build sections
 	if !createOptions.noBuild {
 		if createOptions.quietPull {
 			buildOptions.Progress = string(xprogress.QuietMode)
