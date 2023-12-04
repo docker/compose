@@ -159,16 +159,6 @@ func (opts createOptions) Apply(project *types.Project) error {
 			project.Services[i] = service
 		}
 	}
-	// opts.noBuild, however, means do not perform ANY builds
-	if opts.noBuild {
-		for i, service := range project.Services {
-			service.Build = nil
-			if service.Image == "" {
-				service.Image = api.GetImageNameOrDefault(service, project.Name)
-			}
-			project.Services[i] = service
-		}
-	}
 
 	if err := applyPlatforms(project, true); err != nil {
 		return err
