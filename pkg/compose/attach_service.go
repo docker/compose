@@ -33,5 +33,7 @@ func (s *composeService) Attach(ctx context.Context, projectName string, options
 
 	var attach container.AttachOptions
 	attach.DetachKeys = options.DetachKeys
+	attach.NoStdin = options.NoStdin
+	attach.Proxy = options.Proxy
 	return container.RunAttach(ctx, s.dockerCli, target.ID, &attach)
 }

@@ -31,11 +31,8 @@ type attachOpts struct {
 	index   int
 
 	detachKeys string
-
-	// todo docker container attach also has:
-	// --no-stdin  // whole point of attach is for STDIN (can already attach to STDOUT and STDERR via docker compose up)
-	// --sig-proxy
-
+	noStdin    bool
+	proxy      bool
 }
 
 func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -61,6 +58,8 @@ func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	runCmd.Flags().IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas.")
 	runCmd.Flags().StringVarP(&opts.detachKeys, "detach-keys", "", "", "Override the key sequence for detaching from a container.")
 
+	runCmd.Flags().BoolVar(&opts.noStdin, "no-stdin", false, "Do not attach STDIN")
+	runCmd.Flags().BoolVar(&opts.proxy, "sig-proxy", true, "Proxy all received signals to the process")
 	return runCmd
 }
 
@@ -74,6 +73,8 @@ func runAttach(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		Service:    opts.service,
 		Index:      opts.index,
 		DetachKeys: opts.detachKeys,
+		NoStdin:    opts.noStdin,
+		Proxy:      opts.proxy,
 	}
 	return backend.Attach(ctx, projectName, attachOpts)
 }

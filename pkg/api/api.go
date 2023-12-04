@@ -350,6 +350,8 @@ type AttachOptions struct {
 	Service    string
 	Index      int
 	DetachKeys string
+	NoStdin    bool
+	Proxy      bool
 }
 
 // EventsOptions group options of the Events API
