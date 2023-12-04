@@ -62,6 +62,8 @@ type Service interface {
 	Remove(ctx context.Context, projectName string, options RemoveOptions) error
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, projectName string, options RunOptions) (int, error)
+	// Attach STDIN,STDOUT,STDERR to a running service container
+	Attach(ctx context.Context, projectName string, options AttachOptions) error
 	// Copy copies a file/folder between a service container and the local filesystem
 	Copy(ctx context.Context, projectName string, options CopyOptions) error
 	// Pause executes the equivalent to a `compose pause`
@@ -340,6 +342,14 @@ type RunOptions struct {
 	QuietPull bool
 	// used by exec
 	Index int
+}
+
+// AttachOptions group options of the Attach API
+type AttachOptions struct {
+	Project    *types.Project
+	Service    string
+	Index      int
+	DetachKeys string
 }
 
 // EventsOptions group options of the Events API
