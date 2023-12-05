@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/sirupsen/logrus"
@@ -139,7 +140,7 @@ func (s *composeService) logContainers(ctx context.Context, consumer api.LogCons
 		return err
 	}
 
-	r, err := s.apiClient().ContainerLogs(ctx, cnt.ID, types.ContainerLogsOptions{
+	r, err := s.apiClient().ContainerLogs(ctx, cnt.ID, containerType.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     options.Follow,

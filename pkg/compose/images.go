@@ -24,6 +24,7 @@ import (
 
 	"github.com/distribution/reference"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
@@ -34,7 +35,7 @@ import (
 
 func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
 	projectName = strings.ToLower(projectName)
-	allContainers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+	allContainers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
 		All:     true,
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})

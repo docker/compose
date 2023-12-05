@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -41,7 +42,7 @@ func TestPs(t *testing.T) {
 	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)), hasConfigHashLabel())
 	args.Add("label", "com.docker.compose.oneoff=False")
-	listOpts := moby.ContainerListOptions{Filters: args, All: false}
+	listOpts := containerType.ListOptions{Filters: args, All: false}
 	c1, inspect1 := containerDetails("service1", "123", "running", "healthy", 0)
 	c2, inspect2 := containerDetails("service1", "456", "running", "", 0)
 	c2.Ports = []moby.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}

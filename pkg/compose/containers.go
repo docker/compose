@@ -26,6 +26,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 )
 
@@ -43,7 +44,7 @@ const (
 func (s *composeService) getContainers(ctx context.Context, project string, oneOff oneOff, stopped bool, selectedServices ...string) (Containers, error) {
 	var containers Containers
 	f := getDefaultFilters(project, oneOff, selectedServices...)
-	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
 		Filters: filters.NewArgs(f...),
 		All:     stopped,
 	})
@@ -77,7 +78,7 @@ func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName 
 	if containerIndex > 0 {
 		defaultFilters = append(defaultFilters, containerNumberFilter(containerIndex))
 	}
-	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
 		Filters: filters.NewArgs(
 			defaultFilters...,
 		),

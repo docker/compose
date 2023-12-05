@@ -25,12 +25,13 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {
-	list, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+	list, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
 		Filters: filters.NewArgs(hasProjectLabelFilter(), hasConfigHashLabel()),
 		All:     opts.All,
 	})

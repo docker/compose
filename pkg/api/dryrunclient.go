@@ -34,6 +34,7 @@ import (
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/checkpoint"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
@@ -41,6 +42,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -94,7 +96,7 @@ func getCallingFunction() string {
 
 // All methods and functions which need to be overridden for dry run.
 
-func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options moby.ContainerAttachOptions) (moby.HijackedResponse, error) {
+func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options containerType.AttachOptions) (moby.HijackedResponse, error) {
 	return moby.HijackedResponse{}, errors.New("interactive run is not supported in dry-run mode")
 }
 
@@ -143,7 +145,7 @@ func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal stri
 	return nil
 }
 
-func (d *DryRunClient) ContainerList(ctx context.Context, options moby.ContainerListOptions) ([]moby.Container, error) {
+func (d *DryRunClient) ContainerList(ctx context.Context, options containerType.ListOptions) ([]moby.Container, error) {
 	caller := getCallingFunction()
 	switch caller {
 	case "start":
@@ -162,7 +164,7 @@ func (d *DryRunClient) ContainerPause(ctx context.Context, container string) err
 	return nil
 }
 
-func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options moby.ContainerRemoveOptions) error {
+func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options containerType.RemoveOptions) error {
 	return nil
 }
 
@@ -174,7 +176,7 @@ func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, o
 	return nil
 }
 
-func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options moby.ContainerStartOptions) error {
+func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options containerType.StartOptions) error {
 	return nil
 }
 
@@ -259,7 +261,7 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.I
 	return rc, nil
 }
 
-func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]moby.ImageDeleteResponseItem, error) {
+func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]image.DeleteResponse, error) {
 	return nil, nil
 }
 
@@ -341,7 +343,7 @@ func (d *DryRunClient) ConfigUpdate(ctx context.Context, id string, version swar
 	return d.apiClient.ConfigUpdate(ctx, id, version, config)
 }
 
-func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, options moby.ContainerCommitOptions) (moby.IDResponse, error) {
+func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, options containerType.CommitOptions) (moby.IDResponse, error) {
 	return d.apiClient.ContainerCommit(ctx, container, options)
 }
 
@@ -357,7 +359,7 @@ func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) 
 	return d.apiClient.ContainerExecInspect(ctx, execID)
 }
 
-func (d *DryRunClient) ContainerExecResize(ctx context.Context, execID string, options moby.ResizeOptions) error {
+func (d *DryRunClient) ContainerExecResize(ctx context.Context, execID string, options containerType.ResizeOptions) error {
 	return d.apiClient.ContainerExecResize(ctx, execID, options)
 }
 
@@ -369,11 +371,11 @@ func (d *DryRunClient) ContainerInspectWithRaw(ctx context.Context, container st
 	return d.apiClient.ContainerInspectWithRaw(ctx, container, getSize)
 }
 
-func (d *DryRunClient) ContainerLogs(ctx context.Context, container string, options moby.ContainerLogsOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ContainerLogs(ctx context.Context, container string, options containerType.LogsOptions) (io.ReadCloser, error) {
 	return d.apiClient.ContainerLogs(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerResize(ctx context.Context, container string, options moby.ResizeOptions) error {
+func (d *DryRunClient) ContainerResize(ctx context.Context, container string, options containerType.ResizeOptions) error {
 	return d.apiClient.ContainerResize(ctx, container, options)
 }
 
@@ -429,7 +431,7 @@ func (d *DryRunClient) ImageImport(ctx context.Context, source moby.ImageImportS
 	return d.apiClient.ImageImport(ctx, source, ref, options)
 }
 
-func (d *DryRunClient) ImageList(ctx context.Context, options moby.ImageListOptions) ([]moby.ImageSummary, error) {
+func (d *DryRunClient) ImageList(ctx context.Context, options moby.ImageListOptions) ([]image.Summary, error) {
 	return d.apiClient.ImageList(ctx, options)
 }
 
@@ -525,7 +527,7 @@ func (d *DryRunClient) PluginCreate(ctx context.Context, createContext io.Reader
 	return d.apiClient.PluginCreate(ctx, createContext, options)
 }
 
-func (d *DryRunClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options moby.ServiceCreateOptions) (moby.ServiceCreateResponse, error) {
+func (d *DryRunClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options moby.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
 	return d.apiClient.ServiceCreate(ctx, service, options)
 }
 
@@ -541,15 +543,15 @@ func (d *DryRunClient) ServiceRemove(ctx context.Context, serviceID string) erro
 	return d.apiClient.ServiceRemove(ctx, serviceID)
 }
 
-func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options moby.ServiceUpdateOptions) (moby.ServiceUpdateResponse, error) {
+func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options moby.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
 	return d.apiClient.ServiceUpdate(ctx, serviceID, version, service, options)
 }
 
-func (d *DryRunClient) ServiceLogs(ctx context.Context, serviceID string, options moby.ContainerLogsOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ServiceLogs(ctx context.Context, serviceID string, options containerType.LogsOptions) (io.ReadCloser, error) {
 	return d.apiClient.ServiceLogs(ctx, serviceID, options)
 }
 
-func (d *DryRunClient) TaskLogs(ctx context.Context, taskID string, options moby.ContainerLogsOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) TaskLogs(ctx context.Context, taskID string, options containerType.LogsOptions) (io.ReadCloser, error) {
 	return d.apiClient.TaskLogs(ctx, taskID, options)
 }
 
@@ -613,7 +615,7 @@ func (d *DryRunClient) Events(ctx context.Context, options moby.EventsOptions) (
 	return d.apiClient.Events(ctx, options)
 }
 
-func (d *DryRunClient) Info(ctx context.Context) (moby.Info, error) {
+func (d *DryRunClient) Info(ctx context.Context) (system.Info, error) {
 	return d.apiClient.Info(ctx)
 }
 
@@ -685,14 +687,14 @@ func (d *DryRunClient) Close() error {
 	return d.apiClient.Close()
 }
 
-func (d *DryRunClient) CheckpointCreate(ctx context.Context, container string, options moby.CheckpointCreateOptions) error {
+func (d *DryRunClient) CheckpointCreate(ctx context.Context, container string, options checkpoint.CreateOptions) error {
 	return d.apiClient.CheckpointCreate(ctx, container, options)
 }
 
-func (d *DryRunClient) CheckpointDelete(ctx context.Context, container string, options moby.CheckpointDeleteOptions) error {
+func (d *DryRunClient) CheckpointDelete(ctx context.Context, container string, options checkpoint.DeleteOptions) error {
 	return d.apiClient.CheckpointDelete(ctx, container, options)
 }
 
-func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options moby.CheckpointListOptions) ([]moby.Checkpoint, error) {
+func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options checkpoint.ListOptions) ([]checkpoint.Summary, error) {
 	return d.apiClient.CheckpointList(ctx, container, options)
 }
