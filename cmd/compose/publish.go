@@ -28,6 +28,7 @@ import (
 type publishOptions struct {
 	*ProjectOptions
 	resolveImageDigests bool
+	ociVersion          string
 }
 
 func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -44,6 +45,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests.")
+	flags.StringVar(&opts.ociVersion, "oci-version", "", "OCI Image specification version (automatically determined by default)")
 	return cmd
 }
 
@@ -55,5 +57,6 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service,
 
 	return backend.Publish(ctx, project, repository, api.PublishOptions{
 		ResolveImageDigests: opts.resolveImageDigests,
+		OCIVersion:          api.OCIVersion(opts.ociVersion),
 	})
 }
