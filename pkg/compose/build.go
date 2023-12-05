@@ -410,10 +410,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Type: "docker",
 		Attrs: map[string]string{
 			"load": "true",
-			"push": fmt.Sprint(push),
 		},
 	}}
-	if len(service.Build.Platforms) > 1 {
+	if push {
 		exports = []bclient.ExportEntry{{
 			Type: "image",
 			Attrs: map[string]string{
