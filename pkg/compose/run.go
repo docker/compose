@@ -42,7 +42,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 
 	sigc := make(chan os.Signal, 128)
 	signal.Notify(sigc)
-	go cmd.ForwardAllSignals(ctx, s.dockerCli, containerID, sigc)
+	go cmd.ForwardAllSignals(ctx, s.apiClient(), containerID, sigc)
 	defer signal.Stop(sigc)
 
 	err = cmd.RunStart(s.dockerCli, &cmd.StartOptions{

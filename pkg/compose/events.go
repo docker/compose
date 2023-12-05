@@ -67,7 +67,7 @@ func (s *composeService) Events(ctx context.Context, projectName string, options
 				Timestamp:  timestamp,
 				Service:    service,
 				Container:  event.Actor.ID,
-				Status:     event.Action,
+				Status:     string(event.Action),
 				Attributes: attributes,
 			})
 			if err != nil {

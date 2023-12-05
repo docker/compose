@@ -23,6 +23,7 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/progress"
@@ -105,7 +106,7 @@ func (s *composeService) remove(ctx context.Context, containers Containers, opti
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.RemovingEvent(eventName))
-			err := s.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
+			err := s.apiClient().ContainerRemove(ctx, container.ID, containerType.RemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})

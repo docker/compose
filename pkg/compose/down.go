@@ -314,7 +314,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
+			err = s.apiClient().ContainerRemove(ctx, container.ID, containerType.RemoveOptions{
 				Force:         true,
 				RemoveVolumes: volumes,
 			})

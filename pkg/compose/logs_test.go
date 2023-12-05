@@ -25,7 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/golang/mock/gomock"
@@ -47,7 +47,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	name := strings.ToLower(testProject)
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
+	api.EXPECT().ContainerList(ctx, containerType.ListOptions{
 		All:     true,
 		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
@@ -61,7 +61,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 		ContainerInspect(anyCancellableContext(), "c").
 		Return(moby.ContainerJSON{
 			ContainerJSONBase: &moby.ContainerJSONBase{ID: "c"},
-			Config:            &container.Config{Tty: false},
+			Config:            &containerType.Config{Tty: false},
 		}, nil)
 	c1Reader, c1Writer := io.Pipe()
 	t.Cleanup(func() {
@@ -118,7 +118,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	name := strings.ToLower(testProject)
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
+	api.EXPECT().ContainerList(ctx, containerType.ListOptions{
 		All:     true,
 		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
@@ -140,7 +140,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 			Return(
 				moby.ContainerJSON{
 					ContainerJSONBase: &moby.ContainerJSONBase{ID: id},
-					Config:            &container.Config{Tty: true},
+					Config:            &containerType.Config{Tty: true},
 				},
 				nil,
 			)
@@ -172,7 +172,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 
 type testLogConsumer struct {
 	mu sync.Mutex
-	// logs is keyed container; values are log lines
+	// logs is keyed by container ID; values are log lines
 	logs map[string][]string
 }
 

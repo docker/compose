@@ -427,7 +427,7 @@ func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
 			attempts, _ = strconv.Atoi(split[1])
 		}
 		restart = container.RestartPolicy{
-			Name:              split[0],
+			Name:              mapRestartPolicyCondition(split[0]),
 			MaximumRetryCount: attempts,
 		}
 	}
@@ -445,17 +445,19 @@ func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
 	return restart
 }
 
-func mapRestartPolicyCondition(condition string) string {
+func mapRestartPolicyCondition(condition string) container.RestartPolicyMode {
 	// map definitions of deploy.restart_policy to engine definitions
 	switch condition {
 	case "none", "no":
-		return "no"
-	case "on-failure", "unless-stopped":
-		return condition
+		return container.RestartPolicyDisabled
+	case "on-failure":
+		return container.RestartPolicyOnFailure
+	case "unless-stopped":
+		return container.RestartPolicyUnlessStopped
 	case "any", "always":
-		return "always"
+		return container.RestartPolicyAlways
 	default:
-		return condition
+		return container.RestartPolicyMode(condition)
 	}
 }
 
