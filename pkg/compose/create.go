@@ -449,15 +449,15 @@ func mapRestartPolicyCondition(condition string) container.RestartPolicyMode {
 	// map definitions of deploy.restart_policy to engine definitions
 	switch condition {
 	case "none", "no":
-		return types.RestartPolicyNo
+		return container.RestartPolicyDisabled
 	case "on-failure":
-		return types.RestartPolicyOnFailure
+		return container.RestartPolicyOnFailure
 	case "unless-stopped":
-		return types.RestartPolicyUnlessStopped
+		return container.RestartPolicyUnlessStopped
 	case "any", "always":
-		return types.RestartPolicyAlways
+		return container.RestartPolicyAlways
 	default:
-		return types.RestartPolicyNo
+		return container.RestartPolicyMode(condition)
 	}
 }
 
