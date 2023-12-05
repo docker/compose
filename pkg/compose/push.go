@@ -29,6 +29,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
 	"golang.org/x/sync/errgroup"
@@ -91,7 +92,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 	return eg.Wait()
 }
 
-func (s *composeService) pushServiceImage(ctx context.Context, tag string, info moby.Info, configFile driver.Auth, w progress.Writer, quietPush bool) error {
+func (s *composeService) pushServiceImage(ctx context.Context, tag string, info system.Info, configFile driver.Auth, w progress.Writer, quietPush bool) error {
 	ref, err := reference.ParseNormalizedNamed(tag)
 	if err != nil {
 		return err

@@ -141,7 +141,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 				if err != nil {
 					return err
 				}
-				return c.service.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
+				return c.service.apiClient().ContainerRemove(ctx, container.ID, containerType.RemoveOptions{})
 			}))
 			continue
 		}
@@ -515,7 +515,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 		return created, err
 	}
 
-	err = s.apiClient().ContainerRemove(ctx, replaced.ID, moby.ContainerRemoveOptions{})
+	err = s.apiClient().ContainerRemove(ctx, replaced.ID, containerType.RemoveOptions{})
 	if err != nil {
 		return created, err
 	}
@@ -549,7 +549,7 @@ func setDependentLifecycle(project *types.Project, service string, strategy stri
 func (s *composeService) startContainer(ctx context.Context, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Working, "Restart"))
-	err := s.apiClient().ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
+	err := s.apiClient().ContainerStart(ctx, container.ID, containerType.StartOptions{})
 	if err != nil {
 		return err
 	}
@@ -764,7 +764,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		}
 		eventName := getContainerProgressName(container)
 		w.Event(progress.StartingEvent(eventName))
-		err := s.apiClient().ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
+		err := s.apiClient().ContainerStart(ctx, container.ID, containerType.StartOptions{})
 		if err != nil {
 			return err
 		}

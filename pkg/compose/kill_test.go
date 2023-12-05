@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/golang/mock/gomock"
@@ -46,7 +47,7 @@ func TestKillAll(t *testing.T) {
 	name := strings.ToLower(testProject)
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
+	api.EXPECT().ContainerList(ctx, containerType.ListOptions{
 		Filters: filters.NewArgs(projectFilter(name), hasConfigHashLabel()),
 	}).Return(
 		[]moby.Container{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
@@ -79,7 +80,7 @@ func TestKillSignal(t *testing.T) {
 	}
 
 	name := strings.ToLower(testProject)
-	listOptions := moby.ContainerListOptions{
+	listOptions := containerType.ListOptions{
 		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName), hasConfigHashLabel()),
 	}
 
@@ -133,7 +134,7 @@ func anyCancellableContext() gomock.Matcher {
 	return gomock.AssignableToTypeOf(ctxWithCancel)
 }
 
-func projectFilterListOpt(withOneOff bool) moby.ContainerListOptions {
+func projectFilterListOpt(withOneOff bool) containerType.ListOptions {
 	filter := filters.NewArgs(
 		projectFilter(strings.ToLower(testProject)),
 		hasConfigHashLabel(),
@@ -141,7 +142,7 @@ func projectFilterListOpt(withOneOff bool) moby.ContainerListOptions {
 	if !withOneOff {
 		filter.Add("label", fmt.Sprintf("%s=False", compose.OneoffLabel))
 	}
-	return moby.ContainerListOptions{
+	return containerType.ListOptions{
 		Filters: filter,
 		All:     true,
 	}

@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -111,7 +112,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	}
 
 	var containers Containers
-	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(project.Name),
 			oneOffFilter(false),

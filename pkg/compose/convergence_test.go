@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -63,7 +64,7 @@ func TestServiceLinks(t *testing.T) {
 		Scale: 1,
 	}
 
-	containerListOptions := moby.ContainerListOptions{
+	containerListOptions := containerType.ListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(testProject),
 			serviceFilter("db"),
@@ -189,7 +190,7 @@ func TestServiceLinks(t *testing.T) {
 		s.Labels = s.Labels.Add(api.OneoffLabel, "True")
 
 		c := testContainer("web", webContainerName, true)
-		containerListOptionsOneOff := moby.ContainerListOptions{
+		containerListOptionsOneOff := containerType.ListOptions{
 			Filters: filters.NewArgs(
 				projectFilter(testProject),
 				serviceFilter("web"),
