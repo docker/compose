@@ -45,7 +45,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests.")
-	flags.StringVar(&opts.ociVersion, "oci-version", "", "OCI Image specification version (automatically determined by default)")
+	flags.StringVar(&opts.ociVersion, "oci-version", "", "OCI Image/Artifact specification version (automatically determined by default)")
 	return cmd
 }
 
