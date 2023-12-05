@@ -34,6 +34,28 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+const (
+	// ComposeProjectArtifactType is the OCI 1.1-compliant artifact type value
+	// for the generated image manifest.
+	ComposeProjectArtifactType = "application/vnd.docker.compose.project"
+	// ComposeYAMLMediaType is the media type for each layer (Compose file)
+	// in the image manifest.
+	ComposeYAMLMediaType = "application/vnd.docker.compose.file+yaml"
+	// ComposeEmptyConfigMediaType is a media type used for the config descriptor
+	// when doing OCI 1.0-style pushes.
+	//
+	// The content is always `{}`, the same as a normal empty descriptor, but
+	// the specific media type allows clients to fall back to the config media
+	// type to recognize the manifest as a Compose project since the artifact
+	// type field is not available in OCI 1.0.
+	//
+	// This is based on guidance from the OCI 1.1 spec:
+	//	> Implementers note: artifacts have historically been created without
+	// 	> an artifactType field, and tooling to work with artifacts should
+	//	> fallback to the config.mediaType value.
+	ComposeEmptyConfigMediaType = "application/vnd.docker.compose.config.empty.v1+json"
+)
+
 // clientAuthStatusCodes are client (4xx) errors that are authentication
 // related.
 var clientAuthStatusCodes = []int{
@@ -49,7 +71,7 @@ type Pushable struct {
 
 func DescriptorForComposeFile(path string, content []byte) v1.Descriptor {
 	return v1.Descriptor{
-		MediaType: "application/vnd.docker.compose.file+yaml",
+		MediaType: ComposeYAMLMediaType,
 		Digest:    digest.FromString(string(content)),
 		Size:      int64(len(content)),
 		Annotations: map[string]string{
@@ -133,12 +155,19 @@ func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pusha
 	var artifactType string
 	switch ociCompat {
 	case api.OCIVersion1_0:
-		configData, err := json.Marshal(v1.ImageConfig{})
-		if err != nil {
-			return nil, err
-		}
+		// "Content other than OCI container images MAY be packaged using the image manifest.
+		// When this is done, the config.mediaType value MUST be set to a value specific to
+		// the artifact type or the empty value."
+		// Source: https://github.com/opencontainers/image-spec/blob/main/manifest.md#guidelines-for-artifact-usage
+		//
+		// The `ComposeEmptyConfigMediaType` is used specifically for this purpose:
+		// there is no config, and an empty descriptor is used for OCI 1.1 in
+		// conjunction with the `ArtifactType`, but for OCI 1.0 compatibility,
+		// tooling falls back to the config media type, so this is used to
+		// indicate that it's not a container image but custom content.
+		configData := []byte("{}")
 		config = v1.Descriptor{
-			MediaType: v1.MediaTypeImageConfig,
+			MediaType: ComposeEmptyConfigMediaType,
 			Digest:    digest.FromBytes(configData),
 			Size:      int64(len(configData)),
 		}
@@ -148,7 +177,7 @@ func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pusha
 		toPush = append(toPush, Pushable{Descriptor: config, Data: configData})
 	case api.OCIVersion1_1:
 		config = v1.DescriptorEmptyJSON
-		artifactType = "application/vnd.docker.compose.project"
+		artifactType = ComposeProjectArtifactType
 		// N.B. the descriptor has the data embedded in it
 		toPush = append(toPush, Pushable{Descriptor: config, Data: nil})
 	default:
