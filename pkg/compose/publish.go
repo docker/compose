@@ -70,7 +70,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			return err
 		}
 
-		layerDescriptor := ocipush.DescriptorForComposeFile("image-diegests.yaml", yaml)
+		layerDescriptor := ocipush.DescriptorForComposeFile("image-digests.yaml", yaml)
 		layers = append(layers, ocipush.Pushable{
 			Descriptor: layerDescriptor,
 			Data:       yaml,
