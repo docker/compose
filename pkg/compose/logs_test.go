@@ -172,7 +172,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 
 type testLogConsumer struct {
 	mu sync.Mutex
-	// logs is keyed containerType; values are log lines
+	// logs is keyed by container ID; values are log lines
 	logs map[string][]string
 }
 
