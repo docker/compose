@@ -74,7 +74,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string, _ types.ServiceConfig) error {
 		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err

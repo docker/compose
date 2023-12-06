@@ -38,6 +38,8 @@ const (
 	ServiceStarted
 )
 
+type visitorFn func(context.Context, string, types.ServiceConfig) error
+
 type graphTraversal struct {
 	mu      sync.Mutex
 	seen    map[string]struct{}
@@ -49,11 +51,11 @@ type graphTraversal struct {
 	targetServiceStatus         ServiceStatus
 	adjacentServiceStatusToSkip ServiceStatus
 
-	visitorFn      func(context.Context, string) error
+	visitorFn      visitorFn
 	maxConcurrency int
 }
 
-func upDirectionTraversal(visitorFn func(context.Context, string) error) *graphTraversal {
+func upDirectionTraversal(visitorFn visitorFn) *graphTraversal {
 	return &graphTraversal{
 		extremityNodesFn:            leaves,
 		adjacentNodesFn:             getParents,
@@ -64,7 +66,7 @@ func upDirectionTraversal(visitorFn func(context.Context, string) error) *graphT
 	}
 }
 
-func downDirectionTraversal(visitorFn func(context.Context, string) error) *graphTraversal {
+func downDirectionTraversal(visitorFn visitorFn) *graphTraversal {
 	return &graphTraversal{
 		extremityNodesFn:            roots,
 		adjacentNodesFn:             getChildren,
@@ -76,7 +78,7 @@ func downDirectionTraversal(visitorFn func(context.Context, string) error) *grap
 }
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
-func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
+func InDependencyOrder(ctx context.Context, project *types.Project, fn visitorFn, options ...func(*graphTraversal)) error {
 	graph, err := NewGraph(project, ServiceStopped)
 	if err != nil {
 		return err
@@ -89,7 +91,7 @@ func InDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
-func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
+func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn visitorFn, options ...func(*graphTraversal)) error {
 	graph, err := NewGraph(project, ServiceStarted)
 	if err != nil {
 		return err
@@ -111,9 +113,9 @@ func WithRootNodesAndDown(nodes []string) func(*graphTraversal) {
 			var want []string
 			for _, node := range nodes {
 				vertex := graph.Vertices[node]
-				want = append(want, vertex.Service)
+				want = append(want, vertex.Service.Name)
 				for _, v := range getAncestors(vertex) {
-					want = append(want, v.Service)
+					want = append(want, v.Service.Name)
 				}
 			}
 
@@ -180,8 +182,8 @@ func (t *graphTraversal) run(ctx context.Context, graph *Graph, eg *errgroup.Gro
 
 		eg.Go(func() error {
 			var err error
-			if _, ignore := t.ignored[node.Service]; !ignore {
-				err = t.visitorFn(ctx, node.Service)
+			if _, ignore := t.ignored[node.Key]; !ignore {
+				err = t.visitorFn(ctx, node.Key, *node.Service)
 			}
 			if err == nil {
 				graph.UpdateStatus(node.Key, t.targetServiceStatus)
@@ -214,7 +216,7 @@ type Graph struct {
 // Vertex represents a service in the dependencies structure
 type Vertex struct {
 	Key      string
-	Service  string
+	Service  *types.ServiceConfig
 	Status   ServiceStatus
 	Children map[string]*Vertex
 	Parents  map[string]*Vertex
@@ -263,13 +265,13 @@ func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, erro
 		Vertices: map[string]*Vertex{},
 	}
 
-	for _, s := range project.Services {
-		graph.AddVertex(s.Name, s.Name, initialStatus)
+	for name, s := range project.Services {
+		graph.addVertex(name, s, initialStatus)
 	}
 
 	for index, s := range project.Services {
 		for _, name := range s.GetDependencies() {
-			err := graph.AddEdge(s.Name, name)
+			err := graph.addEdge(s.Name, name)
 			if err != nil {
 				if !s.DependsOn[name].Required {
 					delete(s.DependsOn, name)
@@ -294,8 +296,8 @@ func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, erro
 	return graph, nil
 }
 
-// NewVertex is the constructor function for the Vertex
-func NewVertex(key string, service string, initialStatus ServiceStatus) *Vertex {
+// newVertex is the constructor function for the Vertex
+func newVertex(key string, service *types.ServiceConfig, initialStatus ServiceStatus) *Vertex {
 	return &Vertex{
 		Key:      key,
 		Service:  service,
@@ -305,17 +307,17 @@ func NewVertex(key string, service string, initialStatus ServiceStatus) *Vertex 
 	}
 }
 
-// AddVertex adds a vertex to the Graph
-func (g *Graph) AddVertex(key string, service string, initialStatus ServiceStatus) {
+// addVertex adds a vertex to the Graph
+func (g *Graph) addVertex(key string, service types.ServiceConfig, initialStatus ServiceStatus) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	v := NewVertex(key, service, initialStatus)
+	v := newVertex(key, &service, initialStatus)
 	g.Vertices[key] = v
 }
 
-// AddEdge adds a relationship of dependency between vertices `source` and `destination`
-func (g *Graph) AddEdge(source string, destination string) error {
+// addEdge adds a relationship of dependency between vertices `source` and `destination`
+func (g *Graph) addEdge(source string, destination string) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 

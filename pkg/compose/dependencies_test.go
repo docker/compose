@@ -83,8 +83,8 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 		done <- struct{}{}
 	}()
 
-	err := InDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
-		svc <- service
+	err := InDependencyOrder(ctx, &project, func(ctx context.Context, name string, _ types.ServiceConfig) error {
+		svc <- name
 		return nil
 	})
 	require.NoError(t, err, "Error during iteration")
@@ -102,8 +102,8 @@ func TestInDependencyUpCommandOrder(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var order []string
-	err := InDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
-		order = append(order, service)
+	err := InDependencyOrder(ctx, createTestProject(), func(ctx context.Context, name string, _ types.ServiceConfig) error {
+		order = append(order, name)
 		return nil
 	})
 	require.NoError(t, err, "Error during iteration")
@@ -115,8 +115,8 @@ func TestInDependencyReverseDownCommandOrder(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var order []string
-	err := InReverseDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
-		order = append(order, service)
+	err := InReverseDependencyOrder(ctx, createTestProject(), func(ctx context.Context, name string, _ types.ServiceConfig) error {
+		order = append(order, name)
 		return nil
 	})
 	require.NoError(t, err, "Error during iteration")
@@ -140,7 +140,7 @@ func TestBuildGraph(t *testing.T) {
 			expectedVertices: map[string]*Vertex{
 				"test": {
 					Key:      "test",
-					Service:  "test",
+					Service:  &types.ServiceConfig{Name: "test"},
 					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents:  map[string]*Vertex{},
@@ -162,14 +162,14 @@ func TestBuildGraph(t *testing.T) {
 			expectedVertices: map[string]*Vertex{
 				"test": {
 					Key:      "test",
-					Service:  "test",
+					Service:  &types.ServiceConfig{Name: "test"},
 					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents:  map[string]*Vertex{},
 				},
 				"another": {
 					Key:      "another",
-					Service:  "another",
+					Service:  &types.ServiceConfig{Name: "another"},
 					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents:  map[string]*Vertex{},
@@ -193,7 +193,7 @@ func TestBuildGraph(t *testing.T) {
 			expectedVertices: map[string]*Vertex{
 				"test": {
 					Key:     "test",
-					Service: "test",
+					Service: &types.ServiceConfig{Name: "test"},
 					Status:  ServiceStopped,
 					Children: map[string]*Vertex{
 						"another": {},
@@ -202,7 +202,7 @@ func TestBuildGraph(t *testing.T) {
 				},
 				"another": {
 					Key:      "another",
-					Service:  "another",
+					Service:  &types.ServiceConfig{Name: "another"},
 					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents: map[string]*Vertex{
@@ -234,7 +234,7 @@ func TestBuildGraph(t *testing.T) {
 			expectedVertices: map[string]*Vertex{
 				"test": {
 					Key:     "test",
-					Service: "test",
+					Service: &types.ServiceConfig{Name: "test"},
 					Status:  ServiceStopped,
 					Children: map[string]*Vertex{
 						"another": {},
@@ -243,7 +243,7 @@ func TestBuildGraph(t *testing.T) {
 				},
 				"another": {
 					Key:     "another",
-					Service: "another",
+					Service: &types.ServiceConfig{Name: "another"},
 					Status:  ServiceStopped,
 					Children: map[string]*Vertex{
 						"another_dep": {},
@@ -254,7 +254,7 @@ func TestBuildGraph(t *testing.T) {
 				},
 				"another_dep": {
 					Key:      "another_dep",
-					Service:  "another_dep",
+					Service:  &types.ServiceConfig{Name: "another_dep"},
 					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents: map[string]*Vertex{
@@ -276,29 +276,23 @@ func TestBuildGraph(t *testing.T) {
 			for k, vertex := range graph.Vertices {
 				expected, ok := tC.expectedVertices[k]
 				assert.Equal(t, true, ok)
-				assert.Equal(t, true, isVertexEqual(*expected, *vertex))
+				assertVertexEqual(t, *expected, *vertex)
 			}
 		})
 	}
 }
 
-func isVertexEqual(a, b Vertex) bool {
-	childrenEquality := true
+func assertVertexEqual(t *testing.T, a, b Vertex) {
+	assert.Equal(t, a.Key, b.Key)
+	assert.Equal(t, a.Service.Name, b.Service.Name)
 	for c := range a.Children {
-		if _, ok := b.Children[c]; !ok {
-			childrenEquality = false
-		}
+		_, ok := b.Children[c]
+		assert.Check(t, ok, "expected children missing %s", c)
 	}
-	parentEquality := true
 	for p := range a.Parents {
-		if _, ok := b.Parents[p]; !ok {
-			parentEquality = false
-		}
+		_, ok := b.Parents[p]
+		assert.Check(t, ok, "expected parent missing %s", p)
 	}
-	return a.Key == b.Key &&
-		a.Service == b.Service &&
-		childrenEquality &&
-		parentEquality
 }
 
 func TestWith_RootNodesAndUp(t *testing.T) {
@@ -317,21 +311,21 @@ func TestWith_RootNodesAndUp(t *testing.T) {
 		           F
 	*/
 
-	graph.AddVertex("A", "A", 0)
-	graph.AddVertex("B", "B", 0)
-	graph.AddVertex("C", "C", 0)
-	graph.AddVertex("D", "D", 0)
-	graph.AddVertex("E", "E", 0)
-	graph.AddVertex("F", "F", 0)
-	graph.AddVertex("G", "G", 0)
+	graph.addVertex("A", types.ServiceConfig{Name: "A"}, 0)
+	graph.addVertex("B", types.ServiceConfig{Name: "B"}, 0)
+	graph.addVertex("C", types.ServiceConfig{Name: "C"}, 0)
+	graph.addVertex("D", types.ServiceConfig{Name: "D"}, 0)
+	graph.addVertex("E", types.ServiceConfig{Name: "E"}, 0)
+	graph.addVertex("F", types.ServiceConfig{Name: "F"}, 0)
+	graph.addVertex("G", types.ServiceConfig{Name: "G"}, 0)
 
-	_ = graph.AddEdge("C", "A")
-	_ = graph.AddEdge("C", "B")
-	_ = graph.AddEdge("E", "B")
-	_ = graph.AddEdge("D", "C")
-	_ = graph.AddEdge("D", "E")
-	_ = graph.AddEdge("F", "D")
-	_ = graph.AddEdge("G", "A")
+	_ = graph.addEdge("C", "A")
+	_ = graph.addEdge("C", "B")
+	_ = graph.addEdge("E", "B")
+	_ = graph.addEdge("D", "C")
+	_ = graph.addEdge("D", "E")
+	_ = graph.addEdge("F", "D")
+	_ = graph.addEdge("G", "A")
 
 	tests := []struct {
 		name  string
@@ -371,10 +365,10 @@ func TestWith_RootNodesAndUp(t *testing.T) {
 			expected.AddAll("C", "G", "D", "F")
 			var visited []string
 
-			gt := downDirectionTraversal(func(ctx context.Context, s string) error {
+			gt := downDirectionTraversal(func(ctx context.Context, name string, service types.ServiceConfig) error {
 				mx.Lock()
 				defer mx.Unlock()
-				visited = append(visited, s)
+				visited = append(visited, name)
 				return nil
 			})
 			WithRootNodesAndDown(tt.nodes)(gt)

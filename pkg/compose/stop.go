@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -50,7 +51,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 	}
 
 	w := progress.ContextWriter(ctx)
-	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string, _ types.ServiceConfig) error {
 		if !utils.StringContains(options.Services, service) {
 			return nil
 		}

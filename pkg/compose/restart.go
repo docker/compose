@@ -73,7 +73,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	}
 
 	w := progress.ContextWriter(ctx)
-	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return InDependencyOrder(ctx, project, func(c context.Context, service string, _ types.ServiceConfig) error {
 		eg, ctx := errgroup.WithContext(ctx)
 		for _, container := range containers.filter(isService(service)) {
 			container := container

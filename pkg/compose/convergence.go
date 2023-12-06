@@ -91,12 +91,7 @@ func newConvergence(services []string, state Containers, s *composeService) *con
 }
 
 func (c *convergence) apply(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	return InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-
+	return InDependencyOrder(ctx, project, func(ctx context.Context, name string, service types.ServiceConfig) error {
 		return tracing.SpanWrapFunc("service/apply", tracing.ServiceOptions(service), func(ctx context.Context) error {
 			strategy := options.RecreateDependencies
 			if utils.StringContains(options.Services, name) {

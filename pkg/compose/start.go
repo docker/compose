@@ -123,12 +123,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return err
 	}
 
-	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-
+	err = InDependencyOrder(ctx, project, func(c context.Context, name string, service types.ServiceConfig) error {
 		return s.startService(ctx, project, service, containers)
 	})
 	if err != nil {

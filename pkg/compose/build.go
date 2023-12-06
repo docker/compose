@@ -81,12 +81,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	imageIDs := map[string]string{}
 	serviceToBeBuild := map[string]serviceToBuild{}
 	mapServiceMutx := sync.Mutex{}
-	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string, service types.ServiceConfig) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		service := project.Services[name]
-
 		if service.Build == nil {
 			return nil
 		}
@@ -157,15 +155,14 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		return -1
 	}
-	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string, service types.ServiceConfig) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		serviceToBuild, ok := serviceToBeBuild[name]
+		_, ok := serviceToBeBuild[name]
 		if !ok {
 			return nil
 		}
-		service := serviceToBuild.service
 
 		if !buildkitEnabled {
 			id, err := s.doBuildClassic(ctx, project, service, options)
