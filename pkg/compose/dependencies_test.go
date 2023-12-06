@@ -141,7 +141,6 @@ func TestBuildGraph(t *testing.T) {
 				"test": {
 					Key:      "test",
 					Service:  &types.ServiceConfig{Name: "test"},
-					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents:  map[string]*Vertex{},
 				},
@@ -163,14 +162,12 @@ func TestBuildGraph(t *testing.T) {
 				"test": {
 					Key:      "test",
 					Service:  &types.ServiceConfig{Name: "test"},
-					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents:  map[string]*Vertex{},
 				},
 				"another": {
 					Key:      "another",
 					Service:  &types.ServiceConfig{Name: "another"},
-					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents:  map[string]*Vertex{},
 				},
@@ -194,7 +191,6 @@ func TestBuildGraph(t *testing.T) {
 				"test": {
 					Key:     "test",
 					Service: &types.ServiceConfig{Name: "test"},
-					Status:  ServiceStopped,
 					Children: map[string]*Vertex{
 						"another": {},
 					},
@@ -203,7 +199,6 @@ func TestBuildGraph(t *testing.T) {
 				"another": {
 					Key:      "another",
 					Service:  &types.ServiceConfig{Name: "another"},
-					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents: map[string]*Vertex{
 						"test": {},
@@ -235,7 +230,6 @@ func TestBuildGraph(t *testing.T) {
 				"test": {
 					Key:     "test",
 					Service: &types.ServiceConfig{Name: "test"},
-					Status:  ServiceStopped,
 					Children: map[string]*Vertex{
 						"another": {},
 					},
@@ -244,7 +238,6 @@ func TestBuildGraph(t *testing.T) {
 				"another": {
 					Key:     "another",
 					Service: &types.ServiceConfig{Name: "another"},
-					Status:  ServiceStopped,
 					Children: map[string]*Vertex{
 						"another_dep": {},
 					},
@@ -255,7 +248,6 @@ func TestBuildGraph(t *testing.T) {
 				"another_dep": {
 					Key:      "another_dep",
 					Service:  &types.ServiceConfig{Name: "another_dep"},
-					Status:   ServiceStopped,
 					Children: map[string]*Vertex{},
 					Parents: map[string]*Vertex{
 						"another": {},
@@ -270,7 +262,7 @@ func TestBuildGraph(t *testing.T) {
 				Services: tC.services,
 			}
 
-			graph, err := NewGraph(&project, ServiceStopped)
+			graph, err := NewGraph(&project)
 			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
 
 			for k, vertex := range graph.Vertices {
@@ -311,13 +303,13 @@ func TestWith_RootNodesAndUp(t *testing.T) {
 		           F
 	*/
 
-	graph.addVertex("A", types.ServiceConfig{Name: "A"}, 0)
-	graph.addVertex("B", types.ServiceConfig{Name: "B"}, 0)
-	graph.addVertex("C", types.ServiceConfig{Name: "C"}, 0)
-	graph.addVertex("D", types.ServiceConfig{Name: "D"}, 0)
-	graph.addVertex("E", types.ServiceConfig{Name: "E"}, 0)
-	graph.addVertex("F", types.ServiceConfig{Name: "F"}, 0)
-	graph.addVertex("G", types.ServiceConfig{Name: "G"}, 0)
+	graph.addVertex("A", types.ServiceConfig{Name: "A"})
+	graph.addVertex("B", types.ServiceConfig{Name: "B"})
+	graph.addVertex("C", types.ServiceConfig{Name: "C"})
+	graph.addVertex("D", types.ServiceConfig{Name: "D"})
+	graph.addVertex("E", types.ServiceConfig{Name: "E"})
+	graph.addVertex("F", types.ServiceConfig{Name: "F"})
+	graph.addVertex("G", types.ServiceConfig{Name: "G"})
 
 	_ = graph.addEdge("C", "A")
 	_ = graph.addEdge("C", "B")
