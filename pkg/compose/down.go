@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/graph"
 	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -74,11 +75,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		serviceContainers := containers.filter(isService(service))
+	err = graph.InDependencyOrder(ctx, project, func(c context.Context, name string, service types.ServiceConfig) error {
+		serviceContainers := containers.filter(isService(name))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err
-	}, WithRootNodesAndDown(options.Services))
+	}, graph.WithRootNodesAndDown(options.Services))
 	if err != nil {
 		return err
 	}

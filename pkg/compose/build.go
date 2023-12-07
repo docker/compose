@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/compose-spec/compose-go/v2/graph"
 	"github.com/moby/buildkit/util/progress/progressui"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -79,7 +80,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 	imageIDs := map[string]string{}
 	serviceToBeBuild := map[string]serviceToBuild{}
-	err = project.WithServices(options.Services, func(service types.ServiceConfig) error {
+	err = project.WithServices(options.Services, func(name string, service types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
 		}
@@ -88,7 +89,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 			return nil
 		}
-		name := service.Name
 		serviceToBeBuild[name] = serviceToBuild{name: name, service: service}
 		return nil
 	}, types.IgnoreDependencies)
@@ -145,15 +145,14 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		return -1
 	}
-	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	err = graph.InDependencyOrder(ctx, project, func(ctx context.Context, name string, service types.ServiceConfig) error {
 		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
 			return nil
 		}
-		serviceToBuild, ok := serviceToBeBuild[name]
+		_, ok := serviceToBeBuild[name]
 		if !ok {
 			return nil
 		}
-		service := serviceToBuild.service
 
 		if !buildkitEnabled {
 			id, err := s.doBuildClassic(ctx, project, service, options)
@@ -184,9 +183,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		builtDigests[getServiceIndex(name)] = digest
 
 		return nil
-	}, func(traversal *graphTraversal) {
-		traversal.maxConcurrency = s.maxConcurrency
-	})
+	}, graph.WithMaxConcurrency(s.maxConcurrency))
 
 	// enforce all build event get consumed
 	if buildkitEnabled {

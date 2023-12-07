@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/graph"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -91,12 +92,7 @@ func newConvergence(services []string, state Containers, s *composeService) *con
 }
 
 func (c *convergence) apply(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	return InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-
+	return graph.InDependencyOrder(ctx, project, func(ctx context.Context, name string, service types.ServiceConfig) error {
 		return tracing.SpanWrapFunc("service/apply", tracing.ServiceOptions(service), func(ctx context.Context) error {
 			strategy := options.RecreateDependencies
 			if utils.StringContains(options.Services, name) {
@@ -104,7 +100,7 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 			}
 			return c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
 		})(ctx)
-	})
+	}, graph.WithMaxConcurrency(c.service.maxConcurrency))
 }
 
 var mu sync.Mutex

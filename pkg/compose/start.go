@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/graph"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
 
@@ -123,14 +124,9 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return err
 	}
 
-	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-
+	err = graph.InDependencyOrder(ctx, project, func(c context.Context, name string, service types.ServiceConfig) error {
 		return s.startService(ctx, project, service, containers)
-	})
+	}, graph.WithMaxConcurrency(s.maxConcurrency))
 	if err != nil {
 		return err
 	}

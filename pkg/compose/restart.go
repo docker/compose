@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/graph"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -73,9 +74,9 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	}
 
 	w := progress.ContextWriter(ctx)
-	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return graph.InDependencyOrder(ctx, project, func(c context.Context, name string, _ types.ServiceConfig) error {
 		eg, ctx := errgroup.WithContext(ctx)
-		for _, container := range containers.filter(isService(service)) {
+		for _, container := range containers.filter(isService(name)) {
 			container := container
 			eg.Go(func() error {
 				eventName := getContainerProgressName(container)
@@ -89,5 +90,5 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			})
 		}
 		return eg.Wait()
-	})
+	}, graph.WithMaxConcurrency(s.maxConcurrency))
 }

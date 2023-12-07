@@ -159,10 +159,10 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 	if err != nil {
 		return err
 	}
-	return project.WithServices(project.ServiceNames(), func(s types.ServiceConfig) error {
-		fmt.Fprintln(dockerCli.Out(), s.Name)
-		return nil
-	})
+	for _, name := range project.ServiceNames() {
+		fmt.Fprintln(dockerCli.Out(), name)
+	}
+	return nil
 }
 
 func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) error {

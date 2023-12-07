@@ -20,6 +20,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/graph"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -50,10 +52,10 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 	}
 
 	w := progress.ContextWriter(ctx)
-	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		if !utils.StringContains(options.Services, service) {
+	return graph.InDependencyOrder(ctx, project, func(c context.Context, name string, service types.ServiceConfig) error {
+		if !utils.StringContains(options.Services, name) {
 			return nil
 		}
-		return s.stopContainers(ctx, w, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout)
-	})
+		return s.stopContainers(ctx, w, containers.filter(isService(name)).filter(isNotOneOff), options.Timeout)
+	}, graph.InReverseOrder, graph.WithMaxConcurrency(s.maxConcurrency))
 }

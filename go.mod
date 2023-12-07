@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.0.0-beta.1
+	github.com/compose-spec/compose-go/v2 v2.0.0-beta.2.0.20231222101101-8585af8ec50b
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.7.7
 	github.com/davecgh/go-spew v1.1.1

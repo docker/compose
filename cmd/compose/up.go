@@ -229,9 +229,9 @@ func runUp(
 			if upOptions.attachDependencies {
 				dependencyOpt = types.IncludeDependencies
 			}
-			if err := project.WithServices(services, func(s types.ServiceConfig) error {
+			if err := project.WithServices(services, func(name string, s types.ServiceConfig) error {
 				if s.Attach == nil || *s.Attach {
-					attachSet.Add(s.Name)
+					attachSet.Add(name)
 				}
 				return nil
 			}, dependencyOpt); err != nil {
