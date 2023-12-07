@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/moby/buildkit/util/progress/progressui"
 
@@ -80,30 +79,19 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 	imageIDs := map[string]string{}
 	serviceToBeBuild := map[string]serviceToBuild{}
-	mapServiceMutx := sync.Mutex{}
-	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
-		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
-			return nil
-		}
-		service := project.Services[name]
-
+	err = project.WithServices(options.Services, func(service types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
 		}
-
 		image := api.GetImageNameOrDefault(service, project.Name)
 		_, localImagePresent := localImages[image]
 		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 			return nil
 		}
-		mapServiceMutx.Lock()
+		name := service.Name
 		serviceToBeBuild[name] = serviceToBuild{name: name, service: service}
-		mapServiceMutx.Unlock()
 		return nil
-	}, func(traversal *graphTraversal) {
-		traversal.maxConcurrency = s.maxConcurrency
-	})
-
+	}, types.IgnoreDependencies)
 	if err != nil || len(serviceToBeBuild) == 0 {
 		return imageIDs, err
 	}
