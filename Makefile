@@ -89,7 +89,7 @@ build-and-e2e-compose-standalone: build e2e-compose-standalone ## Compile the co
 
 .PHONY: mocks
 mocks:
-	mockgen --version >/dev/null 2>&1 || go install github.com/golang/mock/mockgen@v1.6.0
+	mockgen --version >/dev/null 2>&1 || go install go.uber.org/mock/mockgen@v0.3.0
 	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
 	mockgen -destination pkg/mocks/mock_docker_api.go -package mocks github.com/docker/docker/client APIClient
 	mockgen -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go Service

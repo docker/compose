@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	compose "github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
