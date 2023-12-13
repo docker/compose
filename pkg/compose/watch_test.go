@@ -26,9 +26,9 @@ import (
 	"github.com/docker/compose/v2/pkg/mocks"
 	"github.com/docker/compose/v2/pkg/watch"
 	moby "github.com/docker/docker/api/types"
-	"github.com/golang/mock/gomock"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 

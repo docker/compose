@@ -26,8 +26,8 @@ import (
 	"github.com/docker/cli/cli/streams"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func TestPsTable(t *testing.T) {
