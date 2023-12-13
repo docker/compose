@@ -428,7 +428,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 				s.stdinfo(),
 				"Rebuilding service %q after changes were detected:%s\n",
 				serviceName,
-				strings.Join(append([]string{""}, batch[i].HostPath), "\n  - "),
+				strings.Join(append([]string{""}, batch[i].PathMapping.HostPath), "\n  - "),
 			)
 			// restrict the build to ONLY this service, not any of its dependencies
 			build.Services = []string{serviceName}

@@ -116,10 +116,9 @@ func testContainer(service string, id string, oneOff bool) moby.Container {
 
 func containerLabels(service string, oneOff bool) map[string]string {
 	workingdir := "/src/pkg/compose/testdata"
-	composefile := filepath.Join(workingdir, "compose.yaml")
 	labels := map[string]string{
 		compose.ServiceLabel:     service,
-		compose.ConfigFilesLabel: composefile,
+		compose.ConfigFilesLabel: filepath.Join(workingdir, "compose.yaml"),
 		compose.WorkingDirLabel:  workingdir,
 		compose.ProjectLabel:     strings.ToLower(testProject)}
 	if oneOff {

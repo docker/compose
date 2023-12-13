@@ -53,12 +53,12 @@ func TestPsTable(t *testing.T) {
 					Name:  "ABC",
 					Image: "foo/bar",
 					Publishers: api.PortPublishers{
-						{
+						api.PortPublisher{
 							TargetPort:    8080,
 							PublishedPort: 8080,
 							Protocol:      "tcp",
 						},
-						{
+						api.PortPublisher{
 							TargetPort:    8443,
 							PublishedPort: 8443,
 							Protocol:      "tcp",
