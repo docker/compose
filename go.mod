@@ -2,6 +2,9 @@ module github.com/docker/compose/v2
 
 go 1.21
 
+// FIXME(thaJeztah): testing changes from https://github.com/docker/cli/pull/4719
+replace github.com/docker/cli => github.com/thaJeztah/cli v0.0.0-20231214140346-70216b662dc4
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.1
@@ -12,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.5.0
 	github.com/docker/buildx v0.12.0
-	github.com/docker/cli v25.0.0-beta.2+incompatible
+	github.com/docker/cli v25.0.0-beta.2+incompatible // FIXME(thaJeztah): replaced: see
 	github.com/docker/cli-docs-tool v0.6.0
 	github.com/docker/docker v25.0.0-beta.2+incompatible
 	github.com/docker/go-connections v0.4.0
