@@ -45,7 +45,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	go cmd.ForwardAllSignals(ctx, s.apiClient(), containerID, sigc)
 	defer signal.Stop(sigc)
 
-	err = cmd.RunStart(s.dockerCli, &cmd.StartOptions{
+	err = cmd.RunStart(ctx, s.dockerCli, &cmd.StartOptions{
 		OpenStdin:  !opts.Detach && opts.Interactive,
 		Attach:     !opts.Detach,
 		Containers: []string{containerID},

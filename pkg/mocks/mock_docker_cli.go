@@ -49,7 +49,7 @@ func (m *MockCli) EXPECT() *MockCliMockRecorder {
 }
 
 // Apply mocks base method.
-func (m *MockCli) Apply(arg0 ...command.DockerCliOption) error {
+func (m *MockCli) Apply(arg0 ...command.CLIOption) error {
 	m.ctrl.T.Helper()
 	varargs := []any{}
 	for _, a := range arg0 {
