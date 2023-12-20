@@ -42,6 +42,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
@@ -75,7 +76,7 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		contextString := fmt.Sprintf("%s", ctx)
-		if !strings.HasSuffix(contextString, ".WithCancel") { // need to handle cancel
+		if !strings.Contains(contextString, ".WithCancel") || plugin.RunningStandalone() { // need to handle cancel
 			cancellableCtx, cancel := context.WithCancel(cmd.Context())
 			ctx = cancellableCtx
 			s := make(chan os.Signal, 1)
@@ -277,7 +278,12 @@ const PluginName = "compose"
 
 // RunningAsStandalone detects when running as a standalone program
 func RunningAsStandalone() bool {
-	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != PluginName
+	println("check running as standalone")
+	standalone := len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != PluginName
+	fmt.Fprintf(os.Stderr, "%v+\n", os.Args)
+	println("len os.args", len(os.Args))
+	println("STANDALONE:", standalone)
+	return standalone
 }
 
 // RootCommand returns the compose command with its child commands
