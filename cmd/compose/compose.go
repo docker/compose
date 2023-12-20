@@ -278,12 +278,7 @@ const PluginName = "compose"
 
 // RunningAsStandalone detects when running as a standalone program
 func RunningAsStandalone() bool {
-	println("check running as standalone")
-	standalone := len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != PluginName
-	fmt.Fprintf(os.Stderr, "%v+\n", os.Args)
-	println("len os.args", len(os.Args))
-	println("STANDALONE:", standalone)
-	return standalone
+	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != PluginName
 }
 
 // RootCommand returns the compose command with its child commands
