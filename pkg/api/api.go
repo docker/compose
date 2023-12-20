@@ -135,6 +135,8 @@ type BuildOptions struct {
 	Quiet bool
 	// Services passed in the command line to be built
 	Services []string
+	// Deps also build selected services dependencies
+	Deps bool
 	// Ssh authentications passed in the command line
 	SSHs []types.SSHKey
 	// Memory limit for the build container

@@ -79,6 +79,11 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 	imageIDs := map[string]string{}
 	serviceToBeBuild := map[string]serviceToBuild{}
+
+	var policy types.DependencyOption = types.IgnoreDependencies
+	if options.Deps {
+		policy = types.IncludeDependencies
+	}
 	err = project.WithServices(options.Services, func(service types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
@@ -91,7 +96,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		name := service.Name
 		serviceToBeBuild[name] = serviceToBuild{name: name, service: service}
 		return nil
-	}, types.IgnoreDependencies)
+	}, policy)
 	if err != nil || len(serviceToBeBuild) == 0 {
 		return imageIDs, err
 	}
@@ -146,9 +151,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return -1
 	}
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
-		if len(options.Services) > 0 && !utils.Contains(options.Services, name) {
-			return nil
-		}
 		serviceToBuild, ok := serviceToBeBuild[name]
 		if !ok {
 			return nil
