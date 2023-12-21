@@ -43,7 +43,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.19.0
 	go.opentelemetry.io/otel/trace v1.19.0
 	go.uber.org/goleak v1.3.0
-	go.uber.org/mock v0.3.0
+	go.uber.org/mock v0.4.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/sync v0.5.0
 	golang.org/x/sys v0.15.0
