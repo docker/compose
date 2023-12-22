@@ -507,12 +507,8 @@ func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
 	if err != nil {
 		return compose.WrapComposeError(err)
 	}
-	workingDir, err := options.GetWorkingDir()
-	if err != nil {
-		return err
-	}
 
-	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), workingDir, options.EnvFiles)
+	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), options.EnvFiles)
 	if err != nil {
 		return err
 	}
