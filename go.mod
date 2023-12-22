@@ -12,9 +12,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.5.0
 	github.com/docker/buildx v0.12.0-rc2.0.20231219140829-617f538cb315
-	github.com/docker/cli v25.0.0-beta.2.0.20231214140346-70216b662dc4+incompatible
+	github.com/docker/cli v25.0.0-beta.3+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
-	github.com/docker/docker v25.0.0-beta.2+incompatible
+	github.com/docker/docker v25.0.0-beta.3+incompatible
 	github.com/docker/go-connections v0.4.1-0.20231110212414-fa09c952e3ea
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsevents v0.1.1
@@ -75,7 +75,7 @@ require (
 	github.com/containerd/continuity v0.4.2 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/typeurl/v2 v2.1.1 // indirect
-	github.com/docker/distribution v2.8.2+incompatible // indirect
+	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.0 // indirect
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
@@ -95,7 +95,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.1 // indirect
-	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -152,12 +152,12 @@ require (
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.19.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
-	golang.org/x/term v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
