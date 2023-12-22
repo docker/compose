@@ -40,6 +40,20 @@ func (m *MockService) EXPECT() *MockServiceMockRecorder {
 	return m.recorder
 }
 
+// Attach mocks base method.
+func (m *MockService) Attach(ctx context.Context, projectName string, options api.AttachOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Attach", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Attach indicates an expected call of Attach.
+func (mr *MockServiceMockRecorder) Attach(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Attach", reflect.TypeOf((*MockService)(nil).Attach), ctx, projectName, options)
+}
+
 // Build mocks base method.
 func (m *MockService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	m.ctrl.T.Helper()
