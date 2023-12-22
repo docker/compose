@@ -28,6 +28,7 @@ Define and run multi-container applications with Docker.
 | [`run`](compose_run.md)         | Run a one-off command on a service.                                                   |
 | [`scale`](compose_scale.md)     | Scale services                                                                        |
 | [`start`](compose_start.md)     | Start services                                                                        |
+| [`stats`](compose_stats.md)     | Display a live stream of container(s) resource usage statistics                       |
 | [`stop`](compose_stop.md)       | Stop services                                                                         |
 | [`top`](compose_top.md)         | Display the running processes                                                         |
 | [`unpause`](compose_unpause.md) | Unpause services                                                                      |
