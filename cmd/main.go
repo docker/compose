@@ -29,14 +29,13 @@ import (
 	"github.com/docker/compose/v2/cmd/compatibility"
 	commands "github.com/docker/compose/v2/cmd/compose"
 	"github.com/docker/compose/v2/internal"
-	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 )
 
 func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
-		serviceProxy := api.NewServiceProxy().WithService(compose.NewComposeService(dockerCli))
-		cmd := commands.RootCommand(dockerCli, serviceProxy)
+		backend := compose.NewComposeService(dockerCli)
+		cmd := commands.RootCommand(dockerCli, backend)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			// initialize the dockerCli instance
