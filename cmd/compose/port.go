@@ -41,7 +41,7 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	}
 	cmd := &cobra.Command{
 		Use:   "port [OPTIONS] SERVICE PRIVATE_PORT",
-		Short: "Print the public port for a port binding.",
+		Short: "Print the public port for a port binding",
 		Args:  cobra.MinimumNArgs(2),
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			port, err := strconv.ParseUint(args[1], 10, 16)
@@ -58,7 +58,7 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	cmd.Flags().StringVar(&opts.protocol, "protocol", "tcp", "tcp or udp")
-	cmd.Flags().IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
+	cmd.Flags().IntVar(&opts.index, "index", 0, "Index of the container if service has multiple replicas")
 	return cmd
 }
 

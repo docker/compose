@@ -54,7 +54,7 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := scaleCmd.Flags()
-	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
+	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services")
 
 	return scaleCmd
 }

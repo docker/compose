@@ -1,14 +1,14 @@
 # docker compose port
 
 <!---MARKER_GEN_START-->
-Print the public port for a port binding.
+Print the public port for a port binding
 
 ### Options
 
 | Name         | Type     | Default | Description                                             |
 |:-------------|:---------|:--------|:--------------------------------------------------------|
 | `--dry-run`  |          |         | Execute command in dry run mode                         |
-| `--index`    | `int`    | `0`     | index of the container if service has multiple replicas |
+| `--index`    | `int`    | `0`     | Index of the container if service has multiple replicas |
 | `--protocol` | `string` | `tcp`   | tcp or udp                                              |
 
 
@@ -16,4 +16,4 @@ Print the public port for a port binding.
 
 ## Description
 
-Prints the public port for a port binding.
+Prints the public port for a port binding

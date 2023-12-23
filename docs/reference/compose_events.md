@@ -1,7 +1,7 @@
 # docker compose events
 
 <!---MARKER_GEN_START-->
-Receive real time events from containers.
+Receive real time events from containers
 
 ### Options
 

@@ -129,7 +129,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	}
 	cmd := &cobra.Command{
 		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
-		Short: "Run a one-off command on a service.",
+		Short: "Run a one-off command on a service",
 		Args:  cobra.MinimumNArgs(1),
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			options.Service = args[0]
@@ -175,24 +175,24 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.StringArrayVarP(&options.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&options.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&options.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&options.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
+	flags.BoolVarP(&options.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected)")
 	flags.StringVar(&options.name, "name", "", "Assign a name to the container")
 	flags.StringVarP(&options.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&options.workdir, "workdir", "w", "", "Working directory inside the container")
 	flags.StringVar(&options.entrypoint, "entrypoint", "", "Override the entrypoint of the image")
 	flags.Var(&options.capAdd, "cap-add", "Add Linux capabilities")
 	flags.Var(&options.capDrop, "cap-drop", "Drop Linux capabilities")
-	flags.BoolVar(&options.noDeps, "no-deps", false, "Don't start linked services.")
-	flags.StringArrayVarP(&options.volumes, "volume", "v", []string{}, "Bind mount a volume.")
-	flags.StringArrayVarP(&options.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
-	flags.BoolVar(&options.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
-	flags.BoolVarP(&options.servicePorts, "service-ports", "P", false, "Run command with all service's ports enabled and mapped to the host.")
-	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information.")
-	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container.")
-	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags.BoolVar(&options.noDeps, "no-deps", false, "Don't start linked services")
+	flags.StringArrayVarP(&options.volumes, "volume", "v", []string{}, "Bind mount a volume")
+	flags.StringArrayVarP(&options.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host")
+	flags.BoolVar(&options.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to")
+	flags.BoolVarP(&options.servicePorts, "service-ports", "P", false, "Run command with all service's ports enabled and mapped to the host")
+	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information")
+	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container")
+	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 
-	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
-	cmd.Flags().BoolVarP(&options.tty, "tty", "t", true, "Allocate a pseudo-TTY.")
+	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
+	cmd.Flags().BoolVarP(&options.tty, "tty", "t", true, "Allocate a pseudo-TTY")
 	cmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	flags.SetNormalizeFunc(normalizeRunFlags)

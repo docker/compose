@@ -105,18 +105,18 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
-	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests.")
-	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
-	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables.")
-	flags.BoolVar(&opts.noNormalize, "no-normalize", false, "Don't normalize compose model.")
-	flags.BoolVar(&opts.noResolvePath, "no-path-resolution", false, "Don't resolve file paths.")
+	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests")
+	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything")
+	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables")
+	flags.BoolVar(&opts.noNormalize, "no-normalize", false, "Don't normalize compose model")
+	flags.BoolVar(&opts.noResolvePath, "no-path-resolution", false, "Don't resolve file paths")
 	flags.BoolVar(&opts.noConsistency, "no-consistency", false, "Don't check model consistency - warning: may produce invalid Compose output")
 
-	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
-	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
-	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line.")
-	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line.")
-	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
+	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line")
+	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line")
+	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line")
+	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line")
+	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line")
 	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
 
 	return cmd
