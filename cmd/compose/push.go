@@ -60,7 +60,7 @@ func runPush(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 	}
 
 	if !opts.IncludeDeps {
-		err := project.ForServices(services, types.IgnoreDependencies)
+		project, err = project.WithSelectedServices(services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}

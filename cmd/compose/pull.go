@@ -72,11 +72,12 @@ func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return cmd
 }
 
-func (opts pullOptions) apply(project *types.Project, services []string) error {
+func (opts pullOptions) apply(project *types.Project, services []string) (*types.Project, error) {
 	if !opts.includeDeps {
-		err := project.ForServices(services, types.IgnoreDependencies)
+		var err error
+		project, err = project.WithSelectedServices(services, types.IgnoreDependencies)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -89,7 +90,7 @@ func (opts pullOptions) apply(project *types.Project, services []string) error {
 			project.Services[i] = service
 		}
 	}
-	return nil
+	return project, nil
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pullOptions, services []string) error {
@@ -98,7 +99,7 @@ func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		return err
 	}
 
-	err = opts.apply(project, services)
+	project, err = opts.apply(project, services)
 	if err != nil {
 		return err
 	}

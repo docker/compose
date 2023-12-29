@@ -226,7 +226,7 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 		return nil, errors.New("project name can't be empty. Use `--project-name` to set a valid name")
 	}
 
-	err = project.EnableServices(services...)
+	project, err = project.WithServicesEnabled(services...)
 	if err != nil {
 		return nil, err
 	}
@@ -246,9 +246,9 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 		project.Services[name] = s
 	}
 
-	project.WithoutUnnecessaryResources()
+	project = project.WithoutUnnecessaryResources()
 
-	err = project.ForServices(services)
+	project, err = project.WithSelectedServices(services)
 	return project, err
 }
 

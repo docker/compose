@@ -148,7 +148,8 @@ func getContainerNameWithoutProject(c moby.Container) string {
 
 func (s *composeService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {
 	if options.ResolveImageDigests {
-		err := project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+		var err error
+		project, err = project.WithImagesResolved(func(named reference.Named) (digest.Digest, error) {
 			auth, err := encodedAuth(named, s.configFile())
 			if err != nil {
 				return "", err
@@ -233,7 +234,7 @@ SERVICES:
 		}
 		return project, fmt.Errorf("no such service: %q: %w", qs, api.ErrNotFound)
 	}
-	err := project.ForServices(services)
+	project, err := project.WithSelectedServices(services)
 	if err != nil {
 		return project, err
 	}

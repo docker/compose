@@ -44,7 +44,7 @@ func TestFilterServices(t *testing.T) {
 			},
 		},
 	}
-	err := p.ForServices([]string{"bar"})
+	p, err := p.WithSelectedServices([]string{"bar"})
 	assert.NilError(t, err)
 
 	assert.Equal(t, len(p.Services), 2)

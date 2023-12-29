@@ -49,7 +49,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	}
 
 	if options.NoDeps {
-		err := project.ForServices(options.Services, types.IgnoreDependencies)
+		project, err = project.WithSelectedServices(options.Services, types.IgnoreDependencies)
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	}
 
 	if len(options.Services) != 0 {
-		err = project.ForServices(options.Services, types.IncludeDependents)
+		project, err = project.WithSelectedServices(options.Services, types.IncludeDependents)
 		if err != nil {
 			return err
 		}

@@ -67,7 +67,7 @@ func runScale(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	if opts.noDeps {
-		if err := project.ForServices(services, types.IgnoreDependencies); err != nil {
+		if project, err = project.WithSelectedServices(services, types.IgnoreDependencies); err != nil {
 			return err
 		}
 	}

@@ -107,8 +107,11 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 }
 
 func (s *composeService) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
-	project.ApplyProfiles([]string{"*"})
-	err := project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+	project, err := project.WithProfiles([]string{"*"})
+	if err != nil {
+		return nil, err
+	}
+	project, err = project.WithImagesResolved(func(named reference.Named) (digest.Digest, error) {
 		auth, err := encodedAuth(named, s.configFile())
 		if err != nil {
 			return "", err
