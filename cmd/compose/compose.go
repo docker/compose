@@ -42,6 +42,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
@@ -75,7 +76,7 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		contextString := fmt.Sprintf("%s", ctx)
-		if !strings.HasSuffix(contextString, ".WithCancel") { // need to handle cancel
+		if !strings.Contains(contextString, ".WithCancel") || plugin.RunningStandalone() { // need to handle cancel
 			cancellableCtx, cancel := context.WithCancel(cmd.Context())
 			ctx = cancellableCtx
 			s := make(chan os.Signal, 1)
