@@ -15,7 +15,7 @@ require (
 	github.com/docker/cli v25.0.0-beta.3+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
 	github.com/docker/docker v25.0.0-beta.3+incompatible
-	github.com/docker/go-connections v0.4.1-0.20231110212414-fa09c952e3ea
+	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsevents v0.1.1
 	github.com/google/go-cmp v0.6.0
