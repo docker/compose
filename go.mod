@@ -12,10 +12,10 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.5.0
 	github.com/docker/buildx v0.12.0-rc2.0.20231219140829-617f538cb315
-	github.com/docker/cli v25.0.0-beta.3+incompatible
+	github.com/docker/cli v25.0.0-rc.1+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
-	github.com/docker/docker v25.0.0-beta.3+incompatible
-	github.com/docker/go-connections v0.4.1-0.20231110212414-fa09c952e3ea
+	github.com/docker/docker v25.0.0-rc.1+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsevents v0.1.1
 	github.com/google/go-cmp v0.6.0
@@ -80,7 +80,7 @@ require (
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
-	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fvbommel/sortorder v1.0.2 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -106,7 +106,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.17.2 // indirect
+	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
