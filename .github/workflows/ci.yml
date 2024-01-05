@@ -19,7 +19,7 @@ on:
         default: "false"
 
 env:
-  DOCKER_CLI_VERSION: "20.10.17"
+  DOCKER_CLI_VERSION: "24.0.7"
 
 permissions:
   contents: read # to fetch code (actions/checkout)
