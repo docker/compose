@@ -410,6 +410,11 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		}}
 	}
 
+	sp, err := build.ReadSourcePolicy()
+	if err != nil {
+		return build.Options{}, err
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:      service.Build.Context,
@@ -417,21 +422,22 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 			DockerfilePath:   dockerFilePath(service.Build.Context, service.Build.Dockerfile),
 			NamedContexts:    toBuildContexts(service.Build.AdditionalContexts),
 		},
-		CacheFrom:   pb.CreateCaches(cacheFrom),
-		CacheTo:     pb.CreateCaches(cacheTo),
-		NoCache:     service.Build.NoCache,
-		Pull:        service.Build.Pull,
-		BuildArgs:   flatten(resolveAndMergeBuildArgs(s.dockerCli, project, service, options)),
-		Tags:        tags,
-		Target:      service.Build.Target,
-		Exports:     exports,
-		Platforms:   plats,
-		Labels:      imageLabels,
-		NetworkMode: service.Build.Network,
-		ExtraHosts:  service.Build.ExtraHosts.AsList(":"),
-		Ulimits:     toUlimitOpt(service.Build.Ulimits),
-		Session:     sessionConfig,
-		Allow:       allow,
+		CacheFrom:    pb.CreateCaches(cacheFrom),
+		CacheTo:      pb.CreateCaches(cacheTo),
+		NoCache:      service.Build.NoCache,
+		Pull:         service.Build.Pull,
+		BuildArgs:    flatten(resolveAndMergeBuildArgs(s.dockerCli, project, service, options)),
+		Tags:         tags,
+		Target:       service.Build.Target,
+		Exports:      exports,
+		Platforms:    plats,
+		Labels:       imageLabels,
+		NetworkMode:  service.Build.Network,
+		ExtraHosts:   service.Build.ExtraHosts.AsList(":"),
+		Ulimits:      toUlimitOpt(service.Build.Ulimits),
+		Session:      sessionConfig,
+		Allow:        allow,
+		SourcePolicy: sp,
 	}, nil
 }
 
