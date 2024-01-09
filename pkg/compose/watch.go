@@ -419,6 +419,12 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 	return nil
 }
 
+func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCloser) error {
+	return t.s.apiClient().CopyToContainer(ctx, id, "/", archive, moby.CopyToContainerOptions{
+		CopyUIDGID: true,
+	})
+}
+
 func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, build api.BuildOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
 	restartService := false
