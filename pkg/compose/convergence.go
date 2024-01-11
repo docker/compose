@@ -737,7 +737,7 @@ func (s *composeService) isServiceCompleted(ctx context.Context, containers Cont
 	return false, 0, nil
 }
 
-func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig, containers Containers) error {
+func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig, containers Containers, wait bool) error {
 	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}
@@ -765,9 +765,26 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		if err != nil {
 			return err
 		}
-		w.Event(progress.StartedEvent(eventName))
+		status := progress.Done
+		if wait || dependencyWaiting(project, service.Name) {
+			status = progress.Working
+		}
+		w.Event(progress.NewEvent(eventName, status, "Started"))
 	}
 	return nil
+}
+
+func dependencyWaiting(project *types.Project, name string) bool {
+	for _, service := range project.Services {
+		depends, ok := service.DependsOn[name]
+		if !ok {
+			continue
+		}
+		if depends.Condition == types.ServiceConditionHealthy {
+			return true
+		}
+	}
+	return false
 }
 
 func mergeLabels(ls ...types.Labels) types.Labels {

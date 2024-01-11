@@ -38,3 +38,6 @@ func (p *noopWriter) TailMsgf(_ string, _ ...interface{}) {
 
 func (p *noopWriter) Stop() {
 }
+
+func (p *noopWriter) HasMore(bool) {
+}
