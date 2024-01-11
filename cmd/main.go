@@ -24,6 +24,7 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/cmdtrace"
+	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/compatibility"
@@ -42,6 +43,9 @@ func pluginMain() {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
+			// compose-specific initialization
+			dockerCliPostInitialize(dockerCli)
+
 			// TODO(milas): add an env var to enable logging from the
 			// OTel components for debugging purposes
 			_ = cmdtrace.Setup(cmd, dockerCli, os.Args[1:])
@@ -65,6 +69,22 @@ func pluginMain() {
 			Vendor:        "Docker Inc.",
 			Version:       internal.Version,
 		})
+}
+
+// dockerCliPostInitialize performs Compose-specific configuration for the
+// command.Cli instance provided by the plugin.Run() initialization.
+//
+// NOTE: This must be called AFTER plugin.PersistentPreRunE.
+func dockerCliPostInitialize(dockerCli command.Cli) {
+	// HACK(milas): remove once docker/cli#4574 is merged; for now,
+	// set it in a rather roundabout way by grabbing the underlying
+	// concrete client and manually invoking an option on it
+	_ = dockerCli.Apply(func(cli *command.DockerCli) error {
+		if mobyClient, ok := cli.Client().(*client.Client); ok {
+			_ = client.WithUserAgent("compose/" + internal.Version)(mobyClient)
+		}
+		return nil
+	})
 }
 
 func main() {
