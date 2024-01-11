@@ -64,7 +64,8 @@ func (s *composeService) getSyncImplementation(project *types.Project) sync.Sync
 }
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
-	if err := project.ForServices(services); err != nil {
+	var err error
+	if project, err = project.WithSelectedServices(services); err != nil {
 		return err
 	}
 	syncer := s.getSyncImplementation(project)

@@ -56,22 +56,23 @@ type upOptions struct {
 	waitTimeout        int
 }
 
-func (opts upOptions) apply(project *types.Project, services []string) error {
+func (opts upOptions) apply(project *types.Project, services []string) (*types.Project, error) {
 	if opts.noDeps {
-		err := project.ForServices(services, types.IgnoreDependencies)
+		var err error
+		project, err = project.WithSelectedServices(services, types.IgnoreDependencies)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if opts.exitCodeFrom != "" {
 		_, err := project.GetService(opts.exitCodeFrom)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return project, nil
 }
 
 func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -171,7 +172,7 @@ func runUp(
 		return err
 	}
 
-	err = upOptions.apply(project, services)
+	project, err = upOptions.apply(project, services)
 	if err != nil {
 		return err
 	}
@@ -229,9 +230,9 @@ func runUp(
 			if upOptions.attachDependencies {
 				dependencyOpt = types.IncludeDependencies
 			}
-			if err := project.WithServices(services, func(s types.ServiceConfig) error {
+			if err := project.ForEachService(services, func(serviceName string, s *types.ServiceConfig) error {
 				if s.Attach == nil || *s.Attach {
-					attachSet.Add(s.Name)
+					attachSet.Add(serviceName)
 				}
 				return nil
 			}, dependencyOpt); err != nil {

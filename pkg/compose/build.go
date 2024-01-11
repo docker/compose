@@ -84,17 +84,16 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	if options.Deps {
 		policy = types.IncludeDependencies
 	}
-	err = project.WithServices(options.Services, func(service types.ServiceConfig) error {
+	err = project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
 		}
-		image := api.GetImageNameOrDefault(service, project.Name)
+		image := api.GetImageNameOrDefault(*service, project.Name)
 		_, localImagePresent := localImages[image]
 		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 			return nil
 		}
-		name := service.Name
-		serviceToBeBuild[name] = serviceToBuild{name: name, service: service}
+		serviceToBeBuild[serviceName] = serviceToBuild{name: serviceName, service: *service}
 		return nil
 	}, policy)
 	if err != nil || len(serviceToBeBuild) == 0 {

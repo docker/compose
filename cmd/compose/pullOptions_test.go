@@ -46,7 +46,7 @@ func TestApplyPullOptions(t *testing.T) {
 			},
 		},
 	}
-	err := pullOptions{
+	project, err := pullOptions{
 		policy: types.PullPolicyMissing,
 	}.apply(project, nil)
 	assert.NilError(t, err)

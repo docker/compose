@@ -66,17 +66,18 @@ type runOptions struct {
 	quietPull     bool
 }
 
-func (options runOptions) apply(project *types.Project) error {
+func (options runOptions) apply(project *types.Project) (*types.Project, error) {
 	if options.noDeps {
-		err := project.ForServices([]string{options.Service}, types.IgnoreDependencies)
+		var err error
+		project, err = project.WithSelectedServices([]string{options.Service}, types.IgnoreDependencies)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	target, err := project.GetService(options.Service)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	target.Tty = !options.noTty
@@ -91,7 +92,7 @@ func (options runOptions) apply(project *types.Project) error {
 		for _, p := range options.publish {
 			config, err := types.ParsePortConfig(p)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			target.Ports = append(target.Ports, config...)
 		}
@@ -100,7 +101,7 @@ func (options runOptions) apply(project *types.Project) error {
 	for _, v := range options.volumes {
 		volume, err := format.ParseVolume(v)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		target.Volumes = append(target.Volumes, volume)
 	}
@@ -111,7 +112,7 @@ func (options runOptions) apply(project *types.Project) error {
 			break
 		}
 	}
-	return nil
+	return project, nil
 }
 
 func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -210,7 +211,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 }
 
 func runRun(ctx context.Context, backend api.Service, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
-	err := options.apply(project)
+	project, err := options.apply(project)
 	if err != nil {
 		return err
 	}

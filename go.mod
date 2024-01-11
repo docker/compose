@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.0.0-beta.2
+	github.com/compose-spec/compose-go/v2 v2.0.0-beta.3
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.7.11
 	github.com/davecgh/go-spew v1.1.1
@@ -114,6 +114,8 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
+	github.com/mitchellh/copystructure v1.2.0 // indirect
+	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
