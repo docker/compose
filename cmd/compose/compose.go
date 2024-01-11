@@ -445,6 +445,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		runCommand(&opts, dockerCli, backend),
 		removeCommand(&opts, dockerCli, backend),
 		execCommand(&opts, dockerCli, backend),
+		attachCommand(&opts, dockerCli, backend),
 		pauseCommand(&opts, dockerCli, backend),
 		unpauseCommand(&opts, dockerCli, backend),
 		topCommand(&opts, dockerCli, backend),
