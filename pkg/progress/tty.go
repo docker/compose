@@ -33,17 +33,18 @@ import (
 )
 
 type ttyWriter struct {
-	out             io.Writer
-	events          map[string]Event
-	eventIDs        []string
-	repeated        bool
-	numLines        int
-	done            chan bool
-	mtx             *sync.Mutex
-	tailEvents      []string
-	dryRun          bool
-	skipChildEvents bool
-	progressTitle   string
+	out               io.Writer
+	events            map[string]Event
+	eventIDs          []string
+	repeated          bool
+	numLines          int
+	done              chan bool
+	mtx               *sync.Mutex
+	tailEvents        []string
+	dryRun            bool
+	skipChildEvents   bool
+	progressTitle     string
+	hasFollowupAction bool
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -70,6 +71,10 @@ func (w *ttyWriter) Stop() {
 	w.done <- true
 }
 
+func (w *ttyWriter) HasMore(b bool) {
+	w.hasFollowupAction = b
+}
+
 func (w *ttyWriter) Event(e Event) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
@@ -82,6 +87,9 @@ func (w *ttyWriter) event(e Event) {
 	}
 	if _, ok := w.events[e.ID]; ok {
 		last := w.events[e.ID]
+		if e.Status == Done && w.hasFollowupAction {
+			e.Status = Working
+		}
 		switch e.Status {
 		case Done, Error, Warning:
 			if last.endTime.IsZero() {

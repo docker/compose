@@ -64,3 +64,6 @@ func (p *plainWriter) TailMsgf(msg string, args ...interface{}) {
 func (p *plainWriter) Stop() {
 	p.done <- true
 }
+
+func (p *plainWriter) HasMore(bool) {
+}

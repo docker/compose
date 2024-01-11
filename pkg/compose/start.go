@@ -129,7 +129,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 			return err
 		}
 
-		return s.startService(ctx, project, service, containers)
+		return s.startService(ctx, project, service, containers, options.Wait)
 	})
 	if err != nil {
 		return err
