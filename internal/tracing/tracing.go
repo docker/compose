@@ -115,11 +115,9 @@ func InitProvider(dockerCli command.Cli) (ShutdownFunc, error) {
 	}
 
 	muxExporter := MuxExporter{exporters: exporters}
-	sp := sdktrace.NewSimpleSpanProcessor(muxExporter)
 	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithResource(res),
-		sdktrace.WithSpanProcessor(sp),
+		sdktrace.WithBatcher(muxExporter),
 	)
 	otel.SetTracerProvider(tracerProvider)
 
