@@ -42,7 +42,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
@@ -74,20 +73,17 @@ type CobraCommand func(context.Context, *cobra.Command, []string) error
 // AdaptCmd adapt a CobraCommand func to cobra library
 func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
-		contextString := fmt.Sprintf("%s", ctx)
-		if !strings.Contains(contextString, ".WithCancel") || plugin.RunningStandalone() { // need to handle cancel
-			cancellableCtx, cancel := context.WithCancel(cmd.Context())
-			ctx = cancellableCtx
-			s := make(chan os.Signal, 1)
-			signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
-			go func() {
-				<-s
-				cancel()
-				signal.Stop(s)
-				close(s)
-			}()
-		}
+		ctx, cancel := context.WithCancel(cmd.Context())
+
+		s := make(chan os.Signal, 1)
+		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+		go func() {
+			<-s
+			cancel()
+			signal.Stop(s)
+			close(s)
+		}()
+
 		err := fn(ctx, cmd, args)
 		var composeErr compose.Error
 		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
