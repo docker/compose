@@ -6,11 +6,9 @@ plink: docker_compose.yaml
 cname:
     - docker compose alpha publish
     - docker compose alpha viz
-    - docker compose alpha watch
 clink:
     - docker_compose_alpha_publish.yaml
     - docker_compose_alpha_viz.yaml
-    - docker_compose_alpha_watch.yaml
 inherited_options:
     - option: dry-run
       value_type: bool
