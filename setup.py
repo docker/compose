@@ -26,7 +26,7 @@ def find_version(*file_paths):
 
 install_requires = [
     'docopt >= 0.6.1, < 1',
-    'PyYAML >= 3.10, < 6',
+    'PyYAML >= 6',
     'requests >= 2.20.0, < 3',
     'texttable >= 0.9.0, < 2',
     'websocket-client >= 0.32.0, < 1',
@@ -70,7 +70,7 @@ except Exception as e:
 
 
 setup(
-    name='docker-compose',
+    name='docker-compose-forks',
     version=find_version("compose", "__init__.py"),
     description='Multi-container orchestration for Docker',
     long_description=read('README.md'),
