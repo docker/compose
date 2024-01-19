@@ -37,18 +37,26 @@ func TestComposeCancel(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	t.Run("metrics on cancel Compose build", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "ls")
-		buildProjectPath := "fixtures/build-infinite/compose.yaml"
+		const buildProjectPath = "fixtures/build-infinite/compose.yaml"
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
 		// sending kill signal
-		stdout := &utils.SafeBuffer{}
-		stderr := &utils.SafeBuffer{}
-		cmd, err := StartWithNewGroupID(context.Background(),
+		var stdout, stderr utils.SafeBuffer
+		cmd, err := StartWithNewGroupID(
+			ctx,
 			c.NewDockerComposeCmd(t, "-f", buildProjectPath, "build", "--progress", "plain"),
-			stdout,
-			stderr)
+			&stdout,
+			&stderr,
+		)
 		assert.NilError(t, err)
+		processDone := make(chan error, 1)
+		go func() {
+			defer close(processDone)
+			processDone <- cmd.Wait()
+		}()
 
 		c.WaitForCondition(t, func() (bool, string) {
 			out := stdout.String()
@@ -58,15 +66,21 @@ func TestComposeCancel(t *testing.T) {
 					errors)
 		}, 30*time.Second, 1*time.Second)
 
-		err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) // simulate Ctrl-C : send signal to processGroup, children will have same groupId by default
+		// simulate Ctrl-C : send signal to processGroup, children will have same groupId by default
+		err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
 		assert.NilError(t, err)
 
-		c.WaitForCondition(t, func() (bool, string) {
-			out := stdout.String()
-			errors := stderr.String()
-			return strings.Contains(out, "CANCELED"), fmt.Sprintf("'CANCELED' not found in : \n%s\nStderr: \n%s\n", out,
-				errors)
-		}, 10*time.Second, 1*time.Second)
+		select {
+		case <-ctx.Done():
+			t.Fatal("test context canceled")
+		case err := <-processDone:
+			// TODO(milas): Compose should really not return exit code 130 here,
+			// 	this is an old hack for the compose-cli wrapper
+			assert.Error(t, err, "exit status 130",
+				"STDOUT:\n%s\nSTDERR:\n%s\n", stdout.String(), stderr.String())
+		case <-time.After(10 * time.Second):
+			t.Fatal("timeout waiting for Compose exit")
+		}
 	})
 }
 

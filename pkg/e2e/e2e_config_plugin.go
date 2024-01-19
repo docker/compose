@@ -18,4 +18,4 @@
 
 package e2e
 
-const composeStandaloneMode = true
+const composeStandaloneMode = false
