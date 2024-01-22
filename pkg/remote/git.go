@@ -48,11 +48,13 @@ func gitRemoteLoaderEnabled() (bool, error) {
 func NewGitRemoteLoader(offline bool) loader.ResourceLoader {
 	return gitRemoteLoader{
 		offline: offline,
+		known:   map[string]string{},
 	}
 }
 
 type gitRemoteLoader struct {
 	offline bool
+	known   map[string]string
 }
 
 func (g gitRemoteLoader) Accept(path string) bool {
@@ -76,31 +78,34 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		return "", err
 	}
 
-	if ref.Commit == "" {
-		ref.Commit = "HEAD" // default branch
-	}
-
-	err = g.resolveGitRef(ctx, path, ref)
-	if err != nil {
-		return "", err
-	}
-
-	cache, err := cacheDir()
-	if err != nil {
-		return "", fmt.Errorf("initializing remote resource cache: %w", err)
-	}
-
-	local := filepath.Join(cache, ref.Commit)
-	if _, err := os.Stat(local); os.IsNotExist(err) {
-		if g.offline {
-			return "", nil
+	local, ok := g.known[path]
+	if !ok {
+		if ref.Commit == "" {
+			ref.Commit = "HEAD" // default branch
 		}
-		err = g.checkout(ctx, local, ref)
+
+		err = g.resolveGitRef(ctx, path, ref)
 		if err != nil {
 			return "", err
 		}
-	}
 
+		cache, err := cacheDir()
+		if err != nil {
+			return "", fmt.Errorf("initializing remote resource cache: %w", err)
+		}
+
+		local = filepath.Join(cache, ref.Commit)
+		if _, err := os.Stat(local); os.IsNotExist(err) {
+			if g.offline {
+				return "", nil
+			}
+			err = g.checkout(ctx, local, ref)
+			if err != nil {
+				return "", err
+			}
+		}
+		g.known[path] = local
+	}
 	if ref.SubDir != "" {
 		local = filepath.Join(local, ref.SubDir)
 	}
@@ -112,6 +117,10 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		local, err = findFile(cli.DefaultFileNames, local)
 	}
 	return local, err
+}
+
+func (g gitRemoteLoader) Dir(path string) string {
+	return g.known[path]
 }
 
 func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gitutil.GitRef) error {

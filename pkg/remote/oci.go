@@ -50,12 +50,14 @@ func NewOCIRemoteLoader(dockerCli command.Cli, offline bool) loader.ResourceLoad
 	return ociRemoteLoader{
 		dockerCli: dockerCli,
 		offline:   offline,
+		known:     map[string]string{},
 	}
 }
 
 type ociRemoteLoader struct {
 	dockerCli command.Cli
 	offline   bool
+	known     map[string]string
 }
 
 const prefix = "oci://"
@@ -77,42 +79,51 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		return "", nil
 	}
 
-	ref, err := reference.ParseDockerRef(path[len(prefix):])
-	if err != nil {
-		return "", err
-	}
-
-	opt, err := storeutil.GetImageConfig(g.dockerCli, nil)
-	if err != nil {
-		return "", err
-	}
-	resolver := imagetools.New(opt)
-
-	content, descriptor, err := resolver.Get(ctx, ref.String())
-	if err != nil {
-		return "", err
-	}
-
-	cache, err := cacheDir()
-	if err != nil {
-		return "", fmt.Errorf("initializing remote resource cache: %w", err)
-	}
-
-	local := filepath.Join(cache, descriptor.Digest.Hex())
-	composeFile := filepath.Join(local, "compose.yaml")
-	if _, err = os.Stat(local); os.IsNotExist(err) {
-		var manifest v1.Manifest
-		err = json.Unmarshal(content, &manifest)
+	local, ok := g.known[path]
+	if !ok {
+		ref, err := reference.ParseDockerRef(path[len(prefix):])
 		if err != nil {
 			return "", err
 		}
 
-		err2 := g.pullComposeFiles(ctx, local, composeFile, manifest, ref, resolver)
-		if err2 != nil {
-			return "", err2
+		opt, err := storeutil.GetImageConfig(g.dockerCli, nil)
+		if err != nil {
+			return "", err
 		}
+		resolver := imagetools.New(opt)
+
+		content, descriptor, err := resolver.Get(ctx, ref.String())
+		if err != nil {
+			return "", err
+		}
+
+		cache, err := cacheDir()
+		if err != nil {
+			return "", fmt.Errorf("initializing remote resource cache: %w", err)
+		}
+
+		local = filepath.Join(cache, descriptor.Digest.Hex())
+		composeFile := filepath.Join(local, "compose.yaml")
+		if _, err = os.Stat(local); os.IsNotExist(err) {
+			var manifest v1.Manifest
+			err = json.Unmarshal(content, &manifest)
+			if err != nil {
+				return "", err
+			}
+
+			err2 := g.pullComposeFiles(ctx, local, composeFile, manifest, ref, resolver)
+			if err2 != nil {
+				return "", err2
+			}
+		}
+		g.known[path] = local
 	}
-	return composeFile, nil
+
+	return filepath.Join(local, "compose.yaml"), nil
+}
+
+func (g ociRemoteLoader) Dir(path string) string {
+	return g.known[path]
 }
 
 func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, composeFile string, manifest v1.Manifest, ref reference.Named, resolver *imagetools.Resolver) error {
