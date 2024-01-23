@@ -99,8 +99,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	orphans := observedState.filter(isNotService(allServiceNames...))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
-			w := progress.ContextWriter(ctx)
-			err := s.removeContainers(ctx, w, orphans, nil, false)
+			err := s.removeContainers(ctx, orphans, nil, false)
 			if err != nil {
 				return err
 			}
