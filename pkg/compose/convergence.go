@@ -134,14 +134,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			container := container
 			traceOpts := append(tracing.ServiceOptions(service), tracing.ContainerOptions(container)...)
 			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "service/scale/down", traceOpts, func(ctx context.Context) error {
-				timeoutInSecond := utils.DurationSecondToInt(timeout)
-				err := c.service.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{
-					Timeout: timeoutInSecond,
-				})
-				if err != nil {
-					return err
-				}
-				return c.service.apiClient().ContainerRemove(ctx, container.ID, containerType.RemoveOptions{})
+				return c.service.stopAndRemoveContainer(ctx, container, timeout, false)
 			}))
 			continue
 		}

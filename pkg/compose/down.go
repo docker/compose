@@ -76,7 +76,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		serviceContainers := containers.filter(isService(service))
-		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
+		err := s.removeContainers(ctx, serviceContainers, options.Timeout, options.Volumes)
 		return err
 	}, WithRootNodesAndDown(options.Services))
 	if err != nil {
@@ -85,7 +85,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	orphans := containers.filter(isOrphaned(project))
 	if options.RemoveOrphans && len(orphans) > 0 {
-		err := s.removeContainers(ctx, w, orphans, options.Timeout, false)
+		err := s.removeContainers(ctx, orphans, options.Timeout, false)
 		if err != nil {
 			return err
 		}
@@ -303,30 +303,35 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 	return eg.Wait()
 }
 
-func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration, volumes bool) error {
+func (s *composeService) removeContainers(ctx context.Context, containers []moby.Container, timeout *time.Duration, volumes bool) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for _, container := range containers {
 		container := container
 		eg.Go(func() error {
-			eventName := getContainerProgressName(container)
-			err := s.stopContainer(ctx, w, container, timeout)
-			if err != nil {
-				return err
-			}
-			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient().ContainerRemove(ctx, container.ID, containerType.RemoveOptions{
-				Force:         true,
-				RemoveVolumes: volumes,
-			})
-			if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
-				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
-				return err
-			}
-			w.Event(progress.RemovedEvent(eventName))
-			return nil
+			return s.stopAndRemoveContainer(ctx, container, timeout, volumes)
 		})
 	}
 	return eg.Wait()
+}
+
+func (s *composeService) stopAndRemoveContainer(ctx context.Context, container moby.Container, timeout *time.Duration, volumes bool) error {
+	w := progress.ContextWriter(ctx)
+	eventName := getContainerProgressName(container)
+	err := s.stopContainer(ctx, w, container, timeout)
+	if err != nil {
+		return err
+	}
+	w.Event(progress.RemovingEvent(eventName))
+	err = s.apiClient().ContainerRemove(ctx, container.ID, containerType.RemoveOptions{
+		Force:         true,
+		RemoveVolumes: volumes,
+	})
+	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
+		w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
+		return err
+	}
+	w.Event(progress.RemovedEvent(eventName))
+	return nil
 }
 
 func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
