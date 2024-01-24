@@ -182,3 +182,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 	tags.cncf.io/container-device-interface v0.6.2 // indirect
 )
+
+// Fix an issue with fsutil v0.0.0-20230825212630-f09800878302 on Windows
+// See https://github.com/docker/buildx/issues/2207#issuecomment-1908460460
+replace github.com/tonistiigi/fsutil v0.0.0-20230825212630-f09800878302 => github.com/crazy-max/fsutil v0.0.0-20240124164449-376dc28ff40f
