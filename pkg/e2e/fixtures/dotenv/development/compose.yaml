@@ -1,0 +1,3 @@
+services:
+  backend:
+    image: $IMAGE_NAME:$IMAGE_TAG
