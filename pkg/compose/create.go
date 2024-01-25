@@ -1246,19 +1246,16 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 		n.Name = networks[0].ID
 		return nil
 	case 0:
-		if n.Driver == "overlay" {
+		enabled, err := s.isSWarmEnabled(ctx)
+		if err != nil {
+			return err
+		}
+		if enabled {
 			// Swarm nodes do not register overlay networks that were
 			// created on a different node unless they're in use.
-			// Here we assume `driver` is relevant for a network we don't manage
-			// which is a non-sense, but this is our legacy ¯\(ツ)/¯
+			// So we can't preemptively check network exists, but
 			// networkAttach will later fail anyway if network actually doesn't exists
-			enabled, err := s.isSWarmEnabled(ctx)
-			if err != nil {
-				return err
-			}
-			if enabled {
-				return nil
-			}
+			return nil
 		}
 		return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
 	default:
