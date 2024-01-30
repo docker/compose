@@ -183,6 +183,8 @@ require (
 	tags.cncf.io/container-device-interface v0.6.2 // indirect
 )
 
-// Fix an issue with fsutil v0.0.0-20230825212630-f09800878302 on Windows
-// See https://github.com/docker/buildx/issues/2207#issuecomment-1908460460
-replace github.com/tonistiigi/fsutil v0.0.0-20230825212630-f09800878302 => github.com/crazy-max/fsutil v0.0.0-20240124164449-376dc28ff40f
+replace (
+	// reverts https://github.com/moby/buildkit/pull/4094 to fix fsutil issues on Windows
+	github.com/moby/buildkit => github.com/crazy-max/buildkit v0.7.1-0.20240130133234-d9aa289bd124 // compose-957cb50df991
+	github.com/tonistiigi/fsutil => github.com/tonistiigi/fsutil v0.0.0-20230629203738-36ef4d8c0dbb
+)
