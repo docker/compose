@@ -312,11 +312,13 @@ func (s *composeService) isSWarmEnabled(ctx context.Context) (bool, error) {
 	return swarmEnabled.val, swarmEnabled.err
 }
 
-var runtimeVersion = struct {
+type runtimeVersionCache struct {
 	once sync.Once
 	val  string
 	err  error
-}{}
+}
+
+var runtimeVersion runtimeVersionCache
 
 func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 	runtimeVersion.once.Do(func() {
