@@ -132,7 +132,8 @@ func getCanonicalContainerName(c moby.Container) string {
 			return name[1:]
 		}
 	}
-	return c.Names[0][1:]
+
+	return strings.TrimPrefix(c.Names[0], "/")
 }
 
 func getContainerNameWithoutProject(c moby.Container) string {
