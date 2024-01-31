@@ -261,10 +261,10 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
 			cli.WithOsEnv,
-			cli.WithEnvFiles(o.EnvFiles...),
-			cli.WithDotEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
+			cli.WithEnvFiles(o.EnvFiles...),
+			cli.WithDotEnv,
 			cli.WithDefaultProfiles(o.Profiles...),
 			cli.WithName(o.ProjectName))...)
 }

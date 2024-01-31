@@ -313,3 +313,15 @@ func TestRemoveOrphaned(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/sentences/compose.yaml", "-p", projectName, "ps", "--format", "{{.Name}}")
 	res.Assert(t, icmd.Expected{Out: fmt.Sprintf("%s-words-1", projectName)})
 }
+
+func TestResolveDotEnv(t *testing.T) {
+	c := NewCLI(t)
+
+	cmd := c.NewDockerComposeCmd(t, "config")
+	cmd.Dir = filepath.Join(".", "fixtures", "dotenv")
+	res := icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Expected{
+		ExitCode: 0,
+		Out:      "image: backend:latest",
+	})
+}
