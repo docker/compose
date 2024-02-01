@@ -8,10 +8,10 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.0.0-rc.3
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.7.12
+	github.com/containerd/containerd v1.7.11
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.5.0
-	github.com/docker/buildx v0.12.0-rc2.0.20231219140829-617f538cb315
+	github.com/docker/buildx v0.12.1
 	github.com/docker/cli v25.0.2+incompatible
 	github.com/docker/cli-docs-tool v0.6.0
 	github.com/docker/docker v25.0.1+incompatible
@@ -24,7 +24,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.13.0-beta1.0.20231219135447-957cb50df991
+	github.com/moby/buildkit v0.13.0-beta1.0.20231023114302-d5c1d785b042
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
@@ -172,7 +172,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.26.7 // indirect
 	k8s.io/apimachinery v0.26.7 // indirect
-	k8s.io/apiserver v0.26.7 // indirect
 	k8s.io/client-go v0.26.7 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
