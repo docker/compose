@@ -56,7 +56,7 @@ func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 }
 
 func runRestart(ctx context.Context, dockerCli command.Cli, backend api.Service, opts restartOptions, services []string) error {
-	project, name, err := opts.projectOrName(dockerCli)
+	project, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

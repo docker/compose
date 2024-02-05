@@ -35,18 +35,17 @@ import (
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
+	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/remote"
+	"github.com/docker/compose/v2/pkg/utils"
 	buildkit "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/morikuni/aec"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/compose"
-	ui "github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 const (
@@ -140,10 +139,9 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 		options := []cli.ProjectOptionsFn{
 			cli.WithResolvedPaths(true),
 			cli.WithDiscardEnvFile,
-			cli.WithContext(ctx),
 		}
 
-		project, err := o.ToProject(dockerCli, args, options...)
+		project, err := o.ToProject(ctx, dockerCli, args, options...)
 		if err != nil {
 			return err
 		}
@@ -164,11 +162,11 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	_ = f.MarkHidden("workdir")
 }
 
-func (o *ProjectOptions) projectOrName(dockerCli command.Cli, services ...string) (*types.Project, string, error) {
+func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cli, services ...string) (*types.Project, string, error) {
 	name := o.ProjectName
 	var project *types.Project
 	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
-		p, err := o.ToProject(dockerCli, services, cli.WithDiscardEnvFile)
+		p, err := o.ToProject(ctx, dockerCli, services, cli.WithDiscardEnvFile)
 		if err != nil {
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
@@ -182,7 +180,7 @@ func (o *ProjectOptions) projectOrName(dockerCli command.Cli, services ...string
 	return project, name, nil
 }
 
-func (o *ProjectOptions) toProjectName(dockerCli command.Cli) (string, error) {
+func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cli) (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil
 	}
@@ -192,17 +190,19 @@ func (o *ProjectOptions) toProjectName(dockerCli command.Cli) (string, error) {
 		return envProjectName, nil
 	}
 
-	project, err := o.ToProject(dockerCli, nil)
+	project, err := o.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return "", err
 	}
 	return project.Name, nil
 }
 
-func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
 	if !o.Offline {
-		po = o.configureRemoteLoaders(dockerCli, po)
+		po = append(po, o.remoteLoaders(dockerCli)...)
 	}
+
+	po = append(po, cli.WithContext(ctx))
 
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
@@ -248,12 +248,10 @@ func (o *ProjectOptions) ToProject(dockerCli command.Cli, services []string, po 
 	return project, err
 }
 
-func (o *ProjectOptions) configureRemoteLoaders(dockerCli command.Cli, po []cli.ProjectOptionsFn) []cli.ProjectOptionsFn {
+func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []cli.ProjectOptionsFn {
 	git := remote.NewGitRemoteLoader(o.Offline)
 	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
-
-	po = append(po, cli.WithResourceLoader(git), cli.WithResourceLoader(oci))
-	return po
+	return []cli.ProjectOptionsFn{cli.WithResourceLoader(git), cli.WithResourceLoader(oci)}
 }
 
 func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {

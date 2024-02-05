@@ -55,7 +55,7 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 }
 
 func runKill(ctx context.Context, dockerCli command.Cli, backend api.Service, opts killOptions, services []string) error {
-	project, name, err := opts.projectOrName(dockerCli, services...)
+	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}
