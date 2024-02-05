@@ -92,7 +92,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 }
 
 func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, opts psOptions) error {
-	project, name, err := opts.projectOrName(dockerCli, services...)
+	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}

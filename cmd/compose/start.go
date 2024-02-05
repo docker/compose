@@ -44,7 +44,7 @@ func startCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 }
 
 func runStart(ctx context.Context, dockerCli command.Cli, backend api.Service, opts startOptions, services []string) error {
-	project, name, err := opts.projectOrName(dockerCli, services...)
+	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}

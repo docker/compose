@@ -71,7 +71,7 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 }
 
 func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Service, opts logsOptions, services []string) error {
-	project, name, err := opts.projectOrName(dockerCli, services...)
+	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}

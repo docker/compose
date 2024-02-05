@@ -57,7 +57,7 @@ func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 }
 
 func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, opts imageOptions, services []string) error {
-	projectName, err := opts.toProjectName(dockerCli)
+	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}
