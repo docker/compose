@@ -17,6 +17,9 @@
 package tracing
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -71,6 +74,9 @@ func ProjectOptions(proj *types.Project) SpanOptions {
 		attribute.StringSlice("project.configs", proj.ConfigNames()),
 		attribute.StringSlice("project.extensions", keys(proj.Extensions)),
 		attribute.StringSlice("project.includes", flattenIncludeReferences(proj.IncludeReferences)),
+	}
+	if projHash, ok := projectHash(proj); ok {
+		attrs = append(attrs, attribute.String("project.hash", projHash))
 	}
 	return []trace.SpanStartEventOption{
 		trace.WithAttributes(attrs...),
@@ -157,4 +163,24 @@ func flattenIncludeReferences(includeRefs map[string][]types.IncludeConfig) []st
 		}
 	}
 	return ret.Elements()
+}
+
+// projectHash returns a checksum from the JSON encoding of the project.
+func projectHash(p *types.Project) (string, bool) {
+	if p == nil {
+		return "", false
+	}
+	// disabled services aren't included in the output, so make a copy with
+	// all the services active for hashing
+	var err error
+	p, err = p.WithServicesEnabled(append(p.ServiceNames(), p.DisabledServiceNames()...)...)
+	if err != nil {
+		return "", false
+	}
+	projData, err := json.Marshal(p)
+	if err != nil {
+		return "", false
+	}
+	d := sha256.Sum256(projData)
+	return fmt.Sprintf("%x", d), true
 }
