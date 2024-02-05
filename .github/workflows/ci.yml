@@ -138,10 +138,20 @@ jobs:
         mode:
           - plugin
           - standalone
+        engine:
+          - 24.0.9
+          - 25.0.2
     steps:
       -
         name: Checkout
         uses: actions/checkout@v3
+      - name: Install Docker ${{ matrix.engine }}
+        run: |
+          sudo apt-get install curl
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh ./get-docker.sh --version ${{ matrix.engine }}
+      - name: Check Docker Version
+        run: docker --version
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
