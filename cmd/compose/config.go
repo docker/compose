@@ -57,9 +57,8 @@ func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, se
 		cli.WithNormalization(!o.noNormalize),
 		cli.WithConsistency(!o.noConsistency),
 		cli.WithDefaultProfiles(o.Profiles...),
-		cli.WithDiscardEnvFile,
-		cli.WithContext(ctx))
-	return o.ProjectOptions.ToProject(dockerCli, services, po...)
+		cli.WithDiscardEnvFile)
+	return o.ProjectOptions.ToProject(ctx, dockerCli, services, po...)
 }
 
 func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
