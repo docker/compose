@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/containerd/console"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -127,7 +129,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		progressCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		w, err = xprogress.NewPrinter(progressCtx, os.Stdout, progressui.DisplayMode(options.Progress),
+		var outPrinter io.Writer = os.Stdout
+		if options.OutPrinter != nil {
+			outPrinter = options.OutPrinter
+		}
+
+		w, err = xprogress.NewPrinter(progressCtx, progressPrinter(outPrinter), progressui.DisplayMode(options.Progress),
 			xprogress.WithDesc(
 				fmt.Sprintf("building with %q instance using %s driver", b.Name, b.Driver),
 				fmt.Sprintf("%s:%s", b.Driver, b.Name),
@@ -563,4 +570,30 @@ func parsePlatforms(service types.ServiceConfig) ([]specs.Platform, error) {
 	}
 
 	return ret, nil
+}
+
+type pPrinter struct {
+	io.Writer
+}
+
+func (p *pPrinter) Read(_ []byte) (n int, err error) {
+	return 0, errors.New("not implemented")
+}
+
+func (p *pPrinter) Close() error {
+	return nil
+}
+
+func (p *pPrinter) Fd() uintptr {
+	return 0
+}
+
+func (p *pPrinter) Name() string {
+	return "pPrinter"
+}
+
+func progressPrinter(w io.Writer) console.File {
+	return &pPrinter{
+		Writer: w,
+	}
 }

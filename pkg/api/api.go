@@ -19,6 +19,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -145,6 +146,8 @@ type BuildOptions struct {
 	Memory int64
 	// Builder name passed in the command line
 	Builder string
+	// OutPrinter used for printing the progress output
+	OutPrinter io.Writer
 }
 
 // Apply mutates project according to build options
