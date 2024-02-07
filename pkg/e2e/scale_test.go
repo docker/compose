@@ -95,6 +95,78 @@ func TestScaleWithDepsCases(t *testing.T) {
 	checkServiceContainer(t, res.Combined(), "scale-deps-tests-db", NO_STATE_TO_CHECK, 1)
 }
 
+func TestScaleUpAndDownPreserveContainerNumber(t *testing.T) {
+	const projectName = "scale-up-down-test"
+
+	c := NewCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME="+projectName))
+
+	reset := func() {
+		c.RunDockerComposeCmd(t, "down", "--rmi", "all")
+	}
+	t.Cleanup(reset)
+	res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d", "--scale", "db=2", "db")
+	res.Assert(t, icmd.Success)
+
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "db")
+	res.Assert(t, icmd.Success)
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1\n"+projectName+"-db-2")
+
+	t.Log("scale down removes replica #2")
+	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d", "--scale", "db=1", "db")
+	res.Assert(t, icmd.Success)
+
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "db")
+	res.Assert(t, icmd.Success)
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1")
+
+	t.Log("scale up restores replica #2")
+	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d", "--scale", "db=2", "db")
+	res.Assert(t, icmd.Success)
+
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "db")
+	res.Assert(t, icmd.Success)
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1\n"+projectName+"-db-2")
+}
+
+func TestScaleDownRemovesObsolete(t *testing.T) {
+	const projectName = "scale-down-obsolete-test"
+	c := NewCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME="+projectName))
+
+	reset := func() {
+		c.RunDockerComposeCmd(t, "down", "--rmi", "all")
+	}
+	t.Cleanup(reset)
+	res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d", "db")
+	res.Assert(t, icmd.Success)
+
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "db")
+	res.Assert(t, icmd.Success)
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1")
+
+	cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d", "--scale", "db=2", "db")
+	res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		cmd.Env = append(cmd.Env, "MAYBE=value")
+	})
+	res.Assert(t, icmd.Success)
+
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "db")
+	res.Assert(t, icmd.Success)
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1\n"+projectName+"-db-2")
+
+	t.Log("scale down removes obsolete replica #1")
+	cmd = c.NewDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d", "--scale", "db=1", "db")
+	res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		cmd.Env = append(cmd.Env, "MAYBE=value")
+	})
+	res.Assert(t, icmd.Success)
+
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "db")
+	res.Assert(t, icmd.Success)
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1")
+}
+
 func checkServiceContainer(t *testing.T, stdout, containerName, containerState string, count int) {
 	found := 0
 	lines := strings.Split(stdout, "\n")
