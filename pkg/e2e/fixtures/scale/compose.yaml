@@ -5,6 +5,8 @@ services:
       - db
   db:
     image: nginx:alpine
+    environment:
+      - MAYBE
   front:
     image: nginx:alpine
     deploy:
