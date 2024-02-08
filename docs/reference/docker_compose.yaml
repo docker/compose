@@ -306,7 +306,7 @@ options:
     - option: progress
       value_type: string
       default_value: auto
-      description: Set type of progress output (auto, tty, plain, quiet)
+      description: Set type of progress output (auto, tty, plain, json, quiet)
       deprecated: false
       hidden: false
       experimental: false

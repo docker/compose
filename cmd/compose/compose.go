@@ -453,6 +453,8 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				ui.Mode = ui.ModePlain
 			case ui.ModeQuiet, "none":
 				ui.Mode = ui.ModeQuiet
+			case ui.ModeJSON:
+				ui.Mode = ui.ModeJSON
 			default:
 				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
@@ -603,6 +605,7 @@ var printerModes = []string{
 	ui.ModeAuto,
 	ui.ModeTTY,
 	ui.ModePlain,
+	ui.ModeJSON,
 	ui.ModeQuiet,
 }
 
