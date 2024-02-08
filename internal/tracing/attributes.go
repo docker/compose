@@ -61,6 +61,7 @@ func ProjectOptions(proj *types.Project) SpanOptions {
 		return nil
 	}
 
+	capabilities, gpu, tpu := proj.ServicesWithCapabilities()
 	attrs := []attribute.KeyValue{
 		attribute.String("project.name", proj.Name),
 		attribute.String("project.dir", proj.WorkingDir),
@@ -74,6 +75,11 @@ func ProjectOptions(proj *types.Project) SpanOptions {
 		attribute.StringSlice("project.configs", proj.ConfigNames()),
 		attribute.StringSlice("project.extensions", keys(proj.Extensions)),
 		attribute.StringSlice("project.includes", flattenIncludeReferences(proj.IncludeReferences)),
+		attribute.StringSlice("project.services.build", proj.ServicesWithBuild()),
+		attribute.StringSlice("project.services.depends_on", proj.ServicesWithDependsOn()),
+		attribute.StringSlice("project.services.capabilities", capabilities),
+		attribute.StringSlice("project.services.capabilities.gpu", gpu),
+		attribute.StringSlice("project.services.capabilities.tpu", tpu),
 	}
 	if projHash, ok := projectHash(proj); ok {
 		attrs = append(attrs, attribute.String("project.hash", projHash))
