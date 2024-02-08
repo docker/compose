@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -98,10 +99,13 @@ func (l *logConsumer) Err(container, message string) {
 	l.write(l.stderr, container, message)
 }
 
+var navColor = makeColorFunc("90")
+
 func (l *logConsumer) write(w io.Writer, container, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
+	fmt.Fprint(os.Stderr, "\r                                                              \r")
 	p := l.getPresenter(container)
 	timestamp := time.Now().Format(jsonmessage.RFC3339NanoFixed)
 	for _, line := range strings.Split(message, "\n") {
@@ -111,6 +115,7 @@ func (l *logConsumer) write(w io.Writer, container, message string) {
 			fmt.Fprintf(w, "%s%s\n", p.prefix, line)
 		}
 	}
+	fmt.Fprint(os.Stderr, navColor("Press [T] to toggle timestamp, [$] to get more features"))
 }
 
 func (l *logConsumer) Status(container, msg string) {

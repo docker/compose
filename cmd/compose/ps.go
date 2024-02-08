@@ -56,6 +56,7 @@ func (p *psOptions) parseFilter() error {
 	switch parts[0] {
 	case "status":
 		p.Status = append(p.Status, parts[1])
+		p.All = true
 	case "source":
 		return api.ErrNotImplemented
 	default:
