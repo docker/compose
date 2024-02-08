@@ -67,10 +67,15 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		builderName = os.Getenv("BUILDX_BUILDER")
 	}
 
+	// The build backends do not have a "json" progress; use "plain" instead
+	uiMode := ui.Mode
+	if uiMode == ui.ModeJSON {
+		uiMode = ui.ModePlain
+	}
 	return api.BuildOptions{
 		Pull:     opts.pull,
 		Push:     opts.push,
-		Progress: ui.Mode,
+		Progress: uiMode,
 		Args:     types.NewMappingWithEquals(opts.args),
 		NoCache:  opts.noCache,
 		Quiet:    opts.quiet,
