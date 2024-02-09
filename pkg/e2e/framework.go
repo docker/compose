@@ -331,6 +331,8 @@ func (c *CLI) RunDockerCmd(t testing.TB, args ...string) *icmd.Result {
 func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
 	t.Helper()
 	res := c.RunDockerComposeCmdNoCheck(t, args...)
+	fmt.Println(res.Stderr())
+	fmt.Println(res.Stdout())
 	res.Assert(t, icmd.Success)
 	return res
 }

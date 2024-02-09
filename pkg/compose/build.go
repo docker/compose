@@ -20,19 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-
-	"github.com/moby/buildkit/util/progress/progressui"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
-	"github.com/docker/buildx/builder"
 	"github.com/docker/buildx/controller/pb"
 	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/buildflags"
-	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/compose/v2/internal/tracing"
@@ -47,8 +42,10 @@ import (
 	"github.com/moby/buildkit/session/secrets/secretsprovider"
 	"github.com/moby/buildkit/session/sshforward/sshprovider"
 	"github.com/moby/buildkit/util/entitlements"
+	"github.com/moby/buildkit/util/progress/progressui"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	// required to get default driver registered
 	_ "github.com/docker/buildx/driver/docker"
@@ -100,44 +97,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return imageIDs, err
 	}
 
-	// Initialize buildkit nodes
-	var (
-		b     *builder.Builder
-		nodes []builder.Node
-		w     *xprogress.Printer
-	)
-	if buildkitEnabled {
-		builderName := options.Builder
-		if builderName == "" {
-			builderName = os.Getenv("BUILDX_BUILDER")
-		}
-		b, err = builder.New(s.dockerCli, builder.WithName(builderName))
-		if err != nil {
-			return nil, err
-		}
-
-		nodes, err = b.LoadNodes(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		// Progress needs its own context that lives longer than the
-		// build one otherwise it won't read all the messages from
-		// build and will lock
-		progressCtx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		w, err = xprogress.NewPrinter(progressCtx, os.Stdout, progressui.DisplayMode(options.Progress),
-			xprogress.WithDesc(
-				fmt.Sprintf("building with %q instance using %s driver", b.Name, b.Driver),
-				fmt.Sprintf("%s:%s", b.Driver, b.Name),
-			))
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// we use a pre-allocated []string to collect build digest by service index while running concurrent goroutines
 	builtDigests := make([]string, len(project.Services))
 	names := project.ServiceNames()
@@ -149,6 +108,21 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		return -1
 	}
+
+	eg := errgroup.Group{}
+	var ch chan *bclient.SolveStatus
+	if buildkitEnabled {
+		ch = make(chan *bclient.SolveStatus)
+		display, err := progressui.NewDisplay(s.stdinfo(), progressui.DisplayMode(options.Progress))
+		if err != nil {
+			return nil, err
+		}
+		eg.Go(func() error {
+			_, err := display.UpdateFrom(ctx, ch)
+			return err
+		})
+	}
+
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		serviceToBuild, ok := serviceToBeBuild[name]
 		if !ok {
@@ -178,7 +152,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return err
 		}
 
-		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
+		digest, err := s.doBuildBuildkit(ctx, buildOptions, ch)
 		if err != nil {
 			return err
 		}
@@ -188,15 +162,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}, func(traversal *graphTraversal) {
 		traversal.maxConcurrency = s.maxConcurrency
 	})
-
-	// enforce all build event get consumed
-	if buildkitEnabled {
-		if errw := w.Wait(); errw != nil {
-			return nil, errw
-		}
+	if ch != nil {
+		// stop progressui
+		close(ch)
 	}
 
-	if err != nil {
+	if eg.Wait() != nil {
 		return nil, err
 	}
 
