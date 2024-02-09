@@ -117,7 +117,6 @@ func TestWatch_Sync(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
-	cli.EXPECT().BuildKitEnabled().Return(true, nil)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return([]moby.Container{
 		testContainer("test", "123", false),
