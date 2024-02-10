@@ -193,7 +193,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			}),
 		}
 
-		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true, "1.43")
 		assert.Equal(t, string(networkMode), "myProject_myNetwork2")
 		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 1))
 		assert.Check(t, cmp.Contains(networkConfig.EndpointsConfig, "myProject_myNetwork2"))
@@ -221,7 +221,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			}),
 		}
 
-		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true, "1.43")
 		assert.Equal(t, string(networkMode), "myProject_default")
 		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 1))
 		assert.Check(t, cmp.Contains(networkConfig.EndpointsConfig, "myProject_default"))
@@ -238,7 +238,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			},
 		}
 
-		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true, "1.43")
 		assert.Equal(t, string(networkMode), "none")
 		assert.Check(t, cmp.Nil(networkConfig))
 	})
@@ -258,7 +258,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			}),
 		}
 
-		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true)
+		networkMode, networkConfig := defaultNetworkSettings(&project, service, 1, nil, true, "1.43")
 		assert.Equal(t, string(networkMode), "host")
 		assert.Check(t, cmp.Nil(networkConfig))
 	})

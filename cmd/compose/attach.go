@@ -64,7 +64,7 @@ func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 }
 
 func runAttach(ctx context.Context, dockerCli command.Cli, backend api.Service, opts attachOpts) error {
-	projectName, err := opts.toProjectName(dockerCli)
+	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

@@ -235,7 +235,11 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	networkMode, networkingConfig := defaultNetworkSettings(p, service, number, links, opts.UseNetworkAliases)
+	apiVersion, err := s.RuntimeVersion(ctx)
+	if err != nil {
+		return createConfigs{}, err
+	}
+	networkMode, networkingConfig := defaultNetworkSettings(p, service, number, links, opts.UseNetworkAliases, apiVersion)
 	portBindings := buildContainerPortBindingOptions(service)
 
 	// MISC
@@ -456,6 +460,7 @@ func defaultNetworkSettings(
 	serviceIndex int,
 	links []string,
 	useNetworkAliases bool,
+	version string,
 ) (container.NetworkMode, *network.NetworkingConfig) {
 	if service.NetworkMode != "" {
 		return container.NetworkMode(service.NetworkMode), nil
@@ -465,23 +470,38 @@ func defaultNetworkSettings(
 		return "none", nil
 	}
 
-	var networkKey string
+	var primaryNetworkKey string
 	if len(service.Networks) > 0 {
-		networkKey = service.NetworksByPriority()[0]
+		primaryNetworkKey = service.NetworksByPriority()[0]
 	} else {
-		networkKey = "default"
+		primaryNetworkKey = "default"
 	}
-	mobyNetworkName := project.Networks[networkKey].Name
-	epSettings := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
+	primaryNetworkMobyNetworkName := project.Networks[primaryNetworkKey].Name
+	endpointsConfig := map[string]*network.EndpointSettings{
+		primaryNetworkMobyNetworkName: createEndpointSettings(project, service, serviceIndex, primaryNetworkKey, links, useNetworkAliases),
+	}
+
+	// Starting from API version 1.44, the Engine will take several EndpointsConfigs
+	// so we can pass all the extra networks we want the container to be connected to
+	// in the network configuration instead of connecting the container to each extra
+	// network individually after creation.
+	if versions.GreaterThanOrEqualTo(version, "1.44") && len(service.Networks) > 1 {
+		serviceNetworks := service.NetworksByPriority()
+		for _, networkKey := range serviceNetworks[1:] {
+			mobyNetworkName := project.Networks[networkKey].Name
+			epSettings := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
+			endpointsConfig[mobyNetworkName] = epSettings
+		}
+	}
+
 	networkConfig := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			mobyNetworkName: epSettings,
-		},
+		EndpointsConfig: endpointsConfig,
 	}
+
 	// From the Engine API docs:
 	// > Supported standard values are: bridge, host, none, and container:<name|id>.
 	// > Any other value is taken as a custom network's name to which this container should connect to.
-	return container.NetworkMode(mobyNetworkName), networkConfig
+	return container.NetworkMode(primaryNetworkMobyNetworkName), networkConfig
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {

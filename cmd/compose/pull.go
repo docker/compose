@@ -94,7 +94,7 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pullOptions, services []string) error {
-	project, err := opts.ToProject(dockerCli, services)
+	project, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}

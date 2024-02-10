@@ -63,7 +63,7 @@ Refer to https://docs.docker.com/go/formatting/ for more information about forma
 }
 
 func runStats(ctx context.Context, dockerCli command.Cli, opts statsOptions, service []string) error {
-	name, err := opts.ProjectOptions.toProjectName(dockerCli)
+	name, err := opts.ProjectOptions.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

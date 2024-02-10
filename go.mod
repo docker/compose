@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.0.0-rc.4
+	github.com/compose-spec/compose-go/v2 v2.0.0-rc.5
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.7.12
 	github.com/davecgh/go-spew v1.1.1
@@ -29,7 +29,7 @@ require (
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.1.0-rc5
+	github.com/opencontainers/image-spec v1.1.0-rc6
 	github.com/otiai10/copy v1.14.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0

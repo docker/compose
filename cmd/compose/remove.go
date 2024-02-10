@@ -60,7 +60,7 @@ Any data which is not in a volume will be lost.`,
 }
 
 func runRemove(ctx context.Context, dockerCli command.Cli, backend api.Service, opts removeOptions, services []string) error {
-	project, name, err := opts.projectOrName(dockerCli, services...)
+	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}

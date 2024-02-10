@@ -54,7 +54,7 @@ func stopCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 }
 
 func runStop(ctx context.Context, dockerCli command.Cli, backend api.Service, opts stopOptions, services []string) error {
-	project, name, err := opts.projectOrName(dockerCli, services...)
+	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}
