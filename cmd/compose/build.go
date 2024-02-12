@@ -136,7 +136,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 }
 
 func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, opts buildOptions, services []string) error {
-	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}

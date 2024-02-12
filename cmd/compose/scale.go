@@ -61,7 +61,7 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 
 func runScale(ctx context.Context, dockerCli command.Cli, backend api.Service, opts scaleOptions, serviceReplicaTuples map[string]int) error {
 	services := maps.Keys(serviceReplicaTuples)
-	project, err := opts.ToProject(ctx, dockerCli, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}

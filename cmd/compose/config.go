@@ -29,6 +29,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 )
@@ -50,7 +51,7 @@ type configOptions struct {
 	noConsistency       bool
 }
 
-func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
 	po = append(po,
 		cli.WithInterpolation(!o.noInterpolate),
 		cli.WithResolvedPaths(!o.noResolvePath),
@@ -124,7 +125,7 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 
 func runConfig(ctx context.Context, dockerCli command.Cli, backend api.Service, opts configOptions, services []string) error {
 	var content []byte
-	project, err := opts.ToProject(ctx, dockerCli, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
@@ -154,7 +155,7 @@ func runConfig(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 }
 
 func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -166,7 +167,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 }
 
 func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -181,7 +182,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
 	}
-	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -217,7 +218,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 
 func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
 	set := map[string]struct{}{}
-	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -238,7 +239,7 @@ func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions,
 }
 
 func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
-	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}

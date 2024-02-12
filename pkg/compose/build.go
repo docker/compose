@@ -221,7 +221,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		return err
 	}
 
-	err = tracing.SpanWrapFunc("project/pull", tracing.ProjectOptions(project),
+	err = tracing.SpanWrapFunc("project/pull", tracing.ProjectOptions(ctx, project),
 		func(ctx context.Context) error {
 			return s.pullRequiredImages(ctx, project, images, quietPull)
 		},
@@ -231,7 +231,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	}
 
 	if buildOpts != nil {
-		err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(project),
+		err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 			func(ctx context.Context) error {
 				builtImages, err := s.build(ctx, project, *buildOpts, images)
 				if err != nil {

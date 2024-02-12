@@ -65,7 +65,7 @@ func vizCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 
 func runViz(ctx context.Context, dockerCli command.Cli, backend api.Service, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
-	project, err := opts.ToProject(ctx, dockerCli, nil)
+	project, _, err := opts.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return err
 	}

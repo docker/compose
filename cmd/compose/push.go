@@ -54,7 +54,7 @@ func pushCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 }
 
 func runPush(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pushOptions, services []string) error {
-	project, err := opts.ToProject(ctx, dockerCli, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
