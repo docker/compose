@@ -50,7 +50,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 }
 
 func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service, opts publishOptions, repository string) error {
-	project, err := opts.ToProject(ctx, dockerCli, nil)
+	project, _, err := opts.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return err
 	}

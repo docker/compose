@@ -37,7 +37,7 @@ func noCompletion() validArgsFn {
 func completeServiceNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		p.Offline = true
-		project, err := p.ToProject(cmd.Context(), dockerCli, nil)
+		project, _, err := p.ToProject(cmd.Context(), dockerCli, nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -72,7 +72,7 @@ func completeProjectNames(backend api.Service) func(cmd *cobra.Command, args []s
 func completeProfileNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		p.Offline = true
-		project, err := p.ToProject(cmd.Context(), dockerCli, nil)
+		project, _, err := p.ToProject(cmd.Context(), dockerCli, nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
