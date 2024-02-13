@@ -1,0 +1,6 @@
+services:
+  test:
+    image: alpine
+    command: cat /text_file.txt
+    volumes:
+      - ${FILE}:/text_file.txt
