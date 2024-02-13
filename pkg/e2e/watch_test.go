@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -38,23 +37,12 @@ func TestWatch(t *testing.T) {
 	t.Skip("Skipping watch tests until we can figure out why they are flaky/failing")
 
 	services := []string{"alpine", "busybox", "debian"}
-	t.Run("docker cp", func(t *testing.T) {
-		for _, svcName := range services {
-			t.Run(svcName, func(t *testing.T) {
-				t.Helper()
-				doTest(t, svcName, false)
-			})
-		}
-	})
-
-	t.Run("tar", func(t *testing.T) {
-		for _, svcName := range services {
-			t.Run(svcName, func(t *testing.T) {
-				t.Helper()
-				doTest(t, svcName, true)
-			})
-		}
-	})
+	for _, svcName := range services {
+		t.Run(svcName, func(t *testing.T) {
+			t.Helper()
+			doTest(t, svcName)
+		})
+	}
 }
 
 func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
@@ -150,8 +138,9 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 
 }
 
-// NOTE: these tests all share a single Compose file but are safe to run concurrently
-func doTest(t *testing.T, svcName string, tarSync bool) {
+// NOTE: these tests all share a single Compose file but are safe to run
+// concurrently (though that's not recommended).
+func doTest(t *testing.T, svcName string) {
 	tmpdir := t.TempDir()
 	dataDir := filepath.Join(tmpdir, "data")
 	configDir := filepath.Join(tmpdir, "config")
@@ -171,13 +160,9 @@ func doTest(t *testing.T, svcName string, tarSync bool) {
 	CopyFile(t, filepath.Join("fixtures", "watch", "compose.yaml"), composeFilePath)
 
 	projName := "e2e-watch-" + svcName
-	if tarSync {
-		projName += "-tar"
-	}
 	env := []string{
 		"COMPOSE_FILE=" + composeFilePath,
 		"COMPOSE_PROJECT_NAME=" + projName,
-		"COMPOSE_EXPERIMENTAL_WATCH_TAR=" + strconv.FormatBool(tarSync),
 	}
 
 	cli := NewCLI(t, WithEnv(env...))
