@@ -158,11 +158,16 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		service := serviceToBuild.service
 
+		cw := progress.ContextWriter(ctx)
+		serviceName := fmt.Sprintf("Service %s", name)
+
 		if !buildkitEnabled {
+			cw.Event(progress.BuildingEvent(serviceName))
 			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
 				return err
 			}
+			cw.Event(progress.BuiltEvent(serviceName))
 			builtDigests[getServiceIndex(name)] = id
 
 			if options.Push {
@@ -180,10 +185,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return err
 		}
 
+		cw.Event(progress.BuildingEvent(serviceName))
 		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
 		if err != nil {
 			return err
 		}
+		cw.Event(progress.BuiltEvent(serviceName))
 		builtDigests[getServiceIndex(name)] = digest
 
 		return nil
