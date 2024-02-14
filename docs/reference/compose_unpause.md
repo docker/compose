@@ -14,4 +14,4 @@ Unpause services
 
 ## Description
 
-Unpauses paused containers of a service.
+Unpauses paused containers of a service

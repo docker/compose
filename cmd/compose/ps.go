@@ -81,7 +81,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	}
 	flags := psCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
-	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property (supported filters: status).")
+	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property (supported filters: status)")
 	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	flags.BoolVar(&opts.Services, "services", false, "Display services")

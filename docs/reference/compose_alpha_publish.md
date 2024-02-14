@@ -9,7 +9,7 @@ Publish compose application
 |:--------------------------|:---------|:--------|:-------------------------------------------------------------------------------|
 | `--dry-run`               |          |         | Execute command in dry run mode                                                |
 | `--oci-version`           | `string` |         | OCI Image/Artifact specification version (automatically determined by default) |
-| `--resolve-image-digests` |          |         | Pin image tags to digests.                                                     |
+| `--resolve-image-digests` |          |         | Pin image tags to digests                                                      |
 
 
 <!---MARKER_GEN_END-->

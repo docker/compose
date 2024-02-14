@@ -55,7 +55,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	}
 	cmd := &cobra.Command{
 		Use:   "create [OPTIONS] [SERVICE...]",
-		Short: "Creates containers for a service.",
+		Short: "Creates containers for a service",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.pullChanged = cmd.Flags().Changed("pull")
 			if opts.Build && opts.noBuild {
@@ -72,12 +72,12 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
-	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
-	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's policy.")
+	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers")
+	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's policy")
 	flags.StringVar(&opts.Pull, "pull", "policy", `Pull image before running ("always"|"missing"|"never"|"build")`)
-	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
+	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed")
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
-	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	return cmd
 }

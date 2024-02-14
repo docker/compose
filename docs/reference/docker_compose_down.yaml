@@ -21,7 +21,7 @@ options:
     - option: remove-orphans
       value_type: bool
       default_value: "false"
-      description: Remove containers for services not defined in the Compose file.
+      description: Remove containers for services not defined in the Compose file
       deprecated: false
       hidden: false
       experimental: false
@@ -54,7 +54,7 @@ options:
       value_type: bool
       default_value: "false"
       description: |
-        Remove named volumes declared in the "volumes" section of the Compose file and anonymous volumes attached to containers.
+        Remove named volumes declared in the "volumes" section of the Compose file and anonymous volumes attached to containers
       deprecated: false
       hidden: false
       experimental: false

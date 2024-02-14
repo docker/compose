@@ -1,5 +1,5 @@
 command: docker compose events
-short: Receive real time events from containers.
+short: Receive real time events from containers
 long: |-
     Stream container events for every container in the project.
 
