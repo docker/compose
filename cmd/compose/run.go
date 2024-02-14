@@ -156,7 +156,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			project, err := p.ToProject(ctx, dockerCli, []string{options.Service}, cgo.WithResolvedPaths(true), cgo.WithDiscardEnvFile)
+			project, _, err := p.ToProject(ctx, dockerCli, []string{options.Service}, cgo.WithResolvedPaths(true), cgo.WithDiscardEnvFile)
 			if err != nil {
 				return err
 			}

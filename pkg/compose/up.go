@@ -32,7 +32,7 @@ import (
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
-	err := progress.Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(project), func(ctx context.Context) error {
+	err := progress.Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		w := progress.ContextWriter(ctx)
 		w.HasMore(options.Start.Attach == nil)
 		err := s.create(ctx, project, options.Create)

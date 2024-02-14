@@ -36,6 +36,7 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 	ui "github.com/docker/compose/v2/pkg/progress"
@@ -141,10 +142,12 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 			cli.WithDiscardEnvFile,
 		}
 
-		project, err := o.ToProject(ctx, dockerCli, args, options...)
+		project, metrics, err := o.ToProject(ctx, dockerCli, args, options...)
 		if err != nil {
 			return err
 		}
+
+		ctx = context.WithValue(ctx, tracing.Metrics{}, metrics)
 
 		return fn(ctx, project, args)
 	})
@@ -166,7 +169,7 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 	name := o.ProjectName
 	var project *types.Project
 	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
-		p, err := o.ToProject(ctx, dockerCli, services, cli.WithDiscardEnvFile)
+		p, _, err := o.ToProject(ctx, dockerCli, services, cli.WithDiscardEnvFile)
 		if err != nil {
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
@@ -190,14 +193,15 @@ func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cl
 		return envProjectName, nil
 	}
 
-	project, err := o.ToProject(ctx, dockerCli, nil)
+	project, _, err := o.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return "", err
 	}
 	return project.Name, nil
 }
 
-func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
+	var metrics tracing.Metrics
 	if !o.Offline {
 		po = append(po, o.remoteLoaders(dockerCli)...)
 	}
@@ -206,25 +210,30 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
-		return nil, compose.WrapComposeError(err)
+		return nil, metrics, compose.WrapComposeError(err)
 	}
 
+	options.WithListeners(func(event string, metadata map[string]any) {
+		if event == "extends" {
+			metrics.CountExtends++
+		}
+	})
 	if o.Compatibility || utils.StringToBool(options.Environment[ComposeCompatibility]) {
 		api.Separator = "_"
 	}
 
 	project, err := cli.ProjectFromOptions(options)
 	if err != nil {
-		return nil, compose.WrapComposeError(err)
+		return nil, metrics, compose.WrapComposeError(err)
 	}
 
 	if project.Name == "" {
-		return nil, errors.New("project name can't be empty. Use `--project-name` to set a valid name")
+		return nil, metrics, errors.New("project name can't be empty. Use `--project-name` to set a valid name")
 	}
 
 	project, err = project.WithServicesEnabled(services...)
 	if err != nil {
-		return nil, err
+		return nil, metrics, err
 	}
 
 	for name, s := range project.Services {
@@ -245,7 +254,7 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 	project = project.WithoutUnnecessaryResources()
 
 	project, err = project.WithSelectedServices(services)
-	return project, err
+	return project, metrics, err
 }
 
 func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []cli.ProjectOptionsFn {
