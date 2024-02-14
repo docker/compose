@@ -17,6 +17,10 @@
 package e2e
 
 import (
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -94,6 +98,26 @@ func TestLocalComposeLogsFollow(t *testing.T) {
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/logs-test/compose.yaml", "--project-name", projectName, "up", "-d", "--scale", "ping=2", "ping")
 
 	poll.WaitOn(t, expectOutput(res, "ping-2 "), poll.WithDelay(100*time.Millisecond), poll.WithTimeout(20*time.Second))
+}
+
+func TestLocalComposeLargeLogs(t *testing.T) {
+	const projectName = "compose-e2e-large_logs"
+	file := filepath.Join(t.TempDir(), "large.txt")
+	c := NewCLI(t, WithEnv("FILE="+file))
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	f, err := os.Create(file)
+	assert.NilError(t, err)
+	for i := 0; i < 300_000; i++ {
+		_, err := io.WriteString(f, fmt.Sprintf("This is line %d in a laaaarge text file\n", i))
+		assert.NilError(t, err)
+	}
+	assert.NilError(t, f.Close())
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/logs-test/cat.yaml", "--project-name", projectName, "up", "--abort-on-container-exit")
+	res.Assert(t, icmd.Expected{Out: "test-1 exited with code 0"})
 }
 
 func expectOutput(res *icmd.Result, expected string) func(t poll.LogT) poll.Result {
