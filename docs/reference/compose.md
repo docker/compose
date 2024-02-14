@@ -1,42 +1,42 @@
 # docker compose
 
 <!---MARKER_GEN_START-->
-Define and run multi-container applications with Docker.
+Define and run multi-container applications with Docker
 
 ### Subcommands
 
-| Name                            | Description                                                                              |
-|:--------------------------------|:-----------------------------------------------------------------------------------------|
-| [`attach`](compose_attach.md)   | Attach local standard input, output, and error streams to a service's running container. |
-| [`build`](compose_build.md)     | Build or rebuild services                                                                |
-| [`config`](compose_config.md)   | Parse, resolve and render compose file in canonical format                               |
-| [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local filesystem                  |
-| [`create`](compose_create.md)   | Creates containers for a service.                                                        |
-| [`down`](compose_down.md)       | Stop and remove containers, networks                                                     |
-| [`events`](compose_events.md)   | Receive real time events from containers.                                                |
-| [`exec`](compose_exec.md)       | Execute a command in a running container.                                                |
-| [`images`](compose_images.md)   | List images used by the created containers                                               |
-| [`kill`](compose_kill.md)       | Force stop service containers.                                                           |
-| [`logs`](compose_logs.md)       | View output from containers                                                              |
-| [`ls`](compose_ls.md)           | List running compose projects                                                            |
-| [`pause`](compose_pause.md)     | Pause services                                                                           |
-| [`port`](compose_port.md)       | Print the public port for a port binding.                                                |
-| [`ps`](compose_ps.md)           | List containers                                                                          |
-| [`pull`](compose_pull.md)       | Pull service images                                                                      |
-| [`push`](compose_push.md)       | Push service images                                                                      |
-| [`restart`](compose_restart.md) | Restart service containers                                                               |
-| [`rm`](compose_rm.md)           | Removes stopped service containers                                                       |
-| [`run`](compose_run.md)         | Run a one-off command on a service.                                                      |
-| [`scale`](compose_scale.md)     | Scale services                                                                           |
-| [`start`](compose_start.md)     | Start services                                                                           |
-| [`stats`](compose_stats.md)     | Display a live stream of container(s) resource usage statistics                          |
-| [`stop`](compose_stop.md)       | Stop services                                                                            |
-| [`top`](compose_top.md)         | Display the running processes                                                            |
-| [`unpause`](compose_unpause.md) | Unpause services                                                                         |
-| [`up`](compose_up.md)           | Create and start containers                                                              |
-| [`version`](compose_version.md) | Show the Docker Compose version information                                              |
-| [`wait`](compose_wait.md)       | Block until the first service container stops                                            |
-| [`watch`](compose_watch.md)     | Watch build context for service and rebuild/refresh containers when files are updated    |
+| Name                            | Description                                                                             |
+|:--------------------------------|:----------------------------------------------------------------------------------------|
+| [`attach`](compose_attach.md)   | Attach local standard input, output, and error streams to a service's running container |
+| [`build`](compose_build.md)     | Build or rebuild services                                                               |
+| [`config`](compose_config.md)   | Parse, resolve and render compose file in canonical format                              |
+| [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local filesystem                 |
+| [`create`](compose_create.md)   | Creates containers for a service                                                        |
+| [`down`](compose_down.md)       | Stop and remove containers, networks                                                    |
+| [`events`](compose_events.md)   | Receive real time events from containers                                                |
+| [`exec`](compose_exec.md)       | Execute a command in a running container                                                |
+| [`images`](compose_images.md)   | List images used by the created containers                                              |
+| [`kill`](compose_kill.md)       | Force stop service containers                                                           |
+| [`logs`](compose_logs.md)       | View output from containers                                                             |
+| [`ls`](compose_ls.md)           | List running compose projects                                                           |
+| [`pause`](compose_pause.md)     | Pause services                                                                          |
+| [`port`](compose_port.md)       | Print the public port for a port binding                                                |
+| [`ps`](compose_ps.md)           | List containers                                                                         |
+| [`pull`](compose_pull.md)       | Pull service images                                                                     |
+| [`push`](compose_push.md)       | Push service images                                                                     |
+| [`restart`](compose_restart.md) | Restart service containers                                                              |
+| [`rm`](compose_rm.md)           | Removes stopped service containers                                                      |
+| [`run`](compose_run.md)         | Run a one-off command on a service                                                      |
+| [`scale`](compose_scale.md)     | Scale services                                                                          |
+| [`start`](compose_start.md)     | Start services                                                                          |
+| [`stats`](compose_stats.md)     | Display a live stream of container(s) resource usage statistics                         |
+| [`stop`](compose_stop.md)       | Stop services                                                                           |
+| [`top`](compose_top.md)         | Display the running processes                                                           |
+| [`unpause`](compose_unpause.md) | Unpause services                                                                        |
+| [`up`](compose_up.md)           | Create and start containers                                                             |
+| [`version`](compose_version.md) | Show the Docker Compose version information                                             |
+| [`wait`](compose_wait.md)       | Block until the first service container stops                                           |
+| [`watch`](compose_watch.md)     | Watch build context for service and rebuild/refresh containers when files are updated   |
 
 
 ### Options
@@ -46,7 +46,7 @@ Define and run multi-container applications with Docker.
 | `--ansi`               | `string`      | `auto`  | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
 | `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
 | `--dry-run`            |               |         | Execute command in dry run mode                                                                     |
-| `--env-file`           | `stringArray` |         | Specify an alternate environment file.                                                              |
+| `--env-file`           | `stringArray` |         | Specify an alternate environment file                                                               |
 | `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
 | `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |
 | `--profile`            | `stringArray` |         | Specify a profile to enable                                                                         |

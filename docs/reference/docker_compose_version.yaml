@@ -18,7 +18,7 @@ options:
     - option: short
       value_type: bool
       default_value: "false"
-      description: Shows only Compose's version number.
+      description: Shows only Compose's version number
       deprecated: false
       hidden: false
       experimental: false

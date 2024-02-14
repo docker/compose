@@ -177,7 +177,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 
 		if options.Memory != 0 {
-			fmt.Fprintln(s.stderr(), "WARNING: --memory is not supported by BuildKit and will be ignored.")
+			fmt.Fprintln(s.stderr(), "WARNING: --memory is not supported by BuildKit and will be ignored")
 		}
 
 		buildOptions, err := s.toBuildOptions(project, service, options)

@@ -14,7 +14,7 @@ Display the running processes
 
 ## Description
 
-Displays the running processes.
+Displays the running processes
 
 ## Examples
 

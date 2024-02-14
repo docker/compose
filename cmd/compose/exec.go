@@ -51,7 +51,7 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	}
 	runCmd := &cobra.Command{
 		Use:   "exec [OPTIONS] SERVICE COMMAND [ARGS...]",
-		Short: "Execute a command in a running container.",
+		Short: "Execute a command in a running container",
 		Args:  cobra.MinimumNArgs(2),
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			opts.service = args[0]
@@ -64,17 +64,17 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 
-	runCmd.Flags().BoolVarP(&opts.detach, "detach", "d", false, "Detached mode: Run command in the background.")
+	runCmd.Flags().BoolVarP(&opts.detach, "detach", "d", false, "Detached mode: Run command in the background")
 	runCmd.Flags().StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
-	runCmd.Flags().IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
-	runCmd.Flags().BoolVarP(&opts.privileged, "privileged", "", false, "Give extended privileges to the process.")
-	runCmd.Flags().StringVarP(&opts.user, "user", "u", "", "Run the command as this user.")
+	runCmd.Flags().IntVar(&opts.index, "index", 0, "Index of the container if service has multiple replicas")
+	runCmd.Flags().BoolVarP(&opts.privileged, "privileged", "", false, "Give extended privileges to the process")
+	runCmd.Flags().StringVarP(&opts.user, "user", "u", "", "Run the command as this user")
 	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
-	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command.")
+	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command")
 
-	runCmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
+	runCmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
 	runCmd.Flags().MarkHidden("interactive") //nolint:errcheck
-	runCmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
+	runCmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY")
 	runCmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	runCmd.Flags().SetInterspersed(false)

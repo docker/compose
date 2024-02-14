@@ -157,7 +157,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-	f.StringArrayVar(&o.EnvFiles, "env-file", nil, "Specify an alternate environment file.")
+	f.StringArrayVar(&o.EnvFiles, "env-file", nil, "Specify an alternate environment file")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
@@ -307,7 +307,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 	)
 	c := &cobra.Command{
 		Short:            "Docker Compose",
-		Long:             "Define and run multi-container applications with Docker.",
+		Long:             "Define and run multi-container applications with Docker",
 		Use:              PluginName,
 		TraverseChildren: true,
 		// By default (no Run/RunE in parent c) for typos in subcommands, cobra displays the help of parent c but exit(0) !
