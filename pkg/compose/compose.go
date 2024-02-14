@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/compose/v2/internal/desktop"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/jonboulle/clockwork"
 
@@ -60,10 +62,27 @@ func NewComposeService(dockerCli command.Cli) api.Service {
 }
 
 type composeService struct {
-	dockerCli      command.Cli
+	dockerCli  command.Cli
+	desktopCli *desktop.Client
+
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
+}
+
+// Close releases any connections/resources held by the underlying clients.
+//
+// In practice, this service has the same lifetime as the process, so everything
+// will get cleaned up at about the same time regardless even if not invoked.
+func (s *composeService) Close() error {
+	var errs []error
+	if s.dockerCli != nil {
+		errs = append(errs, s.dockerCli.Client().Close())
+	}
+	if s.desktopCli != nil {
+		errs = append(errs, s.desktopCli.Close())
+	}
+	return errors.Join(errs...)
 }
 
 func (s *composeService) apiClient() client.APIClient {
