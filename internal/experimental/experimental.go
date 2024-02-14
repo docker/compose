@@ -76,7 +76,7 @@ func (s *State) AutoFileShares() bool {
 }
 
 func (s *State) determineFeatureState(name string) bool {
-	if !s.active || s.desktopValues == nil {
+	if s == nil || !s.active || s.desktopValues == nil {
 		return false
 	}
 	// TODO(milas): we should add individual environment variable overrides

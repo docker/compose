@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/compose/v2/pkg/utils"
-
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/internal/desktop"
+	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -144,6 +144,14 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 			return s.removeVolume(ctx, volumeName, w)
 		})
 	}
+
+	if s.experiments.AutoFileShares() && s.desktopCli != nil {
+		ops = append(ops, func() error {
+			desktop.RemoveFileSharesForProject(ctx, s.desktopCli, project.Name)
+			return nil
+		})
+	}
+
 	return ops
 }
 

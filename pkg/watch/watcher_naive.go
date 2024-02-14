@@ -27,8 +27,8 @@ import (
 	"runtime"
 	"strings"
 
+	pathutil "github.com/docker/compose/v2/internal/paths"
 	"github.com/sirupsen/logrus"
-
 	"github.com/tilt-dev/fsnotify"
 )
 
@@ -71,7 +71,7 @@ func (d *naiveNotify) Start() error {
 		return err
 	}
 	if d.isWatcherRecursive {
-		pathsToWatch = dedupePathsForRecursiveWatcher(pathsToWatch)
+		pathsToWatch = pathutil.EncompassingPaths(pathsToWatch)
 	}
 
 	for _, name := range pathsToWatch {
@@ -246,7 +246,7 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 	}
 
 	for root := range d.notifyList {
-		if IsChild(root, path) {
+		if pathutil.IsChild(root, path) {
 			return true
 		}
 	}
@@ -281,7 +281,7 @@ func (d *naiveNotify) shouldSkipDir(path string) (bool, error) {
 	// - A parent of a directory that's in our notify list
 	//   (i.e., to cover the "path doesn't exist" case).
 	for root := range d.notifyList {
-		if IsChild(root, path) || IsChild(path, root) {
+		if pathutil.IsChild(root, path) || pathutil.IsChild(path, root) {
 			return false, nil
 		}
 	}
@@ -320,7 +320,7 @@ func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 	wrappedEvents := make(chan FileEvent)
 	notifyList := make(map[string]bool, len(paths))
 	if isWatcherRecursive {
-		paths = dedupePathsForRecursiveWatcher(paths)
+		paths = pathutil.EncompassingPaths(paths)
 	}
 	for _, path := range paths {
 		path, err := filepath.Abs(path)
