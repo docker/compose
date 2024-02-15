@@ -29,6 +29,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	composegoutils "github.com/compose-spec/compose-go/v2/utils"
 	"github.com/docker/buildx/util/logutil"
@@ -147,7 +148,7 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 			return err
 		}
 
-		ctx = context.WithValue(ctx, tracing.Metrics{}, metrics)
+		ctx = context.WithValue(ctx, tracing.MetricsKey{}, metrics)
 
 		return fn(ctx, project, args)
 	})
@@ -202,8 +203,10 @@ func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cl
 
 func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
 	var metrics tracing.Metrics
-	if !o.Offline {
-		po = append(po, o.remoteLoaders(dockerCli)...)
+
+	remotes := o.remoteLoaders(dockerCli)
+	for _, r := range remotes {
+		po = append(po, cli.WithResourceLoader(r))
 	}
 
 	po = append(po, cli.WithContext(ctx))
@@ -214,10 +217,28 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 	}
 
 	options.WithListeners(func(event string, metadata map[string]any) {
-		if event == "extends" {
+		switch event {
+		case "extends":
 			metrics.CountExtends++
+		case "include":
+			paths := metadata["path"].(types.StringList)
+			for _, path := range paths {
+				var isRemote bool
+				for _, r := range remotes {
+					if r.Accept(path) {
+						isRemote = true
+						break
+					}
+				}
+				if isRemote {
+					metrics.CountIncludesRemote++
+				} else {
+					metrics.CountIncludesLocal++
+				}
+			}
 		}
 	})
+
 	if o.Compatibility || utils.StringToBool(options.Environment[ComposeCompatibility]) {
 		api.Separator = "_"
 	}
@@ -257,10 +278,13 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 	return project, metrics, err
 }
 
-func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []cli.ProjectOptionsFn {
+func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceLoader {
+	if o.Offline {
+		return nil
+	}
 	git := remote.NewGitRemoteLoader(o.Offline)
 	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
-	return []cli.ProjectOptionsFn{cli.WithResourceLoader(git), cli.WithResourceLoader(oci)}
+	return []loader.ResourceLoader{git, oci}
 }
 
 func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {

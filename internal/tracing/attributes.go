@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/compose/v2/pkg/utils"
-
 	"github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
 	"go.opentelemetry.io/otel/attribute"
@@ -35,8 +33,13 @@ import (
 // SpanOptions is a small helper type to make it easy to share the options helpers between
 // downstream functions that accept slices of trace.SpanStartOption and trace.EventOption.
 type SpanOptions []trace.SpanStartEventOption
+
+type MetricsKey struct{}
+
 type Metrics struct {
-	CountExtends int
+	CountExtends        int
+	CountIncludesLocal  int
+	CountIncludesRemote int
 }
 
 func (s SpanOptions) SpanStartOptions() []trace.SpanStartOption {
@@ -75,7 +78,6 @@ func ProjectOptions(ctx context.Context, proj *types.Project) SpanOptions {
 		attribute.StringSlice("project.secrets", proj.SecretNames()),
 		attribute.StringSlice("project.configs", proj.ConfigNames()),
 		attribute.StringSlice("project.extensions", keys(proj.Extensions)),
-		attribute.StringSlice("project.includes", flattenIncludeReferences(proj.IncludeReferences)),
 		attribute.StringSlice("project.services.active", proj.ServiceNames()),
 		attribute.StringSlice("project.services.disabled", proj.DisabledServiceNames()),
 		attribute.StringSlice("project.services.build", proj.ServicesWithBuild()),
@@ -84,8 +86,10 @@ func ProjectOptions(ctx context.Context, proj *types.Project) SpanOptions {
 		attribute.StringSlice("project.services.capabilities.gpu", gpu),
 		attribute.StringSlice("project.services.capabilities.tpu", tpu),
 	}
-	if metrics, ok := ctx.Value(Metrics{}).(Metrics); ok {
+	if metrics, ok := ctx.Value(MetricsKey{}).(Metrics); ok {
 		attrs = append(attrs, attribute.Int("project.services.extends", metrics.CountExtends))
+		attrs = append(attrs, attribute.Int("project.includes.local", metrics.CountIncludesLocal))
+		attrs = append(attrs, attribute.Int("project.includes.remote", metrics.CountIncludesRemote))
 	}
 
 	if projHash, ok := projectHash(proj); ok {
@@ -166,16 +170,6 @@ func timeAttr(key string, value time.Time) attribute.KeyValue {
 
 func unixTimeAttr(key string, value int64) attribute.KeyValue {
 	return timeAttr(key, time.Unix(value, 0).UTC())
-}
-
-func flattenIncludeReferences(includeRefs map[string][]types.IncludeConfig) []string {
-	ret := utils.NewSet[string]()
-	for _, included := range includeRefs {
-		for i := range included {
-			ret.AddAll(included[i].Path...)
-		}
-	}
-	return ret.Elements()
 }
 
 // projectHash returns a checksum from the JSON encoding of the project.
