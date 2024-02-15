@@ -17,6 +17,7 @@ package e2e
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -36,6 +37,7 @@ func TestScaleBasicCases(t *testing.T) {
 	}
 	t.Cleanup(reset)
 	res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d")
+	frontOrder := getContainerCreationOrder(t, res.Combined(), "front", "Created")
 	res.Assert(t, icmd.Success)
 
 	t.Log("scale up one service")
@@ -46,6 +48,7 @@ func TestScaleBasicCases(t *testing.T) {
 	t.Log("scale up 2 services")
 	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "scale", "front=3", "back=2")
 	out = res.Combined()
+	frontOrder = append(frontOrder, getContainerCreationOrder(t, out, "front", "Created")...)
 	checkServiceContainer(t, out, "scale-basic-tests-front", "Running", 2)
 	checkServiceContainer(t, out, "scale-basic-tests-front", "Started", 1)
 	checkServiceContainer(t, out, "scale-basic-tests-back", "Running", 1)
@@ -64,7 +67,8 @@ func TestScaleBasicCases(t *testing.T) {
 	res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/scale", "scale", "front=2", "back=1")
 	out = res.Combined()
 	checkServiceContainer(t, out, "scale-basic-tests-front", "Running", 2)
-	assert.Check(t, !strings.Contains(out, "Container scale-basic-tests-front-3  Running"), res.Combined())
+	expected := fmt.Sprintf("Container %s  Running", frontOrder[len(frontOrder)-1])
+	assert.Check(t, !strings.Contains(out, expected), out)
 	checkServiceContainer(t, out, "scale-basic-tests-back", "Running", 1)
 }
 
@@ -165,6 +169,23 @@ func TestScaleDownRemovesObsolete(t *testing.T) {
 	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "db")
 	res.Assert(t, icmd.Success)
 	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1")
+}
+
+func getContainerCreationOrder(t *testing.T, stdout, containerName, containerState string) []string {
+	containerOrder := []string{}
+	lines := strings.Split(stdout, "\n")
+	fmt.Println("lines", lines)
+
+	r := regexp.MustCompile(fmt.Sprintf(`([\w\d-]*%s[\w\d-]*)\s*%s`, containerName, containerState))
+	containerFound := r.FindAllStringSubmatch(stdout, len(stdout))
+
+	for _, found := range containerFound {
+		if len(containerFound) < 1 {
+			testify.Fail(t, "Error parsing created container name")
+		}
+		containerOrder = append(containerOrder, found[1])
+	}
+	return containerOrder
 }
 
 func checkServiceContainer(t *testing.T, stdout, containerName, containerState string, count int) {
