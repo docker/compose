@@ -23,6 +23,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-shellwords v1.0.12
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/buildkit v0.13.0-beta1.0.20231219135447-957cb50df991
 	github.com/moby/patternmatcher v0.6.0
