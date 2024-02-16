@@ -140,7 +140,7 @@ jobs:
           - standalone
         engine:
           - 24.0.9
-          - 25.0.2
+          - 25.0.3
     steps:
       -
         name: Checkout
