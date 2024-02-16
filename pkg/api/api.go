@@ -119,6 +119,8 @@ type VizOptions struct {
 // WatchOptions group options of the Watch API
 type WatchOptions struct {
 	Build BuildOptions
+	// Attach to container and forward logs if not nil
+	Attach LogConsumer
 }
 
 // BuildOptions group options of the Build API

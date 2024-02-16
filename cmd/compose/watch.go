@@ -23,6 +23,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/locker"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/sirupsen/logrus"
@@ -31,8 +32,12 @@ import (
 
 type watchOptions struct {
 	*ProjectOptions
-	quiet bool
-	noUp  bool
+	quiet     bool
+	noUp      bool
+	logs      bool
+	noColor   bool
+	noPrefix  bool
+	timestamp bool
 }
 
 func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -59,6 +64,10 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 
 	cmd.Flags().BoolVar(&watchOpts.quiet, "quiet", false, "hide build output")
 	cmd.Flags().BoolVar(&watchOpts.noUp, "no-up", false, "Do not build & start services before watching")
+	cmd.Flags().BoolVar(&watchOpts.logs, "logs", false, "Show containers logs")
+	cmd.Flags().BoolVar(&watchOpts.noColor, "no-color", false, "Produce monochrome output in logs")
+	cmd.Flags().BoolVar(&watchOpts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs")
+	cmd.Flags().BoolVar(&watchOpts.timestamp, "timestamps", false, "Show timestamps in logs")
 	return cmd
 }
 
@@ -86,6 +95,11 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 		return fmt.Errorf("cannot take exclusive lock for project %q: %w", project.Name, err)
 	}
 
+	var consumer api.LogConsumer
+	if watchOpts.logs {
+		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !watchOpts.noColor, !watchOpts.noPrefix, watchOpts.timestamp)
+	}
+
 	if !watchOpts.noUp {
 		for index, service := range project.Services {
 			if service.Build != nil && service.Develop != nil {
@@ -105,7 +119,7 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 			},
 			Start: api.StartOptions{
 				Project:     project,
-				Attach:      nil,
+				Attach:      consumer,
 				CascadeStop: false,
 				Services:    services,
 			},
@@ -115,6 +129,7 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 		}
 	}
 	return backend.Watch(ctx, project, services, api.WatchOptions{
-		Build: build,
+		Build:  build,
+		Attach: consumer,
 	})
 }

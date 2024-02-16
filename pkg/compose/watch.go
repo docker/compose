@@ -190,7 +190,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, name
 			case batch := <-batchEvents:
 				start := time.Now()
 				logrus.Debugf("batch start: service[%s] count[%d]", name, len(batch))
-				if err := s.handleWatchBatch(ctx, project, name, options.Build, batch, syncer); err != nil {
+				if err := s.handleWatchBatch(ctx, project, name, options, batch, syncer); err != nil {
 					logrus.Warnf("Error handling changed files for service %s: %v", name, err)
 				}
 				logrus.Debugf("batch complete: service[%s] duration[%s] count[%d]",
@@ -431,7 +431,7 @@ func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCl
 	})
 }
 
-func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, build api.BuildOptions, batch []fileEvent, syncer sync.Syncer) error {
+func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, options api.WatchOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
 	restartService := false
 	for i := range batch {
@@ -443,15 +443,16 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 				strings.Join(append([]string{""}, batch[i].HostPath), "\n  - "),
 			)
 			// restrict the build to ONLY this service, not any of its dependencies
-			build.Services = []string{serviceName}
+			options.Build.Services = []string{serviceName}
 			err := s.Up(ctx, project, api.UpOptions{
 				Create: api.CreateOptions{
-					Build:    &build,
+					Build:    &options.Build,
 					Services: []string{serviceName},
 					Inherit:  true,
 				},
 				Start: api.StartOptions{
 					Services: []string{serviceName},
+					Attach:   options.Attach,
 					Project:  project,
 				},
 			})
