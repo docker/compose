@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -104,7 +105,8 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVar(&create.Build, "build", false, "Build images before starting containers")
 	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's policy")
 	flags.StringVar(&create.Pull, "pull", "policy", `Pull image before running ("always"|"missing"|"never")`)
-	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
+	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
+	flags.BoolVar(&create.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file")
 	flags.StringArrayVar(&create.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output")
 	flags.BoolVar(&up.noPrefix, "no-log-prefix", false, "Don't print prefix in logs")
