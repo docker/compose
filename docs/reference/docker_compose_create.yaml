@@ -57,6 +57,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: quiet-pull
+      value_type: bool
+      default_value: "false"
+      description: Pull without printing progress information
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: remove-orphans
       value_type: bool
       default_value: "false"
