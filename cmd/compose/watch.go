@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/cmd/formatter"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/locker"
@@ -31,8 +32,7 @@ import (
 
 type watchOptions struct {
 	*ProjectOptions
-	quiet bool
-	noUp  bool
+	noUp bool
 }
 
 func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -57,7 +57,7 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 
-	cmd.Flags().BoolVar(&watchOpts.quiet, "quiet", false, "hide build output")
+	cmd.Flags().BoolVar(&buildOpts.quiet, "quiet", false, "hide build output")
 	cmd.Flags().BoolVar(&watchOpts.noUp, "no-up", false, "Do not build & start services before watching")
 	return cmd
 }
@@ -101,7 +101,7 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 				Recreate:             api.RecreateDiverged,
 				RecreateDependencies: api.RecreateNever,
 				Inherit:              true,
-				QuietPull:            watchOpts.quiet,
+				QuietPull:            buildOpts.quiet,
 			},
 			Start: api.StartOptions{
 				Project:     project,
@@ -114,7 +114,10 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 			return err
 		}
 	}
+
+	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), false, false, false)
 	return backend.Watch(ctx, project, services, api.WatchOptions{
-		Build: build,
+		Build: &build,
+		LogTo: consumer,
 	})
 }
