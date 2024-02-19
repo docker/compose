@@ -24,11 +24,10 @@ import (
 	"strings"
 	"time"
 
-	xprogress "github.com/moby/buildkit/util/progress/progressui"
-
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
+	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -55,6 +54,7 @@ type upOptions struct {
 	timestamp          bool
 	wait               bool
 	waitTimeout        int
+	watch              bool
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) (*types.Project, error) {
@@ -126,6 +126,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration to wait for the project to be running|healthy")
+	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 
 	return upCmd
 }
@@ -257,6 +258,7 @@ func runUp(
 			CascadeStop:  upOptions.cascadeStop,
 			Wait:         upOptions.wait,
 			WaitTimeout:  timeout,
+			Watch:        upOptions.watch,
 			Services:     services,
 		},
 	})

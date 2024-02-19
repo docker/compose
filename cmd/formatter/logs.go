@@ -62,7 +62,11 @@ func (l *logConsumer) Register(name string) {
 func (l *logConsumer) register(name string) *presenter {
 	cf := monochrome
 	if l.color {
-		cf = nextColor()
+		if name == api.WatchLogger {
+			cf = makeColorFunc("92")
+		} else {
+			cf = nextColor()
+		}
 	}
 	p := &presenter{
 		colors: cf,
@@ -138,5 +142,9 @@ type presenter struct {
 }
 
 func (p *presenter) setPrefix(width int) {
+	if p.name == api.WatchLogger {
+		p.prefix = p.colors(strings.Repeat(" ", width) + " ⦿ ")
+		return
+	}
 	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s | ", p.name))
 }
