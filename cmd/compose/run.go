@@ -231,7 +231,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 			}
 			buildForDeps = &bo
 		}
-		return startDependencies(ctx, backend, *project, buildForDeps, options.Service, options.ignoreOrphans)
+		return startDependencies(ctx, backend, *project, buildForDeps, options)
 	}, dockerCli.Err())
 	if err != nil {
 		return err
@@ -298,11 +298,11 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	return err
 }
 
-func startDependencies(ctx context.Context, backend api.Service, project types.Project, buildOpts *api.BuildOptions, requestedServiceName string, ignoreOrphans bool) error {
+func startDependencies(ctx context.Context, backend api.Service, project types.Project, buildOpts *api.BuildOptions, options runOptions) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for name, service := range project.Services {
-		if name != requestedServiceName {
+		if name != options.Service {
 			dependencies[name] = service
 		} else {
 			requestedService = service
@@ -310,10 +310,11 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 	}
 
 	project.Services = dependencies
-	project.DisabledServices[requestedServiceName] = requestedService
+	project.DisabledServices[options.Service] = requestedService
 	err := backend.Create(ctx, &project, api.CreateOptions{
 		Build:         buildOpts,
-		IgnoreOrphans: ignoreOrphans,
+		IgnoreOrphans: options.ignoreOrphans,
+		QuietPull:     options.quietPull,
 	})
 	if err != nil {
 		return err
