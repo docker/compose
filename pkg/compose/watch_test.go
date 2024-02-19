@@ -16,6 +16,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -91,10 +92,29 @@ func (t testWatcher) Errors() chan error {
 	return t.errors
 }
 
+type stdLogger struct{}
+
+func (s stdLogger) Log(containerName, message string) {
+	fmt.Printf("%s: %s\n", containerName, message)
+}
+
+func (s stdLogger) Err(containerName, message string) {
+	fmt.Fprintf(os.Stderr, "%s: %s\n", containerName, message)
+}
+
+func (s stdLogger) Status(container, msg string) {
+	fmt.Printf("%s: %s\n", container, msg)
+}
+
+func (s stdLogger) Register(container string) {
+
+}
+
 func TestWatch_Sync(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().BuildKitEnabled().Return(true, nil)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return([]moby.Container{
 		testContainer("test", "123", false),
@@ -124,7 +144,10 @@ func TestWatch_Sync(t *testing.T) {
 			dockerCli: cli,
 			clock:     clock,
 		}
-		err := service.watch(ctx, &proj, "test", api.WatchOptions{}, watcher, syncer, []types.Trigger{
+		err := service.watch(ctx, &proj, "test", api.WatchOptions{
+			Build: &api.BuildOptions{},
+			LogTo: stdLogger{},
+		}, watcher, syncer, []types.Trigger{
 			{
 				Path:   "/sync",
 				Action: "sync",

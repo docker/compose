@@ -115,9 +115,13 @@ type VizOptions struct {
 	Indentation string
 }
 
+// WatchLogger is a reserved name to log watch events
+const WatchLogger = "#watch"
+
 // WatchOptions group options of the Watch API
 type WatchOptions struct {
-	Build BuildOptions
+	Build *BuildOptions
+	LogTo LogConsumer
 }
 
 // BuildOptions group options of the Build API
@@ -217,6 +221,7 @@ type StartOptions struct {
 	WaitTimeout time.Duration
 	// Services passed in the command line to be started
 	Services []string
+	Watch    bool
 }
 
 // RestartOptions group options of the Restart API

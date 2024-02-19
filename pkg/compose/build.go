@@ -134,6 +134,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			outPrinter = options.OutPrinter
 		}
 
+		if options.Quiet {
+			options.Progress = progress.ModeQuiet
+		}
 		w, err = xprogress.NewPrinter(progressCtx, progressPrinter(outPrinter), progressui.DisplayMode(options.Progress),
 			xprogress.WithDesc(
 				fmt.Sprintf("building with %q instance using %s driver", b.Name, b.Driver),
