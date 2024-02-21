@@ -63,7 +63,7 @@ func traceClientFromDockerContext(dockerCli command.Cli, otelEnv envMap) (otlptr
 		}
 	}
 
-	dialCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	dialCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	conn, err := grpc.DialContext(
 		dialCtx,

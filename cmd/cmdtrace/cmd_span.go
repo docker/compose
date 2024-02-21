@@ -104,7 +104,7 @@ func wrapRunE(c *cobra.Command, cmdSpan trace.Span, tracingShutdown tracing.Shut
 		if tracingShutdown != nil {
 			// use background for root context because the cmd's context might have
 			// been canceled already
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 			// TODO(milas): add an env var to enable logging from the
 			// OTel components for debugging purposes
