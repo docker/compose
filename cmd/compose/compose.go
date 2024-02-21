@@ -209,8 +209,6 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 		po = append(po, cli.WithResourceLoader(r))
 	}
 
-	po = append(po, cli.WithContext(ctx))
-
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
 		return nil, metrics, compose.WrapComposeError(err)
@@ -243,7 +241,7 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 		api.Separator = "_"
 	}
 
-	project, err := cli.ProjectFromOptions(options)
+	project, err := cli.ProjectFromOptions(ctx, options)
 	if err != nil {
 		return nil, metrics, compose.WrapComposeError(err)
 	}
