@@ -75,6 +75,16 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 	if err != nil {
 		return err
 	}
+
+	// exclude services configured to ignore output (attach: false), until explicitly selected
+	if project != nil && len(services) == 0 {
+		for n, service := range project.Services {
+			if service.Attach == nil || *service.Attach {
+				services = append(services, n)
+			}
+		}
+	}
+
 	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !opts.noColor, !opts.noPrefix, false)
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
