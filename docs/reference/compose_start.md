@@ -14,4 +14,4 @@ Start services
 
 ## Description
 
-Starts existing containers for a service.
+Starts existing containers for a service

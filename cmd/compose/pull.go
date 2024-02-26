@@ -60,15 +60,15 @@ func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
-	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information.")
-	cmd.Flags().BoolVar(&opts.includeDeps, "include-deps", false, "Also pull services declared as dependencies.")
-	cmd.Flags().BoolVar(&opts.parallel, "parallel", true, "DEPRECATED pull multiple images in parallel.")
+	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information")
+	cmd.Flags().BoolVar(&opts.includeDeps, "include-deps", false, "Also pull services declared as dependencies")
+	cmd.Flags().BoolVar(&opts.parallel, "parallel", true, "DEPRECATED pull multiple images in parallel")
 	flags.MarkHidden("parallel") //nolint:errcheck
-	cmd.Flags().BoolVar(&opts.parallel, "no-parallel", true, "DEPRECATED disable parallel pulling.")
+	cmd.Flags().BoolVar(&opts.parallel, "no-parallel", true, "DEPRECATED disable parallel pulling")
 	flags.MarkHidden("no-parallel") //nolint:errcheck
-	cmd.Flags().BoolVar(&opts.ignorePullFailures, "ignore-pull-failures", false, "Pull what it can and ignores images with pull failures.")
-	cmd.Flags().BoolVar(&opts.noBuildable, "ignore-buildable", false, "Ignore images that can be built.")
-	cmd.Flags().StringVar(&opts.policy, "policy", "", `Apply pull policy ("missing"|"always").`)
+	cmd.Flags().BoolVar(&opts.ignorePullFailures, "ignore-pull-failures", false, "Pull what it can and ignores images with pull failures")
+	cmd.Flags().BoolVar(&opts.noBuildable, "ignore-buildable", false, "Ignore images that can be built")
+	cmd.Flags().StringVar(&opts.policy, "policy", "", `Apply pull policy ("missing"|"always")`)
 	return cmd
 }
 
@@ -94,7 +94,7 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pullOptions, services []string) error {
-	project, err := opts.ToProject(ctx, dockerCli, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}

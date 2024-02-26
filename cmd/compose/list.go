@@ -49,9 +49,9 @@ func listCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
-	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "table", "Format the output. Values: [table | json].")
-	lsCmd.Flags().BoolVarP(&lsOpts.Quiet, "quiet", "q", false, "Only display IDs.")
-	lsCmd.Flags().Var(&lsOpts.Filter, "filter", "Filter output based on conditions provided.")
+	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "table", "Format the output. Values: [table | json]")
+	lsCmd.Flags().BoolVarP(&lsOpts.Quiet, "quiet", "q", false, "Only display IDs")
+	lsCmd.Flags().Var(&lsOpts.Filter, "filter", "Filter output based on conditions provided")
 	lsCmd.Flags().BoolVarP(&lsOpts.All, "all", "a", false, "Show all stopped Compose projects")
 
 	return lsCmd

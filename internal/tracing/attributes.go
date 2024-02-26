@@ -17,13 +17,12 @@
 package tracing
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
@@ -34,6 +33,14 @@ import (
 // SpanOptions is a small helper type to make it easy to share the options helpers between
 // downstream functions that accept slices of trace.SpanStartOption and trace.EventOption.
 type SpanOptions []trace.SpanStartEventOption
+
+type MetricsKey struct{}
+
+type Metrics struct {
+	CountExtends        int
+	CountIncludesLocal  int
+	CountIncludesRemote int
+}
 
 func (s SpanOptions) SpanStartOptions() []trace.SpanStartOption {
 	out := make([]trace.SpanStartOption, len(s))
@@ -56,31 +63,35 @@ func (s SpanOptions) EventOptions() []trace.EventOption {
 // For convenience, it's returned as a SpanOptions object to allow it to be
 // passed directly to the wrapping helper methods in this package such as
 // SpanWrapFunc.
-func ProjectOptions(proj *types.Project) SpanOptions {
+func ProjectOptions(ctx context.Context, proj *types.Project) SpanOptions {
 	if proj == nil {
 		return nil
 	}
-
 	capabilities, gpu, tpu := proj.ServicesWithCapabilities()
 	attrs := []attribute.KeyValue{
 		attribute.String("project.name", proj.Name),
 		attribute.String("project.dir", proj.WorkingDir),
 		attribute.StringSlice("project.compose_files", proj.ComposeFiles),
-		attribute.StringSlice("project.services.active", proj.ServiceNames()),
-		attribute.StringSlice("project.services.disabled", proj.DisabledServiceNames()),
 		attribute.StringSlice("project.profiles", proj.Profiles),
 		attribute.StringSlice("project.volumes", proj.VolumeNames()),
 		attribute.StringSlice("project.networks", proj.NetworkNames()),
 		attribute.StringSlice("project.secrets", proj.SecretNames()),
 		attribute.StringSlice("project.configs", proj.ConfigNames()),
 		attribute.StringSlice("project.extensions", keys(proj.Extensions)),
-		attribute.StringSlice("project.includes", flattenIncludeReferences(proj.IncludeReferences)),
+		attribute.StringSlice("project.services.active", proj.ServiceNames()),
+		attribute.StringSlice("project.services.disabled", proj.DisabledServiceNames()),
 		attribute.StringSlice("project.services.build", proj.ServicesWithBuild()),
 		attribute.StringSlice("project.services.depends_on", proj.ServicesWithDependsOn()),
 		attribute.StringSlice("project.services.capabilities", capabilities),
 		attribute.StringSlice("project.services.capabilities.gpu", gpu),
 		attribute.StringSlice("project.services.capabilities.tpu", tpu),
 	}
+	if metrics, ok := ctx.Value(MetricsKey{}).(Metrics); ok {
+		attrs = append(attrs, attribute.Int("project.services.extends", metrics.CountExtends))
+		attrs = append(attrs, attribute.Int("project.includes.local", metrics.CountIncludesLocal))
+		attrs = append(attrs, attribute.Int("project.includes.remote", metrics.CountIncludesRemote))
+	}
+
 	if projHash, ok := projectHash(proj); ok {
 		attrs = append(attrs, attribute.String("project.hash", projHash))
 	}
@@ -159,16 +170,6 @@ func timeAttr(key string, value time.Time) attribute.KeyValue {
 
 func unixTimeAttr(key string, value int64) attribute.KeyValue {
 	return timeAttr(key, time.Unix(value, 0).UTC())
-}
-
-func flattenIncludeReferences(includeRefs map[string][]types.IncludeConfig) []string {
-	ret := utils.NewSet[string]()
-	for _, included := range includeRefs {
-		for i := range included {
-			ret.AddAll(included[i].Path...)
-		}
-	}
-	return ret.Elements()
 }
 
 // projectHash returns a checksum from the JSON encoding of the project.

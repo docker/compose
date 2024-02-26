@@ -25,7 +25,7 @@ import (
 )
 
 func (s *composeService) Scale(ctx context.Context, project *types.Project, options api.ScaleOptions) error {
-	return progress.Run(ctx, tracing.SpanWrapFunc("project/scale", tracing.ProjectOptions(project), func(ctx context.Context) error {
+	return progress.Run(ctx, tracing.SpanWrapFunc("project/scale", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, api.CreateOptions{Services: options.Services})
 		if err != nil {
 			return err

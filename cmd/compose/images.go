@@ -51,7 +51,7 @@ func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
-	imgCmd.Flags().StringVar(&opts.Format, "format", "table", "Format the output. Values: [table | json].")
+	imgCmd.Flags().StringVar(&opts.Format, "format", "table", "Format the output. Values: [table | json]")
 	imgCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return imgCmd
 }

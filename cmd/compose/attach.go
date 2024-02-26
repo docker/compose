@@ -43,7 +43,7 @@ func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	}
 	runCmd := &cobra.Command{
 		Use:   "attach [OPTIONS] SERVICE",
-		Short: "Attach local standard input, output, and error streams to a service's running container.",
+		Short: "Attach local standard input, output, and error streams to a service's running container",
 		Args:  cobra.MinimumNArgs(1),
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			opts.service = args[0]

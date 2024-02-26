@@ -39,7 +39,7 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	}
 	cmd := &cobra.Command{
 		Use:   "kill [OPTIONS] [SERVICE...]",
-		Short: "Force stop service containers.",
+		Short: "Force stop service containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runKill(ctx, dockerCli, backend, opts, args)
 		}),
@@ -48,8 +48,8 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 
 	flags := cmd.Flags()
 	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
-	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file.")
-	flags.StringVarP(&opts.signal, "signal", "s", "SIGKILL", "SIGNAL to send to the container.")
+	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file")
+	flags.StringVarP(&opts.signal, "signal", "s", "SIGKILL", "SIGNAL to send to the container")
 
 	return cmd
 }

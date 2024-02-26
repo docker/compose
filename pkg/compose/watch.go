@@ -46,21 +46,23 @@ type fileEvent struct {
 	Action types.WatchAction
 }
 
-// getSyncImplementation returns the the tar-based syncer unless it has been explicitly
-// disabled with `COMPOSE_EXPERIMENTAL_WATCH_TAR=0`. Note that the absence of the env
-// var means enabled.
-func (s *composeService) getSyncImplementation(project *types.Project) sync.Syncer {
+// getSyncImplementation returns an appropriate sync implementation for the
+// project.
+//
+// Currently, an implementation that batches files and transfers them using
+// the Moby `Untar` API.
+func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syncer, error) {
 	var useTar bool
 	if useTarEnv, ok := os.LookupEnv("COMPOSE_EXPERIMENTAL_WATCH_TAR"); ok {
 		useTar, _ = strconv.ParseBool(useTarEnv)
 	} else {
 		useTar = true
 	}
-	if useTar {
-		return sync.NewTar(project.Name, tarDockerClient{s: s})
+	if !useTar {
+		return nil, errors.New("no available sync implementation")
 	}
 
-	return sync.NewDockerCopy(project.Name, s, s.stdinfo())
+	return sync.NewTar(project.Name, tarDockerClient{s: s}), nil
 }
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
@@ -68,7 +70,10 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	if project, err = project.WithSelectedServices(services); err != nil {
 		return err
 	}
-	syncer := s.getSyncImplementation(project)
+	syncer, err := s.getSyncImplementation(project)
+	if err != nil {
+		return err
+	}
 	eg, ctx := errgroup.WithContext(ctx)
 	watching := false
 	for i := range project.Services {

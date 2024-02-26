@@ -1,7 +1,7 @@
 # docker compose events
 
 <!---MARKER_GEN_START-->
-Receive real time events from containers.
+Receive real time events from containers
 
 ### Options
 
@@ -33,4 +33,4 @@ With the `--json` flag, a json object is printed one per line with the format:
 }
 ```
 
-The events that can be received using this can be seen [here](https://docs.docker.com/engine/reference/commandline/system_events/#object-types).
+The events that can be received using this can be seen [here](https://docs.docker.com/reference/cli/docker/system/events/#object-types).

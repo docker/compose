@@ -54,14 +54,14 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := scaleCmd.Flags()
-	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
+	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services")
 
 	return scaleCmd
 }
 
 func runScale(ctx context.Context, dockerCli command.Cli, backend api.Service, opts scaleOptions, serviceReplicaTuples map[string]int) error {
 	services := maps.Keys(serviceReplicaTuples)
-	project, err := opts.ToProject(ctx, dockerCli, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}

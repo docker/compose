@@ -1,3 +1,5 @@
+//go:build !windows
+
 /*
    Copyright 2023 Docker Compose CLI authors
 
@@ -17,19 +19,11 @@
 package locker
 
 import (
-	"fmt"
-	"path/filepath"
+	"os"
+
+	"github.com/docker/docker/pkg/pidfile"
 )
 
-type Pidfile struct {
-	path string
-}
-
-func NewPidfile(projectName string) (*Pidfile, error) {
-	run, err := runDir()
-	if err != nil {
-		return nil, err
-	}
-	path := filepath.Join(run, fmt.Sprintf("%s.pid", projectName))
-	return &Pidfile{path: path}, nil
+func (f *Pidfile) Lock() error {
+	return pidfile.Write(f.path, os.Getpid())
 }

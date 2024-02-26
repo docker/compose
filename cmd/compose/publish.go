@@ -44,13 +44,13 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 		Args: cobra.ExactArgs(1),
 	}
 	flags := cmd.Flags()
-	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests.")
+	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests")
 	flags.StringVar(&opts.ociVersion, "oci-version", "", "OCI Image/Artifact specification version (automatically determined by default)")
 	return cmd
 }
 
 func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service, opts publishOptions, repository string) error {
-	project, err := opts.ToProject(ctx, dockerCli, nil)
+	project, _, err := opts.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return err
 	}
