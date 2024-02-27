@@ -200,18 +200,20 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	// then the status should be warning instead of error
 	if err != nil && service.Build != nil {
 		w.Event(progress.Event{
-			ID:     service.Name,
-			Status: progress.Warning,
-			Text:   "Warning",
+			ID:         service.Name,
+			Status:     progress.Warning,
+			Text:       "Warning",
+			StatusText: err.Error(),
 		})
 		return "", WrapCategorisedComposeError(err, PullFailure)
 	}
 
 	if err != nil {
 		w.Event(progress.Event{
-			ID:     service.Name,
-			Status: progress.Error,
-			Text:   "Error",
+			ID:         service.Name,
+			Status:     progress.Error,
+			Text:       "Error",
+			StatusText: err.Error(),
 		})
 		return "", WrapCategorisedComposeError(err, PullFailure)
 	}
