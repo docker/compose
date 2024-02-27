@@ -129,7 +129,12 @@ jobs:
           name: coverage-data-unit
           path: bin/coverage/unit/
           if-no-files-found: error
-
+      - 
+        name: Unit Test Summary
+        uses: test-summary/action@v2
+        with:
+          paths: bin/coverage/unit/report.xml       
+        if: always()
   e2e:
     runs-on: ubuntu-latest
     strategy:
@@ -202,7 +207,12 @@ jobs:
           rm -f /usr/local/bin/docker-compose
           cp bin/build/docker-compose /usr/local/bin
           make e2e-compose-standalone
-
+      - 
+        name: e2e Test Summary
+        uses: test-summary/action@v2
+        with:
+          paths: /tmp/report/report.xml       
+        if: always()
   coverage:
     runs-on: ubuntu-22.04
     needs:
