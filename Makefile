@@ -75,11 +75,11 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	go test -v $(TEST_FLAGS) -count=1 ./pkg/e2e
+	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -v $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
+	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
 .PHONY: build-and-e2e-compose
 build-and-e2e-compose: build e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
