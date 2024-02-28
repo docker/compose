@@ -41,13 +41,14 @@ func completeServiceNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
+		var values []string
 		serviceNames := append(project.ServiceNames(), project.DisabledServiceNames()...)
 		for _, s := range serviceNames {
 			if toComplete == "" || strings.HasPrefix(s, toComplete) {
-				serviceNames = append(serviceNames, s)
+				values = append(values, s)
 			}
 		}
-		return serviceNames, cobra.ShellCompDirectiveNoFileComp
+		return values, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
