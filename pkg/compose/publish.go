@@ -26,7 +26,6 @@ import (
 	"github.com/docker/compose/v2/internal/ocipush"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/opencontainers/go-digest"
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
@@ -111,17 +110,7 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	if err != nil {
 		return nil, err
 	}
-	project, err = project.WithImagesResolved(func(named reference.Named) (digest.Digest, error) {
-		auth, err := encodedAuth(named, s.configFile())
-		if err != nil {
-			return "", err
-		}
-		inspect, err := s.apiClient().DistributionInspect(ctx, named.String(), auth)
-		if err != nil {
-			return "", err
-		}
-		return inspect.Descriptor.Digest, nil
-	})
+	project, err = project.WithImagesResolved(ImageDigestResolver(ctx, s.configFile(), s.apiClient()))
 	if err != nil {
 		return nil, err
 	}
