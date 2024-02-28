@@ -136,55 +136,19 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 }
 
 func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
-	var content []byte
 	model, err := opts.ToModel(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
 
 	if opts.resolveImageDigests {
-		// create a pseudo-project so we can rely on WithImagesResolved to resolve images
-		p := &types.Project{
-			Services: types.Services{},
-		}
-		services := model["services"].(map[string]any)
-		for name, s := range services {
-			service := s.(map[string]any)
-			if image, ok := service["image"]; ok {
-				p.Services[name] = types.ServiceConfig{
-					Image: image.(string),
-				}
-			}
-		}
-
-		p, err = p.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+		err = resolveImageDigests(ctx, dockerCli, model)
 		if err != nil {
 			return err
 		}
-
-		for name, s := range services {
-			service := s.(map[string]any)
-			config := p.Services[name]
-			if config.Image != "" {
-				service["image"] = config.Image
-			}
-			services[name] = service
-		}
-		model["services"] = services
 	}
 
-	switch opts.Format {
-	case "json":
-		content, err = json.MarshalIndent(model, "", "  ")
-	case "yaml":
-		buf := bytes.NewBuffer([]byte{})
-		encoder := yaml.NewEncoder(buf)
-		encoder.SetIndent(2)
-		err = encoder.Encode(model)
-		content = buf.Bytes()
-	default:
-		return fmt.Errorf("unsupported format %q", opts.Format)
-	}
+	content, err := formatModel(model, opts.Format)
 	if err != nil {
 		return err
 	}
@@ -202,6 +166,55 @@ func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, s
 	}
 	_, err = fmt.Fprint(dockerCli.Out(), string(content))
 	return err
+}
+
+func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) (err error) {
+	// create a pseudo-project so we can rely on WithImagesResolved to resolve images
+	p := &types.Project{
+		Services: types.Services{},
+	}
+	services := model["services"].(map[string]any)
+	for name, s := range services {
+		service := s.(map[string]any)
+		if image, ok := service["image"]; ok {
+			p.Services[name] = types.ServiceConfig{
+				Image: image.(string),
+			}
+		}
+	}
+
+	p, err = p.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+	if err != nil {
+		return err
+	}
+
+	// Collect image resolved with digest and update model accordingly
+	for name, s := range services {
+		service := s.(map[string]any)
+		config := p.Services[name]
+		if config.Image != "" {
+			service["image"] = config.Image
+		}
+		services[name] = service
+	}
+	model["services"] = services
+	return nil
+}
+
+func formatModel(model map[string]any, format string) (content []byte, err error) {
+	switch format {
+	case "json":
+		content, err = json.MarshalIndent(model, "", "  ")
+	case "yaml":
+		buf := bytes.NewBuffer([]byte{})
+		encoder := yaml.NewEncoder(buf)
+		encoder.SetIndent(2)
+		err = encoder.Encode(model)
+		content = buf.Bytes()
+	default:
+		return nil, fmt.Errorf("unsupported format %q", format)
+	}
+	return
 }
 
 func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
