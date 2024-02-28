@@ -25,12 +25,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/docker/api/types/volume"
 	"github.com/jonboulle/clockwork"
 
-	"github.com/docker/docker/api/types/volume"
-
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
@@ -40,7 +38,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
-	"github.com/opencontainers/go-digest"
 )
 
 var stdioToStdout bool
@@ -145,35 +142,6 @@ func getContainerNameWithoutProject(c moby.Container) string {
 		return name
 	}
 	return name[len(project)+1:]
-}
-
-func (s *composeService) Config(ctx context.Context, project *types.Project, options api.ConfigOptions) ([]byte, error) {
-	if options.ResolveImageDigests {
-		var err error
-		project, err = project.WithImagesResolved(func(named reference.Named) (digest.Digest, error) {
-			auth, err := encodedAuth(named, s.configFile())
-			if err != nil {
-				return "", err
-			}
-			inspect, err := s.apiClient().DistributionInspect(ctx, named.String(), auth)
-			if err != nil {
-				return "", err
-			}
-			return inspect.Descriptor.Digest, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	switch options.Format {
-	case "json":
-		return project.MarshalJSON()
-	case "yaml":
-		return project.MarshalYAML()
-	default:
-		return nil, fmt.Errorf("unsupported format %q", options.Format)
-	}
 }
 
 // projectFromName builds a types.Project based on actual resources with compose labels set

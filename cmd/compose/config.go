@@ -19,6 +19,7 @@ package compose
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -28,8 +29,8 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
-	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 )
@@ -51,18 +52,29 @@ type configOptions struct {
 	noConsistency       bool
 }
 
-func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
-	po = append(po,
+func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+	po = append(po, o.ToProjectOptions()...)
+	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, services, po...)
+	return project, err
+}
+
+func (o *configOptions) ToModel(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (map[string]any, error) {
+	po = append(po, o.ToProjectOptions()...)
+	return o.ProjectOptions.ToModel(ctx, dockerCli, services, po...)
+}
+
+func (o *configOptions) ToProjectOptions() []cli.ProjectOptionsFn {
+	return []cli.ProjectOptionsFn{
 		cli.WithInterpolation(!o.noInterpolate),
 		cli.WithResolvedPaths(!o.noResolvePath),
 		cli.WithNormalization(!o.noNormalize),
 		cli.WithConsistency(!o.noConsistency),
 		cli.WithDefaultProfiles(o.Profiles...),
-		cli.WithDiscardEnvFile)
-	return o.ProjectOptions.ToProject(ctx, dockerCli, services, po...)
+		cli.WithDiscardEnvFile,
+	}
 }
 
-func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	opts := configOptions{
 		ProjectOptions: p,
 	}
@@ -100,7 +112,7 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 				return runConfigImages(ctx, dockerCli, opts, args)
 			}
 
-			return runConfig(ctx, dockerCli, backend, opts, args)
+			return runConfig(ctx, dockerCli, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -123,18 +135,56 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return cmd
 }
 
-func runConfig(ctx context.Context, dockerCli command.Cli, backend api.Service, opts configOptions, services []string) error {
+func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
 	var content []byte
-	project, _, err := opts.ToProject(ctx, dockerCli, services)
+	model, err := opts.ToModel(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
 
-	content, err = backend.Config(ctx, project, api.ConfigOptions{
-		Format:              opts.Format,
-		Output:              opts.Output,
-		ResolveImageDigests: opts.resolveImageDigests,
-	})
+	if opts.resolveImageDigests {
+		// create a pseudo-project so we can rely on WithImagesResolved to resolve images
+		p := &types.Project{
+			Services: types.Services{},
+		}
+		services := model["services"].(map[string]any)
+		for name, s := range services {
+			service := s.(map[string]any)
+			if image, ok := service["image"]; ok {
+				p.Services[name] = types.ServiceConfig{
+					Image: image.(string),
+				}
+			}
+		}
+
+		p, err = p.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+		if err != nil {
+			return err
+		}
+
+		for name, s := range services {
+			service := s.(map[string]any)
+			config := p.Services[name]
+			if config.Image != "" {
+				service["image"] = config.Image
+			}
+			services[name] = service
+		}
+		model["services"] = services
+	}
+
+	switch opts.Format {
+	case "json":
+		content, err = json.MarshalIndent(model, "", "  ")
+	case "yaml":
+		buf := bytes.NewBuffer([]byte{})
+		encoder := yaml.NewEncoder(buf)
+		encoder.SetIndent(2)
+		err = encoder.Encode(model)
+		content = buf.Bytes()
+	default:
+		return fmt.Errorf("unsupported format %q", opts.Format)
+	}
 	if err != nil {
 		return err
 	}
@@ -155,7 +205,7 @@ func runConfig(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 }
 
 func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -167,7 +217,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 }
 
 func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -182,7 +232,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 	if opts.hash != "*" {
 		services = append(services, strings.Split(opts.hash, ",")...)
 	}
-	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -218,7 +268,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 
 func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
 	set := map[string]struct{}{}
-	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -239,7 +289,7 @@ func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions,
 }
 
 func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
