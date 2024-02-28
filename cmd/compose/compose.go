@@ -201,6 +201,24 @@ func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cl
 	return project.Name, nil
 }
 
+func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (map[string]any, error) {
+	remotes := o.remoteLoaders(dockerCli)
+	for _, r := range remotes {
+		po = append(po, cli.WithResourceLoader(r))
+	}
+
+	options, err := o.toProjectOptions(po...)
+	if err != nil {
+		return nil, err
+	}
+
+	if o.Compatibility || utils.StringToBool(options.Environment[ComposeCompatibility]) {
+		api.Separator = "_"
+	}
+
+	return options.LoadModel(ctx)
+}
+
 func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
 	var metrics tracing.Metrics
 
@@ -241,7 +259,7 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 		api.Separator = "_"
 	}
 
-	project, err := cli.ProjectFromOptions(ctx, options)
+	project, err := options.LoadProject(ctx)
 	if err != nil {
 		return nil, metrics, compose.WrapComposeError(err)
 	}
@@ -468,7 +486,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		psCommand(&opts, dockerCli, backend),
 		listCommand(dockerCli, backend),
 		logsCommand(&opts, dockerCli, backend),
-		configCommand(&opts, dockerCli, backend),
+		configCommand(&opts, dockerCli),
 		killCommand(&opts, dockerCli, backend),
 		runCommand(&opts, dockerCli, backend),
 		removeCommand(&opts, dockerCli, backend),
