@@ -127,8 +127,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 	if options.Start.Watch {
 		eg.Go(func() error {
+			buildOpts := *options.Create.Build
+			buildOpts.Quiet = true
 			return s.Watch(ctx, project, options.Start.Services, api.WatchOptions{
-				Build: options.Create.Build,
+				Build: &buildOpts,
 				LogTo: options.Start.Attach,
 			})
 		})
