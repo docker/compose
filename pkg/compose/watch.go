@@ -445,7 +445,6 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 			options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service %q after changes were detected...", serviceName))
 			// restrict the build to ONLY this service, not any of its dependencies
 			options.Build.Services = []string{serviceName}
-			options.Build.Quiet = true
 			_, err := s.build(ctx, project, *options.Build, nil)
 			if err != nil {
 				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Build failed. Error: %v", err))
