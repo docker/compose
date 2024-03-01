@@ -28,6 +28,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	imageType "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
@@ -244,7 +245,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {
 	id := fmt.Sprintf("Image %s", image)
 	w.Event(progress.NewEvent(id, progress.Working, "Removing"))
-	_, err := s.apiClient().ImageRemove(ctx, image, moby.ImageRemoveOptions{})
+	_, err := s.apiClient().ImageRemove(ctx, image, imageType.RemoveOptions{})
 	if err == nil {
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil

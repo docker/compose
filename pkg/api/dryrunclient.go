@@ -38,7 +38,7 @@ import (
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
+	imageType "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/swarm"
@@ -231,7 +231,7 @@ func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string
 
 }
 
-func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.ImagePullOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options imageType.PullOptions) (io.ReadCloser, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.I
 	return rc, nil
 }
 
-func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.ImagePushOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options imageType.PushOptions) (io.ReadCloser, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.I
 	return rc, nil
 }
 
-func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]image.DeleteResponse, error) {
+func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options imageType.RemoveOptions) ([]imageType.DeleteResponse, error) {
 	return nil, nil
 }
 
@@ -419,19 +419,19 @@ func (d *DryRunClient) BuildCancel(ctx context.Context, id string) error {
 	return d.apiClient.BuildCancel(ctx, id)
 }
 
-func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options moby.ImageCreateOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options imageType.CreateOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageCreate(ctx, parentReference, options)
 }
 
-func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string) ([]image.HistoryResponseItem, error) {
+func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string) ([]imageType.HistoryResponseItem, error) {
 	return d.apiClient.ImageHistory(ctx, imageName)
 }
 
-func (d *DryRunClient) ImageImport(ctx context.Context, source moby.ImageImportSource, ref string, options moby.ImageImportOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageImport(ctx context.Context, source moby.ImageImportSource, ref string, options imageType.ImportOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageImport(ctx, source, ref, options)
 }
 
-func (d *DryRunClient) ImageList(ctx context.Context, options moby.ImageListOptions) ([]image.Summary, error) {
+func (d *DryRunClient) ImageList(ctx context.Context, options imageType.ListOptions) ([]imageType.Summary, error) {
 	return d.apiClient.ImageList(ctx, options)
 }
 
