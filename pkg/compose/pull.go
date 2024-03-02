@@ -169,6 +169,14 @@ func imageAlreadyPresent(serviceImage string, localImages map[string]string) boo
 	return ok && tagged.Tag() != "latest"
 }
 
+func getUnwrappedErrorMessage(err error) string {
+	derr := errors.Unwrap(err)
+	if derr != nil {
+		return getUnwrappedErrorMessage(derr)
+	}
+	return err.Error()
+}
+
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig,
 	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
 	w.Event(progress.Event{
@@ -203,7 +211,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			ID:         service.Name,
 			Status:     progress.Warning,
 			Text:       "Warning",
-			StatusText: err.Error(),
+			StatusText: getUnwrappedErrorMessage(err),
 		})
 		return "", WrapCategorisedComposeError(err, PullFailure)
 	}
@@ -213,7 +221,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			ID:         service.Name,
 			Status:     progress.Error,
 			Text:       "Error",
-			StatusText: err.Error(),
+			StatusText: getUnwrappedErrorMessage(err),
 		})
 		return "", WrapCategorisedComposeError(err, PullFailure)
 	}
