@@ -447,7 +447,11 @@ func (s *composeService) prepareLabels(labels types.Labels, service types.Servic
 
 	var dependencies []string
 	for s, d := range service.DependsOn {
-		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", s, d.Condition, d.Restart))
+		if s != service.Name {
+			dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", s, d.Condition, d.Restart))
+		} else {
+			fmt.Printf("Warning: Service '%s' has a self-dependency. This is not recommended.\n", s)
+		}
 	}
 	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
 	return labels, nil
