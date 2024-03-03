@@ -125,6 +125,17 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	})
 
+	if options.Start.Watch {
+		eg.Go(func() error {
+			buildOpts := *options.Create.Build
+			buildOpts.Quiet = true
+			return s.Watch(ctx, project, options.Start.Services, api.WatchOptions{
+				Build: &buildOpts,
+				LogTo: options.Start.Attach,
+			})
+		})
+	}
+
 	// We don't use parent (cancelable) context as we manage sigterm to stop the stack
 	err = s.start(context.Background(), project.Name, options.Start, printer.HandleEvent)
 	if err != nil && !isTerminated { // Ignore error if the process is terminated

@@ -235,7 +235,7 @@ func TestCompatibility(t *testing.T) {
 	})
 }
 
-func TestConvert(t *testing.T) {
+func TestConfig(t *testing.T) {
 	const projectName = "compose-e2e-convert"
 	c := NewParallelCLI(t)
 
@@ -244,20 +244,22 @@ func TestConvert(t *testing.T) {
 
 	t.Run("up", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "convert")
-		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`services:
+		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
+networks:
+  default:
+    name: compose-e2e-convert_default
+services:
   nginx:
     build:
       context: %s
       dockerfile: Dockerfile
     networks:
       default: null
-networks:
-  default:
-    name: compose-e2e-convert_default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
+`, projectName, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
 	})
 }
 
-func TestConvertInterpolate(t *testing.T) {
+func TestConfigInterpolate(t *testing.T) {
 	const projectName = "compose-e2e-convert-interpolate"
 	c := NewParallelCLI(t)
 
@@ -266,16 +268,18 @@ func TestConvertInterpolate(t *testing.T) {
 
 	t.Run("convert", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose-interpolate.yaml", "-p", projectName, "convert", "--no-interpolate")
-		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`services:
+		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
+networks:
+  default:
+    name: compose-e2e-convert-interpolate_default
+services:
   nginx:
     build:
       context: %s
       dockerfile: ${MYVAR}
     networks:
       default: null
-networks:
-  default:
-    name: compose-e2e-convert-interpolate_default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
+`, projectName, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
 	})
 }
 

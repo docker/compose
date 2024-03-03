@@ -86,7 +86,8 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 	)
 	defer p.Stop()
 
-	containers := map[string]struct{}{}
+	// containers we are tracking. Use true when container is running, false after we receive a stop|die signal
+	containers := map[string]bool{}
 	for {
 		select {
 		case <-p.stopCh:
@@ -100,18 +101,20 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 				if _, ok := containers[id]; ok {
 					continue
 				}
-				containers[id] = struct{}{}
+				containers[id] = true
 				p.consumer.Register(container)
 			case api.ContainerEventExit, api.ContainerEventStopped, api.ContainerEventRecreated:
-				if !event.Restarting {
-					delete(containers, id)
-				}
-				if !aborting {
+				if !aborting && containers[id] {
 					p.consumer.Status(container, fmt.Sprintf("exited with code %d", event.ExitCode))
 					if event.Type == api.ContainerEventRecreated {
 						p.consumer.Status(container, "has been recreated")
 					}
 				}
+				containers[id] = false
+				if !event.Restarting {
+					delete(containers, id)
+				}
+
 				if cascadeStop {
 					if !aborting {
 						aborting = true

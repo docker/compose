@@ -52,8 +52,6 @@ type Service interface {
 	Ps(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context, options ListOptions) ([]Stack, error)
-	// Config executes the equivalent to a `compose config`
-	Config(ctx context.Context, project *types.Project, options ConfigOptions) ([]byte, error)
 	// Kill executes the equivalent to a `compose kill`
 	Kill(ctx context.Context, projectName string, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
@@ -116,9 +114,13 @@ type VizOptions struct {
 	Indentation string
 }
 
+// WatchLogger is a reserved name to log watch events
+const WatchLogger = "#watch"
+
 // WatchOptions group options of the Watch API
 type WatchOptions struct {
-	Build BuildOptions
+	Build *BuildOptions
+	LogTo LogConsumer
 }
 
 // BuildOptions group options of the Build API
@@ -216,6 +218,7 @@ type StartOptions struct {
 	WaitTimeout time.Duration
 	// Services passed in the command line to be started
 	Services []string
+	Watch    bool
 }
 
 // RestartOptions group options of the Restart API

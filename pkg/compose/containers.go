@@ -127,13 +127,7 @@ func isNotService(services ...string) containerPredicate {
 
 // isOrphaned is a predicate to select containers without a matching service definition in compose project
 func isOrphaned(project *types.Project) containerPredicate {
-	var services []string
-	for _, s := range project.Services {
-		services = append(services, s.Name)
-	}
-	for _, s := range project.DisabledServices {
-		services = append(services, s.Name)
-	}
+	services := append(project.ServiceNames(), project.DisabledServiceNames()...)
 	return func(c moby.Container) bool {
 		service := c.Labels[api.ServiceLabel]
 		return !utils.StringContains(services, service)

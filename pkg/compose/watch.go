@@ -76,6 +76,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	watching := false
+	options.LogTo.Register(api.WatchLogger)
 	for i := range project.Services {
 		service := project.Services[i]
 		config, err := loadDevelopmentConfig(service, project)
@@ -91,9 +92,15 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			continue
 		}
 
-		if len(config.Watch) > 0 && service.Build == nil {
-			// service configured with watchers but no build section
-			return fmt.Errorf("can't watch service %q without a build context", service.Name)
+		for _, trigger := range config.Watch {
+			if trigger.Action == types.WatchActionRebuild {
+				if service.Build == nil {
+					return fmt.Errorf("can't watch service %q with action %s without a build context", service.Name, types.WatchActionRebuild)
+				}
+				if options.Build == nil {
+					return fmt.Errorf("--no-build is incompatible with watch action %s in service %s", types.WatchActionRebuild, service.Name)
+				}
+			}
 		}
 
 		if len(services) > 0 && service.Build == nil {
@@ -142,9 +149,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			return err
 		}
 
-		fmt.Fprintf(
-			s.stdinfo(),
-			"Watch configuration for service %q:%s\n",
+		logrus.Debugf("Watch configuration for service %q:%s\n",
 			service.Name,
 			strings.Join(append([]string{""}, pathLogs...), "\n  - "),
 		)
@@ -163,6 +168,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	if !watching {
 		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'develop' section")
 	}
+	options.LogTo.Log(api.WatchLogger, "watch enabled")
 
 	return eg.Wait()
 }
@@ -190,7 +196,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, name
 			case batch := <-batchEvents:
 				start := time.Now()
 				logrus.Debugf("batch start: service[%s] count[%d]", name, len(batch))
-				if err := s.handleWatchBatch(ctx, project, name, options.Build, batch, syncer); err != nil {
+				if err := s.handleWatchBatch(ctx, project, name, options, batch, syncer); err != nil {
 					logrus.Warnf("Error handling changed files for service %s: %v", name, err)
 				}
 				logrus.Debugf("batch complete: service[%s] duration[%s] count[%d]",
@@ -431,32 +437,37 @@ func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCl
 	})
 }
 
-func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, build api.BuildOptions, batch []fileEvent, syncer sync.Syncer) error {
+func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, options api.WatchOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
 	restartService := false
 	for i := range batch {
 		if batch[i].Action == types.WatchActionRebuild {
-			fmt.Fprintf(
-				s.stdinfo(),
-				"Rebuilding service %q after changes were detected:%s\n",
-				serviceName,
-				strings.Join(append([]string{""}, batch[i].HostPath), "\n  - "),
-			)
+			options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service %q after changes were detected...", serviceName))
 			// restrict the build to ONLY this service, not any of its dependencies
-			build.Services = []string{serviceName}
-			err := s.Up(ctx, project, api.UpOptions{
-				Create: api.CreateOptions{
-					Build:    &build,
-					Services: []string{serviceName},
-					Inherit:  true,
-				},
-				Start: api.StartOptions{
-					Services: []string{serviceName},
-					Project:  project,
-				},
+			options.Build.Services = []string{serviceName}
+			_, err := s.build(ctx, project, *options.Build, nil)
+			if err != nil {
+				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Build failed. Error: %v", err))
+				return err
+			}
+			options.LogTo.Log(api.WatchLogger, fmt.Sprintf("service %q successfully built", serviceName))
+
+			err = s.create(ctx, project, api.CreateOptions{
+				Services: []string{serviceName},
+				Inherit:  true,
+				Recreate: api.RecreateForce,
 			})
 			if err != nil {
-				fmt.Fprintf(s.stderr(), "Application failed to start after update. Error: %v\n", err)
+				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate service after update. Error: %v", err))
+				return err
+			}
+
+			err = s.start(ctx, project.Name, api.StartOptions{
+				Project:  project,
+				Services: []string{serviceName},
+			}, nil)
+			if err != nil {
+				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Application failed to start after update. Error: %v", err))
 			}
 			return nil
 		}
@@ -466,7 +477,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 		pathMappings[i] = batch[i].PathMapping
 	}
 
-	writeWatchSyncMessage(s.stdinfo(), serviceName, pathMappings)
+	writeWatchSyncMessage(options.LogTo, serviceName, pathMappings)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
@@ -486,29 +497,19 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 }
 
 // writeWatchSyncMessage prints out a message about the sync for the changed paths.
-func writeWatchSyncMessage(w io.Writer, serviceName string, pathMappings []sync.PathMapping) {
+func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings []sync.PathMapping) {
 	const maxPathsToShow = 10
 	if len(pathMappings) <= maxPathsToShow || logrus.IsLevelEnabled(logrus.DebugLevel) {
 		hostPathsToSync := make([]string, len(pathMappings))
 		for i := range pathMappings {
 			hostPathsToSync[i] = pathMappings[i].HostPath
 		}
-		fmt.Fprintf(
-			w,
-			"Syncing %q after changes were detected:%s\n",
-			serviceName,
-			strings.Join(append([]string{""}, hostPathsToSync...), "\n  - "),
-		)
+		log.Log(api.WatchLogger, fmt.Sprintf("Syncing %q after changes were detected", serviceName))
 	} else {
 		hostPathsToSync := make([]string, len(pathMappings))
 		for i := range pathMappings {
 			hostPathsToSync[i] = pathMappings[i].HostPath
 		}
-		fmt.Fprintf(
-			w,
-			"Syncing service %q after %d changes were detected\n",
-			serviceName,
-			len(pathMappings),
-		)
+		log.Log(api.WatchLogger, fmt.Sprintf("Syncing service %q after %d changes were detected", serviceName, len(pathMappings)))
 	}
 }

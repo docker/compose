@@ -28,10 +28,13 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
+	"github.com/docker/cli/cli/config/configfile"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
 	"github.com/hashicorp/go-multierror"
+	"github.com/opencontainers/go-digest"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -240,6 +243,21 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 	return inspected.ID, nil
+}
+
+// ImageDigestResolver creates a func able to resolve image digest from a docker ref,
+func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {
+	return func(named reference.Named) (digest.Digest, error) {
+		auth, err := encodedAuth(named, file)
+		if err != nil {
+			return "", err
+		}
+		inspect, err := apiClient.DistributionInspect(ctx, named.String(), auth)
+		if err != nil {
+			return "", err
+		}
+		return inspect.Descriptor.Digest, nil
+	}
 }
 
 func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
