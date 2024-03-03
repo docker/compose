@@ -491,6 +491,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				ui.Mode = ui.ModeQuiet
 			case ui.ModeJSON:
 				ui.Mode = ui.ModeJSON
+				logrus.SetFormatter(&logrus.JSONFormatter{})
 			default:
 				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
