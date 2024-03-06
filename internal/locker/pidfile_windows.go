@@ -19,9 +19,10 @@
 package locker
 
 import (
+	"os"
+
 	"github.com/docker/docker/pkg/pidfile"
 	"github.com/mitchellh/go-ps"
-	"os"
 )
 
 func (f *Pidfile) Lock() error {

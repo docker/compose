@@ -205,7 +205,7 @@ func TestDownRemoveImages(t *testing.T) {
 		}, nil).
 		AnyTimes()
 
-	api.EXPECT().ImageList(gomock.Any(), moby.ImageListOptions{
+	api.EXPECT().ImageList(gomock.Any(), image.ListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(strings.ToLower(testProject)),
 			filters.Arg("dangling", "false"),
@@ -253,7 +253,7 @@ func TestDownRemoveImages(t *testing.T) {
 	for _, img := range localImagesToBeRemoved {
 		// test calls down --rmi=local then down --rmi=all, so local images
 		// get "removed" 2x, while other images are only 1x
-		api.EXPECT().ImageRemove(gomock.Any(), img, moby.ImageRemoveOptions{}).
+		api.EXPECT().ImageRemove(gomock.Any(), img, image.RemoveOptions{}).
 			Return(nil, nil).
 			Times(2)
 	}
@@ -268,7 +268,7 @@ func TestDownRemoveImages(t *testing.T) {
 		"registry.example.com/remote-image-tagged:v1.0",
 	}
 	for _, img := range otherImagesToBeRemoved {
-		api.EXPECT().ImageRemove(gomock.Any(), img, moby.ImageRemoveOptions{}).
+		api.EXPECT().ImageRemove(gomock.Any(), img, image.RemoveOptions{}).
 			Return(nil, nil).
 			Times(1)
 	}
@@ -306,7 +306,7 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 
 	// ImageList returns no images for the project since they were unlabeled
 	// (created by an older version of Compose)
-	api.EXPECT().ImageList(gomock.Any(), moby.ImageListOptions{
+	api.EXPECT().ImageList(gomock.Any(), image.ListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(strings.ToLower(testProject)),
 			filters.Arg("dangling", "false"),
@@ -319,7 +319,7 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	api.EXPECT().ContainerStop(gomock.Any(), "123", containerType.StopOptions{}).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", containerType.RemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1:latest", moby.ImageRemoveOptions{}).Return(nil, nil)
+	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1:latest", image.RemoveOptions{}).Return(nil, nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Images: "local"})
 	assert.NilError(t, err)
