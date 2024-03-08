@@ -32,7 +32,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	composegoutils "github.com/compose-spec/compose-go/v2/utils"
-	"github.com/docker/buildx/util/logutil"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
@@ -45,7 +44,6 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 	buildkit "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/morikuni/aec"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -325,17 +323,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
-	// filter out useless commandConn.CloseWrite warning message that can occur
-	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
-	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
-	logrus.AddHook(logutil.NewFilter([]logrus.Level{
-		logrus.WarnLevel,
-	},
-		"commandConn.CloseWrite:",
-		"commandConn.CloseRead:",
-	))
-
+func RootCommand(dockerCli command.Cli, backend api.Service, debugFlagValue *bool) *cobra.Command { //nolint:gocyclo
 	opts := ProjectOptions{}
 	var (
 		ansi     string
@@ -385,9 +373,6 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 				}
 				ansi = "never"
 				fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
-			}
-			if verbose {
-				logrus.SetLevel(logrus.TraceLevel)
 			}
 
 			if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && !cmd.Flags().Changed("ansi") {
@@ -534,15 +519,25 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 		completeProfileNames(dockerCli, &opts),
 	)
 
-	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
+	// persistent flags are available on all subcommands: they're global,
+	// which is _mostly_ a convenience so that `compose --verbose foo` and
+	// `compose foo --verbose` both work. (otherwise, the latter triggers a
+	// parse error from Cobra)
+	c.PersistentFlags().BoolVar(&verbose, "verbose", false, "Show debugging logging output")
+	// TODO(milas): we aren't actually using verbose for anything right now,
+	// 	it's here for compatibility but also we should start using it for more
+	// 	detailed user-facing output.
+	_ = c.PersistentFlags().MarkHidden("verbose")
+	c.PersistentFlags().BoolVar(debugFlagValue, "debug", false, "Show debugging logging output for development or troubleshooting")
+	_ = c.PersistentFlags().MarkHidden("debug")
+	c.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Execute command in dry run mode")
+	c.PersistentFlags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
+
 	c.Flags().IntVar(&parallel, "parallel", -1, `Control max parallelism, -1 for unlimited`)
 	c.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
-	c.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Execute command in dry run mode")
-	c.Flags().MarkHidden("version") //nolint:errcheck
+	_ = c.Flags().MarkHidden("version")
 	c.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
-	c.Flags().MarkHidden("no-ansi") //nolint:errcheck
-	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
-	c.Flags().MarkHidden("verbose") //nolint:errcheck
+	_ = c.Flags().MarkHidden("no-ansi")
 	return c
 }
 

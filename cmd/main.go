@@ -19,12 +19,14 @@ package main
 import (
 	"os"
 
+	"github.com/docker/buildx/util/logutil"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/cmdtrace"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/compatibility"
@@ -36,7 +38,10 @@ import (
 func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		backend := compose.NewComposeService(dockerCli)
-		cmd := commands.RootCommand(dockerCli, backend)
+		// to initialize logging as early as possible, a pointer to this value
+		// is passed to the root command, which registers it as a Cobra flag.
+		var debugLogging bool
+		cmd := commands.RootCommand(dockerCli, backend, &debugLogging)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			// initialize the dockerCli instance
@@ -46,9 +51,15 @@ func pluginMain() {
 			// compose-specific initialization
 			dockerCliPostInitialize(dockerCli)
 
-			// TODO(milas): add an env var to enable logging from the
-			// OTel components for debugging purposes
-			_ = cmdtrace.Setup(cmd, dockerCli, os.Args[1:])
+			// this is the earliest logging can be configured:
+			// 	1. need the value set by the flag parsing
+			// 	2. initializing the Docker CLI via the parent PersistentPreRun
+			// 		also sets the global logrus level
+			configureLogging(debugLogging)
+
+			if err := cmdtrace.Setup(cmd, dockerCli, os.Args[1:]); err != nil {
+				logrus.Debugf("failed to enable tracing: %v", err)
+			}
 
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
@@ -85,6 +96,21 @@ func dockerCliPostInitialize(dockerCli command.Cli) {
 		}
 		return nil
 	})
+}
+
+func configureLogging(debug bool) {
+	// filter out useless commandConn.CloseWrite warning message that can occur
+	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
+	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
+	logrus.AddHook(logutil.NewFilter([]logrus.Level{
+		logrus.WarnLevel,
+	},
+		"commandConn.CloseWrite:",
+		"commandConn.CloseRead:",
+	))
+	if debug {
+		logrus.SetLevel(logrus.TraceLevel)
+	}
 }
 
 func main() {

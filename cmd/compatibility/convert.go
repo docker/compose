@@ -32,8 +32,7 @@ func getCompletionCommands() []string {
 
 func getBoolFlags() []string {
 	return []string{
-		"--debug", "-D",
-		"--verbose",
+		"-D",
 		"--tls",
 		"--tlsverify",
 	}
@@ -50,7 +49,8 @@ func getStringFlags() []string {
 	}
 }
 
-// Convert transforms standalone docker-compose args into CLI plugin compliant ones
+// Convert transforms v1 args into v2 ones and is used when the binary is
+// invoked standalone, i.e. as `docker-compose`.
 func Convert(args []string) []string {
 	var rootFlags []string
 	command := []string{compose.PluginName}
@@ -67,8 +67,6 @@ func Convert(args []string) []string {
 		}
 
 		switch arg {
-		case "--verbose":
-			arg = "--debug"
 		case "-h":
 			// docker cli has deprecated -h to avoid ambiguity with -H, while docker-compose still support it
 			arg = "--help"

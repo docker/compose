@@ -46,7 +46,7 @@ func Test_convert(t *testing.T) {
 		{
 			name: "compose --verbose",
 			args: []string{"--verbose"},
-			want: []string{"--debug", "compose"},
+			want: []string{"compose", "--verbose"},
 		},
 		{
 			name: "compose --version",
