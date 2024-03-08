@@ -42,20 +42,22 @@ type composeOptions struct {
 
 type upOptions struct {
 	*composeOptions
-	Detach             bool
-	noStart            bool
-	noDeps             bool
-	cascadeStop        bool
-	exitCodeFrom       string
-	noColor            bool
-	noPrefix           bool
-	attachDependencies bool
-	attach             []string
-	noAttach           []string
-	timestamp          bool
-	wait               bool
-	waitTimeout        int
-	watch              bool
+	Detach                bool
+	noStart               bool
+	noDeps                bool
+	cascadeStop           bool
+	exitCodeFrom          string
+	noColor               bool
+	noPrefix              bool
+	attachDependencies    bool
+	attach                []string
+	noAttach              []string
+	timestamp             bool
+	wait                  bool
+	waitTimeout           int
+	watch                 bool
+	navigationMenu        bool
+	navigationMenuChanged bool
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) (*types.Project, error) {
@@ -87,6 +89,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			create.pullChanged = cmd.Flags().Changed("pull")
 			create.timeChanged = cmd.Flags().Changed("timeout")
+			up.navigationMenuChanged = cmd.Flags().Changed("menu")
 			return validateFlags(&up, &create)
 		}),
 		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
@@ -128,6 +131,8 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
+	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached (Experimental). Incompatible with --detach.")
+	flags.MarkHidden("menu") //nolint:errcheck
 
 	return upCmd
 }
@@ -161,7 +166,7 @@ func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
 	backend api.Service,
-	_ *experimental.State,
+	experimentals *experimental.State,
 	createOptions createOptions,
 	upOptions upOptions,
 	buildOptions buildOptions,
@@ -180,6 +185,9 @@ func runUp(
 	project, err = upOptions.apply(project, services)
 	if err != nil {
 		return err
+	}
+	if !upOptions.navigationMenuChanged {
+		upOptions.navigationMenu = SetUnchangedOption(ComposeMenu, experimentals.NavBar())
 	}
 
 	var build *api.BuildOptions
@@ -253,15 +261,16 @@ func runUp(
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
-			Project:      project,
-			Attach:       consumer,
-			AttachTo:     attach,
-			ExitCodeFrom: upOptions.exitCodeFrom,
-			CascadeStop:  upOptions.cascadeStop,
-			Wait:         upOptions.wait,
-			WaitTimeout:  timeout,
-			Watch:        upOptions.watch,
-			Services:     services,
+			Project:        project,
+			Attach:         consumer,
+			AttachTo:       attach,
+			ExitCodeFrom:   upOptions.exitCodeFrom,
+			CascadeStop:    upOptions.cascadeStop,
+			Wait:           upOptions.wait,
+			WaitTimeout:    timeout,
+			Watch:          upOptions.watch,
+			Services:       services,
+			NavigationMenu: upOptions.navigationMenu,
 		},
 	})
 }

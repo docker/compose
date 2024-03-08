@@ -36,6 +36,18 @@ var names = []string{
 }
 
 const (
+	BOLD      = "1"
+	FAINT     = "2"
+	ITALIC    = "3"
+	UNDERLINE = "4"
+)
+
+const (
+	RESET = "0"
+	CYAN  = "36"
+)
+
+const (
 	// Never use ANSI codes
 	Never = "never"
 
@@ -72,12 +84,17 @@ var monochrome = func(s string) string {
 	return s
 }
 
-func ansiColor(code, s string) string {
-	return fmt.Sprintf("%s%s%s", ansi(code), s, ansi("0"))
+func ansiColor(code, s string, formatOpts ...string) string {
+	return fmt.Sprintf("%s%s%s", ansiColorCode(code, formatOpts...), s, ansiColorCode("0"))
 }
 
-func ansi(code string) string {
-	return fmt.Sprintf("\033[%sm", code)
+// Everything about ansiColorCode color https://hyperskill.org/learn/step/18193
+func ansiColorCode(code string, formatOpts ...string) string {
+	res := "\033["
+	for _, c := range formatOpts {
+		res = fmt.Sprintf("%s%s;", res, c)
+	}
+	return fmt.Sprintf("%s%sm", res, code)
 }
 
 func makeColorFunc(code string) colorFunc {

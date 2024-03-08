@@ -108,6 +108,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: menu
+      value_type: bool
+      default_value: "false"
+      description: |
+        Enable interactive shortcuts when running attached (Experimental). Incompatible with --detach.
+      deprecated: false
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-attach
       value_type: stringArray
       default_value: '[]'

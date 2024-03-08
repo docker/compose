@@ -81,7 +81,7 @@ func (s *composeService) Close() error {
 	if s.dockerCli != nil {
 		errs = append(errs, s.dockerCli.Client().Close())
 	}
-	if s.desktopCli != nil {
+	if s.isDesktopIntegrationActive() {
 		errs = append(errs, s.desktopCli.Close())
 	}
 	return errors.Join(errs...)
@@ -319,4 +319,8 @@ func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 	})
 	return runtimeVersion.val, runtimeVersion.err
 
+}
+
+func (s *composeService) isDesktopIntegrationActive() bool {
+	return s.desktopCli != nil
 }

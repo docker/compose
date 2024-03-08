@@ -102,18 +102,28 @@ func (l *logConsumer) Err(container, message string) {
 	l.write(l.stderr, container, message)
 }
 
+var navColor = makeColorFunc("90")
+
 func (l *logConsumer) write(w io.Writer, container, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
-	p := l.getPresenter(container)
-	timestamp := time.Now().Format(jsonmessage.RFC3339NanoFixed)
-	for _, line := range strings.Split(message, "\n") {
-		if l.timestamp {
-			fmt.Fprintf(w, "%s%s%s\n", p.prefix, timestamp, line)
-		} else {
-			fmt.Fprintf(w, "%s%s\n", p.prefix, line)
+	printFn := func() {
+		p := l.getPresenter(container)
+		timestamp := time.Now().Format(jsonmessage.RFC3339NanoFixed)
+		for _, line := range strings.Split(message, "\n") {
+			ClearLine()
+			if l.timestamp {
+				fmt.Fprintf(w, "%s%s%s\n", p.prefix, timestamp, line)
+			} else {
+				fmt.Fprintf(w, "%s%s\n", p.prefix, line)
+			}
 		}
+	}
+	if KeyboardManager != nil {
+		KeyboardManager.PrintKeyboardInfo(printFn)
+	} else {
+		printFn()
 	}
 }
 

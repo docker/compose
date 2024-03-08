@@ -25,9 +25,11 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -73,6 +75,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		first := true
 		gracefulTeardown := func() {
 			printer.Cancel()
+			formatter.ClearLine()
 			fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
 			eg.Go(func() error {
 				err := s.Stop(context.Background(), project.Name, api.StopOptions{
@@ -84,6 +87,23 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				return err
 			})
 			first = false
+		}
+
+		var kEvents <-chan keyboard.KeyEvent
+		isWatchConfigured := s.shouldWatch(project)
+		isDockerDesktopActive := s.isDesktopIntegrationActive()
+
+		tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
+		if options.Start.NavigationMenu {
+			kEvents, err = keyboard.GetKeys(100)
+			if err != nil {
+				panic(err)
+			}
+			formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.Watch)
+			if options.Start.Watch {
+				formatter.KeyboardManager.StartWatch(ctx, project, options)
+			}
+			defer formatter.KeyboardManager.KeyboardClose()
 		}
 		for {
 			select {
@@ -105,6 +125,8 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					})
 					return nil
 				}
+			case event := <-kEvents:
+				formatter.KeyboardManager.HandleKeyEvents(event, ctx, project, options)
 			}
 		}
 	})
@@ -124,7 +146,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	})
 
-	if options.Start.Watch {
+	if options.Start.Watch && !options.Start.NavigationMenu {
 		eg.Go(func() error {
 			buildOpts := *options.Create.Build
 			buildOpts.Quiet = true
