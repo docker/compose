@@ -1088,7 +1088,8 @@ func buildVolumeOptions(vol *types.ServiceVolumeVolume) *mount.VolumeOptions {
 		return nil
 	}
 	return &mount.VolumeOptions{
-		NoCopy: vol.NoCopy,
+		NoCopy:  vol.NoCopy,
+		Subpath: vol.Subpath,
 		// Labels:       , // FIXME missing from model ?
 		// DriverConfig: , // FIXME missing from model ?
 	}
