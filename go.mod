@@ -53,6 +53,8 @@ require (
 	gotest.tools/v3 v3.5.1
 )
 
+replace github.com/compose-spec/compose-go/v2 => github.com/vvoland/compose-go/v2 v2.0.0
+
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
