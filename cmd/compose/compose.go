@@ -37,6 +37,7 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/internal/desktop"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
@@ -365,11 +366,17 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
+			// (1) process env vars
 			err := setEnvWithDotEnv(&opts)
 			if err != nil {
 				return err
 			}
 			parent := cmd.Root()
+
+			// (2) call parent pre-run
+			// TODO(milas): this seems incorrect, remove or document
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
 				if parentPrerun != nil {
@@ -379,6 +386,11 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 					}
 				}
 			}
+
+			// (3) set up display/output
+			if verbose {
+				logrus.SetLevel(logrus.TraceLevel)
+			}
 			if noAnsi {
 				if ansi != "auto" {
 					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
@@ -386,14 +398,9 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 				ansi = "never"
 				fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
 			}
-			if verbose {
-				logrus.SetLevel(logrus.TraceLevel)
-			}
-
 			if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && !cmd.Flags().Changed("ansi") {
 				ansi = v
 			}
-
 			formatter.SetANSIMode(dockerCli, ansi)
 
 			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
@@ -430,6 +437,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
 
+			// (4) options validation / normalization
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
 					return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
@@ -466,13 +474,26 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //
 				parallel = i
 			}
 			if parallel > 0 {
+				logrus.Debugf("Limiting max concurrency to %d jobs", parallel)
 				backend.MaxConcurrency(parallel)
 			}
-			ctx, err := backend.DryRunMode(cmd.Context(), dryRun)
+
+			// (5) dry run detection
+			ctx, err = backend.DryRunMode(ctx, dryRun)
 			if err != nil {
 				return err
 			}
 			cmd.SetContext(ctx)
+
+			// (6) Desktop integration
+			if db, ok := backend.(desktop.IntegrationService); ok {
+				if err := db.MaybeEnableDesktopIntegration(ctx); err != nil {
+					// not fatal, Compose will still work but behave as though
+					// it's not running as part of Docker Desktop
+					logrus.Debugf("failed to enable Docker Desktop integration: %v", err)
+				}
+			}
+
 			return nil
 		},
 	}
