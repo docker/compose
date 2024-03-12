@@ -245,9 +245,6 @@ func TestConfig(t *testing.T) {
 	t.Run("up", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "convert")
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
-networks:
-  default:
-    name: compose-e2e-convert_default
 services:
   nginx:
     build:
@@ -255,6 +252,9 @@ services:
       dockerfile: Dockerfile
     networks:
       default: null
+networks:
+  default:
+    name: compose-e2e-convert_default
 `, projectName, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
 	})
 }

@@ -136,21 +136,34 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 }
 
 func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
-	model, err := opts.ToModel(ctx, dockerCli, services)
-	if err != nil {
-		return err
-	}
-
-	if opts.resolveImageDigests {
-		err = resolveImageDigests(ctx, dockerCli, model)
+	var content []byte
+	if opts.noInterpolate {
+		// we can't use ToProject, so the model we render here is only partially resolved
+		model, err := opts.ToModel(ctx, dockerCli, services)
 		if err != nil {
 			return err
 		}
-	}
 
-	content, err := formatModel(model, opts.Format)
-	if err != nil {
-		return err
+		if opts.resolveImageDigests {
+			err = resolveImageDigests(ctx, dockerCli, model)
+			if err != nil {
+				return err
+			}
+		}
+
+		content, err = formatModel(model, opts.Format)
+		if err != nil {
+			return err
+		}
+	} else {
+		project, err := opts.ToProject(ctx, dockerCli, services)
+		if err != nil {
+			return err
+		}
+		content, err = project.MarshalYAML()
+		if err != nil {
+			return err
+		}
 	}
 
 	if !opts.noInterpolate {
@@ -164,7 +177,7 @@ func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, s
 	if opts.Output != "" && len(content) > 0 {
 		return os.WriteFile(opts.Output, content, 0o666)
 	}
-	_, err = fmt.Fprint(dockerCli.Out(), string(content))
+	_, err := fmt.Fprint(dockerCli.Out(), string(content))
 	return err
 }
 
