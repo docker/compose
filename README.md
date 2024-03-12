@@ -45,6 +45,20 @@ Or copy it into one of these folders to install it system-wide:
 
 (might require making the downloaded file executable with `chmod +x`)
 
+Or you can use the following command to dynamically pull the latest version of `docker compose` and install it on your machine:
+
+```bash
+curl -fSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" --create-dirs -o ~/.docker/cli-plugins/docker-compose && chmod +x ~/.docker/cli-plugins/docker-compose
+```
+
+You can verify the installation by executing the following on your terminal:
+
+```bash
+docker compose version
+Docker Compose version v2.0.1
+```
+
+For more information about the installation process, consider reading the [official documentation](https://docs.docker.com/compose/install/).
 
 Quick Start
 -----------
