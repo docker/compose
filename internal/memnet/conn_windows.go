@@ -1,5 +1,3 @@
-//go:build !windows
-
 /*
    Copyright 2023 Docker Compose CLI authors
 
@@ -16,29 +14,20 @@
    limitations under the License.
 */
 
-package tracing
+package memnet
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"strings"
-	"syscall"
+
+	"github.com/Microsoft/go-winio"
 )
 
-const maxUnixSocketPathSize = len(syscall.RawSockaddrUnix{}.Path)
+func dialNamedPipe(ctx context.Context, addr string) (net.Conn, error) {
+	return winio.DialPipeContext(ctx, addr)
+}
 
-func DialInMemory(ctx context.Context, addr string) (net.Conn, error) {
-	if !strings.HasPrefix(addr, "unix://") {
-		return nil, fmt.Errorf("not a Unix socket address: %s", addr)
-	}
-	addr = strings.TrimPrefix(addr, "unix://")
-
-	if len(addr) > maxUnixSocketPathSize {
-		//goland:noinspection GoErrorStringFormat
-		return nil, fmt.Errorf("Unix socket address is too long: %s", addr)
-	}
-
-	var d net.Dialer
-	return d.DialContext(ctx, "unix", addr)
+func validateSocketPath(addr string) error {
+	// AF_UNIX sockets do not have strict path limits on Windows
+	return nil
 }

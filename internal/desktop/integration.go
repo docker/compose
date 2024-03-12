@@ -1,5 +1,5 @@
 /*
-   Copyright 2023 Docker Compose CLI authors
+   Copyright 2024 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,22 +14,12 @@
    limitations under the License.
 */
 
-package tracing
+package desktop
 
 import (
 	"context"
-	"fmt"
-	"net"
-	"strings"
-
-	"github.com/Microsoft/go-winio"
 )
 
-func DialInMemory(ctx context.Context, addr string) (net.Conn, error) {
-	if !strings.HasPrefix(addr, "npipe://") {
-		return nil, fmt.Errorf("not a named pipe address: %s", addr)
-	}
-	addr = strings.TrimPrefix(addr, "npipe://")
-
-	return winio.DialPipeContext(ctx, addr)
+type IntegrationService interface {
+	MaybeEnableDesktopIntegration(ctx context.Context) error
 }
