@@ -1,0 +1,21 @@
+## Reference: https://github.com/amannn/action-semantic-pull-request
+name: PR title
+
+on:
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - edited
+    - synchronize
+
+jobs:
+  validate-pr-title:
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: amannn/action-semantic-pull-request@v5.4.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        requireScope: false
