@@ -160,7 +160,15 @@ func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, s
 		if err != nil {
 			return err
 		}
-		content, err = project.MarshalYAML()
+
+		switch opts.Format {
+		case "json":
+			content, err = project.MarshalJSON()
+		case "yaml":
+			content, err = project.MarshalYAML()
+		default:
+			return fmt.Errorf("unsupported format %q", opts.Format)
+		}
 		if err != nil {
 			return err
 		}
