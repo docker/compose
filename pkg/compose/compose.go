@@ -27,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/docker/compose/v2/internal/desktop"
+	"github.com/docker/compose/v2/internal/experimental"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/jonboulle/clockwork"
 
@@ -62,8 +63,9 @@ func NewComposeService(dockerCli command.Cli) api.Service {
 }
 
 type composeService struct {
-	dockerCli  command.Cli
-	desktopCli *desktop.Client
+	dockerCli   command.Cli
+	desktopCli  *desktop.Client
+	experiments *experimental.State
 
 	clock          clockwork.Clock
 	maxConcurrency int
