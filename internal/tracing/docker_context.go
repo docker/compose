@@ -25,68 +25,27 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/store"
 	"github.com/docker/compose/v2/internal/memnet"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 const otelConfigFieldName = "otel"
 
-// traceClientFromDockerContext creates a gRPC OTLP client based on metadata
-// from the active Docker CLI context.
-func traceClientFromDockerContext(dockerCli command.Cli, otelEnv envMap) (otlptrace.Client, error) {
-	// attempt to extract an OTEL config from the Docker context to enable
-	// automatic integration with Docker Desktop;
-	cfg, err := ConfigFromDockerContext(dockerCli.ContextStore(), dockerCli.CurrentContext())
-	if err != nil {
-		return nil, fmt.Errorf("loading otel config from docker context metadata: %w", err)
-	}
-
-	if cfg.Endpoint == "" {
-		return nil, nil
-	}
-
-	// HACK: unfortunately _all_ public OTEL initialization functions
-	// 	implicitly read from the OS env, so temporarily unset them all and
-	// 	restore afterwards
-	defer func() {
-		for k, v := range otelEnv {
-			if err := os.Setenv(k, v); err != nil {
-				panic(fmt.Errorf("restoring env for %q: %w", k, err))
-			}
-		}
-	}()
-	for k := range otelEnv {
-		if err := os.Unsetenv(k); err != nil {
-			return nil, fmt.Errorf("stashing env for %q: %w", k, err)
-		}
-	}
-
-	dialCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	conn, err := grpc.DialContext(
-		dialCtx,
-		cfg.Endpoint,
-		grpc.WithContextDialer(memnet.DialEndpoint),
-		// this dial is restricted to using a local Unix socket / named pipe,
-		// so there is no need for TLS
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing otel connection from docker context metadata: %w", err)
-	}
-
-	client := otlptracegrpc.NewClient(otlptracegrpc.WithGRPCConn(conn))
-	return client, nil
+// DockerOTLPConfig contains the necessary values to initialize an OTLP client
+// manually.
+//
+// This supports a minimal set of options based on what is necessary for
+// automatic OTEL configuration from Docker context metadata.
+type DockerOTLPConfig struct {
+	Endpoint string
 }
 
 // ConfigFromDockerContext inspects extra metadata included as part of the
 // specified Docker context to try and extract a valid OTLP client configuration.
-func ConfigFromDockerContext(st store.Store, name string) (OTLPConfig, error) {
+func ConfigFromDockerContext(st store.Store, name string) (DockerOTLPConfig, error) {
 	meta, err := st.GetMetadata(name)
 	if err != nil {
-		return OTLPConfig{}, err
+		return DockerOTLPConfig{}, err
 	}
 
 	var otelCfg interface{}
@@ -97,12 +56,12 @@ func ConfigFromDockerContext(st store.Store, name string) (OTLPConfig, error) {
 		otelCfg = m[otelConfigFieldName]
 	}
 	if otelCfg == nil {
-		return OTLPConfig{}, nil
+		return DockerOTLPConfig{}, nil
 	}
 
 	otelMap, ok := otelCfg.(map[string]interface{})
 	if !ok {
-		return OTLPConfig{}, fmt.Errorf(
+		return DockerOTLPConfig{}, fmt.Errorf(
 			"unexpected type for field %q: %T (expected: %T)",
 			otelConfigFieldName,
 			otelCfg,
@@ -111,10 +70,34 @@ func ConfigFromDockerContext(st store.Store, name string) (OTLPConfig, error) {
 	}
 
 	// keys from https://opentelemetry.io/docs/concepts/sdk-configuration/otlp-exporter-configuration/
-	cfg := OTLPConfig{
+	cfg := DockerOTLPConfig{
 		Endpoint: valueOrDefault[string](otelMap, "OTEL_EXPORTER_OTLP_ENDPOINT"),
 	}
 	return cfg, nil
+}
+
+// grpcConnection creates an OTLP/gRPC connection based on the Docker context configuration.
+//
+// If no endpoint is defined in the config, nil is returned.
+func grpcConnection(ctx context.Context, cfg DockerOTLPConfig) (*grpc.ClientConn, error) {
+	if cfg.Endpoint == "" {
+		return nil, nil
+	}
+
+	dialCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	conn, err := grpc.DialContext(
+		dialCtx,
+		cfg.Endpoint,
+		grpc.WithContextDialer(memnet.DialEndpoint),
+		// this dial is restricted to using a local Unix socket / named pipe,
+		// so there is no need for TLS
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("dialing Docker otel: %w", err)
+	}
+	return conn, nil
 }
 
 // valueOrDefault returns the type-cast value at the specified key in the map
@@ -125,4 +108,27 @@ func valueOrDefault[T any](m map[string]interface{}, key string) T {
 		return v
 	}
 	return *new(T)
+}
+
+// withoutOTelEnv runs a function while temporarily "hiding" all OTEL_ prefixed
+// env vars and restoring them afterward.
+//
+// Unfortunately, the public OTEL exporter constructors ALWAYS implicitly read
+// from the OS env, so this is necessary to allow for custom client construction
+// without interference.
+func withoutOTelEnv[T any](otelEnv envMap, fn func() (T, error)) (T, error) {
+	for k := range otelEnv {
+		if err := os.Unsetenv(k); err != nil {
+			panic(fmt.Errorf("stashing env for %q: %w", k, err))
+		}
+	}
+
+	defer func() {
+		for k, v := range otelEnv {
+			if err := os.Setenv(k, v); err != nil {
+				panic(fmt.Errorf("restoring env for %q: %w", k, err))
+			}
+		}
+	}()
+	return fn()
 }

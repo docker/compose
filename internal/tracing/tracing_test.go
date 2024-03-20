@@ -14,16 +14,15 @@
    limitations under the License.
 */
 
-package tracing_test
+package tracing
 
 import (
+	"context"
 	"testing"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/store"
 	"github.com/stretchr/testify/require"
-
-	"github.com/docker/compose/v2/internal/tracing"
 )
 
 var testStoreCfg = store.NewConfig(
@@ -31,6 +30,15 @@ var testStoreCfg = store.NewConfig(
 		return &map[string]interface{}{}
 	},
 )
+
+func TestCreateResource(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	// this can fail if semconv gets out of sync
+	res, err := createResource(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+}
 
 func TestExtractOtelFromContext(t *testing.T) {
 	if testing.Short() {
@@ -54,7 +62,7 @@ func TestExtractOtelFromContext(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	cfg, err := tracing.ConfigFromDockerContext(st, "test")
+	cfg, err := ConfigFromDockerContext(st, "test")
 	require.NoError(t, err)
 	require.Equal(t, "localhost:1234", cfg.Endpoint)
 }

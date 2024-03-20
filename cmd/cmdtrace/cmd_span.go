@@ -44,12 +44,13 @@ import (
 // command invocation to ensure the span is properly finalized and
 // exported before exit.
 func Setup(cmd *cobra.Command, dockerCli command.Cli, args []string) error {
-	tracingShutdown, err := tracing.InitTracing(dockerCli)
+	ctx := cmd.Context()
+
+	tracingShutdown, err := tracing.Initialize(ctx, dockerCli)
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
 
-	ctx := cmd.Context()
 	ctx, cmdSpan := tracing.Tracer.Start(
 		ctx,
 		"cli/"+strings.Join(commandName(cmd), "-"),
