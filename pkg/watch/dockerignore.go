@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/compose/v2/internal/paths"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 )
@@ -50,7 +51,7 @@ func (i dockerPathMatcher) MatchesEntireDir(f string) (bool, error) {
 			if !pattern.Exclusion() {
 				continue
 			}
-			if IsChild(f, pattern.String()) {
+			if paths.IsChild(f, pattern.String()) {
 				// Found an exclusion match -- we don't match this whole dir
 				return false, nil
 			}

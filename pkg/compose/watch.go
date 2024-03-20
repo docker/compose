@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	pathutil "github.com/docker/compose/v2/internal/paths"
 	"github.com/docker/compose/v2/internal/sync"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/watch"
@@ -228,7 +229,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, name
 //
 // Any errors are logged as warnings and nil (no file event) is returned.
 func maybeFileEvent(trigger types.Trigger, hostPath string, ignore watch.PathMatcher) *fileEvent {
-	if !watch.IsChild(trigger.Path, hostPath) {
+	if !pathutil.IsChild(trigger.Path, hostPath) {
 		return nil
 	}
 	isIgnored, err := ignore.Matches(hostPath)
@@ -456,7 +457,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 				Services: []string{serviceName},
 				Inherit:  true,
 				Recreate: api.RecreateForce,
-			})
+			}, true)
 			if err != nil {
 				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate service after update. Error: %v", err))
 				return err

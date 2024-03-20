@@ -22,12 +22,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/internal/desktop"
+	pathutil "github.com/docker/compose/v2/internal/paths"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
@@ -41,8 +46,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
-
-	"github.com/compose-spec/compose-go/v2/types"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -65,11 +68,11 @@ type createConfigs struct {
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, createOpts)
+		return s.create(ctx, project, createOpts, false)
 	}, s.stdinfo(), "Creating")
 }
 
-func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions, willAttach bool) error {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
@@ -111,6 +114,9 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		}
 	}
 
+	if willAttach {
+		progress.ContextWriter(ctx).HasMore(willAttach)
+	}
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
 }
 
@@ -143,6 +149,49 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		if err != nil {
 			return err
 		}
+	}
+
+	err := func() error {
+		if s.experiments.AutoFileShares() && s.desktopCli != nil {
+			// collect all the bind mount paths and try to set up file shares in
+			// Docker Desktop for them
+			var paths []string
+			for _, svcName := range project.ServiceNames() {
+				svc := project.Services[svcName]
+				for _, vol := range svc.Volumes {
+					if vol.Type != string(mount.TypeBind) {
+						continue
+					}
+					p := filepath.Clean(vol.Source)
+					if !filepath.IsAbs(p) {
+						return fmt.Errorf("file share path is not absolute: %s", p)
+					}
+					if _, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
+						if vol.Bind != nil && !vol.Bind.CreateHostPath {
+							return fmt.Errorf("service %s: host path %q does not exist and `create_host_path` is false", svcName, vol.Source)
+						}
+						if err := os.MkdirAll(p, 0o755); err != nil {
+							return fmt.Errorf("creating host path: %w", err)
+						}
+					}
+					paths = append(paths, p)
+				}
+			}
+
+			// remove duplicate/unnecessary child paths and sort them for predictability
+			paths = pathutil.EncompassingPaths(paths)
+			sort.Strings(paths)
+
+			fileShareManager := desktop.NewFileShareManager(s.desktopCli, project.Name, paths)
+			if err := fileShareManager.EnsureExists(ctx); err != nil {
+				return fmt.Errorf("initializing: %w", err)
+			}
+		}
+		return nil
+	}()
+
+	if err != nil {
+		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized File Shares: %v", err)
 	}
 	return nil
 }
