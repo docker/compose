@@ -28,11 +28,6 @@ import (
 // globally opt-out of any experimental features in Compose.
 const envComposeExperimentalGlobal = "COMPOSE_EXPERIMENTAL"
 
-// FeatureFlagClient queries feature flag state from local configuration.
-type FeatureFlagClient interface {
-	FeatureFlags(ctx context.Context) (desktop.FeatureFlagResponse, error)
-}
-
 // State of experiments (enabled/disabled) based on environment and local config.
 type State struct {
 	// active is false if experiments have been opted-out of globally.
@@ -52,7 +47,7 @@ func NewState() *State {
 	}
 }
 
-func (s *State) Load(ctx context.Context, client FeatureFlagClient) error {
+func (s *State) Load(ctx context.Context, client *desktop.Client) error {
 	if !s.active {
 		// user opted out of experiments globally, no need to load state from
 		// Desktop
