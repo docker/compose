@@ -30,7 +30,8 @@ import (
 
 // Client for integration with Docker Desktop features.
 type Client struct {
-	client *http.Client
+	apiEndpoint string
+	client      *http.Client
 }
 
 // NewClient creates a Desktop integration client for the provided in-memory
@@ -45,9 +46,14 @@ func NewClient(apiEndpoint string) *Client {
 	transport = otelhttp.NewTransport(transport)
 
 	c := &Client{
-		client: &http.Client{Transport: transport},
+		apiEndpoint: apiEndpoint,
+		client:      &http.Client{Transport: transport},
 	}
 	return c
+}
+
+func (c *Client) Endpoint() string {
+	return c.apiEndpoint
 }
 
 // Close releases any open connections.
@@ -82,6 +88,35 @@ func (c *Client) Ping(ctx context.Context) (*PingResponse, error) {
 		return nil, err
 	}
 	return &ret, nil
+}
+
+type FeatureFlagResponse map[string]FeatureFlagValue
+
+type FeatureFlagValue struct {
+	Enabled bool `json:"enabled"`
+}
+
+func (c *Client) FeatureFlags(ctx context.Context) (FeatureFlagResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, backendURL("/features"), http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var ret FeatureFlagResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 // backendURL generates a URL for the given API path.

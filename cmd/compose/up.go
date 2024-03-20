@@ -27,6 +27,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/internal/experimental"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/spf13/cobra"
 
@@ -76,7 +77,7 @@ func (opts upOptions) apply(project *types.Project, services []string) (*types.P
 	return project, nil
 }
 
-func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, experiments *experimental.State) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	build := buildOptions{ProjectOptions: p}
@@ -96,7 +97,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 			if len(up.attach) != 0 && up.attachDependencies {
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
-			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
+			return runUp(ctx, dockerCli, backend, experiments, create, up, build, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -160,6 +161,7 @@ func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
 	backend api.Service,
+	_ *experimental.State,
 	createOptions createOptions,
 	upOptions upOptions,
 	buildOptions buildOptions,
