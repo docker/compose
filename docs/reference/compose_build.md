@@ -23,7 +23,7 @@ Build or rebuild services
 
 ## Description
 
-Services are built once and then tagged, by default as `project_service`.
+Services are built once and then tagged, by default as `project-service`.
 
 If the Compose file specifies an
 [image](https://github.com/compose-spec/compose-spec/blob/master/spec.md#image) name,
