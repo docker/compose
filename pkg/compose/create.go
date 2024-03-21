@@ -307,6 +307,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 
 	hostConfig := container.HostConfig{
 		AutoRemove:     opts.AutoRemove,
+		Annotations:    service.Annotations,
 		Binds:          binds,
 		Mounts:         mounts,
 		CapAdd:         strslice.StrSlice(service.CapAdd),
