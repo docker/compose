@@ -21,13 +21,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -50,6 +53,7 @@ type configOptions struct {
 	images              bool
 	hash                string
 	noConsistency       bool
+	variables           bool
 }
 
 func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
@@ -111,6 +115,9 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 			if opts.images {
 				return runConfigImages(ctx, dockerCli, opts, args)
 			}
+			if opts.variables {
+				return runVariables(ctx, dockerCli, opts, args)
+			}
 
 			return runConfig(ctx, dockerCli, opts, args)
 		}),
@@ -125,11 +132,12 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	flags.BoolVar(&opts.noResolvePath, "no-path-resolution", false, "Don't resolve file paths")
 	flags.BoolVar(&opts.noConsistency, "no-consistency", false, "Don't check model consistency - warning: may produce invalid Compose output")
 
-	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line")
-	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line")
-	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line")
-	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line")
-	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line")
+	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
+	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
+	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line.")
+	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line.")
+	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
+	flags.BoolVar(&opts.variables, "variables", false, "Print model variables and default values.")
 	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
 
 	return cmd
@@ -331,6 +339,22 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 		fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
 	}
 	return nil
+}
+
+func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
+	opts.noInterpolate = true
+	model, err := opts.ToModel(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
+	if err != nil {
+		return err
+	}
+
+	variables := template.ExtractVariables(model, template.DefaultPattern)
+
+	return formatter.Print(variables, "", dockerCli.Out(), func(w io.Writer) {
+		for name, variable := range variables {
+			_, _ = fmt.Fprintf(w, "%s\t%t\t%s\t%s\n", name, variable.Required, variable.DefaultValue, variable.PresenceValue)
+		}
+	}, "NAME", "REQUIRED", "DEFAULT VALUE", "ALTERNATE VALUE")
 }
 
 func escapeDollarSign(marshal []byte) []byte {
