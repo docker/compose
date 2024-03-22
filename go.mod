@@ -8,7 +8,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.0.2
 	github.com/containerd/console v1.0.4
-	github.com/containerd/containerd v1.7.13
+	github.com/containerd/containerd v1.7.14
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.5.0
 	github.com/docker/buildx v0.13.1
@@ -79,7 +79,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/containerd/continuity v0.4.3 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/containerd/ttrpc v1.2.2 // indirect
+	github.com/containerd/ttrpc v1.2.3 // indirect
 	github.com/containerd/typeurl/v2 v2.1.1 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.0 // indirect
