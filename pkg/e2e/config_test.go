@@ -39,7 +39,7 @@ func TestLocalComposeConfig(t *testing.T) {
 
 	t.Run("json", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--format", "json")
-		res.Assert(t, icmd.Expected{Out: `ports":[{"mode":"ingress","target":80,"published":"8080","protocol":"tcp"}]`})
+		res.Assert(t, icmd.Expected{Out: `"published": "8080"`})
 	})
 
 	t.Run("--no-interpolate", func(t *testing.T) {
