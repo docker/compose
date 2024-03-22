@@ -145,7 +145,7 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 		})
 	}
 
-	if s.experiments.AutoFileShares() && s.isDesktopIntegrationActive() {
+	if s.manageDesktopFileSharesEnabled(ctx) {
 		ops = append(ops, func() error {
 			desktop.RemoveFileSharesForProject(ctx, s.desktopCli, project.Name)
 			return nil

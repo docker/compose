@@ -152,7 +152,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	}
 
 	err := func() error {
-		if s.experiments.AutoFileShares() && s.isDesktopIntegrationActive() {
+		if s.manageDesktopFileSharesEnabled(ctx) {
 			// collect all the bind mount paths and try to set up file shares in
 			// Docker Desktop for them
 			var paths []string
