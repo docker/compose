@@ -340,8 +340,12 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 	return events
 }
 
-// ServiceConditionRunningOrHealthy is a service condition on status running or healthy
-const ServiceConditionRunningOrHealthy = "running_or_healthy"
+const (
+	// ServiceConditionRunningOrHealthy is a service condition on status running or healthy
+	ServiceConditionRunningOrHealthy = "running_or_healthy"
+	// ServiceConditionRunningOrHealthyOrCompletedSuccessfully is a service condition on status running or healthy
+	ServiceConditionRunningOrHealthyOrCompletedSuccessfully = "running_or_healthy_or_completed_successfully"
+)
 
 //nolint:gocyclo
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers) error {
@@ -376,7 +380,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 				}
 				switch config.Condition {
 				case ServiceConditionRunningOrHealthy:
-					healthy, err := s.isServiceHealthy(ctx, waitingFor, true)
+					healthy, err := s.isServiceHealthy(ctx, waitingFor, true, false)
 					if err != nil {
 						if !config.Required {
 							w.Events(containerReasonEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep)))
@@ -390,7 +394,45 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return nil
 					}
 				case types.ServiceConditionHealthy:
-					healthy, err := s.isServiceHealthy(ctx, waitingFor, false)
+					healthy, err := s.isServiceHealthy(ctx, waitingFor, false, false)
+					if err != nil {
+						if !config.Required {
+							w.Events(containerReasonEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q failed to start", dep)))
+							logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
+							return nil
+						}
+						w.Events(containerEvents(waitingFor, progress.ErrorEvent))
+						return fmt.Errorf("dependency failed to start: %w", err)
+					}
+					if healthy {
+						w.Events(containerEvents(waitingFor, progress.Healthy))
+						return nil
+					}
+				case ServiceConditionRunningOrHealthyOrCompletedSuccessfully:
+					exited, code, err := s.isServiceCompleted(ctx, waitingFor)
+					if err != nil {
+						return err
+					}
+					if exited {
+						if code == 0 {
+							w.Events(containerEvents(waitingFor, progress.Exited))
+							return nil
+						}
+
+						messageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
+						if !config.Required {
+							// optional -> mark as skipped & don't propagate error
+							w.Events(containerReasonEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %s", messageSuffix)))
+							logrus.Warnf("optional dependency %s", messageSuffix)
+							return nil
+						}
+
+						msg := fmt.Sprintf("service %s", messageSuffix)
+						w.Events(containerReasonEvents(waitingFor, progress.ErrorMessageEvent, msg))
+						return errors.New(msg)
+					}
+
+					healthy, err := s.isServiceHealthy(ctx, waitingFor, true, true)
 					if err != nil {
 						if !config.Required {
 							w.Events(containerReasonEvents(waitingFor, progress.SkippedEvent, fmt.Sprintf("optional dependency %q failed to start", dep)))
@@ -710,7 +752,7 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 	return links, nil
 }
 
-func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool) (bool, error) {
+func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool, ignoreExit bool) (bool, error) {
 	for _, c := range containers {
 		container, err := s.apiClient().ContainerInspect(ctx, c.ID)
 		if err != nil {
@@ -719,6 +761,9 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 		name := container.Name[1:]
 
 		if container.State.Status == "exited" {
+			if ignoreExit {
+				return false, nil
+			}
 			return false, fmt.Errorf("container %s exited (%d)", name, container.State.ExitCode)
 		}
 

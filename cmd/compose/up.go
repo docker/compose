@@ -55,6 +55,7 @@ type upOptions struct {
 	timestamp          bool
 	wait               bool
 	waitTimeout        int
+	waitAllowExit      bool
 	watch              bool
 }
 
@@ -127,6 +128,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration to wait for the project to be running|healthy")
+	flags.BoolVar(&up.waitAllowExit, "wait-allow-exit", false, "Enables Wait to not error on services that exited with code 0")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 
 	return upCmd
@@ -253,15 +255,16 @@ func runUp(
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
-			Project:      project,
-			Attach:       consumer,
-			AttachTo:     attach,
-			ExitCodeFrom: upOptions.exitCodeFrom,
-			CascadeStop:  upOptions.cascadeStop,
-			Wait:         upOptions.wait,
-			WaitTimeout:  timeout,
-			Watch:        upOptions.watch,
-			Services:     services,
+			Project:       project,
+			Attach:        consumer,
+			AttachTo:      attach,
+			ExitCodeFrom:  upOptions.exitCodeFrom,
+			CascadeStop:   upOptions.cascadeStop,
+			Wait:          upOptions.wait,
+			WaitTimeout:   timeout,
+			WaitAllowExit: upOptions.waitAllowExit,
+			Watch:         upOptions.watch,
+			Services:      services,
 		},
 	})
 }

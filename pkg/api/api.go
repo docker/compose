@@ -216,6 +216,8 @@ type StartOptions struct {
 	// Wait won't return until containers reached the running|healthy state
 	Wait        bool
 	WaitTimeout time.Duration
+	// WaitAllowExit allows Wait to return also for containers exited with zero code.
+	WaitAllowExit bool
 	// Services passed in the command line to be started
 	Services []string
 	Watch    bool
