@@ -28,7 +28,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
@@ -117,7 +117,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, info 
 		return err
 	}
 
-	stream, err := s.apiClient().ImagePush(ctx, tag, moby.ImagePushOptions{
+	stream, err := s.apiClient().ImagePush(ctx, tag, image.PushOptions{
 		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
 	})
 	if err != nil {

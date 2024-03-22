@@ -231,7 +231,7 @@ func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string
 
 }
 
-func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.ImagePullOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options moby.I
 	return rc, nil
 }
 
-func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.ImagePushOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options image.PushOptions) (io.ReadCloser, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options moby.I
 	return rc, nil
 }
 
-func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options moby.ImageRemoveOptions) ([]image.DeleteResponse, error) {
+func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options image.RemoveOptions) ([]image.DeleteResponse, error) {
 	return nil, nil
 }
 
@@ -419,7 +419,7 @@ func (d *DryRunClient) BuildCancel(ctx context.Context, id string) error {
 	return d.apiClient.BuildCancel(ctx, id)
 }
 
-func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options moby.ImageCreateOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options image.CreateOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageCreate(ctx, parentReference, options)
 }
 
@@ -427,11 +427,11 @@ func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string) ([]im
 	return d.apiClient.ImageHistory(ctx, imageName)
 }
 
-func (d *DryRunClient) ImageImport(ctx context.Context, source moby.ImageImportSource, ref string, options moby.ImageImportOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageImport(ctx context.Context, source moby.ImageImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageImport(ctx, source, ref, options)
 }
 
-func (d *DryRunClient) ImageList(ctx context.Context, options moby.ImageListOptions) ([]image.Summary, error) {
+func (d *DryRunClient) ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error) {
 	return d.apiClient.ImageList(ctx, options)
 }
 
