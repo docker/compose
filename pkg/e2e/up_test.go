@@ -71,6 +71,7 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	testCmd := c.NewDockerComposeCmd(t,
 		"-f=./fixtures/ups-deps-stop/compose.yaml",
 		"up",
+		"--menu=false",
 		"app",
 	)
 
