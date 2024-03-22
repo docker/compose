@@ -77,16 +77,26 @@ func RunWithTitle(ctx context.Context, pf progressFunc, out io.Writer, progressT
 // RunWithStatus will run a writer and the progress function in parallel and return a status
 func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out io.Writer, progressTitle string) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
+
 	w, err := NewWriter(ctx, out, progressTitle)
 	var result string
 	if err != nil {
 		return "", err
+
 	}
+
+	if w == nil {
+		_w, err := NewWriter(os.Stderr)
+		if err != nil {
+			return "", err
+		}
+		w = _w
+		ctx = WithContextWriter(ctx, w)
+	}
+
 	eg.Go(func() error {
 		return w.Start(context.Background())
 	})
-
-	ctx = WithContextWriter(ctx, w)
 
 	eg.Go(func() error {
 		defer w.Stop()
@@ -97,7 +107,7 @@ func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out io.Writer
 		return err
 	})
 
-	err = eg.Wait()
+	err := eg.Wait()
 	return result, err
 }
 
