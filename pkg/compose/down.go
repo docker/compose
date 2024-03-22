@@ -24,15 +24,15 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/internal/desktop"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	imageapi "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 type downOp func() error
@@ -252,7 +252,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {
 	id := fmt.Sprintf("Image %s", image)
 	w.Event(progress.NewEvent(id, progress.Working, "Removing"))
-	_, err := s.apiClient().ImageRemove(ctx, image, moby.ImageRemoveOptions{})
+	_, err := s.apiClient().ImageRemove(ctx, image, imageapi.RemoveOptions{})
 	if err == nil {
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
