@@ -152,7 +152,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	}
 
 	err := func() error {
-		if s.experiments.AutoFileShares() && s.desktopCli != nil {
+		if s.manageDesktopFileSharesEnabled(ctx) {
 			// collect all the bind mount paths and try to set up file shares in
 			// Docker Desktop for them
 			var paths []string
@@ -307,6 +307,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 
 	hostConfig := container.HostConfig{
 		AutoRemove:     opts.AutoRemove,
+		Annotations:    service.Annotations,
 		Binds:          binds,
 		Mounts:         mounts,
 		CapAdd:         strslice.StrSlice(service.CapAdd),
@@ -710,10 +711,8 @@ func setLimits(limits *types.Resource, resources *container.Resources) {
 	if limits.MemoryBytes != 0 {
 		resources.Memory = int64(limits.MemoryBytes)
 	}
-	if limits.NanoCPUs != "" {
-		if f, err := strconv.ParseFloat(limits.NanoCPUs, 64); err == nil {
-			resources.NanoCPUs = int64(f * 1e9)
-		}
+	if limits.NanoCPUs != 0 {
+		resources.NanoCPUs = int64(limits.NanoCPUs * 1e9)
 	}
 	if limits.Pids > 0 {
 		resources.PidsLimit = &limits.Pids
@@ -1137,7 +1136,8 @@ func buildVolumeOptions(vol *types.ServiceVolumeVolume) *mount.VolumeOptions {
 		return nil
 	}
 	return &mount.VolumeOptions{
-		NoCopy: vol.NoCopy,
+		NoCopy:  vol.NoCopy,
+		Subpath: vol.Subpath,
 		// Labels:       , // FIXME missing from model ?
 		// DriverConfig: , // FIXME missing from model ?
 	}

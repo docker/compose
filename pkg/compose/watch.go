@@ -65,6 +65,17 @@ func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syn
 
 	return sync.NewTar(project.Name, tarDockerClient{s: s}), nil
 }
+func (s *composeService) shouldWatch(project *types.Project) bool {
+	var shouldWatch bool
+	for i := range project.Services {
+		service := project.Services[i]
+
+		if service.Develop != nil && service.Develop.Watch != nil {
+			shouldWatch = true
+		}
+	}
+	return shouldWatch
+}
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
 	var err error
@@ -159,17 +170,15 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 			return err
 		}
 		watching = true
-
 		eg.Go(func() error {
 			defer watcher.Close() //nolint:errcheck
 			return s.watch(ctx, project, service.Name, options, watcher, syncer, config.Watch)
 		})
 	}
-
 	if !watching {
 		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'develop' section")
 	}
-	options.LogTo.Log(api.WatchLogger, "watch enabled")
+	options.LogTo.Log(api.WatchLogger, "Watch enabled")
 
 	return eg.Wait()
 }
@@ -189,10 +198,12 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, name
 
 	events := make(chan fileEvent)
 	batchEvents := batchDebounceEvents(ctx, s.clock, quietPeriod, events)
+	quit := make(chan bool)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
+				quit <- true
 				return
 			case batch := <-batchEvents:
 				start := time.Now()
@@ -208,9 +219,11 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, name
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-quit:
+			options.LogTo.Log(api.WatchLogger, "Watch disabled")
 			return nil
 		case err := <-watcher.Errors():
+			options.LogTo.Err(api.WatchLogger, "Watch disabled with errors")
 			return err
 		case event := <-watcher.Events():
 			hostPath := event.Path()

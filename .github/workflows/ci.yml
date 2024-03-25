@@ -18,9 +18,6 @@ on:
         required: false
         default: "false"
 
-env:
-  DOCKER_CLI_VERSION: "25.0.1"
-
 permissions:
   contents: read # to fetch code (actions/checkout)
 
@@ -145,7 +142,8 @@ jobs:
           - standalone
         engine:
           - 24.0.9
-          - 25.0.3
+          - 25.0.4
+          - 26.0.0
     steps:
       -
         name: Checkout

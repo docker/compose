@@ -29,7 +29,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	"github.com/docker/cli/cli/config/configfile"
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
@@ -169,6 +169,14 @@ func imageAlreadyPresent(serviceImage string, localImages map[string]string) boo
 	return ok && tagged.Tag() != "latest"
 }
 
+func getUnwrappedErrorMessage(err error) string {
+	derr := errors.Unwrap(err)
+	if derr != nil {
+		return getUnwrappedErrorMessage(derr)
+	}
+	return err.Error()
+}
+
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig,
 	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
 	w.Event(progress.Event{
@@ -191,7 +199,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		platform = defaultPlatform
 	}
 
-	stream, err := s.apiClient().ImagePull(ctx, service.Image, moby.ImagePullOptions{
+	stream, err := s.apiClient().ImagePull(ctx, service.Image, image.PullOptions{
 		RegistryAuth: encodedAuth,
 		Platform:     platform,
 	})
@@ -200,18 +208,20 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	// then the status should be warning instead of error
 	if err != nil && service.Build != nil {
 		w.Event(progress.Event{
-			ID:     service.Name,
-			Status: progress.Warning,
-			Text:   "Warning",
+			ID:         service.Name,
+			Status:     progress.Warning,
+			Text:       "Warning",
+			StatusText: getUnwrappedErrorMessage(err),
 		})
 		return "", WrapCategorisedComposeError(err, PullFailure)
 	}
 
 	if err != nil {
 		w.Event(progress.Event{
-			ID:     service.Name,
-			Status: progress.Error,
-			Text:   "Error",
+			ID:         service.Name,
+			Status:     progress.Error,
+			Text:       "Error",
+			StatusText: getUnwrappedErrorMessage(err),
 		})
 		return "", WrapCategorisedComposeError(err, PullFailure)
 	}

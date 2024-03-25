@@ -123,6 +123,37 @@ func (c *Client) FeatureFlags(ctx context.Context) (FeatureFlagResponse, error) 
 	return ret, nil
 }
 
+type GetFileSharesConfigResponse struct {
+	Active  bool `json:"active"`
+	Compose struct {
+		ManageBindMounts bool `json:"manageBindMounts"`
+	}
+}
+
+func (c *Client) GetFileSharesConfig(ctx context.Context) (*GetFileSharesConfigResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, backendURL("/mutagen/file-shares/config"), http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, newHTTPStatusCodeError(resp)
+	}
+
+	var ret GetFileSharesConfigResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
 type CreateFileShareRequest struct {
 	HostPath string            `json:"hostPath"`
 	Labels   map[string]string `json:"labels,omitempty"`

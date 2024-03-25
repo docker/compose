@@ -21,7 +21,7 @@ options:
       swarm: false
     - option: hash
       value_type: string
-      description: Print the service config hash, one per line
+      description: Print the service config hash, one per line.
       deprecated: false
       hidden: false
       experimental: false
@@ -31,7 +31,7 @@ options:
     - option: images
       value_type: bool
       default_value: "false"
-      description: Print the image names, one per line
+      description: Print the image names, one per line.
       deprecated: false
       hidden: false
       experimental: false
@@ -92,7 +92,7 @@ options:
     - option: profiles
       value_type: bool
       default_value: "false"
-      description: Print the profile names, one per line
+      description: Print the profile names, one per line.
       deprecated: false
       hidden: false
       experimental: false
@@ -123,7 +123,17 @@ options:
     - option: services
       value_type: bool
       default_value: "false"
-      description: Print the service names, one per line
+      description: Print the service names, one per line.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: variables
+      value_type: bool
+      default_value: "false"
+      description: Print model variables and default values.
       deprecated: false
       hidden: false
       experimental: false
@@ -133,7 +143,7 @@ options:
     - option: volumes
       value_type: bool
       default_value: "false"
-      description: Print the volume names, one per line
+      description: Print the volume names, one per line.
       deprecated: false
       hidden: false
       experimental: false

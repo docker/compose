@@ -17,8 +17,11 @@
 package compose
 
 import (
+	"context"
+
 	"github.com/docker/compose/v2/internal/desktop"
 	"github.com/docker/compose/v2/internal/experimental"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) SetDesktopClient(cli *desktop.Client) {
@@ -27,4 +30,19 @@ func (s *composeService) SetDesktopClient(cli *desktop.Client) {
 
 func (s *composeService) SetExperiments(experiments *experimental.State) {
 	s.experiments = experiments
+}
+
+func (s *composeService) manageDesktopFileSharesEnabled(ctx context.Context) bool {
+	// there's some slightly redundancy here to avoid fetching the config if
+	// we can already tell the feature state - in practice, we
+	if !s.isDesktopIntegrationActive() || !s.experiments.AutoFileShares() {
+		return false
+	}
+
+	fileSharesConfig, err := s.desktopCli.GetFileSharesConfig(ctx)
+	if err != nil {
+		logrus.Debugf("Failed to retrieve file shares config: %v", err)
+		return false
+	}
+	return fileSharesConfig.Active && fileSharesConfig.Compose.ManageBindMounts
 }

@@ -19,6 +19,8 @@ package tracing
 import (
 	"context"
 
+	"github.com/acarl005/stripansi"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.19.0"
 	"go.opentelemetry.io/otel/trace"
@@ -80,12 +82,16 @@ func EventWrapFuncForErrGroup(ctx context.Context, eventName string, opts SpanOp
 		eventOpts := opts.EventOptions()
 
 		err := fn(ctx)
-
 		if err != nil {
-			eventOpts = append(eventOpts, trace.WithAttributes(semconv.ExceptionMessage(err.Error())))
+			eventOpts = append(eventOpts, trace.WithAttributes(semconv.ExceptionMessage(stripansi.Strip(err.Error()))))
 		}
 		span.AddEvent(eventName, eventOpts...)
 
 		return err
 	}
+}
+
+func AddAttributeToSpan(ctx context.Context, attr ...attribute.KeyValue) {
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(attr...)
 }
