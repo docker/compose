@@ -137,6 +137,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 	return upCmd
 }
 
+//nolint:gocyclo
 func validateFlags(up *upOptions, create *createOptions) error {
 	if up.exitCodeFrom != "" {
 		up.cascadeStop = true
@@ -158,6 +159,9 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	}
 	if create.recreateDeps && create.noRecreate {
 		return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
+	}
+	if create.noBuild && up.watch {
+		return fmt.Errorf("--no-build and --watch are incompatible")
 	}
 	return nil
 }
