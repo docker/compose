@@ -37,7 +37,7 @@ var names = []string{
 
 const (
 	BOLD      = "1"
-	FAINT     = "2"
+	DIM       = "2"
 	ITALIC    = "3"
 	UNDERLINE = "4"
 )
