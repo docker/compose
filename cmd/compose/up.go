@@ -55,6 +55,7 @@ type upOptions struct {
 	timestamp             bool
 	wait                  bool
 	waitTimeout           int
+	waitAllowExit         bool
 	watch                 bool
 	navigationMenu        bool
 	navigationMenuChanged bool
@@ -130,6 +131,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration to wait for the project to be running|healthy")
+	flags.BoolVar(&up.waitAllowExit, "wait-allow-exit", false, "Enables Wait to not error on services that exited with code 0")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached (Experimental). Incompatible with --detach.")
 	flags.MarkHidden("menu") //nolint:errcheck
@@ -272,6 +274,7 @@ func runUp(
 			CascadeStop:    upOptions.cascadeStop,
 			Wait:           upOptions.wait,
 			WaitTimeout:    timeout,
+			WaitAllowExit:  upOptions.waitAllowExit,
 			Watch:          upOptions.watch,
 			Services:       services,
 			NavigationMenu: upOptions.navigationMenu,

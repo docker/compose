@@ -139,7 +139,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		depends := types.DependsOnConfig{}
 		for _, s := range project.Services {
 			depends[s.Name] = types.ServiceDependency{
-				Condition: getDependencyCondition(s, project),
+				Condition: getDependencyCondition(s, project, options.WaitAllowExit),
 				Required:  true,
 			}
 		}
@@ -163,14 +163,20 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 
 // getDependencyCondition checks if service is depended on by other services
 // with service_completed_successfully condition, and applies that condition
-// instead, or --wait will never finish waiting for one-shot containers
-func getDependencyCondition(service types.ServiceConfig, project *types.Project) string {
+// instead, or --wait will never finish waiting for one-shot containers. Also,
+// with --wait-ignore-exit it applies the service_running_or_healthy_or_completed_successfully
+// condition.
+func getDependencyCondition(service types.ServiceConfig, project *types.Project, allowExit bool) string {
 	for _, services := range project.Services {
 		for dependencyService, dependencyConfig := range services.DependsOn {
 			if dependencyService == service.Name && dependencyConfig.Condition == types.ServiceConditionCompletedSuccessfully {
 				return types.ServiceConditionCompletedSuccessfully
 			}
 		}
+	}
+
+	if allowExit {
+		return ServiceConditionRunningOrHealthyOrCompletedSuccessfully
 	}
 	return ServiceConditionRunningOrHealthy
 }
