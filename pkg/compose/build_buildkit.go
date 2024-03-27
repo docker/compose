@@ -71,11 +71,6 @@ func (s composeService) dryRunBuildResponse(ctx context.Context, name string, op
 	buildResponse := map[string]*client.SolveResponse{}
 	dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
 	w.Event(progress.Event{
-		ID:     " ",
-		Status: progress.Done,
-		Text:   fmt.Sprintf("build service %s", name),
-	})
-	w.Event(progress.Event{
 		ID:     "==>",
 		Status: progress.Done,
 		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
