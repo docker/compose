@@ -1,0 +1,17 @@
+include:
+  - ./dind.compose.yaml
+
+services:
+  e2e:
+    pull_policy: build
+    build:
+      context: .
+      target: e2e
+    volumes:
+      - type: volume
+        source: dind-sock
+        target: /var/run
+    network_mode: service:docker
+    depends_on:
+      docker:
+        condition: service_healthy
