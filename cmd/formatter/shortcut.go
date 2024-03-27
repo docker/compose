@@ -259,6 +259,12 @@ func (lk *LogKeyboard) StartWatch(ctx context.Context, project *types.Project, o
 	} else {
 		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
 			func(ctx context.Context) error {
+				if options.Create.Build == nil {
+					err := fmt.Errorf("Cannot run watch mode with flag --no-build")
+					lk.keyboardError("Watch", err)
+					return err
+				}
+
 				lk.Watch.newContext(ctx)
 				buildOpts := *options.Create.Build
 				buildOpts.Quiet = true
