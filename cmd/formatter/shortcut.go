@@ -325,3 +325,7 @@ func shortcutKeyColor(key string) string {
 	white := "255;255;255"
 	return ansiColor(foreground+";"+black+";"+background+";"+white, key, BOLD)
 }
+
+func navColor(key string) string {
+	return ansiColor(DIM, key)
+}
