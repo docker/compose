@@ -187,7 +187,6 @@ func (lk *LogKeyboard) printNavigationMenu() {
 }
 
 func (lk *LogKeyboard) navigationMenu() string {
-	var options string
 	var openDDInfo string
 	if lk.IsDockerDesktopActive {
 		openDDInfo = shortcutKeyColor("v") + navColor(" View in Docker Desktop")
@@ -201,7 +200,7 @@ func (lk *LogKeyboard) navigationMenu() string {
 		isEnabled = " Disable"
 	}
 	watchInfo = watchInfo + shortcutKeyColor("w") + navColor(isEnabled+" Watch")
-	return options + openDDInfo + watchInfo
+	return openDDInfo + watchInfo
 }
 
 func (lk *LogKeyboard) clearNavigationMenu() {
@@ -324,4 +323,8 @@ func shortcutKeyColor(key string) string {
 	background := "48;2"
 	white := "255;255;255"
 	return ansiColor(foreground+";"+black+";"+background+";"+white, key, BOLD)
+}
+
+func navColor(key string) string {
+	return ansiColor(FAINT, key)
 }
