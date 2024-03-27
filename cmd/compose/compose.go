@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -111,6 +112,9 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 				Status:     err.Error(),
 			}
 		}
+		if ui.Mode == ui.ModeJSON {
+			err = makeJSONError(err)
+		}
 		return err
 	}
 }
@@ -164,6 +168,38 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 
 		return fn(ctx, project, args)
 	})
+}
+
+type jsonErrorData struct {
+	Error   bool   `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+func errorAsJSON(message string) string {
+	errorMessage := &jsonErrorData{
+		Error:   true,
+		Message: message,
+	}
+	marshal, err := json.Marshal(errorMessage)
+	if err == nil {
+		return string(marshal)
+	} else {
+		return message
+	}
+}
+
+func makeJSONError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var statusErr dockercli.StatusError
+	if errors.As(err, &statusErr) {
+		return dockercli.StatusError{
+			StatusCode: statusErr.StatusCode,
+			Status:     errorAsJSON(statusErr.Status),
+		}
+	}
+	return fmt.Errorf("%s", errorAsJSON(err.Error()))
 }
 
 func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
@@ -445,6 +481,9 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				ui.Mode = ui.ModePlain
 			case ui.ModeQuiet, "none":
 				ui.Mode = ui.ModeQuiet
+			case ui.ModeJSON:
+				ui.Mode = ui.ModeJSON
+				logrus.SetFormatter(&logrus.JSONFormatter{})
 			default:
 				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
@@ -620,6 +659,7 @@ var printerModes = []string{
 	ui.ModeAuto,
 	ui.ModeTTY,
 	ui.ModePlain,
+	ui.ModeJSON,
 	ui.ModeQuiet,
 }
 

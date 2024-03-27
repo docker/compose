@@ -110,6 +110,8 @@ const (
 	ModePlain = "plain"
 	// ModeQuiet don't display events
 	ModeQuiet = "quiet"
+	// ModeJSON outputs a machine-readable JSON stream
+	ModeJSON = "json"
 )
 
 // Mode define how progress should be rendered, either as ModePlain or ModeTTY
@@ -135,6 +137,13 @@ func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer
 		} else {
 			return newTTYWriter(f, dryRun, progressTitle)
 		}
+	}
+	if Mode == ModeJSON {
+		return &jsonWriter{
+			out:    out,
+			done:   make(chan bool),
+			dryRun: dryRun,
+		}, nil
 	}
 	return &plainWriter{
 		out:    out,
