@@ -102,8 +102,6 @@ func (l *logConsumer) Err(container, message string) {
 	l.write(l.stderr, container, message)
 }
 
-var navColor = makeColorFunc("90")
-
 func (l *logConsumer) write(w io.Writer, container, message string) {
 	if l.ctx.Err() != nil {
 		return
