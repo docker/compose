@@ -165,7 +165,7 @@ func TestAttachRestart(t *testing.T) {
 func TestInitContainer(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	res := c.RunDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/init-container", "up")
+	res := c.RunDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/init-container", "up", "--menu=false")
 	defer c.RunDockerComposeCmd(t, "-p", "init-container", "down")
 	testify.Regexp(t, "foo-1  | hello(?m:.*)bar-1  | world", res.Stdout())
 }
@@ -293,7 +293,7 @@ func TestStopWithDependenciesAttached(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo")
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo", "--menu=false")
 	res.Assert(t, icmd.Expected{Out: "exited with code 0"})
 }
 

@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 PKG := github.com/docker/compose/v2
-export COMPOSE_MENU = FALSE
 VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
 
 GO_LDFLAGS ?= -w -X ${PKG}/internal.Version=${VERSION}

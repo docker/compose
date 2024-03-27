@@ -101,7 +101,6 @@ RUN --mount=type=bind,target=. \
 FROM build-base AS test
 ARG CGO_ENABLED=0
 ARG BUILD_TAGS
-ENV COMPOSE_MENU=FALSE
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
