@@ -21,6 +21,7 @@ on:
 permissions:
   contents: read # to fetch code (actions/checkout)
 
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -29,7 +30,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       -
         name: Create matrix
         id: platforms
@@ -53,10 +54,21 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: "lab:latest"
+          driver: ${{ github.event_name != 'pull_request' && 'cloud' || '' }}
+          endpoint: ${{ github.event_name != 'pull_request' && secrets.DOCKER_BUILD_CLOUD_ENDPOINT || '' }}
       -
         name: Run
         run: |
@@ -78,16 +90,29 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      -
+        name: Login
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
+        with:
+          if: github.event_name != 'pull_request'
+          version: "lab:latest"
+          driver: ${{ github.event_name != 'pull_request' && 'cloud' || '' }}
+          endpoint: ${{ github.event_name != 'pull_request' && secrets.DOCKER_BUILD_CLOUD_ENDPOINT || '' }}
       -
         name: Build
-        uses: docker/bake-action@v2
+        uses: docker/bake-action@v4
         with:
           targets: release
           set: |
@@ -96,10 +121,10 @@ jobs:
             *.cache-to=type=gha,scope=binary-${{ env.PLATFORM_PAIR }},mode=max
       -
         name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: compose
-          path: ./bin/release/*
+          name: compose-${{ env.PLATFORM_PAIR }}
+          path: ./bin/release
           if-no-files-found: error
 
   test:
@@ -107,13 +132,25 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      -
+        name: Login
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: "lab:latest"
+          driver: ${{ github.event_name != 'pull_request' && 'cloud' || '' }}
+          endpoint: ${{ github.event_name != 'pull_request' && secrets.DOCKER_BUILD_CLOUD_ENDPOINT || '' }}
       -
         name: Test
-        uses: docker/bake-action@v2
+        uses: docker/bake-action@v4
         with:
           targets: test
           set: |
@@ -121,7 +158,7 @@ jobs:
             *.cache-to=type=gha,scope=test
       -
         name: Gather coverage data
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-data-unit
           path: bin/coverage/unit/
@@ -147,27 +184,40 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
-      - name: Install Docker ${{ matrix.engine }}
+        uses: actions/checkout@v4
+      -
+        name: Install Docker ${{ matrix.engine }}
         run: |
           sudo apt-get install curl
           curl -fsSL https://get.docker.com -o get-docker.sh
           sudo sh ./get-docker.sh --version ${{ matrix.engine }}
-      - name: Check Docker Version
+      -
+        name: Check Docker Version
         run: docker --version
       -
+        name: Login
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
+      -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: "lab:latest"
+          driver: ${{ github.event_name != 'pull_request' && 'cloud' || '' }}
+          endpoint: ${{ github.event_name != 'pull_request' && secrets.DOCKER_BUILD_CLOUD_ENDPOINT || '' }}
       -
         name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
           check-latest: true
           cache: true
       -
         name: Build
-        uses: docker/bake-action@v2
+        uses: docker/bake-action@v4
         with:
           targets: binary-with-coverage
           set: |
@@ -192,8 +242,9 @@ jobs:
           make e2e-compose GOCOVERDIR=bin/coverage/e2e TEST_FLAGS="-v"
       -
         name: Gather coverage data
-        if: ${{ matrix.mode == 'plugin' }}
-        uses: actions/upload-artifact@v3
+        # Only upload coverage data for the latest engine version
+        if: ${{ matrix.mode == 'plugin' && '26.0.0' == matrix.engine}}
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-data-e2e
           path: bin/coverage/e2e/
@@ -218,34 +269,41 @@ jobs:
       - e2e
     steps:
       # codecov won't process the report without the source code available
-      - name: Checkout
+      -
+        name: Checkout
         uses: actions/checkout@v3
-      - name: Set up Go
+      -
+        name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
           check-latest: true
-      - name: Download unit test coverage
-        uses: actions/download-artifact@v3
+      -
+        name: Download unit test coverage
+        uses: actions/download-artifact@v4
         with:
           name: coverage-data-unit
           path: coverage/unit
-      - name: Download E2E test coverage
-        uses: actions/download-artifact@v3
+      -
+        name: Download E2E test coverage
+        uses: actions/download-artifact@v4
         with:
           name: coverage-data-e2e
           path: coverage/e2e
-      - name: Merge coverage reports
+      -
+        name: Merge coverage reports
         run: |
           go tool covdata textfmt -i=./coverage/unit,./coverage/e2e -o ./coverage.txt
-      - name: Store coverage report in GitHub Actions
+      -
+        name: Store coverage report in GitHub Actions
         uses: actions/upload-artifact@v3
         with:
           name: go-covdata-txt
           path: ./coverage.txt
           if-no-files-found: error
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+      -
+        name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
         with:
           files: ./coverage.txt
 
@@ -259,16 +317,17 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       -
         name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: compose
-          path: bin/release
+          pattern: compose-*
+          path: ./bin/release
+          merge-multiple: true
       -
         name: Create checksums
-        working-directory: bin/release
+        working-directory: ./bin/release
         run: |
           find . -type f -print0 | sort -z | xargs -r0 shasum -a 256 -b | sed 's# \*\./# *#' > $RUNNER_TEMP/checksums.txt
           shasum -a 256 -U -c $RUNNER_TEMP/checksums.txt
@@ -276,21 +335,21 @@ jobs:
           cat checksums.txt | while read sum file; do echo "$sum $file" > ${file#\*}.sha256; done
       -
         name: License
-        run: cp packaging/* bin/release/
+        run: cp packaging/* ./bin/release
       -
         name: List artifacts
         run: |
-          tree -nh bin/release
+          tree -nh ./bin/release
       -
         name: Check artifacts
         run: |
-          find bin/release -type f -exec file -e ascii -- {} +
+          find ./bin/release -type f -exec file -e ascii -- {} +
       -
         name: GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: ncipollo/release-action@58ae73b360456532aafd58ee170c045abbeaee37 # v1.10.0
         with:
-          artifacts: bin/release/*
+          artifacts: ./bin/release/*
           generateReleaseNotes: true
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
