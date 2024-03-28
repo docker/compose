@@ -275,10 +275,6 @@ func (lk *LogKeyboard) StartWatch(ctx context.Context, project *types.Project, o
 	}
 }
 
-func (lk *LogKeyboard) KeyboardClose() {
-	_ = keyboard.Close()
-}
-
 func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Context, project *types.Project, options api.UpOptions) {
 	switch kRune := event.Rune; kRune {
 	case 'v':
@@ -288,8 +284,7 @@ func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Cont
 	}
 	switch key := event.Key; key {
 	case keyboard.KeyCtrlC:
-		lk.KeyboardClose()
-
+		_ = keyboard.Close()
 		lk.clearNavigationMenu()
 		ShowCursor()
 

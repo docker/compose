@@ -31,6 +31,7 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
@@ -90,20 +91,20 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 
 		var kEvents <-chan keyboard.KeyEvent
-		isWatchConfigured := s.shouldWatch(project)
-		isDockerDesktopActive := s.isDesktopIntegrationActive()
-
-		tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
 		if options.Start.NavigationMenu {
 			kEvents, err = keyboard.GetKeys(100)
 			if err != nil {
-				panic(err)
+				logrus.Warn("could not start menu, an error occurred while starting.")
+			} else {
+				isWatchConfigured := s.shouldWatch(project)
+				isDockerDesktopActive := s.isDesktopIntegrationActive()
+				tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
+
+				formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.Watch)
+				if options.Start.Watch {
+					formatter.KeyboardManager.StartWatch(ctx, project, options)
+				}
 			}
-			formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.Watch)
-			if options.Start.Watch {
-				formatter.KeyboardManager.StartWatch(ctx, project, options)
-			}
-			defer formatter.KeyboardManager.KeyboardClose()
 		}
 		for {
 			select {
