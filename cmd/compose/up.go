@@ -79,6 +79,16 @@ func (opts upOptions) apply(project *types.Project, services []string) (*types.P
 	return project, nil
 }
 
+func (opts *upOptions) validateNavigationMenu(dockerCli command.Cli, experimentals *experimental.State) {
+	if !dockerCli.Out().IsTerminal() {
+		opts.navigationMenu = false
+		return
+	}
+	if !opts.navigationMenuChanged {
+		opts.navigationMenu = SetUnchangedOption(ComposeMenu, experimentals.NavBar())
+	}
+}
+
 func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, experiments *experimental.State) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
@@ -100,7 +110,10 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 			if len(up.attach) != 0 && up.attachDependencies {
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
-			return runUp(ctx, dockerCli, backend, experiments, create, up, build, project, services)
+
+			up.validateNavigationMenu(dockerCli, experiments)
+
+			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -170,7 +183,6 @@ func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
 	backend api.Service,
-	experimentals *experimental.State,
 	createOptions createOptions,
 	upOptions upOptions,
 	buildOptions buildOptions,
@@ -189,9 +201,6 @@ func runUp(
 	project, err = upOptions.apply(project, services)
 	if err != nil {
 		return err
-	}
-	if !upOptions.navigationMenuChanged {
-		upOptions.navigationMenu = SetUnchangedOption(ComposeMenu, experimentals.NavBar())
 	}
 
 	var build *api.BuildOptions
