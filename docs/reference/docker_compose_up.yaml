@@ -35,6 +35,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: abort-on-container-failure
+      value_type: bool
+      default_value: "false"
+      description: |
+        Stops all containers if any container exited with failure. Incompatible with -d
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: always-recreate-deps
       value_type: bool
       default_value: "false"
