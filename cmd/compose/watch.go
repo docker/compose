@@ -104,10 +104,9 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 				QuietPull:            buildOpts.quiet,
 			},
 			Start: api.StartOptions{
-				Project:     project,
-				Attach:      nil,
-				CascadeStop: false,
-				Services:    services,
+				Project:  project,
+				Attach:   nil,
+				Services: services,
 			},
 		}
 		if err := backend.Up(ctx, project, upOpts); err != nil {

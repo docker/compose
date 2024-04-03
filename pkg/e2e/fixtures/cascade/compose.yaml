@@ -1,0 +1,8 @@
+services:
+  exit:
+    image: alpine
+    command: /bin/true
+
+  fail:
+    image: alpine
+    command: sh -c "sleep 0.1 && /bin/false"

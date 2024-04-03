@@ -80,7 +80,7 @@ func (s *composeService) Logs(
 		containers = containers.filter(isRunning())
 		printer := newLogPrinter(consumer)
 		eg.Go(func() error {
-			_, err := printer.Run(false, "", nil)
+			_, err := printer.Run(api.CascadeIgnore, "", nil)
 			return err
 		})
 
