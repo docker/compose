@@ -64,6 +64,7 @@ func SetANSIMode(streams api.Streams, ansi string) {
 		nextColor = func() colorFunc {
 			return monochrome
 		}
+		disableAnsi = true
 	}
 }
 
