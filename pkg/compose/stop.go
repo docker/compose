@@ -50,7 +50,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 	}
 
 	w := progress.ContextWriter(ctx)
-	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return InReverseDependencyOrder(ctx, project, false, func(c context.Context, service string) error {
 		if !utils.StringContains(options.Services, service) {
 			return nil
 		}
