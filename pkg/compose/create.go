@@ -99,6 +99,8 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
+	prepareServiceDNS(project)
+
 	if err := s.ensureProjectVolumes(ctx, project); err != nil {
 		return err
 	}
@@ -139,6 +141,17 @@ func (s *composeService) ensureNetworks(ctx context.Context, networks types.Netw
 		networks[i] = network
 	}
 	return nil
+}
+
+func prepareServiceDNS(project *types.Project) {
+	for k, service := range project.Services {
+		trimmedDNS := utils.Remove(service.DNS, "")
+		if len(trimmedDNS) != len(service.DNS) {
+			logrus.Warnf("The %q service has one or more empty DNS entries. Skipping them.", k)
+		}
+		service.DNS = trimmedDNS
+		project.Services[k] = service
+	}
 }
 
 func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {

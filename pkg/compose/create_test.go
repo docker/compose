@@ -327,3 +327,31 @@ func TestCreateEndpointSettings(t *testing.T) {
 		IPv6Gateway: "fdb4:7a7f:373a:3f0c::42",
 	}))
 }
+
+func TestPrepareServiceDNS(t *testing.T) {
+	t.Run("returns DNS list without empty strings", func(t *testing.T) {
+		const (
+			serviceName = "myService"
+			dns1        = "dns-1"
+			dns2        = "dns-2"
+		)
+		project := composetypes.Project{
+			Services: composetypes.Services{
+				serviceName: composetypes.ServiceConfig{
+					DNS: []string{
+						dns1,
+						"",
+						dns2,
+						"",
+					},
+				},
+			},
+		}
+
+		prepareServiceDNS(&project)
+		dnsConfig := project.Services[serviceName].DNS
+		assert.Equal(t, len(dnsConfig), 2)
+		assert.Equal(t, dnsConfig[0], dns1)
+		assert.Equal(t, dnsConfig[1], dns2)
+	})
+}
