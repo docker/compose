@@ -1,6 +1,6 @@
 module github.com/docker/compose/v2
 
-go 1.21
+go 1.21.6
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -193,3 +193,5 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 	tags.cncf.io/container-device-interface v0.6.2 // indirect
 )
+
+replace github.com/fsnotify/fsevents v0.1.1 => github.com/glours/fsevents v0.0.0-20230629001834-f53e17b91ebc
