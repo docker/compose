@@ -85,8 +85,7 @@ before anybody starts working on it.
 
 We are always thrilled to receive pull requests. We do our best to process them
 quickly. If your pull request is not accepted on the first try,
-don't get discouraged! Our contributor's guide explains
-[the review process we use for simple changes](https://docs.docker.com/opensource/workflow/make-a-contribution/).
+don't get discouraged!
 
 ### Talking to other Docker users and contributors
 
