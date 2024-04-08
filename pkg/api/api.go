@@ -209,8 +209,8 @@ type StartOptions struct {
 	Attach LogConsumer
 	// AttachTo set the services to attach to
 	AttachTo []string
-	// CascadeStop stops the application when a container stops
-	CascadeStop bool
+	// OnExit defines behavior when a container stops
+	OnExit Cascade
 	// ExitCodeFrom return exit code from specified service
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
@@ -221,6 +221,14 @@ type StartOptions struct {
 	Watch          bool
 	NavigationMenu bool
 }
+
+type Cascade int
+
+const (
+	CascadeIgnore Cascade = iota
+	CascadeStop   Cascade = iota
+	CascadeFail   Cascade = iota
+)
 
 // RestartOptions group options of the Restart API
 type RestartOptions struct {

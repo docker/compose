@@ -26,7 +26,7 @@ import (
 // logPrinter watch application containers an collect their logs
 type logPrinter interface {
 	HandleEvent(event api.ContainerEvent)
-	Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error)
+	Run(cascade api.Cascade, exitCodeFrom string, stopFn func() error) (int, error)
 	Cancel()
 	Stop()
 }
@@ -79,7 +79,7 @@ func (p *printer) HandleEvent(event api.ContainerEvent) {
 }
 
 //nolint:gocyclo
-func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error) {
+func (p *printer) Run(cascade api.Cascade, exitCodeFrom string, stopFn func() error) (int, error) {
 	var (
 		aborting bool
 		exitCode int
@@ -115,7 +115,7 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 					delete(containers, id)
 				}
 
-				if cascadeStop {
+				if cascade == api.CascadeStop {
 					if !aborting {
 						aborting = true
 						err := stopFn()
@@ -123,13 +123,23 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 							return 0, err
 						}
 					}
-					if event.Type == api.ContainerEventExit {
-						if exitCodeFrom == "" {
-							exitCodeFrom = event.Service
+				}
+				if event.Type == api.ContainerEventExit {
+					if cascade == api.CascadeFail && event.ExitCode != 0 {
+						exitCodeFrom = event.Service
+						if !aborting {
+							aborting = true
+							err := stopFn()
+							if err != nil {
+								return 0, err
+							}
 						}
-						if exitCodeFrom == event.Service {
-							exitCode = event.ExitCode
-						}
+					}
+					if cascade == api.CascadeStop && exitCodeFrom == "" {
+						exitCodeFrom = event.Service
+					}
+					if exitCodeFrom == event.Service {
+						exitCode = event.ExitCode
 					}
 				}
 				if len(containers) == 0 {

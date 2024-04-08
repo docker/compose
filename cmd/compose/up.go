@@ -46,6 +46,7 @@ type upOptions struct {
 	noStart               bool
 	noDeps                bool
 	cascadeStop           bool
+	cascadeFail           bool
 	exitCodeFrom          string
 	noColor               bool
 	noPrefix              bool
@@ -86,6 +87,17 @@ func (opts *upOptions) validateNavigationMenu(dockerCli command.Cli, experimenta
 	}
 	if !opts.navigationMenuChanged {
 		opts.navigationMenu = SetUnchangedOption(ComposeMenu, experimentals.NavBar())
+	}
+}
+
+func (opts upOptions) OnExit() api.Cascade {
+	switch {
+	case opts.cascadeStop:
+		return api.CascadeStop
+	case opts.cascadeFail:
+		return api.CascadeFail
+	default:
+		return api.CascadeIgnore
 	}
 }
 
@@ -131,6 +143,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 	flags.BoolVar(&create.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	flags.BoolVar(&up.noStart, "no-start", false, "Don't start the services after creating them")
 	flags.BoolVar(&up.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
+	flags.BoolVar(&up.cascadeFail, "abort-on-container-failure", false, "Stops all containers if any container exited with failure. Incompatible with -d")
 	flags.StringVar(&up.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
 	flags.IntVarP(&create.timeout, "timeout", "t", 0, "Use this timeout in seconds for container shutdown when attached or when containers are already running")
 	flags.BoolVar(&up.timestamp, "timestamps", false, "Show timestamps")
@@ -152,8 +165,11 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 
 //nolint:gocyclo
 func validateFlags(up *upOptions, create *createOptions) error {
-	if up.exitCodeFrom != "" {
+	if up.exitCodeFrom != "" && !up.cascadeFail {
 		up.cascadeStop = true
+	}
+	if up.cascadeStop && up.cascadeFail {
+		return fmt.Errorf("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
 	}
 	if up.wait {
 		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
@@ -164,8 +180,8 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	if create.Build && create.noBuild {
 		return fmt.Errorf("--build and --no-build are incompatible")
 	}
-	if up.Detach && (up.attachDependencies || up.cascadeStop || len(up.attach) > 0) {
-		return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
+	if up.Detach && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0) {
+		return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach or --attach-dependencies")
 	}
 	if create.forceRecreate && create.noRecreate {
 		return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
@@ -278,7 +294,7 @@ func runUp(
 			Attach:         consumer,
 			AttachTo:       attach,
 			ExitCodeFrom:   upOptions.exitCodeFrom,
-			CascadeStop:    upOptions.cascadeStop,
+			OnExit:         upOptions.OnExit(),
 			Wait:           upOptions.wait,
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
