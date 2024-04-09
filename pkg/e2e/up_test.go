@@ -22,6 +22,7 @@ package e2e
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -164,4 +165,16 @@ func TestUpWithDependencyNotRequired(t *testing.T) {
 		"--profile", "not-required", "up", "-d")
 	assert.Assert(t, strings.Contains(res.Combined(), "foo"), res.Combined())
 	assert.Assert(t, strings.Contains(res.Combined(), " optional dependency \"bar\" failed to start"), res.Combined())
+}
+
+func TestUpWithAllResources(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-all-resources"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-v")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/resources/compose.yaml", "--all-resources", "--project-name", projectName, "up")
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Volume "%s_my_vol"  Created`, projectName)), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Network %s_my_net  Created`, projectName)), res.Combined())
 }
