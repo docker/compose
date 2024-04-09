@@ -115,7 +115,7 @@ func TestInDependencyReverseDownCommandOrder(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var order []string
-	err := InReverseDependencyOrder(ctx, createTestProject(), false, func(ctx context.Context, service string) error {
+	err := InReverseDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
 		order = append(order, service)
 		return nil
 	})
@@ -270,7 +270,7 @@ func TestBuildGraph(t *testing.T) {
 				Services: tC.services,
 			}
 
-			graph, err := NewGraph(&project, ServiceStopped, false)
+			graph, err := NewGraph(&project, ServiceStopped)
 			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
 
 			for k, vertex := range graph.Vertices {
@@ -282,7 +282,7 @@ func TestBuildGraph(t *testing.T) {
 	}
 }
 
-func TestBuildGraphIgnoreMissing(t *testing.T) {
+func TestBuildGraphDependsOn(t *testing.T) {
 	testCases := []struct {
 		desc             string
 		services         types.Services
@@ -298,7 +298,7 @@ func TestBuildGraphIgnoreMissing(t *testing.T) {
 							Condition:  "service_completed_successfully",
 							Restart:    false,
 							Extensions: types.Extensions(nil),
-							Required:   true,
+							Required:   false,
 						},
 					},
 				},
@@ -320,7 +320,7 @@ func TestBuildGraphIgnoreMissing(t *testing.T) {
 				Services: tC.services,
 			}
 
-			graph, err := NewGraph(&project, ServiceStopped, true)
+			graph, err := NewGraph(&project, ServiceStopped)
 			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
 
 			for k, vertex := range graph.Vertices {

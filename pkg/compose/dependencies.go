@@ -77,7 +77,7 @@ func downDirectionTraversal(visitorFn func(context.Context, string) error) *grap
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
 func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
-	graph, err := NewGraph(project, ServiceStopped, false)
+	graph, err := NewGraph(project, ServiceStopped)
 	if err != nil {
 		return err
 	}
@@ -89,8 +89,8 @@ func InDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
-func InReverseDependencyOrder(ctx context.Context, project *types.Project, ignoreMissing bool, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
-	graph, err := NewGraph(project, ServiceStarted, ignoreMissing)
+func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
+	graph, err := NewGraph(project, ServiceStarted)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (v *Vertex) GetChildren() []*Vertex {
 }
 
 // NewGraph returns the dependency graph of the services
-func NewGraph(project *types.Project, initialStatus ServiceStatus, ignoreMissing bool) (*Graph, error) {
+func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, error) {
 	graph := &Graph{
 		lock:     sync.RWMutex{},
 		Vertices: map[string]*Vertex{},
@@ -271,7 +271,7 @@ func NewGraph(project *types.Project, initialStatus ServiceStatus, ignoreMissing
 		for _, name := range s.GetDependencies() {
 			err := graph.AddEdge(s.Name, name)
 			if err != nil {
-				if ignoreMissing || !s.DependsOn[name].Required {
+				if !s.DependsOn[name].Required {
 					delete(s.DependsOn, name)
 					project.Services[index] = s
 					continue

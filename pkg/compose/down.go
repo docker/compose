@@ -74,7 +74,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	err = InReverseDependencyOrder(ctx, project, true, func(c context.Context, service string) error {
+	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, serviceContainers, options.Timeout, options.Volumes)
 		return err
@@ -344,8 +344,20 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, container m
 
 func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
-	project, err := s.projectFromName(containers, projectName)
+	p, err := s.projectFromName(containers, projectName)
 	if err != nil && !api.IsNotFoundError(err) {
+		return nil, err
+	}
+	project, err := p.WithServicesTransform(func(name string, service types.ServiceConfig) (types.ServiceConfig, error) {
+		for k := range service.DependsOn {
+			if dependency, ok := service.DependsOn[k]; ok {
+				dependency.Required = false
+				service.DependsOn[k] = dependency
+			}
+		}
+		return service, nil
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -360,5 +372,6 @@ func (s *composeService) getProjectWithResources(ctx context.Context, containers
 		return nil, err
 	}
 	project.Networks = networks
+
 	return project, nil
 }
