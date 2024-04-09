@@ -132,6 +132,7 @@ type ProjectOptions struct {
 	Compatibility bool
 	Progress      string
 	Offline       bool
+	All           bool
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -175,6 +176,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
 	f.StringVar(&o.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
+	f.BoolVar(&o.All, "all-resources", false, "Include all resources, even those not used by services")
 	_ = f.MarkHidden("workdir")
 }
 
@@ -231,9 +233,8 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 	return options.LoadModel(ctx)
 }
 
-func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
+func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) { //nolint:gocyclo
 	var metrics tracing.Metrics
-
 	remotes := o.remoteLoaders(dockerCli)
 	for _, r := range remotes {
 		po = append(po, cli.WithResourceLoader(r))
@@ -300,7 +301,9 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 		project.Services[name] = s
 	}
 
-	project = project.WithoutUnnecessaryResources()
+	if !o.All {
+		project = project.WithoutUnnecessaryResources()
+	}
 
 	project, err = project.WithSelectedServices(services)
 	return project, metrics, err

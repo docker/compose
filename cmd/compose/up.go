@@ -125,6 +125,10 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 
 			up.validateNavigationMenu(dockerCli, experiments)
 
+			if !p.All && len(project.Services) == 0 {
+				return fmt.Errorf("no service selected")
+			}
+
 			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
@@ -205,10 +209,6 @@ func runUp(
 	project *types.Project,
 	services []string,
 ) error {
-	if len(project.Services) == 0 {
-		return fmt.Errorf("no service selected")
-	}
-
 	err := createOptions.Apply(project)
 	if err != nil {
 		return err

@@ -43,6 +43,7 @@ Define and run multi-container applications with Docker
 
 | Name                   | Type          | Default | Description                                                                                         |
 |:-----------------------|:--------------|:--------|:----------------------------------------------------------------------------------------------------|
+| `--all-resources`      |               |         | Include all resources, even those not used by services                                              |
 | `--ansi`               | `string`      | `auto`  | Control when to print ANSI control characters ("never"\|"always"\|"auto")                           |
 | `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
 | `--dry-run`            |               |         | Execute command in dry run mode                                                                     |
