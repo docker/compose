@@ -208,6 +208,16 @@ clink:
     - docker_compose_wait.yaml
     - docker_compose_watch.yaml
 options:
+    - option: all-resources
+      value_type: bool
+      default_value: "false"
+      description: Include all resources, even those not used by services
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: ansi
       value_type: string
       default_value: auto
