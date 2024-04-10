@@ -388,7 +388,11 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	if len(service.Build.Tags) > 0 {
 		tags = append(tags, service.Build.Tags...)
 	}
-	var allow []entitlements.Entitlement
+
+	allow, err := buildflags.ParseEntitlements(service.Build.Entitlements)
+	if err != nil {
+		return build.Options{}, err
+	}
 	if service.Build.Privileged {
 		allow = append(allow, entitlements.EntitlementSecurityInsecure)
 	}

@@ -1,0 +1,7 @@
+services:
+  privileged-service:
+    build:
+      context: .
+      entitlements:
+        - security.insecure
+

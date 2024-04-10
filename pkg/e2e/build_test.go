@@ -471,3 +471,35 @@ func TestBuildBuilder(t *testing.T) {
 	})
 
 }
+
+func TestBuildEntitlements(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	// declare builder
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-insecure", "--use", "--bootstrap", "--buildkitd-flags",
+		`'--allow-insecure-entitlement=security.insecure'`)
+	assert.NilError(t, result.Error)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/entitlements", "down")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", "build-insecure")
+	})
+
+	t.Run("use build privileged mode to run insecure build command", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/entitlements", "build")
+		capEffRe := regexp.MustCompile("CapEff:\t([0-9a-f]+)")
+		matches := capEffRe.FindStringSubmatch(res.Stdout())
+		assert.Equal(t, 2, len(matches), "Did not match CapEff in output, matches: %v", matches)
+
+		capEff, err := strconv.ParseUint(matches[1], 16, 64)
+		assert.NilError(t, err, "Parsing CapEff: %s", matches[1])
+
+		// NOTE: can't use constant from x/sys/unix or tests won't compile on macOS/Windows
+		// #define CAP_SYS_ADMIN        21
+		// https://github.com/torvalds/linux/blob/v6.1/include/uapi/linux/capability.h#L278
+		const capSysAdmin = 0x15
+		if capEff&capSysAdmin != capSysAdmin {
+			t.Fatalf("CapEff %s is missing CAP_SYS_ADMIN", matches[1])
+		}
+	})
+}
