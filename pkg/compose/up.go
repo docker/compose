@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -66,9 +67,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	// we might miss a signal while setting up the second channel read
 	// (this is also why signal.Notify is used vs signal.NotifyContext)
 	signalChan := make(chan os.Signal, 2)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	defer close(signalChan)
-	var isTerminated bool
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signalChan)
+	var isTerminated atomic.Bool
 	printer := newLogPrinter(options.Start.Attach)
 
 	doneCh := make(chan bool)
@@ -79,12 +81,11 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			formatter.ClearLine()
 			fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
 			eg.Go(func() error {
-				err := s.Stop(context.Background(), project.Name, api.StopOptions{
+				err := s.Stop(context.WithoutCancel(ctx), project.Name, api.StopOptions{
 					Services: options.Create.Services,
 					Project:  project,
 				})
-				isTerminated = true
-				close(doneCh)
+				isTerminated.Store(true)
 				return err
 			})
 			first = false
@@ -106,6 +107,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				}
 			}
 		}
+
 		for {
 			select {
 			case <-doneCh:
@@ -119,7 +121,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					gracefulTeardown()
 				} else {
 					eg.Go(func() error {
-						return s.Kill(context.Background(), project.Name, api.KillOptions{
+						return s.Kill(context.WithoutCancel(ctx), project.Name, api.KillOptions{
 							Services: options.Create.Services,
 							Project:  project,
 						})
@@ -158,18 +160,17 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		})
 	}
 
-	// We don't use parent (cancelable) context as we manage sigterm to stop the stack
-	err = s.start(context.Background(), project.Name, options.Start, printer.HandleEvent)
-	if err != nil && !isTerminated { // Ignore error if the process is terminated
+	// We use the parent context without cancelation as we manage sigterm to stop the stack
+	err = s.start(context.WithoutCancel(ctx), project.Name, options.Start, printer.HandleEvent)
+	if err != nil && !isTerminated.Load() { // Ignore error if the process is terminated
 		return err
 	}
 
+	// Signal for the signal-handler goroutines to stop
+	close(doneCh)
+
 	printer.Stop()
 
-	if !isTerminated {
-		// signal for the signal-handler goroutines to stop
-		close(doneCh)
-	}
 	err = eg.Wait().ErrorOrNil()
 	if exitCode != 0 {
 		errMsg := ""
