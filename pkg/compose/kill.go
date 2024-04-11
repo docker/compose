@@ -40,7 +40,7 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 	services := options.Services
 
 	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false, services...)
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, options.All, services...)
 	if err != nil {
 		return err
 	}

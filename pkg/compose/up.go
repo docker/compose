@@ -122,6 +122,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 						return s.Kill(context.Background(), project.Name, api.KillOptions{
 							Services: options.Create.Services,
 							Project:  project,
+							All:      true,
 						})
 					})
 					return nil
