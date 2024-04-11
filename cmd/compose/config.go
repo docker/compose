@@ -169,6 +169,13 @@ func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, s
 			return err
 		}
 
+		if !opts.noConsistency {
+			err := project.CheckContainerNameUnicity()
+			if err != nil {
+				return err
+			}
+		}
+
 		switch opts.Format {
 		case "json":
 			content, err = project.MarshalJSON()

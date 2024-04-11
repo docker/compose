@@ -1,0 +1,10 @@
+services:
+  test:
+    image: alpine
+    container_name: test
+    command: /bin/true
+
+  another_test:
+    image: alpine
+    container_name: test
+    command: /bin/true
