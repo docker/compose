@@ -77,8 +77,13 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		options.Services = project.ServiceNames()
 	}
 
+	err := project.CheckContainerNameUnicity()
+	if err != nil {
+		return err
+	}
+
 	var observedState Containers
-	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return err
 	}
