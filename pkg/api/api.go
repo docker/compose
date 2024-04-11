@@ -312,6 +312,8 @@ type KillOptions struct {
 	Services []string
 	// Signal to send to containers
 	Signal string
+	// All can be set to true to try to kill all found containers, independently of their state
+	All bool
 }
 
 // RemoveOptions group options of the Remove API
