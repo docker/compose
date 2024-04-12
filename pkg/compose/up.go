@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -29,6 +30,7 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -106,6 +108,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				}
 			}
 		}
+
+		// killRunning is used to control that we don't run more than one kill if signals are spammed.
+		var killRunning atomic.Bool
 		for {
 			select {
 			case <-doneCh:
@@ -117,19 +122,27 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			case <-signalChan:
 				if first {
 					gracefulTeardown()
-				} else {
-					eg.Go(func() error {
-						// Intentionally ignore errors, for cases where some
-						// of the containers are already stopped.
-						s.kill(context.Background(), project.Name, api.KillOptions{
-							Services: options.Create.Services,
-							Project:  project,
-							All:      true,
-						})
-						return nil
-					})
-					return nil
+					break
 				}
+				if !killRunning.CompareAndSwap(false, true) {
+					break
+				}
+				eg.Go(func() error {
+					defer killRunning.Store(false)
+					// Intentionally ignore errors, for cases where some
+					// of the containers are already stopped.
+					err := s.kill(context.Background(), project.Name, api.KillOptions{
+						Services: options.Create.Services,
+						Project:  project,
+						All:      true,
+					})
+					// Ignore errors indicating that some of the containers were already stopped or removed.
+					if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
+						return nil
+					}
+
+					return err
+				})
 			case event := <-kEvents:
 				formatter.KeyboardManager.HandleKeyEvents(event, ctx, project, options)
 			}
