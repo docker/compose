@@ -119,11 +119,14 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					gracefulTeardown()
 				} else {
 					eg.Go(func() error {
-						return s.Kill(context.Background(), project.Name, api.KillOptions{
+						// Intentionally ignore errors, for cases where some
+						// of the containers are already stopped.
+						s.kill(context.Background(), project.Name, api.KillOptions{
 							Services: options.Create.Services,
 							Project:  project,
 							All:      true,
 						})
+						return nil
 					})
 					return nil
 				}
