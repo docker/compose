@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sync/atomic"
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -109,8 +108,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			}
 		}
 
-		// killRunning is used to control that we don't run more than one kill if signals are spammed.
-		var killRunning atomic.Bool
 		for {
 			select {
 			case <-doneCh:
@@ -124,13 +121,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					gracefulTeardown()
 					break
 				}
-				if !killRunning.CompareAndSwap(false, true) {
-					break
-				}
 				eg.Go(func() error {
-					defer killRunning.Store(false)
-					// Intentionally ignore errors, for cases where some
-					// of the containers are already stopped.
 					err := s.kill(context.Background(), project.Name, api.KillOptions{
 						Services: options.Create.Services,
 						Project:  project,
@@ -143,6 +134,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 					return err
 				})
+				return nil
 			case event := <-kEvents:
 				formatter.KeyboardManager.HandleKeyEvents(event, ctx, project, options)
 			}
