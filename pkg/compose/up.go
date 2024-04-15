@@ -43,7 +43,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return err
 		}
 		if options.Start.Attach == nil {
-			w.HasMore(false)
 			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil

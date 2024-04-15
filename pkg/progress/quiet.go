@@ -35,6 +35,3 @@ func (q quiet) Events(_ []Event) {
 
 func (q quiet) TailMsgf(_ string, _ ...interface{}) {
 }
-
-func (q quiet) HasMore(bool) {
-}
