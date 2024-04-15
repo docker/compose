@@ -191,6 +191,6 @@ func (e *Event) Spinner() any {
 	case Error:
 		return ErrorColor(spinnerError)
 	default:
-		return CountColor(e.spinner.String())
+		return e.spinner.String()
 	}
 }

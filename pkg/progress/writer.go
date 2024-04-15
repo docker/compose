@@ -36,7 +36,6 @@ type Writer interface {
 	Event(Event)
 	Events([]Event)
 	TailMsgf(string, ...interface{})
-	HasMore(more bool)
 }
 
 type writerKey struct{}
