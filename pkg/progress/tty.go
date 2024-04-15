@@ -84,14 +84,11 @@ func (w *ttyWriter) event(e Event) {
 		last := w.events[e.ID]
 		switch e.Status {
 		case Done, Error, Warning:
-			if last.endTime.IsZero() {
+			if last.Status != e.Status {
 				last.stop()
 			}
 		case Working:
-			if !last.endTime.IsZero() {
-				// already done, don't overwrite
-				return
-			}
+			last.hasMore()
 		}
 		last.Status = e.Status
 		last.Text = e.Text

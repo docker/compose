@@ -42,7 +42,7 @@ func TestLineText(t *testing.T) {
 	lineWidth := len(fmt.Sprintf("%s %s", ev.ID, ev.Text))
 
 	out := tty().lineText(ev, "", 50, lineWidth, false)
-	assert.Equal(t, out, " . id Text Status                            \x1b[34m0.0s \x1b[0m\n")
+	assert.Equal(t, out, " \x1b[33m.\x1b[0m id Text Status                            \x1b[34m0.0s \x1b[0m\n")
 
 	ev.Status = Done
 	out = tty().lineText(ev, "", 50, lineWidth, false)
