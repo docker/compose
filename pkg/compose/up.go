@@ -30,6 +30,7 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -119,15 +120,22 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			case <-signalChan:
 				if first {
 					gracefulTeardown()
-				} else {
-					eg.Go(func() error {
-						return s.Kill(context.WithoutCancel(ctx), project.Name, api.KillOptions{
-							Services: options.Create.Services,
-							Project:  project,
-						})
-					})
-					return nil
+					break
 				}
+				eg.Go(func() error {
+					err := s.kill(context.WithoutCancel(ctx), project.Name, api.KillOptions{
+						Services: options.Create.Services,
+						Project:  project,
+						All:      true,
+					})
+					// Ignore errors indicating that some of the containers were already stopped or removed.
+					if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
+						return nil
+					}
+
+					return err
+				})
+				return nil
 			case event := <-kEvents:
 				formatter.KeyboardManager.HandleKeyEvents(event, ctx, project, options)
 			}
