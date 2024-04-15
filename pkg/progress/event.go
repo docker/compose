@@ -176,6 +176,10 @@ func (e *Event) stop() {
 	e.spinner.Stop()
 }
 
+func (e *Event) hasMore() {
+	e.spinner.Restart()
+}
+
 var (
 	spinnerDone    = "✔"
 	spinnerWarning = "!"
@@ -191,6 +195,6 @@ func (e *Event) Spinner() any {
 	case Error:
 		return ErrorColor(spinnerError)
 	default:
-		return e.spinner.String()
+		return CountColor(e.spinner.String())
 	}
 }
