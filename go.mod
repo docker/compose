@@ -11,7 +11,7 @@ require (
 	github.com/containerd/console v1.0.4
 	github.com/containerd/containerd v1.7.13
 	github.com/davecgh/go-spew v1.1.1
-	github.com/distribution/reference v0.5.0
+	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.13.1
 	github.com/docker/cli v26.0.0+incompatible
 	github.com/docker/cli-docs-tool v0.7.0
