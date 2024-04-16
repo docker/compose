@@ -268,6 +268,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 						Container: name,
 						ID:        container.ID,
 						Service:   service,
+						ExitCode:  inspected.State.ExitCode,
 					})
 				}
 
