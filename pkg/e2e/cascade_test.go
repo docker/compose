@@ -36,6 +36,8 @@ func TestCascadeStop(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/cascade/compose.yaml", "--project-name", projectName,
 		"up", "--abort-on-container-exit")
 	assert.Assert(t, strings.Contains(res.Combined(), "exit-1 exited with code 0"), res.Combined())
+	// no --exit-code-from, so this is not an error
+	assert.Equal(t, res.ExitCode, 0)
 }
 
 func TestCascadeFail(t *testing.T) {
@@ -48,6 +50,7 @@ func TestCascadeFail(t *testing.T) {
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/cascade/compose.yaml", "--project-name", projectName,
 		"up", "--abort-on-container-failure")
 	assert.Assert(t, strings.Contains(res.Combined(), "exit-1 exited with code 0"), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), "fail-1 exited with code 1"), res.Combined())
-	assert.Equal(t, res.ExitCode, 1)
+	assert.Assert(t, strings.Contains(res.Combined(), "fail-1 exited with code 111"), res.Combined())
+	// failing exit code should be propagated
+	assert.Equal(t, res.ExitCode, 111)
 }
