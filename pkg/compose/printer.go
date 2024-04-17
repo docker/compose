@@ -138,9 +138,11 @@ func (p *printer) Run(cascade api.Cascade, exitCodeFrom string, stopFn func() er
 					if cascade == api.CascadeStop && exitCodeFrom == "" {
 						exitCodeFrom = event.Service
 					}
-					if exitCodeFrom == event.Service {
-						exitCode = event.ExitCode
-					}
+				}
+
+				if exitCodeFrom == event.Service && (event.Type == api.ContainerEventExit || event.Type == api.ContainerEventStopped) {
+					// Container was interrupted or exited, let's capture exit code
+					exitCode = event.ExitCode
 				}
 				if len(containers) == 0 {
 					// Last container terminated, done

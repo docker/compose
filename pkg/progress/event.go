@@ -176,6 +176,10 @@ func (e *Event) stop() {
 	e.spinner.Stop()
 }
 
+func (e *Event) hasMore() {
+	e.spinner.Restart()
+}
+
 var (
 	spinnerDone    = "✔"
 	spinnerWarning = "!"

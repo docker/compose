@@ -38,13 +38,11 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
 	err := progress.Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		w := progress.ContextWriter(ctx)
-		err := s.create(ctx, project, options.Create, options.Start.Attach != nil)
+		err := s.create(ctx, project, options.Create)
 		if err != nil {
 			return err
 		}
 		if options.Start.Attach == nil {
-			w.HasMore(false)
 			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil

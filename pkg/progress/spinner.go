@@ -64,3 +64,7 @@ func (s *spinner) String() string {
 func (s *spinner) Stop() {
 	s.stop = true
 }
+
+func (s *spinner) Restart() {
+	s.stop = false
+}

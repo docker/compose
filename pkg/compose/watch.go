@@ -470,7 +470,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 				Services: []string{serviceName},
 				Inherit:  true,
 				Recreate: api.RecreateForce,
-			}, true)
+			})
 			if err != nil {
 				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate service after update. Error: %v", err))
 				return err

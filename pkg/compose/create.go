@@ -68,17 +68,22 @@ type createConfigs struct {
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, createOpts, false)
+		return s.create(ctx, project, createOpts)
 	}, s.stdinfo(), "Creating")
 }
 
-func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions, willAttach bool) error {
+func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
 
+	err := project.CheckContainerNameUnicity()
+	if err != nil {
+		return err
+	}
+
 	var observedState Containers
-	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return err
 	}
@@ -112,10 +117,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 				"file, you can run this command with the "+
 				"--remove-orphans flag to clean it up.", orphans.names())
 		}
-	}
-
-	if willAttach {
-		progress.ContextWriter(ctx).HasMore(willAttach)
 	}
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
 }

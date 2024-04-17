@@ -110,7 +110,9 @@ func (l *logConsumer) write(w io.Writer, container, message string) {
 		p := l.getPresenter(container)
 		timestamp := time.Now().Format(jsonmessage.RFC3339NanoFixed)
 		for _, line := range strings.Split(message, "\n") {
-			ClearLine()
+			if KeyboardManager != nil {
+				ClearLine()
+			}
 			if l.timestamp {
 				fmt.Fprintf(w, "%s%s%s\n", p.prefix, timestamp, line)
 			} else {

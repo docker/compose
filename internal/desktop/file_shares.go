@@ -139,9 +139,6 @@ func NewFileShareManager(cli *Client, projectName string, hostPaths []string) *F
 // flow can continue.
 func (m *FileShareManager) EnsureExists(ctx context.Context) (err error) {
 	w := progress.ContextWriter(ctx)
-	// TODO(milas): this should be a per-node option, not global
-	w.HasMore(false)
-
 	w.Event(progress.NewEvent(fileShareProgressID, progress.Working, ""))
 	defer func() {
 		if err != nil {
