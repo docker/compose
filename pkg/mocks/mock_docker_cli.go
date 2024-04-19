@@ -9,6 +9,7 @@
 package mocks
 
 import (
+	context "context"
 	io "io"
 	reflect "reflect"
 
@@ -22,6 +23,9 @@ import (
 	trust "github.com/docker/cli/cli/trust"
 	client0 "github.com/docker/docker/client"
 	client1 "github.com/theupdateframework/notary/client"
+	metric "go.opentelemetry.io/otel/sdk/metric"
+	resource "go.opentelemetry.io/otel/sdk/resource"
+	trace "go.opentelemetry.io/otel/sdk/trace"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -235,6 +239,25 @@ func (mr *MockCliMockRecorder) ManifestStore() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ManifestStore", reflect.TypeOf((*MockCli)(nil).ManifestStore))
 }
 
+// MeterProvider mocks base method.
+func (m *MockCli) MeterProvider(arg0 context.Context, arg1 ...metric.Option) command.MeterProvider {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0}
+	for _, a := range arg1 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "MeterProvider", varargs...)
+	ret0, _ := ret[0].(command.MeterProvider)
+	return ret0
+}
+
+// MeterProvider indicates an expected call of MeterProvider.
+func (mr *MockCliMockRecorder) MeterProvider(arg0 any, arg1 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0}, arg1...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MeterProvider", reflect.TypeOf((*MockCli)(nil).MeterProvider), varargs...)
+}
+
 // NotaryClient mocks base method.
 func (m *MockCli) NotaryClient(arg0 trust.ImageRefAndAuth, arg1 []string) (client1.Repository, error) {
 	m.ctrl.T.Helper()
@@ -278,6 +301,20 @@ func (mr *MockCliMockRecorder) RegistryClient(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegistryClient", reflect.TypeOf((*MockCli)(nil).RegistryClient), arg0)
 }
 
+// Resource mocks base method.
+func (m *MockCli) Resource() *resource.Resource {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Resource")
+	ret0, _ := ret[0].(*resource.Resource)
+	return ret0
+}
+
+// Resource indicates an expected call of Resource.
+func (mr *MockCliMockRecorder) Resource() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resource", reflect.TypeOf((*MockCli)(nil).Resource))
+}
+
 // ServerInfo mocks base method.
 func (m *MockCli) ServerInfo() command.ServerInfo {
 	m.ctrl.T.Helper()
@@ -302,4 +339,23 @@ func (m *MockCli) SetIn(arg0 *streams.In) {
 func (mr *MockCliMockRecorder) SetIn(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetIn", reflect.TypeOf((*MockCli)(nil).SetIn), arg0)
+}
+
+// TracerProvider mocks base method.
+func (m *MockCli) TracerProvider(arg0 context.Context, arg1 ...trace.TracerProviderOption) command.TracerProvider {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0}
+	for _, a := range arg1 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "TracerProvider", varargs...)
+	ret0, _ := ret[0].(command.TracerProvider)
+	return ret0
+}
+
+// TracerProvider indicates an expected call of TracerProvider.
+func (mr *MockCliMockRecorder) TracerProvider(arg0 any, arg1 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0}, arg1...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TracerProvider", reflect.TypeOf((*MockCli)(nil).TracerProvider), varargs...)
 }
