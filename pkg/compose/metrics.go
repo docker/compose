@@ -16,7 +16,7 @@
 
 package compose
 
-// FailureCategory sruct regrouping metrics failure status and specific exit code
+// FailureCategory struct regrouping metrics failure status and specific exit code
 type FailureCategory struct {
 	MetricsStatus string
 	ExitCode      int

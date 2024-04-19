@@ -33,12 +33,12 @@ func (s *composeService) SetExperiments(experiments *experimental.State) {
 }
 
 func (s *composeService) manageDesktopFileSharesEnabled(ctx context.Context) bool {
-	// there's some slightly redundancy here to avoid fetching the config if
-	// we can already tell the feature state - in practice, we
-	if !s.isDesktopIntegrationActive() || !s.experiments.AutoFileShares() {
+	if !s.isDesktopIntegrationActive() {
 		return false
 	}
 
+	// synchronized file share support in Docker Desktop is dependent upon
+	// a variety of factors (settings, OS, etc), which this endpoint abstracts
 	fileSharesConfig, err := s.desktopCli.GetFileSharesConfig(ctx)
 	if err != nil {
 		logrus.Debugf("Failed to retrieve file shares config: %v", err)

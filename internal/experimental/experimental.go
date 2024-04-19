@@ -71,10 +71,6 @@ func (s *State) NavBar() bool {
 	return s.determineFeatureState("ComposeNav")
 }
 
-func (s *State) AutoFileShares() bool {
-	return s.determineFeatureState("ComposeAutoFileShares")
-}
-
 func (s *State) determineFeatureState(name string) bool {
 	if s == nil || !s.active || s.desktopValues == nil {
 		return false
