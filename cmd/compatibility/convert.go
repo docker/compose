@@ -19,6 +19,7 @@ package compatibility
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/docker/compose/v2/cmd/compose"
 )
@@ -55,6 +56,7 @@ func Convert(args []string) []string {
 	var rootFlags []string
 	command := []string{compose.PluginName}
 	l := len(args)
+ARGS:
 	for i := 0; i < l; i++ {
 		arg := args[i]
 		if contains(getCompletionCommands(), arg) {
@@ -81,14 +83,23 @@ func Convert(args []string) []string {
 			rootFlags = append(rootFlags, arg)
 			continue
 		}
-		if contains(getStringFlags(), arg) {
-			i++
-			if i >= l {
-				fmt.Fprintf(os.Stderr, "flag needs an argument: '%s'\n", arg)
-				os.Exit(1)
+		for _, flag := range getStringFlags() {
+			if arg == flag {
+				i++
+				if i >= l {
+					fmt.Fprintf(os.Stderr, "flag needs an argument: '%s'\n", arg)
+					os.Exit(1)
+				}
+				rootFlags = append(rootFlags, arg, args[i])
+				continue ARGS
 			}
-			rootFlags = append(rootFlags, arg, args[i])
-			continue
+			if strings.HasPrefix(arg, flag) {
+				_, val, found := strings.Cut(arg, "=")
+				if found {
+					rootFlags = append(rootFlags, flag, val)
+					continue ARGS
+				}
+			}
 		}
 		command = append(command, arg)
 	}
