@@ -39,6 +39,11 @@ func Test_convert(t *testing.T) {
 			want: []string{"--context", "foo", "compose", "-f", "compose.yaml", "up"},
 		},
 		{
+			name: "with context arg",
+			args: []string{"--context=foo", "-f", "compose.yaml", "up"},
+			want: []string{"--context", "foo", "compose", "-f", "compose.yaml", "up"},
+		},
+		{
 			name: "with host",
 			args: []string{"--host", "tcp://1.2.3.4", "up"},
 			want: []string{"--host", "tcp://1.2.3.4", "compose", "up"},
