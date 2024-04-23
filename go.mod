@@ -13,7 +13,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.13.1
-	github.com/docker/cli v26.0.1+incompatible
+	github.com/docker/cli v26.1.0+incompatible
 	github.com/docker/cli-docs-tool v0.7.0
 	github.com/docker/docker v26.0.1+incompatible
 	github.com/docker/go-connections v0.5.0
