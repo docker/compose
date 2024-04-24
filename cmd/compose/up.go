@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
+	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
@@ -301,7 +302,7 @@ func runUp(
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
 			Services:       services,
-			NavigationMenu: upOptions.navigationMenu,
+			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain",
 		},
 	})
 }
