@@ -17,10 +17,10 @@
 package compose
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPreferredIndentationStr(t *testing.T) {
@@ -83,10 +83,12 @@ func TestPreferredIndentationStr(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := preferredIndentationStr(tt.args.size, tt.args.useSpace)
-			if tt.wantErr && assert.NotNilf(t, err, fmt.Sprintf("preferredIndentationStr(%v, %v)", tt.args.size, tt.args.useSpace)) {
-				return
+			if tt.wantErr {
+				require.Errorf(t, err, "preferredIndentationStr(%v, %v)", tt.args.size, tt.args.useSpace)
+			} else {
+				require.NoError(t, err)
+				assert.Equalf(t, tt.want, got, "preferredIndentationStr(%v, %v)", tt.args.size, tt.args.useSpace)
 			}
-			assert.Equalf(t, tt.want, got, "preferredIndentationStr(%v, %v)", tt.args.size, tt.args.useSpace)
 		})
 	}
 }

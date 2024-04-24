@@ -23,6 +23,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	compose "github.com/docker/compose/v2/pkg/api"
@@ -128,7 +129,7 @@ func TestViz(t *testing.T) {
 			IncludeImageName: false,
 			IncludeNetworks:  false,
 		})
-		assert.NoError(t, err, "viz command failed")
+		require.NoError(t, err, "viz command failed")
 
 		// check indentation
 		assert.Contains(t, graphStr, "\n  ", graphStr)
@@ -187,7 +188,7 @@ func TestViz(t *testing.T) {
 			IncludeImageName: true,
 			IncludeNetworks:  true,
 		})
-		assert.NoError(t, err, "viz command failed")
+		require.NoError(t, err, "viz command failed")
 
 		// check indentation
 		assert.Contains(t, graphStr, "\n\t", graphStr)

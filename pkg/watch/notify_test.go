@@ -39,15 +39,15 @@ func TestWindowsBufferSize(t *testing.T) {
 	defer os.Setenv(WindowsBufferSizeEnvVar, orig) //nolint:errcheck
 
 	err := os.Setenv(WindowsBufferSizeEnvVar, "")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
 
 	err = os.Setenv(WindowsBufferSizeEnvVar, "a")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
 
 	err = os.Setenv(WindowsBufferSizeEnvVar, "10")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 10, DesiredWindowsBufferSize())
 }
 

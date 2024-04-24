@@ -27,6 +27,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -74,13 +75,13 @@ func TestPsTable(t *testing.T) {
 	cli.EXPECT().Out().Return(stdout).AnyTimes()
 	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 	err = runPs(ctx, cli, backend, nil, opts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = f.Seek(0, 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	output, err := os.ReadFile(out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Contains(t, string(output), "8080/tcp, 8443/tcp")
 }
