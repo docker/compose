@@ -149,10 +149,15 @@ jobs:
         name: Checkout
         uses: actions/checkout@v3
       - name: Install Docker ${{ matrix.engine }}
-        run: |
-          sudo apt-get install curl
-          curl -fsSL https://get.docker.com -o get-docker.sh
-          sudo sh ./get-docker.sh --version ${{ matrix.engine }}
+        uses: crazy-max/ghaction-setup-docker@v3
+        with:
+          version: v${{ matrix.engine }}
+          set-host: true
+          daemon-config: |
+            {
+              "debug": true
+            }
+
       - name: Check Docker Version
         run: docker --version
       -
