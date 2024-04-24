@@ -249,6 +249,34 @@ jobs:
         with:
           files: ./coverage.txt
 
+  vendor:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+          check-latest: true
+          cache: true
+      -
+        name: Build vendor
+        run: |
+          go mod vendor
+          mkdir -p bin/release
+          tar czf bin/release/docker-compose-vendor.tar.gz vendor
+      -
+        name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: compose
+          path: ./bin/release/*
+          if-no-files-found: error
+
   release:
     permissions:
       contents: write # to create a release (ncipollo/release-action)
