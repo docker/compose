@@ -50,7 +50,7 @@ func (ke *KeyboardError) printError(height int, info string) {
 	if ke.shouldDisplay() {
 		errMessage := ke.err.Error()
 
-		MoveCursor(height-linesOffset(info)-linesOffset(errMessage)-1, 0)
+		MoveCursor(height-1-extraLines(info)-extraLines(errMessage), 0)
 		ClearLine()
 
 		fmt.Print(errMessage)
@@ -132,13 +132,13 @@ func NewKeyboardManager(ctx context.Context, isDockerDesktopActive, isWatchConfi
 	km.signalChannel = sc
 
 	KeyboardManager = &km
-
-	HideCursor()
 }
 
-func (lk *LogKeyboard) PrintKeyboardInfo(printFn func()) {
-	printFn()
+func (lk *LogKeyboard) ClearKeyboardInfo() {
+	lk.clearNavigationMenu()
+}
 
+func (lk *LogKeyboard) PrintKeyboardInfo() {
 	if lk.logLevel == INFO {
 		lk.printNavigationMenu()
 	}
@@ -146,27 +146,28 @@ func (lk *LogKeyboard) PrintKeyboardInfo(printFn func()) {
 
 // Creates space to print error and menu string
 func (lk *LogKeyboard) createBuffer(lines int) {
-	allocateSpace(lines)
-
 	if lk.kError.shouldDisplay() {
-		extraLines := linesOffset(lk.kError.error()) + 1
-		allocateSpace(extraLines)
+		extraLines := extraLines(lk.kError.error()) + 1
 		lines += extraLines
 	}
 
+	// get the string
 	infoMessage := lk.navigationMenu()
-	extraLines := linesOffset(infoMessage) + 1
-	allocateSpace(extraLines)
+	// calculate how many lines we need to display the menu info
+	// might be needed a line break
+	extraLines := extraLines(infoMessage) + 1
 	lines += extraLines
 
 	if lines > 0 {
+		allocateSpace(lines)
 		MoveCursorUp(lines)
 	}
 }
 
 func (lk *LogKeyboard) printNavigationMenu() {
+	offset := 1
 	lk.clearNavigationMenu()
-	lk.createBuffer(0)
+	lk.createBuffer(offset)
 
 	if lk.logLevel == INFO {
 		height := goterm.Height()
@@ -177,7 +178,7 @@ func (lk *LogKeyboard) printNavigationMenu() {
 
 		lk.kError.printError(height, menu)
 
-		MoveCursor(height-linesOffset(menu), 0)
+		MoveCursor(height-extraLines(menu), 0)
 		ClearLine()
 		fmt.Print(menu)
 
@@ -207,6 +208,8 @@ func (lk *LogKeyboard) clearNavigationMenu() {
 	height := goterm.Height()
 	MoveCursorX(0)
 	SaveCursor()
+
+	// ClearLine()
 	for i := 0; i < height; i++ {
 		MoveCursorDown(1)
 		ClearLine()
@@ -308,7 +311,7 @@ func allocateSpace(lines int) {
 	}
 }
 
-func linesOffset(s string) int {
+func extraLines(s string) int {
 	return int(math.Floor(float64(lenAnsi(s)) / float64(goterm.Width())))
 }
 
