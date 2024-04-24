@@ -27,7 +27,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.13.0-rc3.0.20240417151852-71f99c52a669
+	github.com/moby/buildkit v0.13.1
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
@@ -107,6 +107,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
