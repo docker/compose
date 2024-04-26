@@ -9,7 +9,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.1.0
 	github.com/containerd/console v1.0.4
-	github.com/containerd/containerd v1.7.15
+	github.com/containerd/containerd v1.7.16
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.14.0
@@ -189,5 +189,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
-	tags.cncf.io/container-device-interface v0.6.2 // indirect
+	tags.cncf.io/container-device-interface v0.7.2 // indirect
 )
