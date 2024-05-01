@@ -1,4 +1,6 @@
-These topics describe version 2 of the Compose file format.
+This page describes version 2 of the Compose file format. 
+
+This is legacy content. The latest Compose file format is defined by the [Compose Specification](https://docs.docker.com/compose/compose-file/) and is implemented by Docker Compose **1.27.0+**.
 
 ## Compose and Docker compatibility matrix
 
@@ -6,7 +8,33 @@ There are several versions of the Compose file format – 1, 2, 2.x, and 3.x. Th
 table below is a quick look. For full details on what each version includes and
 how to upgrade, see **[About versions and upgrading](compose-versioning.md)**.
 
-{{< include "content/compose-matrix.md" >}}
+This table shows which Compose file versions support specific Docker releases.
+
+| **Compose file format** | **Docker Engine release** |
+|  -------------------    |    ------------------     |
+|  Compose specification  |       19.03.0+            |
+|      3.8                |       19.03.0+            |
+|      3.7                |       18.06.0+            |
+|      3.6                |       18.02.0+            |
+|      3.5                |       17.12.0+            |
+|      3.4                |       17.09.0+            |
+|      3.3                |       17.06.0+            |
+|      3.2                |       17.04.0+            |
+|      3.1                |       1.13.1+             |
+|      3.0                |       1.13.0+             |
+|      2.4                |       17.12.0+            |
+|      2.3                |       17.06.0+            |
+|      2.2                |       1.13.0+             |
+|      2.1                |       1.12.0+             |
+|      2.0                |       1.10.0+             |
+
+In addition to Compose file format versions shown in the table, the Compose
+itself is on a release schedule, as shown in [Compose
+releases](https://github.com/docker/compose/releases/), but file format versions
+do not necessarily increment with each release. For example, Compose file format
+3.0 was first introduced in [Compose release
+1.10.0](https://github.com/docker/compose/releases/tag/1.10.0), and versioned
+gradually in subsequent releases.
 
 ## Service configuration reference
 
@@ -205,7 +233,7 @@ build:
 > In your Dockerfile, if you specify `ARG` before the `FROM` instruction,
 > `ARG` is not available in the build instructions under `FROM`.
 > If you need an argument to be available in both places, also specify it under
-> the `FROM` instruction. Refer to the [understand how ARGS and FROM interact](../../reference/dockerfile.md#understand-how-arg-and-from-interact)
+> the `FROM` instruction. Refer to the [understand how ARGS and FROM interact](https://docs.docker.com/reference/dockerfile#understand-how-arg-and-from-interact)
 > section in the documentation for usage details.
 
 You can omit the value when specifying a build argument, in which case its value
@@ -261,7 +289,7 @@ An entry with the ip address and hostname is created in `/etc/hosts` inside cont
 Specify a build’s container isolation technology. On Linux, the only supported value
 is `default`. On Windows, acceptable values are `default`, `process` and
 `hyperv`. Refer to the
-[Docker Engine docs](../../reference/cli/docker/container/run.md#isolation)
+[Docker Engine docs](https://docs.docker.com/reference/cli/docker/container/run#isolation)
 for details.
 
 If unspecified, Compose will use the `isolation` value found in the service's definition
@@ -271,7 +299,7 @@ to determine the value to use for builds.
 
 > Added in [version 2.1](compose-versioning.md#version-21) file format
 
-Add metadata to the resulting image using [Docker labels](../../config/labels-custom-metadata.md).
+Add metadata to the resulting image using [Docker labels](https://docs.docker.com/config/labels-custom-metadata).
 You can use either an array or a dictionary.
 
 It's recommended that you use reverse-DNS notation to prevent your labels from
@@ -347,7 +375,7 @@ build:
 > Added in [version 2.3](compose-versioning.md#version-23) file format
 
 Build the specified stage as defined inside the `Dockerfile`. See the
-[multi-stage build docs](../../build/building/multi-stage.md) for
+[multi-stage build docs](https://docs.docker.com/build/building/multi-stage) for
 details.
 
 ```yaml
@@ -387,7 +415,7 @@ command: bundle exec thin -p 3000
 ```
 
 The command can also be a list, in a manner similar to
-[dockerfile](../../reference/dockerfile.md#cmd):
+[dockerfile](https://docs.docker.com/reference/dockerfile#cmd):
 
 ```yaml
 command: ["bundle", "exec", "thin", "-p", "3000"]
@@ -480,7 +508,7 @@ services:
 >
 > `depends_on` does not wait for `db` and `redis` to be "ready" before
 > starting `web` - only until they have been started. If you need to wait
-> for a service to be ready, see [Controlling startup order](../startup-order.md)
+> for a service to be ready, see [Controlling startup order](https://docs.docker.com/compose/startup-order/)
 > for more on this problem and strategies for solving it.
 
 > Added in [version 2.1](compose-versioning.md#version-21) file format.
@@ -562,7 +590,7 @@ entrypoint: /code/entrypoint.sh
 ```
 
 The entrypoint can also be a list, in a manner similar to
-[dockerfile](../../reference/dockerfile.md#entrypoint):
+[dockerfile](https://docs.docker.com/reference/dockerfile#entrypoint):
 
 ```yaml
 entrypoint: ["php", "-d", "memory_limit=-1", "vendor/bin/phpunit"]
@@ -718,7 +746,7 @@ indefinitely. Compose does not support circular references and `docker-compose`
 returns an error if it encounters one.
 
 For more on `extends`, see the
-[the extends documentation](../multiple-compose-files/extends.md)
+[the extends documentation](https://docs.docker.com/compose/multiple-compose-files/extends)
 
 ### external_links
 
@@ -766,7 +794,7 @@ host system to be added. An example of where this is useful is when multiple
 containers (running as different users) need to all read or write the same
 file on the host system. That file can be owned by a group shared by all the
 containers, and specified in `group_add`. See the
-[Docker documentation](../../reference/cli/docker/container/run.md#additional-groups) for more
+[Docker documentation](https://docs.docker.com/reference/cli/docker/container/run#additional-groups) for more
 details.
 
 A full example:
@@ -790,7 +818,7 @@ used.
 
 Configure a check that's run to determine whether or not containers for this
 service are "healthy". See the docs for the
-[HEALTHCHECK Dockerfile instruction](../../reference/dockerfile.md#healthcheck)
+[HEALTHCHECK Dockerfile instruction](https://docs.docker.com/reference/dockerfile#healthcheck)
 for details on how healthchecks work.
 
 ```yaml
@@ -879,7 +907,7 @@ services:
 > The default init binary that is used is [Tini](https://github.com/krallin/tini),
 > and is installed in `/usr/libexec/docker-init` on the daemon host. You can
 > configure the daemon to use a custom init binary through the
-> [`init-path` configuration option](../../reference/cli/dockerd.md#daemon-configuration-file).
+> [`init-path` configuration option](https://docs.docker.com/reference/cli/dockerd#daemon-configuration-file).
 
 ### isolation
 
@@ -888,12 +916,12 @@ services:
 Specify a container’s isolation technology. On Linux, the only supported value
 is `default`. On Windows, acceptable values are `default`, `process` and
 `hyperv`. Refer to the
-[Docker Engine docs](../../reference/cli/docker/container/run.md#isolation)
+[Docker Engine docs](https://docs.docker.com/reference/cli/docker/container/run#isolation)
 for details.
 
 ### labels
 
-Add metadata to containers using [Docker labels](../../config/labels-custom-metadata.md). You can use either an array or a dictionary.
+Add metadata to containers using [Docker labels](https://docs.docker.com/config/labels-custom-metadata). You can use either an array or a dictionary.
 
 It's recommended that you use reverse-DNS notation to prevent your labels from conflicting with those used by other software.
 
@@ -932,7 +960,7 @@ the alias, or the service name if no alias was specified.
 
 Links are not required to enable services to communicate - by default,
 any service can reach any other service at that service’s name. (See also, the
-[Links topic in Networking in Compose](../networking.md#link-containers).)
+[Links topic in Networking in Compose](https://docs.docker.com/compose/networking#link-containers).)
 
 Links also express dependency between services in the same way as
 [depends_on](#depends_on), so they determine the order of service startup.
@@ -956,7 +984,7 @@ logging:
 
 The `driver`  name specifies a logging driver for the service's
 containers, as with the ``--log-driver`` option for docker run
-([documented here](../../config/containers/logging/configure.md)).
+([documented here](https://docs.docker.com/config/containers/logging/configure)).
 
 The default value is json-file.
 
@@ -1282,7 +1310,7 @@ web:
 Specify the default number of containers to deploy for this service. Whenever
 you run `docker-compose up`, Compose creates or removes containers to match
 the specified number. This value can be overridden using the
-[`--scale`](../../reference/cli/docker/compose/up.md)
+[`--scale`](https://docs.docker.com/reference/cli/docker/compose/up)
 
 ```yaml
 web:
@@ -1395,7 +1423,7 @@ userns_mode: "host"
 ```
 
 Disables the user namespace for this service, if Docker daemon is configured with user namespaces.
-See [dockerd](../../engine/security/userns-remap.md#disable-namespace-remapping-for-a-container) for
+See [dockerd](https://docs.docker.com/engine/security/userns-remap#disable-namespace-remapping-for-a-container) for
 more information.
 
 ### volumes
@@ -1483,7 +1511,7 @@ volumes:
 > When creating bind mounts, using the long syntax requires the
 > referenced folder to be created beforehand. Using the short syntax
 > creates the folder on the fly if it doesn't exist.
-> See the [bind mounts documentation](../../storage/bind-mounts.md#differences-between--v-and---mount-behavior)
+> See the [bind mounts documentation](https://docs.docker.com/storage/bind-mounts#differences-between--v-and---mount-behavior)
 > for more information.
 
 ### volume\_driver
@@ -1504,7 +1532,7 @@ volume_driver: mydriver
 > entry in the [top-level `volumes` option](#volume-configuration-reference).
 
 
-See [Docker Volumes](../../storage/volumes.md) and
+See [Docker Volumes](https://docs.docker.com/storage/volumes) and
 [Volume Plugins](/engine/extend/plugins_volume/) for more information.
 
 ### volumes_from
@@ -1545,7 +1573,7 @@ restart: "unless-stopped"
 ### cpu_count, cpu_percent, cpu\_shares, cpu\_period, cpu\_quota, cpus, cpuset, domainname, hostname, ipc, mac\_address, mem\_limit, memswap\_limit, mem\_swappiness, mem\_reservation, oom_kill_disable, oom_score_adj, privileged, read\_only, shm\_size, stdin\_open, tty, user, working\_dir
 
 Each of these is a single value, analogous to its
-[docker run](../../reference/cli/docker/container/run.md#runtime-constraints-on-resources) counterpart.
+[docker run](https://docs.docker.com/reference/cli/docker/container/run#runtime-constraints-on-resources) counterpart.
 
 > Added in [version 2.2](compose-versioning.md#version-22) file format.
 >
@@ -1623,10 +1651,10 @@ While it is possible to declare [volumes](#volumes) on the fly as part of the
 service declaration, this section allows you to create named volumes that can be
 reused across multiple services (without relying on `volumes_from`), and are
 easily retrieved and inspected using the docker command line or API.
-See the [docker volume](../../reference/cli/docker/volume/create.md)
+See the [docker volume](https://docs.docker.com/reference/cli/docker/volume/create)
 subcommand documentation for more information.
 
-See [use volumes](../../storage/volumes.md) and [volume plugins](/engine/extend/plugins_volume/)
+See [use volumes](https://docs.docker.com/storage/volumes) and [volume plugins](/engine/extend/plugins_volume/)
 for general information on volumes.
 
 Here's an example of a two-service setup where a database's data directory is
@@ -1729,7 +1757,7 @@ volumes:
 > Added in [version 2.1](compose-versioning.md#version-21) file format.
 
 Add metadata to containers using
-[Docker labels](../../config/labels-custom-metadata.md). You can use either
+[Docker labels](https://docs.docker.com/config/labels-custom-metadata). You can use either
 an array or a dictionary.
 
 It's recommended that you use reverse-DNS notation to prevent your labels from
@@ -1778,7 +1806,7 @@ volumes:
 
 The top-level `networks` key lets you specify networks to be created. For a full
 explanation of Compose's use of Docker networking features, see the
-[Networking guide](../networking.md).
+[Networking guide](https://docs.docker.com/compose/networking).
 
 ### driver
 
@@ -1862,7 +1890,7 @@ you can set this option to `true`.
 > Added in [version 2.1](compose-versioning.md#version-21) file format.
 
 Add metadata to containers using
-[Docker labels](../../config/labels-custom-metadata.md). You can use either
+[Docker labels](https://docs.docker.com/config/labels-custom-metadata). You can use either
 an array or a dictionary.
 
 It's recommended that you use reverse-DNS notation to prevent your labels from
@@ -1958,10 +1986,151 @@ networks:
 
 ## Variable substitution
 
-{{< include "content/compose-var-sub.md" >}}
+Your configuration options can contain environment variables. Compose uses the
+variable values from the shell environment in which `docker compose` is run. For
+example, suppose the shell contains `POSTGRES_VERSION=9.3` and you supply this
+configuration:
+
+```yaml
+db:
+  image: "postgres:${POSTGRES_VERSION}"
+```
+
+When you run `docker compose up` with this configuration, Compose looks for the
+`POSTGRES_VERSION` environment variable in the shell and substitutes its value
+in. For this example, Compose resolves the `image` to `postgres:9.3` before
+running the configuration.
+
+If an environment variable is not set, Compose substitutes with an empty
+string. In the example above, if `POSTGRES_VERSION` is not set, the value for
+the `image` option is `postgres:`.
+
+You can set default values for environment variables using a
+`.env` file, which Compose automatically looks for in
+project directory (parent folder of your Compose file). 
+Values set in the shell environment override those set in the `.env` file.
+
+> Note when using docker stack deploy
+>
+> The `.env file` feature only works when you use the `docker compose up` command
+> and does not work with `docker stack deploy`.
+{ .important }
+
+Both `$VARIABLE` and `${VARIABLE}` syntax are supported. Additionally when using
+the [2.1 file format](compose-versioning.md#version-21), it is possible to
+provide inline default values using typical shell syntax:
+
+- `${VARIABLE:-default}` evaluates to `default` if `VARIABLE` is unset or
+  empty in the environment.
+- `${VARIABLE-default}` evaluates to `default` only if `VARIABLE` is unset
+  in the environment.
+
+Similarly, the following syntax allows you to specify mandatory variables:
+
+- `${VARIABLE:?err}` exits with an error message containing `err` if
+  `VARIABLE` is unset or empty in the environment.
+- `${VARIABLE?err}` exits with an error message containing `err` if
+  `VARIABLE` is unset in the environment.
+
+Other extended shell-style features, such as `${VARIABLE/foo/bar}`, are not
+supported.
+
+You can use a `$$` (double-dollar sign) when your configuration needs a literal
+dollar sign. This also prevents Compose from interpolating a value, so a `$$`
+allows you to refer to environment variables that you don't want processed by
+Compose.
+
+```yaml
+web:
+  build: .
+  command: "$$VAR_NOT_INTERPOLATED_BY_COMPOSE"
+```
+
+If you forget and use a single dollar sign (`$`), Compose interprets the value
+as an environment variable and warns you:
+
+```console
+The VAR_NOT_INTERPOLATED_BY_COMPOSE is not set. Substituting an empty string.
+```
 
 ## Extension fields
 
 > Added in [version 2.1](compose-versioning.md#version-21) file format.
 
-{{< include "content/compose-extfields-sub.md" >}}
+It is possible to re-use configuration fragments using extension fields. Those
+special fields can be of any format as long as they are located at the root of
+your Compose file and their name start with the `x-` character sequence.
+
+> **Note**
+>
+> Starting with the 3.7 format (for the 3.x series) and 2.4 format
+> (for the 2.x series), extension fields are also allowed at the root
+> of service, volume, network, config and secret definitions.
+
+```yaml
+version: "{{% param "compose_file_v3" %}}"
+x-custom:
+  items:
+    - a
+    - b
+  options:
+    max-size: '12m'
+  name: "custom"
+```
+
+The contents of those fields are ignored by Compose, but they can be
+inserted in your resource definitions using [YAML anchors](https://yaml.org/spec/1.2/spec.html#id2765878).
+For example, if you want several of your services to use the same logging
+configuration:
+
+```yaml
+logging:
+  options:
+    max-size: '12m'
+    max-file: '5'
+  driver: json-file
+```
+
+You may write your Compose file as follows:
+
+```yaml
+version: "{{% param "compose_file_v3" %}}"
+x-logging:
+  &default-logging
+  options:
+    max-size: '12m'
+    max-file: '5'
+  driver: json-file
+
+services:
+  web:
+    image: myapp/web:latest
+    logging: *default-logging
+  db:
+    image: mysql:latest
+    logging: *default-logging
+```
+
+It is also possible to partially override values in extension fields using
+the [YAML merge type](https://yaml.org/type/merge.html). For example:
+
+```yaml
+version: "{{% param "compose_file_v3" %}}"
+x-volumes:
+  &default-volume
+  driver: foobar-storage
+
+services:
+  web:
+    image: myapp/web:latest
+    volumes: ["vol1", "vol2", "vol3"]
+volumes:
+  vol1: *default-volume
+  vol2:
+    << : *default-volume
+    name: volume02
+  vol3:
+    << : *default-volume
+    driver: default
+    name: volume-local
+```
