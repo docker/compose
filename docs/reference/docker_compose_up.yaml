@@ -123,9 +123,9 @@ options:
       value_type: bool
       default_value: "false"
       description: |
-        Enable interactive shortcuts when running attached (Experimental). Incompatible with --detach.
+        Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.
       deprecated: false
-      hidden: true
+      hidden: false
       experimental: false
       experimentalcli: false
       kubernetes: false

@@ -118,6 +118,9 @@ long: |-
     Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` stops docker compose from detecting orphaned
     containers for the project.
 
+    Setting the `COMPOSE_MENU` environment variable to `false` disables the helper menu when running `docker compose up`
+    in attached mode. Alternatively, you can also run `docker compose up --menu=false` to disable the helper menu.
+
     ### Use Dry Run mode to test your command
 
     Use `--dry-run` flag to test a command without changing your application stack state.
