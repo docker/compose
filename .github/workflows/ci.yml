@@ -64,6 +64,10 @@ jobs:
 
   binary:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
     needs:
       - prepare
     strategy:
@@ -94,6 +98,11 @@ jobs:
             *.platform=${{ matrix.platform }}
             *.cache-from=type=gha,scope=binary-${{ env.PLATFORM_PAIR }}
             *.cache-to=type=gha,scope=binary-${{ env.PLATFORM_PAIR }},mode=max
+      -
+        name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ./bin/release/*
       -
         name: Upload artifacts
         uses: actions/upload-artifact@v3
