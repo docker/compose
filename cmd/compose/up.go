@@ -164,8 +164,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
-	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached (Experimental). Incompatible with --detach.")
-	flags.MarkHidden("menu") //nolint:errcheck
+	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
 
 	return upCmd
 }
