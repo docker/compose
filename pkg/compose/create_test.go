@@ -25,6 +25,7 @@ import (
 	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/docker/api/types/network"
 
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
@@ -274,4 +275,55 @@ func TestDefaultNetworkSettings(t *testing.T) {
 		assert.Equal(t, string(networkMode), "host")
 		assert.Check(t, cmp.Nil(networkConfig))
 	})
+}
+
+func TestCreateEndpointSettings(t *testing.T) {
+	eps := createEndpointSettings(
+		&composetypes.Project{
+			Name: "projName",
+		},
+		composetypes.ServiceConfig{
+			Name:          "serviceName",
+			ContainerName: "containerName",
+			Networks: map[string]*composetypes.ServiceNetworkConfig{
+				"netName": {
+					Priority:     100,
+					Aliases:      []string{"alias1", "alias2"},
+					Ipv4Address:  "10.16.17.18",
+					Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
+					LinkLocalIPs: []string{"169.254.10.20"},
+					MacAddress:   "10:00:00:00:01",
+					DriverOpts: composetypes.Options{
+						"driverOpt1": "optval1",
+						"driverOpt2": "optval2",
+					},
+				},
+			},
+		},
+		0,                          // serviceIndex
+		"netName",                  // networkKey
+		[]string{"link1", "link2"}, // links
+		true,                       // useNetworkAliases
+	)
+	assert.Check(t, cmp.DeepEqual(eps, &network.EndpointSettings{
+		IPAMConfig: &network.EndpointIPAMConfig{
+			IPv4Address:  "10.16.17.18",
+			IPv6Address:  "fdb4:7a7f:373a:3f0c::42",
+			LinkLocalIPs: []string{"169.254.10.20"},
+		},
+		Links:      []string{"link1", "link2"},
+		Aliases:    []string{"containerName", "serviceName", "alias1", "alias2"},
+		MacAddress: "10:00:00:00:01",
+		DriverOpts: map[string]string{
+			"driverOpt1": "optval1",
+			"driverOpt2": "optval2",
+		},
+
+		// FIXME(robmry) - IPAddress and IPv6Gateway are "operational data" fields...
+		//  - The IPv6 address here is the container's address, not the gateway.
+		//  - Both fields will be cleared by the daemon, but they could be removed from
+		//    the request.
+		IPAddress:   "10.16.17.18",
+		IPv6Gateway: "fdb4:7a7f:373a:3f0c::42",
+	}))
 }
