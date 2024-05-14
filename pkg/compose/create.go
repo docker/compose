@@ -439,6 +439,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		ipv4Address string
 		ipv6Address string
 		macAddress  string
+		driverOpts  types.Options
 	)
 	if config != nil {
 		ipv4Address = config.Ipv4Address
@@ -449,6 +450,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 			LinkLocalIPs: config.LinkLocalIPs,
 		}
 		macAddress = config.MacAddress
+		driverOpts = config.DriverOpts
 	}
 	return &network.EndpointSettings{
 		Aliases:     getAliases(p, service, serviceIndex, networkKey, useNetworkAliases),
@@ -457,6 +459,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		IPv6Gateway: ipv6Address,
 		IPAMConfig:  ipam,
 		MacAddress:  macAddress,
+		DriverOpts:  driverOpts,
 	}
 }
 
