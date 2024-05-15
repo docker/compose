@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -595,6 +597,14 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 }
 
 func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
+	os.Setenv("COMPOSE_CLIENT_OS", runtime.GOOS)
+	os.Setenv("COMPOSE_CLIENT_ARCH", runtime.GOARCH)
+
+	if user, err := user.Current(); err == nil {
+		os.Setenv("COMPOSE_CLIENT_UID", user.Uid)
+		os.Setenv("COMPOSE_CLIENT_GID", user.Gid)
+	}
+
 	if len(prjOpts.EnvFiles) == 0 {
 		if envFiles := os.Getenv(ComposeEnvFiles); envFiles != "" {
 			prjOpts.EnvFiles = strings.Split(envFiles, ",")
