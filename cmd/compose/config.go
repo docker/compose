@@ -143,47 +143,15 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	return cmd
 }
 
-func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
+func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) (err error) {
 	var content []byte
 	if opts.noInterpolate {
-		// we can't use ToProject, so the model we render here is only partially resolved
-		model, err := opts.ToModel(ctx, dockerCli, services)
-		if err != nil {
-			return err
-		}
-
-		if opts.resolveImageDigests {
-			err = resolveImageDigests(ctx, dockerCli, model)
-			if err != nil {
-				return err
-			}
-		}
-
-		content, err = formatModel(model, opts.Format)
+		content, err = runConfigNoInterpolate(ctx, dockerCli, opts, services)
 		if err != nil {
 			return err
 		}
 	} else {
-		project, err := opts.ToProject(ctx, dockerCli, services)
-		if err != nil {
-			return err
-		}
-
-		if !opts.noConsistency {
-			err := project.CheckContainerNameUnicity()
-			if err != nil {
-				return err
-			}
-		}
-
-		switch opts.Format {
-		case "json":
-			content, err = project.MarshalJSON()
-		case "yaml":
-			content, err = project.MarshalYAML()
-		default:
-			return fmt.Errorf("unsupported format %q", opts.Format)
-		}
+		content, err = runConfigInterpolate(ctx, dockerCli, opts, services)
 		if err != nil {
 			return err
 		}
@@ -200,8 +168,60 @@ func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, s
 	if opts.Output != "" && len(content) > 0 {
 		return os.WriteFile(opts.Output, content, 0o666)
 	}
-	_, err := fmt.Fprint(dockerCli.Out(), string(content))
+	_, err = fmt.Fprint(dockerCli.Out(), string(content))
 	return err
+}
+
+func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) ([]byte, error) {
+	project, err := opts.ToProject(ctx, dockerCli, services)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.resolveImageDigests {
+		project, err = project.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !opts.noConsistency {
+		err := project.CheckContainerNameUnicity()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var content []byte
+	switch opts.Format {
+	case "json":
+		content, err = project.MarshalJSON()
+	case "yaml":
+		content, err = project.MarshalYAML()
+	default:
+		return nil, fmt.Errorf("unsupported format %q", opts.Format)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return content, nil
+}
+
+func runConfigNoInterpolate(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) ([]byte, error) {
+	// we can't use ToProject, so the model we render here is only partially resolved
+	model, err := opts.ToModel(ctx, dockerCli, services)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.resolveImageDigests {
+		err = resolveImageDigests(ctx, dockerCli, model)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return formatModel(model, opts.Format)
 }
 
 func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) (err error) {
@@ -342,6 +362,7 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 	if err != nil {
 		return err
 	}
+
 	for _, s := range project.Services {
 		fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
 	}
