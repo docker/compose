@@ -5,11 +5,11 @@
 //
 //	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
 //
+
 // Package mocks is a generated GoMock package.
 package mocks
 
 import (
-	context "context"
 	io "io"
 	reflect "reflect"
 
@@ -23,9 +23,9 @@ import (
 	trust "github.com/docker/cli/cli/trust"
 	client0 "github.com/docker/docker/client"
 	client1 "github.com/theupdateframework/notary/client"
-	metric "go.opentelemetry.io/otel/sdk/metric"
+	metric "go.opentelemetry.io/otel/metric"
 	resource "go.opentelemetry.io/otel/sdk/resource"
-	trace "go.opentelemetry.io/otel/sdk/trace"
+	trace "go.opentelemetry.io/otel/trace"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -240,22 +240,17 @@ func (mr *MockCliMockRecorder) ManifestStore() *gomock.Call {
 }
 
 // MeterProvider mocks base method.
-func (m *MockCli) MeterProvider(arg0 context.Context, arg1 ...metric.Option) command.MeterProvider {
+func (m *MockCli) MeterProvider() metric.MeterProvider {
 	m.ctrl.T.Helper()
-	varargs := []any{arg0}
-	for _, a := range arg1 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "MeterProvider", varargs...)
-	ret0, _ := ret[0].(command.MeterProvider)
+	ret := m.ctrl.Call(m, "MeterProvider")
+	ret0, _ := ret[0].(metric.MeterProvider)
 	return ret0
 }
 
 // MeterProvider indicates an expected call of MeterProvider.
-func (mr *MockCliMockRecorder) MeterProvider(arg0 any, arg1 ...any) *gomock.Call {
+func (mr *MockCliMockRecorder) MeterProvider() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{arg0}, arg1...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MeterProvider", reflect.TypeOf((*MockCli)(nil).MeterProvider), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MeterProvider", reflect.TypeOf((*MockCli)(nil).MeterProvider))
 }
 
 // NotaryClient mocks base method.
@@ -342,20 +337,15 @@ func (mr *MockCliMockRecorder) SetIn(arg0 any) *gomock.Call {
 }
 
 // TracerProvider mocks base method.
-func (m *MockCli) TracerProvider(arg0 context.Context, arg1 ...trace.TracerProviderOption) command.TracerProvider {
+func (m *MockCli) TracerProvider() trace.TracerProvider {
 	m.ctrl.T.Helper()
-	varargs := []any{arg0}
-	for _, a := range arg1 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "TracerProvider", varargs...)
-	ret0, _ := ret[0].(command.TracerProvider)
+	ret := m.ctrl.Call(m, "TracerProvider")
+	ret0, _ := ret[0].(trace.TracerProvider)
 	return ret0
 }
 
 // TracerProvider indicates an expected call of TracerProvider.
-func (mr *MockCliMockRecorder) TracerProvider(arg0 any, arg1 ...any) *gomock.Call {
+func (mr *MockCliMockRecorder) TracerProvider() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{arg0}, arg1...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TracerProvider", reflect.TypeOf((*MockCli)(nil).TracerProvider), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TracerProvider", reflect.TypeOf((*MockCli)(nil).TracerProvider))
 }
