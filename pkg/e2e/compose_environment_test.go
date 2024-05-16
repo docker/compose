@@ -117,7 +117,8 @@ func TestEnvPriority(t *testing.T) {
 			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		cmd.Env = append(cmd.Env, "COMPOSE_ENV_FILES=./fixtures/environment/env-priority/.env.override.with.default")
 		res := icmd.RunCmd(cmd)
-		assert.Equal(t, strings.TrimSpace(res.Stdout()), "EnvFileDefaultValue")
+		stdout := res.Stdout()
+		assert.Equal(t, strings.TrimSpace(stdout), "EnvFileDefaultValue")
 	})
 
 	// No Compose file and env variable pass to the run command

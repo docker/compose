@@ -1,0 +1,4 @@
+services:
+  echo:
+    image: alpine
+    command: echo $ROOT $SUB win=$WIN

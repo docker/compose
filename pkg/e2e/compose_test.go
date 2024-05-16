@@ -329,3 +329,24 @@ func TestResolveDotEnv(t *testing.T) {
 		Out:      "image: backend:latest",
 	})
 }
+
+func TestNestedDotEnv(t *testing.T) {
+	c := NewCLI(t)
+
+	cmd := c.NewDockerComposeCmd(t, "run", "echo")
+	cmd.Dir = filepath.Join(".", "fixtures", "nested")
+	res := icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Expected{
+		ExitCode: 0,
+		Out:      "root win=root",
+	})
+
+	cmd = c.NewDockerComposeCmd(t, "run", "echo")
+	cmd.Dir = filepath.Join(".", "fixtures", "nested", "sub")
+	res = icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Expected{
+		ExitCode: 0,
+		Out:      "root sub win=sub",
+	})
+
+}
