@@ -171,13 +171,20 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-	f.StringArrayVar(&o.EnvFiles, "env-file", nil, "Specify an alternate environment file")
+	f.StringArrayVar(&o.EnvFiles, "env-file", defaultStringArrayVar(ComposeEnvFiles), "Specify an alternate environment file")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
 	f.StringVar(&o.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	f.BoolVar(&o.All, "all-resources", false, "Include all resources, even those not used by services")
 	_ = f.MarkHidden("workdir")
+}
+
+// get default value for a command line flag that is set by a coma-separated value in environment variable
+func defaultStringArrayVar(env string) []string {
+	return strings.FieldsFunc(os.Getenv(env), func(c rune) bool {
+		return c == ','
+	})
 }
 
 func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cli, services ...string) (*types.Project, string, error) {
@@ -384,7 +391,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 			ctx := cmd.Context()
 
 			// (1) process env vars
-			err := setEnvWithDotEnv(&opts)
+			err := setEnvWithLocalDotEnv(&opts)
 			if err != nil {
 				return err
 			}
@@ -594,18 +601,29 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 	return c
 }
 
-func setEnvWithDotEnv(prjOpts *ProjectOptions) error {
-	if len(prjOpts.EnvFiles) == 0 {
-		if envFiles := os.Getenv(ComposeEnvFiles); envFiles != "" {
-			prjOpts.EnvFiles = strings.Split(envFiles, ",")
-		}
+// If user has a local .env file, load it as os.environment so it can be used to set COMPOSE_ variables
+// This also allows to override values set by the default .env in a compose project when ran from a distinct folder
+func setEnvWithLocalDotEnv(prjOpts *ProjectOptions) error {
+	if len(prjOpts.EnvFiles) > 0 {
+		return nil
 	}
-	options, err := prjOpts.toProjectOptions()
+
+	wd, err := os.Getwd()
 	if err != nil {
 		return compose.WrapComposeError(err)
 	}
 
-	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), options.EnvFiles)
+	defaultDotEnv := filepath.Join(wd, ".env")
+
+	s, err := os.Stat(defaultDotEnv)
+	if os.IsNotExist(err) || s.IsDir() {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), []string{defaultDotEnv})
 	if err != nil {
 		return err
 	}
