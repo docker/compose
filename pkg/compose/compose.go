@@ -324,3 +324,10 @@ func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 func (s *composeService) isDesktopIntegrationActive() bool {
 	return s.desktopCli != nil
 }
+
+func (s *composeService) isDesktopUIEnabled() bool {
+	if !s.isDesktopIntegrationActive() {
+		return false
+	}
+	return s.experiments.ComposeUI()
+}

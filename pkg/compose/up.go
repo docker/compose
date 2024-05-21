@@ -97,9 +97,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			} else {
 				isWatchConfigured := s.shouldWatch(project)
 				isDockerDesktopActive := s.isDesktopIntegrationActive()
+				isDDComposeUI := s.isDesktopUIEnabled()
 				tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
 
-				formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.Watch)
+				formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, isDDComposeUI, signalChan, s.Watch)
 				if options.Start.Watch {
 					formatter.KeyboardManager.StartWatch(ctx, project, options)
 				}

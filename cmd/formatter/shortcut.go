@@ -106,6 +106,7 @@ type LogKeyboard struct {
 	Watch                 KeyboardWatch
 	IsDockerDesktopActive bool
 	IsWatchConfigured     bool
+	IsDDComposeUIActive   bool
 	logLevel              KEYBOARD_LOG_LEVEL
 	signalChannel         chan<- os.Signal
 }
@@ -113,7 +114,7 @@ type LogKeyboard struct {
 var KeyboardManager *LogKeyboard
 var eg multierror.Group
 
-func NewKeyboardManager(ctx context.Context, isDockerDesktopActive, isWatchConfigured bool,
+func NewKeyboardManager(ctx context.Context, isDockerDesktopActive, isWatchConfigured, isDockerDesktopConfigActive bool,
 	sc chan<- os.Signal,
 	watchFn func(ctx context.Context,
 		project *types.Project,
@@ -124,6 +125,7 @@ func NewKeyboardManager(ctx context.Context, isDockerDesktopActive, isWatchConfi
 	km := LogKeyboard{}
 	km.IsDockerDesktopActive = isDockerDesktopActive
 	km.IsWatchConfigured = isWatchConfigured
+	km.IsDDComposeUIActive = isDockerDesktopConfigActive
 	km.logLevel = INFO
 
 	km.Watch.Watching = false
@@ -192,8 +194,16 @@ func (lk *LogKeyboard) navigationMenu() string {
 	if lk.IsDockerDesktopActive {
 		openDDInfo = shortcutKeyColor("v") + navColor(" View in Docker Desktop")
 	}
-	var watchInfo string
+
+	var openDDUI string
 	if openDDInfo != "" {
+		openDDUI = navColor("   ")
+	}
+	if lk.IsDDComposeUIActive {
+		openDDUI = openDDUI + shortcutKeyColor("o") + navColor(" View Config")
+	}
+	var watchInfo string
+	if openDDInfo != "" || openDDUI != "" {
 		watchInfo = navColor("   ")
 	}
 	var isEnabled = " Enable"
@@ -201,7 +211,7 @@ func (lk *LogKeyboard) navigationMenu() string {
 		isEnabled = " Disable"
 	}
 	watchInfo = watchInfo + shortcutKeyColor("w") + navColor(isEnabled+" Watch")
-	return openDDInfo + watchInfo
+	return openDDInfo + openDDUI + watchInfo
 }
 
 func (lk *LogKeyboard) clearNavigationMenu() {
@@ -228,6 +238,23 @@ func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Pro
 			if err != nil {
 				err = fmt.Errorf("Could not open Docker Desktop")
 				lk.keyboardError("View", err)
+			}
+			return err
+		}),
+	)
+}
+
+func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Project) {
+	if !lk.IsDDComposeUIActive {
+		return
+	}
+	eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/composeview", tracing.SpanOptions{},
+		func(ctx context.Context) error {
+			link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s", project.Name)
+			err := open.Run(link)
+			if err != nil {
+				err = fmt.Errorf("Could not open Docker Desktop Compose UI")
+				lk.keyboardError("View Config", err)
 			}
 			return err
 		}),
@@ -284,6 +311,8 @@ func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Cont
 		lk.openDockerDesktop(ctx, project)
 	case 'w':
 		lk.StartWatch(ctx, project, options)
+	case 'o':
+		lk.openDDComposeUI(ctx, project)
 	}
 	switch key := event.Key; key {
 	case keyboard.KeyCtrlC:
