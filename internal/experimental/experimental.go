@@ -71,6 +71,10 @@ func (s *State) NavBar() bool {
 	return s.determineFeatureState("ComposeNav")
 }
 
+func (s *State) ComposeUI() bool {
+	return s.determineFeatureState("ComposeUIView")
+}
+
 func (s *State) determineFeatureState(name string) bool {
 	if s == nil || !s.active || s.desktopValues == nil {
 		return false
