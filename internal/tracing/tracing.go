@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/docker/compose/v2/internal"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/buildkit/util/tracing/detect"
@@ -46,7 +46,7 @@ func init() {
 	otel.SetErrorHandler(skipErrors{})
 }
 
-var Tracer = otel.Tracer("compose")
+var TracingProvider trace.TracerProvider
 
 // OTLPConfig contains the necessary values to initialize an OTLP client
 // manually.
@@ -66,10 +66,6 @@ type envMap map[string]string
 func InitTracing(dockerCli command.Cli) (ShutdownFunc, error) {
 	// set global propagator to tracecontext (the default is no-op).
 	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	if v, _ := strconv.ParseBool(os.Getenv("COMPOSE_EXPERIMENTAL_OTEL")); !v {
-		return nil, nil
-	}
 
 	return InitProvider(dockerCli)
 }
@@ -120,6 +116,7 @@ func InitProvider(dockerCli command.Cli) (ShutdownFunc, error) {
 		sdktrace.WithBatcher(muxExporter),
 	)
 	otel.SetTracerProvider(tracerProvider)
+	TracingProvider = tracerProvider
 
 	// Shutdown will flush any remaining spans and shut down the exporter.
 	return tracerProvider.Shutdown, nil

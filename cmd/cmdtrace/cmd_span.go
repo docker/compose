@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,13 +46,17 @@ import (
 // command invocation to ensure the span is properly finalized and
 // exported before exit.
 func Setup(cmd *cobra.Command, dockerCli command.Cli, args []string) error {
+	if v, _ := strconv.ParseBool(os.Getenv("COMPOSE_EXPERIMENTAL_OTEL")); !v {
+		return nil
+	}
+
 	tracingShutdown, err := tracing.InitTracing(dockerCli)
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
 
 	ctx := cmd.Context()
-	ctx, cmdSpan := tracing.Tracer.Start(
+	ctx, cmdSpan := tracing.TracingProvider.Tracer("compose").Start(
 		ctx,
 		"cli/"+strings.Join(commandName(cmd), "-"),
 	)
