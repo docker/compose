@@ -46,8 +46,6 @@ func init() {
 	otel.SetErrorHandler(skipErrors{})
 }
 
-var Tracer = otel.Tracer("compose")
-
 // OTLPConfig contains the necessary values to initialize an OTLP client
 // manually.
 //

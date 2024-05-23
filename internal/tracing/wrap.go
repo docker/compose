@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/acarl005/stripansi"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.19.0"
@@ -36,7 +37,7 @@ import (
 // adding even more levels of function wrapping/indirection.
 func SpanWrapFunc(spanName string, opts SpanOptions, fn func(ctx context.Context) error) func(context.Context) error {
 	return func(ctx context.Context) error {
-		ctx, span := Tracer.Start(ctx, spanName, opts.SpanStartOptions()...)
+		ctx, span := otel.Tracer("").Start(ctx, spanName, opts.SpanStartOptions()...)
 		defer span.End()
 
 		if err := fn(ctx); err != nil {
@@ -59,7 +60,7 @@ func SpanWrapFunc(spanName string, opts SpanOptions, fn func(ctx context.Context
 // adding even more levels of function wrapping/indirection.
 func SpanWrapFuncForErrGroup(ctx context.Context, spanName string, opts SpanOptions, fn func(ctx context.Context) error) func() error {
 	return func() error {
-		ctx, span := Tracer.Start(ctx, spanName, opts.SpanStartOptions()...)
+		ctx, span := otel.Tracer("").Start(ctx, spanName, opts.SpanStartOptions()...)
 		defer span.End()
 
 		if err := fn(ctx); err != nil {
