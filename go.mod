@@ -12,7 +12,7 @@ require (
 	github.com/containerd/containerd v1.7.16
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
-	github.com/docker/buildx v0.14.0
+	github.com/docker/buildx v0.14.1
 	github.com/docker/cli v26.1.3+incompatible
 	github.com/docker/cli-docs-tool v0.7.0
 	github.com/docker/docker v26.1.3+incompatible
