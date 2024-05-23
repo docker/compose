@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/docker/compose/v2/internal"
@@ -64,11 +63,6 @@ type envMap map[string]string
 func InitTracing(dockerCli command.Cli) (ShutdownFunc, error) {
 	// set global propagator to tracecontext (the default is no-op).
 	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	if v, _ := strconv.ParseBool(os.Getenv("COMPOSE_EXPERIMENTAL_OTEL")); !v {
-		return nil, nil
-	}
-
 	return InitProvider(dockerCli)
 }
 
