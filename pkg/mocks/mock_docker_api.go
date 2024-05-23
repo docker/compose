@@ -5,7 +5,6 @@
 //
 //	mockgen -destination pkg/mocks/mock_docker_api.go -package mocks github.com/docker/docker/client APIClient
 //
-
 // Package mocks is a generated GoMock package.
 package mocks
 
