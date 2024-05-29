@@ -45,17 +45,17 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 	for i, container := range containers {
 		i, container := i, container
 		eg.Go(func() error {
-			var publishers []api.PortPublisher
+			publishers := make([]api.PortPublisher, len(container.Ports))
 			sort.Slice(container.Ports, func(i, j int) bool {
 				return container.Ports[i].PrivatePort < container.Ports[j].PrivatePort
 			})
-			for _, p := range container.Ports {
-				publishers = append(publishers, api.PortPublisher{
+			for i, p := range container.Ports {
+				publishers[i] = api.PortPublisher{
 					URL:           p.IP,
 					TargetPort:    int(p.PrivatePort),
 					PublishedPort: int(p.PublicPort),
 					Protocol:      p.Type,
-				})
+				}
 			}
 
 			inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)
