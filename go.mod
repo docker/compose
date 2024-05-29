@@ -7,7 +7,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.1.1
+	github.com/compose-spec/compose-go/v2 v2.1.2-0.20240530052535-7dfa54c9658b
 	github.com/containerd/console v1.0.4
 	github.com/containerd/containerd v1.7.17
 	github.com/davecgh/go-spew v1.1.1
