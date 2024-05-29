@@ -56,7 +56,7 @@ func TestPs(t *testing.T) {
 
 	expected := []compose.ContainerSummary{
 		{ID: "123", Name: "123", Names: []string{"/123"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
-			State: "running", Health: "healthy", Publishers: nil,
+			State: "running", Health: "healthy", Publishers: []compose.PortPublisher{},
 			Labels: map[string]string{
 				compose.ProjectLabel:     strings.ToLower(testProject),
 				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
@@ -75,7 +75,7 @@ func TestPs(t *testing.T) {
 			},
 		},
 		{ID: "789", Name: "789", Names: []string{"/789"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service2",
-			State: "exited", Health: "", ExitCode: 130, Publishers: nil,
+			State: "exited", Health: "", ExitCode: 130, Publishers: []compose.PortPublisher{},
 			Labels: map[string]string{
 				compose.ProjectLabel:     strings.ToLower(testProject),
 				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
