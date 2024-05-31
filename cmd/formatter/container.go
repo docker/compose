@@ -216,8 +216,8 @@ func (c *ContainerContext) Ports() string {
 	for _, publisher := range c.c.Publishers {
 		ports = append(ports, types.Port{
 			IP:          publisher.URL,
-			PrivatePort: uint16(publisher.TargetPort),
-			PublicPort:  uint16(publisher.PublishedPort),
+			PrivatePort: publisher.TargetPort,
+			PublicPort:  publisher.PublishedPort,
 			Type:        publisher.Protocol,
 		})
 	}

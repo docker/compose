@@ -52,8 +52,8 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 			for i, p := range container.Ports {
 				publishers[i] = api.PortPublisher{
 					URL:           p.IP,
-					TargetPort:    int(p.PrivatePort),
-					PublishedPort: int(p.PublicPort),
+					TargetPort:    p.PrivatePort,
+					PublishedPort: p.PublicPort,
 					Protocol:      p.Type,
 				}
 			}

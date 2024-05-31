@@ -40,10 +40,15 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "port [OPTIONS] SERVICE PRIVATE_PORT",
-		Short: "Print the public port for a port binding",
-		Args:  cobra.MinimumNArgs(2),
+		Use:   "port [OPTIONS] SERVICE [PRIVATE_PORT]",
+		Short: "List port mappings or print the public port of a specific mapping for the service",
+		Args:  cobra.RangeArgs(1, 2),
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
+			if len(args) == 1 {
+				opts.port = 0
+				return nil
+			}
+
 			port, err := strconv.ParseUint(args[1], 10, 16)
 			if err != nil {
 				return err
@@ -67,7 +72,8 @@ func runPort(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 	if err != nil {
 		return err
 	}
-	ip, port, err := backend.Port(ctx, projectName, service, opts.port, api.PortOptions{
+
+	ports, err := backend.Port(ctx, projectName, service, opts.port, api.PortOptions{
 		Protocol: opts.protocol,
 		Index:    opts.index,
 	})
@@ -75,6 +81,9 @@ func runPort(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		return err
 	}
 
-	fmt.Fprintf(dockerCli.Out(), "%s:%d\n", ip, port)
+	for _, port := range ports {
+		fmt.Fprintf(dockerCli.Out(), "%s\n", port.String())
+	}
+
 	return nil
 }

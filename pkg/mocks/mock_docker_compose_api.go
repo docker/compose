@@ -240,13 +240,12 @@ func (mr *MockServiceMockRecorder) Pause(ctx, projectName, options any) *gomock.
 }
 
 // Port mocks base method.
-func (m *MockService) Port(ctx context.Context, projectName, service string, port uint16, options api.PortOptions) (string, int, error) {
+func (m *MockService) Port(ctx context.Context, projectName, service string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Port", ctx, projectName, service, port, options)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(int)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(api.PortPublishers)
+	ret1, _ := ret[2].(error)
+	return ret0, ret1
 }
 
 // Port indicates an expected call of Port.

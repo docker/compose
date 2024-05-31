@@ -26,18 +26,40 @@ import (
 	moby "github.com/docker/docker/api/types"
 )
 
-func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
+func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
 	projectName = strings.ToLower(projectName)
 	container, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, service, options.Index)
 	if err != nil {
-		return "", 0, err
+		return nil, err
 	}
-	for _, p := range container.Ports {
-		if p.PrivatePort == port && p.Type == options.Protocol {
-			return p.IP, int(p.PublicPort), nil
+
+	if port != 0 {
+		for _, p := range container.Ports {
+			if p.PrivatePort == port && p.Type == options.Protocol {
+				return api.PortPublishers{
+					api.PortPublisher{
+						URL:           p.IP,
+						TargetPort:    p.PrivatePort,
+						PublishedPort: p.PublicPort,
+						Protocol:      p.Type,
+					},
+				}, nil
+			}
+		}
+		return nil, portNotFoundError(options.Protocol, port, container)
+	}
+
+	res := make(api.PortPublishers, len(container.Ports))
+	for idx, p := range container.Ports {
+		res[idx] = api.PortPublisher{
+			URL:           p.IP,
+			TargetPort:    p.PrivatePort,
+			PublishedPort: p.PublicPort,
+			Protocol:      p.Type,
 		}
 	}
-	return "", 0, portNotFoundError(options.Protocol, port, container)
+
+	return res, nil
 }
 
 func portNotFoundError(protocol string, port uint16, ctr moby.Container) error {

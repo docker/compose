@@ -36,3 +36,36 @@ func TestRunOptionsEnvironmentMap(t *testing.T) {
 	assert.Equal(t, *env["ZOT"], "")
 	assert.Check(t, env["QIX"] == nil)
 }
+
+func TestPortPublisherString(t *testing.T) {
+	tests := map[string]struct {
+		pub    PortPublisher
+		expect string
+	}{
+		"ipv6_udp": {
+			pub: PortPublisher{
+				Protocol:      "udp",
+				PublishedPort: 32769,
+				TargetPort:    5060,
+				URL:           "::",
+			},
+			expect: "5060/udp -> [::]:32769",
+		},
+		"ipv4_tcp": {
+			pub: PortPublisher{
+				Protocol:      "tcp",
+				PublishedPort: 5060,
+				TargetPort:    5060,
+				URL:           "0.0.0.0",
+			},
+			expect: "5060/tcp -> 0.0.0.0:5060",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := tt.pub.String()
+			assert.Equal(t, tt.expect, got)
+		})
+	}
+}

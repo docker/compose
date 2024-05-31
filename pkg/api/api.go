@@ -19,6 +19,8 @@ package api
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,7 +75,7 @@ type Service interface {
 	// Events executes the equivalent to a `compose events`
 	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
-	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
+	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (PortPublishers, error)
 	// Publish executes the equivalent to a `compose publish`
 	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`
@@ -448,8 +450,8 @@ type CopyOptions struct {
 // PortPublisher hold status about published port
 type PortPublisher struct {
 	URL           string
-	TargetPort    int
-	PublishedPort int
+	TargetPort    uint16
+	PublishedPort uint16
 	Protocol      string
 }
 
@@ -474,6 +476,10 @@ type ContainerSummary struct {
 	Mounts       []string
 	Networks     []string
 	LocalVolumes int
+}
+
+func (p *PortPublisher) String() string {
+	return fmt.Sprintf("%d/%s -> %s", p.TargetPort, p.Protocol, net.JoinHostPort(p.URL, strconv.Itoa(int(p.PublishedPort))))
 }
 
 // PortPublishers is a slice of PortPublisher
