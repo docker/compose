@@ -87,15 +87,6 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		if err != nil {
 			return err
 		}
-
-		if err != nil {
-			w.Event(progress.Event{
-				ID:     repository,
-				Text:   "publishing",
-				Status: progress.Error,
-			})
-			return err
-		}
 	}
 	w.Event(progress.Event{
 		ID:     repository,
