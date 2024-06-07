@@ -28,10 +28,8 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
-	composegoutils "github.com/compose-spec/compose-go/v2/utils"
 	"github.com/docker/buildx/util/logutil"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
@@ -329,11 +327,20 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 	return cli.NewProjectOptions(o.ConfigPaths,
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
+			// First apply os.Environment, always win
 			cli.WithOsEnv,
+			// Load PWD/.env if present and no explicit --env-file has been set
+			cli.WithEnvFiles(o.EnvFiles...),
+			// read dot env file to populate project environment
+			cli.WithDotEnv,
+			// get compose file path set by COMPOSE_FILE
 			cli.WithConfigFileEnv,
+			// if none was selected, get default compose.yaml file from current dir or parent folder
 			cli.WithDefaultConfigPath,
+			// .. and then, a project directory != PWD maybe has been set so let's load .env file
 			cli.WithEnvFiles(o.EnvFiles...),
 			cli.WithDotEnv,
+			// eventually COMPOSE_PROFILES should have been set
 			cli.WithDefaultProfiles(o.Profiles...),
 			cli.WithName(o.ProjectName))...)
 }
@@ -389,16 +396,8 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-
-			// (1) process env vars
-			err := setEnvWithLocalDotEnv(&opts)
-			if err != nil {
-				return err
-			}
 			parent := cmd.Root()
 
-			// (2) call parent pre-run
-			// TODO(milas): this seems incorrect, remove or document
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
 				if parentPrerun != nil {
@@ -409,7 +408,6 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				}
 			}
 
-			// (3) set up display/output
 			if verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			}
@@ -469,7 +467,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 			}
 			for i, file := range opts.EnvFiles {
 				if !filepath.IsAbs(file) {
-					file, err = filepath.Abs(file)
+					file, err := filepath.Abs(file)
 					if err != nil {
 						return err
 					}
@@ -500,8 +498,8 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				backend.MaxConcurrency(parallel)
 			}
 
-			// (5) dry run detection
-			ctx, err = backend.DryRunMode(ctx, dryRun)
+			// dry run detection
+			ctx, err := backend.DryRunMode(ctx, dryRun)
 			if err != nil {
 				return err
 			}
@@ -599,42 +597,6 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	c.Flags().MarkHidden("verbose") //nolint:errcheck
 	return c
-}
-
-// If user has a local .env file, load it as os.environment so it can be used to set COMPOSE_ variables
-// This also allows to override values set by the default .env in a compose project when ran from a distinct folder
-func setEnvWithLocalDotEnv(prjOpts *ProjectOptions) error {
-	if len(prjOpts.EnvFiles) > 0 {
-		return nil
-	}
-
-	wd, err := os.Getwd()
-	if err != nil {
-		return compose.WrapComposeError(err)
-	}
-
-	defaultDotEnv := filepath.Join(wd, ".env")
-
-	s, err := os.Stat(defaultDotEnv)
-	if os.IsNotExist(err) || s.IsDir() {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), []string{defaultDotEnv})
-	if err != nil {
-		return err
-	}
-	for k, v := range envFromFile {
-		if _, ok := os.LookupEnv(k); !ok { // Precedence to OS Env
-			if err := os.Setenv(k, v); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 var printerModes = []string{
