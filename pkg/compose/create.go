@@ -1260,7 +1260,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 		Internal:   n.Internal,
 		Attachable: n.Attachable,
 		IPAM:       ipam,
-		EnableIPv6: &n.EnableIPv6,
+		EnableIPv6: n.EnableIPv6,
 	}
 
 	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
