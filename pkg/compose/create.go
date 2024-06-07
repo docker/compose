@@ -269,7 +269,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: service.NetworkMode == "disabled",
-		MacAddress:      macAddress, //nolint:staticcheck // ignore SA1019: field is deprecated, but still used on API < v1.44.
+		MacAddress:      macAddress,
 		Labels:          labels,
 		StopSignal:      service.StopSignal,
 		Env:             ToMobyEnv(env),
@@ -1258,7 +1258,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 		Internal:   n.Internal,
 		Attachable: n.Attachable,
 		IPAM:       ipam,
-		EnableIPv6: &n.EnableIPv6,
+		EnableIPv6: n.EnableIPv6,
 	}
 
 	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
