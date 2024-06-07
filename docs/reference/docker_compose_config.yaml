@@ -9,6 +9,16 @@ usage: docker compose config [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: environment
+      value_type: bool
+      default_value: "false"
+      description: Print environment used for interpolation.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: format
       value_type: string
       default_value: yaml
