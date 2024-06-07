@@ -29,6 +29,7 @@ import (
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -56,8 +57,8 @@ func TestStopTimeout(t *testing.T) {
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]moby.NetworkResource{}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return([]network.Summary{}, nil)
 
 	timeout := 2 * time.Second
 	stopConfig := containerType.StopOptions{Timeout: utils.DurationSecondToInt(&timeout)}
