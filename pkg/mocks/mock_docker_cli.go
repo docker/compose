@@ -10,7 +10,6 @@
 package mocks
 
 import (
-	io "io"
 	reflect "reflect"
 
 	command "github.com/docker/cli/cli/command"
@@ -198,10 +197,10 @@ func (mr *MockCliMockRecorder) DockerEndpoint() *gomock.Call {
 }
 
 // Err mocks base method.
-func (m *MockCli) Err() io.Writer {
+func (m *MockCli) Err() *streams.Out {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Err")
-	ret0, _ := ret[0].(io.Writer)
+	ret0, _ := ret[0].(*streams.Out)
 	return ret0
 }
 

@@ -33,6 +33,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/watch"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/jonboulle/clockwork"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -399,7 +400,7 @@ func (t tarDockerClient) ContainersForService(ctx context.Context, projectName s
 }
 
 func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
-	execCfg := moby.ExecConfig{
+	execCfg := container.ExecOptions{
 		Cmd:          cmd,
 		AttachStdout: false,
 		AttachStderr: true,
@@ -411,7 +412,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	startCheck := moby.ExecStartCheck{Tty: false, Detach: false}
+	startCheck := container.ExecStartOptions{Tty: false, Detach: false}
 	conn, err := t.s.apiClient().ContainerExecAttach(ctx, execCreateResp.ID, startCheck)
 	if err != nil {
 		return err
@@ -459,7 +460,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 }
 
 func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCloser) error {
-	return t.s.apiClient().CopyToContainer(ctx, id, "/", archive, moby.CopyToContainerOptions{
+	return t.s.apiClient().CopyToContainer(ctx, id, "/", archive, container.CopyToContainerOptions{
 		CopyUIDGID: true,
 	})
 }

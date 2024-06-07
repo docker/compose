@@ -107,7 +107,8 @@ func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerTyp
 		Names:  []string{containerName},
 		Labels: config.Labels,
 		HostConfig: struct {
-			NetworkMode string `json:",omitempty"`
+			NetworkMode string            `json:",omitempty"`
+			Annotations map[string]string `json:",omitempty"`
 		}{},
 	})
 	return containerType.CreateResponse{ID: containerName}, nil
@@ -188,15 +189,15 @@ func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) e
 	return nil
 }
 
-func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, moby.ContainerPathStat, error) {
+func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, containerType.PathStat, error) {
 	rc := io.NopCloser(strings.NewReader(""))
 	if _, err := d.ContainerStatPath(ctx, container, srcPath); err != nil {
-		return rc, moby.ContainerPathStat{}, fmt.Errorf(" %s Could not find the file %s in container %s", DRYRUN_PREFIX, srcPath, container)
+		return rc, containerType.PathStat{}, fmt.Errorf(" %s Could not find the file %s in container %s", DRYRUN_PREFIX, srcPath, container)
 	}
-	return rc, moby.ContainerPathStat{}, nil
+	return rc, containerType.PathStat{}, nil
 }
 
-func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options moby.CopyToContainerOptions) error {
+func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options containerType.CopyToContainerOptions) error {
 	if _, err := d.ContainerStatPath(ctx, container, path); err != nil {
 		return fmt.Errorf(" %s Could not find the file %s in container %s", DRYRUN_PREFIX, path, container)
 	}
@@ -269,8 +270,8 @@ func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, containe
 	return nil
 }
 
-func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options moby.NetworkCreate) (moby.NetworkCreateResponse, error) {
-	return moby.NetworkCreateResponse{
+func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options network.CreateOptions) (network.CreateResponse, error) {
+	return network.CreateResponse{
 		ID:      name,
 		Warning: "",
 	}, nil
@@ -298,7 +299,7 @@ func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force 
 	return nil
 }
 
-func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config moby.ExecConfig) (moby.IDResponse, error) {
+func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config containerType.ExecOptions) (moby.IDResponse, error) {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	id := fmt.Sprintf("%x", b)
@@ -311,7 +312,7 @@ func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string
 	}, nil
 }
 
-func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config moby.ExecStartCheck) error {
+func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config containerType.ExecStartOptions) error {
 	v, ok := d.execs.LoadAndDelete(execID)
 	if !ok {
 		return fmt.Errorf("invalid exec ID %q", execID)
@@ -351,11 +352,11 @@ func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]c
 	return d.apiClient.ContainerDiff(ctx, container)
 }
 
-func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config moby.ExecStartCheck) (moby.HijackedResponse, error) {
+func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config containerType.ExecStartOptions) (moby.HijackedResponse, error) {
 	return moby.HijackedResponse{}, errors.New("interactive exec is not supported in dry-run mode")
 }
 
-func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (moby.ContainerExecInspect, error) {
+func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (containerType.ExecInspect, error) {
 	return d.apiClient.ContainerExecInspect(ctx, execID)
 }
 
@@ -379,15 +380,15 @@ func (d *DryRunClient) ContainerResize(ctx context.Context, container string, op
 	return d.apiClient.ContainerResize(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerStatPath(ctx context.Context, container, path string) (moby.ContainerPathStat, error) {
+func (d *DryRunClient) ContainerStatPath(ctx context.Context, container, path string) (containerType.PathStat, error) {
 	return d.apiClient.ContainerStatPath(ctx, container, path)
 }
 
-func (d *DryRunClient) ContainerStats(ctx context.Context, container string, stream bool) (moby.ContainerStats, error) {
+func (d *DryRunClient) ContainerStats(ctx context.Context, container string, stream bool) (containerType.StatsResponseReader, error) {
 	return d.apiClient.ContainerStats(ctx, container, stream)
 }
 
-func (d *DryRunClient) ContainerStatsOneShot(ctx context.Context, container string) (moby.ContainerStats, error) {
+func (d *DryRunClient) ContainerStatsOneShot(ctx context.Context, container string) (containerType.StatsResponseReader, error) {
 	return d.apiClient.ContainerStatsOneShot(ctx, container)
 }
 
@@ -403,7 +404,7 @@ func (d *DryRunClient) ContainerWait(ctx context.Context, container string, cond
 	return d.apiClient.ContainerWait(ctx, container, condition)
 }
 
-func (d *DryRunClient) ContainersPrune(ctx context.Context, pruneFilters filters.Args) (moby.ContainersPruneReport, error) {
+func (d *DryRunClient) ContainersPrune(ctx context.Context, pruneFilters filters.Args) (containerType.PruneReport, error) {
 	return d.apiClient.ContainersPrune(ctx, pruneFilters)
 }
 
@@ -427,7 +428,7 @@ func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string) ([]im
 	return d.apiClient.ImageHistory(ctx, imageName)
 }
 
-func (d *DryRunClient) ImageImport(ctx context.Context, source moby.ImageImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageImport(ctx context.Context, source image.ImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageImport(ctx, source, ref, options)
 }
 
@@ -435,11 +436,11 @@ func (d *DryRunClient) ImageList(ctx context.Context, options image.ListOptions)
 	return d.apiClient.ImageList(ctx, options)
 }
 
-func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, quiet bool) (moby.ImageLoadResponse, error) {
+func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, quiet bool) (image.LoadResponse, error) {
 	return d.apiClient.ImageLoad(ctx, input, quiet)
 }
 
-func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options moby.ImageSearchOptions) ([]registry.SearchResult, error) {
+func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options registry.SearchOptions) ([]registry.SearchResult, error) {
 	return d.apiClient.ImageSearch(ctx, term, options)
 }
 
@@ -451,7 +452,7 @@ func (d *DryRunClient) ImageTag(ctx context.Context, imageName, ref string) erro
 	return d.apiClient.ImageTag(ctx, imageName, ref)
 }
 
-func (d *DryRunClient) ImagesPrune(ctx context.Context, pruneFilter filters.Args) (moby.ImagesPruneReport, error) {
+func (d *DryRunClient) ImagesPrune(ctx context.Context, pruneFilter filters.Args) (image.PruneReport, error) {
 	return d.apiClient.ImagesPrune(ctx, pruneFilter)
 }
 
@@ -471,19 +472,19 @@ func (d *DryRunClient) NodeUpdate(ctx context.Context, nodeID string, version sw
 	return d.apiClient.NodeUpdate(ctx, nodeID, version, node)
 }
 
-func (d *DryRunClient) NetworkInspect(ctx context.Context, networkName string, options moby.NetworkInspectOptions) (moby.NetworkResource, error) {
+func (d *DryRunClient) NetworkInspect(ctx context.Context, networkName string, options network.InspectOptions) (network.Inspect, error) {
 	return d.apiClient.NetworkInspect(ctx, networkName, options)
 }
 
-func (d *DryRunClient) NetworkInspectWithRaw(ctx context.Context, networkName string, options moby.NetworkInspectOptions) (moby.NetworkResource, []byte, error) {
+func (d *DryRunClient) NetworkInspectWithRaw(ctx context.Context, networkName string, options network.InspectOptions) (network.Inspect, []byte, error) {
 	return d.apiClient.NetworkInspectWithRaw(ctx, networkName, options)
 }
 
-func (d *DryRunClient) NetworkList(ctx context.Context, options moby.NetworkListOptions) ([]moby.NetworkResource, error) {
+func (d *DryRunClient) NetworkList(ctx context.Context, options network.ListOptions) ([]network.Inspect, error) {
 	return d.apiClient.NetworkList(ctx, options)
 }
 
-func (d *DryRunClient) NetworksPrune(ctx context.Context, pruneFilter filters.Args) (moby.NetworksPruneReport, error) {
+func (d *DryRunClient) NetworksPrune(ctx context.Context, pruneFilter filters.Args) (network.PruneReport, error) {
 	return d.apiClient.NetworksPrune(ctx, pruneFilter)
 }
 
@@ -611,7 +612,7 @@ func (d *DryRunClient) SecretUpdate(ctx context.Context, id string, version swar
 	return d.apiClient.SecretUpdate(ctx, id, version, secret)
 }
 
-func (d *DryRunClient) Events(ctx context.Context, options moby.EventsOptions) (<-chan events.Message, <-chan error) {
+func (d *DryRunClient) Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error) {
 	return d.apiClient.Events(ctx, options)
 }
 
@@ -643,7 +644,7 @@ func (d *DryRunClient) VolumeList(ctx context.Context, opts volume.ListOptions) 
 	return d.apiClient.VolumeList(ctx, opts)
 }
 
-func (d *DryRunClient) VolumesPrune(ctx context.Context, pruneFilter filters.Args) (moby.VolumesPruneReport, error) {
+func (d *DryRunClient) VolumesPrune(ctx context.Context, pruneFilter filters.Args) (volume.PruneReport, error) {
 	return d.apiClient.VolumesPrune(ctx, pruneFilter)
 }
 

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/streams"
 	"github.com/docker/compose/v2/internal/sync"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
@@ -113,7 +114,7 @@ func (s stdLogger) Register(container string) {
 func TestWatch_Sync(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)
-	cli.EXPECT().Err().Return(os.Stderr).AnyTimes()
+	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
 	cli.EXPECT().BuildKitEnabled().Return(true, nil)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return([]moby.Container{
