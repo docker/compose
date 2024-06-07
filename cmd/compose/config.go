@@ -54,6 +54,7 @@ type configOptions struct {
 	hash                string
 	noConsistency       bool
 	variables           bool
+	environment         bool
 }
 
 func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
@@ -118,6 +119,9 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 			if opts.variables {
 				return runVariables(ctx, dockerCli, opts, args)
 			}
+			if opts.environment {
+				return runEnvironment(ctx, dockerCli, opts, args)
+			}
 
 			return runConfig(ctx, dockerCli, opts, args)
 		}),
@@ -138,6 +142,7 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line.")
 	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
 	flags.BoolVar(&opts.variables, "variables", false, "Print model variables and default values.")
+	flags.BoolVar(&opts.environment, "environment", false, "Print environment used for interpolation.")
 	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
 
 	return cmd
@@ -383,6 +388,18 @@ func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions
 			_, _ = fmt.Fprintf(w, "%s\t%t\t%s\t%s\n", name, variable.Required, variable.DefaultValue, variable.PresenceValue)
 		}
 	}, "NAME", "REQUIRED", "DEFAULT VALUE", "ALTERNATE VALUE")
+}
+
+func runEnvironment(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
+	project, err := opts.ToProject(ctx, dockerCli, services)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range project.Environment.Values() {
+		fmt.Println(v)
+	}
+	return nil
 }
 
 func escapeDollarSign(marshal []byte) []byte {
