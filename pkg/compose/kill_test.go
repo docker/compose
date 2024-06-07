@@ -26,6 +26,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -57,8 +58,8 @@ func TestKillAll(t *testing.T) {
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]moby.NetworkResource{
+	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return([]network.Summary{
 			{ID: "abc123", Name: "testProject_default"},
 		}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "").Return(nil)
@@ -92,8 +93,8 @@ func TestKillSignal(t *testing.T) {
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]moby.NetworkResource{
+	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return([]network.Summary{
 			{ID: "abc123", Name: "testProject_default"},
 		}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)

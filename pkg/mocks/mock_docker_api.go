@@ -289,7 +289,7 @@ func (mr *MockAPIClientMockRecorder) ContainerDiff(arg0, arg1 any) *gomock.Call 
 }
 
 // ContainerExecAttach mocks base method.
-func (m *MockAPIClient) ContainerExecAttach(arg0 context.Context, arg1 string, arg2 types.ExecStartCheck) (types.HijackedResponse, error) {
+func (m *MockAPIClient) ContainerExecAttach(arg0 context.Context, arg1 string, arg2 container.ExecStartOptions) (types.HijackedResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecAttach", arg0, arg1, arg2)
 	ret0, _ := ret[0].(types.HijackedResponse)
@@ -304,7 +304,7 @@ func (mr *MockAPIClientMockRecorder) ContainerExecAttach(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecCreate mocks base method.
-func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 types.ExecConfig) (types.IDResponse, error) {
+func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (types.IDResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecCreate", arg0, arg1, arg2)
 	ret0, _ := ret[0].(types.IDResponse)
@@ -319,10 +319,10 @@ func (mr *MockAPIClientMockRecorder) ContainerExecCreate(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecInspect mocks base method.
-func (m *MockAPIClient) ContainerExecInspect(arg0 context.Context, arg1 string) (types.ContainerExecInspect, error) {
+func (m *MockAPIClient) ContainerExecInspect(arg0 context.Context, arg1 string) (container.ExecInspect, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecInspect", arg0, arg1)
-	ret0, _ := ret[0].(types.ContainerExecInspect)
+	ret0, _ := ret[0].(container.ExecInspect)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -348,7 +348,7 @@ func (mr *MockAPIClientMockRecorder) ContainerExecResize(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecStart mocks base method.
-func (m *MockAPIClient) ContainerExecStart(arg0 context.Context, arg1 string, arg2 types.ExecStartCheck) error {
+func (m *MockAPIClient) ContainerExecStart(arg0 context.Context, arg1 string, arg2 container.ExecStartOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecStart", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -536,10 +536,10 @@ func (mr *MockAPIClientMockRecorder) ContainerStart(arg0, arg1, arg2 any) *gomoc
 }
 
 // ContainerStatPath mocks base method.
-func (m *MockAPIClient) ContainerStatPath(arg0 context.Context, arg1, arg2 string) (types.ContainerPathStat, error) {
+func (m *MockAPIClient) ContainerStatPath(arg0 context.Context, arg1, arg2 string) (container.PathStat, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerStatPath", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.ContainerPathStat)
+	ret0, _ := ret[0].(container.PathStat)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -551,10 +551,10 @@ func (mr *MockAPIClientMockRecorder) ContainerStatPath(arg0, arg1, arg2 any) *go
 }
 
 // ContainerStats mocks base method.
-func (m *MockAPIClient) ContainerStats(arg0 context.Context, arg1 string, arg2 bool) (types.ContainerStats, error) {
+func (m *MockAPIClient) ContainerStats(arg0 context.Context, arg1 string, arg2 bool) (container.StatsResponseReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerStats", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.ContainerStats)
+	ret0, _ := ret[0].(container.StatsResponseReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -566,10 +566,10 @@ func (mr *MockAPIClientMockRecorder) ContainerStats(arg0, arg1, arg2 any) *gomoc
 }
 
 // ContainerStatsOneShot mocks base method.
-func (m *MockAPIClient) ContainerStatsOneShot(arg0 context.Context, arg1 string) (types.ContainerStats, error) {
+func (m *MockAPIClient) ContainerStatsOneShot(arg0 context.Context, arg1 string) (container.StatsResponseReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerStatsOneShot", arg0, arg1)
-	ret0, _ := ret[0].(types.ContainerStats)
+	ret0, _ := ret[0].(container.StatsResponseReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -654,10 +654,10 @@ func (mr *MockAPIClientMockRecorder) ContainerWait(arg0, arg1, arg2 any) *gomock
 }
 
 // ContainersPrune mocks base method.
-func (m *MockAPIClient) ContainersPrune(arg0 context.Context, arg1 filters.Args) (types.ContainersPruneReport, error) {
+func (m *MockAPIClient) ContainersPrune(arg0 context.Context, arg1 filters.Args) (container.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainersPrune", arg0, arg1)
-	ret0, _ := ret[0].(types.ContainersPruneReport)
+	ret0, _ := ret[0].(container.PruneReport)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -669,11 +669,11 @@ func (mr *MockAPIClientMockRecorder) ContainersPrune(arg0, arg1 any) *gomock.Cal
 }
 
 // CopyFromContainer mocks base method.
-func (m *MockAPIClient) CopyFromContainer(arg0 context.Context, arg1, arg2 string) (io.ReadCloser, types.ContainerPathStat, error) {
+func (m *MockAPIClient) CopyFromContainer(arg0 context.Context, arg1, arg2 string) (io.ReadCloser, container.PathStat, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CopyFromContainer", arg0, arg1, arg2)
 	ret0, _ := ret[0].(io.ReadCloser)
-	ret1, _ := ret[1].(types.ContainerPathStat)
+	ret1, _ := ret[1].(container.PathStat)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
@@ -685,7 +685,7 @@ func (mr *MockAPIClientMockRecorder) CopyFromContainer(arg0, arg1, arg2 any) *go
 }
 
 // CopyToContainer mocks base method.
-func (m *MockAPIClient) CopyToContainer(arg0 context.Context, arg1, arg2 string, arg3 io.Reader, arg4 types.CopyToContainerOptions) error {
+func (m *MockAPIClient) CopyToContainer(arg0 context.Context, arg1, arg2 string, arg3 io.Reader, arg4 container.CopyToContainerOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CopyToContainer", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
@@ -772,7 +772,7 @@ func (mr *MockAPIClientMockRecorder) DistributionInspect(arg0, arg1, arg2 any) *
 }
 
 // Events mocks base method.
-func (m *MockAPIClient) Events(arg0 context.Context, arg1 types.EventsOptions) (<-chan events.Message, <-chan error) {
+func (m *MockAPIClient) Events(arg0 context.Context, arg1 events.ListOptions) (<-chan events.Message, <-chan error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Events", arg0, arg1)
 	ret0, _ := ret[0].(<-chan events.Message)
@@ -846,7 +846,7 @@ func (mr *MockAPIClientMockRecorder) ImageHistory(arg0, arg1 any) *gomock.Call {
 }
 
 // ImageImport mocks base method.
-func (m *MockAPIClient) ImageImport(arg0 context.Context, arg1 types.ImageImportSource, arg2 string, arg3 image.ImportOptions) (io.ReadCloser, error) {
+func (m *MockAPIClient) ImageImport(arg0 context.Context, arg1 image.ImportSource, arg2 string, arg3 image.ImportOptions) (io.ReadCloser, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageImport", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(io.ReadCloser)
@@ -892,10 +892,10 @@ func (mr *MockAPIClientMockRecorder) ImageList(arg0, arg1 any) *gomock.Call {
 }
 
 // ImageLoad mocks base method.
-func (m *MockAPIClient) ImageLoad(arg0 context.Context, arg1 io.Reader, arg2 bool) (types.ImageLoadResponse, error) {
+func (m *MockAPIClient) ImageLoad(arg0 context.Context, arg1 io.Reader, arg2 bool) (image.LoadResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageLoad", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.ImageLoadResponse)
+	ret0, _ := ret[0].(image.LoadResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -967,7 +967,7 @@ func (mr *MockAPIClientMockRecorder) ImageSave(arg0, arg1 any) *gomock.Call {
 }
 
 // ImageSearch mocks base method.
-func (m *MockAPIClient) ImageSearch(arg0 context.Context, arg1 string, arg2 types.ImageSearchOptions) ([]registry.SearchResult, error) {
+func (m *MockAPIClient) ImageSearch(arg0 context.Context, arg1 string, arg2 registry.SearchOptions) ([]registry.SearchResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageSearch", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]registry.SearchResult)
@@ -996,10 +996,10 @@ func (mr *MockAPIClientMockRecorder) ImageTag(arg0, arg1, arg2 any) *gomock.Call
 }
 
 // ImagesPrune mocks base method.
-func (m *MockAPIClient) ImagesPrune(arg0 context.Context, arg1 filters.Args) (types.ImagesPruneReport, error) {
+func (m *MockAPIClient) ImagesPrune(arg0 context.Context, arg1 filters.Args) (image.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImagesPrune", arg0, arg1)
-	ret0, _ := ret[0].(types.ImagesPruneReport)
+	ret0, _ := ret[0].(image.PruneReport)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1064,10 +1064,10 @@ func (mr *MockAPIClientMockRecorder) NetworkConnect(arg0, arg1, arg2, arg3 any) 
 }
 
 // NetworkCreate mocks base method.
-func (m *MockAPIClient) NetworkCreate(arg0 context.Context, arg1 string, arg2 types.NetworkCreate) (types.NetworkCreateResponse, error) {
+func (m *MockAPIClient) NetworkCreate(arg0 context.Context, arg1 string, arg2 network.CreateOptions) (network.CreateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NetworkCreate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.NetworkCreateResponse)
+	ret0, _ := ret[0].(network.CreateResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1093,10 +1093,10 @@ func (mr *MockAPIClientMockRecorder) NetworkDisconnect(arg0, arg1, arg2, arg3 an
 }
 
 // NetworkInspect mocks base method.
-func (m *MockAPIClient) NetworkInspect(arg0 context.Context, arg1 string, arg2 types.NetworkInspectOptions) (types.NetworkResource, error) {
+func (m *MockAPIClient) NetworkInspect(arg0 context.Context, arg1 string, arg2 network.InspectOptions) (network.Inspect, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NetworkInspect", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.NetworkResource)
+	ret0, _ := ret[0].(network.Inspect)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1108,10 +1108,10 @@ func (mr *MockAPIClientMockRecorder) NetworkInspect(arg0, arg1, arg2 any) *gomoc
 }
 
 // NetworkInspectWithRaw mocks base method.
-func (m *MockAPIClient) NetworkInspectWithRaw(arg0 context.Context, arg1 string, arg2 types.NetworkInspectOptions) (types.NetworkResource, []byte, error) {
+func (m *MockAPIClient) NetworkInspectWithRaw(arg0 context.Context, arg1 string, arg2 network.InspectOptions) (network.Inspect, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NetworkInspectWithRaw", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.NetworkResource)
+	ret0, _ := ret[0].(network.Inspect)
 	ret1, _ := ret[1].([]byte)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -1124,10 +1124,10 @@ func (mr *MockAPIClientMockRecorder) NetworkInspectWithRaw(arg0, arg1, arg2 any)
 }
 
 // NetworkList mocks base method.
-func (m *MockAPIClient) NetworkList(arg0 context.Context, arg1 types.NetworkListOptions) ([]types.NetworkResource, error) {
+func (m *MockAPIClient) NetworkList(arg0 context.Context, arg1 network.ListOptions) ([]network.Inspect, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NetworkList", arg0, arg1)
-	ret0, _ := ret[0].([]types.NetworkResource)
+	ret0, _ := ret[0].([]network.Inspect)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1153,10 +1153,10 @@ func (mr *MockAPIClientMockRecorder) NetworkRemove(arg0, arg1 any) *gomock.Call 
 }
 
 // NetworksPrune mocks base method.
-func (m *MockAPIClient) NetworksPrune(arg0 context.Context, arg1 filters.Args) (types.NetworksPruneReport, error) {
+func (m *MockAPIClient) NetworksPrune(arg0 context.Context, arg1 filters.Args) (network.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NetworksPrune", arg0, arg1)
-	ret0, _ := ret[0].(types.NetworksPruneReport)
+	ret0, _ := ret[0].(network.PruneReport)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1818,10 +1818,10 @@ func (mr *MockAPIClientMockRecorder) VolumeUpdate(arg0, arg1, arg2, arg3 any) *g
 }
 
 // VolumesPrune mocks base method.
-func (m *MockAPIClient) VolumesPrune(arg0 context.Context, arg1 filters.Args) (types.VolumesPruneReport, error) {
+func (m *MockAPIClient) VolumesPrune(arg0 context.Context, arg1 filters.Args) (volume.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VolumesPrune", arg0, arg1)
-	ret0, _ := ret[0].(types.VolumesPruneReport)
+	ret0, _ := ret[0].(volume.PruneReport)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

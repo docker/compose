@@ -17,13 +17,11 @@
 package api
 
 import (
-	"io"
-
 	"github.com/docker/cli/cli/streams"
 )
 
 type Streams interface {
 	Out() *streams.Out
-	Err() io.Writer
+	Err() *streams.Out
 	In() *streams.In
 }

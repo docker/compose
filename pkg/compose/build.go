@@ -23,8 +23,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/moby/buildkit/util/progress/progressui"
-
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
@@ -39,14 +37,15 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
-	"github.com/docker/go-units"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
 	"github.com/moby/buildkit/session/secrets/secretsprovider"
 	"github.com/moby/buildkit/session/sshforward/sshprovider"
 	"github.com/moby/buildkit/util/entitlements"
+	"github.com/moby/buildkit/util/progress/progressui"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
@@ -448,9 +447,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 }
 
 func toUlimitOpt(ulimits map[string]*types.UlimitsConfig) *cliopts.UlimitOpt {
-	ref := map[string]*units.Ulimit{}
+	ref := map[string]*container.Ulimit{}
 	for _, limit := range toUlimits(ulimits) {
-		ref[limit.Name] = &units.Ulimit{
+		ref[limit.Name] = &container.Ulimit{
 			Name: limit.Name,
 			Hard: limit.Hard,
 			Soft: limit.Soft,

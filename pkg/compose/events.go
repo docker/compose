@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -30,12 +30,12 @@ import (
 
 func (s *composeService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
 	projectName = strings.ToLower(projectName)
-	events, errors := s.apiClient().Events(ctx, moby.EventsOptions{
+	evts, errors := s.apiClient().Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	for {
 		select {
-		case event := <-events:
+		case event := <-evts:
 			// TODO: support other event types
 			if event.Type != "container" {
 				continue
