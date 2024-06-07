@@ -186,8 +186,8 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	if create.Build && create.noBuild {
 		return fmt.Errorf("--build and --no-build are incompatible")
 	}
-	if up.Detach && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0) {
-		return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach or --attach-dependencies")
+	if up.Detach && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0 || up.watch) {
+		return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
 	}
 	if create.forceRecreate && create.noRecreate {
 		return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
