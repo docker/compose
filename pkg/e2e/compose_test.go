@@ -318,7 +318,7 @@ func TestRemoveOrphaned(t *testing.T) {
 	res.Assert(t, icmd.Expected{Out: fmt.Sprintf("%s-words-1", projectName)})
 }
 
-func TestResolveDotEnv(t *testing.T) {
+func TestComposeFileSetByDotEnv(t *testing.T) {
 	c := NewCLI(t)
 
 	cmd := c.NewDockerComposeCmd(t, "config")
@@ -326,7 +326,45 @@ func TestResolveDotEnv(t *testing.T) {
 	res := icmd.RunCmd(cmd)
 	res.Assert(t, icmd.Expected{
 		ExitCode: 0,
+		Out:      "image: test:latest",
+	})
+	res.Assert(t, icmd.Expected{
+		Out: "image: enabled:profile",
+	})
+}
+
+func TestComposeFileSetByProjectDirectory(t *testing.T) {
+	c := NewCLI(t)
+
+	dir := filepath.Join(".", "fixtures", "dotenv", "development")
+	cmd := c.NewDockerComposeCmd(t, "--project-directory", dir, "config")
+	res := icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Expected{
+		ExitCode: 0,
 		Out:      "image: backend:latest",
+	})
+}
+
+func TestComposeFileSetByEnvFile(t *testing.T) {
+	c := NewCLI(t)
+
+	dotEnv, err := os.CreateTemp(t.TempDir(), ".env")
+	assert.NilError(t, err)
+	err = os.WriteFile(dotEnv.Name(), []byte(`
+COMPOSE_FILE=fixtures/dotenv/development/compose.yaml
+IMAGE_NAME=test
+IMAGE_TAG=latest
+COMPOSE_PROFILES=test
+`), 0o700)
+	assert.NilError(t, err)
+
+	cmd := c.NewDockerComposeCmd(t, "--env-file", dotEnv.Name(), "config")
+	res := icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Expected{
+		Out: "image: test:latest",
+	})
+	res.Assert(t, icmd.Expected{
+		Out: "image: enabled:profile",
 	})
 }
 
