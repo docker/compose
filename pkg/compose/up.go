@@ -95,6 +95,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			if err != nil {
 				logrus.Warn("could not start menu, an error occurred while starting.")
 			} else {
+				defer keyboard.Close() //nolint:errcheck
 				isWatchConfigured := s.shouldWatch(project)
 				isDockerDesktopActive := s.isDesktopIntegrationActive()
 				isDockerDesktopComposeUI := s.isDesktopUIEnabled()
