@@ -124,7 +124,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		}
 
 		// And canonicalize dockerfile name to a platform-independent one
-		relDockerfile = archive.CanonicalTarNameForPath(relDockerfile)
+		relDockerfile = filepath.ToSlash(relDockerfile)
 
 		excludes = build.TrimBuildFilesFromExcludes(excludes, relDockerfile, false)
 		buildCtx, err = archive.TarWithOptions(contextDir, &archive.TarOptions{
