@@ -28,8 +28,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/buildkit/util/tracing/detect"
-	_ "github.com/moby/buildkit/util/tracing/detect/delegated" //nolint:blank-imports
-	_ "github.com/moby/buildkit/util/tracing/env"              //nolint:blank-imports
+	_ "github.com/moby/buildkit/util/tracing/env" //nolint:blank-imports
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
