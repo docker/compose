@@ -77,7 +77,10 @@ func (s *composeService) shouldWatch(project *types.Project) bool {
 	return shouldWatch
 }
 
-func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
+func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
+	return s.watch(ctx, nil, project, services, options)
+}
+func (s *composeService) watch(ctx context.Context, syncChannel chan bool, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
 	var err error
 	if project, err = project.WithSelectedServices(services); err != nil {
 		return err
@@ -172,7 +175,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 		watching = true
 		eg.Go(func() error {
 			defer watcher.Close() //nolint:errcheck
-			return s.watch(ctx, project, service.Name, options, watcher, syncer, config.Watch)
+			return s.watchEvents(ctx, project, service.Name, options, watcher, syncer, config.Watch)
 		})
 	}
 	if !watching {
@@ -180,10 +183,20 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 	}
 	options.LogTo.Log(api.WatchLogger, "Watch enabled")
 
-	return eg.Wait()
+	err = eg.Wait()
+	for {
+		select {
+		case <-ctx.Done():
+			return err
+		case <-syncChannel:
+			options.LogTo.Log(api.WatchLogger, "Watch disabled")
+			ctx.Done()
+			return err
+		}
+	}
 }
 
-func (s *composeService) watch(ctx context.Context, project *types.Project, name string, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, triggers []types.Trigger) error {
+func (s *composeService) watchEvents(ctx context.Context, project *types.Project, name string, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, triggers []types.Trigger) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

@@ -144,7 +144,7 @@ func TestWatch_Sync(t *testing.T) {
 			dockerCli: cli,
 			clock:     clock,
 		}
-		err := service.watch(ctx, &proj, "test", api.WatchOptions{
+		err := service.watchEvents(ctx, &proj, "test", api.WatchOptions{
 			Build: &api.BuildOptions{},
 			LogTo: stdLogger{},
 		}, watcher, syncer, []types.Trigger{
