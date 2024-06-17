@@ -73,7 +73,7 @@ func (ke *KeyboardError) error() string {
 type KeyboardWatch struct {
 	Watcher  watch.Notify
 	Watching bool
-	WatchFn  func(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error
+	WatchFn  func(ctx context.Context, doneCh chan bool, project *types.Project, services []string, options api.WatchOptions) error
 	Ctx      context.Context
 	Cancel   context.CancelFunc
 }
@@ -117,6 +117,7 @@ var eg multierror.Group
 func NewKeyboardManager(ctx context.Context, isDockerDesktopActive, isWatchConfigured, isDockerDesktopConfigActive bool,
 	sc chan<- os.Signal,
 	watchFn func(ctx context.Context,
+		doneCh chan bool,
 		project *types.Project,
 		services []string,
 		options api.WatchOptions,
@@ -272,7 +273,7 @@ func (lk *LogKeyboard) keyboardError(prefix string, err error) {
 	}()
 }
 
-func (lk *LogKeyboard) StartWatch(ctx context.Context, project *types.Project, options api.UpOptions) {
+func (lk *LogKeyboard) StartWatch(ctx context.Context, doneCh chan bool, project *types.Project, options api.UpOptions) {
 	if !lk.IsWatchConfigured {
 		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
 			func(ctx context.Context) error {
@@ -297,7 +298,7 @@ func (lk *LogKeyboard) StartWatch(ctx context.Context, project *types.Project, o
 				lk.Watch.newContext(ctx)
 				buildOpts := *options.Create.Build
 				buildOpts.Quiet = true
-				return lk.Watch.WatchFn(lk.Watch.Ctx, project, options.Start.Services, api.WatchOptions{
+				return lk.Watch.WatchFn(lk.Watch.Ctx, doneCh, project, options.Start.Services, api.WatchOptions{
 					Build: &buildOpts,
 					LogTo: options.Start.Attach,
 				})
@@ -305,12 +306,12 @@ func (lk *LogKeyboard) StartWatch(ctx context.Context, project *types.Project, o
 	}
 }
 
-func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Context, project *types.Project, options api.UpOptions) {
+func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Context, doneCh chan bool, project *types.Project, options api.UpOptions) {
 	switch kRune := event.Rune; kRune {
 	case 'v':
 		lk.openDockerDesktop(ctx, project)
 	case 'w':
-		lk.StartWatch(ctx, project, options)
+		lk.StartWatch(ctx, doneCh, project, options)
 	case 'o':
 		lk.openDDComposeUI(ctx, project)
 	}
