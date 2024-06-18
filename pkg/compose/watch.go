@@ -183,15 +183,13 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 	}
 	options.LogTo.Log(api.WatchLogger, "Watch enabled")
 
-	err = eg.Wait()
 	for {
 		select {
 		case <-ctx.Done():
-			return err
+			return eg.Wait()
 		case <-syncChannel:
 			options.LogTo.Log(api.WatchLogger, "Watch disabled")
-			ctx.Done()
-			return err
+			return nil
 		}
 	}
 }
