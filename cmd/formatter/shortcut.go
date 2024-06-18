@@ -261,6 +261,19 @@ func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Proje
 		}),
 	)
 }
+func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Project) {
+	eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/watch", tracing.SpanOptions{},
+		func(ctx context.Context) error {
+			link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
+			err := open.Run(link)
+			if err != nil {
+				err = fmt.Errorf("Could not open Docker Desktop Compose UI")
+				lk.keyboardError("Watch Docs", err)
+			}
+			return err
+		}),
+	)
+}
 
 func (lk *LogKeyboard) keyboardError(prefix string, err error) {
 	lk.kError.addError(prefix, err)
@@ -275,6 +288,11 @@ func (lk *LogKeyboard) keyboardError(prefix string, err error) {
 
 func (lk *LogKeyboard) StartWatch(ctx context.Context, doneCh chan bool, project *types.Project, options api.UpOptions) {
 	if !lk.IsWatchConfigured {
+		if lk.IsDDComposeUIActive {
+			// we try to open watch docs
+			lk.openDDWatchDocs(ctx, project)
+		}
+		// either way we mark menu/watch as an error
 		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
 			func(ctx context.Context) error {
 				err := fmt.Errorf("Watch is not yet configured. Learn more: %s", ansiColor(CYAN, "https://docs.docker.com/compose/file-watch/"))
@@ -282,6 +300,7 @@ func (lk *LogKeyboard) StartWatch(ctx context.Context, doneCh chan bool, project
 				return err
 			}))
 		return
+
 	}
 	lk.Watch.switchWatching()
 	if !lk.Watch.isWatching() {
