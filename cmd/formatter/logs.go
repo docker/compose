@@ -98,7 +98,7 @@ func (l *logConsumer) Log(container, message string) {
 	l.write(l.stdout, container, message)
 }
 
-// Log formats a log message as received from name/container
+// Err formats a log message as received from name/container
 func (l *logConsumer) Err(container, message string) {
 	l.write(l.stderr, container, message)
 }
