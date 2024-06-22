@@ -1,14 +1,24 @@
+version: "3"
 services:
-  frontend:
-    image: nginx
-    container_name: frontend
-    volumes:
-      - project-data:/data
-
-volumes:
-  project-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: "${TEST_DIR}"
+   prep:
+      image: iconloop/icon2-node
+      container_name: "icon2-node"
+      network_mode: host
+      restart: "always"
+      environment:
+         SERVICE: "MainNet"  # MainNet, SejongNet  ## network type
+         GOLOOP_LOG_LEVEL: "debug" # trace, debug, info, warn, error, fatal, panic
+         KEY_STORE_FILENAME: "INPUT_YOUR_KEY_STORE_FILENAME" # e.g. keystore.json read a config/keystore.json
+         # e.g. "/goloop/config/keystore.json" read a "config/keystore.json" of host machine
+         KEY_PASSWORD: "INPUT_YOUR_KEY_PASSWORD"
+         FASTEST_START: "true"    # It can be restored from latest Snapshot DB.
+         ROLE: 3 # Validator = 3, API Endpoint = 0
+      cap_add:
+         - SYS_TIME
+      volumes:
+         - ./data:/goloop/data # mount a data volumes
+         - ./config:/goloop/config # mount a config volumes ,Put your used keystore file here.
+         - ./logs:/goloop/logs
+      ports:
+         - 9000:9000
+         - 7100:7100
