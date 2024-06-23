@@ -18,13 +18,14 @@ package compose
 
 import (
 	"encoding/json"
+	"os"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/opencontainers/go-digest"
 )
 
 // ServiceHash computes the configuration hash for a service.
-func ServiceHash(o types.ServiceConfig) (string, error) {
+func ServiceHash(project *types.Project, o types.ServiceConfig) (string, error) {
 	// remove the Build config when generating the service hash
 	o.Build = nil
 	o.PullPolicy = ""
@@ -39,6 +40,26 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	for _, serviceConfig := range o.Configs {
+		projectConfig, ok := project.Configs[serviceConfig.Source]
+		if !ok {
+			continue
+		}
+
+		if projectConfig.Content != "" {
+			bytes = append(bytes, []byte(projectConfig.Content)...)
+		} else if projectConfig.File != "" {
+			content, err := os.ReadFile(projectConfig.File)
+			if err != nil {
+				return "", err
+			}
+			bytes = append(bytes, content...)
+		} else if projectConfig.Environment != "" {
+			bytes = append(bytes, []byte(projectConfig.Environment)...)
+		}
+	}
+
 	return digest.SHA256.FromBytes(bytes).Encoded(), nil
 }
 
