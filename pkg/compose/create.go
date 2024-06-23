@@ -218,7 +218,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	inherit *container.Summary,
 	opts createOptions,
 ) (createConfigs, error) {
-	labels, err := s.prepareLabels(opts.Labels, service, number)
+	labels, err := s.prepareLabels(opts.Labels, p, service, number)
 	if err != nil {
 		return createConfigs{}, err
 	}
@@ -507,8 +507,8 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 	return parsed, unconfined, nil
 }
 
-func (s *composeService) prepareLabels(labels types.Labels, service types.ServiceConfig, number int) (map[string]string, error) {
-	hash, err := ServiceHash(service)
+func (s *composeService) prepareLabels(labels types.Labels, project *types.Project, service types.ServiceConfig, number int) (map[string]string, error) {
+	hash, err := ServiceHash(project, service)
 	if err != nil {
 		return nil, err
 	}

@@ -127,11 +127,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	sort.Slice(containers, func(i, j int) bool {
 		// select obsolete containers first, so they get removed as we scale down
-		if obsolete, _ := c.mustRecreate(service, containers[i], recreate); obsolete {
+		if obsolete, _ := c.mustRecreate(project, service, containers[i], recreate); obsolete {
 			// i is obsolete, so must be first in the list
 			return true
 		}
-		if obsolete, _ := c.mustRecreate(service, containers[j], recreate); obsolete {
+		if obsolete, _ := c.mustRecreate(project, service, containers[j], recreate); obsolete {
 			// j is obsolete, so must be first in the list
 			return false
 		}
@@ -160,7 +160,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			continue
 		}
 
-		mustRecreate, err := c.mustRecreate(service, container, recreate)
+		mustRecreate, err := c.mustRecreate(project, service, container, recreate)
 		if err != nil {
 			return err
 		}
@@ -323,14 +323,14 @@ func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) erro
 	return nil
 }
 
-func (c *convergence) mustRecreate(expected types.ServiceConfig, actual containerType.Summary, policy string) (bool, error) {
+func (c *convergence) mustRecreate(project *types.Project,, expected types.ServiceConfig, actual containerType.Summary, policy string) (bool, error) {
 	if policy == api.RecreateNever {
 		return false, nil
 	}
 	if policy == api.RecreateForce {
 		return true, nil
 	}
-	configHash, err := ServiceHash(expected)
+	configHash, err := ServiceHash(project, expected)
 	if err != nil {
 		return false, err
 	}
