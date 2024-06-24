@@ -26,6 +26,6 @@ import (
 )
 
 func checkConsole(fd uintptr) (console.File, bool) {
-	file := os.NewFile(fd, "")
+	file := os.NewFile(fd, "/dev/stderr")
 	return file, file != nil
 }
