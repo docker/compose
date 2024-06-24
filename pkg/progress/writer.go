@@ -22,11 +22,11 @@ import (
 	"sync"
 
 	"github.com/containerd/console"
+	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/term"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/docker/compose/v2/pkg/api"
 )
 
 // Writer can write multiple progress events
@@ -116,7 +116,14 @@ var Mode = ModeAuto
 
 // NewWriter returns a new multi-progress writer
 func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer, error) {
-	_, isTerminal := term.GetFdInfo(out)
+	var isTerminal bool
+	var fd uintptr
+	if stream, ok := out.(*streams.Out); ok {
+		isTerminal = stream.IsTerminal()
+		fd = stream.FD()
+	} else {
+		fd, isTerminal = term.GetFdInfo(out)
+	}
 	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
 	if !ok {
 		dryRun = false
@@ -124,7 +131,7 @@ func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer
 	if Mode == ModeQuiet {
 		return quiet{}, nil
 	}
-	f, isConsole := out.(console.File) // see https://github.com/docker/compose/issues/10560
+	f, isConsole := checkConsole(fd) // see https://github.com/docker/compose/issues/10560
 	if Mode == ModeAuto && isTerminal && isConsole {
 		return newTTYWriter(f, dryRun, progressTitle)
 	}

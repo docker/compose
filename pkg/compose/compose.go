@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -129,11 +128,11 @@ func (s *composeService) stdin() *streams.In {
 	return s.dockerCli.In()
 }
 
-func (s *composeService) stderr() io.Writer {
+func (s *composeService) stderr() *streams.Out {
 	return s.dockerCli.Err()
 }
 
-func (s *composeService) stdinfo() io.Writer {
+func (s *composeService) stdinfo() *streams.Out {
 	if stdioToStdout {
 		return s.dockerCli.Out()
 	}
