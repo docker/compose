@@ -121,6 +121,7 @@ const WatchLogger = "#watch"
 type WatchOptions struct {
 	Build *BuildOptions
 	LogTo LogConsumer
+	Prune bool
 }
 
 // BuildOptions group options of the Build API
