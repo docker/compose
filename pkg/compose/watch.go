@@ -34,6 +34,8 @@ import (
 	"github.com/docker/compose/v2/pkg/watch"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/jonboulle/clockwork"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -175,7 +177,11 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 		}
 		watching = true
 		eg.Go(func() error {
-			defer watcher.Close() //nolint:errcheck
+			defer func() {
+				if err := watcher.Close(); err != nil {
+					logrus.Debugf("Error closing watcher for service %s: %v", service.Name, err)
+				}
+			}()
 			return s.watchEvents(ctx, project, service.Name, options, watcher, syncer, config.Watch)
 		})
 	}
@@ -471,11 +477,17 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 			options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service %q after changes were detected...", serviceName))
 			// restrict the build to ONLY this service, not any of its dependencies
 			options.Build.Services = []string{serviceName}
-			_, err := s.build(ctx, project, *options.Build, nil)
+			imageNameToIdMap, err := s.build(ctx, project, *options.Build, nil)
+
 			if err != nil {
 				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Build failed. Error: %v", err))
 				return err
 			}
+
+			if options.Prune {
+				s.pruneDanglingImagesOnRebuild(ctx, project.Name, imageNameToIdMap)
+			}
+
 			options.LogTo.Log(api.WatchLogger, fmt.Sprintf("service %q successfully built", serviceName))
 
 			err = s.create(ctx, project, api.CreateOptions{
@@ -537,5 +549,28 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 			hostPathsToSync[i] = pathMappings[i].HostPath
 		}
 		log.Log(api.WatchLogger, fmt.Sprintf("Syncing service %q after %d changes were detected", serviceName, len(pathMappings)))
+	}
+}
+
+func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
+	images, err := s.apiClient().ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("dangling", "true"),
+			filters.Arg("label", api.ProjectLabel+"="+projectName),
+		),
+	})
+
+	if err != nil {
+		logrus.Debugf("Failed to list images: %v", err)
+		return
+	}
+
+	for _, img := range images {
+		if _, ok := imageNameToIdMap[img.ID]; !ok {
+			_, err := s.apiClient().ImageRemove(ctx, img.ID, image.RemoveOptions{})
+			if err != nil {
+				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
+			}
+		}
 	}
 }
