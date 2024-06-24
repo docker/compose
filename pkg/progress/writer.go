@@ -21,9 +21,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/containerd/console"
-	"github.com/moby/term"
-	"github.com/sirupsen/logrus"
+	"github.com/docker/cli/cli/streams"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -59,14 +57,14 @@ type progressFunc func(context.Context) error
 type progressFuncWithStatus func(context.Context) (string, error)
 
 // Run will run a writer and the progress function in parallel
-func Run(ctx context.Context, pf progressFunc, out io.Writer) error {
+func Run(ctx context.Context, pf progressFunc, out *streams.Out) error {
 	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
 		return "", pf(ctx)
 	}, out, "Running")
 	return err
 }
 
-func RunWithTitle(ctx context.Context, pf progressFunc, out io.Writer, progressTitle string) error {
+func RunWithTitle(ctx context.Context, pf progressFunc, out *streams.Out, progressTitle string) error {
 	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
 		return "", pf(ctx)
 	}, out, progressTitle)
@@ -74,7 +72,7 @@ func RunWithTitle(ctx context.Context, pf progressFunc, out io.Writer, progressT
 }
 
 // RunWithStatus will run a writer and the progress function in parallel and return a status
-func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out io.Writer, progressTitle string) (string, error) {
+func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out *streams.Out, progressTitle string) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
 	w, err := NewWriter(ctx, out, progressTitle)
 	var result string
@@ -115,8 +113,8 @@ const (
 var Mode = ModeAuto
 
 // NewWriter returns a new multi-progress writer
-func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer, error) {
-	_, isTerminal := term.GetFdInfo(out)
+func NewWriter(ctx context.Context, out *streams.Out, progressTitle string) (Writer, error) {
+	isTerminal := out.IsTerminal()
 	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
 	if !ok {
 		dryRun = false
@@ -124,16 +122,13 @@ func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer
 	if Mode == ModeQuiet {
 		return quiet{}, nil
 	}
-	f, isConsole := out.(console.File) // see https://github.com/docker/compose/issues/10560
-	if Mode == ModeAuto && isTerminal && isConsole {
-		return newTTYWriter(f, dryRun, progressTitle)
+
+	tty := Mode == ModeTTY
+	if Mode == ModeAuto && isTerminal {
+		tty = true
 	}
-	if Mode == ModeTTY {
-		if !isConsole {
-			logrus.Warn("Terminal is not a POSIX console")
-		} else {
-			return newTTYWriter(f, dryRun, progressTitle)
-		}
+	if tty {
+		return newTTYWriter(out, dryRun, progressTitle)
 	}
 	return &plainWriter{
 		out:    out,
@@ -142,14 +137,9 @@ func NewWriter(ctx context.Context, out io.Writer, progressTitle string) (Writer
 	}, nil
 }
 
-func newTTYWriter(out console.File, dryRun bool, progressTitle string) (Writer, error) {
-	con, err := console.ConsoleFromFile(out)
-	if err != nil {
-		return nil, err
-	}
-
+func newTTYWriter(out io.Writer, dryRun bool, progressTitle string) (Writer, error) {
 	return &ttyWriter{
-		out:           con,
+		out:           out,
 		eventIDs:      []string{},
 		events:        map[string]Event{},
 		repeated:      false,
