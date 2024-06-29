@@ -144,7 +144,7 @@ jobs:
           - 24.0.9
           - 25.0.5
           - 26.1.4
-          - 27.0.2
+          - 27.0.3
     steps:
       - name: Prepare
         run: |
@@ -160,7 +160,7 @@ jobs:
           sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-ce-rootless-extras docker-buildx-plugin
           sudo apt-get install curl
           curl -fsSL https://test.docker.com -o get-docker.sh
-          sudo sh ./get-docker.sh --version ${{ matrix.engine }}
+          sudo REPO_FILE=docker-ce-staging.repo DOWNLOAD_URL=https://download-stage.docker.com sh ./get-docker.sh --version ${{ matrix.engine }}
       - name: Check Docker Version
         run: docker --version
       -
