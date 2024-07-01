@@ -124,9 +124,11 @@ type ProjectOptions struct {
 	ProjectName   string
 	Profiles      []string
 	ConfigPaths   []string
+	OptionalPaths []string
 	WorkDir       string
 	ProjectDir    string
 	EnvFiles      []string
+	OptionalEnv   []string
 	Compatibility bool
 	Progress      string
 	Offline       bool
@@ -169,7 +171,9 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
+	f.StringArrayVar(&o.OptionalPaths, "file?", []string{}, "Optional Compose override files")
 	f.StringArrayVar(&o.EnvFiles, "env-file", defaultStringArrayVar(ComposeEnvFiles), "Specify an alternate environment file")
+	f.StringArrayVar(&o.OptionalEnv, "env-file?", defaultStringArrayVar(ComposeEnvFiles), "Specify an optional environment file")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
@@ -457,7 +461,6 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
 
-			// (4) options validation / normalization
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
 					return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
@@ -465,6 +468,19 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
 			}
+
+			for _, p := range opts.OptionalPaths {
+				if _, err := os.Stat(p); err == nil {
+					opts.ConfigPaths = append(opts.ConfigPaths, p)
+				}
+			}
+
+			for _, p := range opts.OptionalEnv {
+				if _, err := os.Stat(p); err == nil {
+					opts.EnvFiles = append(opts.EnvFiles, p)
+				}
+			}
+
 			for i, file := range opts.EnvFiles {
 				if !filepath.IsAbs(file) {
 					file, err := filepath.Abs(file)

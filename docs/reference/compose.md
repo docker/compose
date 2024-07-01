@@ -48,7 +48,9 @@ Define and run multi-container applications with Docker
 | `--compatibility`      |               |         | Run compose in backward compatibility mode                                                          |
 | `--dry-run`            |               |         | Execute command in dry run mode                                                                     |
 | `--env-file`           | `stringArray` |         | Specify an alternate environment file                                                               |
+| `--env-file?`          | `stringArray` |         | Specify an optional environment file                                                                |
 | `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
+| `--file?`              | `stringArray` |         | Optional Compose override files                                                                     |
 | `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |
 | `--profile`            | `stringArray` |         | Specify a profile to enable                                                                         |
 | `--progress`           | `string`      | `auto`  | Set type of progress output (auto, tty, plain, quiet)                                               |

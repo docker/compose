@@ -262,11 +262,31 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: env-file?
+      value_type: stringArray
+      default_value: '[]'
+      description: Specify an optional environment file
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: file
       shorthand: f
       value_type: stringArray
       default_value: '[]'
       description: Compose configuration files
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: file?
+      value_type: stringArray
+      default_value: '[]'
+      description: Optional Compose override files
       deprecated: false
       hidden: false
       experimental: false
