@@ -12,9 +12,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.15.1
-	github.com/docker/cli v27.0.2+incompatible
+	github.com/docker/cli v27.0.3+incompatible
 	github.com/docker/cli-docs-tool v0.7.0
-	github.com/docker/docker v27.0.2+incompatible
+	github.com/docker/docker v27.0.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
