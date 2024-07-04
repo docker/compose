@@ -1,0 +1,7 @@
+services:
+  empty-variable:
+    build:
+      context: .
+    image: empty-variable
+    environment:
+      - EMPTY # expect to propagate value from user's env OR unset in container
