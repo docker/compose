@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -110,6 +111,13 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 		Use:   "up [OPTIONS] [SERVICE...]",
 		Short: "Create and start containers",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+			var err error
+			p.ConfigPaths, err = expandGlobs(p.ConfigPaths)
+
+			if err != nil {
+				return err
+			}
+
 			create.pullChanged = cmd.Flags().Changed("pull")
 			create.timeChanged = cmd.Flags().Changed("timeout")
 			up.navigationMenuChanged = cmd.Flags().Changed("menu")
@@ -167,6 +175,19 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
 
 	return upCmd
+}
+
+// expandGlobs expands any glob patterns in the paths
+func expandGlobs(paths []string) ([]string, error) {
+	var processedPaths []string
+	for _, path := range paths {
+		expandedPaths, err := filepath.Glob(path)
+		if err != nil {
+			return paths, err
+		}
+		processedPaths = append(processedPaths, expandedPaths...)
+	}
+	return processedPaths, nil
 }
 
 //nolint:gocyclo
