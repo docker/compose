@@ -12,8 +12,10 @@ on:
 jobs:
   validate-pr-title:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      statuses: write
     steps:
-
     - uses: amannn/action-semantic-pull-request@v5.4.0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
