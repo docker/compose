@@ -118,17 +118,16 @@ func isRunning() containerPredicate {
 	}
 }
 
-func isNotService(services ...string) containerPredicate {
-	return func(c moby.Container) bool {
-		service := c.Labels[api.ServiceLabel]
-		return !utils.StringContains(services, service)
-	}
-}
-
 // isOrphaned is a predicate to select containers without a matching service definition in compose project
 func isOrphaned(project *types.Project) containerPredicate {
 	services := append(project.ServiceNames(), project.DisabledServiceNames()...)
 	return func(c moby.Container) bool {
+		// One-off container
+		v, ok := c.Labels[api.OneoffLabel]
+		if ok && v == "True" {
+			return c.State == ContainerExited || c.State == ContainerDead
+		}
+		// Service that is not defined in the compose model
 		service := c.Labels[api.ServiceLabel]
 		return !utils.StringContains(services, service)
 	}

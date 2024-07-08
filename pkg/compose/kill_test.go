@@ -112,6 +112,7 @@ func testContainer(service string, id string, oneOff bool) moby.Container {
 		ID:     id,
 		Names:  []string{name},
 		Labels: containerLabels(service, oneOff),
+		State:  ContainerExited,
 	}
 }
 
