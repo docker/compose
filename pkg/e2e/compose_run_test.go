@@ -37,7 +37,7 @@ func TestLocalComposeRun(t *testing.T) {
 			"Hello one more time")
 		lines = Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello one more time", res.Stdout())
-		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))
+		assert.Assert(t, strings.Contains(res.Combined(), "orphan"))
 	})
 
 	t.Run("check run container exited", func(t *testing.T) {

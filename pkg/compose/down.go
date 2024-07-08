@@ -327,6 +327,10 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, container m
 	w := progress.ContextWriter(ctx)
 	eventName := getContainerProgressName(container)
 	err := s.stopContainer(ctx, w, container, timeout)
+	if errdefs.IsNotFound(err) {
+		w.Event(progress.RemovedEvent(eventName))
+		return nil
+	}
 	if err != nil {
 		return err
 	}

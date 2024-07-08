@@ -29,8 +29,10 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	composegoutils "github.com/compose-spec/compose-go/v2/utils"
 	"github.com/docker/buildx/util/logutil"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
@@ -450,6 +452,11 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 			if verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			}
+
+			err := setEnvWithDotEnv(opts)
+			if err != nil {
+				return err
+			}
 			if noAnsi {
 				if ansi != "auto" {
 					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
@@ -541,7 +548,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 			}
 
 			// dry run detection
-			ctx, err := backend.DryRunMode(ctx, dryRun)
+			ctx, err = backend.DryRunMode(ctx, dryRun)
 			if err != nil {
 				return err
 			}
@@ -639,6 +646,30 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	c.Flags().MarkHidden("verbose") //nolint:errcheck
 	return c
+}
+
+func setEnvWithDotEnv(opts ProjectOptions) error {
+	options, err := cli.NewProjectOptions(opts.ConfigPaths,
+		cli.WithWorkingDirectory(opts.ProjectDir),
+		cli.WithOsEnv,
+		cli.WithEnvFiles(opts.EnvFiles...),
+		cli.WithDotEnv,
+	)
+	if err != nil {
+		return nil
+	}
+	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), options.EnvFiles)
+	if err != nil {
+		return nil
+	}
+	for k, v := range envFromFile {
+		if _, ok := os.LookupEnv(k); !ok {
+			if err = os.Setenv(k, v); err != nil {
+				return nil
+			}
+		}
+	}
+	return err
 }
 
 var printerModes = []string{
