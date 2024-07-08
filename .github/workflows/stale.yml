@@ -1,14 +1,7 @@
 name: 'Close stale issues'
 on:
-  # schedule:
-  #   - cron: '0 0 * * *' # at midnight UTC every day
-  pull_request:
-  workflow_dispatch:
-    inputs:
-      debug_enabled:
-        description: 'To run in debug mode'
-        required: false
-        default: "true"
+  schedule:
+    - cron: '0 0 * * 0,3' # at midnight UTC every Sunday and Tuesday
 jobs:
   stale:
     runs-on: ubuntu-latest
@@ -19,7 +12,6 @@ jobs:
       - uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          debug-only: ${{ github.event.inputs.debug_enabled }}
           stale-issue-message: >
             This issue has been automatically marked as stale because it has not had
             recent activity. It will be closed if no further activity occurs. Thank you
