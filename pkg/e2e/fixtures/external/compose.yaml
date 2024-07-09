@@ -1,0 +1,14 @@
+services:
+  test:
+    image: nginx:alpine
+
+  other:
+    image: nginx:alpine
+    networks:
+      test_network:
+        ipv4_address: 8.8.8.8
+
+networks:
+  test_network:
+    external: true
+    name: foo_bar

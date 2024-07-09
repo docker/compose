@@ -388,3 +388,20 @@ func TestNestedDotEnv(t *testing.T) {
 	})
 
 }
+
+func TestUnnecesaryResources(t *testing.T) {
+	const projectName = "compose-e2e-unnecessary-resources"
+	c := NewParallelCLI(t)
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-p", projectName, "down", "-t=0")
+	})
+
+	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/external/compose.yaml", "-p", projectName, "up", "-d")
+	res.Assert(t, icmd.Expected{
+		ExitCode: 1,
+		Err:      "network foo_bar declared as external, but could not be found",
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/external/compose.yaml", "-p", projectName, "up", "-d", "test")
+	// Should not fail as missing external network is not used
+}
