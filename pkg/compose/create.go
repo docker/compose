@@ -1307,11 +1307,10 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	if len(networks) == 0 {
 		// in this instance, n.Name is really an ID
 		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
-		if err != nil {
+		if err != nil && !errdefs.IsNotFound(err) {
 			return err
 		}
 		networks = append(networks, sn)
-
 	}
 
 	// NetworkList API doesn't return the exact name match, so we can retrieve more than one network with a request

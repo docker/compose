@@ -342,11 +342,14 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 		project.Services[name] = s
 	}
 
+	project, err = project.WithSelectedServices(services)
+	if err != nil {
+		return nil, tracing.Metrics{}, err
+	}
+
 	if !o.All {
 		project = project.WithoutUnnecessaryResources()
 	}
-
-	project, err = project.WithSelectedServices(services)
 	return project, metrics, err
 }
 
