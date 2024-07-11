@@ -25,7 +25,7 @@ import (
 )
 
 // ServiceHash computes the configuration hash for a service.
-func ServiceHash(project *types.Project, o types.ServiceConfig) (string, error) {
+func ServiceHash(o types.ServiceConfig) (string, error) {
 	// remove the Build config when generating the service hash
 	o.Build = nil
 	o.PullPolicy = ""
@@ -40,7 +40,12 @@ func ServiceHash(project *types.Project, o types.ServiceConfig) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+}
 
+// ServiceDependenciesHash computes the configuration hash for service dependencies.
+func ServiceDependenciesHash(project *types.Project, o types.ServiceConfig) (string, error) {
+	bytes := make([]byte, 0)
 	for _, serviceConfig := range o.Configs {
 		projectConfig, ok := project.Configs[serviceConfig.Source]
 		if !ok {

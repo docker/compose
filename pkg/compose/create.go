@@ -506,16 +506,23 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 }
 
 func (s *composeService) prepareLabels(labels types.Labels, project *types.Project, service types.ServiceConfig, number int) (map[string]string, error) {
-	hash, err := ServiceHash(project, service)
+	serviceHash, err := ServiceHash(service)
 	if err != nil {
 		return nil, err
 	}
-	labels[api.ConfigHashLabel] = hash
+
+	serviceDependenciesHash, err := ServiceDependenciesHash(project, service)
+	if err != nil {
+		return nil, err
+	}
 
 	if number > 0 {
 		// One-off containers are not indexed
 		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 	}
+	labels[api.ConfigHashLabel] = serviceHash
+	labels[api.ConfigHashDependenciesLabel] = serviceDependenciesHash
+	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var dependencies []string
 	for s, d := range service.DependsOn {

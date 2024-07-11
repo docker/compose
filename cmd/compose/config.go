@@ -347,7 +347,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 			return err
 		}
 
-		hash, err := compose.ServiceHash(project, s)
+		hash, err := compose.ServiceHash(s)
 
 		if err != nil {
 			return err
