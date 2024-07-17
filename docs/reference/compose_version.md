@@ -7,9 +7,9 @@ Show the Docker Compose version information
 
 | Name             | Type     | Default | Description                                                    |
 |:-----------------|:---------|:--------|:---------------------------------------------------------------|
-| `--dry-run`      |          |         | Execute command in dry run mode                                |
+| `--dry-run`      | `bool`   |         | Execute command in dry run mode                                |
 | `-f`, `--format` | `string` |         | Format the output. Values: [pretty \| json]. (Default: pretty) |
-| `--short`        |          |         | Shows only Compose's version number                            |
+| `--short`        | `bool`   |         | Shows only Compose's version number                            |
 
 
 <!---MARKER_GEN_END-->

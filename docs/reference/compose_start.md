@@ -1,13 +1,13 @@
 # docker compose start
 
 <!---MARKER_GEN_START-->
-Start services
+Starts existing containers for a service
 
 ### Options
 
-| Name        | Type | Default | Description                     |
-|:------------|:-----|:--------|:--------------------------------|
-| `--dry-run` |      |         | Execute command in dry run mode |
+| Name        | Type   | Default | Description                     |
+|:------------|:-------|:--------|:--------------------------------|
+| `--dry-run` | `bool` |         | Execute command in dry run mode |
 
 
 <!---MARKER_GEN_END-->

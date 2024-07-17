@@ -48,7 +48,21 @@ func generateDocs(opts *options) error {
 	if err != nil {
 		return err
 	}
-	return tool.GenAllTree()
+	for _, format := range opts.formats {
+		switch format {
+		case "yaml":
+			if err := tool.GenYamlTree(cmd); err != nil {
+				return err
+			}
+		case "md":
+			if err := tool.GenMarkdownTree(cmd); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unknown format %q", format)
+		}
+	}
+	return nil
 }
 
 func disableFlagsInUseLine(cmd *cobra.Command) {
@@ -69,15 +83,17 @@ func visitAll(root *cobra.Command, fn func(*cobra.Command)) {
 }
 
 type options struct {
-	source string
-	target string
+	source  string
+	target  string
+	formats []string
 }
 
 func main() {
 	cwd, _ := os.Getwd()
 	opts := &options{
-		source: filepath.Join(cwd, "docs", "reference"),
-		target: filepath.Join(cwd, "docs", "reference"),
+		source:  filepath.Join(cwd, "docs", "reference"),
+		target:  filepath.Join(cwd, "docs", "reference"),
+		formats: []string{"yaml", "md"},
 	}
 	fmt.Printf("Project root: %s\n", opts.source)
 	fmt.Printf("Generating yaml files into %s\n", opts.target)

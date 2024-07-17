@@ -5,10 +5,10 @@ Block until the first service container stops
 
 ### Options
 
-| Name             | Type | Default | Description                                  |
-|:-----------------|:-----|:--------|:---------------------------------------------|
-| `--down-project` |      |         | Drops project when the first container stops |
-| `--dry-run`      |      |         | Execute command in dry run mode              |
+| Name             | Type   | Default | Description                                  |
+|:-----------------|:-------|:--------|:---------------------------------------------|
+| `--down-project` | `bool` |         | Drops project when the first container stops |
+| `--dry-run`      | `bool` |         | Execute command in dry run mode              |
 
 
 <!---MARKER_GEN_END-->
