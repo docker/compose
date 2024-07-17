@@ -7,9 +7,9 @@ List images used by the created containers
 
 | Name            | Type     | Default | Description                                |
 |:----------------|:---------|:--------|:-------------------------------------------|
-| `--dry-run`     |          |         | Execute command in dry run mode            |
+| `--dry-run`     | `bool`   |         | Execute command in dry run mode            |
 | `--format`      | `string` | `table` | Format the output. Values: [table \| json] |
-| `-q`, `--quiet` |          |         | Only display IDs                           |
+| `-q`, `--quiet` | `bool`   |         | Only display IDs                           |
 
 
 <!---MARKER_GEN_END-->
