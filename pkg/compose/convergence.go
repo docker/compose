@@ -30,7 +30,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 	"github.com/docker/compose/v2/internal/tracing"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
