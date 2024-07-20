@@ -44,6 +44,8 @@ import (
 	"github.com/docker/docker/pkg/streamformatter"
 
 	"github.com/docker/compose/v2/pkg/api"
+
+	"github.com/sirupsen/logrus"
 )
 
 //nolint:gocyclo
@@ -180,7 +182,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	aux := func(msg jsonmessage.JSONMessage) {
 		var result dockertypes.BuildResult
 		if err := json.Unmarshal(*msg.Aux, &result); err != nil {
-			fmt.Fprintf(s.stderr(), "Failed to parse aux message: %s", err)
+			logrus.Errorf("Failed to parse aux message: %s", err)
 		} else {
 			imageID = result.ID
 		}

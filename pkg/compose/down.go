@@ -33,6 +33,7 @@ import (
 	imageapi "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/errdefs"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -107,7 +108,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
-		fmt.Fprintf(s.stderr(), "Warning: No resource found to remove for project %q.\n", projectName)
+		logrus.Warnf("Warning: No resource found to remove for project %q.", projectName)
 	}
 
 	eg, _ := errgroup.WithContext(ctx)
