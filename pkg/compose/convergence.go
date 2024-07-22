@@ -332,14 +332,20 @@ func mustRecreate(project *types.Project, expected types.ServiceConfig, actual m
 		return true, nil
 	}
 
-	serviceDependenciesHash, err := ServiceDependenciesHash(project, expected)
+	serviceConfigsHash, err := ServiceConfigsHash(project, expected)
 	if err != nil {
 		return false, err
 	}
 
-	serviceDependenciesChanged := actual.Labels[api.ConfigHashDependenciesLabel] != serviceDependenciesHash
+	serviceSecretsHash, err := ServiceSecretsHash(project, expected)
+	if err != nil {
+		return false, err
+	}
 
-	return serviceDependenciesChanged, nil
+	serviceConfigsChanged := actual.Labels[api.ServiceConfigsHash] != serviceConfigsHash
+	serviceSecretsChanged := actual.Labels[api.ServiceSecretsHash] != serviceSecretsHash
+
+	return serviceConfigsChanged || serviceSecretsChanged, nil
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
