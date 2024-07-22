@@ -30,11 +30,15 @@ type jsonWriter struct {
 }
 
 type jsonMessage struct {
-	DryRun bool   `json:"dry-run,omitempty"`
-	Tail   bool   `json:"tail,omitempty"`
-	ID     string `json:"id,omitempty"`
-	Text   string `json:"text,omitempty"`
-	Status string `json:"status,omitempty"`
+	DryRun   bool   `json:"dry-run,omitempty"`
+	Tail     bool   `json:"tail,omitempty"`
+	ID       string `json:"id,omitempty"`
+	ParentID string `json:"parent_id,omitempty"`
+	Text     string `json:"text,omitempty"`
+	Status   string `json:"status,omitempty"`
+	Current  int64  `json:"current,omitempty"`
+	Total    int64  `json:"total,omitempty"`
+	Percent  int    `json:"percent,omitempty"`
 }
 
 func (p *jsonWriter) Start(ctx context.Context) error {
@@ -48,11 +52,15 @@ func (p *jsonWriter) Start(ctx context.Context) error {
 
 func (p *jsonWriter) Event(e Event) {
 	var message = &jsonMessage{
-		DryRun: p.dryRun,
-		Tail:   false,
-		ID:     e.ID,
-		Text:   e.Text,
-		Status: e.StatusText,
+		DryRun:   p.dryRun,
+		Tail:     false,
+		ID:       e.ID,
+		Text:     e.Text,
+		Status:   e.StatusText,
+		ParentID: e.ParentID,
+		Current:  e.Current,
+		Total:    e.Total,
+		Percent:  e.Percent,
 	}
 	marshal, err := json.Marshal(message)
 	if err == nil {
