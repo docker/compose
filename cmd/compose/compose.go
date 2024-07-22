@@ -647,12 +647,12 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 	c.Flags().MarkHidden("verbose") //nolint:errcheck
 	return c
 }
-
 func setEnvWithDotEnv(opts ProjectOptions) error {
 	options, err := cli.NewProjectOptions(opts.ConfigPaths,
 		cli.WithWorkingDirectory(opts.ProjectDir),
 		cli.WithOsEnv,
 		cli.WithEnvFiles(opts.EnvFiles...),
+		WithExtendedEnvFiles,
 		cli.WithDotEnv,
 	)
 	if err != nil {
@@ -670,6 +670,88 @@ func setEnvWithDotEnv(opts ProjectOptions) error {
 		}
 	}
 	return err
+}
+
+func WithExtendedEnvFiles(o *cli.ProjectOptions) error {
+
+	absEnvFiles := make([]string, 0)
+	fileLookupCache := make(map[string]string)
+
+	for _, file := range o.EnvFiles {
+		absFile, err := filepath.Abs(file)
+		if err != nil {
+			return err
+		}
+		absEnvFiles = append(absEnvFiles, absFile)
+		fileLookupCache[absFile] = absFile
+
+		recursedFiles, err := recurseEnvFiles(absFile, fileLookupCache)
+		if err != nil {
+			return err
+		}
+		absEnvFiles = append(absEnvFiles, recursedFiles...)
+	}
+	o.EnvFiles = absEnvFiles
+
+	return nil
+}
+
+func recurseEnvFiles(envFile string, fileLookup map[string]string) ([]string, error) {
+
+	newEnvFiles := make([]string, 0)
+
+	_, err := os.Stat(envFile)
+	// This indicates that the specified file does not exist
+	// In this specific case it's safe to ignore loading the file i.e. the file is optional.
+	if os.IsNotExist(err) {
+		return newEnvFiles, nil
+	}
+
+	// Parse the .env file
+	envFromFile, err := dotenv.GetEnvFromFile(make(map[string]string), []string{envFile})
+	if err != nil {
+		return nil, err
+	}
+
+	// If the file contains a COMPOSE_ENV_FILES key, add the files to the list.
+	// Remote any files that don't exist i.e. the file is optional.
+	// Filter any files we've already seen in the fileLookup.
+	// Depth first recursion into the new files
+	if extraEnvFiles, ok := envFromFile[ComposeEnvFiles]; ok {
+
+		for _, newFile := range strings.Split(extraEnvFiles, ",") {
+			// Handle relative paths
+			if !filepath.IsAbs(newFile) {
+				newFile, err = filepath.Abs(filepath.Join(filepath.Dir(envFile), newFile))
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			_, err := os.Stat(newFile)
+			// This indicates that the specified file does not exist
+			// In this specific case it's safe to ignore using the file as an env file
+			// i.e. the file is optional.
+			if os.IsNotExist(err) {
+				continue
+			}
+
+			// if we haven't seen this file before, add it to the list
+			// and recurse into it
+			if _, ok := fileLookup[newFile]; !ok {
+				newEnvFiles = append(newEnvFiles, newFile)
+				fileLookup[newFile] = newFile
+				recursedFiles, recurseErr := recurseEnvFiles(newFile, fileLookup)
+				if recurseErr != nil {
+					return nil, recurseErr
+				}
+
+				newEnvFiles = append(newEnvFiles, recursedFiles...)
+			}
+		}
+	}
+
+	return newEnvFiles, nil
 }
 
 var printerModes = []string{
