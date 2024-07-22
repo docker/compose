@@ -17,10 +17,13 @@
 package compose
 
 import (
+	"bytes"
 	"encoding/json"
-	"os"
+	"fmt"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -36,36 +39,77 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	o.DependsOn = nil
 	o.Profiles = nil
 
-	bytes, err := json.Marshal(o)
+	data, err := json.Marshal(o)
 	if err != nil {
 		return "", err
 	}
-	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+	return digest.SHA256.FromBytes(data).Encoded(), nil
 }
 
-// ServiceDependenciesHash computes the configuration hash for service dependencies.
-func ServiceDependenciesHash(project *types.Project, o types.ServiceConfig) (string, error) {
-	bytes := make([]byte, 0)
-	for _, serviceConfig := range o.Configs {
-		projectConfig, ok := project.Configs[serviceConfig.Source]
-		if !ok {
-			continue
+// ServiceConfigsHash computes the configuration hash for service configs.
+func ServiceConfigsHash(project *types.Project, serviceConfig types.ServiceConfig) (string, error) {
+	data := make([]byte, 0)
+	for _, config := range serviceConfig.Configs {
+		file := project.Configs[config.Source]
+		b, err := createTarForConfig(project, types.FileReferenceConfig(config), types.FileObjectConfig(file))
+
+		if err != nil {
+			return "", err
 		}
 
-		if projectConfig.Content != "" {
-			bytes = append(bytes, []byte(projectConfig.Content)...)
-		} else if projectConfig.File != "" {
-			content, err := os.ReadFile(projectConfig.File)
-			if err != nil {
-				return "", err
-			}
-			bytes = append(bytes, content...)
-		} else if projectConfig.Environment != "" {
-			bytes = append(bytes, []byte(projectConfig.Environment)...)
-		}
+		data = append(data, b.Bytes()...)
 	}
 
-	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+	return digest.SHA256.FromBytes(data).Encoded(), nil
+}
+
+// ServiceSecretsHash computes the configuration hash for service secrets.
+func ServiceSecretsHash(project *types.Project, serviceConfig types.ServiceConfig) (string, error) {
+	data := make([]byte, 0)
+	for _, secret := range serviceConfig.Secrets {
+		file := project.Secrets[secret.Source]
+		b, err := createTarForConfig(project, types.FileReferenceConfig(secret), types.FileObjectConfig(file))
+
+		if err != nil {
+			return "", err
+		}
+
+		data = append(data, b.Bytes()...)
+	}
+
+	return digest.SHA256.FromBytes(data).Encoded(), nil
+}
+
+func createTarForConfig(
+	project *types.Project,
+	serviceConfig types.FileReferenceConfig,
+	file types.FileObjectConfig,
+) (*bytes.Buffer, error) {
+	// fixed time to ensure the tarball is deterministic
+	modTime := time.Unix(0, 0)
+
+	if serviceConfig.Target == "" {
+		serviceConfig.Target = "/" + serviceConfig.Source
+	}
+
+	switch {
+	case file.Content != "":
+		return bytes.NewBuffer([]byte(file.Content)), nil
+	case file.Environment != "":
+		env, ok := project.Environment[file.Environment]
+		if !ok {
+			return nil, fmt.Errorf(
+				"environment variable %q required by file %q is not set",
+				file.Environment,
+				file.Name,
+			)
+		}
+		return bytes.NewBuffer([]byte(env)), nil
+	case file.File != "":
+		return utils.CreateTarByPath(file.File, modTime)
+	}
+
+	return nil, fmt.Errorf("config %q is empty", file.Name)
 }
 
 // NetworkHash computes the configuration hash for a network.

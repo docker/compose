@@ -511,7 +511,12 @@ func (s *composeService) prepareLabels(labels types.Labels, project *types.Proje
 		return nil, err
 	}
 
-	serviceDependenciesHash, err := ServiceDependenciesHash(project, service)
+	serviceConfigsHash, err := ServiceConfigsHash(project, service)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceSecretsHash, err := ServiceSecretsHash(project, service)
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +526,8 @@ func (s *composeService) prepareLabels(labels types.Labels, project *types.Proje
 		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 	}
 	labels[api.ConfigHashLabel] = serviceHash
-	labels[api.ConfigHashDependenciesLabel] = serviceDependenciesHash
+	labels[api.ServiceConfigsHash] = serviceConfigsHash
+	labels[api.ServiceSecretsHash] = serviceSecretsHash
 	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var dependencies []string

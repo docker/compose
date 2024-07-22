@@ -346,13 +346,19 @@ func (c *convergence) mustRecreate(project *types.Project, expected types.Servic
 		return true, nil
 	}
 
-	serviceDependenciesHash, err := ServiceDependenciesHash(project, expected)
+	serviceConfigsHash, err := ServiceConfigsHash(project, expected)
 	if err != nil {
 		return false, err
 	}
-	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
-	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
-	if configChanged || imageUpdated {
+
+	serviceSecretsHash, err := ServiceSecretsHash(project, expected)
+	if err != nil {
+		return false, err
+	}
+	serviceConfigsChanged := actual.Labels[api.ServiceConfigsHash] != serviceConfigsHash
+	serviceSecretsChanged := actual.Labels[api.ServiceSecretsHash] != serviceSecretsHash
+
+	if serviceConfigsChanged || serviceSecretsChanged {
 		return true, nil
 	}
 
