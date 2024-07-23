@@ -19,6 +19,5 @@ updates:
       - dependency-name: "github.com/containerd/containerd"
         # containerd major/minor must be kept in sync with moby
         update-types: [ "version-update:semver-major", "version-update:semver-minor" ]
-      - dependency-name: "go.opentelemetry.io/otel/*"
-        # OTEL is v1.x but has some parts that are not API stable yet
-        update-types: [ "version-update:semver-major", "version-update:semver-minor"]
+        # OTEL dependencies should be upgraded in sync with engine, cli, buildkit and buildx projects
+      - dependency-name: "go.opentelemetry.io/*"
