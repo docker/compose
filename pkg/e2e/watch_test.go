@@ -34,7 +34,6 @@ import (
 )
 
 func TestWatch(t *testing.T) {
-	t.Skip("Skipping watch tests until we can figure out why they are flaky/failing")
 
 	services := []string{"alpine", "busybox", "debian"}
 	for _, svcName := range services {
