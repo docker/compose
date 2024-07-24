@@ -257,6 +257,11 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 			service := container.Labels[api.ServiceLabel]
 			switch event.Status {
 			case "stop":
+				if inspected.State.Running {
+					// on sync+restart action the container stops -> dies -> start -> restart
+					// we do not want to stop the current container, we want to restart it
+					return nil
+				}
 				if _, ok := watched[container.ID]; ok {
 					eType := api.ContainerEventStopped
 					if utils.Contains(replaced, container.ID) {
@@ -279,6 +284,11 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				watched[container.ID] = restarted + 1
 				// Container terminated.
 				willRestart := inspected.State.Restarting
+				if inspected.State.Running {
+					// on sync+restart action inspected.State.Restarting is false,
+					// however the container is already running before it restarts
+					willRestart = true
+				}
 
 				eType := api.ContainerEventExit
 				if utils.Contains(replaced, container.ID) {
