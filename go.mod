@@ -14,7 +14,7 @@ require (
 	github.com/containerd/platforms v0.2.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
-	github.com/docker/buildx v0.16.1
+	github.com/docker/buildx v0.16.2
 	github.com/docker/cli v27.1.1+incompatible
 	github.com/docker/cli-docs-tool v0.8.0
 	github.com/docker/docker v27.1.1+incompatible
@@ -29,7 +29,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.15.0
+	github.com/moby/buildkit v0.15.1
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/term v0.5.0
 	github.com/morikuni/aec v1.0.0
