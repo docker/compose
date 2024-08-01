@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -157,6 +158,13 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 			if checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
 				continue
+			} else {
+				var initialSync bool
+				success, err := trigger.Extensions.Get("x-initialSync", &initialSync)
+				if err == nil && success && initialSync && (trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart) {
+					// Need to check initial files are in container that are meant to be synched from watch action
+					s.initialSync(ctx, service, trigger, ignore, syncer)
+				}
 			}
 			paths = append(paths, trigger.Path)
 			pathLogs = append(pathLogs, fmt.Sprintf("Action %s for path %q", trigger.Action, trigger.Path))
@@ -573,4 +581,68 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 			}
 		}
 	}
+}
+
+func (s *composeService) initialSync(ctx context.Context, service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher, syncer sync.Syncer) error {
+	dockerFileIgnore, _ := watch.NewDockerPatternMatcher("/", []string{"Dockerfile", "*compose*.y*ml"})
+	triggerIgnore, _ := watch.NewDockerPatternMatcher("/", trigger.Ignore)
+	ignoreInitialSync := watch.NewCompositeMatcher(ignore, dockerFileIgnore, triggerIgnore)
+
+	pathsToCopy, err := initialSyncFiles(service, trigger, ignoreInitialSync)
+	if err != nil {
+		return err
+	}
+
+	return syncer.Sync(ctx, service, pathsToCopy)
+}
+
+func initialSyncFiles(service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]sync.PathMapping, error) {
+	fi, err := os.Stat(trigger.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathsToCopy []sync.PathMapping
+	switch mode := fi.Mode(); {
+	case mode.IsDir():
+		// do directory stuff
+		err = filepath.WalkDir(trigger.Path, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				// handle possible path err, just in case...
+				return err
+			}
+			if trigger.Path == path {
+				// walk starts at the root directory
+				return nil
+			}
+			rel, _ := filepath.Rel(trigger.Path, path)
+			if shouldIgnoreOrSkip(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
+				// By definition sync ignores bind mounted paths
+				if d.IsDir() {
+					return fs.SkipDir // ignore or skip folder
+				}
+				return nil // ignore or skip file
+			}
+			pathsToCopy = append(pathsToCopy, sync.PathMapping{
+				HostPath:      path,
+				ContainerPath: filepath.Join(trigger.Target, rel),
+			})
+			return nil
+		})
+	case mode.IsRegular():
+		// do file stuff
+		if !shouldIgnoreOrSkip(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+			pathsToCopy = append(pathsToCopy, sync.PathMapping{
+				HostPath:      trigger.Path,
+				ContainerPath: trigger.Target,
+			})
+		}
+	}
+	return pathsToCopy, nil
+}
+
+func shouldIgnoreOrSkip(rel string, ignore watch.PathMatcher) bool {
+	shouldIgnore, _ := ignore.Matches(rel)
+	// ignore files that match any ignore pattern
+	return shouldIgnore
 }
