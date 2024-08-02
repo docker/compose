@@ -4,7 +4,7 @@
 Forces running containers to stop by sending a `SIGKILL` signal. Optionally the signal can be passed, for example:
 
 ```console
-$ docker-compose kill -s SIGINT
+$ docker compose kill -s SIGINT
 ```
 
 ### Options
@@ -23,5 +23,5 @@ $ docker-compose kill -s SIGINT
 Forces running containers to stop by sending a `SIGKILL` signal. Optionally the signal can be passed, for example:
 
 ```console
-$ docker-compose kill -s SIGINT
+$ docker compose kill -s SIGINT
 ```
