@@ -47,6 +47,7 @@ type runOptions struct {
 	Detach        bool
 	Remove        bool
 	noTty         bool
+	noBuild       bool
 	tty           bool
 	interactive   bool
 	user          string
@@ -81,6 +82,12 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	}
 
 	target.Tty = !options.noTty
+	if options.noBuild {
+		target.Build = &types.BuildConfig{
+			Pull: target.Build.Pull,
+			Tags: target.Build.Tags,
+		}
+	}
 	target.StdinOpen = options.interactive
 
 	// --service-ports and --publish are incompatible
@@ -153,6 +160,13 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 					options.noTty = !options.tty
 				}
 			}
+			if cmd.Flags().Changed("build") {
+				if cmd.Flags().Changed("no-build") {
+					return fmt.Errorf("--build and --no-build are incompatible")
+				} else {
+					createOpts.noBuild = !createOpts.Build
+				}
+			}
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
@@ -189,6 +203,8 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.BoolVarP(&options.servicePorts, "service-ports", "P", false, "Run command with all service's ports enabled and mapped to the host")
 	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container")
+	flags.BoolVar(&createOpts.noBuild, "no-build", false, "Don't build an image, even if it's policy")
+	flags.StringVar(&createOpts.Pull, "pull", "policy", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 
 	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
