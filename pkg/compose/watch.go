@@ -37,8 +37,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/jonboulle/clockwork"
-	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -128,6 +128,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 		}
 
 		if len(services) == 0 && service.Build == nil {
+			logrus.Debugf("service %q has no build context, skipping watch", service.Name)
 			continue
 		}
 
