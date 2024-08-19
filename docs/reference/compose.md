@@ -178,7 +178,7 @@ Dry Run mode works with almost all commands. You cannot use Dry Run mode with a 
 | [`unpause`](compose_unpause.md) | Unpause services                                                                        |
 | [`up`](compose_up.md)           | Create and start containers                                                             |
 | [`version`](compose_version.md) | Show the Docker Compose version information                                             |
-| [`wait`](compose_wait.md)       | Block until the first service container stops                                           |
+| [`wait`](compose_wait.md)       | Block until containers of all (or specified) services stop.                             |
 | [`watch`](compose_watch.md)     | Watch build context for service and rebuild/refresh containers when files are updated   |
 
 
