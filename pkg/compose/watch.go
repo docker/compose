@@ -156,8 +156,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 		var paths, pathLogs []string
 		for _, trigger := range config.Watch {
 			if checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
-				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
-				continue
+				logrus.Infof("path '%s' also declared by a bind mount volume\n", trigger.Path)
 			} else {
 				var initialSync bool
 				success, err := trigger.Extensions.Get("x-initialSync", &initialSync)
