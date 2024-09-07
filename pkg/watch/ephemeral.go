@@ -36,7 +36,7 @@ func EphemeralPathMatcher() PathMatcher {
 	// seems safe and should catch most cases
 	vimPatterns := []string{"**/4913", "**/*~", "**/.*.swp", "**/.*.swx", "**/.*.swo", "**/.*.swn"}
 	// kate (the default text editor for KDE) uses a file similar to Vim's .swp
-	// files, but it doesn't have the "incrememnting" character problem mentioned
+	// files, but it doesn't have the "incrementing" character problem mentioned
 	// above
 	katePatterns := []string{"**/.*.kate-swp"}
 	// go stdlib creates tmpfiles to determine umask for setting permissions

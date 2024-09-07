@@ -173,7 +173,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 							continue
 						}
 					} else if err != nil {
-						// if we can't read the path, we won't be able ot make
+						// if we can't read the path, we won't be able to make
 						// a file share for it
 						logrus.Debugf("Skipping creating file share for %q: %v", p, err)
 						continue
@@ -1183,7 +1183,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
 	if err == nil {
 		// NetworkInspect will match on ID prefix, so double check we get the expected one
-		// as looking for network named `db` we could erroneously matched network ID `db9086999caf`
+		// as looking for network named `db` we could erroneously match network ID `db9086999caf`
 		if inspect.Name == n.Name || inspect.ID == n.Name {
 			p, ok := inspect.Labels[api.ProjectLabel]
 			if !ok {
@@ -1329,7 +1329,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 			// Swarm nodes do not register overlay networks that were
 			// created on a different node unless they're in use.
 			// So we can't preemptively check network exists, but
-			// networkAttach will later fail anyway if network actually doesn't exists
+			// networkAttach will later fail anyway if network actually doesn't exist
 			return nil
 		}
 		return fmt.Errorf("network %s declared as external, but could not be found", n.Name)

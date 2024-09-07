@@ -21,7 +21,7 @@ import (
 	"io"
 )
 
-// GetWriter creates a io.Writer that will actually split by line and format by LogConsumer
+// GetWriter creates an io.Writer that will actually split by line and format by LogConsumer
 func GetWriter(consumer func(string)) io.WriteCloser {
 	return &splitWriter{
 		buffer:   bytes.Buffer{},

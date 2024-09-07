@@ -49,7 +49,7 @@ To execute both CLI and standalone e2e tests, run :
 make e2e
 ```
 
-Or if you need to build the CLI, run: 
+Or if you need to build the CLI, run:
 ```console
 make build-and-e2e
 ```
@@ -85,7 +85,7 @@ make build-and-e2e-compose-standalone
 
 To create a new release:
 * Check that the CI is green on the main branch for the commit you want to release
-* Run the release Github Actions workflow with a tag of form vx.y.z following existing tags.
+* Run the release GitHub Actions workflow with a tag of form vx.y.z following existing tags.
 
 This will automatically create a new tag, release and make binaries for
 Windows, macOS, and Linux available for download on the

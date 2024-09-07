@@ -35,9 +35,9 @@ const (
 	FileNotFoundFailureStatus = "failure-file-not-found"
 	// CommandSyntaxFailureStatus failure reading command
 	CommandSyntaxFailureStatus = "failure-cmd-syntax"
-	// BuildFailureStatus failure building imge
+	// BuildFailureStatus failure building image
 	BuildFailureStatus = "failure-build"
-	// PullFailureStatus failure pulling imge
+	// PullFailureStatus failure pulling image
 	PullFailureStatus = "failure-pull"
 	// CanceledStatus command canceled
 	CanceledStatus = "canceled"

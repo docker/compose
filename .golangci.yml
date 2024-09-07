@@ -69,5 +69,5 @@ linters-settings:
     line-length: 200
 issues:
   # golangci hides some golint warnings (the warning about exported things
-  # withtout documentation for example), this will make it show them anyway.
+  # without documentation for example), this will make it show them anyway.
   exclude-use-default: false
