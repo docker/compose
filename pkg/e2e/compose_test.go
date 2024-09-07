@@ -389,7 +389,7 @@ func TestNestedDotEnv(t *testing.T) {
 
 }
 
-func TestUnnecesaryResources(t *testing.T) {
+func TestUnnecessaryResources(t *testing.T) {
 	const projectName = "compose-e2e-unnecessary-resources"
 	c := NewParallelCLI(t)
 	t.Cleanup(func() {

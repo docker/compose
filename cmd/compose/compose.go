@@ -60,7 +60,7 @@ const (
 	ComposeProjectName = "COMPOSE_PROJECT_NAME"
 	// ComposeCompatibility try to mimic compose v1 as much as possible
 	ComposeCompatibility = "COMPOSE_COMPATIBILITY"
-	// ComposeRemoveOrphans remove “orphaned" containers, i.e. containers tagged for current project but not declared as service
+	// ComposeRemoveOrphans remove "orphaned" containers, i.e. containers tagged for current project but not declared as service
 	ComposeRemoveOrphans = "COMPOSE_REMOVE_ORPHANS"
 	// ComposeIgnoreOrphans ignore "orphaned" containers
 	ComposeIgnoreOrphans = "COMPOSE_IGNORE_ORPHANS"

@@ -196,7 +196,7 @@ type CreateOptions struct {
 	RecreateDependencies string
 	// Inherit reuse anonymous volumes from previous container
 	Inherit bool
-	// Timeout set delay to wait for container to gracelfuly stop before sending SIGKILL
+	// Timeout set delay to wait for container to gracefully stop before sending SIGKILL
 	Timeout *time.Duration
 	// QuietPull makes the pulling process quiet
 	QuietPull bool

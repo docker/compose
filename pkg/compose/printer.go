@@ -23,7 +23,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-// logPrinter watch application containers an collect their logs
+// logPrinter watch application containers and collect their logs
 type logPrinter interface {
 	HandleEvent(event api.ContainerEvent)
 	Run(cascade api.Cascade, exitCodeFrom string, stopFn func() error) (int, error)

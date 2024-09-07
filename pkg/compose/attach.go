@@ -43,7 +43,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 		return containers, nil
 	}
 
-	containers.sorted() // This enforce predictable colors assignment
+	containers.sorted() // This enforces predictable colors assignment
 
 	var names []string
 	for _, c := range containers {
