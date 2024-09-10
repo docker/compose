@@ -102,9 +102,7 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 
 func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (func(), chan bool, error) {
 	detached := make(chan bool)
-	var (
-		restore = func() { /* noop */ }
-	)
+	restore := func() { /* noop */ }
 	if stdin != nil {
 		in := streams.NewIn(stdin)
 		if in.IsTerminal() {
@@ -128,7 +126,6 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 		if stdin != nil {
 			stdin.Close() //nolint:errcheck
 		}
-		streamOut.Close() //nolint:errcheck
 	}()
 
 	if streamIn != nil && stdin != nil {
@@ -143,8 +140,9 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 
 	if stdout != nil {
 		go func() {
-			defer stdout.Close() //nolint:errcheck
-			defer stderr.Close() //nolint:errcheck
+			defer stdout.Close()    //nolint:errcheck
+			defer stderr.Close()    //nolint:errcheck
+			defer streamOut.Close() //nolint:errcheck
 			if tty {
 				io.Copy(stdout, streamOut) //nolint:errcheck
 			} else {
