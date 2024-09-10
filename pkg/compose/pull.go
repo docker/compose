@@ -265,7 +265,7 @@ func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiCl
 		inspect, err := apiClient.DistributionInspect(ctx, named.String(), auth)
 		if err != nil {
 			return "",
-				fmt.Errorf("failed ot resolve digest for %s: %w", named.String(), err)
+				fmt.Errorf("failed to resolve digest for %s: %w", named.String(), err)
 		}
 		return inspect.Descriptor.Digest, nil
 	}
