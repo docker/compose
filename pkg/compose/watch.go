@@ -553,13 +553,19 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 		for i := range pathMappings {
 			hostPathsToSync[i] = pathMappings[i].HostPath
 		}
-		log.Log(api.WatchLogger, fmt.Sprintf("Syncing %q after changes were detected", serviceName))
+		log.Log(
+			api.WatchLogger,
+			fmt.Sprintf(
+				"Syncing %q after changes were detected: %s",
+				serviceName,
+				strings.Join(hostPathsToSync, ", "),
+			),
+		)
 	} else {
-		hostPathsToSync := make([]string, len(pathMappings))
-		for i := range pathMappings {
-			hostPathsToSync[i] = pathMappings[i].HostPath
-		}
-		log.Log(api.WatchLogger, fmt.Sprintf("Syncing service %q after %d changes were detected", serviceName, len(pathMappings)))
+		log.Log(
+			api.WatchLogger,
+			fmt.Sprintf("Syncing service %q after %d changes were detected", serviceName, len(pathMappings)),
+		)
 	}
 }
 
