@@ -646,28 +646,10 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 	}
 
 	for _, device := range s.Devices {
-		// FIXME should use docker/cli parseDevice, unfortunately private
-		src := ""
-		dst := ""
-		permissions := "rwm"
-		arr := strings.Split(device, ":")
-		switch len(arr) {
-		case 3:
-			permissions = arr[2]
-			fallthrough
-		case 2:
-			dst = arr[1]
-			fallthrough
-		case 1:
-			src = arr[0]
-		}
-		if dst == "" {
-			dst = src
-		}
 		resources.Devices = append(resources.Devices, container.DeviceMapping{
-			PathOnHost:        src,
-			PathInContainer:   dst,
-			CgroupPermissions: permissions,
+			PathOnHost:        device.Source,
+			PathInContainer:   device.Target,
+			CgroupPermissions: device.Permissions,
 		})
 	}
 
