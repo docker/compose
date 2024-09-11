@@ -205,7 +205,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	// daemon isn't running Windows.
 	if response.OSType != "windows" && runtime.GOOS == "windows" {
 		// if response.OSType != "windows" && runtime.GOOS == "windows" && !options.quiet {
-		fmt.Fprintln(s.stdout(), "SECURITY WARNING: You are building a Docker "+
+		_, _ = fmt.Fprintln(s.stdout(), "SECURITY WARNING: You are building a Docker "+
 			"image from Windows against a non-Windows Docker host. All files and "+
 			"directories added to build context will have '-rwxr-xr-x' permissions. "+
 			"It is recommended to double check and reset permissions for sensitive "+

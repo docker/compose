@@ -124,7 +124,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	if len(opts.Command) > 0 {
 		service.Command = opts.Command
 	}
-	if len(opts.User) > 0 {
+	if opts.User != "" {
 		service.User = opts.User
 	}
 
@@ -136,7 +136,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 		service.CapDrop = append(service.CapDrop, opts.CapDrop...)
 		service.CapAdd = utils.Remove(service.CapAdd, opts.CapDrop...)
 	}
-	if len(opts.WorkingDir) > 0 {
+	if opts.WorkingDir != "" {
 		service.WorkingDir = opts.WorkingDir
 	}
 	if opts.Entrypoint != nil {

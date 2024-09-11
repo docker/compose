@@ -57,7 +57,7 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		containers = containers.filter(isService(project.ServiceNames()...))
 	}
 	if len(containers) == 0 {
-		fmt.Fprintf(s.stdinfo(), "no container to kill")
+		_, _ = fmt.Fprintf(s.stdinfo(), "no container to kill")
 		return nil
 	}
 

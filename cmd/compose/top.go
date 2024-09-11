@@ -64,7 +64,7 @@ func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opt
 	})
 
 	for _, container := range containers {
-		fmt.Fprintf(dockerCli.Out(), "%s\n", container.Name)
+		_, _ = fmt.Fprintf(dockerCli.Out(), "%s\n", container.Name)
 		err := psPrinter(dockerCli.Out(), func(w io.Writer) {
 			for _, proc := range container.Processes {
 				info := []interface{}{}
@@ -74,7 +74,7 @@ func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opt
 				_, _ = fmt.Fprintf(w, strings.Repeat("%s\t", len(info))+"\n", info...)
 
 			}
-			fmt.Fprintln(w)
+			_, _ = fmt.Fprintln(w)
 		},
 			container.Titles...)
 		if err != nil {

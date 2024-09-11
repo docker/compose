@@ -46,7 +46,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 	if err != nil {
 		if api.IsNotFoundError(err) {
-			fmt.Fprintln(s.stderr(), "No stopped containers")
+			_, _ = fmt.Fprintln(s.stderr(), "No stopped containers")
 			return nil
 		}
 		return err
@@ -78,12 +78,12 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	})
 
 	if len(names) == 0 {
-		fmt.Fprintln(s.stdinfo(), "No stopped containers")
+		_, _ = fmt.Fprintln(s.stdinfo(), "No stopped containers")
 		return nil
 	}
 	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
 	if options.Force {
-		fmt.Fprintln(s.stdout(), msg)
+		_, _ = fmt.Fprintln(s.stdout(), msg)
 	} else {
 		confirm, err := prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)
 		if err != nil {

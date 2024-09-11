@@ -458,7 +458,7 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 }
 
 func nextContainerNumber(containers []moby.Container) int {
-	max := 0
+	maxNumber := 0
 	for _, c := range containers {
 		s, ok := c.Labels[api.ContainerNumberLabel]
 		if !ok {
@@ -469,11 +469,11 @@ func nextContainerNumber(containers []moby.Container) int {
 			logrus.Warnf("container %s has invalid %s label: %s", c.ID, api.ContainerNumberLabel, s)
 			continue
 		}
-		if n > max {
-			max = n
+		if n > maxNumber {
+			maxNumber = n
 		}
 	}
-	return max + 1
+	return maxNumber + 1
 
 }
 

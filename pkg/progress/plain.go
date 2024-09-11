@@ -44,7 +44,7 @@ func (p *plainWriter) Event(e Event) {
 	if p.dryRun {
 		prefix = api.DRYRUN_PREFIX
 	}
-	fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.StatusText)
+	_, _ = fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.StatusText)
 }
 
 func (p *plainWriter) Events(events []Event) {
@@ -58,7 +58,7 @@ func (p *plainWriter) TailMsgf(msg string, args ...interface{}) {
 	if p.dryRun {
 		msg = api.DRYRUN_PREFIX + msg
 	}
-	fmt.Fprintln(p.out, msg)
+	_, _ = fmt.Fprintln(p.out, msg)
 }
 
 func (p *plainWriter) Stop() {

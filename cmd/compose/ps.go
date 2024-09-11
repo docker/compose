@@ -130,7 +130,7 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 
 	if opts.Quiet {
 		for _, c := range containers {
-			fmt.Fprintln(dockerCli.Out(), c.ID)
+			_, _ = fmt.Fprintln(dockerCli.Out(), c.ID)
 		}
 		return nil
 	}
@@ -143,7 +143,7 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 				services = append(services, s)
 			}
 		}
-		fmt.Fprintln(dockerCli.Out(), strings.Join(services, "\n"))
+		_, _ = fmt.Fprintln(dockerCli.Out(), strings.Join(services, "\n"))
 		return nil
 	}
 

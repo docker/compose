@@ -284,7 +284,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 		return err
 	}
 	err = project.ForEachService(project.ServiceNames(), func(serviceName string, _ *types.ServiceConfig) error {
-		fmt.Fprintln(dockerCli.Out(), serviceName)
+		_, _ = fmt.Fprintln(dockerCli.Out(), serviceName)
 		return nil
 	})
 	return err
@@ -296,7 +296,7 @@ func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) 
 		return err
 	}
 	for n := range project.Volumes {
-		fmt.Fprintln(dockerCli.Out(), n)
+		_, _ = fmt.Fprintln(dockerCli.Out(), n)
 	}
 	return nil
 }
@@ -335,7 +335,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(dockerCli.Out(), "%s %s\n", name, hash)
+		_, _ = fmt.Fprintf(dockerCli.Out(), "%s %s\n", name, hash)
 	}
 	return nil
 }
@@ -357,7 +357,7 @@ func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions,
 	}
 	sort.Strings(profiles)
 	for _, p := range profiles {
-		fmt.Fprintln(dockerCli.Out(), p)
+		_, _ = fmt.Fprintln(dockerCli.Out(), p)
 	}
 	return nil
 }
@@ -369,7 +369,7 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 	}
 
 	for _, s := range project.Services {
-		fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
+		_, _ = fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
 	}
 	return nil
 }

@@ -59,12 +59,12 @@ func versionCommand(dockerCli command.Cli) *cobra.Command {
 
 func runVersion(opts versionOptions, dockerCli command.Cli) {
 	if opts.short {
-		fmt.Fprintln(dockerCli.Out(), strings.TrimPrefix(internal.Version, "v"))
+		_, _ = fmt.Fprintln(dockerCli.Out(), strings.TrimPrefix(internal.Version, "v"))
 		return
 	}
 	if opts.format == formatter.JSON {
-		fmt.Fprintf(dockerCli.Out(), "{\"version\":%q}\n", internal.Version)
+		_, _ = fmt.Fprintf(dockerCli.Out(), "{\"version\":%q}\n", internal.Version)
 		return
 	}
-	fmt.Fprintln(dockerCli.Out(), "Docker Compose version", internal.Version)
+	_, _ = fmt.Fprintln(dockerCli.Out(), "Docker Compose version", internal.Version)
 }
