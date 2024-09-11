@@ -172,7 +172,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 
 		if options.Memory != 0 {
-			fmt.Fprintln(s.stderr(), "WARNING: --memory is not supported by BuildKit and will be ignored")
+			_, _ = fmt.Fprintln(s.stderr(), "WARNING: --memory is not supported by BuildKit and will be ignored")
 		}
 
 		buildOptions, err := s.toBuildOptions(project, service, options)
@@ -542,8 +542,8 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 
 func toBuildContexts(additionalContexts types.Mapping) map[string]build.NamedContext {
 	namedContexts := map[string]build.NamedContext{}
-	for name, context := range additionalContexts {
-		namedContexts[name] = build.NamedContext{Path: context}
+	for name, contextPath := range additionalContexts {
+		namedContexts[name] = build.NamedContext{Path: contextPath}
 	}
 	return namedContexts
 }

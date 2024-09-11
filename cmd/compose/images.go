@@ -81,7 +81,7 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 			}
 		}
 		for _, img := range ids {
-			fmt.Fprintln(dockerCli.Out(), img)
+			_, _ = fmt.Fprintln(dockerCli.Out(), img)
 		}
 		return nil
 	}

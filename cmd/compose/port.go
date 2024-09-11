@@ -75,6 +75,6 @@ func runPort(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		return err
 	}
 
-	fmt.Fprintf(dockerCli.Out(), "%s:%d\n", ip, port)
+	_, _ = fmt.Fprintf(dockerCli.Out(), "%s:%d\n", ip, port)
 	return nil
 }

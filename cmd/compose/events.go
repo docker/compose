@@ -72,9 +72,9 @@ func runEvents(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 				if err != nil {
 					return err
 				}
-				fmt.Fprintln(dockerCli.Out(), string(marshal))
+				_, _ = fmt.Fprintln(dockerCli.Out(), string(marshal))
 			} else {
-				fmt.Fprintln(dockerCli.Out(), event)
+				_, _ = fmt.Fprintln(dockerCli.Out(), event)
 			}
 			return nil
 		},

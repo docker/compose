@@ -88,7 +88,7 @@ func addNodes(graphBuilder *strings.Builder, graph vizGraph, projectName string,
 			graphBuilder.WriteString("<br/><br/><b>Ports:</b>")
 			for _, portConfig := range serviceNode.Ports {
 				graphBuilder.WriteString("<br/>")
-				if len(portConfig.HostIP) > 0 {
+				if portConfig.HostIP != "" {
 					graphBuilder.WriteString(portConfig.HostIP)
 					graphBuilder.WriteByte(':')
 				}

@@ -86,7 +86,7 @@ func runList(ctx context.Context, dockerCli command.Cli, backend api.Service, ls
 
 	if lsOpts.Quiet {
 		for _, s := range stackList {
-			fmt.Fprintln(dockerCli.Out(), s.Name)
+			_, _ = fmt.Fprintln(dockerCli.Out(), s.Name)
 		}
 		return nil
 	}

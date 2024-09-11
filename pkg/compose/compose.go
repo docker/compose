@@ -191,7 +191,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	}
 	for name, service := range set {
 		dependencies := service.Labels[api.DependenciesLabel]
-		if len(dependencies) > 0 {
+		if dependencies != "" {
 			service.DependsOn = types.DependsOnConfig{}
 			for _, dc := range strings.Split(dependencies, ",") {
 				dcArr := strings.Split(dc, ":")

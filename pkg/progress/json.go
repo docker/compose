@@ -64,7 +64,7 @@ func (p *jsonWriter) Event(e Event) {
 	}
 	marshal, err := json.Marshal(message)
 	if err == nil {
-		fmt.Fprintln(p.out, string(marshal))
+		_, _ = fmt.Fprintln(p.out, string(marshal))
 	}
 }
 
@@ -84,7 +84,7 @@ func (p *jsonWriter) TailMsgf(msg string, args ...interface{}) {
 	}
 	marshal, err := json.Marshal(message)
 	if err == nil {
-		fmt.Fprintln(p.out, string(marshal))
+		_, _ = fmt.Fprintln(p.out, string(marshal))
 	}
 }
 

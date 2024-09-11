@@ -94,8 +94,8 @@ type Pipe struct {
 
 // Confirm asks for yes or no input
 func (u Pipe) Confirm(message string, defaultValue bool) (bool, error) {
-	fmt.Fprint(u.stdout, message)
+	_, _ = fmt.Fprint(u.stdout, message)
 	var answer string
-	fmt.Scanln(&answer)
+	_, _ = fmt.Scanln(&answer)
 	return utils.StringToBool(answer), nil
 }

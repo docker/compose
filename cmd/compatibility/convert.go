@@ -63,7 +63,7 @@ ARGS:
 			command = append([]string{arg}, command...)
 			continue
 		}
-		if len(arg) > 0 && arg[0] != '-' {
+		if arg != "" && arg[0] != '-' {
 			command = append(command, args[i:]...)
 			break
 		}
