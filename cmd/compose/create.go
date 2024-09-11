@@ -117,6 +117,9 @@ func (opts createOptions) recreateStrategy() string {
 	if opts.forceRecreate {
 		return api.RecreateForce
 	}
+	if opts.noInherit {
+		return api.RecreateForce
+	}
 	return api.RecreateDiverged
 }
 
