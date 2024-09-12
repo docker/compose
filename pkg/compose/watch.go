@@ -547,8 +547,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 
 // writeWatchSyncMessage prints out a message about the sync for the changed paths.
 func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings []sync.PathMapping) {
-	const maxPathsToShow = 10
-	if len(pathMappings) <= maxPathsToShow || logrus.IsLevelEnabled(logrus.DebugLevel) {
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		hostPathsToSync := make([]string, len(pathMappings))
 		for i := range pathMappings {
 			hostPathsToSync[i] = pathMappings[i].HostPath
