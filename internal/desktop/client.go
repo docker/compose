@@ -166,10 +166,10 @@ type CreateFileShareResponse struct {
 func (c *Client) CreateFileShare(ctx context.Context, r CreateFileShareRequest) (*CreateFileShareResponse, error) {
 	rawBody, _ := json.Marshal(r)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, backendURL("/mutagen/file-shares"), bytes.NewReader(rawBody))
-	req.Header.Set("Content-Type", "application/json")
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
