@@ -45,9 +45,6 @@ import (
 )
 
 const (
-	extLifecycle  = "x-lifecycle"
-	forceRecreate = "force_recreate"
-
 	doubledContainerNameWarning = "WARNING: The %q service is using the custom container name %q. " +
 		"Docker requires each container to have a unique name. " +
 		"Remove the custom name to scale the service.\n"
@@ -108,9 +105,7 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 	})
 }
 
-var mu sync.Mutex
-
-func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error {
+func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error { //nolint:gocyclo
 	expected, err := getScale(service)
 	if err != nil {
 		return err
@@ -147,6 +142,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		// If we don't get a container number (?) just sort by creation date
 		return containers[i].Created < containers[j].Created
 	})
+
 	for i, container := range containers {
 		if i >= expected {
 			// Scale Down
@@ -163,6 +159,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			return err
 		}
 		if mustRecreate {
+			err := c.stopDependentContainers(ctx, project, service)
+			if err != nil {
+				return err
+			}
+
 			i, container := i, container
 			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "container/recreate", tracing.ContainerOptions(container), func(ctx context.Context) error {
 				recreated, err := c.service.recreateContainer(ctx, project, service, container, inherit, timeout)
@@ -215,6 +216,25 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	err = eg.Wait()
 	c.setObservedState(service.Name, updated)
 	return err
+}
+
+func (c *convergence) stopDependentContainers(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	w := progress.ContextWriter(ctx)
+	// Stop dependent containers, so they will be restarted after service is re-created
+	dependents := project.GetDependentsForService(service)
+	for _, name := range dependents {
+		dependents := c.observedState[name]
+		err := c.service.stopContainers(ctx, w, dependents, nil)
+		if err != nil {
+			return err
+		}
+		for i, dependent := range dependents {
+			dependent.State = ContainerExited
+			dependents[i] = dependent
+		}
+		c.observedState[name] = dependents
+	}
+	return nil
 }
 
 func getScale(config types.ServiceConfig) (int, error) {
@@ -296,7 +316,7 @@ func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy st
 	if policy == api.RecreateNever {
 		return false, nil
 	}
-	if policy == api.RecreateForce || expected.Extensions[extLifecycle] == forceRecreate {
+	if policy == api.RecreateForce {
 		return true, nil
 	}
 	configHash, err := ServiceHash(expected)
@@ -535,24 +555,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	}
 
 	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Done, "Recreated"))
-	setDependentLifecycle(project, service.Name, forceRecreate)
 	return created, err
-}
-
-// setDependentLifecycle define the Lifecycle strategy for all services to depend on specified service
-func setDependentLifecycle(project *types.Project, service string, strategy string) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	for i, s := range project.Services {
-		if utils.StringContains(s.GetDependencies(), service) {
-			if s.Extensions == nil {
-				s.Extensions = map[string]interface{}{}
-			}
-			s.Extensions[extLifecycle] = strategy
-			project.Services[i] = s
-		}
-	}
 }
 
 func (s *composeService) startContainer(ctx context.Context, container moby.Container) error {
