@@ -90,3 +90,23 @@ func TestStdoutStderr(t *testing.T) {
 
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
 }
+
+func TestLoggingDriver(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "e2e-logging-driver"
+
+	host := "HOST=127.0.0.1"
+	res := c.RunDockerCmd(t, "info", "-f", "{{.OperatingSystem}}")
+	os := res.Stdout()
+	if strings.TrimSpace(os) == "Docker Desktop" {
+		host = "HOST=host.docker.internal"
+	}
+
+	cmd := c.NewDockerComposeCmd(t, "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
+	cmd.Env = append(cmd.Env, host, "BAR=foo")
+	icmd.RunCmd(cmd).Assert(t, icmd.Success)
+
+	cmd = c.NewDockerComposeCmd(t, "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
+	cmd.Env = append(cmd.Env, host, "BAR=zot")
+	icmd.RunCmd(cmd).Assert(t, icmd.Success)
+}
