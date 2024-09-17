@@ -90,6 +90,8 @@ type Service interface {
 	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
 	// Scale manages numbers of container instances running per service
 	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
+	// Export a service container's filesystem as a tar archive
+	Export(ctx context.Context, projectName string, options ExportOptions) error
 }
 
 type ScaleOptions struct {
@@ -551,6 +553,13 @@ type PauseOptions struct {
 	Services []string
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project *types.Project
+}
+
+// ExportOptions group options of the Export API
+type ExportOptions struct {
+	Service string
+	Index   int
+	Output  string
 }
 
 const (
