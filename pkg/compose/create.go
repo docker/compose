@@ -806,23 +806,23 @@ func (s *composeService) buildContainerVolumes(
 		return nil, nil, err
 	}
 
-	version, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	if versions.GreaterThan(version, "1.42") {
-		// We can fully leverage `Mount` API as a replacement for legacy `Bind`
-		return nil, mountOptions, nil
-	}
-
 MOUNTS:
 	for _, m := range mountOptions {
+		if m.Type == mount.TypeNamedPipe {
+			mounts = append(mounts, m)
+			continue
+		}
 		if m.Type == mount.TypeBind {
-			// `Mount` does not offer option to created host path if missing
+			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
+			// see https://github.com/moby/moby/issues/43483
 			for _, v := range service.Volumes {
 				if v.Target == m.Target {
-					if v.Bind != nil && v.Bind.CreateHostPath {
+					switch {
+					case string(m.Type) != v.Type:
+						v.Source = m.Source
+						fallthrough
+					case v.Bind != nil && v.Bind.CreateHostPath:
 						binds = append(binds, v.String())
 						continue MOUNTS
 					}
@@ -1060,7 +1060,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
-	bind, vol, tmpfs := buildMountOptions(volume)
+	bind, vol, tmpfs := buildMountOptions(project, volume)
 
 	volume.Target = path.Clean(volume.Target)
 
@@ -1080,7 +1080,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 	}, nil
 }
 
-func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
+func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
 	switch volume.Type {
 	case "bind":
 		if volume.Volume != nil {
@@ -1096,6 +1096,11 @@ func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *m
 		}
 		if volume.Tmpfs != nil {
 			logrus.Warnf("mount of type `volume` should not define `tmpfs` option")
+		}
+		if v, ok := project.Volumes[volume.Source]; ok && v.DriverOpts["o"] == types.VolumeTypeBind {
+			return buildBindOption(&types.ServiceVolumeBind{
+				CreateHostPath: true,
+			}), nil, nil
 		}
 		return nil, buildVolumeOptions(volume.Volume), nil
 	case "tmpfs":
