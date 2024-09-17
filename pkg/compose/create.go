@@ -1114,8 +1114,15 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 	if bind == nil {
 		return nil
 	}
+
+	// I miss ternary operator
+	propagation := types.PropagationRPrivate
+	if bind.Propagation != "" {
+		propagation = bind.Propagation
+	}
+
 	return &mount.BindOptions{
-		Propagation:      mount.Propagation(bind.Propagation),
+		Propagation:      mount.Propagation(propagation),
 		CreateMountpoint: bind.CreateHostPath,
 		// NonRecursive: false, FIXME missing from model ?
 	}
