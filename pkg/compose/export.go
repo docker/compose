@@ -69,15 +69,24 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		return err
 	}
 
-	defer responseBody.Close()
+	defer func() {
+		if err := responseBody.Close(); err != nil {
+			w.Event(progress.Event{
+				ID:         name,
+				Text:       msg,
+				Status:     progress.Error,
+				StatusText: fmt.Sprintf("Failed to close response body: %v", err),
+			})
+		}
+	}()
 
 	if !s.dryRun {
 		if options.Output == "" {
 			_, err := io.Copy(s.dockerCli.Out(), responseBody)
 			return err
 		}
-	
-		if err = command.CopyToFile(options.Output, responseBody); err != nil {
+
+		if err := command.CopyToFile(options.Output, responseBody); err != nil {
 			return err
 		}
 	}

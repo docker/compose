@@ -21,31 +21,30 @@ import (
 )
 
 func TestExport(t *testing.T) {
-    const projectName = "e2e-export-service"
-    c := NewParallelCLI(t)
+	const projectName = "e2e-export-service"
+	c := NewParallelCLI(t)
 
-    cleanup := func() {
-        c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-    }
-    t.Cleanup(cleanup)
-    cleanup()
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
+	}
+	t.Cleanup(cleanup)
+	cleanup()
 
-    c.RunDockerComposeCmd(t, "-f", "./fixtures/export/compose.yaml", "--project-name", projectName, "up", "-d", "service")
-    c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "service.tar", "service")
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/export/compose.yaml", "--project-name", projectName, "up", "-d", "service")
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "service.tar", "service")
 }
 
 func TestExportWithReplicas(t *testing.T) {
-    const projectName = "e2e-export-service-with-replicas"
-    c := NewParallelCLI(t)
+	const projectName = "e2e-export-service-with-replicas"
+	c := NewParallelCLI(t)
 
-    cleanup := func() {
-        c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-    }
-    t.Cleanup(cleanup)
-    cleanup()
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
+	}
+	t.Cleanup(cleanup)
+	cleanup()
 
-    c.RunDockerComposeCmd(t, "-f", "./fixtures/export/compose.yaml", "--project-name", projectName, "up", "-d", "service-with-replicas")
-    c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "r1.tar", "--index=1", "service-with-replicas")
-    c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "r2.tar", "--index=2", "service-with-replicas")
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/export/compose.yaml", "--project-name", projectName, "up", "-d", "service-with-replicas")
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "r1.tar", "--index=1", "service-with-replicas")
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "r2.tar", "--index=2", "service-with-replicas")
 }
-
