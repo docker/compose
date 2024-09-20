@@ -294,7 +294,7 @@ func maybeFileEvent(trigger types.Trigger, hostPath string, ignore watch.PathMat
 			return nil
 		}
 		// always use Unix-style paths for inside the container
-		containerPath = path.Join(trigger.Target, rel)
+		containerPath = path.Join(trigger.Target, filepath.ToSlash(rel))
 	}
 
 	return &fileEvent{
