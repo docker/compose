@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -42,8 +41,7 @@ func TestBuildBindMount(t *testing.T) {
 		Source: "",
 		Target: "/data",
 	}
-	s := composeService{}
-	mount, err := s.buildMount(context.TODO(), project, volume)
+	mount, err := buildMount(project, volume)
 	assert.NilError(t, err)
 	assert.Assert(t, filepath.IsAbs(mount.Source))
 	_, err = os.Stat(mount.Source)
@@ -58,8 +56,7 @@ func TestBuildNamedPipeMount(t *testing.T) {
 		Source: "\\\\.\\pipe\\docker_engine_windows",
 		Target: "\\\\.\\pipe\\docker_engine",
 	}
-	s := composeService{}
-	mount, err := s.buildMount(context.TODO(), project, volume)
+	mount, err := buildMount(project, volume)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Type, mountTypes.TypeNamedPipe)
 }
@@ -78,8 +75,7 @@ func TestBuildVolumeMount(t *testing.T) {
 		Source: "myVolume",
 		Target: "/data",
 	}
-	s := composeService{}
-	mount, err := s.buildMount(context.TODO(), project, volume)
+	mount, err := buildMount(project, volume)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Source, "myProject_myVolume")
 	assert.Equal(t, mount.Type, mountTypes.TypeVolume)
@@ -156,8 +152,8 @@ func TestBuildContainerMountOptions(t *testing.T) {
 			},
 		},
 	}
-	s := composeService{}
-	mounts, err := s.buildContainerMountOptions(context.TODO(), project, project.Services["myService"], moby.ImageInspect{}, inherit)
+
+	mounts, err := buildContainerMountOptions(project, project.Services["myService"], moby.ImageInspect{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -169,7 +165,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
-	mounts, err = s.buildContainerMountOptions(context.TODO(), project, project.Services["myService"], moby.ImageInspect{}, inherit)
+	mounts, err = buildContainerMountOptions(project, project.Services["myService"], moby.ImageInspect{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})

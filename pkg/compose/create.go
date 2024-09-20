@@ -801,28 +801,28 @@ func (s *composeService) buildContainerVolumes(
 		return nil, nil, err
 	}
 
-	mountOptions, err := s.buildContainerMountOptions(ctx, p, service, imgInspect, inherit)
+	mountOptions, err := buildContainerMountOptions(p, service, imgInspect, inherit)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	version, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	if versions.GreaterThan(version, "1.42") {
-		// We can fully leverage `Mount` API as a replacement for legacy `Bind`
-		return nil, mountOptions, nil
 	}
 
 MOUNTS:
 	for _, m := range mountOptions {
+		if m.Type == mount.TypeNamedPipe {
+			mounts = append(mounts, m)
+			continue
+		}
 		if m.Type == mount.TypeBind {
-			// `Mount` does not offer option to created host path if missing
+			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
+			// see https://github.com/moby/moby/issues/43483
 			for _, v := range service.Volumes {
 				if v.Target == m.Target {
-					if v.Bind != nil && v.Bind.CreateHostPath {
+					switch {
+					case string(m.Type) != v.Type:
+						v.Source = m.Source
+						fallthrough
+					case v.Bind != nil && v.Bind.CreateHostPath:
 						binds = append(binds, v.String())
 						continue MOUNTS
 					}
@@ -834,7 +834,7 @@ MOUNTS:
 	return binds, mounts, nil
 }
 
-func (s *composeService) buildContainerMountOptions(ctx context.Context, p types.Project, service types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
+func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
 	var mounts = map[string]mount.Mount{}
 	if inherit != nil {
 		for _, m := range inherit.Mounts {
@@ -859,7 +859,7 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 				}
 			}
 			volumes := []types.ServiceVolumeConfig{}
-			for _, v := range service.Volumes {
+			for _, v := range s.Volumes {
 				if v.Target != m.Destination || v.Source != "" {
 					volumes = append(volumes, v)
 					continue
@@ -872,11 +872,11 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 					ReadOnly: !m.RW,
 				}
 			}
-			service.Volumes = volumes
+			s.Volumes = volumes
 		}
 	}
 
-	mounts, err := s.fillBindMounts(ctx, p, service, mounts)
+	mounts, err := fillBindMounts(p, s, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -888,27 +888,27 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	return values, nil
 }
 
-func (s *composeService) fillBindMounts(ctx context.Context, p types.Project, service types.ServiceConfig, m map[string]mount.Mount) (map[string]mount.Mount, error) {
-	for _, v := range service.Volumes {
-		bindMount, err := s.buildMount(ctx, p, v)
+func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.Mount) (map[string]mount.Mount, error) {
+	for _, v := range s.Volumes {
+		bindMount, err := buildMount(p, v)
 		if err != nil {
 			return nil, err
 		}
 		m[bindMount.Target] = bindMount
 	}
 
-	secrets, err := s.buildContainerSecretMounts(ctx, p, service)
+	secrets, err := buildContainerSecretMounts(p, s)
 	if err != nil {
 		return nil, err
 	}
-	for _, secret := range secrets {
-		if _, found := m[secret.Target]; found {
+	for _, s := range secrets {
+		if _, found := m[s.Target]; found {
 			continue
 		}
-		m[secret.Target] = secret
+		m[s.Target] = s
 	}
 
-	configs, err := s.buildContainerConfigMounts(ctx, p, service)
+	configs, err := buildContainerConfigMounts(p, s)
 	if err != nil {
 		return nil, err
 	}
@@ -921,11 +921,11 @@ func (s *composeService) fillBindMounts(ctx context.Context, p types.Project, se
 	return m, nil
 }
 
-func (s *composeService) buildContainerConfigMounts(ctx context.Context, p types.Project, service types.ServiceConfig) ([]mount.Mount, error) {
+func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
 	var mounts = map[string]mount.Mount{}
 
 	configsBaseDir := "/"
-	for _, config := range service.Configs {
+	for _, config := range s.Configs {
 		target := config.Target
 		if config.Target == "" {
 			target = configsBaseDir + config.Source
@@ -953,7 +953,7 @@ func (s *composeService) buildContainerConfigMounts(ctx context.Context, p types
 			continue
 		}
 
-		bindMount, err := s.buildMount(ctx, p, types.ServiceVolumeConfig{
+		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedConfig.File,
 			Target:   target,
@@ -971,11 +971,11 @@ func (s *composeService) buildContainerConfigMounts(ctx context.Context, p types
 	return values, nil
 }
 
-func (s *composeService) buildContainerSecretMounts(ctx context.Context, p types.Project, service types.ServiceConfig) ([]mount.Mount, error) {
+func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
 	var mounts = map[string]mount.Mount{}
 
 	secretsDir := "/run/secrets/"
-	for _, secret := range service.Secrets {
+	for _, secret := range s.Secrets {
 		target := secret.Target
 		if secret.Target == "" {
 			target = secretsDir + secret.Source
@@ -1003,7 +1003,7 @@ func (s *composeService) buildContainerSecretMounts(ctx context.Context, p types
 			continue
 		}
 
-		mnt, err := s.buildMount(ctx, p, types.ServiceVolumeConfig{
+		mnt, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
@@ -1039,7 +1039,7 @@ func isWindowsAbs(p string) bool {
 	return false
 }
 
-func (s *composeService) buildMount(ctx context.Context, project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
+func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
 	source := volume.Source
 	// on windows, filepath.IsAbs(source) is false for unix style abs path like /var/run/docker.sock.
 	// do not replace these with  filepath.Abs(source) that will include a default drive.
@@ -1060,10 +1060,7 @@ func (s *composeService) buildMount(ctx context.Context, project types.Project, 
 		}
 	}
 
-	bind, vol, tmpfs, err := s.buildMountOptions(ctx, volume)
-	if err != nil {
-		return mount.Mount{}, err
-	}
+	bind, vol, tmpfs := buildMountOptions(project, volume)
 
 	volume.Target = path.Clean(volume.Target)
 
@@ -1083,7 +1080,7 @@ func (s *composeService) buildMount(ctx context.Context, project types.Project, 
 	}, nil
 }
 
-func (s *composeService) buildMountOptions(ctx context.Context, volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions, error) {
+func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
 	switch volume.Type {
 	case "bind":
 		if volume.Volume != nil {
@@ -1092,8 +1089,7 @@ func (s *composeService) buildMountOptions(ctx context.Context, volume types.Ser
 		if volume.Tmpfs != nil {
 			logrus.Warnf("mount of type `bind` should not define `tmpfs` option")
 		}
-		option, err := s.buildBindOption(ctx, volume.Bind)
-		return option, nil, nil, err
+		return buildBindOption(volume.Bind), nil, nil
 	case "volume":
 		if volume.Bind != nil {
 			logrus.Warnf("mount of type `volume` should not define `bind` option")
@@ -1101,7 +1097,12 @@ func (s *composeService) buildMountOptions(ctx context.Context, volume types.Ser
 		if volume.Tmpfs != nil {
 			logrus.Warnf("mount of type `volume` should not define `tmpfs` option")
 		}
-		return nil, buildVolumeOptions(volume.Volume), nil, nil
+		if v, ok := project.Volumes[volume.Source]; ok && v.DriverOpts["o"] == types.VolumeTypeBind {
+			return buildBindOption(&types.ServiceVolumeBind{
+				CreateHostPath: true,
+			}), nil, nil
+		}
+		return nil, buildVolumeOptions(volume.Volume), nil
 	case "tmpfs":
 		if volume.Bind != nil {
 			logrus.Warnf("mount of type `tmpfs` should not define `bind` option")
@@ -1109,30 +1110,19 @@ func (s *composeService) buildMountOptions(ctx context.Context, volume types.Ser
 		if volume.Volume != nil {
 			logrus.Warnf("mount of type `tmpfs` should not define `volume` option")
 		}
-		return nil, nil, buildTmpfsOptions(volume.Tmpfs), nil
+		return nil, nil, buildTmpfsOptions(volume.Tmpfs)
 	}
-	return nil, nil, nil, nil
+	return nil, nil, nil
 }
 
-func (s *composeService) buildBindOption(ctx context.Context, bind *types.ServiceVolumeBind) (*mount.BindOptions, error) {
+func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 	if bind == nil {
-		return nil, nil
+		return nil
 	}
-
-	propagation := bind.Propagation
-	isWindowsContainer, err := s.isWindowsContainer(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if propagation == "" && !isWindowsContainer {
-		propagation = types.PropagationRPrivate
-	}
-
 	return &mount.BindOptions{
-		Propagation:      mount.Propagation(propagation),
-		CreateMountpoint: bind.CreateHostPath,
+		Propagation: mount.Propagation(bind.Propagation),
 		// NonRecursive: false, FIXME missing from model ?
-	}, nil
+	}
 }
 
 func buildVolumeOptions(vol *types.ServiceVolumeVolume) *mount.VolumeOptions {

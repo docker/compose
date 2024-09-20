@@ -321,23 +321,6 @@ func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 
 }
 
-var windowsContainer = struct {
-	once sync.Once
-	val  bool
-	err  error
-}{}
-
-func (s *composeService) isWindowsContainer(ctx context.Context) (bool, error) {
-	windowsContainer.once.Do(func() {
-		info, err := s.apiClient().Info(ctx)
-		if err != nil {
-			windowsContainer.err = err
-		}
-		windowsContainer.val = info.OSType == "windows"
-	})
-	return windowsContainer.val, windowsContainer.err
-}
-
 func (s *composeService) isDesktopIntegrationActive() bool {
 	return s.desktopCli != nil
 }
