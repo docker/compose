@@ -28,6 +28,7 @@ import (
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -300,10 +301,17 @@ func TestCreateMobyContainer(t *testing.T) {
 			},
 		}
 
-		apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
-			v := x.(*containerType.HostConfig)
-			return v.NetworkMode == "b-moby-name"
-		}), gomock.Eq(
+		var falseBool bool
+		apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any(), gomock.Eq(
+			&containerType.HostConfig{
+				PortBindings: nat.PortMap{},
+				ExtraHosts:   []string{},
+				Tmpfs:        map[string]string{},
+				Resources: containerType.Resources{
+					OomKillDisable: &falseBool,
+				},
+				NetworkMode: "b-moby-name",
+			}), gomock.Eq(
 			&network.NetworkingConfig{
 				EndpointsConfig: map[string]*network.EndpointSettings{
 					"b-moby-name": {
@@ -382,10 +390,17 @@ func TestCreateMobyContainer(t *testing.T) {
 			},
 		}
 
-		apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
-			v := x.(*containerType.HostConfig)
-			return v.NetworkMode == "b-moby-name"
-		}), gomock.Eq(
+		var falseBool bool
+		apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any(), gomock.Eq(
+			&containerType.HostConfig{
+				PortBindings: nat.PortMap{},
+				ExtraHosts:   []string{},
+				Tmpfs:        map[string]string{},
+				Resources: containerType.Resources{
+					OomKillDisable: &falseBool,
+				},
+				NetworkMode: "b-moby-name",
+			}), gomock.Eq(
 			&network.NetworkingConfig{
 				EndpointsConfig: map[string]*network.EndpointSettings{
 					"a-moby-name": {
