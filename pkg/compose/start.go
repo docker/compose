@@ -123,6 +123,12 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return err
 	}
 
+	if options.Wait && options.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
+		ctx = withTimeout
+		defer cancel()
+	}
+
 	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
@@ -131,6 +137,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 
 		return s.startService(ctx, project, service, containers)
 	})
+
 	if err != nil {
 		return err
 	}
@@ -142,11 +149,6 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 				Condition: getDependencyCondition(s, project),
 				Required:  true,
 			}
-		}
-		if options.WaitTimeout > 0 {
-			withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
-			ctx = withTimeout
-			defer cancel()
 		}
 
 		err = s.waitDependencies(ctx, project, project.Name, depends, containers)
