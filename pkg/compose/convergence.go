@@ -223,7 +223,7 @@ func (c *convergence) stopDependentContainers(ctx context.Context, project *type
 	// Stop dependent containers, so they will be restarted after service is re-created
 	dependents := project.GetDependentsForService(service)
 	for _, name := range dependents {
-		dependents := c.observedState[name]
+		dependents := c.getObservedState(name)
 		err := c.service.stopContainers(ctx, w, dependents, nil)
 		if err != nil {
 			return err
@@ -232,7 +232,7 @@ func (c *convergence) stopDependentContainers(ctx context.Context, project *type
 			dependent.State = ContainerExited
 			dependents[i] = dependent
 		}
-		c.observedState[name] = dependents
+		c.setObservedState(name, dependents)
 	}
 	return nil
 }
