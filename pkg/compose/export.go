@@ -25,7 +25,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/pkg/errors"
 )
 
 func (s *composeService) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
@@ -43,11 +42,11 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 	}
 
 	if options.Output == "" && s.dockerCli.Out().IsTerminal() {
-		return errors.New("output option is required when exporting to terminal")
+		return fmt.Errorf("output option is required when exporting to terminal")
 	}
 
 	if err := command.ValidateOutputPath(options.Output); err != nil {
-		return errors.Wrap(err, "failed to export container")
+		return fmt.Errorf("failed to export container: %w", err)
 	}
 
 	clnt := s.dockerCli.Client()
