@@ -129,7 +129,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 			return err
 		}
 
-		return s.startService(ctx, project, service, containers)
+		return s.startService(ctx, project, service, containers, options.WaitTimeout)
 	})
 	if err != nil {
 		return err
@@ -149,7 +149,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 			defer cancel()
 		}
 
-		err = s.waitDependencies(ctx, project, project.Name, depends, containers)
+		err = s.waitDependencies(ctx, project, project.Name, depends, containers, 0)
 		if err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
