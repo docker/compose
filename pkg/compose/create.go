@@ -1003,11 +1003,18 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
+		if _, err := os.Stat(definedSecret.File); os.IsNotExist(err) {
+			logrus.Warnf("secret file %s does not exist", definedSecret.Name)
+		}
+
 		mnt, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
 			ReadOnly: true,
+			Bind: &types.ServiceVolumeBind{
+				CreateHostPath: false,
+			},
 		})
 		if err != nil {
 			return nil, err
