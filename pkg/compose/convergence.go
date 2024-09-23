@@ -364,7 +364,12 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 //nolint:gocyclo
-func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers) error {
+func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
+	if timeout > 0 {
+		withTimeout, cancelFunc := context.WithTimeout(ctx, timeout)
+		defer cancelFunc()
+		ctx = withTimeout
+	}
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 	for dep, config := range dependencies {
@@ -454,7 +459,11 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			}
 		})
 	}
-	return eg.Wait()
+	err := eg.Wait()
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("timeout waiting for dependencies")
+	}
+	return err
 }
 
 func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceDependency, project *types.Project) (bool, error) {
@@ -760,12 +769,12 @@ func (s *composeService) isServiceCompleted(ctx context.Context, containers Cont
 	return false, 0, nil
 }
 
-func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig, containers Containers) error {
+func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig, containers Containers, timeout time.Duration) error {
 	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}
 
-	err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, containers)
+	err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, containers, timeout)
 	if err != nil {
 		return err
 	}
