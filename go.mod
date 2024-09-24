@@ -192,3 +192,5 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 	tags.cncf.io/container-device-interface v0.8.0 // indirect
 )
+
+replace github.com/compose-spec/compose-go/v2 => github.com/compose-spec/compose-go/v2 v2.2.1-0.20240926141145-d3fd7d94aa31
