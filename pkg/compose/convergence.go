@@ -149,7 +149,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			container := container
 			traceOpts := append(tracing.ServiceOptions(service), tracing.ContainerOptions(container)...)
 			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "service/scale/down", traceOpts, func(ctx context.Context) error {
-				return c.service.stopAndRemoveContainer(ctx, container, timeout, false)
+				return c.service.stopAndRemoveContainer(ctx, container, &service, timeout, false)
 			}))
 			continue
 		}
@@ -224,7 +224,7 @@ func (c *convergence) stopDependentContainers(ctx context.Context, project *type
 	dependents := project.GetDependentsForService(service)
 	for _, name := range dependents {
 		dependents := c.getObservedState(name)
-		err := c.service.stopContainers(ctx, w, dependents, nil)
+		err := c.service.stopContainers(ctx, w, &service, dependents, nil)
 		if err != nil {
 			return err
 		}
@@ -769,7 +769,10 @@ func (s *composeService) isServiceCompleted(ctx context.Context, containers Cont
 	return false, 0, nil
 }
 
-func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig, containers Containers, timeout time.Duration) error {
+func (s *composeService) startService(ctx context.Context,
+	project *types.Project, service types.ServiceConfig,
+	containers Containers, listener api.ContainerEventListener,
+	timeout time.Duration) error {
 	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}
@@ -793,10 +796,18 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		}
 		eventName := getContainerProgressName(container)
 		w.Event(progress.StartingEvent(eventName))
-		err := s.apiClient().ContainerStart(ctx, container.ID, containerType.StartOptions{})
+		err = s.apiClient().ContainerStart(ctx, container.ID, containerType.StartOptions{})
 		if err != nil {
 			return err
 		}
+
+		for _, hook := range service.PostStart {
+			err = s.runHook(ctx, container, service, hook, listener)
+			if err != nil {
+				return err
+			}
+		}
+
 		w.Event(progress.StartedEvent(eventName))
 	}
 	return nil

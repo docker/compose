@@ -637,6 +637,8 @@ const (
 	ContainerEventExit
 	// UserCancel user cancelled compose up, we are stopping containers
 	UserCancel
+	// HookEventLog is a ContainerEvent of type log on stdout by service hook
+	HookEventLog
 )
 
 // Separator is used for naming components
