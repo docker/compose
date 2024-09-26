@@ -67,10 +67,17 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	// Check requested services exists in model
-	options.Services, err = checkSelectedServices(options, project)
+	services, err := checkSelectedServices(options, project)
 	if err != nil {
 		return err
 	}
+
+	if len(options.Services) > 0 && len(services) == 0 {
+		logrus.Infof("Any of the services %v not running in project %q", options.Services, projectName)
+		return nil
+	}
+
+	options.Services = services
 
 	if len(containers) > 0 {
 		resourceToRemove = true
