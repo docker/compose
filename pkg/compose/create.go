@@ -104,7 +104,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	orphans := observedState.filter(isOrphaned(project))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
-			err := s.removeContainers(ctx, orphans, nil, false)
+			err := s.removeContainers(ctx, orphans, nil, nil, false)
 			if err != nil {
 				return err
 			}

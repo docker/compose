@@ -54,6 +54,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		if !utils.StringContains(options.Services, service) {
 			return nil
 		}
-		return s.stopContainers(ctx, w, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout)
+		serv := project.Services[service]
+		return s.stopContainers(ctx, w, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout)
 	})
 }
