@@ -179,7 +179,7 @@ func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pusha
 		config = v1.DescriptorEmptyJSON
 		artifactType = ComposeProjectArtifactType
 		// N.B. the descriptor has the data embedded in it
-		toPush = append(toPush, Pushable{Descriptor: config, Data: nil})
+		toPush = append(toPush, Pushable{Descriptor: config, Data: make([]byte, len(config.Data))})
 	default:
 		return nil, fmt.Errorf("unsupported OCI version: %s", ociCompat)
 	}
