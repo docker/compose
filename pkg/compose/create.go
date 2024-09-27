@@ -823,6 +823,9 @@ MOUNTS:
 						v.Source = m.Source
 						fallthrough
 					case v.Bind != nil && v.Bind.CreateHostPath:
+						if v.Volume != nil && v.Volume.Subpath != "" {
+							logrus.Warnf("Docker does not support subpath with a bind mount. Please consider changing your target")
+						}
 						binds = append(binds, v.String())
 						continue MOUNTS
 					}
