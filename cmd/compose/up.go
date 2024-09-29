@@ -57,6 +57,7 @@ type upOptions struct {
 	noAttach              []string
 	timestamp             bool
 	wait                  bool
+	waitServices          []string
 	waitTimeout           int
 	watch                 bool
 	navigationMenu        bool
@@ -168,7 +169,8 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.StringArrayVar(&up.attach, "attach", []string{}, "Restrict attaching to the specified services. Incompatible with --attach-dependencies.")
 	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services")
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
-	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
+	flags.BoolVar(&up.wait, "wait", false, "Wait for all services to be running|healthy. Implies detached mode.")
+	flags.StringArrayVar(&up.waitServices, "wait-services", []string{}, "Wait for specified services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
@@ -192,9 +194,9 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	if up.cascadeStop && up.cascadeFail {
 		return fmt.Errorf("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
 	}
-	if up.wait {
+	if up.wait || len(up.waitServices) > 0 {
 		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
-			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
+			return fmt.Errorf("--wait|--wait-services cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
 		}
 		up.Detach = true
 	}
@@ -325,6 +327,7 @@ func runUp(
 			ExitCodeFrom:   upOptions.exitCodeFrom,
 			OnExit:         upOptions.OnExit(),
 			Wait:           upOptions.wait,
+			WaitServices:   upOptions.waitServices,
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
 			Services:       services,

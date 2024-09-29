@@ -279,7 +279,19 @@ options:
     - option: wait
       value_type: bool
       default_value: "false"
-      description: Wait for services to be running|healthy. Implies detached mode.
+      description: |
+        Wait for all services to be running|healthy. Implies detached mode.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: wait-services
+      value_type: stringArray
+      default_value: '[]'
+      description: |
+        Wait for specified services to be running|healthy. Implies detached mode.
       deprecated: false
       hidden: false
       experimental: false

@@ -134,14 +134,19 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return err
 	}
 
-	if options.Wait {
+	if options.Wait || len(options.WaitServices) != 0 {
 		depends := types.DependsOnConfig{}
 		for _, s := range project.Services {
+			if len(options.WaitServices) > 0 && !utils.Contains(options.WaitServices, s.Name) {
+				continue
+			}
+
 			depends[s.Name] = types.ServiceDependency{
 				Condition: getDependencyCondition(s, project),
 				Required:  true,
 			}
 		}
+
 		if options.WaitTimeout > 0 {
 			withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
 			ctx = withTimeout

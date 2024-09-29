@@ -226,7 +226,10 @@ type StartOptions struct {
 	// ExitCodeFrom return exit code from specified service
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
-	Wait        bool
+	Wait bool
+	// WaitServices defines the services to wait for
+	WaitServices []string
+	// WaitTimeout set delay to wait for container to reach running state
 	WaitTimeout time.Duration
 	// Services passed in the command line to be started
 	Services       []string
