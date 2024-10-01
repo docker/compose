@@ -134,35 +134,46 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return err
 	}
 
-	if options.Wait || len(options.WaitServices) != 0 {
-		depends := types.DependsOnConfig{}
-		for _, s := range project.Services {
-			if len(options.WaitServices) > 0 && !utils.Contains(options.WaitServices, s.Name) {
-				continue
-			}
-
-			depends[s.Name] = types.ServiceDependency{
-				Condition: getDependencyCondition(s, project),
-				Required:  true,
-			}
-		}
-
-		if options.WaitTimeout > 0 {
-			withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
-			ctx = withTimeout
-			defer cancel()
-		}
-
-		err = s.waitDependencies(ctx, project, project.Name, depends, containers, 0)
-		if err != nil {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
-			}
-			return err
-		}
+	err = s.waitIfNeeded(ctx, project, options, containers)
+	if err != nil {
+		return err
 	}
 
 	return eg.Wait()
+}
+
+func (s *composeService) waitIfNeeded(ctx context.Context, project *types.Project, options api.StartOptions, containers Containers) error {
+	if !options.Wait && len(options.WaitServices) == 0 {
+		return nil
+	}
+
+	depends := types.DependsOnConfig{}
+	for _, s := range project.Services {
+		if len(options.WaitServices) > 0 && !utils.Contains(options.WaitServices, s.Name) {
+			continue
+		}
+
+		depends[s.Name] = types.ServiceDependency{
+			Condition: getDependencyCondition(s, project),
+			Required:  true,
+		}
+	}
+
+	if options.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
+		ctx = withTimeout
+		defer cancel()
+	}
+
+	err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0)
+	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
+		}
+		return err
+	}
+
+	return nil
 }
 
 // getDependencyCondition checks if service is depended on by other services
