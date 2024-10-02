@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -37,6 +38,7 @@ import (
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/pkg/kvfile"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/desktop"
 	"github.com/docker/compose/v2/internal/experimental"
@@ -69,6 +71,26 @@ const (
 	// ComposeMenu defines if the navigation menu should be rendered. Can be also set via --menu
 	ComposeMenu = "COMPOSE_MENU"
 )
+
+// rawEnv load a dot env file using docker/cli key=value parser, without attempt to interpolate or evaluate values
+func rawEnv(r io.Reader, filename string, lookup func(key string) (string, bool)) (map[string]string, error) {
+	lines, err := kvfile.ParseFromReader(r, lookup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse env_file %s: %w", filename, err)
+	}
+	vars := types.Mapping{}
+	for _, line := range lines {
+		key, value, _ := strings.Cut(line, "=")
+		vars[key] = value
+	}
+	return vars, nil
+}
+
+func init() {
+	// compose evaluates env file values for interpolation
+	// `raw` format allows to load env_file with the same parser used by docker run --env-file
+	dotenv.RegisterFormat("raw", rawEnv)
+}
 
 type Backend interface {
 	api.Service

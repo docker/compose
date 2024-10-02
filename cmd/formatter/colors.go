@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/cli/cli/command"
 )
 
 var names = []string{
@@ -59,7 +59,7 @@ const (
 )
 
 // SetANSIMode configure formatter for colored output on ANSI-compliant console
-func SetANSIMode(streams api.Streams, ansi string) {
+func SetANSIMode(streams command.Streams, ansi string) {
 	if !useAnsi(streams, ansi) {
 		nextColor = func() colorFunc {
 			return monochrome
@@ -68,7 +68,7 @@ func SetANSIMode(streams api.Streams, ansi string) {
 	}
 }
 
-func useAnsi(streams api.Streams, ansi string) bool {
+func useAnsi(streams command.Streams, ansi string) bool {
 	switch ansi {
 	case Always:
 		return true
