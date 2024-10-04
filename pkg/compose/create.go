@@ -48,6 +48,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
+	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 )
 
 type createOptions struct {
@@ -645,11 +646,25 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		setReservations(s.Deploy.Resources.Reservations, &resources)
 	}
 
+	var cdiDeviceNames []string
 	for _, device := range s.Devices {
+
+		if device.Source == device.Target && cdi.IsQualifiedName(device.Source) {
+			cdiDeviceNames = append(cdiDeviceNames, device.Source)
+			continue
+		}
+
 		resources.Devices = append(resources.Devices, container.DeviceMapping{
 			PathOnHost:        device.Source,
 			PathInContainer:   device.Target,
 			CgroupPermissions: device.Permissions,
+		})
+	}
+
+	if len(cdiDeviceNames) > 0 {
+		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
+			Driver:    "cdi",
+			DeviceIDs: cdiDeviceNames,
 		})
 	}
 
