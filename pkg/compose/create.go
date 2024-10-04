@@ -694,6 +694,7 @@ func setReservations(reservations *types.Resource, resources *container.Resource
 			Count:        int(device.Count),
 			DeviceIDs:    device.IDs,
 			Driver:       device.Driver,
+			Options:      device.Options,
 		})
 	}
 }

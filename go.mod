@@ -7,7 +7,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.2.0
+	github.com/compose-spec/compose-go/v2 v2.2.1-0.20241003145835-48d3a5bbf4ea
 	github.com/containerd/containerd v1.7.22
 	github.com/containerd/platforms v0.2.1
 	github.com/davecgh/go-spew v1.1.1
@@ -192,5 +192,3 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 	tags.cncf.io/container-device-interface v0.8.0 // indirect
 )
-
-replace github.com/compose-spec/compose-go/v2 => github.com/compose-spec/compose-go/v2 v2.2.1-0.20240926141145-d3fd7d94aa31
