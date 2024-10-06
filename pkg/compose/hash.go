@@ -67,9 +67,9 @@ func ServiceConfigsHash(project *types.Project, serviceConfig types.ServiceConfi
 // ServiceSecretsHash computes the configuration hash for service secrets.
 func ServiceSecretsHash(project *types.Project, serviceConfig types.ServiceConfig) (string, error) {
 	bytes := make([]byte, 0)
-	for _, config := range serviceConfig.Secrets {
-		file := project.Secrets[config.Source]
-		b, err := createTarForConfig(project, types.FileReferenceConfig(config), types.FileObjectConfig(file))
+	for _, secret := range serviceConfig.Secrets {
+		file := project.Secrets[secret.Source]
+		b, err := createTarForConfig(project, types.FileReferenceConfig(secret), types.FileObjectConfig(file))
 
 		if err != nil {
 			return "", err
