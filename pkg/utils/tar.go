@@ -98,7 +98,7 @@ func CreateTarByPath(path string, modTime time.Time) (*bytes.Buffer, error) {
 		}
 
 		// Set custom modification time
-		header.ModTime = modTime
+		header.ModTime = modTime.UTC()
 
 		// Write header to the tarball
 		if err := tw.WriteHeader(header); err != nil {
