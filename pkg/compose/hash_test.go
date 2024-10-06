@@ -40,37 +40,37 @@ func TestServiceHashWithIgnorableValues(t *testing.T) {
 }
 
 func TestServiceConfigsHashWithoutChangesContent(t *testing.T) {
-	hash1, err := ServiceConfigsHash(projectWithConfigs("myConfigSource", "a", "", ""), serviceConfig("myContext1", "always", 1))
+	hash1, err := ServiceConfigsHash(projectWithConfigs("a", "", ""), serviceConfig("myContext1", "always", 1))
 	assert.NilError(t, err)
-	hash2, err := ServiceConfigsHash(projectWithConfigs("myConfigSource", "a", "", ""), serviceConfig("myContext2", "never", 2))
+	hash2, err := ServiceConfigsHash(projectWithConfigs("a", "", ""), serviceConfig("myContext2", "never", 2))
 	assert.NilError(t, err)
 	assert.Assert(t, hash1 == hash2)
 }
 
 func TestServiceConfigsHashWithChangedConfigContent(t *testing.T) {
-	hash1, err := ServiceConfigsHash(projectWithConfigs("myConfigSource", "a", "", ""), serviceConfig("myContext1", "always", 1))
+	hash1, err := ServiceConfigsHash(projectWithConfigs("a", "", ""), serviceConfig("myContext1", "always", 1))
 	assert.NilError(t, err)
-	hash2, err := ServiceConfigsHash(projectWithConfigs("myConfigSource", "b", "", ""), serviceConfig("myContext2", "never", 2))
+	hash2, err := ServiceConfigsHash(projectWithConfigs("b", "", ""), serviceConfig("myContext2", "never", 2))
 	assert.NilError(t, err)
 	assert.Assert(t, hash1 != hash2)
 }
 
 func TestServiceConfigsHashWithChangedConfigEnvironment(t *testing.T) {
-	hash1, err := ServiceConfigsHash(projectWithConfigs("myConfigSource", "", "a", ""), serviceConfig("myContext1", "always", 1))
+	hash1, err := ServiceConfigsHash(projectWithConfigs("", "a", ""), serviceConfig("myContext1", "always", 1))
 	assert.NilError(t, err)
-	hash2, err := ServiceConfigsHash(projectWithConfigs("myConfigSource", "", "b", ""), serviceConfig("myContext2", "never", 2))
+	hash2, err := ServiceConfigsHash(projectWithConfigs("", "b", ""), serviceConfig("myContext2", "never", 2))
 	assert.NilError(t, err)
 	assert.Assert(t, hash1 != hash2)
 }
 
 func TestServiceConfigsHashWithChangedConfigFile(t *testing.T) {
 	hash1, err := ServiceConfigsHash(
-		projectWithConfigs("myConfigSource", "", "", "./testdata/config1.txt"),
+		projectWithConfigs("", "", "./testdata/config1.txt"),
 		serviceConfig("myContext1", "always", 1),
 	)
 	assert.NilError(t, err)
 	hash2, err := ServiceConfigsHash(
-		projectWithConfigs("myConfigSource", "", "", "./testdata/config2.txt"),
+		projectWithConfigs("", "", "./testdata/config2.txt"),
 		serviceConfig("myContext2", "never", 2),
 	)
 	assert.NilError(t, err)
@@ -78,44 +78,44 @@ func TestServiceConfigsHashWithChangedConfigFile(t *testing.T) {
 }
 
 func TestServiceSecretsHashWithoutChangesContent(t *testing.T) {
-	hash1, err := ServiceSecretsHash(projectWithSecrets("mySecretSource", "a", "", ""), serviceConfig("myContext1", "always", 1))
+	hash1, err := ServiceSecretsHash(projectWithSecrets("a", "", ""), serviceConfig("myContext1", "always", 1))
 	assert.NilError(t, err)
-	hash2, err := ServiceSecretsHash(projectWithSecrets("mySecretSource", "a", "", ""), serviceConfig("myContext2", "never", 2))
+	hash2, err := ServiceSecretsHash(projectWithSecrets("a", "", ""), serviceConfig("myContext2", "never", 2))
 	assert.NilError(t, err)
 	assert.Assert(t, hash1 == hash2)
 }
 
 func TestServiceSecretsHashWithChangedSecretContent(t *testing.T) {
-	hash1, err := ServiceSecretsHash(projectWithSecrets("mySecretSource", "a", "", ""), serviceConfig("myContext1", "always", 1))
+	hash1, err := ServiceSecretsHash(projectWithSecrets("a", "", ""), serviceConfig("myContext1", "always", 1))
 	assert.NilError(t, err)
-	hash2, err := ServiceSecretsHash(projectWithSecrets("mySecretSource", "b", "", ""), serviceConfig("myContext2", "never", 2))
+	hash2, err := ServiceSecretsHash(projectWithSecrets("b", "", ""), serviceConfig("myContext2", "never", 2))
 	assert.NilError(t, err)
 	assert.Assert(t, hash1 != hash2)
 }
 
 func TestServiceSecretsHashWithChangedSecretEnvironment(t *testing.T) {
-	hash1, err := ServiceSecretsHash(projectWithSecrets("mySecretSource", "", "a", ""), serviceConfig("myContext1", "always", 1))
+	hash1, err := ServiceSecretsHash(projectWithSecrets("", "a", ""), serviceConfig("myContext1", "always", 1))
 	assert.NilError(t, err)
-	hash2, err := ServiceSecretsHash(projectWithSecrets("mySecretSource", "", "b", ""), serviceConfig("myContext2", "never", 2))
+	hash2, err := ServiceSecretsHash(projectWithSecrets("", "b", ""), serviceConfig("myContext2", "never", 2))
 	assert.NilError(t, err)
 	assert.Assert(t, hash1 != hash2)
 }
 
 func TestServiceSecretsHashWithChangedSecretFile(t *testing.T) {
 	hash1, err := ServiceSecretsHash(
-		projectWithSecrets("mySecretSource", "", "", "./testdata/config1.txt"),
+		projectWithSecrets("", "", "./testdata/config1.txt"),
 		serviceConfig("myContext1", "always", 1),
 	)
 	assert.NilError(t, err)
 	hash2, err := ServiceSecretsHash(
-		projectWithSecrets("mySecretSource", "", "", "./testdata/config2.txt"),
+		projectWithSecrets("", "", "./testdata/config2.txt"),
 		serviceConfig("myContext2", "never", 2),
 	)
 	assert.NilError(t, err)
 	assert.Assert(t, hash1 != hash2)
 }
 
-func projectWithConfigs(configName, configContent, configEnvironmentValue, configFile string) *types.Project {
+func projectWithConfigs(configContent, configEnvironmentValue, configFile string) *types.Project {
 	envName := "myEnv"
 
 	if configEnvironmentValue == "" {
@@ -127,7 +127,7 @@ func projectWithConfigs(configName, configContent, configEnvironmentValue, confi
 			envName: configEnvironmentValue,
 		},
 		Configs: types.Configs{
-			configName: types.ConfigObjConfig{
+			"myConfigSource": types.ConfigObjConfig{
 				Content:     configContent,
 				Environment: envName,
 				File:        configFile,
@@ -136,7 +136,7 @@ func projectWithConfigs(configName, configContent, configEnvironmentValue, confi
 	}
 }
 
-func projectWithSecrets(secretName, secretContent, secretEnvironmentValue, secretFile string) *types.Project {
+func projectWithSecrets(secretContent, secretEnvironmentValue, secretFile string) *types.Project {
 	envName := "myEnv"
 
 	if secretEnvironmentValue == "" {
@@ -148,7 +148,7 @@ func projectWithSecrets(secretName, secretContent, secretEnvironmentValue, secre
 			envName: secretEnvironmentValue,
 		},
 		Secrets: types.Secrets{
-			secretName: types.SecretConfig{
+			"mySecretSource": types.SecretConfig{
 				Content:     secretContent,
 				Environment: envName,
 				File:        secretFile,

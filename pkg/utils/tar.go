@@ -75,7 +75,9 @@ func CreateTar(content []byte, config types.FileReferenceConfig, modTime time.Ti
 func CreateTarByPath(path string, modTime time.Time) (*bytes.Buffer, error) {
 	b := new(bytes.Buffer)
 	tw := tar.NewWriter(b)
-	defer tw.Close()
+	defer func() {
+		_ = tw.Close()
+	}()
 
 	// Walk the directory or file tree at the given path
 	err := filepath.Walk(path, func(file string, fi os.FileInfo, err error) error {
@@ -110,7 +112,9 @@ func CreateTarByPath(path string, modTime time.Time) (*bytes.Buffer, error) {
 			if err != nil {
 				return err
 			}
-			defer f.Close()
+			defer func() {
+				_ = f.Close()
+			}()
 
 			if _, err := io.Copy(tw, f); err != nil {
 				return err
