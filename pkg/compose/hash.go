@@ -20,12 +20,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"github.com/docker/compose/v2/pkg/utils"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -88,10 +86,13 @@ func createTarForConfig(
 ) (*bytes.Buffer, error) {
 	// fixed time to ensure the tarball is deterministic
 	modTime := time.Unix(0, 0)
-	content := make([]byte, 0)
+
+	if serviceConfig.Target == "" {
+		serviceConfig.Target = "/" + serviceConfig.Source
+	}
 
 	if file.Content != "" {
-		content = []byte(file.Content)
+		return bytes.NewBuffer([]byte(file.Content)), nil
 	} else if file.Environment != "" {
 		env, ok := project.Environment[file.Environment]
 		if !ok {
@@ -101,67 +102,10 @@ func createTarForConfig(
 				file.Name,
 			)
 		}
-		content = []byte(env)
+		return bytes.NewBuffer([]byte(env)), nil
 	} else if file.File != "" {
-		var err error
-		content, err = readPathContent(file.File)
-
-		if err != nil {
-			return nil, err
-		}
+		return utils.CreateTarByPath(file.File, modTime)
 	}
 
-	if len(content) == 0 {
-		return nil, fmt.Errorf("config %q is empty", file.Name)
-	}
-
-	if serviceConfig.Target == "" {
-		serviceConfig.Target = "/" + serviceConfig.Source
-	}
-
-	b, err := utils.CreateTar(content, serviceConfig, modTime)
-	if err != nil {
-		return nil, err
-	}
-
-	return &b, nil
-}
-
-func readPathContent(path string) ([]byte, error) {
-	content := make([]byte, 0)
-
-	// Check if the path is a directory
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, fmt.Errorf("error accessing path %q: %v", path, err)
-	}
-
-	if info.IsDir() {
-		// If it's a directory, read all files and concatenate their contents
-		err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() {
-				fileContent, err := os.ReadFile(path)
-				if err != nil {
-					return err
-				}
-				content = append(content, fileContent...)
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("error reading directory %q: %v", path, err)
-		}
-	} else {
-		// If it's a file, read its content
-		fileContent, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("error reading file %q: %v", path, err)
-		}
-		content = fileContent
-	}
-
-	return content, nil
+	return nil, fmt.Errorf("config %q is empty", file.Name)
 }

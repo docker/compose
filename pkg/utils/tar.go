@@ -19,6 +19,9 @@ package utils
 import (
 	"archive/tar"
 	"bytes"
+	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -67,4 +70,59 @@ func CreateTar(content []byte, config types.FileReferenceConfig, modTime time.Ti
 	}
 	err = tarWriter.Close()
 	return b, err
+}
+
+func CreateTarByPath(path string, modTime time.Time) (*bytes.Buffer, error) {
+	b := new(bytes.Buffer)
+	tw := tar.NewWriter(b)
+	defer tw.Close()
+
+	// Walk the directory or file tree at the given path
+	err := filepath.Walk(path, func(file string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Create tar header
+		header, err := tar.FileInfoHeader(fi, fi.Name())
+		if err != nil {
+			return err
+		}
+
+		// Preserve folder structure by using relative paths
+		header.Name, err = filepath.Rel(filepath.Dir(path), file)
+		if err != nil {
+			return err
+		}
+
+		// Set custom modification time
+		header.ModTime = modTime
+
+		// Write header to the tarball
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// If it's a directory, we don't need to write file content
+		if fi.Mode().IsRegular() {
+			// Open the file and write its contents
+			f, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			if _, err := io.Copy(tw, f); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }
