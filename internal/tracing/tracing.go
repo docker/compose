@@ -25,6 +25,7 @@ import (
 
 	"github.com/docker/compose/v2/internal"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric/noop"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/buildkit/util/tracing/detect"
@@ -62,6 +63,9 @@ type envMap map[string]string
 func InitTracing(dockerCli command.Cli) (ShutdownFunc, error) {
 	// set global propagator to tracecontext (the default is no-op).
 	otel.SetTextMapPropagator(propagation.TraceContext{})
+	// workaround for https://github.com/moby/moby/issues/48144
+	// see https://github.com/moby/moby/issues/48204#issuecomment-2377593220
+	otel.SetMeterProvider(noop.MeterProvider{})
 	return InitProvider(dockerCli)
 }
 
