@@ -98,10 +98,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				defer keyboard.Close() //nolint:errcheck
 				isWatchConfigured := s.shouldWatch(project)
 				isDockerDesktopActive := s.isDesktopIntegrationActive()
-				isDockerDesktopComposeUI := s.isDesktopUIEnabled()
-				tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured, isDockerDesktopComposeUI)
+				tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
 
-				formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, isDockerDesktopComposeUI, signalChan, s.watch)
+				formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.watch)
 				if options.Start.Watch {
 					formatter.KeyboardManager.StartWatch(ctx, doneCh, project, options)
 				}

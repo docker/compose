@@ -580,7 +580,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 	}
 
 	c.AddCommand(
-		upCommand(&opts, dockerCli, backend, experiments),
+		upCommand(&opts, dockerCli, backend),
 		downCommand(&opts, dockerCli, backend),
 		startCommand(&opts, dockerCli, backend),
 		restartCommand(&opts, dockerCli, backend),
