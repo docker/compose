@@ -1,4 +1,14 @@
 name: 'Close stale issues'
+
+# Default to 'contents: read', which grants actions to read commits.
+#
+# If any permission is set, any permission not included in the list is
+# implicitly set to "none".
+#
+# see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions
+permissions:
+  contents: read
+
 on:
   schedule:
     - cron: '0 0 * * 0,3' # at midnight UTC every Sunday and Wednesday
