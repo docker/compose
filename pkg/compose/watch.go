@@ -136,7 +136,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 		service.PullPolicy = types.PullPolicyBuild
 		project.Services[i] = service
 
-		dockerIgnores, err := watch.LoadDockerIgnore(service.Build.Context)
+		dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
 		if err != nil {
 			return err
 		}
