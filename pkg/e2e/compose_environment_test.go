@@ -171,6 +171,41 @@ func TestEnvPriority(t *testing.T) {
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Env File")
 	})
 
+	// Recursing through multiple env files based on the COMPOSE_ENV_FILES variable
+	// Chain of env files:
+	// 1. .env
+	// 2. .env.2
+	// 3. .env.3
+	t.Run("recurse env files with COMPOSE_ENV_FILES", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-recursion/compose.yaml",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-recursion")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Env File 3")
+	})
+
+	// Recursing through multiple env files based on the COMPOSE_ENV_FILES variable
+	// Chain of env files:
+	// 1. .env.3
+	// 2. .env
+	// 3. .env.2
+	t.Run("recurse env files with COMPOSE_ENV_FILES with --env-file", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-recursion/compose.yaml",
+			"--env-file", "./fixtures/environment/env-recursion/.env.3",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-recursion")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Env File 2")
+	})
+	// Recursing through multiple env files based on the COMPOSE_ENV_FILES variable with missing file
+	// Chain of env files:
+	// 1. .env.test-missing
+	// 2. .env.test-missing.2
+	// 3. .env.test-missing.idontexist -> Skipped because it does not exist
+	// 4. .env.test-missing.3
+	t.Run("recurse env files with COMPOSE_ENV_FILES with --env-file and missing file", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-recursion/compose.yaml",
+			"--env-file", "./fixtures/environment/env-recursion/.env.test-missing",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-recursion")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Env File Test Missing 3")
+	})
+
 	// No Compose file & no env variable, using an empty override env file
 	// 1. Command Line (docker compose run --env <KEY[=VAL]>)
 	// 2. Compose File (service::environment section)
