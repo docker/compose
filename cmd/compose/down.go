@@ -83,6 +83,15 @@ func runDown(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		return err
 	}
 
+	// Validate service names
+	if project != nil {
+		for _, service := range services {
+			if _, exists := project.Services[service]; !exists {
+				return fmt.Errorf("no such service: %s", service)
+			}
+		}
+	}
+
 	var timeout *time.Duration
 	if opts.timeChanged {
 		timeoutValue := time.Duration(opts.timeout) * time.Second
