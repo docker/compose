@@ -668,6 +668,16 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		})
 	}
 
+	for _, gpus := range s.Gpus {
+		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
+			Driver:       gpus.Driver,
+			Count:        int(gpus.Count),
+			DeviceIDs:    gpus.IDs,
+			Capabilities: [][]string{append(gpus.Capabilities, "gpu")},
+			Options:      gpus.Options,
+		})
+	}
+
 	ulimits := toUlimits(s.Ulimits)
 	resources.Ulimits = ulimits
 	return resources
