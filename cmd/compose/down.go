@@ -88,7 +88,7 @@ func runDown(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	return backend.Down(ctx, name, api.DownOptions{
+	err = backend.Down(ctx, name, api.DownOptions{
 		RemoveOrphans: opts.removeOrphans,
 		Project:       project,
 		Timeout:       timeout,
@@ -96,4 +96,12 @@ func runDown(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		Volumes:       opts.volumes,
 		Services:      services,
 	})
+	if err != nil {
+		return err
+	}
+	err = killProcessesUsingExposedPorts(project)
+	if err != nil {
+		return err
+	}
+	return nil
 }
