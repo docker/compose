@@ -92,6 +92,8 @@ type Service interface {
 	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
 	// Export a service container's filesystem as a tar archive
 	Export(ctx context.Context, projectName string, options ExportOptions) error
+	// Generate generates a Compose Project from existing containers
+	Generate(ctx context.Context, options ReverseOptions) (*types.Project, error)
 }
 
 type ScaleOptions struct {
@@ -560,6 +562,13 @@ type ExportOptions struct {
 	Service string
 	Index   int
 	Output  string
+}
+
+type ReverseOptions struct {
+	// Containers passed in the command line to be started
+	Containers []string
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	Project *types.Project
 }
 
 const (
