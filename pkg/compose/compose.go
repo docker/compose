@@ -202,7 +202,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 			if err != nil {
 				continue
 			}
-			s.extractComposeConfiguration(service, inspect, volumes, secrets)
+			s.extractComposeConfiguration(&service, inspect, volumes, secrets, networks)
 		}
 		set[serviceLabel] = service
 	}
@@ -253,7 +253,7 @@ SERVICES:
 	return project, nil
 }
 
-func (s *composeService) extractComposeConfiguration(service types.ServiceConfig, inspect moby.ContainerJSON, volumes types.Volumes, secrets types.Secrets) {
+func (s *composeService) extractComposeConfiguration(service *types.ServiceConfig, inspect moby.ContainerJSON, volumes types.Volumes, secrets types.Secrets, networks types.Networks) {
 	service.Environment = types.NewMappingWithEquals(inspect.Config.Env)
 	if inspect.Config.Healthcheck != nil {
 		healthConfig := inspect.Config.Healthcheck
@@ -265,6 +265,11 @@ func (s *composeService) extractComposeConfiguration(service types.ServiceConfig
 		service.Secrets = append(service.Secrets, secretsConfigs...)
 		maps.Copy(volumes, detectedVolumes)
 		maps.Copy(secrets, detectedSecrets)
+	}
+	if len(inspect.NetworkSettings.Networks) > 0 {
+		detectedNetworks, networkConfigs := s.toComposeNetwork(inspect.NetworkSettings.Networks)
+		service.Networks = networkConfigs
+		maps.Copy(networks, detectedNetworks)
 	}
 }
 

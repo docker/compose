@@ -27,6 +27,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/versions"
 )
 
@@ -169,4 +170,28 @@ func (s *composeService) toComposeVolumes(volumes []types.MountPoint) (map[strin
 		}
 	}
 	return volumeConfigs, serviceVolumeConfigs, secretConfigs, serviceSecretConfigs
+}
+
+func (s *composeService) toComposeNetwork(networks map[string]*network.EndpointSettings) (map[string]compose.NetworkConfig, map[string]*compose.ServiceNetworkConfig) {
+	networkConfigs := make(map[string]compose.NetworkConfig)
+	serviceNetworkConfigs := make(map[string]*compose.ServiceNetworkConfig)
+
+	for name, net := range networks {
+		if strings.HasSuffix(name, "_default") {
+			continue
+		}
+		inspect, err := s.apiClient().NetworkInspect(context.Background(), name, network.InspectOptions{})
+		if err != nil {
+			networkConfigs[name] = compose.NetworkConfig{}
+		} else {
+			networkConfigs[name] = compose.NetworkConfig{
+				Internal: inspect.Internal,
+			}
+
+		}
+		serviceNetworkConfigs[name] = &compose.ServiceNetworkConfig{
+			Aliases: net.Aliases,
+		}
+	}
+	return networkConfigs, serviceNetworkConfigs
 }
