@@ -20,10 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/versions"
 )
 
@@ -96,4 +99,74 @@ func ToSeconds(d *compose.Duration) *int {
 	}
 	s := int(time.Duration(*d).Seconds())
 	return &s
+}
+
+func (s *composeService) toComposeHealthCheck(healthConfig *container.HealthConfig) *compose.HealthCheckConfig {
+	var healthCheck compose.HealthCheckConfig
+	healthCheck.Test = healthConfig.Test
+	if healthConfig.Timeout != 0 {
+		timeout := compose.Duration(healthConfig.Timeout)
+		healthCheck.Timeout = &timeout
+	}
+	if healthConfig.Interval != 0 {
+		interval := compose.Duration(healthConfig.Interval)
+		healthCheck.Interval = &interval
+	}
+	if healthConfig.StartPeriod != 0 {
+		startPeriod := compose.Duration(healthConfig.StartPeriod)
+		healthCheck.StartPeriod = &startPeriod
+	}
+	if healthConfig.StartInterval != 0 {
+		startInterval := compose.Duration(healthConfig.StartInterval)
+		healthCheck.StartInterval = &startInterval
+	}
+	if healthConfig.Retries != 0 {
+		retries := uint64(healthConfig.Retries)
+		healthCheck.Retries = &retries
+	}
+	return &healthCheck
+}
+
+func (s *composeService) toComposeVolumes(volumes []types.MountPoint) (map[string]compose.VolumeConfig,
+	[]compose.ServiceVolumeConfig, map[string]compose.SecretConfig, []compose.ServiceSecretConfig) {
+	volumeConfigs := make(map[string]compose.VolumeConfig)
+	secretConfigs := make(map[string]compose.SecretConfig)
+	var serviceVolumeConfigs []compose.ServiceVolumeConfig
+	var serviceSecretConfigs []compose.ServiceSecretConfig
+
+	for _, volume := range volumes {
+		serviceVC := compose.ServiceVolumeConfig{
+			Type:     string(volume.Type),
+			Source:   volume.Source,
+			Target:   volume.Destination,
+			ReadOnly: !volume.RW,
+		}
+		switch volume.Type {
+		case mount.TypeVolume:
+			serviceVC.Source = volume.Name
+			vol := compose.VolumeConfig{}
+			if volume.Driver != "local" {
+				vol.Driver = volume.Driver
+				vol.Name = volume.Name
+			}
+			volumeConfigs[volume.Name] = vol
+			serviceVolumeConfigs = append(serviceVolumeConfigs, serviceVC)
+		case mount.TypeBind:
+			if strings.HasPrefix(volume.Destination, "/run/secrets") {
+				destination := strings.Split(volume.Destination, "/")
+				secret := compose.SecretConfig{
+					Name: destination[len(destination)-1],
+					File: strings.TrimPrefix(volume.Source, "/host_mnt"),
+				}
+				secretConfigs[secret.Name] = secret
+				serviceSecretConfigs = append(serviceSecretConfigs, compose.ServiceSecretConfig{
+					Source: secret.Name,
+					Target: volume.Destination,
+				})
+			} else {
+				serviceVolumeConfigs = append(serviceVolumeConfigs, serviceVC)
+			}
+		}
+	}
+	return volumeConfigs, serviceVolumeConfigs, secretConfigs, serviceSecretConfigs
 }

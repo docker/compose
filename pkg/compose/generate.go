@@ -57,5 +57,5 @@ func (s *composeService) Generate(ctx context.Context, options api.ReverseOption
 		}
 	}
 
-	return s.projectFromName(containers, options.Project.Name)
+	return s.projectFromName(containers, options.Project.Name, true)
 }

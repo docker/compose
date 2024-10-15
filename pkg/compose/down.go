@@ -368,7 +368,7 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, container m
 
 func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
-	p, err := s.projectFromName(containers, projectName)
+	p, err := s.projectFromName(containers, projectName, false)
 	if err != nil && !api.IsNotFoundError(err) {
 		return nil, err
 	}
