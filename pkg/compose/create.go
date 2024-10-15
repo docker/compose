@@ -1208,7 +1208,13 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 					"Set `external: true` to use an existing network", n.Name, expectedProjectLabel)
 			}
 			if inspect.Labels[api.NetworkLabel] != expectedNetworkLabel {
-				return fmt.Errorf("network %s was found but has incorrect label %s set to %q", n.Name, api.NetworkLabel, inspect.Labels[api.NetworkLabel])
+				return fmt.Errorf(
+					"network %s was found but has incorrect label %s set to %q (expected: %q)",
+					n.Name,
+					api.NetworkLabel,
+					inspect.Labels[api.NetworkLabel],
+					expectedNetworkLabel,
+				)
 			}
 			return nil
 		}
