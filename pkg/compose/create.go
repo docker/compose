@@ -848,7 +848,7 @@ MOUNTS:
 					case string(m.Type) != v.Type:
 						v.Source = m.Source
 						fallthrough
-					case v.Bind != nil && v.Bind.CreateHostPath:
+					case !requireMountAPI(v.Bind):
 						binds = append(binds, v.String())
 						continue MOUNTS
 					}
@@ -858,6 +858,23 @@ MOUNTS:
 		mounts = append(mounts, m)
 	}
 	return binds, mounts, nil
+}
+
+// requireMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
+// options which require use of Mount API
+func requireMountAPI(bind *types.ServiceVolumeBind) bool {
+	switch {
+	case bind == nil:
+		return false
+	case !bind.CreateHostPath:
+		return true
+	case bind.Propagation != "":
+		return true
+	case bind.Recursive != "":
+		return true
+	default:
+		return false
+	}
 }
 
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
@@ -1147,10 +1164,19 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 	if bind == nil {
 		return nil
 	}
-	return &mount.BindOptions{
-		Propagation: mount.Propagation(bind.Propagation),
-		// NonRecursive: false, FIXME missing from model ?
+	opts := &mount.BindOptions{
+		Propagation:      mount.Propagation(bind.Propagation),
+		CreateMountpoint: bind.CreateHostPath,
 	}
+	switch bind.Recursive {
+	case "disabled":
+		opts.NonRecursive = true
+	case "writable":
+		opts.ReadOnlyNonRecursive = true
+	case "readonly":
+		opts.ReadOnlyForceRecursive = true
+	}
+	return opts
 }
 
 func buildVolumeOptions(vol *types.ServiceVolumeVolume) *mount.VolumeOptions {
