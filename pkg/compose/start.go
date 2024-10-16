@@ -51,7 +51,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 			return err
 		}
 
-		project, err = s.projectFromName(containers, projectName, options.AttachTo...)
+		project, err = s.projectFromName(containers, projectName, false, options.AttachTo...)
 		if err != nil {
 			return err
 		}

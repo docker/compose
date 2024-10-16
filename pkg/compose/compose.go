@@ -41,6 +41,8 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+
+	"golang.org/x/exp/maps"
 )
 
 var stdioToStdout bool
@@ -166,7 +168,7 @@ func getContainerNameWithoutProject(c moby.Container) string {
 }
 
 // projectFromName builds a types.Project based on actual resources with compose labels set
-func (s *composeService) projectFromName(containers Containers, projectName string, services ...string) (*types.Project, error) {
+func (s *composeService) projectFromName(containers Containers, projectName string, generateMode bool, services ...string) (*types.Project, error) {
 	project := &types.Project{
 		Name:     projectName,
 		Services: types.Services{},
@@ -175,8 +177,16 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		return project, fmt.Errorf("no container found for project %q: %w", projectName, api.ErrNotFound)
 	}
 	set := types.Services{}
+	networks := types.Networks{}
+	volumes := types.Volumes{}
+	secrets := types.Secrets{}
+	configs := types.Configs{}
+
 	for _, c := range containers {
-		serviceLabel := c.Labels[api.ServiceLabel]
+		serviceLabel, ok := c.Labels[api.ServiceLabel]
+		if !ok {
+			serviceLabel = getCanonicalContainerName(c)
+		}
 		service, ok := set[serviceLabel]
 		if !ok {
 			service = types.ServiceConfig{
@@ -187,6 +197,13 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 
 		}
 		service.Scale = increment(service.Scale)
+		if generateMode {
+			inspect, err := s.apiClient().ContainerInspect(context.Background(), c.ID)
+			if err != nil {
+				continue
+			}
+			s.extractComposeConfiguration(&service, inspect, volumes, secrets, networks)
+		}
 		set[serviceLabel] = service
 	}
 	for name, service := range set {
@@ -214,6 +231,10 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		}
 	}
 	project.Services = set
+	project.Networks = networks
+	project.Volumes = volumes
+	project.Secrets = secrets
+	project.Configs = configs
 
 SERVICES:
 	for _, qs := range services {
@@ -230,6 +251,37 @@ SERVICES:
 	}
 
 	return project, nil
+}
+
+func (s *composeService) extractComposeConfiguration(service *types.ServiceConfig, inspect moby.ContainerJSON, volumes types.Volumes, secrets types.Secrets, networks types.Networks) {
+	service.Environment = types.NewMappingWithEquals(inspect.Config.Env)
+	if inspect.Config.Healthcheck != nil {
+		healthConfig := inspect.Config.Healthcheck
+		service.HealthCheck = s.toComposeHealthCheck(healthConfig)
+	}
+	if len(inspect.Mounts) > 0 {
+		detectedVolumes, volumeConfigs, detectedSecrets, secretsConfigs := s.toComposeVolumes(inspect.Mounts)
+		service.Volumes = append(service.Volumes, volumeConfigs...)
+		service.Secrets = append(service.Secrets, secretsConfigs...)
+		maps.Copy(volumes, detectedVolumes)
+		maps.Copy(secrets, detectedSecrets)
+	}
+	if len(inspect.NetworkSettings.Networks) > 0 {
+		detectedNetworks, networkConfigs := s.toComposeNetwork(inspect.NetworkSettings.Networks)
+		service.Networks = networkConfigs
+		maps.Copy(networks, detectedNetworks)
+	}
+	if len(inspect.HostConfig.PortBindings) > 0 {
+		for key, portBindings := range inspect.HostConfig.PortBindings {
+			for _, portBinding := range portBindings {
+				service.Ports = append(service.Ports, types.ServicePortConfig{
+					Target:    uint32(key.Int()),
+					Published: portBinding.HostPort,
+					Protocol:  key.Proto(),
+				})
+			}
+		}
+	}
 }
 
 func increment(scale *int) *int {
