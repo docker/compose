@@ -271,6 +271,17 @@ func (s *composeService) extractComposeConfiguration(service *types.ServiceConfi
 		service.Networks = networkConfigs
 		maps.Copy(networks, detectedNetworks)
 	}
+	if len(inspect.HostConfig.PortBindings) > 0 {
+		for key, portBindings := range inspect.HostConfig.PortBindings {
+			for _, portBinding := range portBindings {
+				service.Ports = append(service.Ports, types.ServicePortConfig{
+					Target:    uint32(key.Int()),
+					Published: portBinding.HostPort,
+					Protocol:  key.Proto(),
+				})
+			}
+		}
+	}
 }
 
 func increment(scale *int) *int {
