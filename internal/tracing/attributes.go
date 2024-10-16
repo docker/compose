@@ -30,8 +30,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// SpanOptions is a small helper type to make it easy to share the options helpers between
-// downstream functions that accept slices of trace.SpanStartOption and trace.EventOption.
+// SpanOptions is a helper type for trace.SpanStartOption and trace.EventOption slices.
 type SpanOptions []trace.SpanStartEventOption
 
 type MetricsKey struct{}
@@ -45,7 +44,7 @@ type Metrics struct {
 func (s SpanOptions) SpanStartOptions() []trace.SpanStartOption {
 	out := make([]trace.SpanStartOption, len(s))
 	for i := range s {
-		out[i] = s[i]
+		out[i] = trace.SpanStartOption(s[i])
 	}
 	return out
 }
@@ -53,16 +52,12 @@ func (s SpanOptions) SpanStartOptions() []trace.SpanStartOption {
 func (s SpanOptions) EventOptions() []trace.EventOption {
 	out := make([]trace.EventOption, len(s))
 	for i := range s {
-		out[i] = s[i]
+		out[i] = trace.EventOption(s[i])
 	}
 	return out
 }
 
 // ProjectOptions returns common attributes from a Compose project.
-//
-// For convenience, it's returned as a SpanOptions object to allow it to be
-// passed directly to the wrapping helper methods in this package such as
-// SpanWrapFunc.
 func ProjectOptions(ctx context.Context, proj *types.Project) SpanOptions {
 	if proj == nil {
 		return nil
@@ -95,16 +90,12 @@ func ProjectOptions(ctx context.Context, proj *types.Project) SpanOptions {
 	if projHash, ok := projectHash(proj); ok {
 		attrs = append(attrs, attribute.String("project.hash", projHash))
 	}
-	return []trace.SpanStartEventOption{
+	return SpanOptions{
 		trace.WithAttributes(attrs...),
 	}
 }
 
 // ServiceOptions returns common attributes from a Compose service.
-//
-// For convenience, it's returned as a SpanOptions object to allow it to be
-// passed directly to the wrapping helper methods in this package such as
-// SpanWrapFunc.
 func ServiceOptions(service types.ServiceConfig) SpanOptions {
 	attrs := []attribute.KeyValue{
 		attribute.String("service.name", service.Name),
@@ -130,16 +121,12 @@ func ServiceOptions(service types.ServiceConfig) SpanOptions {
 	}
 	attrs = append(attrs, attribute.StringSlice("service.volumes", volNames))
 
-	return []trace.SpanStartEventOption{
+	return SpanOptions{
 		trace.WithAttributes(attrs...),
 	}
 }
 
 // ContainerOptions returns common attributes from a Moby container.
-//
-// For convenience, it's returned as a SpanOptions object to allow it to be
-// passed directly to the wrapping helper methods in this package such as
-// SpanWrapFunc.
 func ContainerOptions(container moby.Container) SpanOptions {
 	attrs := []attribute.KeyValue{
 		attribute.String("container.id", container.ID),
@@ -151,7 +138,7 @@ func ContainerOptions(container moby.Container) SpanOptions {
 		attrs = append(attrs, attribute.String("container.name", strings.TrimPrefix(container.Names[0], "/")))
 	}
 
-	return []trace.SpanStartEventOption{
+	return SpanOptions{
 		trace.WithAttributes(attrs...),
 	}
 }
@@ -177,8 +164,7 @@ func projectHash(p *types.Project) (string, bool) {
 	if p == nil {
 		return "", false
 	}
-	// disabled services aren't included in the output, so make a copy with
-	// all the services active for hashing
+	// Ensure all services are enabled for hashing
 	var err error
 	p, err = p.WithServicesEnabled(append(p.ServiceNames(), p.DisabledServiceNames()...)...)
 	if err != nil {
