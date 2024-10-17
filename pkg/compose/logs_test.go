@@ -28,7 +28,6 @@ import (
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -72,9 +71,9 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	c1Stderr := stdcopy.NewStdWriter(c1Writer, stdcopy.Stderr)
 	go func() {
 		_, err := c1Stdout.Write([]byte("hello stdout\n"))
-		assert.NoError(t, err, "Writing to fake stdout")
+		require.NoError(t, err, "Writing to fake stdout")
 		_, err = c1Stderr.Write([]byte("hello stderr\n"))
-		assert.NoError(t, err, "Writing to fake stderr")
+		require.NoError(t, err, "Writing to fake stderr")
 		_ = c1Writer.Close()
 	}()
 	api.EXPECT().ContainerLogs(anyCancellableContext(), "c", gomock.Any()).
