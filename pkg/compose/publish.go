@@ -35,7 +35,7 @@ func (s *composeService) Publish(ctx context.Context, project *types.Project, re
 }
 
 func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
-	err := s.Push(ctx, project, api.PushOptions{})
+	err := s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
 	if err != nil {
 		return err
 	}
