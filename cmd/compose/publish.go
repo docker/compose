@@ -36,7 +36,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "publish [OPTIONS] [REPOSITORY]",
+		Use:   "publish [OPTIONS] REPOSITORY[:TAG]",
 		Short: "Publish compose application",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPublish(ctx, dockerCli, backend, opts, args[0])
