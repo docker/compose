@@ -4,9 +4,11 @@ long: Experimental commands
 pname: docker compose
 plink: docker_compose.yaml
 cname:
+    - docker compose alpha generate
     - docker compose alpha publish
     - docker compose alpha viz
 clink:
+    - docker_compose_alpha_generate.yaml
     - docker_compose_alpha_publish.yaml
     - docker_compose_alpha_viz.yaml
 inherited_options:

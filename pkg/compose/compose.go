@@ -176,7 +176,10 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	}
 	set := types.Services{}
 	for _, c := range containers {
-		serviceLabel := c.Labels[api.ServiceLabel]
+		serviceLabel, ok := c.Labels[api.ServiceLabel]
+		if !ok {
+			serviceLabel = getCanonicalContainerName(c)
+		}
 		service, ok := set[serviceLabel]
 		if !ok {
 			service = types.ServiceConfig{

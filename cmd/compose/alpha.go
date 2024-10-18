@@ -33,6 +33,7 @@ func alphaCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	cmd.AddCommand(
 		vizCommand(p, dockerCli, backend),
 		publishCommand(p, dockerCli, backend),
+		generateCommand(p, backend),
 	)
 	return cmd
 }
