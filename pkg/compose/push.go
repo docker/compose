@@ -62,6 +62,9 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 	w := progress.ContextWriter(ctx)
 	for _, service := range project.Services {
 		if service.Build == nil || service.Image == "" {
+			if options.ImageMandatory && service.Image == "" {
+				return fmt.Errorf("%q attribut is mandatory to push an image for service %q", "service.image", service.Name)
+			}
 			w.Event(progress.Event{
 				ID:     service.Name,
 				Status: progress.Done,
