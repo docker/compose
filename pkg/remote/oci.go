@@ -113,6 +113,8 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 
 			err2 := g.pullComposeFiles(ctx, local, composeFile, manifest, ref, resolver)
 			if err2 != nil {
+				// we need to clean up the directory to be sure we won't let empty files present
+				_ = os.RemoveAll(local)
 				return "", err2
 			}
 		}
