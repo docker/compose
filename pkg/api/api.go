@@ -291,6 +291,7 @@ type ConfigOptions struct {
 type PushOptions struct {
 	Quiet          bool
 	IgnoreFailures bool
+	ImageMandatory bool
 }
 
 // PullOptions group options of the Pull API
