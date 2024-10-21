@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -35,6 +36,36 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	o.DependsOn = nil
 	o.Profiles = nil
 
+	bytes, err := json.Marshal(o)
+	if err != nil {
+		return "", err
+	}
+	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+}
+
+func DeepCopy(src *types.VolumeConfig) (types.VolumeConfig, error) {
+	var dst types.VolumeConfig
+	data, err := json.Marshal(src)
+	if err != nil {
+		return types.VolumeConfig{}, err
+	}
+	err = json.Unmarshal(data, &dst)
+	return dst, err
+}
+
+// From a top-level Volume Configuration, creates a unique hash ignoring
+// External
+func VolumeHash(v types.VolumeConfig) (string, error) {
+	o, err := DeepCopy(&v)
+	if err != nil {
+		return "", err
+	}
+
+	if o.Driver == "" { // (TODO: jhrotko) This probably should be fixed in compose-go
+		o.Driver = "local"
+	}
+	delete(o.Labels, api.ConfigHashLabel)
+	delete(o.Labels, api.ComposeVersion)
 	bytes, err := json.Marshal(o)
 	if err != nil {
 		return "", err

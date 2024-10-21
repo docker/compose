@@ -204,6 +204,8 @@ type CreateOptions struct {
 	Timeout *time.Duration
 	// QuietPull makes the pulling process quiet
 	QuietPull bool
+	// Allow recreate volumes when volumes configuration changes
+	RecreateVolumes bool
 }
 
 // StartOptions group options of the Start API

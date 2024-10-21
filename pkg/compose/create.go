@@ -64,6 +64,8 @@ type createConfigs struct {
 	Links     []string
 }
 
+type ComposeVolumes map[string]*volumetypes.Volume
+
 func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, createOpts)
@@ -80,12 +82,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-
 	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
 	if err != nil {
 		return err
@@ -97,10 +93,15 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	if err := s.ensureProjectVolumes(ctx, project); err != nil {
+	if err := s.ensureProjectVolumes(ctx, project, options.RecreateVolumes); err != nil {
 		return err
 	}
 
+	var observedState Containers
+	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return err
+	}
 	orphans := observedState.filter(isOrphaned(project))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
@@ -116,6 +117,25 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		}
 	}
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
+}
+
+func (s *composeService) getVolumes(ctx context.Context, projectName string) (ComposeVolumes, error) {
+	volumeList, err := s.apiClient().VolumeList(ctx, volumetypes.ListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if volumeList.Volumes == nil {
+		return nil, nil
+	}
+
+	volumes := make(ComposeVolumes, len(volumeList.Volumes))
+	for _, v := range volumeList.Volumes {
+		name := v.Labels[api.VolumeLabel]
+		volumes[name] = v
+	}
+	return volumes, nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -138,71 +158,152 @@ func (s *composeService) ensureNetworks(ctx context.Context, networks types.Netw
 	return nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project, recreateVolumes bool) error {
+	// create observed state for volumes
+	observedVolumesState, err := s.getVolumes(ctx, project.Name)
+	if err != nil {
+		return err
+	}
 	for k, volume := range project.Volumes {
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
 		volume.Labels = volume.Labels.Add(api.VersionLabel, api.ComposeVersion)
-		err := s.ensureVolume(ctx, volume, project.Name)
+		volumeConfigHash, err := VolumeHash(volume)
 		if err != nil {
 			return err
 		}
-	}
+		volume.Labels = volume.Labels.Add(api.ConfigHashLabel, volumeConfigHash)
 
-	err := func() error {
-		if s.manageDesktopFileSharesEnabled(ctx) {
-			// collect all the bind mount paths and try to set up file shares in
-			// Docker Desktop for them
-			var paths []string
-			for _, svcName := range project.ServiceNames() {
-				svc := project.Services[svcName]
-				for _, vol := range svc.Volumes {
-					if vol.Type != string(mount.TypeBind) {
-						continue
-					}
-					p := filepath.Clean(vol.Source)
-					if !filepath.IsAbs(p) {
-						return fmt.Errorf("file share path is not absolute: %s", p)
-					}
-					if fi, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
-						// actual directory will be implicitly created when the
-						// file share is initialized if it doesn't exist, so
-						// need to filter out any that should not be auto-created
-						if vol.Bind != nil && !vol.Bind.CreateHostPath {
-							logrus.Debugf("Skipping creating file share for %q: does not exist and `create_host_path` is false", p)
-							continue
-						}
-					} else if err != nil {
-						// if we can't read the path, we won't be able to make
-						// a file share for it
-						logrus.Debugf("Skipping creating file share for %q: %v", p, err)
-						continue
-					} else if !fi.IsDir() {
-						// ignore files & special types (e.g. Unix sockets)
-						logrus.Debugf("Skipping creating file share for %q: not a directory", p)
-						continue
-					}
+		err = s.ensureVolume(ctx, volume, project.Name)
+		if err != nil {
+			return err
+		}
 
-					paths = append(paths, p)
-				}
-			}
-
-			// remove duplicate/unnecessary child paths and sort them for predictability
-			paths = pathutil.EncompassingPaths(paths)
-			sort.Strings(paths)
-
-			fileShareManager := desktop.NewFileShareManager(s.desktopCli, project.Name, paths)
-			if err := fileShareManager.EnsureExists(ctx); err != nil {
-				return fmt.Errorf("initializing file shares: %w", err)
+		actualVolume, exists := observedVolumesState[k]
+		if !exists {
+			continue
+		}
+		// Check if it's necessary to recreate the volume by comparing
+		// with the current volume config hash
+		shouldRecreateVolume, err := shouldUpdateVolume(volume, actualVolume)
+		if err != nil {
+			return err
+		}
+		if !shouldRecreateVolume {
+			continue
+		}
+		if !recreateVolumes && shouldRecreateVolume {
+			logrus.Warnf("Warning: An update has been made to the volume \"%s\". To apply this update to your running Compose project,"+
+				" please use the up command with the --recreate-volumes option. Note that recreating the volume will remove the existing "+
+				"volume in order to update it.", k)
+			continue
+		}
+		if recreateVolumes && shouldRecreateVolume {
+			err = s.recreateVolume(ctx, project, k, volume, actualVolume)
+			if err != nil {
+				return err
 			}
 		}
-		return nil
-	}()
+	}
 
+	err = s.configureFileShares(ctx, project)
 	if err != nil {
 		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized file shares: %v", err)
 	}
 	return nil
+}
+
+func (s *composeService) configureFileShares(ctx context.Context, project *types.Project) error {
+	if s.manageDesktopFileSharesEnabled(ctx) {
+		// collect all the bind mount paths and try to set up file shares in
+		// Docker Desktop for them
+		var paths []string
+		for _, svcName := range project.ServiceNames() {
+			svc := project.Services[svcName]
+			for _, vol := range svc.Volumes {
+				if vol.Type != string(mount.TypeBind) {
+					continue
+				}
+				p := filepath.Clean(vol.Source)
+				if !filepath.IsAbs(p) {
+					return fmt.Errorf("file share path is not absolute: %s", p)
+				}
+				if fi, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
+					// actual directory will be implicitly created when the
+					// file share is initialized if it doesn't exist, so
+					// need to filter out any that should not be auto-created
+					if vol.Bind != nil && !vol.Bind.CreateHostPath {
+						logrus.Debugf("Skipping creating file share for %q: does not exist and `create_host_path` is false", p)
+						continue
+					}
+				} else if err != nil {
+					// if we can't read the path, we won't be able to make
+					// a file share for it
+					logrus.Debugf("Skipping creating file share for %q: %v", p, err)
+					continue
+				} else if !fi.IsDir() {
+					// ignore files & special types (e.g. Unix sockets)
+					logrus.Debugf("Skipping creating file share for %q: not a directory", p)
+					continue
+				}
+
+				paths = append(paths, p)
+			}
+		}
+
+		// remove duplicate/unnecessary child paths and sort them for predictability
+		paths = pathutil.EncompassingPaths(paths)
+		sort.Strings(paths)
+
+		fileShareManager := desktop.NewFileShareManager(s.desktopCli, project.Name, paths)
+		if err := fileShareManager.EnsureExists(ctx); err != nil {
+			return fmt.Errorf("initializing file shares: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *composeService) recreateVolume(ctx context.Context, project *types.Project, volumeID string, volumeConfig types.VolumeConfig, actualVolume *volumetypes.Volume) error {
+	// need to recreate containers associated with the volume first
+	selectedService := []string{}
+	for _, s := range project.Services {
+		for _, v := range s.Volumes {
+			if v.Source == volumeID {
+				selectedService = append(selectedService, s.Name)
+			}
+		}
+	}
+	err := s.Remove(ctx, project.Name, api.RemoveOptions{
+		Project:  project,
+		Services: selectedService,
+		Force:    true,
+		Stop:     true,
+		Volumes:  false, // do not remove anonymous volumes
+	})
+	if err != nil {
+		return err
+	}
+	// remove previous volume before update
+	w := progress.ContextWriter(ctx)
+	err = s.removeVolume(ctx, actualVolume.Name, w)
+	if err != nil {
+		return err
+	}
+
+	// create updated volume
+	return s.createVolume(ctx, volumeConfig)
+}
+
+func shouldUpdateVolume(config types.VolumeConfig, volume *volumetypes.Volume) (bool, error) {
+	previousHash, ok := volume.Labels[api.ConfigHashLabel]
+	if !ok {
+		return false, nil
+	}
+	currentHash, err := VolumeHash(config)
+	if err != nil {
+		return false, fmt.Errorf("could not get hash label for volume config %s", config.Name)
+	}
+	return previousHash != currentHash, nil
 }
 
 func (s *composeService) getCreateConfigs(ctx context.Context,
@@ -1394,7 +1495,6 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		err := s.createVolume(ctx, volume)
 		return err
 	}
-
 	if volume.External {
 		return nil
 	}

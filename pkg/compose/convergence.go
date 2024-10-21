@@ -123,11 +123,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	sort.Slice(containers, func(i, j int) bool {
 		// select obsolete containers first, so they get removed as we scale down
-		if obsolete, _ := mustRecreate(service, containers[i], recreate); obsolete {
+		if obsolete, _ := mustRecreate(project, service, containers[i], recreate); obsolete {
 			// i is obsolete, so must be first in the list
 			return true
 		}
-		if obsolete, _ := mustRecreate(service, containers[j], recreate); obsolete {
+		if obsolete, _ := mustRecreate(project, service, containers[j], recreate); obsolete {
 			// j is obsolete, so must be first in the list
 			return false
 		}
@@ -154,7 +154,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			continue
 		}
 
-		mustRecreate, err := mustRecreate(service, container, recreate)
+		mustRecreate, err := mustRecreate(project, service, container, recreate)
 		if err != nil {
 			return err
 		}
@@ -312,7 +312,7 @@ func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) erro
 	return nil
 }
 
-func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
+func mustRecreate(project *types.Project, expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
 	if policy == api.RecreateNever {
 		return false, nil
 	}
@@ -325,7 +325,28 @@ func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy st
 	}
 	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
 	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
-	return configChanged || imageUpdated, nil
+
+	// it is needed recreate the mount if the external volume name changes
+	externalChanged := externalVolumeNameChanged(expected, project, actual)
+	return configChanged || imageUpdated || externalChanged, nil
+}
+
+func externalVolumeNameChanged(expected types.ServiceConfig, project *types.Project, actual moby.Container) (externalChanged bool) {
+	for _, v := range expected.Volumes {
+		if vol, ok := project.Volumes[v.Source]; ok && bool(vol.External) {
+
+			externalFound := false
+			for _, mount := range actual.Mounts {
+				if mount.Name == vol.Name {
+					externalFound = true
+				}
+			}
+			if !externalFound {
+				externalChanged = true
+			}
+		}
+	}
+	return externalChanged
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {

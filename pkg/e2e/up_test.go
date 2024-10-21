@@ -179,7 +179,6 @@ func TestUpWithAllResources(t *testing.T) {
 	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Volume "%s_my_vol"  Created`, projectName)), res.Combined())
 	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Network %s_my_net  Created`, projectName)), res.Combined())
 }
-
 func TestUpProfile(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "compose-e2e-up-profile"
@@ -191,4 +190,30 @@ func TestUpProfile(t *testing.T) {
 	assert.Assert(t, strings.Contains(res.Combined(), `Container db_c  Created`), res.Combined())
 	assert.Assert(t, strings.Contains(res.Combined(), `Container foo_c  Created`), res.Combined())
 	assert.Assert(t, !strings.Contains(res.Combined(), `Container bar_c  Created`), res.Combined())
+}
+
+func TestUpRecreateVolumes(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-recreate-volumes"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-v")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/compose.yaml", "--project-name", projectName, "up", "-d")
+	assert.NilError(t, res.Error)
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Volume "%s_my_vol"  Created`, projectName)), res.Combined())
+
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/compose.yaml", "--project-name", projectName, "up", "--recreate-volumes", "-d")
+	// If there are no changes it does not recreate volume
+	assert.Assert(t, !strings.Contains(res.Combined(), fmt.Sprintf(`Volume "%s_my_vol"`, projectName)), res.Combined())
+
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/compose2.yaml", "--project-name", projectName, "up", "--recreate-volumes", "-d")
+	// removes the affected container
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Container %s-app-1  Stopped`, projectName)), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Container %s-app-1  Removed`, projectName)), res.Combined())
+	// recreates the changed volume
+	assert.Assert(t, strings.Contains(res.Combined(), "Volume compose-e2e-recreate-volumes_my_vol  Removed"), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), `Volume "cool"  Created`), res.Combined())
+	// starts the container
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Container %s-app-1  Started`, projectName)), res.Combined())
 }

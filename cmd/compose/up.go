@@ -148,6 +148,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's policy")
 	flags.StringVar(&create.Pull, "pull", "policy", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
+	flags.BoolVar(&create.recreateVolumes, "recreate-volumes", false, "Recreate volumes when volume configuration in the Compose file changes.")
 	flags.StringArrayVar(&create.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output")
 	flags.BoolVar(&up.noPrefix, "no-log-prefix", false, "Don't print prefix in logs")
@@ -255,6 +256,7 @@ func runUp(
 		Inherit:              !createOptions.noInherit,
 		Timeout:              createOptions.GetTimeout(),
 		QuietPull:            createOptions.quietPull,
+		RecreateVolumes:      createOptions.recreateVolumes,
 	}
 
 	if upOptions.noStart {
