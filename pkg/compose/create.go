@@ -92,7 +92,8 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	if err := s.ensureProjectVolumes(ctx, project); err != nil {
+	volumes, err := s.ensureProjectVolumes(ctx, project)
+	if err != nil {
 		return err
 	}
 
@@ -115,7 +116,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 				"--remove-orphans flag to clean it up.", orphans.names())
 		}
 	}
-	return newConvergence(options.Services, observedState, networks, s).apply(ctx, project, options)
+	return newConvergence(options.Services, observedState, networks, volumes, s).apply(ctx, project, options)
 }
 
 func prepareNetworks(project *types.Project) {
@@ -141,15 +142,17 @@ func (s *composeService) ensureNetworks(ctx context.Context, project *types.Proj
 	return networks, nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
+	ids := map[string]string{}
 	for k, volume := range project.Volumes {
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
 		volume.Labels = volume.Labels.Add(api.VersionLabel, api.ComposeVersion)
-		err := s.ensureVolume(ctx, volume, project.Name)
+		id, err := s.ensureVolume(ctx, volume, project.Name)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		ids[k] = id
 	}
 
 	err := func() error {
@@ -205,7 +208,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	if err != nil {
 		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized file shares: %v", err)
 	}
-	return nil
+	return ids, nil
 }
 
 func (s *composeService) getCreateConfigs(ctx context.Context,
@@ -1426,21 +1429,21 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 }
 
-func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig, project string) error {
+func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig, project string) (string, error) {
 	inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			return err
+			return "", err
 		}
 		if volume.External {
-			return fmt.Errorf("external volume %q not found", volume.Name)
+			return "", fmt.Errorf("external volume %q not found", volume.Name)
 		}
-		err := s.createVolume(ctx, volume)
-		return err
+		err = s.createVolume(ctx, volume)
+		return "", err
 	}
 
 	if volume.External {
-		return nil
+		return volume.Name, nil
 	}
 
 	// Volume exists with name, but let's double-check this is the expected one
@@ -1451,7 +1454,16 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 	if ok && p != project {
 		logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, p, project)
 	}
-	return nil
+
+	expected, err := VolumeHash(volume)
+	if err != nil {
+		return "", err
+	}
+	actual, ok := inspected.Labels[api.ConfigHashLabel]
+	if ok && actual != expected {
+		logrus.Warnf("volume %q exists but doesn't match configuration in compose file. You should remove it so it get recreated", volume.Name)
+	}
+	return inspected.Name, nil
 }
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
