@@ -1,0 +1,10 @@
+services:
+  app:
+    image: alpine
+    volumes:
+      - my_vol:/my_vol
+
+volumes:
+  my_vol:
+    external: true
+    name: test_external_volume
