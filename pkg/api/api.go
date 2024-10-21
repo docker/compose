@@ -150,6 +150,8 @@ type BuildOptions struct {
 	Memory int64
 	// Builder name passed in the command line
 	Builder string
+	// If any service build fails, continue building the remaining services
+	ContinueOnFailure bool
 }
 
 // Apply mutates project according to build options

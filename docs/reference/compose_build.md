@@ -13,18 +13,19 @@ run `docker compose build` to rebuild it.
 
 ### Options
 
-| Name                  | Type          | Default | Description                                                                                                 |
-|:----------------------|:--------------|:--------|:------------------------------------------------------------------------------------------------------------|
-| `--build-arg`         | `stringArray` |         | Set build-time variables for services                                                                       |
-| `--builder`           | `string`      |         | Set builder to use                                                                                          |
-| `--dry-run`           | `bool`        |         | Execute command in dry run mode                                                                             |
-| `-m`, `--memory`      | `bytes`       | `0`     | Set memory limit for the build container. Not supported by BuildKit.                                        |
-| `--no-cache`          | `bool`        |         | Do not use cache when building the image                                                                    |
-| `--pull`              | `bool`        |         | Always attempt to pull a newer version of the image                                                         |
-| `--push`              | `bool`        |         | Push service images                                                                                         |
-| `-q`, `--quiet`       | `bool`        |         | Don't print anything to STDOUT                                                                              |
-| `--ssh`               | `string`      |         | Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent) |
-| `--with-dependencies` | `bool`        |         | Also build dependencies (transitively)                                                                      |
+| Name                    | Type          | Default | Description                                                                                                 |
+|:------------------------|:--------------|:--------|:------------------------------------------------------------------------------------------------------------|
+| `--build-arg`           | `stringArray` |         | Set build-time variables for services                                                                       |
+| `--builder`             | `string`      |         | Set builder to use                                                                                          |
+| `--dry-run`             | `bool`        |         | Execute command in dry run mode                                                                             |
+| `-m`, `--memory`        | `bytes`       | `0`     | Set memory limit for the build container. Not supported by BuildKit.                                        |
+| `--no-cache`            | `bool`        |         | Do not use cache when building the image                                                                    |
+| `--pull`                | `bool`        |         | Always attempt to pull a newer version of the image                                                         |
+| `--push`                | `bool`        |         | Push service images                                                                                         |
+| `-q`, `--quiet`         | `bool`        |         | Don't print anything to STDOUT                                                                              |
+| `--ssh`                 | `string`      |         | Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent) |
+| `--with-dependencies`   | `bool`        |         | Also build dependencies (transitively)                                                                      |
+| `--continue-on-failure` | `bool`        | false   | If any service build fails, continue building the remaining services                                        |
 
 
 <!---MARKER_GEN_END-->

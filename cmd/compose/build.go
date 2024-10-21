@@ -35,15 +35,16 @@ import (
 
 type buildOptions struct {
 	*ProjectOptions
-	quiet   bool
-	pull    bool
-	push    bool
-	args    []string
-	noCache bool
-	memory  cliopts.MemBytes
-	ssh     string
-	builder string
-	deps    bool
+	quiet             bool
+	pull              bool
+	push              bool
+	args              []string
+	noCache           bool
+	memory            cliopts.MemBytes
+	ssh               string
+	builder           string
+	deps              bool
+	continueOnFailure bool
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -68,16 +69,17 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		uiMode = "rawjson"
 	}
 	return api.BuildOptions{
-		Pull:     opts.pull,
-		Push:     opts.push,
-		Progress: uiMode,
-		Args:     types.NewMappingWithEquals(opts.args),
-		NoCache:  opts.noCache,
-		Quiet:    opts.quiet,
-		Services: services,
-		Deps:     opts.deps,
-		SSHs:     SSHKeys,
-		Builder:  builderName,
+		Pull:              opts.pull,
+		Push:              opts.push,
+		Progress:          uiMode,
+		Args:              types.NewMappingWithEquals(opts.args),
+		NoCache:           opts.noCache,
+		Quiet:             opts.quiet,
+		Services:          services,
+		Deps:              opts.deps,
+		SSHs:              SSHKeys,
+		Builder:           builderName,
+		ContinueOnFailure: opts.continueOnFailure,
 	}, nil
 }
 
@@ -118,6 +120,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	flags.StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	flags.StringVar(&opts.builder, "builder", "", "Set builder to use")
 	flags.BoolVar(&opts.deps, "with-dependencies", false, "Also build dependencies (transitively)")
+	flags.BoolVar(&opts.continueOnFailure, "continue-on-failure", false, "If any service build fails, continue building the remaining services")
 
 	flags.Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	flags.MarkHidden("parallel") //nolint:errcheck
