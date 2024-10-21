@@ -65,3 +65,32 @@ func TestLocalComposeExec(t *testing.T) {
 		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="), res.Combined())
 	})
 }
+
+func TestLocalComposeExecOneOff(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	const projectName = "compose-e2e-exec-one-off"
+	cmdArgs := func(cmd string, args ...string) []string {
+		ret := []string{"--project-directory", "fixtures/simple-composefile", "--project-name", projectName, cmd}
+		ret = append(ret, args...)
+		return ret
+	}
+
+	cleanup := func() {
+		c.RunDockerComposeCmd(t, cmdArgs("down", "--timeout=0")...)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	c.RunDockerComposeCmd(t, cmdArgs("run", "-d", "simple")...)
+
+	t.Run("exec in one-off container", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...)
+		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="), res.Combined())
+	})
+
+	t.Run("exec with index", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, cmdArgs("exec", "--index", "1", "-e", "FOO", "simple", "/usr/bin/env")...)
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "service \"simple\" is not running container #1"})
+	})
+}

@@ -62,7 +62,6 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Assert(t, runContainerID != "")
 		res = c.RunDockerCmd(t, "inspect", runContainerID)
 		res.Assert(t, icmd.Expected{Out: ` "Status": "exited"`})
-		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "run-test"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "True",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.slug": "` + truncatedSlug})

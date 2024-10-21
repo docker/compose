@@ -506,7 +506,10 @@ func (s *composeService) prepareLabels(labels types.Labels, service types.Servic
 	}
 	labels[api.ConfigHashLabel] = hash
 
-	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+	if number > 0 {
+		// One-off containers are not indexed
+		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+	}
 
 	var dependencies []string
 	for s, d := range service.DependsOn {
