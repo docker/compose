@@ -123,11 +123,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	sort.Slice(containers, func(i, j int) bool {
 		// select obsolete containers first, so they get removed as we scale down
-		if obsolete, _ := mustRecreate(service, containers[i], recreate); obsolete {
+		if obsolete, _ := mustRecreate(project, service, containers[i], recreate); obsolete {
 			// i is obsolete, so must be first in the list
 			return true
 		}
-		if obsolete, _ := mustRecreate(service, containers[j], recreate); obsolete {
+		if obsolete, _ := mustRecreate(project, service, containers[j], recreate); obsolete {
 			// j is obsolete, so must be first in the list
 			return false
 		}
@@ -154,7 +154,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			continue
 		}
 
-		mustRecreate, err := mustRecreate(service, container, recreate)
+		mustRecreate, err := mustRecreate(project, service, container, recreate)
 		if err != nil {
 			return err
 		}
@@ -312,7 +312,7 @@ func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) erro
 	return nil
 }
 
-func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
+func mustRecreate(project *types.Project, expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
 	if policy == api.RecreateNever {
 		return false, nil
 	}
@@ -325,7 +325,48 @@ func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy st
 	}
 	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
 	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
-	return configChanged || imageUpdated, nil
+	volumesUpdated := compareVolumeMount(project, expected, actual)
+	fmt.Printf("volumesUpdated %+v\n", volumesUpdated)
+
+	return configChanged || imageUpdated || volumesUpdated, nil
+}
+
+func compareVolumeMount(project *types.Project, expected types.ServiceConfig, actual moby.Container) bool {
+	var needsUpdate = false
+	for _, v := range expected.Volumes {
+		var mount *moby.MountPoint = nil
+		composeVolume := project.Volumes[v.Source]
+		// Find in container the named mount
+		for _, m := range actual.Mounts {
+			if composeVolume.Name == m.Name {
+				mount = &m
+				break
+			}
+		}
+		fmt.Printf("composeVolume -- %+v\n", composeVolume)
+		fmt.Printf("mount -- %+v\n", mount)
+		fmt.Printf("v.Type -- %+v\n", v.Type)
+		fmt.Printf("v.Source -- %+v\n", v.Source)
+		fmt.Printf("v.Target -- %+v\n", v.Target)
+		fmt.Printf("v.ReadOnly -- %+v\n", v.ReadOnly)
+		if mount == nil {
+			// volume name field has changed
+			return true
+		}
+		composeVolumeDriver := composeVolume.Driver
+		if composeVolume.Driver == "" {
+			composeVolumeDriver = "local"
+		}
+		fmt.Printf("v.Type != string(mount.Type) -- %v\n", v.Type != string(mount.Type))
+		fmt.Printf("strings.Contains(mount.Source, fmt.Sprintf('/ss/', v.Source)) -- %v\n", strings.Contains(mount.Source, fmt.Sprintf("/%s/", v.Source)))
+		fmt.Printf("v.Target != mount.Destination -- %v\n", v.Target != mount.Destination)
+		fmt.Printf("(composeVolumeDriver != mount.Driver) -- %v\n", composeVolumeDriver != mount.Driver)
+		fmt.Printf("v.ReadOnly == mount.RW -- %v\n", v.ReadOnly == mount.RW)
+
+		needsUpdate = needsUpdate || v.Type != string(mount.Type) || strings.Contains(mount.Source, fmt.Sprintf("/%s/", v.Source)) || v.Target != mount.Destination || (composeVolumeDriver != mount.Driver) || !v.ReadOnly != mount.RW
+		fmt.Println("==================")
+	}
+	return needsUpdate
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {

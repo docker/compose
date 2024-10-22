@@ -33,7 +33,6 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 		o.Deploy.Replicas = nil
 	}
 	o.DependsOn = nil
-	o.Volumes = nil
 
 	bytes, err := json.Marshal(o)
 	if err != nil {
