@@ -54,3 +54,7 @@ func hasProjectLabelFilter() filters.KeyValuePair {
 func hasConfigHashLabel() filters.KeyValuePair {
 	return filters.Arg("label", api.ConfigHashLabel)
 }
+
+func hasVolumeConfigHashLabel() filters.KeyValuePair {
+	return filters.Arg("label", api.VolumeConfigHashLabel)
+}

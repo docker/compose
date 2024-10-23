@@ -18,6 +18,7 @@ package compose
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/opencontainers/go-digest"
@@ -35,6 +36,26 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	o.DependsOn = nil
 
 	bytes, err := json.Marshal(o)
+	if err != nil {
+		return "", err
+	}
+	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+}
+
+// From a top-level Volume Configuration, creates a unique hash ignoring
+// DriverOpts,  External and Extensions
+func VolumeHash(o types.VolumeConfig) (string, error) {
+	// We can't have these attributes into account, because when converting
+	// from a volume inspect there is no way to deduce these attributes back
+	// to a VolumeConfig
+	if o.Driver == "" { // (TODO: jhrotko) This probably should be fixed in compose-go
+		o.Driver = "local"
+	}
+	o.External = false // the name can change. Need to think about this case
+	o.Labels = nil
+
+	fmt.Printf("VolumeHash - %+v\n", o)
+	bytes, err := json.Marshal(o.Name)
 	if err != nil {
 		return "", err
 	}

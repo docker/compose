@@ -97,7 +97,18 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
 		return err
 	}
-
+	// create observed state for volumes
+	// might want to return the volumes from the containers instead of a compose type
+	// to handle the convertino issues later
+	observedVolumesState, err := s.getVolumes(ctx, project.Name)
+	if err != nil {
+		return err
+	}
+	// fmt.Printf("\nobservedVolumesState %+v\n", observedVolumesState)
+	// for k, v := range observedVolumesState {
+	// 	h, _ := VolumeHash(v)
+	// 	fmt.Printf("%s - %+v\n", k, h)
+	// }
 	if err := s.ensureProjectVolumes(ctx, project); err != nil {
 		return err
 	}
@@ -116,7 +127,38 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 				"--remove-orphans flag to clean it up.", orphans.names())
 		}
 	}
-	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
+	return newConvergence(options.Services, observedState, s, observedVolumesState).apply(ctx, project, options)
+}
+
+func (s *composeService) getVolumes(ctx context.Context, projectName string) (map[string]*volumetypes.Volume, error) {
+	f := projectFilter(projectName)
+
+	volumeList, err := s.apiClient().VolumeList(ctx, volumetypes.ListOptions{
+		Filters: filters.NewArgs(f),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if volumeList.Volumes == nil {
+		return nil, nil
+	}
+
+	volumes := make(map[string]*volumetypes.Volume, len(volumeList.Volumes))
+	for _, v := range volumeList.Volumes {
+		name := v.Labels[api.VolumeLabel]
+		volumes[name] = v
+	}
+	// volumes := make(types.Volumes, len(volumeList.Volumes))
+	// for _, v := range volumeList.Volumes {
+	// 	name := v.Labels[api.VolumeLabel]
+	// 	volumes[name] = types.VolumeConfig{
+	// 		Name:     v.Name,
+	// 		Driver:   v.Driver,
+	// 		External: false, // external volumes should not have com.docker.compose.project label
+	// 		Labels:   v.Labels,
+	// 	}
+	// }
+	return volumes, nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -144,7 +186,15 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
 		volume.Labels = volume.Labels.Add(api.VersionLabel, api.ComposeVersion)
-		err := s.ensureVolume(ctx, volume, project.Name)
+
+		volumeConfigHash, err := VolumeHash(volume)
+		volume.Labels = volume.Labels.Add(api.VolumeConfigHashLabel, volumeConfigHash)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s - %+v\n\n", k, volume)
+
+		err = s.ensureVolume(ctx, volume, project.Name)
 		if err != nil {
 			return err
 		}
@@ -1393,6 +1443,7 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		if volume.External {
 			return fmt.Errorf("external volume %q not found", volume.Name)
 		}
+		// check volume hash here?? (maybe not)
 		err := s.createVolume(ctx, volume)
 		return err
 	}

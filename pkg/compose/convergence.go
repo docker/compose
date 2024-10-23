@@ -35,6 +35,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/versions"
+	volumetypes "github.com/docker/docker/api/types/volume"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -56,9 +57,10 @@ const (
 // Cross services dependencies are managed by creating services in expected order and updating `service:xx` reference
 // when a service has converged, so dependent ones can be managed with resolved containers references.
 type convergence struct {
-	service       *composeService
-	observedState map[string]Containers
-	stateMutex    sync.Mutex
+	service             *composeService
+	observedState       map[string]Containers
+	observedVolumeState map[string]*volumetypes.Volume
+	stateMutex          sync.Mutex
 }
 
 func (c *convergence) getObservedState(serviceName string) Containers {
@@ -67,13 +69,19 @@ func (c *convergence) getObservedState(serviceName string) Containers {
 	return c.observedState[serviceName]
 }
 
+func (c *convergence) getObservedVolumeState(volumeName string) *volumetypes.Volume {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	return c.observedVolumeState[volumeName]
+}
+
 func (c *convergence) setObservedState(serviceName string, containers Containers) {
 	c.stateMutex.Lock()
 	defer c.stateMutex.Unlock()
 	c.observedState[serviceName] = containers
 }
 
-func newConvergence(services []string, state Containers, s *composeService) *convergence {
+func newConvergence(services []string, state Containers, s *composeService, volumeState map[string]*volumetypes.Volume) *convergence {
 	observedState := map[string]Containers{}
 	for _, s := range services {
 		observedState[s] = Containers{}
@@ -82,9 +90,12 @@ func newConvergence(services []string, state Containers, s *composeService) *con
 		service := c.Labels[api.ServiceLabel]
 		observedState[service] = append(observedState[service], c)
 	}
+	// Need to initialize here?
+	// observedVolumeState := []*volumetypes.Volume{}
 	return &convergence{
-		service:       s,
-		observedState: observedState,
+		service:             s,
+		observedState:       observedState,
+		observedVolumeState: volumeState,
 	}
 }
 
@@ -105,12 +116,27 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 	})
 }
 
+func (c *convergence) getServiceVolumes(service types.ServiceConfig) map[string]volumetypes.Volume {
+	volumes := make(map[string]volumetypes.Volume, len(service.Volumes))
+
+	for _, v := range service.Volumes {
+		observedVolume := c.getObservedVolumeState(v.Source)
+		// fmt.Printf("%s -- volume source %s -- observed %+v\n", service.Name, v.Source, observedVolume)
+		if observedVolume != nil {
+			volumes[v.Source] = *observedVolume
+		}
+	}
+	return volumes
+}
+
 func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error { //nolint:gocyclo
 	expected, err := getScale(service)
 	if err != nil {
 		return err
 	}
 	containers := c.getObservedState(service.Name)
+	volumes := c.getServiceVolumes(service)
+
 	actual := len(containers)
 	updated := make(Containers, expected)
 
@@ -123,11 +149,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	sort.Slice(containers, func(i, j int) bool {
 		// select obsolete containers first, so they get removed as we scale down
-		if obsolete, _ := mustRecreate(project, service, containers[i], recreate); obsolete {
+		if obsolete, _ := mustRecreate(project, service, containers[i], recreate, volumes); obsolete {
 			// i is obsolete, so must be first in the list
 			return true
 		}
-		if obsolete, _ := mustRecreate(project, service, containers[j], recreate); obsolete {
+		if obsolete, _ := mustRecreate(project, service, containers[j], recreate, volumes); obsolete {
 			// j is obsolete, so must be first in the list
 			return false
 		}
@@ -154,7 +180,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			continue
 		}
 
-		mustRecreate, err := mustRecreate(project, service, container, recreate)
+		mustRecreate, err := mustRecreate(project, service, container, recreate, volumes)
 		if err != nil {
 			return err
 		}
@@ -312,7 +338,7 @@ func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) erro
 	return nil
 }
 
-func mustRecreate(project *types.Project, expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
+func mustRecreate(project *types.Project, expected types.ServiceConfig, actual moby.Container, policy string, volumes map[string]volumetypes.Volume) (bool, error) {
 	if policy == api.RecreateNever {
 		return false, nil
 	}
@@ -324,49 +350,46 @@ func mustRecreate(project *types.Project, expected types.ServiceConfig, actual m
 		return false, err
 	}
 	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
+	fmt.Printf("configChanged %+v\n", configChanged)
 	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
-	volumesUpdated := compareVolumeMount(project, expected, actual)
+	// check hash config volumes for service
+	volumesUpdated, err := compareVolumeMount(project, expected, volumes)
+	if err != nil {
+		return false, err
+	}
 	fmt.Printf("volumesUpdated %+v\n", volumesUpdated)
 
 	return configChanged || imageUpdated || volumesUpdated, nil
 }
 
-func compareVolumeMount(project *types.Project, expected types.ServiceConfig, actual moby.Container) bool {
+func compareVolumeMount(project *types.Project, service types.ServiceConfig, actualVolumes map[string]volumetypes.Volume) (bool, error) {
+	// we should recreate the container if we need to recreate the volume
 	var needsUpdate = false
-	for _, v := range expected.Volumes {
-		var mount *moby.MountPoint = nil
-		composeVolume := project.Volumes[v.Source]
-		// Find in container the named mount
-		for _, m := range actual.Mounts {
-			if composeVolume.Name == m.Name {
-				mount = &m
-				break
-			}
-		}
-		fmt.Printf("composeVolume -- %+v\n", composeVolume)
-		fmt.Printf("mount -- %+v\n", mount)
-		fmt.Printf("v.Type -- %+v\n", v.Type)
-		fmt.Printf("v.Source -- %+v\n", v.Source)
-		fmt.Printf("v.Target -- %+v\n", v.Target)
-		fmt.Printf("v.ReadOnly -- %+v\n", v.ReadOnly)
-		if mount == nil {
-			// volume name field has changed
-			return true
-		}
-		composeVolumeDriver := composeVolume.Driver
-		if composeVolume.Driver == "" {
-			composeVolumeDriver = "local"
-		}
-		fmt.Printf("v.Type != string(mount.Type) -- %v\n", v.Type != string(mount.Type))
-		fmt.Printf("strings.Contains(mount.Source, fmt.Sprintf('/ss/', v.Source)) -- %v\n", strings.Contains(mount.Source, fmt.Sprintf("/%s/", v.Source)))
-		fmt.Printf("v.Target != mount.Destination -- %v\n", v.Target != mount.Destination)
-		fmt.Printf("(composeVolumeDriver != mount.Driver) -- %v\n", composeVolumeDriver != mount.Driver)
-		fmt.Printf("v.ReadOnly == mount.RW -- %v\n", v.ReadOnly == mount.RW)
+	for _, volume := range service.Volumes {
+		// list volumes and get the volume?
+		// we need to check hash volumes (from inspect that should be inside the convergence) labels
+		if v, ok := actualVolumes[volume.Source]; ok {
+			// get volume hash from inspected volumes
+			volumeConfig := project.Volumes[volume.Source]
+			// get current hash for service volume
+			fmt.Printf("===========\n")
+			fmt.Printf("[%s]\n", volume.Source)
 
-		needsUpdate = needsUpdate || v.Type != string(mount.Type) || strings.Contains(mount.Source, fmt.Sprintf("/%s/", v.Source)) || v.Target != mount.Destination || (composeVolumeDriver != mount.Driver) || !v.ReadOnly != mount.RW
-		fmt.Println("==================")
+			currentHash, err := VolumeHash(volumeConfig)
+			if err != nil {
+				return false, err
+			}
+			fmt.Printf("volumeConfig - %+v\n", volumeConfig)
+			fmt.Printf("currentHash - %s\n", currentHash)
+			fmt.Println()
+
+			previousHash := v.Labels[api.VolumeConfigHashLabel]
+			fmt.Printf("v %+v\n", v)
+			fmt.Printf("volumeHash - %s\n", previousHash)
+			needsUpdate = needsUpdate || currentHash != previousHash
+		}
 	}
-	return needsUpdate
+	return needsUpdate, nil
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
