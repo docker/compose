@@ -61,11 +61,6 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 		direction |= fromService
 		serviceName = srcService
 		copyFunc = s.copyFromContainer
-
-		// copying from multiple containers of a services doesn't make sense.
-		if options.All {
-			return errors.New("cannot use the --all flag when copying from a service")
-		}
 	}
 	if destService != "" {
 		direction |= toService
@@ -80,7 +75,7 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 		return errors.New("unknown copy direction")
 	}
 
-	containers, err := s.listContainersTargetedForCopy(ctx, projectName, options.Index, direction, serviceName)
+	containers, err := s.listContainersTargetedForCopy(ctx, projectName, options, direction, serviceName)
 	if err != nil {
 		return err
 	}
@@ -119,18 +114,22 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 	return g.Wait()
 }
 
-func (s *composeService) listContainersTargetedForCopy(ctx context.Context, projectName string, index int, direction copyDirection, serviceName string) (Containers, error) {
+func (s *composeService) listContainersTargetedForCopy(ctx context.Context, projectName string, options api.CopyOptions, direction copyDirection, serviceName string) (Containers, error) {
 	var containers Containers
 	var err error
 	switch {
-	case index > 0:
-		ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, serviceName, index)
+	case options.Index > 0:
+		ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, serviceName, options.Index)
 		if err != nil {
 			return nil, err
 		}
 		return append(containers, ctr), nil
 	default:
-		containers, err = s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+		withOneOff := oneOffExclude
+		if options.All {
+			withOneOff = oneOffInclude
+		}
+		containers, err = s.getContainers(ctx, projectName, withOneOff, true, serviceName)
 		if err != nil {
 			return nil, err
 		}
