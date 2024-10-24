@@ -3,3 +3,4 @@ bin/
 coverage.out
 covdatafiles/
 .DS_Store
+/.idea

@@ -1,0 +1,5 @@
+services:
+  env-compose-recursion:
+    image: env-compose-recursion
+    build:
+      context: .
