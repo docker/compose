@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	moby "github.com/docker/docker/api/types"
@@ -46,7 +45,7 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 	}
 
 	if len(containers) == 0 {
-		_, _ = fmt.Fprintf(s.stdinfo(), "no container to kill\n")
+		w.Event(progress.SkippedEvent(strings.Join(services, ","), "No containers for selected service"))
 		return nil
 	}
 
