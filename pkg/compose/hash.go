@@ -40,3 +40,19 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	}
 	return digest.SHA256.FromBytes(bytes).Encoded(), nil
 }
+
+// From a top-level Volume Configuration, creates a unique hash ignoring
+// External and Labels
+func VolumeHash(o types.VolumeConfig) (string, error) {
+	if o.Driver == "" { // (TODO: jhrotko) This probably should be fixed in compose-go
+		o.Driver = "local"
+	}
+	o.External = false // (TODO: jhrotko) the name can change. Need to think about this case
+	o.Labels = nil
+
+	bytes, err := json.Marshal(o)
+	if err != nil {
+		return "", err
+	}
+	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+}

@@ -31,6 +31,8 @@ const (
 	ServiceLabel = "com.docker.compose.service"
 	// ConfigHashLabel stores configuration hash for a compose service
 	ConfigHashLabel = "com.docker.compose.config-hash"
+	// ConfigHashLabel stores configuration hash for a compose service
+	VolumeConfigHashLabel = "com.docker.compose.volume-config-hash"
 	// ContainerNumberLabel stores the container index of a replicated service
 	ContainerNumberLabel = "com.docker.compose.container-number"
 	// VolumeLabel allow to track resource related to a compose volume

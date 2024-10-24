@@ -80,12 +80,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-
 	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
 	if err != nil {
 		return err
@@ -96,11 +90,20 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
 		return err
 	}
-
-	if err := s.ensureProjectVolumes(ctx, project); err != nil {
+	// create observed state for volumes
+	observedVolumesState, err := s.getVolumes(ctx, project.Name)
+	if err != nil {
+		return err
+	}
+	if err := s.ensureProjectVolumes(ctx, project, observedVolumesState, options.RecreateVolumes); err != nil {
 		return err
 	}
 
+	var observedState Containers
+	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return err
+	}
 	orphans := observedState.filter(isOrphaned(project))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
@@ -115,7 +118,26 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 				"--remove-orphans flag to clean it up.", orphans.names())
 		}
 	}
-	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
+	return newConvergence(options.Services, observedState, s, observedVolumesState).apply(ctx, project, options)
+}
+
+func (s *composeService) getVolumes(ctx context.Context, projectName string) (map[string]*volumetypes.Volume, error) {
+	volumeList, err := s.apiClient().VolumeList(ctx, volumetypes.ListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if volumeList.Volumes == nil {
+		return nil, nil
+	}
+
+	volumes := make(map[string]*volumetypes.Volume, len(volumeList.Volumes))
+	for _, v := range volumeList.Volumes {
+		name := v.Labels[api.VolumeLabel]
+		volumes[name] = v
+	}
+	return volumes, nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -138,14 +160,41 @@ func (s *composeService) ensureNetworks(ctx context.Context, networks types.Netw
 	return nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project, currentState map[string]*volumetypes.Volume, recreateVolumes bool) error {
 	for k, volume := range project.Volumes {
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
 		volume.Labels = volume.Labels.Add(api.VersionLabel, api.ComposeVersion)
-		err := s.ensureVolume(ctx, volume, project.Name)
+
+		volumeConfigHash, err := VolumeHash(volume)
+		volume.Labels = volume.Labels.Add(api.VolumeConfigHashLabel, volumeConfigHash)
 		if err != nil {
 			return err
+		}
+		err = s.ensureVolume(ctx, volume, project.Name)
+		if err != nil {
+			return err
+		}
+
+		if recreateVolumes {
+			actualVolume, ok := currentState[k]
+			if !ok {
+				return nil
+			}
+			// Check if it's necessary to recreate the volume by comparing
+			// with the current volume config
+			ok, err = shouldUpdateVolume(volume, actualVolume)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				continue
+			}
+			logrus.Warnf("Warning: Running with --recreate-volumes will delete data for volume %s", k)
+			err = s.recreateVolume(ctx, project, k, volume)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -203,6 +252,46 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized file shares: %v", err)
 	}
 	return nil
+}
+
+func (s *composeService) recreateVolume(ctx context.Context, project *types.Project, volumeID string, volumeConfig types.VolumeConfig) error {
+	// need to recreate containers associated with the volume first
+	selectedService := []string{}
+	for _, s := range project.Services {
+		for _, v := range s.Volumes {
+			if v.Source == volumeID {
+				selectedService = append(selectedService, s.Name)
+			}
+		}
+	}
+	err := s.Remove(ctx, project.Name, api.RemoveOptions{
+		Project:  project,
+		Services: selectedService,
+		Volumes:  true, // this does not work in the apiClient???
+		Force:    true,
+		Stop:     true,
+	})
+	if err != nil {
+		return err
+	}
+	// remove volume to update it
+	w := progress.ContextWriter(ctx)
+	s.removeVolume(ctx, volumeConfig.Name, w)
+
+	// create the volume
+	return s.createVolume(ctx, volumeConfig)
+}
+
+func shouldUpdateVolume(config types.VolumeConfig, volume *volumetypes.Volume) (bool, error) {
+	previousHash, ok := volume.Labels[api.VolumeConfigHashLabel]
+	if !ok {
+		return false, fmt.Errorf("could not get hash label for volume %s", volume.Name)
+	}
+	currentHash, err := VolumeHash(config)
+	if err != nil {
+		return false, fmt.Errorf("could not get hash label for volume config %s", config.Name)
+	}
+	return previousHash != currentHash, nil
 }
 
 func (s *composeService) getCreateConfigs(ctx context.Context,
