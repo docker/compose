@@ -976,10 +976,6 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			target = configsBaseDir + config.Target
 		}
 
-		if config.UID != "" || config.GID != "" || config.Mode != nil {
-			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
-		}
-
 		definedConfig := p.Configs[config.Source]
 		if definedConfig.External {
 			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
@@ -994,6 +990,10 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 
 		if definedConfig.Environment != "" || definedConfig.Content != "" {
 			continue
+		}
+
+		if config.UID != "" || config.GID != "" || config.Mode != nil {
+			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
@@ -1026,10 +1026,6 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			target = secretsDir + secret.Target
 		}
 
-		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
-			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
-		}
-
 		definedSecret := p.Secrets[secret.Source]
 		if definedSecret.External {
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
@@ -1044,6 +1040,10 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 
 		if definedSecret.Environment != "" {
 			continue
+		}
+
+		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
+			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		if _, err := os.Stat(definedSecret.File); os.IsNotExist(err) {
