@@ -191,6 +191,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 			if !ok {
 				continue
 			}
+			logrus.Warnf("Warning: Running with --recreate-volumes will delete data for volume %s", k)
 			err = s.recreateVolume(ctx, project, k, volume)
 			if err != nil {
 				return err
