@@ -161,6 +161,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if !buildkitEnabled {
 			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
+				if options.ContinueOnFailure {
+					return nil
+				}
 				return err
 			}
 			builtDigests[getServiceIndex(name)] = id
@@ -177,11 +180,17 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 		buildOptions, err := s.toBuildOptions(project, service, options)
 		if err != nil {
+			if options.ContinueOnFailure {
+				return nil
+			}
 			return err
 		}
 
 		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
 		if err != nil {
+			if options.ContinueOnFailure {
+				return nil
+			}
 			return err
 		}
 		builtDigests[getServiceIndex(name)] = digest
