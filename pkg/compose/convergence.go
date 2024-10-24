@@ -241,6 +241,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	err = eg.Wait()
 	c.setObservedState(service.Name, updated)
+	// TODO update obeserved state for volumes
 	return err
 }
 
@@ -350,15 +351,13 @@ func mustRecreate(project *types.Project, expected types.ServiceConfig, actual m
 		return false, err
 	}
 	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
-	fmt.Printf("configChanged %+v\n", configChanged)
 	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
+
 	// check hash config volumes for service
 	volumesUpdated, err := compareVolumeMount(project, expected, volumes)
 	if err != nil {
 		return false, err
 	}
-	fmt.Printf("volumesUpdated %+v\n", volumesUpdated)
-
 	return configChanged || imageUpdated || volumesUpdated, nil
 }
 
@@ -366,26 +365,18 @@ func compareVolumeMount(project *types.Project, service types.ServiceConfig, act
 	// we should recreate the container if we need to recreate the volume
 	var needsUpdate = false
 	for _, volume := range service.Volumes {
-		// list volumes and get the volume?
+		name := volume.Source
 		// we need to check hash volumes (from inspect that should be inside the convergence) labels
-		if v, ok := actualVolumes[volume.Source]; ok {
+		if v, ok := actualVolumes[name]; ok {
 			// get volume hash from inspected volumes
-			volumeConfig := project.Volumes[volume.Source]
-			// get current hash for service volume
-			fmt.Printf("===========\n")
-			fmt.Printf("[%s]\n", volume.Source)
+			volumeConfig := project.Volumes[name]
 
+			// get current hash for service volume
 			currentHash, err := VolumeHash(volumeConfig)
 			if err != nil {
 				return false, err
 			}
-			fmt.Printf("volumeConfig - %+v\n", volumeConfig)
-			fmt.Printf("currentHash - %s\n", currentHash)
-			fmt.Println()
-
 			previousHash := v.Labels[api.VolumeConfigHashLabel]
-			fmt.Printf("v %+v\n", v)
-			fmt.Printf("volumeHash - %s\n", previousHash)
 			needsUpdate = needsUpdate || currentHash != previousHash
 		}
 	}

@@ -81,12 +81,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-
 	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
 	if err != nil {
 		return err
@@ -98,21 +92,19 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 	// create observed state for volumes
-	// might want to return the volumes from the containers instead of a compose type
-	// to handle the convertino issues later
 	observedVolumesState, err := s.getVolumes(ctx, project.Name)
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("\nobservedVolumesState %+v\n", observedVolumesState)
-	// for k, v := range observedVolumesState {
-	// 	h, _ := VolumeHash(v)
-	// 	fmt.Printf("%s - %+v\n", k, h)
-	// }
-	if err := s.ensureProjectVolumes(ctx, project); err != nil {
+	if err := s.ensureProjectVolumes(ctx, project, observedVolumesState); err != nil {
 		return err
 	}
 
+	var observedState Containers
+	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return err
+	}
 	orphans := observedState.filter(isOrphaned(project))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
@@ -131,10 +123,8 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 }
 
 func (s *composeService) getVolumes(ctx context.Context, projectName string) (map[string]*volumetypes.Volume, error) {
-	f := projectFilter(projectName)
-
 	volumeList, err := s.apiClient().VolumeList(ctx, volumetypes.ListOptions{
-		Filters: filters.NewArgs(f),
+		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	if err != nil {
 		return nil, err
@@ -148,16 +138,6 @@ func (s *composeService) getVolumes(ctx context.Context, projectName string) (ma
 		name := v.Labels[api.VolumeLabel]
 		volumes[name] = v
 	}
-	// volumes := make(types.Volumes, len(volumeList.Volumes))
-	// for _, v := range volumeList.Volumes {
-	// 	name := v.Labels[api.VolumeLabel]
-	// 	volumes[name] = types.VolumeConfig{
-	// 		Name:     v.Name,
-	// 		Driver:   v.Driver,
-	// 		External: false, // external volumes should not have com.docker.compose.project label
-	// 		Labels:   v.Labels,
-	// 	}
-	// }
 	return volumes, nil
 }
 
@@ -181,7 +161,7 @@ func (s *composeService) ensureNetworks(ctx context.Context, networks types.Netw
 	return nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project, currentState map[string]*volumetypes.Volume) error {
 	for k, volume := range project.Volumes {
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
@@ -192,9 +172,25 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%s - %+v\n\n", k, volume)
-
 		err = s.ensureVolume(ctx, volume, project.Name)
+		if err != nil {
+			return err
+		}
+
+		actualVolume, ok := currentState[k]
+		if !ok {
+			return nil
+		}
+		// Check if it's necessary to recreate the volume by comparing
+		// with the current volume config
+		ok, err = shouldUpdateVolume(volume, actualVolume)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		err = s.recreateVolume(ctx, project, k, volume)
 		if err != nil {
 			return err
 		}
@@ -254,6 +250,46 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized file shares: %v", err)
 	}
 	return nil
+}
+
+func (s *composeService) recreateVolume(ctx context.Context, project *types.Project, volumeID string, volumeConfig types.VolumeConfig) error {
+	// need to recreate containers associated with the volume first
+	selectedService := []string{}
+	for _, s := range project.Services {
+		for _, v := range s.Volumes {
+			if v.Source == volumeID {
+				selectedService = append(selectedService, s.Name)
+			}
+		}
+	}
+	err := s.Remove(ctx, project.Name, api.RemoveOptions{
+		Project:  project,
+		Services: selectedService,
+		Volumes:  true, // this does not work in the apiClient???
+		Force:    true,
+		Stop:     true,
+	})
+	if err != nil {
+		return err
+	}
+	// remove volume to update it
+	w := progress.ContextWriter(ctx)
+	s.removeVolume(ctx, volumeConfig.Name, w)
+
+	// create the volume
+	return s.createVolume(ctx, volumeConfig)
+}
+
+func shouldUpdateVolume(config types.VolumeConfig, volume *volumetypes.Volume) (bool, error) {
+	previousHash, ok := volume.Labels[api.VolumeConfigHashLabel]
+	if !ok {
+		return false, fmt.Errorf("could not get hash label for volume %s", volume.Name)
+	}
+	currentHash, err := VolumeHash(config)
+	if err != nil {
+		return false, fmt.Errorf("could not get hash label for volume config %s", config.Name)
+	}
+	return previousHash != currentHash, nil
 }
 
 func (s *composeService) getCreateConfigs(ctx context.Context,
@@ -1443,7 +1479,6 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		if volume.External {
 			return fmt.Errorf("external volume %q not found", volume.Name)
 		}
-		// check volume hash here?? (maybe not)
 		err := s.createVolume(ctx, volume)
 		return err
 	}
