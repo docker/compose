@@ -96,7 +96,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	if err != nil {
 		return err
 	}
-	if err := s.ensureProjectVolumes(ctx, project, observedVolumesState); err != nil {
+	if err := s.ensureProjectVolumes(ctx, project, observedVolumesState, options.RecreateVolumes); err != nil {
 		return err
 	}
 
@@ -161,7 +161,7 @@ func (s *composeService) ensureNetworks(ctx context.Context, networks types.Netw
 	return nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project, currentState map[string]*volumetypes.Volume) error {
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project, currentState map[string]*volumetypes.Volume, recreateVolumes bool) error {
 	for k, volume := range project.Volumes {
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
@@ -177,22 +177,24 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 			return err
 		}
 
-		actualVolume, ok := currentState[k]
-		if !ok {
-			return nil
-		}
-		// Check if it's necessary to recreate the volume by comparing
-		// with the current volume config
-		ok, err = shouldUpdateVolume(volume, actualVolume)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			continue
-		}
-		err = s.recreateVolume(ctx, project, k, volume)
-		if err != nil {
-			return err
+		if recreateVolumes {
+			actualVolume, ok := currentState[k]
+			if !ok {
+				return nil
+			}
+			// Check if it's necessary to recreate the volume by comparing
+			// with the current volume config
+			ok, err = shouldUpdateVolume(volume, actualVolume)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				continue
+			}
+			err = s.recreateVolume(ctx, project, k, volume)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

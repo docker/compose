@@ -32,20 +32,21 @@ import (
 )
 
 type createOptions struct {
-	Build         bool
-	noBuild       bool
-	Pull          string
-	pullChanged   bool
-	removeOrphans bool
-	ignoreOrphans bool
-	forceRecreate bool
-	noRecreate    bool
-	recreateDeps  bool
-	noInherit     bool
-	timeChanged   bool
-	timeout       int
-	quietPull     bool
-	scale         []string
+	Build           bool
+	noBuild         bool
+	Pull            string
+	pullChanged     bool
+	removeOrphans   bool
+	ignoreOrphans   bool
+	forceRecreate   bool
+	noRecreate      bool
+	recreateDeps    bool
+	noInherit       bool
+	timeChanged     bool
+	timeout         int
+	quietPull       bool
+	scale           []string
+	recreateVolumes bool
 }
 
 func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {

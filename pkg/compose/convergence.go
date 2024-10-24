@@ -90,8 +90,7 @@ func newConvergence(services []string, state Containers, s *composeService, volu
 		service := c.Labels[api.ServiceLabel]
 		observedState[service] = append(observedState[service], c)
 	}
-	// Need to initialize here?
-	// observedVolumeState := []*volumetypes.Volume{}
+
 	return &convergence{
 		service:             s,
 		observedState:       observedState,
@@ -121,7 +120,6 @@ func (c *convergence) getServiceVolumes(service types.ServiceConfig) map[string]
 
 	for _, v := range service.Volumes {
 		observedVolume := c.getObservedVolumeState(v.Source)
-		// fmt.Printf("%s -- volume source %s -- observed %+v\n", service.Name, v.Source, observedVolume)
 		if observedVolume != nil {
 			volumes[v.Source] = *observedVolume
 		}
