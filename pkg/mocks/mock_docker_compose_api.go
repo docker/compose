@@ -169,6 +169,21 @@ func (mr *MockServiceMockRecorder) Export(ctx, projectName, options any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Export", reflect.TypeOf((*MockService)(nil).Export), ctx, projectName, options)
 }
 
+// Generate mocks base method.
+func (m *MockService) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Generate", ctx, options)
+	ret0, _ := ret[0].(*types.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Generate indicates an expected call of Generate.
+func (mr *MockServiceMockRecorder) Generate(ctx, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockService)(nil).Generate), ctx, options)
+}
+
 // Images mocks base method.
 func (m *MockService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
 	m.ctrl.T.Helper()
