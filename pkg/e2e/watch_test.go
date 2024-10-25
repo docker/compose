@@ -99,9 +99,8 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 				errors)
 	}, 30*time.Second, 1*time.Second)
 
-	n := c.RunDockerCmd(t, "network", "inspect", networkName, "-f", "{{ .Id }}")
 	pn := c.RunDockerCmd(t, "inspect", containerName, "-f", "{{ .HostConfig.NetworkMode }}")
-	assert.Equal(t, pn.Stdout(), n.Stdout())
+	assert.Equal(t, strings.TrimSpace(pn.Stdout()), networkName)
 
 	t.Log("create a dotenv file that will be used to trigger the rebuild")
 	err = os.WriteFile(dotEnvFilepath, []byte("HELLO=WORLD\nTEST=REBUILD"), 0o666)
@@ -119,9 +118,8 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 		return true, fmt.Sprintf("container %s was rebuilt", containerName)
 	}, 30*time.Second, 1*time.Second)
 
-	n2 := c.RunDockerCmd(t, "network", "inspect", networkName, "-f", "{{ .Id }}")
 	pn2 := c.RunDockerCmd(t, "inspect", containerName, "-f", "{{ .HostConfig.NetworkMode }}")
-	assert.Equal(t, pn2.Stdout(), n2.Stdout())
+	assert.Equal(t, strings.TrimSpace(pn2.Stdout()), networkName)
 
 	assert.Check(t, !strings.Contains(r.Combined(), "Application failed to start after update"))
 
