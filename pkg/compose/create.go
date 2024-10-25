@@ -1363,7 +1363,6 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 
 	switch len(networks) {
 	case 1:
-		n.Name = networks[0].ID
 		return nil
 	case 0:
 		enabled, err := s.isSWarmEnabled(ctx)
