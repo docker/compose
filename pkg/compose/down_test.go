@@ -96,6 +96,95 @@ func TestDown(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+func TestDownWithGivenServices(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested := composeService{
+		dockerCli: cli,
+	}
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
+		[]moby.Container{
+			testContainer("service1", "123", false),
+			testContainer("service2", "456", false),
+			testContainer("service2", "789", false),
+			testContainer("service_orphan", "321", true),
+		}, nil)
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
+		Return(volume.ListResponse{}, nil)
+
+	// network names are not guaranteed to be unique, ensure Compose handles
+	// cleanup properly if duplicates are inadvertently created
+	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return([]network.Summary{
+			{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+		}, nil)
+
+	stopOptions := containerType.StopOptions{}
+	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
+
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", containerType.RemoveOptions{Force: true}).Return(nil)
+
+	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(strings.ToLower(testProject)),
+			networkFilter("default")),
+	}).Return([]network.Summary{
+		{ID: "abc123", Name: "myProject_default"},
+	}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{ID: "abc123"}, nil)
+	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
+
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{
+		Services: []string{"service1", "not-running-service"},
+	})
+	assert.NilError(t, err)
+}
+
+func TestDownWithSpecifiedServiceButTheServicesAreNotRunning(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested := composeService{
+		dockerCli: cli,
+	}
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
+		[]moby.Container{
+			testContainer("service1", "123", false),
+			testContainer("service2", "456", false),
+			testContainer("service2", "789", false),
+			testContainer("service_orphan", "321", true),
+		}, nil)
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		volume.ListOptions{
+			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		}).
+		Return(volume.ListResponse{}, nil)
+
+	// network names are not guaranteed to be unique, ensure Compose handles
+	// cleanup properly if duplicates are inadvertently created
+	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return([]network.Summary{
+			{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+		}, nil)
+
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{
+		Services: []string{"not-running-service1", "not-running-service2"},
+	})
+	assert.NilError(t, err)
+}
+
 func TestDownRemoveOrphans(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

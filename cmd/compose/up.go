@@ -27,7 +27,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/internal/experimental"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/spf13/cobra"
 
@@ -81,13 +80,19 @@ func (opts upOptions) apply(project *types.Project, services []string) (*types.P
 	return project, nil
 }
 
-func (opts *upOptions) validateNavigationMenu(dockerCli command.Cli, experimentals *experimental.State) {
+func (opts *upOptions) validateNavigationMenu(dockerCli command.Cli) {
 	if !dockerCli.Out().IsTerminal() {
 		opts.navigationMenu = false
 		return
 	}
+	// If --menu flag was not set
 	if !opts.navigationMenuChanged {
-		opts.navigationMenu = SetUnchangedOption(ComposeMenu, experimentals.NavBar())
+		if envVar, ok := os.LookupEnv(ComposeMenu); ok {
+			opts.navigationMenu = utils.StringToBool(envVar)
+			return
+		}
+		// ...and COMPOSE_MENU env var is not defined we want the default value to be true
+		opts.navigationMenu = true
 	}
 }
 
@@ -102,7 +107,7 @@ func (opts upOptions) OnExit() api.Cascade {
 	}
 }
 
-func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, experiments *experimental.State) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	build := buildOptions{ProjectOptions: p}
@@ -127,7 +132,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service, ex
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
 
-			up.validateNavigationMenu(dockerCli, experiments)
+			up.validateNavigationMenu(dockerCli)
 
 			if !p.All && len(project.Services) == 0 {
 				return fmt.Errorf("no service selected")

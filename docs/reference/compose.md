@@ -19,6 +19,7 @@ Define and run multi-container applications with Docker
 | [`down`](compose_down.md)       | Stop and remove containers, networks                                                    |
 | [`events`](compose_events.md)   | Receive real time events from containers                                                |
 | [`exec`](compose_exec.md)       | Execute a command in a running container                                                |
+| [`export`](compose_export.md)   | Export a service container's filesystem as a tar archive                                |
 | [`images`](compose_images.md)   | List images used by the created containers                                              |
 | [`kill`](compose_kill.md)       | Force stop service containers                                                           |
 | [`logs`](compose_logs.md)       | View output from containers                                                             |

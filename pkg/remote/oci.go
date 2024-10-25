@@ -30,6 +30,7 @@ import (
 	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/internal/ocipush"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -113,6 +114,8 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 
 			err2 := g.pullComposeFiles(ctx, local, composeFile, manifest, ref, resolver)
 			if err2 != nil {
+				// we need to clean up the directory to be sure we won't let empty files present
+				_ = os.RemoveAll(local)
 				return "", err2
 			}
 		}
@@ -137,8 +140,8 @@ func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, com
 		return err
 	}
 	defer f.Close() //nolint:errcheck
-
-	if manifest.ArtifactType != "application/vnd.docker.compose.project" {
+	if (manifest.ArtifactType != "" && manifest.ArtifactType != ocipush.ComposeProjectArtifactType) ||
+		(manifest.ArtifactType == "" && manifest.Config.MediaType != ocipush.ComposeEmptyConfigMediaType) {
 		return fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.ArtifactType)
 	}
 

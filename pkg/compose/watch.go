@@ -136,7 +136,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 		service.PullPolicy = types.PullPolicyBuild
 		project.Services[i] = service
 
-		dockerIgnores, err := watch.LoadDockerIgnore(service.Build.Context)
+		dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
 		if err != nil {
 			return err
 		}
@@ -527,7 +527,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 		pathMappings[i] = batch[i].PathMapping
 	}
 
-	writeWatchSyncMessage(options.LogTo, serviceName, pathMappings)
+	writeWatchSyncMessage(options.LogTo, serviceName, pathMappings, restartService)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
@@ -537,17 +537,28 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 		return err
 	}
 	if restartService {
-		return s.Restart(ctx, project.Name, api.RestartOptions{
+		err = s.restart(ctx, project.Name, api.RestartOptions{
 			Services: []string{serviceName},
 			Project:  project,
 			NoDeps:   false,
 		})
+		if err != nil {
+			return err
+		}
+		options.LogTo.Log(
+			api.WatchLogger,
+			fmt.Sprintf("service %q restarted", serviceName))
+
 	}
 	return nil
 }
 
 // writeWatchSyncMessage prints out a message about the sync for the changed paths.
-func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings []sync.PathMapping) {
+func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings []sync.PathMapping, restart bool) {
+	action := "Syncing"
+	if restart {
+		action = "Syncing and restarting"
+	}
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		hostPathsToSync := make([]string, len(pathMappings))
 		for i := range pathMappings {
@@ -556,7 +567,8 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 		log.Log(
 			api.WatchLogger,
 			fmt.Sprintf(
-				"Syncing %q after changes were detected: %s",
+				"%s service %q after changes were detected: %s",
+				action,
 				serviceName,
 				strings.Join(hostPathsToSync, ", "),
 			),
@@ -564,7 +576,7 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 	} else {
 		log.Log(
 			api.WatchLogger,
-			fmt.Sprintf("Syncing service %q after %d changes were detected", serviceName, len(pathMappings)),
+			fmt.Sprintf("%s service %q after %d changes were detected", action, serviceName, len(pathMappings)),
 		)
 	}
 }

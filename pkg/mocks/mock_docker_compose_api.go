@@ -155,6 +155,20 @@ func (mr *MockServiceMockRecorder) Exec(ctx, projectName, options any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exec", reflect.TypeOf((*MockService)(nil).Exec), ctx, projectName, options)
 }
 
+// Export mocks base method.
+func (m *MockService) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Export", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Export indicates an expected call of Export.
+func (mr *MockServiceMockRecorder) Export(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Export", reflect.TypeOf((*MockService)(nil).Export), ctx, projectName, options)
+}
+
 // Images mocks base method.
 func (m *MockService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
 	m.ctrl.T.Helper()

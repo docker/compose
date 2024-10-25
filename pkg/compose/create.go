@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -48,6 +47,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
+	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 )
 
 type createOptions struct {
@@ -104,7 +104,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	orphans := observedState.filter(isOrphaned(project))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
-			err := s.removeContainers(ctx, orphans, nil, false)
+			err := s.removeContainers(ctx, orphans, nil, nil, false)
 			if err != nil {
 				return err
 			}
@@ -505,7 +505,10 @@ func (s *composeService) prepareLabels(labels types.Labels, service types.Servic
 	}
 	labels[api.ConfigHashLabel] = hash
 
-	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+	if number > 0 {
+		// One-off containers are not indexed
+		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+	}
 
 	var dependencies []string
 	for s, d := range service.DependsOn {
@@ -645,11 +648,35 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		setReservations(s.Deploy.Resources.Reservations, &resources)
 	}
 
+	var cdiDeviceNames []string
 	for _, device := range s.Devices {
+
+		if device.Source == device.Target && cdi.IsQualifiedName(device.Source) {
+			cdiDeviceNames = append(cdiDeviceNames, device.Source)
+			continue
+		}
+
 		resources.Devices = append(resources.Devices, container.DeviceMapping{
 			PathOnHost:        device.Source,
 			PathInContainer:   device.Target,
 			CgroupPermissions: device.Permissions,
+		})
+	}
+
+	if len(cdiDeviceNames) > 0 {
+		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
+			Driver:    "cdi",
+			DeviceIDs: cdiDeviceNames,
+		})
+	}
+
+	for _, gpus := range s.Gpus {
+		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
+			Driver:       gpus.Driver,
+			Count:        int(gpus.Count),
+			DeviceIDs:    gpus.IDs,
+			Capabilities: [][]string{append(gpus.Capabilities, "gpu")},
+			Options:      gpus.Options,
 		})
 	}
 
@@ -694,6 +721,7 @@ func setReservations(reservations *types.Resource, resources *container.Resource
 			Count:        int(device.Count),
 			DeviceIDs:    device.IDs,
 			Driver:       device.Driver,
+			Options:      device.Options,
 		})
 	}
 }
@@ -822,7 +850,7 @@ MOUNTS:
 					case string(m.Type) != v.Type:
 						v.Source = m.Source
 						fallthrough
-					case v.Bind != nil && v.Bind.CreateHostPath:
+					case !requireMountAPI(v.Bind):
 						binds = append(binds, v.String())
 						continue MOUNTS
 					}
@@ -832,6 +860,23 @@ MOUNTS:
 		mounts = append(mounts, m)
 	}
 	return binds, mounts, nil
+}
+
+// requireMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
+// options which require use of Mount API
+func requireMountAPI(bind *types.ServiceVolumeBind) bool {
+	switch {
+	case bind == nil:
+		return false
+	case !bind.CreateHostPath:
+		return true
+	case bind.Propagation != "":
+		return true
+	case bind.Recursive != "":
+		return true
+	default:
+		return false
+	}
 }
 
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
@@ -845,7 +890,6 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 			if m.Type == "volume" {
 				src = m.Name
 			}
-			m.Destination = path.Clean(m.Destination)
 
 			if img.Config != nil {
 				if _, ok := img.Config.Volumes[m.Destination]; ok {
@@ -933,10 +977,6 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			target = configsBaseDir + config.Target
 		}
 
-		if config.UID != "" || config.GID != "" || config.Mode != nil {
-			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
-		}
-
 		definedConfig := p.Configs[config.Source]
 		if definedConfig.External {
 			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
@@ -951,6 +991,10 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 
 		if definedConfig.Environment != "" || definedConfig.Content != "" {
 			continue
+		}
+
+		if config.UID != "" || config.GID != "" || config.Mode != nil {
+			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
@@ -983,10 +1027,6 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			target = secretsDir + secret.Target
 		}
 
-		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
-			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
-		}
-
 		definedSecret := p.Secrets[secret.Source]
 		if definedSecret.External {
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
@@ -1003,11 +1043,22 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
+		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
+			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
+		}
+
+		if _, err := os.Stat(definedSecret.File); os.IsNotExist(err) {
+			logrus.Warnf("secret file %s does not exist", definedSecret.Name)
+		}
+
 		mnt, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
 			ReadOnly: true,
+			Bind: &types.ServiceVolumeBind{
+				CreateHostPath: false,
+			},
 		})
 		if err != nil {
 			return nil, err
@@ -1060,9 +1111,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
-	bind, vol, tmpfs := buildMountOptions(project, volume)
-
-	volume.Target = path.Clean(volume.Target)
+	bind, vol, tmpfs := buildMountOptions(volume)
 
 	if bind != nil {
 		volume.Type = types.VolumeTypeBind
@@ -1080,7 +1129,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 	}, nil
 }
 
-func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
+func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
 	switch volume.Type {
 	case "bind":
 		if volume.Volume != nil {
@@ -1096,11 +1145,6 @@ func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) 
 		}
 		if volume.Tmpfs != nil {
 			logrus.Warnf("mount of type `volume` should not define `tmpfs` option")
-		}
-		if v, ok := project.Volumes[volume.Source]; ok && v.DriverOpts["o"] == types.VolumeTypeBind {
-			return buildBindOption(&types.ServiceVolumeBind{
-				CreateHostPath: true,
-			}), nil, nil
 		}
 		return nil, buildVolumeOptions(volume.Volume), nil
 	case "tmpfs":
@@ -1119,10 +1163,19 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 	if bind == nil {
 		return nil
 	}
-	return &mount.BindOptions{
-		Propagation: mount.Propagation(bind.Propagation),
-		// NonRecursive: false, FIXME missing from model ?
+	opts := &mount.BindOptions{
+		Propagation:      mount.Propagation(bind.Propagation),
+		CreateMountpoint: bind.CreateHostPath,
 	}
+	switch bind.Recursive {
+	case "disabled":
+		opts.NonRecursive = true
+	case "writable":
+		opts.ReadOnlyNonRecursive = true
+	case "readonly":
+		opts.ReadOnlyForceRecursive = true
+	}
+	return opts
 }
 
 func buildVolumeOptions(vol *types.ServiceVolumeVolume) *mount.VolumeOptions {
@@ -1180,7 +1233,13 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 					"Set `external: true` to use an existing network", n.Name, expectedProjectLabel)
 			}
 			if inspect.Labels[api.NetworkLabel] != expectedNetworkLabel {
-				return fmt.Errorf("network %s was found but has incorrect label %s set to %q", n.Name, api.NetworkLabel, inspect.Labels[api.NetworkLabel])
+				return fmt.Errorf(
+					"network %s was found but has incorrect label %s set to %q (expected: %q)",
+					n.Name,
+					api.NetworkLabel,
+					inspect.Labels[api.NetworkLabel],
+					expectedNetworkLabel,
+				)
 			}
 			return nil
 		}
@@ -1304,7 +1363,6 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 
 	switch len(networks) {
 	case 1:
-		n.Name = networks[0].ID
 		return nil
 	case 0:
 		enabled, err := s.isSWarmEnabled(ctx)

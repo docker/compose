@@ -13,6 +13,7 @@ cname:
     - docker compose down
     - docker compose events
     - docker compose exec
+    - docker compose export
     - docker compose images
     - docker compose kill
     - docker compose logs
@@ -44,6 +45,7 @@ clink:
     - docker_compose_down.yaml
     - docker_compose_events.yaml
     - docker_compose_exec.yaml
+    - docker_compose_export.yaml
     - docker_compose_images.yaml
     - docker_compose_kill.yaml
     - docker_compose_logs.yaml
