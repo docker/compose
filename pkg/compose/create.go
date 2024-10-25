@@ -1339,10 +1339,10 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
 	})
-
 	if err != nil {
 		return err
 	}
+	logrus.Debugf("search network %q by name returned: %d", n.Name, len(networks))
 
 	if len(networks) == 0 {
 		// in this instance, n.Name is really an ID
@@ -1350,6 +1350,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 		if err != nil && !errdefs.IsNotFound(err) {
 			return err
 		}
+		logrus.Debugf("search network %q by ID succeeded", n.Name)
 		networks = append(networks, sn)
 	}
 
@@ -1360,9 +1361,11 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 		// we still require just one network back, but we need to run the search on the ID
 		return net.Name == n.Name || net.ID == n.Name
 	})
+	logrus.Debugf("networks matching name %q after strict filtering: %d", n.Name, len(networks))
 
 	switch len(networks) {
 	case 1:
+		logrus.Debugf("match, network is: %s", networks[0].ID)
 		n.Name = networks[0].ID
 		return nil
 	case 0:
@@ -1370,6 +1373,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 		if err != nil {
 			return err
 		}
+		logrus.Debugf("no match, swarm is enabled: %t", enabled)
 		if enabled {
 			// Swarm nodes do not register overlay networks that were
 			// created on a different node unless they're in use.
