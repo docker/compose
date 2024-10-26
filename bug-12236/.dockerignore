@@ -1,0 +1,4 @@
+# ignore everything by default
+*
+# add exceptions here
+!dir1/

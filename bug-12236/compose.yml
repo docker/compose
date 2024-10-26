@@ -1,0 +1,11 @@
+services:
+  alpine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync+restart
+          x-initialSync: true
+          path: ./dir1
+          target: /app/dir1

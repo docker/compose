@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+	
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/internal/paths"
 	"github.com/moby/patternmatcher"
@@ -83,7 +85,7 @@ func LoadDockerIgnore(build *types.BuildConfig) (*dockerPathMatcher, error) {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
-
+	logrus.Debugf("Using .dockerignore file: %s", f.Name())
 	patterns, err := readDockerignorePatterns(f)
 	if err != nil {
 		return nil, err

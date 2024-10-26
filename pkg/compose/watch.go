@@ -621,7 +621,7 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 	if err != nil {
 		return err
 	}
-
+	logrus.Debugf("copying %d files for initial sync", len(pathsToCopy))
 	return syncer.Sync(ctx, service, pathsToCopy)
 }
 
@@ -665,6 +665,7 @@ func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Pr
 			if !d.IsDir() {
 				if info.ModTime().Before(timeImageCreated) {
 					// skip file if it was modified before image creation
+					logrus.Debugf("skipping file %s; it was modified before image creation", path)
 					return nil
 				}
 				rel, err := filepath.Rel(trigger.Path, path)
