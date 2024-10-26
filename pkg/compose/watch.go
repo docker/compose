@@ -651,6 +651,7 @@ func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Pr
 				return nil
 			}
 			if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
+				logrus.Debugf("ignoring file %s", path)
 				// By definition sync ignores bind mounted paths
 				if d.IsDir() {
 					// skip folder
