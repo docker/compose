@@ -134,7 +134,7 @@ func NewDockerPatternMatcher(repoRoot string, patterns []string) (*dockerPathMat
 	if hasAllPattern {
 		// Remove all non-exclusion patterns (those that don't start with '!')
 		patterns = slices.DeleteFunc(patterns, func(p string) bool {
-			return len(p) > 0 && p[0] != '!' // Only keep exclusion patterns
+			return p != "" && p[0] != '!' // Only keep exclusion patterns
 		})
 	}
 
