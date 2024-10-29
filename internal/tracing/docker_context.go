@@ -17,10 +17,8 @@
 package tracing
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/store"
@@ -63,11 +61,7 @@ func traceClientFromDockerContext(dockerCli command.Cli, otelEnv envMap) (otlptr
 		}
 	}
 
-	dialCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	conn, err := grpc.DialContext(
-		dialCtx,
-		cfg.Endpoint,
+	conn, err := grpc.NewClient(cfg.Endpoint,
 		grpc.WithContextDialer(memnet.DialEndpoint),
 		// this dial is restricted to using a local Unix socket / named pipe,
 		// so there is no need for TLS
