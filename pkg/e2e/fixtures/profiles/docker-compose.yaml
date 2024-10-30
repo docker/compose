@@ -1,0 +1,15 @@
+services:
+  foo:
+    container_name: foo_c
+    profiles: [ test ]
+    image: alpine
+    depends_on: [ db ]
+
+  bar:
+    container_name: bar_c
+    profiles: [ test ]
+    image: alpine
+  
+  db:
+    container_name: db_c
+    image: alpine

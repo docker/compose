@@ -179,3 +179,16 @@ func TestUpWithAllResources(t *testing.T) {
 	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Volume "%s_my_vol"  Created`, projectName)), res.Combined())
 	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Network %s_my_net  Created`, projectName)), res.Combined())
 }
+
+func TestUpProfile(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-up-profile"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "--profile", "test", "down", "-v")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/docker-compose.yaml", "--project-name", projectName, "up", "foo")
+	assert.Assert(t, strings.Contains(res.Combined(), `Container db_c  Created`), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), `Container foo_c  Created`), res.Combined())
+	assert.Assert(t, !strings.Contains(res.Combined(), `Container bar_c  Created`), res.Combined())
+}
