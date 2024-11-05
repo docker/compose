@@ -7,6 +7,7 @@ plink: docker.yaml
 cname:
     - docker compose attach
     - docker compose build
+    - docker compose commit
     - docker compose config
     - docker compose cp
     - docker compose create
@@ -39,6 +40,7 @@ cname:
 clink:
     - docker_compose_attach.yaml
     - docker_compose_build.yaml
+    - docker_compose_commit.yaml
     - docker_compose_config.yaml
     - docker_compose_cp.yaml
     - docker_compose_create.yaml

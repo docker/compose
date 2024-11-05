@@ -69,6 +69,20 @@ func (mr *MockServiceMockRecorder) Build(ctx, project, options any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Build", reflect.TypeOf((*MockService)(nil).Build), ctx, project, options)
 }
 
+// Commit mocks base method.
+func (m *MockService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Commit", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Commit indicates an expected call of Commit.
+func (mr *MockServiceMockRecorder) Commit(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockService)(nil).Commit), ctx, projectName, options)
+}
+
 // Copy mocks base method.
 func (m *MockService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
 	m.ctrl.T.Helper()

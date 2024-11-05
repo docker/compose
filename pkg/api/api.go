@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/opts"
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
@@ -92,6 +93,8 @@ type Service interface {
 	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
 	// Export a service container's filesystem as a tar archive
 	Export(ctx context.Context, projectName string, options ExportOptions) error
+	// Create a new image from a service container's changes
+	Commit(ctx context.Context, projectName string, options CommitOptions) error
 	// Generate generates a Compose Project from existing containers
 	Generate(ctx context.Context, options GenerateOptions) (*types.Project, error)
 }
@@ -563,6 +566,19 @@ type ExportOptions struct {
 	Service string
 	Index   int
 	Output  string
+}
+
+// CommitOptions group options of the Commit API
+type CommitOptions struct {
+	Service   string
+	Reference string
+
+	Pause   bool
+	Comment string
+	Author  string
+	Changes opts.ListOpts
+
+	Index int
 }
 
 type GenerateOptions struct {
