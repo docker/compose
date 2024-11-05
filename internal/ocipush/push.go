@@ -178,7 +178,6 @@ func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pusha
 	case api.OCIVersion1_1:
 		config = v1.DescriptorEmptyJSON
 		artifactType = ComposeProjectArtifactType
-		config.ArtifactType = artifactType
 		// N.B. the descriptor has the data embedded in it
 		toPush = append(toPush, Pushable{Descriptor: config, Data: make([]byte, len(config.Data))})
 	default:
