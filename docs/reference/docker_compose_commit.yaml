@@ -1,0 +1,76 @@
+command: docker compose commit
+short: Create a new image from a service container's changes
+long: Create a new image from a service container's changes
+usage: docker compose commit [OPTIONS] SERVICE [REPOSITORY[:TAG]]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+    - option: author
+      shorthand: a
+      value_type: string
+      description: Author (e.g., "John Hannibal Smith <hannibal@a-team.com>")
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: change
+      shorthand: c
+      value_type: list
+      description: Apply Dockerfile instruction to the created image
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: index
+      value_type: int
+      default_value: "0"
+      description: index of the container if service has multiple replicas.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: message
+      shorthand: m
+      value_type: string
+      description: Commit message
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: pause
+      shorthand: p
+      value_type: bool
+      default_value: "true"
+      description: Pause container during commit
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+hidden: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+
