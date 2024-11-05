@@ -57,24 +57,25 @@ const (
 // Cross services dependencies are managed by creating services in expected order and updating `service:xx` reference
 // when a service has converged, so dependent ones can be managed with resolved containers references.
 type convergence struct {
-	service       *composeService
-	observedState map[string]Containers
-	stateMutex    sync.Mutex
+	service    *composeService
+	services   map[string]Containers
+	networks   map[string]string
+	stateMutex sync.Mutex
 }
 
 func (c *convergence) getObservedState(serviceName string) Containers {
 	c.stateMutex.Lock()
 	defer c.stateMutex.Unlock()
-	return c.observedState[serviceName]
+	return c.services[serviceName]
 }
 
 func (c *convergence) setObservedState(serviceName string, containers Containers) {
 	c.stateMutex.Lock()
 	defer c.stateMutex.Unlock()
-	c.observedState[serviceName] = containers
+	c.services[serviceName] = containers
 }
 
-func newConvergence(services []string, state Containers, s *composeService) *convergence {
+func newConvergence(services []string, state Containers, networks map[string]string, s *composeService) *convergence {
 	observedState := map[string]Containers{}
 	for _, s := range services {
 		observedState[s] = Containers{}
@@ -84,8 +85,9 @@ func newConvergence(services []string, state Containers, s *composeService) *con
 		observedState[service] = append(observedState[service], c)
 	}
 	return &convergence{
-		service:       s,
-		observedState: observedState,
+		service:  s,
+		services: observedState,
+		networks: networks,
 	}
 }
 
@@ -124,11 +126,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	sort.Slice(containers, func(i, j int) bool {
 		// select obsolete containers first, so they get removed as we scale down
-		if obsolete, _ := mustRecreate(service, containers[i], recreate); obsolete {
+		if obsolete, _ := c.mustRecreate(service, containers[i], recreate); obsolete {
 			// i is obsolete, so must be first in the list
 			return true
 		}
-		if obsolete, _ := mustRecreate(service, containers[j], recreate); obsolete {
+		if obsolete, _ := c.mustRecreate(service, containers[j], recreate); obsolete {
 			// j is obsolete, so must be first in the list
 			return false
 		}
@@ -157,7 +159,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			continue
 		}
 
-		mustRecreate, err := mustRecreate(service, container, recreate)
+		mustRecreate, err := c.mustRecreate(service, container, recreate)
 		if err != nil {
 			return err
 		}
@@ -315,7 +317,7 @@ func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) erro
 	return nil
 }
 
-func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
+func (c *convergence) mustRecreate(expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
 	if policy == api.RecreateNever {
 		return false, nil
 	}
@@ -328,7 +330,33 @@ func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy st
 	}
 	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
 	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
-	return configChanged || imageUpdated, nil
+	if configChanged || imageUpdated {
+		return true, nil
+	}
+
+	if c.networks != nil {
+		// check the networks container is connected to are the expected ones
+		for net := range expected.Networks {
+			id := c.networks[net]
+			if id == "swarm" {
+				// corner-case : swarm overlay network isn't visible until a container is attached
+				continue
+			}
+			found := false
+			for _, settings := range actual.NetworkSettings.Networks {
+				if settings.NetworkID == id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				// config is up-t-date but container is not connected to network - maybe recreated ?
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {

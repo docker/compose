@@ -104,7 +104,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		Labels:            mergeLabels(service.Labels, service.CustomLabels),
 	}
 
-	err = newConvergence(project.ServiceNames(), observedState, s).resolveServiceReferences(&service)
+	err = newConvergence(project.ServiceNames(), observedState, nil, s).resolveServiceReferences(&service)
 	if err != nil {
 		return "", err
 	}

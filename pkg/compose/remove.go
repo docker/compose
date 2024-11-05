@@ -81,6 +81,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 		_, _ = fmt.Fprintln(s.stdinfo(), "No stopped containers")
 		return nil
 	}
+
 	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
 	if options.Force {
 		_, _ = fmt.Fprintln(s.stdout(), msg)

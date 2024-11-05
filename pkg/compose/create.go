@@ -80,12 +80,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-
 	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
 	if err != nil {
 		return err
@@ -93,7 +87,8 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	prepareNetworks(project)
 
-	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
+	networks, err := s.ensureNetworks(ctx, project)
+	if err != nil {
 		return err
 	}
 
@@ -101,6 +96,11 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
+	var observedState Containers
+	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return err
+	}
 	orphans := observedState.filter(isOrphaned(project))
 	if len(orphans) > 0 && !options.IgnoreOrphans {
 		if options.RemoveOrphans {
@@ -115,27 +115,30 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 				"--remove-orphans flag to clean it up.", orphans.names())
 		}
 	}
-	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
+	return newConvergence(options.Services, observedState, networks, s).apply(ctx, project, options)
 }
 
 func prepareNetworks(project *types.Project) {
 	for k, nw := range project.Networks {
-		nw.Labels = nw.Labels.Add(api.NetworkLabel, k)
-		nw.Labels = nw.Labels.Add(api.ProjectLabel, project.Name)
-		nw.Labels = nw.Labels.Add(api.VersionLabel, api.ComposeVersion)
+		nw.CustomLabels = nw.CustomLabels.
+			Add(api.NetworkLabel, k).
+			Add(api.ProjectLabel, project.Name).
+			Add(api.VersionLabel, api.ComposeVersion)
 		project.Networks[k] = nw
 	}
 }
 
-func (s *composeService) ensureNetworks(ctx context.Context, networks types.Networks) error {
-	for i, nw := range networks {
-		err := s.ensureNetwork(ctx, &nw)
+func (s *composeService) ensureNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
+	networks := map[string]string{}
+	for name, nw := range project.Networks {
+		id, err := s.ensureNetwork(ctx, project, name, &nw)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		networks[i] = nw
+		networks[name] = id
+		project.Networks[name] = nw
 	}
-	return nil
+	return networks, nil
 }
 
 func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
@@ -1200,24 +1203,21 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 	}
 }
 
-func (s *composeService) ensureNetwork(ctx context.Context, n *types.NetworkConfig) error {
+func (s *composeService) ensureNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (string, error) {
 	if n.External {
 		return s.resolveExternalNetwork(ctx, n)
 	}
 
-	err := s.resolveOrCreateNetwork(ctx, n)
+	id, err := s.resolveOrCreateNetwork(ctx, project, name, n)
 	if errdefs.IsConflict(err) {
 		// Maybe another execution of `docker compose up|run` created same network
 		// let's retry once
-		return s.resolveOrCreateNetwork(ctx, n)
+		return s.resolveOrCreateNetwork(ctx, project, "", n)
 	}
-	return err
+	return id, err
 }
 
-func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.NetworkConfig) error { //nolint:gocyclo
-	expectedNetworkLabel := n.Labels[api.NetworkLabel]
-	expectedProjectLabel := n.Labels[api.ProjectLabel]
-
+func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (string, error) { //nolint:gocyclo
 	// First, try to find a unique network matching by name or ID
 	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
 	if err == nil {
@@ -1228,20 +1228,33 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 			if !ok {
 				logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
 					"Set `external: true` to use an existing network", n.Name)
-			} else if p != expectedProjectLabel {
+			} else if p != project.Name {
 				logrus.Warnf("a network with name %s exists but was not created for project %q.\n"+
-					"Set `external: true` to use an existing network", n.Name, expectedProjectLabel)
+					"Set `external: true` to use an existing network", n.Name, project.Name)
 			}
-			if inspect.Labels[api.NetworkLabel] != expectedNetworkLabel {
-				return fmt.Errorf(
+			if inspect.Labels[api.NetworkLabel] != name {
+				return "", fmt.Errorf(
 					"network %s was found but has incorrect label %s set to %q (expected: %q)",
 					n.Name,
 					api.NetworkLabel,
 					inspect.Labels[api.NetworkLabel],
-					expectedNetworkLabel,
+					name,
 				)
 			}
-			return nil
+
+			hash := inspect.Labels[api.ConfigHashLabel]
+			expected, err := NetworkHash(n)
+			if err != nil {
+				return "", err
+			}
+			if hash == "" || hash == expected {
+				return inspect.ID, nil
+			}
+
+			err = s.removeDivergedNetwork(ctx, project, name, n)
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 	// ignore other errors. Typically, an ambiguous request by name results in some generic `invalidParameter` error
@@ -1251,7 +1264,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// NetworkList Matches all or part of a network name, so we have to filter for a strict match
@@ -1260,9 +1273,9 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 	})
 
 	for _, net := range networks {
-		if net.Labels[api.ProjectLabel] == expectedProjectLabel &&
-			net.Labels[api.NetworkLabel] == expectedNetworkLabel {
-			return nil
+		if net.Labels[api.ProjectLabel] == project.Name &&
+			net.Labels[api.NetworkLabel] == name {
+			return net.ID, nil
 		}
 	}
 
@@ -1272,7 +1285,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 	if len(networks) > 0 {
 		logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
 			"Set `external: true` to use an existing network", n.Name)
-		return nil
+		return networks[0].ID, nil
 	}
 
 	var ipam *network.IPAM
@@ -1291,8 +1304,13 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 			Config: config,
 		}
 	}
+	hash, err := NetworkHash(n)
+	if err != nil {
+		return "", err
+	}
+	n.CustomLabels = n.CustomLabels.Add(api.ConfigHashLabel, hash)
 	createOpts := network.CreateOptions{
-		Labels:     n.Labels,
+		Labels:     mergeLabels(n.Labels, n.CustomLabels),
 		Driver:     n.Driver,
 		Options:    n.DriverOpts,
 		Internal:   n.Internal,
@@ -1322,16 +1340,42 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, n *types.Ne
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(networkEventName))
 
-	_, err = s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
+	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
 	if err != nil {
 		w.Event(progress.ErrorEvent(networkEventName))
-		return fmt.Errorf("failed to create network %s: %w", n.Name, err)
+		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
 	w.Event(progress.CreatedEvent(networkEventName))
-	return nil
+	return resp.ID, nil
 }
 
-func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.NetworkConfig) error {
+func (s *composeService) removeDivergedNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) error {
+	// Remove services attached to this network to force recreation
+	var services []string
+	for _, service := range project.Services.Filter(func(config types.ServiceConfig) bool {
+		_, ok := config.Networks[name]
+		return ok
+	}) {
+		services = append(services, service.Name)
+	}
+
+	// Stop containers so we can remove network
+	// They will be restarted (actually: recreated) with the updated network
+	err := s.stop(ctx, project.Name, api.StopOptions{
+		Services: services,
+		Project:  project,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = s.apiClient().NetworkRemove(ctx, n.Name)
+	eventName := fmt.Sprintf("Network %s", n.Name)
+	progress.ContextWriter(ctx).Event(progress.RemovedEvent(eventName))
+	return err
+}
+
+func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.NetworkConfig) (string, error) {
 	// NetworkInspect will match on ID prefix, so NetworkList with a name
 	// filter is used to look for an exact match to prevent e.g. a network
 	// named `db` from getting erroneously matched to a network with an ID
@@ -1341,14 +1385,14 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	})
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if len(networks) == 0 {
 		// in this instance, n.Name is really an ID
 		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
 		if err != nil && !errdefs.IsNotFound(err) {
-			return err
+			return "", err
 		}
 		networks = append(networks, sn)
 	}
@@ -1363,22 +1407,22 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 
 	switch len(networks) {
 	case 1:
-		return nil
+		return networks[0].ID, nil
 	case 0:
 		enabled, err := s.isSWarmEnabled(ctx)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if enabled {
 			// Swarm nodes do not register overlay networks that were
 			// created on a different node unless they're in use.
 			// So we can't preemptively check network exists, but
 			// networkAttach will later fail anyway if network actually doesn't exist
-			return nil
+			return "swarm", nil
 		}
-		return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
+		return "", fmt.Errorf("network %s declared as external, but could not be found", n.Name)
 	default:
-		return fmt.Errorf("multiple networks with name %q were found. Use network ID as `name` to avoid ambiguity", n.Name)
+		return "", fmt.Errorf("multiple networks with name %q were found. Use network ID as `name` to avoid ambiguity", n.Name)
 	}
 }
 

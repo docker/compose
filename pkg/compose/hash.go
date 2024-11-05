@@ -41,3 +41,11 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	}
 	return digest.SHA256.FromBytes(bytes).Encoded(), nil
 }
+
+func NetworkHash(o *types.NetworkConfig) (string, error) {
+	bytes, err := json.Marshal(o)
+	if err != nil {
+		return "", err
+	}
+	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+}
