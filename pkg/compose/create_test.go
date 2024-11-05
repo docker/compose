@@ -92,7 +92,7 @@ func TestPrepareNetworkLabels(t *testing.T) {
 		Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{"skynet": {}}),
 	}
 	prepareNetworks(&project)
-	assert.DeepEqual(t, project.Networks["skynet"].Labels, composetypes.Labels(map[string]string{
+	assert.DeepEqual(t, project.Networks["skynet"].CustomLabels, composetypes.Labels(map[string]string{
 		"com.docker.compose.network": "skynet",
 		"com.docker.compose.project": "myProject",
 		"com.docker.compose.version": api.ComposeVersion,
