@@ -512,9 +512,15 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 				return err
 			}
 
+			services := []string{serviceName}
+			p, err := project.WithSelectedServices(services)
+			if err != nil {
+				return err
+			}
 			err = s.start(ctx, project.Name, api.StartOptions{
-				Project:  project,
-				Services: []string{serviceName},
+				Project:  p,
+				Services: services,
+				AttachTo: services,
 			}, nil)
 			if err != nil {
 				options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Application failed to start after update. Error: %v", err))
