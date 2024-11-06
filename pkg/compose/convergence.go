@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -136,16 +137,18 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		ni, erri := strconv.Atoi(containers[i].Labels[api.ContainerNumberLabel])
 		nj, errj := strconv.Atoi(containers[j].Labels[api.ContainerNumberLabel])
 		if erri == nil && errj == nil {
-			return ni < nj
+			return ni > nj
 		}
 
 		// If we don't get a container number (?) just sort by creation date
 		return containers[i].Created < containers[j].Created
 	})
 
+	slices.Reverse(containers)
 	for i, container := range containers {
 		if i >= expected {
 			// Scale Down
+			// As we sorted containers, obsolete ones and/or highest number will be removed
 			container := container
 			traceOpts := append(tracing.ServiceOptions(service), tracing.ContainerOptions(container)...)
 			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "service/scale/down", traceOpts, func(ctx context.Context) error {

@@ -184,3 +184,34 @@ func checkServiceContainer(t *testing.T, stdout, containerName, containerState s
 	}
 	testify.Fail(t, errMessage, stdout)
 }
+
+func TestScaleDownNoRecreate(t *testing.T) {
+	const projectName = "scale-down-recreated-test"
+	c := NewCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME="+projectName))
+
+	reset := func() {
+		c.RunDockerComposeCmd(t, "down", "--rmi", "all")
+	}
+	t.Cleanup(reset)
+	c.RunDockerComposeCmd(t, "-f", "fixtures/scale/build.yaml", "build", "--build-arg", "FOO=test")
+	c.RunDockerComposeCmd(t, "-f", "fixtures/scale/build.yaml", "up", "-d", "--scale", "test=2")
+
+	c.RunDockerComposeCmd(t, "-f", "fixtures/scale/build.yaml", "build", "--build-arg", "FOO=updated")
+	c.RunDockerComposeCmd(t, "-f", "fixtures/scale/build.yaml", "up", "-d", "--scale", "test=4", "--no-recreate")
+
+	res := c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "test")
+	res.Assert(t, icmd.Success)
+	assert.Check(t, strings.Contains(res.Stdout(), "scale-down-recreated-test-test-1"))
+	assert.Check(t, strings.Contains(res.Stdout(), "scale-down-recreated-test-test-2"))
+	assert.Check(t, strings.Contains(res.Stdout(), "scale-down-recreated-test-test-3"))
+	assert.Check(t, strings.Contains(res.Stdout(), "scale-down-recreated-test-test-4"))
+
+	t.Log("scale down removes obsolete replica #1 and #2")
+	c.NewDockerComposeCmd(t, "--project-directory", "fixtures/scale", "up", "-d", "--scale", "test=2")
+
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.Name}}", "test")
+	res.Assert(t, icmd.Success)
+	assert.Check(t, strings.Contains(res.Stdout(), "scale-down-recreated-test-test-3"))
+	assert.Check(t, strings.Contains(res.Stdout(), "scale-down-recreated-test-test-4"))
+}
