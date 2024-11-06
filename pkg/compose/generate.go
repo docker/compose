@@ -31,6 +31,8 @@ import (
 	"github.com/docker/docker/api/types/network"
 
 	"golang.org/x/exp/maps"
+
+	logrus "github.com/sirupsen/logrus"
 )
 
 func (s *composeService) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
@@ -222,6 +224,7 @@ func (s *composeService) toComposeNetwork(networks map[string]*network.EndpointS
 	for name, net := range networks {
 		inspect, err := s.apiClient().NetworkInspect(context.Background(), name, network.InspectOptions{})
 		if err != nil {
+			logrus.Warnf("Failed to inspect network %s: %v", name, err)
 			networkConfigs[name] = types.NetworkConfig{}
 		} else {
 			networkConfigs[name] = types.NetworkConfig{
