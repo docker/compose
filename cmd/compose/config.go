@@ -279,6 +279,22 @@ func formatModel(model map[string]any, format string) (content []byte, err error
 }
 
 func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
+	if opts.noInterpolate {
+		// we can't use ToProject, so the model we render here is only partially resolved
+		data, err := opts.ToModel(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+		if err != nil {
+			return err
+		}
+
+		if _, ok := data["services"]; ok {
+			for serviceName := range data["services"].(map[string]any) {
+				_, _ = fmt.Fprintln(dockerCli.Out(), serviceName)
+			}
+		}
+
+		return nil
+	}
+
 	project, err := opts.ToProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
@@ -287,6 +303,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 		_, _ = fmt.Fprintln(dockerCli.Out(), serviceName)
 		return nil
 	})
+
 	return err
 }
 
