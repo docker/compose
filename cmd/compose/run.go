@@ -63,6 +63,7 @@ type runOptions struct {
 	name          string
 	noDeps        bool
 	ignoreOrphans bool
+	removeOrphans bool
 	quietPull     bool
 }
 
@@ -189,7 +190,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.BoolVarP(&options.servicePorts, "service-ports", "P", false, "Run command with all service's ports enabled and mapped to the host")
 	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container")
-	flags.BoolVar(&createOpts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
+	flags.BoolVar(&options.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 
 	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
 	cmd.Flags().BoolVarP(&options.tty, "tty", "t", true, "Allocate a pseudo-TTY")
@@ -314,6 +315,7 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 	err := backend.Create(ctx, &project, api.CreateOptions{
 		Build:         buildOpts,
 		IgnoreOrphans: options.ignoreOrphans,
+		RemoveOrphans: options.removeOrphans,
 		QuietPull:     options.quietPull,
 	})
 	if err != nil {
