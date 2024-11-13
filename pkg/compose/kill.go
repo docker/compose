@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	moby "github.com/docker/docker/api/types"
@@ -45,6 +44,11 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		return err
 	}
 
+	if len(containers) == 0 {
+		w.Event(progress.SkippedEvent(strings.Join(services, ","), "No containers for selected service"))
+		return nil
+	}
+
 	project := options.Project
 	if project == nil {
 		project, err = s.getProjectWithResources(ctx, containers, projectName)
@@ -55,10 +59,6 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 
 	if !options.RemoveOrphans {
 		containers = containers.filter(isService(project.ServiceNames()...))
-	}
-	if len(containers) == 0 {
-		_, _ = fmt.Fprintf(s.stdinfo(), "no container to kill")
-		return nil
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)

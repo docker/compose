@@ -221,6 +221,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: recreate-volumes
+      value_type: bool
+      default_value: "false"
+      description: |
+        Recreate volumes when volume configuration in the Compose file changes.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: remove-orphans
       value_type: bool
       default_value: "false"

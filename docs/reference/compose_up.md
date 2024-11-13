@@ -45,6 +45,7 @@ If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the contai
 | `--no-start`                   | `bool`        |          | Don't start the services after creating them                                                                                                        |
 | `--pull`                       | `string`      | `policy` | Pull image before running ("always"\|"missing"\|"never")                                                                                            |
 | `--quiet-pull`                 | `bool`        |          | Pull without printing progress information                                                                                                          |
+| `--recreate-volumes`           | `bool`        |          | Recreate volumes when volume configuration in the Compose file changes.                                                                             |
 | `--remove-orphans`             | `bool`        |          | Remove containers for services not defined in the Compose file                                                                                      |
 | `-V`, `--renew-anon-volumes`   | `bool`        |          | Recreate anonymous volumes instead of retrieving data from the previous containers                                                                  |
 | `--scale`                      | `stringArray` |          | Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.                                                       |
