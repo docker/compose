@@ -29,7 +29,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-const ddevVersion = "v1.21.1"
+const ddevVersion = "v1.23.5"
 
 func TestComposeRunDdev(t *testing.T) {
 	if !composeStandaloneMode {
