@@ -350,7 +350,7 @@ func (c *convergence) mustRecreate(expected types.ServiceConfig, actual moby.Con
 				}
 			}
 			if !found {
-				// config is up-t-date but container is not connected to network - maybe recreated ?
+				// config is up-to-date but container is not connected to network - maybe recreated ?
 				return true, nil
 			}
 		}
