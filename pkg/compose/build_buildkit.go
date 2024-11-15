@@ -45,7 +45,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, service string, op
 		response, err = build.Build(ctx, nodes,
 			map[string]build.Options{service: opts},
 			dockerutil.NewClient(s.dockerCli),
-			confutil.ConfigDir(s.dockerCli),
+			confutil.NewConfig(s.dockerCli),
 			buildx.WithPrefix(p, service, true))
 		if err != nil {
 			return "", WrapCategorisedComposeError(err, BuildFailure)
