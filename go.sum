@@ -130,8 +130,8 @@ github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5Qvfr
 github.com/distribution/reference v0.6.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
 github.com/docker/buildx v0.18.0 h1:rSauXHeJt90NvtXrLK5J992Eb0UPJZs2vV3u1zTf1nE=
 github.com/docker/buildx v0.18.0/go.mod h1:JGNSshOhHs5FhG3u51jXUf4lLOeD2QBIlJ2vaRB67p4=
-github.com/docker/cli v27.4.0-rc.1+incompatible h1:stc5Zfjn750ghCwxciTECYuzvbshVtAMcKasQ33ovoQ=
-github.com/docker/cli v27.4.0-rc.1+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
+github.com/docker/cli v27.4.0-rc.1.0.20241115102512-8d1bacae3e49+incompatible h1:PdkOILAlL5gYB0BqujECP4eche1lY/aerO53i28Gifc=
+github.com/docker/cli v27.4.0-rc.1.0.20241115102512-8d1bacae3e49+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli-docs-tool v0.8.0 h1:YcDWl7rQJC3lJ7WVZRwSs3bc9nka97QLWfyJQli8yJU=
 github.com/docker/cli-docs-tool v0.8.0/go.mod h1:8TQQ3E7mOXoYUs811LiPdUnAhXrcVsBIrW21a5pUbdk=
 github.com/docker/distribution v2.7.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
