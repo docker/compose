@@ -51,7 +51,7 @@ If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the contai
 | `-t`, `--timeout`              | `int`         | `0`      | Use this timeout in seconds for container shutdown when attached or when containers are already running                                             |
 | `--timestamps`                 | `bool`        |          | Show timestamps                                                                                                                                     |
 | `--wait`                       | `bool`        |          | Wait for services to be running\|healthy. Implies detached mode.                                                                                    |
-| `--wait-timeout`               | `int`         | `0`      | Maximum duration to wait for the project to be running\|healthy                                                                                     |
+| `--wait-timeout`               | `int`         | `0`      | Maximum duration in seconds to wait for the project to be running\|healthy                                                                          |
 | `-w`, `--watch`                | `bool`        |          | Watch source code and rebuild/refresh containers when files are updated.                                                                            |
 
 
