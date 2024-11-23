@@ -289,7 +289,8 @@ options:
     - option: wait-timeout
       value_type: int
       default_value: "0"
-      description: Maximum duration to wait for the project to be running|healthy
+      description: |
+        Maximum duration in seconds to wait for the project to be running|healthy
       deprecated: false
       hidden: false
       experimental: false
