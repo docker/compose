@@ -55,20 +55,19 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 		containers = allContainers
 	}
 
-	imageIDs := []string{}
-	// aggregate image IDs
+	images := []string{}
 	for _, c := range containers {
-		if !utils.StringContains(imageIDs, c.ImageID) {
-			imageIDs = append(imageIDs, c.ImageID)
+		if !utils.StringContains(images, c.Image) {
+			images = append(images, c.Image)
 		}
 	}
-	images, err := s.getImages(ctx, imageIDs)
+	imageSummaries, err := s.getImageSummaries(ctx, images)
 	if err != nil {
 		return nil, err
 	}
 	summary := make([]api.ImageSummary, len(containers))
 	for i, container := range containers {
-		img, ok := images[container.ImageID]
+		img, ok := imageSummaries[container.Image]
 		if !ok {
 			return nil, fmt.Errorf("failed to retrieve image for container %s", getCanonicalContainerName(container))
 		}
@@ -79,34 +78,32 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	return summary, nil
 }
 
-func (s *composeService) getImages(ctx context.Context, images []string) (map[string]api.ImageSummary, error) {
+func (s *composeService) getImageSummaries(ctx context.Context, repoTags []string) (map[string]api.ImageSummary, error) {
 	summary := map[string]api.ImageSummary{}
 	l := sync.Mutex{}
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, img := range images {
-		img := img
+	for _, repoTag := range repoTags {
+		repoTag := repoTag
 		eg.Go(func() error {
-			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, img)
+			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, repoTag)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					return nil
 				}
-				return fmt.Errorf("unable to get image '%s': %w", img, err)
+				return fmt.Errorf("unable to get image '%s': %w", repoTag, err)
 			}
 			tag := ""
 			repository := ""
-			if len(inspect.RepoTags) > 0 {
-				ref, err := reference.ParseDockerRef(inspect.RepoTags[0])
-				if err != nil {
-					return err
-				}
-				repository = reference.FamiliarName(ref)
-				if tagged, ok := ref.(reference.Tagged); ok {
-					tag = tagged.Tag()
-				}
+			ref, err := reference.ParseDockerRef(repoTag)
+			if err != nil {
+				return err
+			}
+			repository = reference.FamiliarName(ref)
+			if tagged, ok := ref.(reference.Tagged); ok {
+				tag = tagged.Tag()
 			}
 			l.Lock()
-			summary[img] = api.ImageSummary{
+			summary[repoTag] = api.ImageSummary{
 				ID:         inspect.ID,
 				Repository: repository,
 				Tag:        tag,

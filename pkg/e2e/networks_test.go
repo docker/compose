@@ -147,3 +147,28 @@ func TestNetworkModes(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
 }
+
+func TestNetworkConfigChanged(t *testing.T) {
+	// fixture is shared with TestNetworks and is not safe to run concurrently
+	c := NewCLI(t)
+	const projectName = "network_config_change"
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.subnet.yaml", "--project-name", projectName, "up", "-d")
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	res := c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "hostname", "-i")
+	res.Assert(t, icmd.Expected{Out: "172.28.0."})
+	res.Combined()
+
+	cmd := c.NewCmdWithEnv([]string{"SUBNET=192.168.0.0/16"},
+		"docker", "compose", "-f", "./fixtures/network-test/compose.subnet.yaml", "--project-name", projectName, "up", "-d")
+	res = icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Success)
+	out := res.Combined()
+	fmt.Println(out)
+
+	res = c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "hostname", "-i")
+	res.Assert(t, icmd.Expected{Out: "192.168.0."})
+}

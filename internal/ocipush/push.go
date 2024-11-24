@@ -88,6 +88,10 @@ func PushManifest(
 	layers []Pushable,
 	ociVersion api.OCIVersion,
 ) error {
+	// Check if we need an extra empty layer for the manifest config
+	if ociVersion == api.OCIVersion1_1 || ociVersion == "" {
+		layers = append(layers, Pushable{Descriptor: v1.DescriptorEmptyJSON, Data: []byte("{}")})
+	}
 	// prepare to push the manifest by pushing the layers
 	layerDescriptors := make([]v1.Descriptor, len(layers))
 	for i := range layers {
