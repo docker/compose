@@ -159,7 +159,7 @@ func TestNetworkConfigChanged(t *testing.T) {
 	})
 
 	res := c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "hostname", "-i")
-	res.Assert(t, icmd.Expected{Out: "172.28.0."})
+	res.Assert(t, icmd.Expected{Out: "172.99.0."})
 	res.Combined()
 
 	cmd := c.NewCmdWithEnv([]string{"SUBNET=192.168.0.0/16"},
