@@ -224,15 +224,18 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 }
 
 func (c *convergence) stopDependentContainers(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	w := progress.ContextWriter(ctx)
 	// Stop dependent containers, so they will be restarted after service is re-created
 	dependents := project.GetDependentsForService(service)
+	err := c.service.stop(ctx, project.Name, api.StopOptions{
+		Services: dependents,
+		Project:  project,
+	})
+	if err != nil {
+		return err
+	}
+
 	for _, name := range dependents {
 		dependents := c.getObservedState(name)
-		err := c.service.stopContainers(ctx, w, &service, dependents, nil)
-		if err != nil {
-			return err
-		}
 		for i, dependent := range dependents {
 			dependent.State = ContainerExited
 			dependents[i] = dependent
