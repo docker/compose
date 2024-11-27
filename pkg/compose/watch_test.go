@@ -48,7 +48,7 @@ func TestDebounceBatching(t *testing.T) {
 		if i%2 == 0 {
 			action = "b"
 		}
-		ch <- fileEvent{Action: action}
+		ch <- fileEvent{Trigger: types.Trigger{Action: action}}
 	}
 	// we sent 100 events + the debouncer
 	clock.BlockUntil(101)
@@ -56,8 +56,8 @@ func TestDebounceBatching(t *testing.T) {
 	select {
 	case batch := <-eventBatchCh:
 		require.ElementsMatch(t, batch, []fileEvent{
-			{Action: "a"},
-			{Action: "b"},
+			{Trigger: types.Trigger{Action: "a"}},
+			{Trigger: types.Trigger{Action: "b"}},
 		})
 	case <-time.After(50 * time.Millisecond):
 		t.Fatal("timed out waiting for events")

@@ -1,0 +1,14 @@
+services:
+  test:
+    build:
+      dockerfile_inline: FROM alpine
+    command: ping localhost
+    volumes:
+      - /data
+    develop:
+      watch:
+        - path: .
+          target: /data
+          action: sync+exec
+          exec:
+            command: echo "SUCCESS"
