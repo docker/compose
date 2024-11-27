@@ -226,6 +226,9 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 func (c *convergence) stopDependentContainers(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	// Stop dependent containers, so they will be restarted after service is re-created
 	dependents := project.GetDependentsForService(service)
+	if len(dependents) == 0 {
+		return nil
+	}
 	err := c.service.stop(ctx, project.Name, api.StopOptions{
 		Services: dependents,
 		Project:  project,
