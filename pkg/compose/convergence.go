@@ -337,7 +337,7 @@ func (c *convergence) mustRecreate(expected types.ServiceConfig, actual moby.Con
 		return true, nil
 	}
 
-	if c.networks != nil {
+	if c.networks != nil && actual.State == "running" {
 		// check the networks container is connected to are the expected ones
 		for net := range expected.Networks {
 			id := c.networks[net]
