@@ -9,7 +9,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.4.5
+	github.com/compose-spec/compose-go/v2 v2.4.6-0.20241203131247-9a9cc5d9c345
 	github.com/containerd/containerd v1.7.24
 	github.com/containerd/platforms v0.2.1
 	github.com/davecgh/go-spew v1.1.1
@@ -195,5 +195,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace github.com/compose-spec/compose-go/v2 => github.com/ndeloof/compose-go/v2 v2.0.1-0.20241127110655-b1321070b3ab

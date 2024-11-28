@@ -355,7 +355,7 @@ func batchDebounceEvents(ctx context.Context, clock clockwork.Clock, delay time.
 	out := make(chan []fileEvent)
 	go func() {
 		defer close(out)
-		seen := make(map[sync.PathMapping]fileEvent)
+		seen := make(map[string]fileEvent)
 		flushEvents := func() {
 			if len(seen) == 0 {
 				return
@@ -365,7 +365,7 @@ func batchDebounceEvents(ctx context.Context, clock clockwork.Clock, delay time.
 				events = append(events, e)
 			}
 			out <- events
-			seen = make(map[sync.PathMapping]fileEvent)
+			seen = make(map[string]fileEvent)
 		}
 
 		t := clock.NewTicker(delay)
@@ -382,7 +382,7 @@ func batchDebounceEvents(ctx context.Context, clock clockwork.Clock, delay time.
 					flushEvents()
 					return
 				}
-				seen[e.PathMapping] = e
+				seen[e.HostPath] = e
 				t.Reset(delay)
 			}
 		}
