@@ -119,22 +119,11 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 				if options.Build == nil {
 					return fmt.Errorf("--no-build is incompatible with watch action %s in service %s", types.WatchActionRebuild, service.Name)
 				}
+				// set the service to always be built - watch triggers `Up()` when it receives a rebuild event
+				service.PullPolicy = types.PullPolicyBuild
+				project.Services[i] = service
 			}
 		}
-
-		if len(services) > 0 && service.Build == nil {
-			// service explicitly selected for watch has no build section
-			return fmt.Errorf("can't watch service %q without a build context", service.Name)
-		}
-
-		if len(services) == 0 && service.Build == nil {
-			logrus.Debugf("service %q has no build context, skipping watch", service.Name)
-			continue
-		}
-
-		// set the service to always be built - watch triggers `Up()` when it receives a rebuild event
-		service.PullPolicy = types.PullPolicyBuild
-		project.Services[i] = service
 
 		dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
 		if err != nil {
