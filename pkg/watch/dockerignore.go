@@ -64,7 +64,10 @@ func (i dockerPathMatcher) MatchesEntireDir(f string) (bool, error) {
 	return true, nil
 }
 
-func LoadDockerIgnore(build *types.BuildConfig) (*dockerPathMatcher, error) {
+func LoadDockerIgnore(build *types.BuildConfig) (PathMatcher, error) {
+	if build == nil {
+		return EmptyMatcher{}, nil
+	}
 	repoRoot := build.Context
 	absRoot, err := filepath.Abs(repoRoot)
 	if err != nil {
