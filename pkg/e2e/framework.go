@@ -94,13 +94,14 @@ func NewParallelCLI(t *testing.T, opts ...CLIOption) *CLI {
 func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
 	t.Helper()
 
-	configDir := t.TempDir()
+	homeDir := t.TempDir()
+	configDir := filepath.Join(homeDir, ".docker")
 	initializePlugins(t, configDir)
 	initializeContextDir(t, configDir)
 
 	c := &CLI{
 		ConfigDir: configDir,
-		HomeDir:   t.TempDir(),
+		HomeDir:   homeDir,
 	}
 
 	for _, opt := range opts {
@@ -155,14 +156,21 @@ func initializePlugins(t testing.TB, configDir string) {
 }
 
 func initializeContextDir(t testing.TB, configDir string) {
-	dockerUserDir := ".docker/contexts"
+	dockerUserDir := ".docker"
 	userDir, err := os.UserHomeDir()
 	require.NoError(t, err, "Failed to get user home directory")
-	userContextsDir := filepath.Join(userDir, dockerUserDir)
+	userDockerDir := filepath.Join(userDir, dockerUserDir)
+	userContextsDir := filepath.Join(userDockerDir, "contexts")
 	if checkExists(userContextsDir) {
 		dstContexts := filepath.Join(configDir, "contexts")
 		require.NoError(t, cp.Copy(userContextsDir, dstContexts), "Failed to copy contexts directory")
 	}
+	userConfigJson := filepath.Join(userDockerDir, "config.json")
+	if checkExists(userConfigJson) {
+		dstConfigJson := filepath.Join(configDir, "config.json")
+		require.NoError(t, cp.Copy(userConfigJson, dstConfigJson), "Failed to copy config.json file")
+	}
+
 }
 
 func checkExists(path string) bool {
