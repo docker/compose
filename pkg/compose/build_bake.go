@@ -137,7 +137,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	var group bakeGroup
 
-	for name, service := range serviceToBeBuild {
+	for _, service := range serviceToBeBuild {
 		if service.Build == nil {
 			continue
 		}
@@ -151,12 +151,14 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			args[k] = *v
 		}
 
-		cfg.Targets[name] = bakeTarget{
+		image := api.GetImageNameOrDefault(service, project.Name)
+
+		cfg.Targets[image] = bakeTarget{
 			Context:    build.Context,
 			Dockerfile: dockerFilePath(build.Context, build.Dockerfile),
 			Args:       args,
 			Labels:     build.Labels,
-			Tags:       build.Tags,
+			Tags:       append(build.Tags, image),
 
 			CacheFrom: build.CacheFrom,
 			// CacheTo:    TODO
@@ -167,7 +169,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Pull:      options.Pull,
 			NoCache:   options.NoCache,
 		}
-		group.Targets = append(group.Targets, name)
+		group.Targets = append(group.Targets, image)
 	}
 
 	cfg.Groups["default"] = group
