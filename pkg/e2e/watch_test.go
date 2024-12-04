@@ -165,11 +165,7 @@ func doTest(t *testing.T, svcName string) {
 	cli := NewCLI(t, WithEnv(env...))
 
 	// important that --rmi is used to prune the images and ensure that watch builds on launch
-	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", svcName, "--remove-orphans", "--volumes", "--rmi=local")
-	}
-	cleanup()
-	t.Cleanup(cleanup)
+	defer cli.cleanupWithDown(t, projName, "--rmi=local")
 
 	cmd := cli.NewDockerComposeCmd(t, "--verbose", "watch", svcName)
 	// stream output since watch runs in the background

@@ -70,17 +70,12 @@ func TestLocalComposeExecOneOff(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	const projectName = "compose-e2e-exec-one-off"
+	defer c.cleanupWithDown(t, projectName)
 	cmdArgs := func(cmd string, args ...string) []string {
 		ret := []string{"--project-directory", "fixtures/simple-composefile", "--project-name", projectName, cmd}
 		ret = append(ret, args...)
 		return ret
 	}
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, cmdArgs("down", "--timeout=0")...)
-	}
-	cleanup()
-	t.Cleanup(cleanup)
 
 	c.RunDockerComposeCmd(t, cmdArgs("run", "-d", "simple")...)
 
@@ -93,4 +88,7 @@ func TestLocalComposeExecOneOff(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, cmdArgs("exec", "--index", "1", "-e", "FOO", "simple", "/usr/bin/env")...)
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "service \"simple\" is not running container #1"})
 	})
+	cmdResult := c.RunDockerCmd(t, "ps", "-q", "--filter", "label=com.docker.compose.project=compose-e2e-exec-one-off").Stdout()
+	containerIDs := strings.Split(cmdResult, "\n")
+	_ = c.RunDockerOrExitError(t, append([]string{"stop"}, containerIDs...)...)
 }

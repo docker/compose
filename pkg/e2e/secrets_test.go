@@ -24,6 +24,7 @@ import (
 
 func TestSecretFromEnv(t *testing.T) {
 	c := NewParallelCLI(t)
+	defer c.cleanupWithDown(t, "env-secret")
 
 	t.Run("compose run", func(t *testing.T) {
 		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "foo"),

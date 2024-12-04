@@ -24,6 +24,7 @@ import (
 
 func TestConfigFromEnv(t *testing.T) {
 	c := NewParallelCLI(t)
+	defer c.cleanupWithDown(t, "configs")
 
 	t.Run("config from file", func(t *testing.T) {
 		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/configs/compose.yaml", "run", "from_file"))

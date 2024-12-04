@@ -94,6 +94,7 @@ func TestStdoutStderr(t *testing.T) {
 func TestLoggingDriver(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "e2e-logging-driver"
+	defer c.cleanupWithDown(t, projectName)
 
 	host := "HOST=127.0.0.1"
 	res := c.RunDockerCmd(t, "info", "-f", "{{.OperatingSystem}}")
