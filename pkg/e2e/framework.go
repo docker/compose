@@ -95,6 +95,7 @@ func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
 	t.Helper()
 
 	configDir := t.TempDir()
+	copyLocalConfig(t, configDir)
 	initializePlugins(t, configDir)
 	initializeContextDir(t, configDir)
 
@@ -117,10 +118,21 @@ func WithEnv(env ...string) CLIOption {
 	}
 }
 
+func copyLocalConfig(t testing.TB, configDir string) {
+	t.Helper()
+
+	// copy local config.json if exists
+	localConfig := filepath.Join(os.Getenv("HOME"), ".docker", "config.json")
+	// if no config present just continue
+	if _, err := os.Stat(localConfig); err != nil {
+		// copy the local config.json to the test config dir
+		CopyFile(t, localConfig, filepath.Join(configDir, "config.json"))
+	}
+}
+
 // initializePlugins copies the necessary plugin files to the temporary config
 // directory for the test.
 func initializePlugins(t testing.TB, configDir string) {
-	t.Helper()
 
 	t.Cleanup(func() {
 		if t.Failed() {
