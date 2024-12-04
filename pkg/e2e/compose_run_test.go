@@ -27,6 +27,7 @@ import (
 
 func TestLocalComposeRun(t *testing.T) {
 	c := NewParallelCLI(t)
+	defer c.cleanupWithDown(t, "run-test")
 
 	t.Run("compose run", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "back")

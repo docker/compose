@@ -320,6 +320,7 @@ func TestRemoveOrphaned(t *testing.T) {
 
 func TestComposeFileSetByDotEnv(t *testing.T) {
 	c := NewCLI(t)
+	defer c.cleanupWithDown(t, "dotenv")
 
 	cmd := c.NewDockerComposeCmd(t, "config")
 	cmd.Dir = filepath.Join(".", "fixtures", "dotenv")
@@ -335,6 +336,7 @@ func TestComposeFileSetByDotEnv(t *testing.T) {
 
 func TestComposeFileSetByProjectDirectory(t *testing.T) {
 	c := NewCLI(t)
+	defer c.cleanupWithDown(t, "dotenv")
 
 	dir := filepath.Join(".", "fixtures", "dotenv", "development")
 	cmd := c.NewDockerComposeCmd(t, "--project-directory", dir, "config")
@@ -347,6 +349,7 @@ func TestComposeFileSetByProjectDirectory(t *testing.T) {
 
 func TestComposeFileSetByEnvFile(t *testing.T) {
 	c := NewCLI(t)
+	defer c.cleanupWithDown(t, "dotenv")
 
 	dotEnv, err := os.CreateTemp(t.TempDir(), ".env")
 	assert.NilError(t, err)
@@ -370,6 +373,7 @@ COMPOSE_PROFILES=test
 
 func TestNestedDotEnv(t *testing.T) {
 	c := NewCLI(t)
+	defer c.cleanupWithDown(t, "nested")
 
 	cmd := c.NewDockerComposeCmd(t, "run", "echo")
 	cmd.Dir = filepath.Join(".", "fixtures", "nested")
@@ -381,6 +385,7 @@ func TestNestedDotEnv(t *testing.T) {
 
 	cmd = c.NewDockerComposeCmd(t, "run", "echo")
 	cmd.Dir = filepath.Join(".", "fixtures", "nested", "sub")
+	defer c.cleanupWithDown(t, "nested")
 	res = icmd.RunCmd(cmd)
 	res.Assert(t, icmd.Expected{
 		ExitCode: 0,
@@ -392,9 +397,7 @@ func TestNestedDotEnv(t *testing.T) {
 func TestUnnecessaryResources(t *testing.T) {
 	const projectName = "compose-e2e-unnecessary-resources"
 	c := NewParallelCLI(t)
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-p", projectName, "down", "-t=0")
-	})
+	defer c.cleanupWithDown(t, projectName)
 
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/external/compose.yaml", "-p", projectName, "up", "-d")
 	res.Assert(t, icmd.Expected{

@@ -27,6 +27,7 @@ func TestRemoveOrphans(t *testing.T) {
 	c := NewCLI(t)
 
 	const projectName = "compose-e2e-orphans"
+	defer c.cleanupWithDown(t, projectName)
 
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/orphans/compose.yaml", "-p", projectName, "run", "orphan")
 	res := c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--all")

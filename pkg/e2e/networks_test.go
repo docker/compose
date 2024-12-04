@@ -63,6 +63,7 @@ func TestNetworkAliases(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	const projectName = "network_alias_e2e"
+	defer c.cleanupWithDown(t, projectName)
 
 	t.Run("up", func(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "up",
@@ -136,6 +137,7 @@ func TestNetworkModes(t *testing.T) {
 	c := NewCLI(t)
 
 	const projectName = "network_mode_service_run"
+	defer c.cleanupWithDown(t, projectName)
 
 	t.Run("run with service mode dependency", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "-T", "mydb", "echo", "success")
@@ -143,9 +145,6 @@ func TestNetworkModes(t *testing.T) {
 
 	})
 
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
 }
 
 func TestNetworkConfigChanged(t *testing.T) {

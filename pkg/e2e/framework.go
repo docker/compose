@@ -494,3 +494,8 @@ func HTTPGetWithRetry(
 	}
 	return ""
 }
+
+func (c *CLI) cleanupWithDown(t testing.TB, project string, args ...string) {
+	t.Helper()
+	c.RunDockerComposeCmd(t, append([]string{"-p", project, "down", "-v", "--remove-orphans"}, args...)...)
+}

@@ -25,6 +25,7 @@ import (
 
 func TestRawEnvFile(t *testing.T) {
 	c := NewParallelCLI(t)
+	defer c.cleanupWithDown(t, "dotenv")
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dotenv/raw.yaml", "run", "test")
 	assert.Equal(t, strings.TrimSpace(res.Stdout()), "'{\"key\": \"value\"}'")
