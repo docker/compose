@@ -42,9 +42,6 @@ import (
 )
 
 func (s *composeService) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
-	if options.Quiet {
-		return s.pull(ctx, project, options)
-	}
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
 		return s.pull(ctx, project, options)
 	}, s.stdinfo(), "Pulling")
@@ -118,7 +115,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		idx, name, service := i, name, service
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[idx] = err
 				if service.Build != nil {
