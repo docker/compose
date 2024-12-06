@@ -304,10 +304,15 @@ func (lk *LogKeyboard) StartWatch(ctx context.Context, doneCh chan bool, project
 				lk.Watch.newContext(ctx)
 				buildOpts := *options.Create.Build
 				buildOpts.Quiet = true
-				return lk.Watch.WatchFn(lk.Watch.Ctx, doneCh, project, options.Start.Services, api.WatchOptions{
+				err := lk.Watch.WatchFn(lk.Watch.Ctx, doneCh, project, options.Start.Services, api.WatchOptions{
 					Build: &buildOpts,
 					LogTo: options.Start.Attach,
 				})
+				if err != nil {
+					lk.Watch.switchWatching()
+					options.Start.Attach.Err(api.WatchLogger, err.Error())
+				}
+				return err
 			}))
 	}
 }
