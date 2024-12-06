@@ -292,17 +292,15 @@ func doTest(t *testing.T, svcName string) {
 }
 
 func TestWatchExec(t *testing.T) {
-	cli := NewCLI(t)
+	c := NewCLI(t)
 	const projectName = "test_watch_exec"
 
-	t.Cleanup(func() {
-		cli.RunDockerComposeCmd(t, "-p", projectName, "down")
-	})
+	defer c.cleanupWithDown(t, projectName)
 
 	tmpdir := t.TempDir()
 	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
 	CopyFile(t, filepath.Join("fixtures", "watch", "exec.yaml"), composeFilePath)
-	cmd := cli.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--watch")
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--watch")
 	buffer := bytes.NewBuffer(nil)
 	cmd.Stdout = buffer
 	watch := icmd.StartCmd(cmd)
@@ -327,5 +325,5 @@ func TestWatchExec(t *testing.T) {
 		}
 		return poll.Continue("%v", out)
 	})
-	cli.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
+	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
