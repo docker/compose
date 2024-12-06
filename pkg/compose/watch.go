@@ -371,7 +371,10 @@ func batchDebounceEvents(ctx context.Context, clock clockwork.Clock, delay time.
 					flushEvents()
 					return
 				}
-				seen[e.HostPath] = e
+				if _, ok := seen[e.HostPath]; !ok {
+					// already know updated path, first rule in watch configuration wins
+					seen[e.HostPath] = e
+				}
 				t.Reset(delay)
 			}
 		}
