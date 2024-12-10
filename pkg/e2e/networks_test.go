@@ -172,3 +172,15 @@ func TestNetworkConfigChanged(t *testing.T) {
 	res = c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "hostname", "-i")
 	res.Assert(t, icmd.Expected{Out: "192.168.0."})
 }
+
+func TestMacAddress(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "network_mac_address"
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/mac_address.yaml", "--project-name", projectName, "up", "-d")
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+	res := c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-test-1", projectName), "-f", "{{ (index .NetworkSettings.Networks \"network_mac_address_default\" ).MacAddress }}")
+	res.Assert(t, icmd.Expected{Out: "00:e0:84:35:d0:e8"})
+
+}

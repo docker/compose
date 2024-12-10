@@ -278,33 +278,26 @@ func TestDefaultNetworkSettings(t *testing.T) {
 }
 
 func TestCreateEndpointSettings(t *testing.T) {
-	eps := createEndpointSettings(
-		&composetypes.Project{
-			Name: "projName",
-		},
-		composetypes.ServiceConfig{
-			Name:          "serviceName",
-			ContainerName: "containerName",
-			Networks: map[string]*composetypes.ServiceNetworkConfig{
-				"netName": {
-					Priority:     100,
-					Aliases:      []string{"alias1", "alias2"},
-					Ipv4Address:  "10.16.17.18",
-					Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
-					LinkLocalIPs: []string{"169.254.10.20"},
-					MacAddress:   "10:00:00:00:01",
-					DriverOpts: composetypes.Options{
-						"driverOpt1": "optval1",
-						"driverOpt2": "optval2",
-					},
+	eps := createEndpointSettings(&composetypes.Project{
+		Name: "projName",
+	}, composetypes.ServiceConfig{
+		Name:          "serviceName",
+		ContainerName: "containerName",
+		Networks: map[string]*composetypes.ServiceNetworkConfig{
+			"netName": {
+				Priority:     100,
+				Aliases:      []string{"alias1", "alias2"},
+				Ipv4Address:  "10.16.17.18",
+				Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
+				LinkLocalIPs: []string{"169.254.10.20"},
+				MacAddress:   "10:00:00:00:01",
+				DriverOpts: composetypes.Options{
+					"driverOpt1": "optval1",
+					"driverOpt2": "optval2",
 				},
 			},
 		},
-		0,                          // serviceIndex
-		"netName",                  // networkKey
-		[]string{"link1", "link2"}, // links
-		true,                       // useNetworkAliases
-	)
+	}, 0, "netName", []string{"link1", "link2"}, true)
 	assert.Check(t, cmp.DeepEqual(eps, &network.EndpointSettings{
 		IPAMConfig: &network.EndpointIPAMConfig{
 			IPv4Address:  "10.16.17.18",
