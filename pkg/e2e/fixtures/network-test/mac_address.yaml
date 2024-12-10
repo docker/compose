@@ -1,0 +1,4 @@
+services:
+  test:
+    image: nginx:alpine
+    mac_address: 00:e0:84:35:d0:e8
