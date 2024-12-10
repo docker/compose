@@ -83,7 +83,6 @@ func TestLocalComposeUp(t *testing.T) {
 	t.Run("check user labels", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "inspect", projectName+"-web-1")
 		res.Assert(t, icmd.Expected{Out: `"my-label": "test"`})
-
 	})
 
 	t.Run("check healthcheck output", func(t *testing.T) {
@@ -391,7 +390,6 @@ func TestNestedDotEnv(t *testing.T) {
 		ExitCode: 0,
 		Out:      "root sub win=sub",
 	})
-
 }
 
 func TestUnnecessaryResources(t *testing.T) {

@@ -205,7 +205,6 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		}
 		return nil
 	}()
-
 	if err != nil {
 		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized file shares: %v", err)
 	}
@@ -259,7 +258,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	var containerConfig = container.Config{
+	containerConfig := container.Config{
 		Hostname:        service.Hostname,
 		Domainname:      service.DomainName,
 		User:            service.User,
@@ -892,7 +891,7 @@ func requireMountAPI(bind *types.ServiceVolumeBind) bool {
 }
 
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
-	var mounts = map[string]mount.Mount{}
+	mounts := map[string]mount.Mount{}
 	if inherit != nil {
 		for _, m := range inherit.Mounts {
 			if m.Type == "tmpfs" {
@@ -978,7 +977,7 @@ func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.M
 }
 
 func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
-	var mounts = map[string]mount.Mount{}
+	mounts := map[string]mount.Mount{}
 
 	configsBaseDir := "/"
 	for _, config := range s.Configs {
@@ -1028,7 +1027,7 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 }
 
 func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
-	var mounts = map[string]mount.Mount{}
+	mounts := map[string]mount.Mount{}
 
 	secretsDir := "/run/secrets/"
 	for _, secret := range s.Secrets {
@@ -1392,7 +1391,6 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
 	})
-
 	if err != nil {
 		return "", err
 	}
@@ -1467,7 +1465,7 @@ func (s *composeService) ensureVolume(ctx context.Context, name string, volume t
 	}
 	actual, ok := inspected.Labels[api.ConfigHashLabel]
 	if ok && actual != expected {
-		var confirm = assumeYes
+		confirm := assumeYes
 		if !assumeYes {
 			msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
 			confirm, err = prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)

@@ -123,7 +123,8 @@ func containerLabels(service string, oneOff bool) map[string]string {
 		compose.ServiceLabel:     service,
 		compose.ConfigFilesLabel: composefile,
 		compose.WorkingDirLabel:  workingdir,
-		compose.ProjectLabel:     strings.ToLower(testProject)}
+		compose.ProjectLabel:     strings.ToLower(testProject),
+	}
 	if oneOff {
 		labels[compose.OneoffLabel] = "True"
 	}

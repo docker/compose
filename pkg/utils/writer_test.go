@@ -36,5 +36,4 @@ func TestSplitWriter(t *testing.T) {
 	w.Write([]byte("\n"))
 	w.Write([]byte("world!\n"))
 	assert.DeepEqual(t, lines, []string{"hello", "world!"})
-
 }

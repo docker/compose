@@ -581,11 +581,11 @@ func nextContainerNumber(containers []moby.Container) int {
 		}
 	}
 	return maxNumber + 1
-
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, opts createOptions) (container moby.Container, err error) {
+	name string, number int, opts createOptions,
+) (container moby.Container, err error) {
 	w := progress.ContextWriter(ctx)
 	eventName := "Container " + name
 	w.Event(progress.CreatingEvent(eventName))
@@ -598,7 +598,8 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 }
 
 func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	replaced moby.Container, inherit bool, timeout *time.Duration) (moby.Container, error) {
+	replaced moby.Container, inherit bool, timeout *time.Duration,
+) (moby.Container, error) {
 	var created moby.Container
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Working, "Recreate"))
@@ -667,7 +668,6 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 ) (moby.Container, error) {
 	var created moby.Container
 	cfgs, err := s.getCreateConfigs(ctx, project, service, number, inherit, opts)
-
 	if err != nil {
 		return created, err
 	}
@@ -850,7 +850,8 @@ func (s *composeService) isServiceCompleted(ctx context.Context, containers Cont
 func (s *composeService) startService(ctx context.Context,
 	project *types.Project, service types.ServiceConfig,
 	containers Containers, listener api.ContainerEventListener,
-	timeout time.Duration) error {
+	timeout time.Duration,
+) error {
 	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}

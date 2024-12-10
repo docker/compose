@@ -438,7 +438,6 @@ func (g *Graph) HasCycles() (bool, error) {
 		if !utils.StringContains(discovered, vertex.Key) && !utils.StringContains(finished, vertex.Key) {
 			var err error
 			discovered, finished, err = g.visit(vertex.Key, path, discovered, finished)
-
 			if err != nil {
 				return true, err
 			}
