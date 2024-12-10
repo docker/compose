@@ -345,6 +345,4 @@ func lenAnsi(s string) int {
 	return length
 }
 
-var (
-	percentChars = strings.Split("⠀⡀⣀⣄⣤⣦⣶⣷⣿", "")
-)
+var percentChars = strings.Split("⠀⡀⣀⣄⣤⣦⣶⣷⣿", "")

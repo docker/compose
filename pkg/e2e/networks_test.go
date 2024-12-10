@@ -142,9 +142,7 @@ func TestNetworkModes(t *testing.T) {
 	t.Run("run with service mode dependency", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "-T", "mydb", "echo", "success")
 		res.Assert(t, icmd.Expected{Out: "success"})
-
 	})
-
 }
 
 func TestNetworkConfigChanged(t *testing.T) {
@@ -182,5 +180,4 @@ func TestMacAddress(t *testing.T) {
 	})
 	res := c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-test-1", projectName), "-f", "{{ (index .NetworkSettings.Networks \"network_mac_address_default\" ).MacAddress }}")
 	res.Assert(t, icmd.Expected{Out: "00:e0:84:35:d0:e8"})
-
 }

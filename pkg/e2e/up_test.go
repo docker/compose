@@ -152,7 +152,6 @@ func TestScaleDoesntRecreate(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml", "--project-name", projectName, "up", "--scale", "simple=2", "-d")
 	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
-
 }
 
 func TestUpWithDependencyNotRequired(t *testing.T) {

@@ -110,8 +110,10 @@ type LogKeyboard struct {
 	signalChannel         chan<- os.Signal
 }
 
-var KeyboardManager *LogKeyboard
-var eg multierror.Group
+var (
+	KeyboardManager *LogKeyboard
+	eg              multierror.Group
+)
 
 func NewKeyboardManager(ctx context.Context, isDockerDesktopActive, isWatchConfigured bool,
 	sc chan<- os.Signal,
@@ -206,7 +208,7 @@ func (lk *LogKeyboard) navigationMenu() string {
 	if openDDInfo != "" || openDDUI != "" {
 		watchInfo = navColor("   ")
 	}
-	var isEnabled = " Enable"
+	isEnabled := " Enable"
 	if lk.Watch.Watching {
 		isEnabled = " Disable"
 	}
@@ -260,6 +262,7 @@ func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Proje
 		}),
 	)
 }
+
 func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Project) {
 	eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/watch", tracing.SpanOptions{},
 		func(ctx context.Context) error {

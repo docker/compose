@@ -47,5 +47,4 @@ func TestApplyScaleOpt(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, *bar.Scale, 3)
 	assert.Equal(t, *bar.Deploy.Replicas, 3)
-
 }

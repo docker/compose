@@ -50,7 +50,7 @@ func TestDebounceBatching(t *testing.T) {
 	matcher := watch.EmptyMatcher{}
 	eventBatchCh := batchDebounceEvents(ctx, clock, quietPeriod, ch)
 	for i := 0; i < 100; i++ {
-		var path = "/a"
+		path := "/a"
 		if i%2 == 0 {
 			path = "/b"
 		}
@@ -121,7 +121,6 @@ func (s stdLogger) Status(container, msg string) {
 }
 
 func (s stdLogger) Register(container string) {
-
 }
 
 func TestWatch_Sync(t *testing.T) {
