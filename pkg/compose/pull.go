@@ -175,7 +175,8 @@ func getUnwrappedErrorMessage(err error) string {
 }
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig,
-	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
+	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string,
+) (string, error) {
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,

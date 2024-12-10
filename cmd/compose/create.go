@@ -195,7 +195,9 @@ func applyScaleOpts(project *types.Project, opts []string) error {
 }
 
 func (opts createOptions) isPullPolicyValid() bool {
-	pullPolicies := []string{types.PullPolicyAlways, types.PullPolicyNever, types.PullPolicyBuild,
-		types.PullPolicyMissing, types.PullPolicyIfNotPresent}
+	pullPolicies := []string{
+		types.PullPolicyAlways, types.PullPolicyNever, types.PullPolicyBuild,
+		types.PullPolicyMissing, types.PullPolicyIfNotPresent,
+	}
 	return slices.Contains(pullPolicies, opts.Pull)
 }

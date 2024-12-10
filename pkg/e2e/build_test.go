@@ -32,7 +32,6 @@ import (
 )
 
 func TestLocalComposeBuild(t *testing.T) {
-
 	for _, env := range []string{"DOCKER_BUILDKIT=0", "DOCKER_BUILDKIT=1", "DOCKER_BUILDKIT=1,COMPOSE-BAKE=1"} {
 		c := NewCLI(t, WithEnv(strings.Split(env, ",")...))
 
@@ -135,7 +134,6 @@ func TestLocalComposeBuild(t *testing.T) {
 			c.RunDockerOrExitError(t, "rmi", "-f", "custom-nginx")
 		})
 	}
-
 }
 
 func TestBuildSSH(t *testing.T) {
@@ -150,7 +148,6 @@ func TestBuildSSH(t *testing.T) {
 			ExitCode: 1,
 			Err:      "invalid empty ssh agent socket: make sure SSH_AUTH_SOCK is set",
 		})
-
 	})
 
 	t.Run("build succeed with ssh from Compose file", func(t *testing.T) {
@@ -218,7 +215,6 @@ func TestBuildTags(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	t.Run("build with tags", func(t *testing.T) {
-
 		// ensure local test run does not reuse previously build image
 		c.RunDockerOrExitError(t, "rmi", "build-test-tags")
 
@@ -318,7 +314,6 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 		assert.NilError(t, res.Error, res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/arm64"})
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/amd64"})
-
 	})
 
 	t.Run("multi-arch multi service builds ok", func(t *testing.T) {
@@ -355,7 +350,6 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 		assert.NilError(t, res.Error, res.Stderr())
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/386"})
 	})
-
 }
 
 func TestBuildPrivileged(t *testing.T) {
@@ -445,7 +439,6 @@ Switch to a different driver, or turn on the containerd image store, and try aga
 			Err:      "the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit",
 		})
 	})
-
 }
 
 func TestBuildBuilder(t *testing.T) {
@@ -472,7 +465,6 @@ func TestBuildBuilder(t *testing.T) {
 			Err:      fmt.Sprintf(`no builder %q found`, "unknown-builder"),
 		})
 	})
-
 }
 
 func TestBuildEntitlements(t *testing.T) {
