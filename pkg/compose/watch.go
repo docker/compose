@@ -472,11 +472,17 @@ func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCl
 func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, serviceName string, options api.WatchOptions, batch []fileEvent, syncer sync.Syncer) error {
 	pathMappings := make([]sync.PathMapping, len(batch))
 	restartService := false
+	syncService := false
 	for i := range batch {
-		if batch[i].Trigger.Action == types.WatchActionRebuild {
+		switch batch[i].Trigger.Action {
+		case types.WatchActionRebuild:
 			return s.rebuild(ctx, project, serviceName, options)
-		}
-		if batch[i].Trigger.Action == types.WatchActionSyncRestart {
+		case types.WatchActionSync, types.WatchActionSyncExec:
+			syncService = true
+		case types.WatchActionSyncRestart:
+			restartService = true
+			syncService = true
+		case types.WatchActionRestart:
 			restartService = true
 		}
 		pathMappings[i] = batch[i].PathMapping
@@ -488,8 +494,10 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 	if err != nil {
 		return err
 	}
-	if err := syncer.Sync(ctx, service, pathMappings); err != nil {
-		return err
+	if syncService {
+		if err := syncer.Sync(ctx, service, pathMappings); err != nil {
+			return err
+		}
 	}
 	if restartService {
 		err = s.restart(ctx, project.Name, api.RestartOptions{
@@ -507,30 +515,37 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, b := range batch {
 		if b.Trigger.Action == types.WatchActionSyncExec {
-			containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, serviceName)
+			err := s.exec(ctx, project, serviceName, b.Trigger.Exec, eg)
 			if err != nil {
 				return err
-			}
-			x := b.Trigger.Exec
-			for _, c := range containers {
-				eg.Go(func() error {
-					exec := ccli.NewExecOptions()
-					exec.User = x.User
-					exec.Privileged = x.Privileged
-					exec.Command = x.Command
-					exec.Workdir = x.WorkingDir
-					for _, v := range x.Environment.ToMapping().Values() {
-						err := exec.Env.Set(v)
-						if err != nil {
-							return err
-						}
-					}
-					return ccli.RunExec(ctx, s.dockerCli, c.ID, exec)
-				})
 			}
 		}
 	}
 	return eg.Wait()
+}
+
+func (s *composeService) exec(ctx context.Context, project *types.Project, serviceName string, x types.ServiceHook, eg *errgroup.Group) error {
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, serviceName)
+	if err != nil {
+		return err
+	}
+	for _, c := range containers {
+		eg.Go(func() error {
+			exec := ccli.NewExecOptions()
+			exec.User = x.User
+			exec.Privileged = x.Privileged
+			exec.Command = x.Command
+			exec.Workdir = x.WorkingDir
+			for _, v := range x.Environment.ToMapping().Values() {
+				err := exec.Env.Set(v)
+				if err != nil {
+					return err
+				}
+			}
+			return ccli.RunExec(ctx, s.dockerCli, c.ID, exec)
+		})
+	}
+	return nil
 }
 
 func (s *composeService) rebuild(ctx context.Context, project *types.Project, serviceName string, options api.WatchOptions) error {
