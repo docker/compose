@@ -53,6 +53,7 @@ If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the contai
 | `--wait`                       | `bool`        |          | Wait for services to be running\|healthy. Implies detached mode.                                                                                    |
 | `--wait-timeout`               | `int`         | `0`      | Maximum duration in seconds to wait for the project to be running\|healthy                                                                          |
 | `-w`, `--watch`                | `bool`        |          | Watch source code and rebuild/refresh containers when files are updated.                                                                            |
+| `-y`, `--y`                    | `bool`        |          | Assume "yes" as answer to all prompts and run non-interactively                                                                                     |
 
 
 <!---MARKER_GEN_END-->
