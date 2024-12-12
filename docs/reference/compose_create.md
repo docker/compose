@@ -16,6 +16,7 @@ Creates containers for a service
 | `--quiet-pull`     | `bool`        |          | Pull without printing progress information                                                    |
 | `--remove-orphans` | `bool`        |          | Remove containers for services not defined in the Compose file                                |
 | `--scale`          | `stringArray` |          | Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present. |
+| `-y`, `--y`        | `bool`        |          | Assume "yes" as answer to all prompts and run non-interactively                               |
 
 
 <!---MARKER_GEN_END-->

@@ -46,6 +46,7 @@ type createOptions struct {
 	timeout       int
 	quietPull     bool
 	scale         []string
+	AssumeYes     bool
 }
 
 func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -80,6 +81,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
+	flags.BoolVarP(&opts.AssumeYes, "y", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
 	return cmd
 }
 
@@ -107,6 +109,7 @@ func runCreate(ctx context.Context, _ command.Cli, backend api.Service, createOp
 		Inherit:              !createOpts.noInherit,
 		Timeout:              createOpts.GetTimeout(),
 		QuietPull:            createOpts.quietPull,
+		AssumeYes:            createOpts.AssumeYes,
 	})
 }
 
