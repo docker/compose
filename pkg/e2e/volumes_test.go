@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -120,4 +121,26 @@ func TestProjectVolumeBind(t *testing.T) {
 		ret := c.RunDockerOrExitError(t, "exec", "frontend", "bash", "-c", "cat /data/resultfile").Assert(t, icmd.Success)
 		assert.Assert(t, strings.Contains(ret.Stdout(), "SUCCESS"))
 	})
+}
+
+func TestUpRecreateVolumes(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-recreate-volumes"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+		c.RunDockerCmd(t, "volume", "rm", "-f", "test_external_volume")
+		c.RunDockerCmd(t, "volume", "rm", "-f", "test_external_volume_2")
+	})
+
+	c.RunDockerCmd(t, "volume", "create", "test_external_volume")
+	c.RunDockerCmd(t, "volume", "create", "test_external_volume_2")
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/compose.yaml", "--project-name", projectName, "up", "-d")
+
+	res := c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-app-1", projectName), "-f", "{{ (index .Mounts 0).Name }}")
+	res.Assert(t, icmd.Expected{Out: "test_external_volume"})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/compose2.yaml", "--project-name", projectName, "up", "-d")
+	res = c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-app-1", projectName), "-f", "{{ (index .Mounts 0).Name }}")
+	res.Assert(t, icmd.Expected{Out: "test_external_volume_2"})
 }

@@ -34,6 +34,7 @@ import (
 	pathutil "github.com/docker/compose/v2/internal/paths"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/prompt"
 	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/blkiodev"
@@ -92,7 +93,8 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	if err := s.ensureProjectVolumes(ctx, project); err != nil {
+	volumes, err := s.ensureProjectVolumes(ctx, project)
+	if err != nil {
 		return err
 	}
 
@@ -115,7 +117,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 				"--remove-orphans flag to clean it up.", orphans.names())
 		}
 	}
-	return newConvergence(options.Services, observedState, networks, s).apply(ctx, project, options)
+	return newConvergence(options.Services, observedState, networks, volumes, s).apply(ctx, project, options)
 }
 
 func prepareNetworks(project *types.Project) {
@@ -141,15 +143,17 @@ func (s *composeService) ensureNetworks(ctx context.Context, project *types.Proj
 	return networks, nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
+	ids := map[string]string{}
 	for k, volume := range project.Volumes {
-		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
-		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
-		volume.Labels = volume.Labels.Add(api.VersionLabel, api.ComposeVersion)
-		err := s.ensureVolume(ctx, volume, project.Name)
+		volume.CustomLabels = volume.CustomLabels.Add(api.VolumeLabel, k)
+		volume.CustomLabels = volume.CustomLabels.Add(api.ProjectLabel, project.Name)
+		volume.CustomLabels = volume.CustomLabels.Add(api.VersionLabel, api.ComposeVersion)
+		id, err := s.ensureVolume(ctx, k, volume, project)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		ids[k] = id
 	}
 
 	err := func() error {
@@ -205,7 +209,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	if err != nil {
 		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized file shares: %v", err)
 	}
-	return nil
+	return ids, nil
 }
 
 func (s *composeService) getCreateConfigs(ctx context.Context,
@@ -1431,21 +1435,21 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 }
 
-func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig, project string) error {
+func (s *composeService) ensureVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) (string, error) {
 	inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
-			return err
+			return "", err
 		}
 		if volume.External {
-			return fmt.Errorf("external volume %q not found", volume.Name)
+			return "", fmt.Errorf("external volume %q not found", volume.Name)
 		}
-		err := s.createVolume(ctx, volume)
-		return err
+		err = s.createVolume(ctx, volume)
+		return volume.Name, err
 	}
 
 	if volume.External {
-		return nil
+		return volume.Name, nil
 	}
 
 	// Volume exists with name, but let's double-check this is the expected one
@@ -1453,18 +1457,84 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 	if !ok {
 		logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
 	}
-	if ok && p != project {
+	if ok && p != project.Name {
 		logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, p, project)
 	}
-	return nil
+
+	expected, err := VolumeHash(volume)
+	if err != nil {
+		return "", err
+	}
+	actual, ok := inspected.Labels[api.ConfigHashLabel]
+	if ok && actual != expected {
+		err = s.removeDivergedVolume(ctx, name, volume, project)
+		if err != nil {
+			return "", err
+		}
+		return volume.Name, s.createVolume(ctx, volume)
+	}
+	return inspected.Name, nil
+}
+
+func (s *composeService) removeDivergedVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) error {
+	msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
+	confirm, err := prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)
+	if err != nil {
+		return err
+	}
+	if !confirm {
+		return nil
+	}
+	// Remove services mounting divergent volume
+	var services []string
+	for _, service := range project.Services.Filter(func(config types.ServiceConfig) bool {
+		for _, cfg := range config.Volumes {
+			if cfg.Source == name {
+				return true
+			}
+		}
+		return false
+	}) {
+		services = append(services, service.Name)
+	}
+
+	err = s.stop(ctx, project.Name, api.StopOptions{
+		Services: services,
+		Project:  project,
+	})
+	if err != nil {
+		return err
+	}
+
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, services...)
+	if err != nil {
+		return err
+	}
+
+	// FIXME (ndeloof) we have to remove container so we can recreate volume
+	// but doing so we can't inherit anonymous volumes from previous instance
+	err = s.remove(ctx, containers, api.RemoveOptions{
+		Services: services,
+		Project:  project,
+	})
+	if err != nil {
+		return err
+	}
+
+	return s.apiClient().VolumeRemove(ctx, volume.Name, true)
 }
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
 	eventName := fmt.Sprintf("Volume %q", volume.Name)
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(eventName))
-	_, err := s.apiClient().VolumeCreate(ctx, volumetypes.CreateOptions{
-		Labels:     volume.Labels,
+	hash, err := VolumeHash(volume)
+	if err != nil {
+		return err
+	}
+	volume.CustomLabels.Add(api.ConfigHashLabel, hash)
+	_, err = s.apiClient().VolumeCreate(ctx, volumetypes.CreateOptions{
+		Labels:     mergeLabels(volume.Labels, volume.CustomLabels),
 		Name:       volume.Name,
 		Driver:     volume.Driver,
 		DriverOpts: volume.DriverOpts,

@@ -35,6 +35,7 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
+	mmount "github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/versions"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
@@ -60,6 +61,7 @@ type convergence struct {
 	service    *composeService
 	services   map[string]Containers
 	networks   map[string]string
+	volumes    map[string]string
 	stateMutex sync.Mutex
 }
 
@@ -75,7 +77,7 @@ func (c *convergence) setObservedState(serviceName string, containers Containers
 	c.services[serviceName] = containers
 }
 
-func newConvergence(services []string, state Containers, networks map[string]string, s *composeService) *convergence {
+func newConvergence(services []string, state Containers, networks map[string]string, volumes map[string]string, s *composeService) *convergence {
 	observedState := map[string]Containers{}
 	for _, s := range services {
 		observedState[s] = Containers{}
@@ -88,6 +90,7 @@ func newConvergence(services []string, state Containers, networks map[string]str
 		service:  s,
 		services: observedState,
 		networks: networks,
+		volumes:  volumes,
 	}
 }
 
@@ -341,28 +344,63 @@ func (c *convergence) mustRecreate(expected types.ServiceConfig, actual moby.Con
 	}
 
 	if c.networks != nil && actual.State == "running" {
-		// check the networks container is connected to are the expected ones
-		for net := range expected.Networks {
-			id := c.networks[net]
-			if id == "swarm" {
-				// corner-case : swarm overlay network isn't visible until a container is attached
-				continue
-			}
-			found := false
-			for _, settings := range actual.NetworkSettings.Networks {
-				if settings.NetworkID == id {
-					found = true
-					break
-				}
-			}
-			if !found {
-				// config is up-to-date but container is not connected to network - maybe recreated ?
-				return true, nil
-			}
+		if checkExpectedNetworks(expected, actual, c.networks) {
+			return true, nil
+		}
+	}
+
+	if c.volumes != nil {
+		if checkExpectedVolumes(expected, actual, c.volumes) {
+			return true, nil
 		}
 	}
 
 	return false, nil
+}
+
+func checkExpectedNetworks(expected types.ServiceConfig, actual moby.Container, networks map[string]string) bool {
+	// check the networks container is connected to are the expected ones
+	for net := range expected.Networks {
+		id := networks[net]
+		if id == "swarm" {
+			// corner-case : swarm overlay network isn't visible until a container is attached
+			continue
+		}
+		found := false
+		for _, settings := range actual.NetworkSettings.Networks {
+			if settings.NetworkID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			// config is up-to-date but container is not connected to network
+			return true
+		}
+	}
+	return false
+}
+
+func checkExpectedVolumes(expected types.ServiceConfig, actual moby.Container, volumes map[string]string) bool {
+	// check container's volume mounts and search for the expected ones
+	for _, vol := range expected.Volumes {
+		id := volumes[vol.Source]
+		found := false
+		for _, mount := range actual.Mounts {
+			if mount.Type != mmount.TypeVolume {
+				continue
+			}
+			if mount.Name == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			// config is up-to-date but container doesn't have volume mounted
+			return true
+		}
+	}
+	return false
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
