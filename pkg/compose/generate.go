@@ -92,7 +92,6 @@ func (s *composeService) createProjectFromContainers(containers []moby.Container
 				Image:  c.Image,
 				Labels: c.Labels,
 			}
-
 		}
 		service.Scale = increment(service.Scale)
 
@@ -172,7 +171,8 @@ func (s *composeService) toComposeHealthCheck(healthConfig *containerType.Health
 }
 
 func (s *composeService) toComposeVolumes(volumes []moby.MountPoint) (map[string]types.VolumeConfig,
-	[]types.ServiceVolumeConfig, map[string]types.SecretConfig, []types.ServiceSecretConfig) {
+	[]types.ServiceVolumeConfig, map[string]types.SecretConfig, []types.ServiceSecretConfig,
+) {
 	volumeConfigs := make(map[string]types.VolumeConfig)
 	secretConfigs := make(map[string]types.SecretConfig)
 	var serviceVolumeConfigs []types.ServiceVolumeConfig
@@ -227,7 +227,6 @@ func (s *composeService) toComposeNetwork(networks map[string]*network.EndpointS
 			networkConfigs[name] = types.NetworkConfig{
 				Internal: inspect.Internal,
 			}
-
 		}
 		serviceNetworkConfigs[name] = &types.ServiceNetworkConfig{
 			Aliases: net.Aliases,

@@ -35,7 +35,6 @@ import (
 )
 
 func TestWatch(t *testing.T) {
-
 	services := []string{"alpine", "busybox", "debian"}
 	for _, svcName := range services {
 		t.Run(svcName, func(t *testing.T) {
@@ -133,7 +132,6 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 		}
 	})
 	testComplete.Store(true)
-
 }
 
 // NOTE: these tests all share a single Compose file but are safe to run

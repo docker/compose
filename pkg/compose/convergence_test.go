@@ -432,5 +432,4 @@ func TestCreateMobyContainer(t *testing.T) {
 		}, progress.ContextWriter(context.TODO()))
 		assert.NilError(t, err)
 	})
-
 }

@@ -89,5 +89,4 @@ func TestComposePull(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/unknown-image", "pull", "--ignore-pull-failures")
 		res.Assert(t, icmd.Expected{Err: "Some service image(s) must be built from source by running:"})
 	})
-
 }

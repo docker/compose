@@ -54,7 +54,6 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 			}
 			return err
 		})
-
 	})
 	return eg.Wait()
 }
@@ -86,7 +85,6 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 			}
 			return err
 		})
-
 	})
 	return eg.Wait()
 }

@@ -48,7 +48,6 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 		for _, c := range allContainers {
 			if utils.StringContains(options.Services, c.Labels[api.ServiceLabel]) {
 				containers = append(containers, c)
-
 			}
 		}
 	} else {

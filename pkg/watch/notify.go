@@ -28,9 +28,7 @@ import (
 	"github.com/tilt-dev/fsnotify"
 )
 
-var (
-	numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
-)
+var numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
 
 type FileEvent struct {
 	path string
@@ -76,8 +74,7 @@ type PathMatcher interface {
 	MatchesEntireDir(file string) (bool, error)
 }
 
-type EmptyMatcher struct {
-}
+type EmptyMatcher struct{}
 
 func (EmptyMatcher) Matches(f string) (bool, error)          { return false, nil }
 func (EmptyMatcher) MatchesEntireDir(f string) (bool, error) { return false, nil }

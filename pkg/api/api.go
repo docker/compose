@@ -429,7 +429,6 @@ func (e Event) String() string {
 		attr = append(attr, fmt.Sprintf("%s=%s", k, v))
 	}
 	return fmt.Sprintf("%s container %s %s (%s)\n", t, e.Status, e.Container, strings.Join(attr, ", "))
-
 }
 
 // ListOptions group options of the ls API

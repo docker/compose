@@ -20,8 +20,7 @@ import (
 	"context"
 )
 
-type noopWriter struct {
-}
+type noopWriter struct{}
 
 func (p *noopWriter) Start(ctx context.Context) error {
 	return nil

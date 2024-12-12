@@ -101,7 +101,8 @@ func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, op
 }
 
 func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerType.Config, hostConfig *containerType.HostConfig,
-	networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (containerType.CreateResponse, error) {
+	networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string,
+) (containerType.CreateResponse, error) {
 	d.containers = append(d.containers, moby.Container{
 		ID:     containerName,
 		Names:  []string{containerName},
@@ -229,7 +230,6 @@ func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string
 	default:
 		return d.apiClient.ImageInspectWithRaw(ctx, imageName)
 	}
-
 }
 
 func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {

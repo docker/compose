@@ -187,7 +187,6 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 				Image:  c.Image,
 				Labels: c.Labels,
 			}
-
 		}
 		service.Scale = increment(service.Scale)
 		set[serviceLabel] = service
@@ -321,7 +320,6 @@ func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 		runtimeVersion.val = version.APIVersion
 	})
 	return runtimeVersion.val, runtimeVersion.err
-
 }
 
 func (s *composeService) isDesktopIntegrationActive() bool {

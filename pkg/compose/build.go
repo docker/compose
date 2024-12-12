@@ -134,7 +134,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				fmt.Sprintf("building with %q instance using %s driver", b.Name, b.Driver),
 				fmt.Sprintf("%s:%s", b.Driver, b.Name),
 			))
-
 		if err != nil {
 			return nil, err
 		}

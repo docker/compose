@@ -51,7 +51,7 @@ func (p *jsonWriter) Start(ctx context.Context) error {
 }
 
 func (p *jsonWriter) Event(e Event) {
-	var message = &jsonMessage{
+	message := &jsonMessage{
 		DryRun:   p.dryRun,
 		Tail:     false,
 		ID:       e.ID,
@@ -75,7 +75,7 @@ func (p *jsonWriter) Events(events []Event) {
 }
 
 func (p *jsonWriter) TailMsgf(msg string, args ...interface{}) {
-	var message = &jsonMessage{
+	message := &jsonMessage{
 		DryRun: p.dryRun,
 		Tail:   true,
 		ID:     "",

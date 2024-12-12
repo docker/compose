@@ -104,10 +104,12 @@ func makeColorFunc(code string) colorFunc {
 	}
 }
 
-var nextColor = rainbowColor
-var rainbow []colorFunc
-var currentIndex = 0
-var mutex sync.Mutex
+var (
+	nextColor    = rainbowColor
+	rainbow      []colorFunc
+	currentIndex = 0
+	mutex        sync.Mutex
+)
 
 func rainbowColor() colorFunc {
 	mutex.Lock()

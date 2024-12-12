@@ -133,7 +133,6 @@ func copyLocalConfig(t testing.TB, configDir string) {
 // initializePlugins copies the necessary plugin files to the temporary config
 // directory for the test.
 func initializePlugins(t testing.TB, configDir string) {
-
 	t.Cleanup(func() {
 		if t.Failed() {
 			if conf, err := os.ReadFile(filepath.Join(configDir, "config.json")); err == nil {

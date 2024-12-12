@@ -128,6 +128,5 @@ func expectOutput(res *icmd.Result, expected string) func(t poll.LogT) poll.Resu
 			return poll.Success()
 		}
 		return poll.Continue("condition not met")
-
 	}
 }

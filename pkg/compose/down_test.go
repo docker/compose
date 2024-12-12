@@ -211,7 +211,8 @@ func TestDownRemoveOrphans(t *testing.T) {
 			{
 				Name:   "myProject_default",
 				Labels: map[string]string{compose.NetworkLabel: "default"},
-			}}, nil)
+			},
+		}, nil)
 
 	stopOptions := containerType.StopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)

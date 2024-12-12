@@ -180,7 +180,8 @@ type containerWatchFn func(container moby.Container, t time.Time) error
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
 func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 	projectName string, services, required []string,
-	listener api.ContainerEventListener, containers Containers, onStart, onRecreate containerWatchFn) error {
+	listener api.ContainerEventListener, containers Containers, onStart, onRecreate containerWatchFn,
+) error {
 	if len(containers) == 0 {
 		return nil
 	}

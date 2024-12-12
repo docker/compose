@@ -69,6 +69,7 @@ func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syn
 
 	return sync.NewTar(project.Name, tarDockerClient{s: s}), nil
 }
+
 func (s *composeService) shouldWatch(project *types.Project) bool {
 	var shouldWatch bool
 	for i := range project.Services {
@@ -84,6 +85,7 @@ func (s *composeService) shouldWatch(project *types.Project) bool {
 func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
 	return s.watch(ctx, nil, project, services, options)
 }
+
 func (s *composeService) watch(ctx context.Context, syncChannel chan bool, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
 	var err error
 	if project, err = project.WithSelectedServices(services); err != nil {
@@ -553,7 +555,6 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	// restrict the build to ONLY this service, not any of its dependencies
 	options.Build.Services = []string{serviceName}
 	imageNameToIdMap, err := s.build(ctx, project, *options.Build, nil)
-
 	if err != nil {
 		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Build failed. Error: %v", err))
 		return err
@@ -626,7 +627,6 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 			filters.Arg("label", api.ProjectLabel+"="+projectName),
 		),
 	})
-
 	if err != nil {
 		logrus.Debugf("Failed to list images: %v", err)
 		return

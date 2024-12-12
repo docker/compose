@@ -139,7 +139,6 @@ func (s *composeService) listContainersTargetedForCopy(ctx context.Context, proj
 		}
 		if direction == fromService {
 			return containers[:1], err
-
 		}
 		return containers, err
 	}

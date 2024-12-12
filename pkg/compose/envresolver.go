@@ -21,10 +21,8 @@ import (
 	"strings"
 )
 
-var (
-	// isCaseInsensitiveEnvVars is true on platforms where environment variable names are treated case-insensitively.
-	isCaseInsensitiveEnvVars = (runtime.GOOS == "windows")
-)
+// isCaseInsensitiveEnvVars is true on platforms where environment variable names are treated case-insensitively.
+var isCaseInsensitiveEnvVars = (runtime.GOOS == "windows")
 
 // envResolver returns resolver for environment variables suitable for the current platform.
 // Expected to be used with `MappingWithEquals.Resolve`.

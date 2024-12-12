@@ -39,7 +39,6 @@ func (s *composeService) Logs(
 	consumer api.LogConsumer,
 	options api.LogOptions,
 ) error {
-
 	var containers Containers
 	var err error
 

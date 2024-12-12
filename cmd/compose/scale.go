@@ -92,7 +92,6 @@ func parseServicesReplicasArgs(args []string) (map[string]int, error) {
 			return nil, fmt.Errorf("invalid scale specifier: %s", arg)
 		}
 		intValue, err := strconv.Atoi(val)
-
 		if err != nil {
 			return nil, fmt.Errorf("invalid scale specifier: can't parse replica value as int: %v", arg)
 		}
