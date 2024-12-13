@@ -6,5 +6,5 @@ services:
 
 volumes:
   my_vol:
-    labels:
-      foo: zot
+    external: true
+    name: test_external_volume_2
