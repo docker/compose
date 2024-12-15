@@ -513,14 +513,22 @@ func (s *composeService) prepareLabels(labels types.Labels, project *types.Proje
 		return nil, err
 	}
 
-	serviceConfigsHash, err := ServiceConfigsHash(project, service)
+	serviceNameToConfigHash, err := ServiceConfigsHash(project, service)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceSecretsHash, err := ServiceSecretsHash(project, service)
+	for serviceName, hash := range serviceNameToConfigHash {
+		labels[fmt.Sprintf(api.ServiceConfigsHash, serviceName)] = hash
+	}
+
+	serviceNameToSecretHash, err := ServiceSecretsHash(project, service)
 	if err != nil {
 		return nil, err
+	}
+
+	for serviceName, hash := range serviceNameToSecretHash {
+		labels[fmt.Sprintf(api.ServiceSecretsHash, serviceName)] = hash
 	}
 
 	if number > 0 {
@@ -528,8 +536,6 @@ func (s *composeService) prepareLabels(labels types.Labels, project *types.Proje
 		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 	}
 	labels[api.ConfigHashLabel] = serviceHash
-	labels[api.ServiceConfigsHash] = serviceConfigsHash
-	labels[api.ServiceSecretsHash] = serviceSecretsHash
 	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var dependencies []string
