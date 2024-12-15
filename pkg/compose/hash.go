@@ -47,37 +47,37 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 }
 
 // ServiceConfigsHash computes the configuration hash for service configs.
-func ServiceConfigsHash(project *types.Project, serviceConfig types.ServiceConfig) (string, error) {
-	data := make([]byte, 0)
+func ServiceConfigsHash(project *types.Project, serviceConfig types.ServiceConfig) (map[string]string, error) {
+	serviceNameToHash := make(map[string]string)
 	for _, config := range serviceConfig.Configs {
 		file := project.Configs[config.Source]
 		b, err := createTarForConfig(project, types.FileReferenceConfig(config), types.FileObjectConfig(file))
 
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
-		data = append(data, b.Bytes()...)
+		serviceNameToHash[config.Target] = digest.SHA256.FromBytes(b.Bytes()).Encoded()
 	}
 
-	return digest.SHA256.FromBytes(data).Encoded(), nil
+	return serviceNameToHash, nil
 }
 
 // ServiceSecretsHash computes the configuration hash for service secrets.
-func ServiceSecretsHash(project *types.Project, serviceConfig types.ServiceConfig) (string, error) {
-	data := make([]byte, 0)
+func ServiceSecretsHash(project *types.Project, serviceConfig types.ServiceConfig) (map[string]string, error) {
+	serviceNameToHash := make(map[string]string)
 	for _, secret := range serviceConfig.Secrets {
 		file := project.Secrets[secret.Source]
 		b, err := createTarForConfig(project, types.FileReferenceConfig(secret), types.FileObjectConfig(file))
 
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
-		data = append(data, b.Bytes()...)
+		serviceNameToHash[secret.Target] = digest.SHA256.FromBytes(b.Bytes()).Encoded()
 	}
 
-	return digest.SHA256.FromBytes(data).Encoded(), nil
+	return serviceNameToHash, nil
 }
 
 func createTarForConfig(

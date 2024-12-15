@@ -326,6 +326,7 @@ func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) erro
 	return nil
 }
 
+//nolint:gocyclo
 func (c *convergence) mustRecreate(project *types.Project, expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
 	if policy == api.RecreateNever {
 		return false, nil
@@ -346,20 +347,26 @@ func (c *convergence) mustRecreate(project *types.Project, expected types.Servic
 		return true, nil
 	}
 
-	serviceConfigsHash, err := ServiceConfigsHash(project, expected)
+	serviceNameToConfigHash, err := ServiceConfigsHash(project, expected)
 	if err != nil {
 		return false, err
+	}
+
+	for serviceName, hash := range serviceNameToConfigHash {
+		if actual.Labels[fmt.Sprintf(api.ServiceConfigsHash, serviceName)] != hash {
+			return true, nil
+		}
 	}
 
 	serviceSecretsHash, err := ServiceSecretsHash(project, expected)
 	if err != nil {
 		return false, err
 	}
-	serviceConfigsChanged := actual.Labels[api.ServiceConfigsHash] != serviceConfigsHash
-	serviceSecretsChanged := actual.Labels[api.ServiceSecretsHash] != serviceSecretsHash
 
-	if serviceConfigsChanged || serviceSecretsChanged {
-		return true, nil
+	for serviceName, hash := range serviceSecretsHash {
+		if actual.Labels[fmt.Sprintf(api.ServiceSecretsHash, serviceName)] != hash {
+			return true, nil
+		}
 	}
 
 	if c.networks != nil && actual.State == "running" {
