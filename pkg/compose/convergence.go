@@ -384,6 +384,9 @@ func checkExpectedNetworks(expected types.ServiceConfig, actual moby.Container, 
 func checkExpectedVolumes(expected types.ServiceConfig, actual moby.Container, volumes map[string]string) bool {
 	// check container's volume mounts and search for the expected ones
 	for _, vol := range expected.Volumes {
+		if vol.Type != string(mmount.TypeVolume) {
+			continue
+		}
 		id := volumes[vol.Source]
 		found := false
 		for _, mount := range actual.Mounts {
