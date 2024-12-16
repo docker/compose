@@ -161,3 +161,16 @@ func TestUpRecreateVolumes(t *testing.T) {
 	res = c.RunDockerCmd(t, "volume", "inspect", fmt.Sprintf("%s_my_vol", projectName), "-f", "{{ index .Labels \"foo\" }}")
 	res.Assert(t, icmd.Expected{Out: "zot"})
 }
+
+func TestUpRecreateVolumes_IgnoreBinds(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-recreate-volumes"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/bind.yaml", "--project-name", projectName, "up", "-d")
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/bind.yaml", "--project-name", projectName, "up", "-d")
+	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
+}
