@@ -49,6 +49,9 @@ func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	return topCmd
 }
 
+type topHeader map[string]int // maps a proc title to its output index
+type topEntries map[string]string
+
 func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opts topOptions, services []string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
@@ -63,30 +66,60 @@ func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opt
 		return containers[i].Name < containers[j].Name
 	})
 
-	for _, container := range containers {
-		_, _ = fmt.Fprintf(dockerCli.Out(), "%s\n", container.Name)
-		err := psPrinter(dockerCli.Out(), func(w io.Writer) {
-			for _, proc := range container.Processes {
-				info := []interface{}{}
-				for _, p := range proc {
-					info = append(info, p)
-				}
-				_, _ = fmt.Fprintf(w, strings.Repeat("%s\t", len(info))+"\n", info...)
-
-			}
-			_, _ = fmt.Fprintln(w)
-		},
-			container.Titles...)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	header, entries := collectTop(containers)
+	return topPrint(dockerCli.Out(), header, entries)
 }
 
-func psPrinter(out io.Writer, printer func(writer io.Writer), headers ...string) error {
+func collectTop(containers []api.ContainerProcSummary) (topHeader, []topEntries) {
+	// map column name to its header (should keep working if backend.Top returns
+	// varying columns for different containers)
+	header := topHeader{"SERVICE": 0}
+
+	// assume one process per container and grow if needed
+	entries := make([]topEntries, 0, len(containers))
+
+	for _, container := range containers {
+		for _, proc := range container.Processes {
+			entry := topEntries{"SERVICE": container.Name}
+
+			for i, title := range container.Titles {
+				if _, exists := header[title]; !exists {
+					header[title] = len(header)
+				}
+				entry[title] = proc[i]
+			}
+
+			entries = append(entries, entry)
+		}
+	}
+	return header, entries
+}
+
+func topPrint(out io.Writer, headers topHeader, rows []topEntries) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
 	w := tabwriter.NewWriter(out, 5, 1, 3, ' ', 0)
-	_, _ = fmt.Fprintln(w, strings.Join(headers, "\t"))
-	printer(w)
+
+	// write headers in the order we've encountered them
+	h := make([]string, len(headers))
+	for title, index := range headers {
+		h[index] = title
+	}
+	_, _ = fmt.Fprintln(w, strings.Join(h, "\t"))
+
+	for _, row := range rows {
+		// write proc data in header order
+		r := make([]string, len(headers))
+		for title, index := range headers {
+			if v, ok := row[title]; ok {
+				r[index] = v
+			} else {
+				r[index] = "-"
+			}
+		}
+		_, _ = fmt.Fprintln(w, strings.Join(r, "\t"))
+	}
 	return w.Flush()
 }
