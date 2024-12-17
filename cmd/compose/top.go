@@ -101,6 +101,21 @@ func collectTop(containers []api.ContainerProcSummary) (topHeader, []topEntries)
 			entries = append(entries, entry)
 		}
 	}
+
+	// ensure CMD is the right-most column
+	if pos, ok := header["CMD"]; ok {
+		max := pos
+		for h, i := range header {
+			if i > max {
+				max = i
+			}
+			if i > pos {
+				header[h] = i - 1
+			}
+		}
+		header["CMD"] = max
+	}
+
 	return header, entries
 }
 
