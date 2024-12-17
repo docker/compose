@@ -163,6 +163,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			cw.Event(progress.BuildingEvent(serviceName))
 			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
+				if options.ContinueOnFailure {
+					return nil
+				}
 				return err
 			}
 			cw.Event(progress.BuiltEvent(serviceName))
@@ -180,12 +183,18 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 		buildOptions, err := s.toBuildOptions(project, service, options)
 		if err != nil {
+			if options.ContinueOnFailure {
+				return nil
+			}
 			return err
 		}
 
 		cw.Event(progress.BuildingEvent(serviceName))
 		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
 		if err != nil {
+			if options.ContinueOnFailure {
+				return nil
+			}
 			return err
 		}
 		cw.Event(progress.BuiltEvent(serviceName))
