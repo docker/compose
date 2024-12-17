@@ -116,6 +116,11 @@ cache-clear: ## Clear the builder cache
 lint: ## run linter(s)
 	$(BUILDX_CMD) bake lint
 
+.PHONY: fmt
+fmt:
+	gofumpt --version >/dev/null 2>&1 || go install mvdan.cc/gofumpt@latest
+	gofumpt -w .
+
 .PHONY: docs
 docs: ## generate documentation
 	$(eval $@_TMP_OUT := $(shell mktemp -d -t compose-output.XXXXXXXXXX))
