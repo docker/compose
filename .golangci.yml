@@ -10,7 +10,7 @@ linters:
     - errorlint
     - gocritic
     - gocyclo
-    - gofmt
+    - gofumpt
     - goimports
     - gomodguard
     - revive
