@@ -521,6 +521,7 @@ type ContainerProcSummary struct {
 	Name      string
 	Processes [][]string
 	Titles    []string
+	Labels    map[string]string
 }
 
 // ImageSummary holds container image description

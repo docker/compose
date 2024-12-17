@@ -48,6 +48,7 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 				Name:      getCanonicalContainerName(container),
 				Processes: topContent.Processes,
 				Titles:    topContent.Titles,
+				Labels:    container.Labels,
 			}
 			return nil
 		})
