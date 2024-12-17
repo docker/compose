@@ -74,8 +74,8 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE   #    UID    PID   PPID   C    STIME   TTY   TIME       CMD
-			simple    1    root   1     1      0    12:00   ?     00:00:01   /entrypoint
+			SERVICE  #   UID   PID  PPID  C   STIME  TTY  TIME      CMD
+			simple   1   root  1    1     0   12:00  ?    00:00:01  /entrypoint
 		`),
 	},
 	{
@@ -107,8 +107,8 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE   #    UID    PID   C    STIME   TTY   TIME       CMD
-			noppid    1    root   1     0    12:00   ?     00:00:02   /entrypoint
+			SERVICE  #   UID   PID  C   STIME  TTY  TIME      CMD
+			noppid   1   root  1    0   12:00  ?    00:00:02  /entrypoint
 		`),
 	},
 	{
@@ -144,8 +144,8 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE     #    UID    GID   PID   PPID   C    STIME   TTY   TIME       CMD
-			extra-hdr   1    root   1     1     1      0    12:00   ?     00:00:03   /entrypoint
+			SERVICE    #   UID   GID  PID  PPID  C   STIME  TTY  TIME      CMD
+			extra-hdr  1   root  1    1    1     0   12:00  ?    00:00:03  /entrypoint
 		`),
 	},
 	{
@@ -194,9 +194,9 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE    #    UID    PID   PPID   C    STIME   TTY   TIME       CMD
-			multiple   1    root   1     1      0    12:00   ?     00:00:04   /entrypoint
-			multiple   1    root   123   1      0    12:00   ?     00:00:42   sleep infinity
+			SERVICE   #   UID   PID  PPID  C   STIME  TTY  TIME      CMD
+			multiple  1   root  1    1     0   12:00  ?    00:00:04  /entrypoint
+			multiple  1   root  123  1     0   12:00  ?    00:00:42  sleep infinity
 		`),
 	},
 }
@@ -311,12 +311,12 @@ func TestRunTopCore(t *testing.T) {
 		err := topPrint(&buf, header, entries)
 		require.NoError(t, err)
 		assert.Equal(t, trim(`
-			SERVICE     #    UID    PID   PPID   C    STIME   TTY   TIME       GID   CMD
-			simple      1    root   1     1      0    12:00   ?     00:00:01   -     /entrypoint
-			noppid      1    root   1     -      0    12:00   ?     00:00:02   -     /entrypoint
-			extra-hdr   1    root   1     1      0    12:00   ?     00:00:03   1     /entrypoint
-			multiple    1    root   1     1      0    12:00   ?     00:00:04   -     /entrypoint
-			multiple    1    root   123   1      0    12:00   ?     00:00:42   -     sleep infinity
+			SERVICE    #   UID   PID  PPID  C   STIME  TTY  TIME      GID  CMD
+			simple     1   root  1    1     0   12:00  ?    00:00:01  -    /entrypoint
+			noppid     1   root  1    -     0   12:00  ?    00:00:02  -    /entrypoint
+			extra-hdr  1   root  1    1     0   12:00  ?    00:00:03  1    /entrypoint
+			multiple   1   root  1    1     0   12:00  ?    00:00:04  -    /entrypoint
+			multiple   1   root  123  1     0   12:00  ?    00:00:42  -    sleep infinity
 		`), buf.String())
 
 	})
