@@ -245,8 +245,8 @@ func TestRunTopCore(t *testing.T) {
 			"STIME":   6,
 			"TTY":     7,
 			"TIME":    8,
-			"CMD":     9,
-			"GID":     10,
+			"GID":     9,
+			"CMD":     10,
 		}, header)
 		assert.EqualValues(t, []topEntries{
 			{
@@ -311,12 +311,12 @@ func TestRunTopCore(t *testing.T) {
 		err := topPrint(&buf, header, entries)
 		require.NoError(t, err)
 		assert.Equal(t, trim(`
-			SERVICE     #    UID    PID   PPID   C    STIME   TTY   TIME       CMD              GID
-			simple      1    root   1     1      0    12:00   ?     00:00:01   /entrypoint      -
-			noppid      1    root   1     -      0    12:00   ?     00:00:02   /entrypoint      -
-			extra-hdr   1    root   1     1      0    12:00   ?     00:00:03   /entrypoint      1
-			multiple    1    root   1     1      0    12:00   ?     00:00:04   /entrypoint      -
-			multiple    1    root   123   1      0    12:00   ?     00:00:42   sleep infinity   -
+			SERVICE     #    UID    PID   PPID   C    STIME   TTY   TIME       GID   CMD
+			simple      1    root   1     1      0    12:00   ?     00:00:01   -     /entrypoint
+			noppid      1    root   1     -      0    12:00   ?     00:00:02   -     /entrypoint
+			extra-hdr   1    root   1     1      0    12:00   ?     00:00:03   1     /entrypoint
+			multiple    1    root   1     1      0    12:00   ?     00:00:04   -     /entrypoint
+			multiple    1    root   123   1      0    12:00   ?     00:00:42   -     sleep infinity
 		`), buf.String())
 
 	})
