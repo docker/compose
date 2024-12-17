@@ -73,14 +73,23 @@ func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opt
 func collectTop(containers []api.ContainerProcSummary) (topHeader, []topEntries) {
 	// map column name to its header (should keep working if backend.Top returns
 	// varying columns for different containers)
-	header := topHeader{"SERVICE": 0}
+	header := topHeader{"SERVICE": 0, "#": 1}
 
 	// assume one process per container and grow if needed
 	entries := make([]topEntries, 0, len(containers))
 
 	for _, container := range containers {
 		for _, proc := range container.Processes {
-			entry := topEntries{"SERVICE": container.Name}
+			svc := container.Name
+			if tmp, ok := container.Labels[api.ServiceLabel]; ok {
+				svc = tmp
+			}
+			replica := "-"
+			if tmp, ok := container.Labels[api.ContainerNumberLabel]; ok {
+				replica = tmp
+			}
+
+			entry := topEntries{"SERVICE": svc, "#": replica}
 
 			for i, title := range container.Titles {
 				if _, exists := header[title]; !exists {

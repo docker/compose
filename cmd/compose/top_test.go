@@ -39,7 +39,7 @@ var topTestCases = []struct {
 		name:    "noprocs",
 		titles:  []string{"UID", "PID", "PPID", "C", "STIME", "TTY", "TIME", "CMD"},
 		procs:   [][]string{},
-		header:  topHeader{"SERVICE": 0},
+		header:  topHeader{"SERVICE": 0, "#": 1},
 		entries: []topEntries{},
 		output:  "",
 	},
@@ -49,18 +49,20 @@ var topTestCases = []struct {
 		procs:  [][]string{{"root", "1", "1", "0", "12:00", "?", "00:00:01", "/entrypoint"}},
 		header: topHeader{
 			"SERVICE": 0,
-			"UID":     1,
-			"PID":     2,
-			"PPID":    3,
-			"C":       4,
-			"STIME":   5,
-			"TTY":     6,
-			"TIME":    7,
-			"CMD":     8,
+			"#":       1,
+			"UID":     2,
+			"PID":     3,
+			"PPID":    4,
+			"C":       5,
+			"STIME":   6,
+			"TTY":     7,
+			"TIME":    8,
+			"CMD":     9,
 		},
 		entries: []topEntries{
 			{
 				"SERVICE": "simple",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "1",
 				"PPID":    "1",
@@ -72,8 +74,8 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE   UID    PID   PPID   C    STIME   TTY   TIME       CMD
-			simple    root   1     1      0    12:00   ?     00:00:01   /entrypoint
+			SERVICE   #    UID    PID   PPID   C    STIME   TTY   TIME       CMD
+			simple    1    root   1     1      0    12:00   ?     00:00:01   /entrypoint
 		`),
 	},
 	{
@@ -82,17 +84,19 @@ var topTestCases = []struct {
 		procs:  [][]string{{"root", "1", "0", "12:00", "?", "00:00:02", "/entrypoint"}},
 		header: topHeader{
 			"SERVICE": 0,
-			"UID":     1,
-			"PID":     2,
-			"C":       3,
-			"STIME":   4,
-			"TTY":     5,
-			"TIME":    6,
-			"CMD":     7,
+			"#":       1,
+			"UID":     2,
+			"PID":     3,
+			"C":       4,
+			"STIME":   5,
+			"TTY":     6,
+			"TIME":    7,
+			"CMD":     8,
 		},
 		entries: []topEntries{
 			{
 				"SERVICE": "noppid",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "1",
 				"C":       "0",
@@ -103,8 +107,8 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE   UID    PID   C    STIME   TTY   TIME       CMD
-			noppid    root   1     0    12:00   ?     00:00:02   /entrypoint
+			SERVICE   #    UID    PID   C    STIME   TTY   TIME       CMD
+			noppid    1    root   1     0    12:00   ?     00:00:02   /entrypoint
 		`),
 	},
 	{
@@ -113,19 +117,21 @@ var topTestCases = []struct {
 		procs:  [][]string{{"root", "1", "1", "1", "0", "12:00", "?", "00:00:03", "/entrypoint"}},
 		header: topHeader{
 			"SERVICE": 0,
-			"UID":     1,
-			"GID":     2,
-			"PID":     3,
-			"PPID":    4,
-			"C":       5,
-			"STIME":   6,
-			"TTY":     7,
-			"TIME":    8,
-			"CMD":     9,
+			"#":       1,
+			"UID":     2,
+			"GID":     3,
+			"PID":     4,
+			"PPID":    5,
+			"C":       6,
+			"STIME":   7,
+			"TTY":     8,
+			"TIME":    9,
+			"CMD":     10,
 		},
 		entries: []topEntries{
 			{
 				"SERVICE": "extra-hdr",
+				"#":       "1",
 				"UID":     "root",
 				"GID":     "1",
 				"PID":     "1",
@@ -138,8 +144,8 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE     UID    GID   PID   PPID   C    STIME   TTY   TIME       CMD
-			extra-hdr   root   1     1     1      0    12:00   ?     00:00:03   /entrypoint
+			SERVICE     #    UID    GID   PID   PPID   C    STIME   TTY   TIME       CMD
+			extra-hdr   1    root   1     1     1      0    12:00   ?     00:00:03   /entrypoint
 		`),
 	},
 	{
@@ -151,18 +157,20 @@ var topTestCases = []struct {
 		},
 		header: topHeader{
 			"SERVICE": 0,
-			"UID":     1,
-			"PID":     2,
-			"PPID":    3,
-			"C":       4,
-			"STIME":   5,
-			"TTY":     6,
-			"TIME":    7,
-			"CMD":     8,
+			"#":       1,
+			"UID":     2,
+			"PID":     3,
+			"PPID":    4,
+			"C":       5,
+			"STIME":   6,
+			"TTY":     7,
+			"TIME":    8,
+			"CMD":     9,
 		},
 		entries: []topEntries{
 			{
 				"SERVICE": "multiple",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "1",
 				"PPID":    "1",
@@ -174,6 +182,7 @@ var topTestCases = []struct {
 			},
 			{
 				"SERVICE": "multiple",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "123",
 				"PPID":    "1",
@@ -185,9 +194,9 @@ var topTestCases = []struct {
 			},
 		},
 		output: trim(`
-			SERVICE    UID    PID   PPID   C    STIME   TTY   TIME       CMD
-			multiple   root   1     1      0    12:00   ?     00:00:04   /entrypoint
-			multiple   root   123   1      0    12:00   ?     00:00:42   sleep infinity
+			SERVICE    #    UID    PID   PPID   C    STIME   TTY   TIME       CMD
+			multiple   1    root   1     1      0    12:00   ?     00:00:04   /entrypoint
+			multiple   1    root   123   1      0    12:00   ?     00:00:42   sleep infinity
 		`),
 	},
 }
@@ -201,9 +210,13 @@ func TestRunTopCore(t *testing.T) {
 
 	for _, tc := range topTestCases {
 		summary := api.ContainerProcSummary{
-			Name:      tc.name,
+			Name:      "not used",
 			Titles:    tc.titles,
 			Processes: tc.procs,
+			Labels: map[string]string{
+				api.ServiceLabel:         tc.name,
+				api.ContainerNumberLabel: "1",
+			},
 		}
 		all = append(all, summary)
 
@@ -224,19 +237,21 @@ func TestRunTopCore(t *testing.T) {
 		header, entries := collectTop(all)
 		assert.EqualValues(t, topHeader{
 			"SERVICE": 0,
-			"UID":     1,
-			"PID":     2,
-			"PPID":    3,
-			"C":       4,
-			"STIME":   5,
-			"TTY":     6,
-			"TIME":    7,
-			"CMD":     8,
-			"GID":     9,
+			"#":       1,
+			"UID":     2,
+			"PID":     3,
+			"PPID":    4,
+			"C":       5,
+			"STIME":   6,
+			"TTY":     7,
+			"TIME":    8,
+			"CMD":     9,
+			"GID":     10,
 		}, header)
 		assert.EqualValues(t, []topEntries{
 			{
 				"SERVICE": "simple",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "1",
 				"PPID":    "1",
@@ -247,6 +262,7 @@ func TestRunTopCore(t *testing.T) {
 				"CMD":     "/entrypoint",
 			}, {
 				"SERVICE": "noppid",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "1",
 				"C":       "0",
@@ -256,6 +272,7 @@ func TestRunTopCore(t *testing.T) {
 				"CMD":     "/entrypoint",
 			}, {
 				"SERVICE": "extra-hdr",
+				"#":       "1",
 				"UID":     "root",
 				"GID":     "1",
 				"PID":     "1",
@@ -267,6 +284,7 @@ func TestRunTopCore(t *testing.T) {
 				"CMD":     "/entrypoint",
 			}, {
 				"SERVICE": "multiple",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "1",
 				"PPID":    "1",
@@ -277,6 +295,7 @@ func TestRunTopCore(t *testing.T) {
 				"CMD":     "/entrypoint",
 			}, {
 				"SERVICE": "multiple",
+				"#":       "1",
 				"UID":     "root",
 				"PID":     "123",
 				"PPID":    "1",
@@ -292,12 +311,12 @@ func TestRunTopCore(t *testing.T) {
 		err := topPrint(&buf, header, entries)
 		require.NoError(t, err)
 		assert.Equal(t, trim(`
-			SERVICE     UID    PID   PPID   C    STIME   TTY   TIME       CMD              GID
-			simple      root   1     1      0    12:00   ?     00:00:01   /entrypoint      -
-			noppid      root   1     -      0    12:00   ?     00:00:02   /entrypoint      -
-			extra-hdr   root   1     1      0    12:00   ?     00:00:03   /entrypoint      1
-			multiple    root   1     1      0    12:00   ?     00:00:04   /entrypoint      -
-			multiple    root   123   1      0    12:00   ?     00:00:42   sleep infinity   -
+			SERVICE     #    UID    PID   PPID   C    STIME   TTY   TIME       CMD              GID
+			simple      1    root   1     1      0    12:00   ?     00:00:01   /entrypoint      -
+			noppid      1    root   1     -      0    12:00   ?     00:00:02   /entrypoint      -
+			extra-hdr   1    root   1     1      0    12:00   ?     00:00:03   /entrypoint      1
+			multiple    1    root   1     1      0    12:00   ?     00:00:04   /entrypoint      -
+			multiple    1    root   123   1      0    12:00   ?     00:00:42   sleep infinity   -
 		`), buf.String())
 
 	})
