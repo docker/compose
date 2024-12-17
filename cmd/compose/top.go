@@ -124,7 +124,7 @@ func topPrint(out io.Writer, headers topHeader, rows []topEntries) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(out, 5, 1, 3, ' ', 0)
+	w := tabwriter.NewWriter(out, 4, 1, 2, ' ', 0)
 
 	// write headers in the order we've encountered them
 	h := make([]string, len(headers))
