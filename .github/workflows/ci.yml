@@ -141,9 +141,9 @@ jobs:
           - plugin
           - standalone
         engine:
-          - 25.0.5
-          - 26.1.4
-          - 27.4.1
+          - 25
+          - 26
+          - 27
     steps:
       - name: Prepare
         run: |
