@@ -57,29 +57,30 @@ specified in the service configuration.
 
 ### Options
 
-| Name                    | Type          | Default | Description                                                                      |
-|:------------------------|:--------------|:--------|:---------------------------------------------------------------------------------|
-| `--build`               | `bool`        |         | Build image before starting container                                            |
-| `--cap-add`             | `list`        |         | Add Linux capabilities                                                           |
-| `--cap-drop`            | `list`        |         | Drop Linux capabilities                                                          |
-| `-d`, `--detach`        | `bool`        |         | Run container in background and print container ID                               |
-| `--dry-run`             | `bool`        |         | Execute command in dry run mode                                                  |
-| `--entrypoint`          | `string`      |         | Override the entrypoint of the image                                             |
-| `-e`, `--env`           | `stringArray` |         | Set environment variables                                                        |
-| `-i`, `--interactive`   | `bool`        | `true`  | Keep STDIN open even if not attached                                             |
-| `-l`, `--label`         | `stringArray` |         | Add or override a label                                                          |
-| `--name`                | `string`      |         | Assign a name to the container                                                   |
-| `-T`, `--no-TTY`        | `bool`        | `true`  | Disable pseudo-TTY allocation (default: auto-detected)                           |
-| `--no-deps`             | `bool`        |         | Don't start linked services                                                      |
-| `-p`, `--publish`       | `stringArray` |         | Publish a container's port(s) to the host                                        |
-| `--quiet-pull`          | `bool`        |         | Pull without printing progress information                                       |
-| `--remove-orphans`      | `bool`        |         | Remove containers for services not defined in the Compose file                   |
-| `--rm`                  | `bool`        |         | Automatically remove the container when it exits                                 |
-| `-P`, `--service-ports` | `bool`        |         | Run command with all service's ports enabled and mapped to the host              |
-| `--use-aliases`         | `bool`        |         | Use the service's network useAliases in the network(s) the container connects to |
-| `-u`, `--user`          | `string`      |         | Run as specified username or uid                                                 |
-| `-v`, `--volume`        | `stringArray` |         | Bind mount a volume                                                              |
-| `-w`, `--workdir`       | `string`      |         | Working directory inside the container                                           |
+| Name                    | Type          | Default  | Description                                                                      |
+|:------------------------|:--------------|:---------|:---------------------------------------------------------------------------------|
+| `--build`               | `bool`        |          | Build image before starting container                                            |
+| `--cap-add`             | `list`        |          | Add Linux capabilities                                                           |
+| `--cap-drop`            | `list`        |          | Drop Linux capabilities                                                          |
+| `-d`, `--detach`        | `bool`        |          | Run container in background and print container ID                               |
+| `--dry-run`             | `bool`        |          | Execute command in dry run mode                                                  |
+| `--entrypoint`          | `string`      |          | Override the entrypoint of the image                                             |
+| `-e`, `--env`           | `stringArray` |          | Set environment variables                                                        |
+| `-i`, `--interactive`   | `bool`        | `true`   | Keep STDIN open even if not attached                                             |
+| `-l`, `--label`         | `stringArray` |          | Add or override a label                                                          |
+| `--name`                | `string`      |          | Assign a name to the container                                                   |
+| `-T`, `--no-TTY`        | `bool`        | `true`   | Disable pseudo-TTY allocation (default: auto-detected)                           |
+| `--no-deps`             | `bool`        |          | Don't start linked services                                                      |
+| `-p`, `--publish`       | `stringArray` |          | Publish a container's port(s) to the host                                        |
+| `--pull`                | `string`      | `policy` | Pull image before running ("always"\|"missing"\|"never")                         |
+| `--quiet-pull`          | `bool`        |          | Pull without printing progress information                                       |
+| `--remove-orphans`      | `bool`        |          | Remove containers for services not defined in the Compose file                   |
+| `--rm`                  | `bool`        |          | Automatically remove the container when it exits                                 |
+| `-P`, `--service-ports` | `bool`        |          | Run command with all service's ports enabled and mapped to the host              |
+| `--use-aliases`         | `bool`        |          | Use the service's network useAliases in the network(s) the container connects to |
+| `-u`, `--user`          | `string`      |          | Run as specified username or uid                                                 |
+| `-v`, `--volume`        | `stringArray` |          | Bind mount a volume                                                              |
+| `-w`, `--workdir`       | `string`      |          | Working directory inside the container                                           |
 
 
 <!---MARKER_GEN_END-->
