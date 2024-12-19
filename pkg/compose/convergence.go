@@ -387,6 +387,9 @@ func checkExpectedVolumes(expected types.ServiceConfig, actual moby.Container, v
 		if vol.Type != string(mmount.TypeVolume) {
 			continue
 		}
+		if vol.Source == "" {
+			continue
+		}
 		id := volumes[vol.Source]
 		found := false
 		for _, mount := range actual.Mounts {
