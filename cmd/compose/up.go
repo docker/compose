@@ -57,6 +57,7 @@ type upOptions struct {
 	wait                  bool
 	waitTimeout           int
 	watch                 bool
+	prune                 bool
 	navigationMenu        bool
 	navigationMenuChanged bool
 }
@@ -170,6 +171,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
+	flags.BoolVar(&up.prune, "prune", false, "Prune dangling images on rebuild")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
 
 	return upCmd
@@ -206,6 +208,9 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	}
 	if create.noBuild && up.watch {
 		return fmt.Errorf("--no-build and --watch are incompatible")
+	}
+	if !up.watch && up.prune {
+		return fmt.Errorf("--prune can only be used with --watch")
 	}
 	return nil
 }
@@ -310,6 +315,7 @@ func runUp(
 			Wait:           upOptions.wait,
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
+			Prune:          upOptions.prune,
 			Services:       services,
 			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain",
 		},
