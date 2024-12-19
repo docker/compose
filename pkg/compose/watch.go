@@ -147,13 +147,13 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 
 		var paths, pathLogs []string
 		for _, trigger := range config.Watch {
-			if trigger.Action != types.WatchActionRebuild && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+			if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
 				continue
 			} else {
 				var initialSync bool
 				success, err := trigger.Extensions.Get("x-initialSync", &initialSync)
-				if err == nil && success && initialSync && (trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart) {
+				if err == nil && success && initialSync && isSync(trigger) {
 					// Need to check initial files are in container that are meant to be synched from watch action
 					err := s.initialSync(ctx, project, service, trigger, ignore, syncer)
 					if err != nil {
@@ -202,6 +202,10 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 			return nil
 		}
 	}
+}
+
+func isSync(trigger types.Trigger) bool {
+	return trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart
 }
 
 func (s *composeService) watchEvents(ctx context.Context, project *types.Project, name string, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, triggers []types.Trigger) error {
