@@ -17,14 +17,12 @@
 package compose
 
 import (
-	"archive/tar"
-	"bytes"
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 )
 
@@ -45,7 +43,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		if !ok {
 			return fmt.Errorf("environment variable %q required by file %q is not set", file.Environment, file.Name)
 		}
-		b, err := createTar(env, types.FileReferenceConfig(config))
+		b, err := utils.CreateTar([]byte(env), types.FileReferenceConfig(config), time.Now())
 		if err != nil {
 			return err
 		}
@@ -79,7 +77,7 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 			config.Target = "/" + config.Source
 		}
 
-		b, err := createTar(content, types.FileReferenceConfig(config))
+		b, err := utils.CreateTar([]byte(content), types.FileReferenceConfig(config), time.Now())
 		if err != nil {
 			return err
 		}
@@ -92,49 +90,4 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 		}
 	}
 	return nil
-}
-
-func createTar(env string, config types.FileReferenceConfig) (bytes.Buffer, error) {
-	value := []byte(env)
-	b := bytes.Buffer{}
-	tarWriter := tar.NewWriter(&b)
-	mode := uint32(0o444)
-	if config.Mode != nil {
-		mode = *config.Mode
-	}
-
-	var uid, gid int
-	if config.UID != "" {
-		v, err := strconv.Atoi(config.UID)
-		if err != nil {
-			return b, err
-		}
-		uid = v
-	}
-	if config.GID != "" {
-		v, err := strconv.Atoi(config.GID)
-		if err != nil {
-			return b, err
-		}
-		gid = v
-	}
-
-	header := &tar.Header{
-		Name:    config.Target,
-		Size:    int64(len(value)),
-		Mode:    int64(mode),
-		ModTime: time.Now(),
-		Uid:     uid,
-		Gid:     gid,
-	}
-	err := tarWriter.WriteHeader(header)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-	_, err = tarWriter.Write(value)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-	err = tarWriter.Close()
-	return b, err
 }
