@@ -1220,7 +1220,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, project *types.Proje
 	if errdefs.IsConflict(err) {
 		// Maybe another execution of `docker compose up|run` created same network
 		// let's retry once
-		return s.resolveOrCreateNetwork(ctx, project, "", n)
+		return s.resolveOrCreateNetwork(ctx, project, name, n)
 	}
 	return id, err
 }
