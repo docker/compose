@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG COMPOSE_VERSION=v2.28.1
+ARG COMPOSE_VERSION=v2.32.1
 
 FROM docker/compose-bin:${COMPOSE_VERSION} AS compose
 
