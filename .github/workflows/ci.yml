@@ -141,7 +141,6 @@ jobs:
           - plugin
           - standalone
         engine:
-          - 25
           - 26
           - 27
     steps:
