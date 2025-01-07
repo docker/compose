@@ -4,4 +4,4 @@ services:
     build:
       context: .
       ssh:
-        - fake-ssh=./fixtures/build-test/ssh/fake_rsa
+        - fake-ssh=./fake_rsa
