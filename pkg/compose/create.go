@@ -416,7 +416,7 @@ func (s *composeService) prepareContainerMACAddress(ctx context.Context, service
 			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine 1.44 or later (currently: %s)", strings.Join(withMacAddress, ", "), version)
 		}
 
-		if mainNw != nil {
+		if mainNw != nil && mainNw.MacAddress != "" {
 			macAddress = mainNw.MacAddress
 		}
 	}
