@@ -150,12 +150,13 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		return -1
 	}
+
+	cw := progress.ContextWriter(ctx)
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		service, ok := serviceToBuild[name]
 		if !ok {
 			return nil
 		}
-		cw := progress.ContextWriter(ctx)
 		serviceName := fmt.Sprintf("Service %s", name)
 
 		if !buildkitEnabled {
@@ -182,12 +183,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return err
 		}
 
-		cw.Event(progress.BuildingEvent(serviceName))
 		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
 		if err != nil {
 			return err
 		}
-		cw.Event(progress.BuiltEvent(serviceName))
 		builtDigests[getServiceIndex(name)] = digest
 
 		return nil
@@ -211,6 +210,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			service := project.Services[names[i]]
 			imageRef := api.GetImageNameOrDefault(service, project.Name)
 			imageIDs[imageRef] = imageDigest
+			cw.Event(progress.BuiltEvent(names[i]))
 		}
 	}
 	return imageIDs, err
