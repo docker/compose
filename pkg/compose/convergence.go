@@ -460,7 +460,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			continue
 		}
 
-		waitingFor := containers.filter(isService(dep))
+		waitingFor := containers.filter(isService(dep), isNotOneOff)
 		w.Events(containerEvents(waitingFor, progress.Waiting))
 		if len(waitingFor) == 0 {
 			if config.Required {
