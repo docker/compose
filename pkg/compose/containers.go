@@ -114,6 +114,15 @@ func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName 
 // containerPredicate define a predicate we want container to satisfy for filtering operations
 type containerPredicate func(c moby.Container) bool
 
+func matches(c moby.Container, predicates ...containerPredicate) bool {
+	for _, predicate := range predicates {
+		if !predicate(c) {
+			return false
+		}
+	}
+	return true
+}
+
 func isService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
 		service := c.Labels[api.ServiceLabel]
@@ -148,10 +157,10 @@ func isNotOneOff(c moby.Container) bool {
 }
 
 // filter return Containers with elements to match predicate
-func (containers Containers) filter(predicate containerPredicate) Containers {
+func (containers Containers) filter(predicates ...containerPredicate) Containers {
 	var filtered Containers
 	for _, c := range containers {
-		if predicate(c) {
+		if matches(c, predicates...) {
 			filtered = append(filtered, c)
 		}
 	}
