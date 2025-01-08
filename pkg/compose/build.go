@@ -279,7 +279,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 			imageNames = append(imageNames, imgName)
 		}
 	}
-	imgs, err := s.getImageSummaries(ctx, imageNames)
+	imgs, err := s.getImages(ctx, imageNames)
 	if err != nil {
 		return nil, err
 	}
