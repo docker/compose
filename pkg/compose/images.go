@@ -94,12 +94,12 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 			tag := ""
 			repository := ""
 			ref, err := reference.ParseDockerRef(repoTag)
-			if err != nil {
-				return err
-			}
-			repository = reference.FamiliarName(ref)
-			if tagged, ok := ref.(reference.Tagged); ok {
-				tag = tagged.Tag()
+			if err == nil {
+				// ParseDockerRef will reject a local image ID
+				repository = reference.FamiliarName(ref)
+				if tagged, ok := ref.(reference.Tagged); ok {
+					tag = tagged.Tag()
+				}
 			}
 			l.Lock()
 			summary[repoTag] = api.ImageSummary{

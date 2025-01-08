@@ -1,0 +1,3 @@
+services:
+  test:
+    image: ${ID:?ID variable must be set}
