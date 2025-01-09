@@ -294,6 +294,12 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		return createConfigs{}, err
 	}
 
+	// CONFIGS and SECRETS
+	err = checkContainerConfigsSecrets(*p, service)
+	if err != nil {
+		return createConfigs{}, err
+	}
+
 	// NETWORKING
 	links, err := s.getLinks(ctx, p.Name, service, number)
 	if err != nil {
@@ -952,52 +958,36 @@ func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.M
 		m[bindMount.Target] = bindMount
 	}
 
-	secrets, err := buildContainerSecretMounts(p, s)
-	if err != nil {
-		return nil, err
-	}
-	for _, s := range secrets {
-		if _, found := m[s.Target]; found {
-			continue
-		}
-		m[s.Target] = s
-	}
-
-	configs, err := buildContainerConfigMounts(p, s)
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range configs {
-		if _, found := m[c.Target]; found {
-			continue
-		}
-		m[c.Target] = c
-	}
 	return m, nil
 }
 
-func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
-	mounts := map[string]mount.Mount{}
+func checkContainerConfigsSecrets(p types.Project, s types.ServiceConfig) error {
+	err := checkContainerConfigs(p, s)
+	if err != nil {
+		return err
+	}
 
-	configsBaseDir := "/"
+	err = checkContainerSecrets(p, s)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkContainerConfigs(p types.Project, s types.ServiceConfig) error {
+
 	for _, config := range s.Configs {
-		target := config.Target
-		if config.Target == "" {
-			target = configsBaseDir + config.Source
-		} else if !isAbsTarget(config.Target) {
-			target = configsBaseDir + config.Target
-		}
-
 		definedConfig := p.Configs[config.Source]
 		if definedConfig.External {
-			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
+			return fmt.Errorf("unsupported external config %s", definedConfig.Name)
 		}
 
 		if definedConfig.Driver != "" {
-			return nil, errors.New("Docker Compose does not support configs.*.driver")
+			return errors.New("Docker Compose does not support configs.*.driver")
 		}
 		if definedConfig.TemplateDriver != "" {
-			return nil, errors.New("Docker Compose does not support configs.*.template_driver")
+			return errors.New("Docker Compose does not support configs.*.template_driver")
 		}
 
 		if definedConfig.Environment != "" || definedConfig.Content != "" {
@@ -1008,46 +998,26 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
-		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
-			Type:     types.VolumeTypeBind,
-			Source:   definedConfig.File,
-			Target:   target,
-			ReadOnly: true,
-		})
-		if err != nil {
-			return nil, err
+		if _, err := os.Stat(definedConfig.File); os.IsNotExist(err) {
+			logrus.Warnf("config file %s does not exist", definedConfig.Name)
 		}
-		mounts[target] = bindMount
 	}
-	values := make([]mount.Mount, 0, len(mounts))
-	for _, v := range mounts {
-		values = append(values, v)
-	}
-	return values, nil
+	return nil
 }
 
-func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
-	mounts := map[string]mount.Mount{}
-
-	secretsDir := "/run/secrets/"
+func checkContainerSecrets(p types.Project, s types.ServiceConfig) error {
 	for _, secret := range s.Secrets {
-		target := secret.Target
-		if secret.Target == "" {
-			target = secretsDir + secret.Source
-		} else if !isAbsTarget(secret.Target) {
-			target = secretsDir + secret.Target
-		}
 
 		definedSecret := p.Secrets[secret.Source]
 		if definedSecret.External {
-			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
+			return fmt.Errorf("unsupported external secret %s", definedSecret.Name)
 		}
 
 		if definedSecret.Driver != "" {
-			return nil, errors.New("Docker Compose does not support secrets.*.driver")
+			return errors.New("Docker Compose does not support secrets.*.driver")
 		}
 		if definedSecret.TemplateDriver != "" {
-			return nil, errors.New("Docker Compose does not support secrets.*.template_driver")
+			return errors.New("Docker Compose does not support secrets.*.template_driver")
 		}
 
 		if definedSecret.Environment != "" {
@@ -1062,25 +1032,8 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			logrus.Warnf("secret file %s does not exist", definedSecret.Name)
 		}
 
-		mnt, err := buildMount(p, types.ServiceVolumeConfig{
-			Type:     types.VolumeTypeBind,
-			Source:   definedSecret.File,
-			Target:   target,
-			ReadOnly: true,
-			Bind: &types.ServiceVolumeBind{
-				CreateHostPath: false,
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		mounts[target] = mnt
 	}
-	values := make([]mount.Mount, 0, len(mounts))
-	for _, v := range mounts {
-		values = append(values, v)
-	}
-	return values, nil
+	return nil
 }
 
 func isAbsTarget(p string) bool {
