@@ -424,11 +424,11 @@ func (s *composeService) prepareContainerMACAddress(ctx context.Context, service
 	return macAddress, nil
 }
 
-func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, useNetworkAliases bool) []string {
+func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, cfg *types.ServiceNetworkConfig, useNetworkAliases bool) []string {
 	aliases := []string{getContainerName(project.Name, service, serviceIndex)}
 	if useNetworkAliases {
 		aliases = append(aliases, service.Name)
-		if cfg := service.Networks[networkKey]; cfg != nil {
+		if cfg != nil {
 			aliases = append(aliases, cfg.Aliases...)
 		}
 	}
@@ -456,7 +456,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		driverOpts = config.DriverOpts
 	}
 	return &network.EndpointSettings{
-		Aliases:     getAliases(p, service, serviceIndex, networkKey, useNetworkAliases),
+		Aliases:     getAliases(p, service, serviceIndex, config, useNetworkAliases),
 		Links:       links,
 		IPAddress:   ipv4Address,
 		IPv6Gateway: ipv6Address,
