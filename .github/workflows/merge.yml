@@ -80,8 +80,12 @@ jobs:
       digest: ${{ fromJSON(steps.bake.outputs.metadata).image-cross['containerimage.digest'] }}
     steps:
       -
-        name: Checkout
-        uses: actions/checkout@v4
+        name: Login to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
+          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -100,27 +104,20 @@ jobs:
             type=edge
           bake-target: meta-helper
       -
-        name: Login to DockerHub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
-          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
-      -
         name: Build and push image
         uses: docker/bake-action@v5
         id: bake
         with:
           files: |
             ./docker-bake.hcl
-            ${{ steps.meta.outputs.bake-file }}
+            cwd://${{ steps.meta.outputs.bake-file }}
           targets: image-cross
           push: ${{ github.event_name != 'pull_request' }}
+          sbom: true
+          provenance: mode=max
           set: |
             *.cache-from=type=gha,scope=bin-image
             *.cache-to=type=gha,scope=bin-image,mode=max
-            *.attest=type=sbom
-            *.attest=type=provenance,mode=max,builder-id=https://github.com/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.GITHUB_RUN_ID }}
 
   desktop-edge-test:
     runs-on: ubuntu-latest

@@ -77,9 +77,6 @@ jobs:
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
       -
-        name: Checkout
-        uses: actions/checkout@v4
-      -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       -
@@ -87,7 +84,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
       -
         name: Build
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@v6
         with:
           targets: release
           set: |
@@ -106,14 +103,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       -
-        name: Checkout
-        uses: actions/checkout@v4
-      -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       -
         name: Test
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@v6
         with:
           targets: test
           set: |
@@ -149,9 +143,10 @@ jobs:
           mode=${{ matrix.mode }}
           engine=${{ matrix.engine }}
           echo "MODE_ENGINE_PAIR=${mode}-${engine}" >> $GITHUB_ENV
-      -
-        name: Checkout
+
+      - name: Checkout
         uses: actions/checkout@v4
+
       - name: Install Docker ${{ matrix.engine }}
         run: |
           sudo systemctl stop docker.service
@@ -159,22 +154,24 @@ jobs:
           sudo apt-get install curl
           curl -fsSL https://test.docker.com -o get-docker.sh
           sudo sh ./get-docker.sh --version ${{ matrix.engine }}
+
       - name: Check Docker Version
         run: docker --version
-      -
-        name: Set up Docker Buildx
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      -
-        name: Set up Go
+
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           check-latest: true
           cache: true
-      -
-        name: Build
-        uses: docker/bake-action@v5
+
+      - name: Build
+        uses: docker/bake-action@v6
         with:
+          source: .
           targets: binary-with-coverage
           set: |
             *.cache-from=type=gha,scope=binary-linux-amd64
@@ -182,37 +179,37 @@ jobs:
             *.cache-to=type=gha,scope=binary-e2e-${{ matrix.mode }},mode=max
         env:
           BUILD_TAGS: e2e
-      -
-        name: Setup tmate session
+
+      - name: Setup tmate session
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
         uses: mxschmitt/action-tmate@8b4e4ac71822ed7e0ad5fb3d1c33483e9e8fb270 # v3.11
         with:
           limit-access-to-actor: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      -
-        name: Test plugin mode
+
+      - name: Test plugin mode
         if: ${{ matrix.mode == 'plugin' }}
         run: |
           rm -rf ./bin/coverage/e2e
           mkdir -p ./bin/coverage/e2e
           make e2e-compose GOCOVERDIR=bin/coverage/e2e TEST_FLAGS="-v"
-      -
-        name: Gather coverage data
+
+      - name: Gather coverage data
         if: ${{ matrix.mode == 'plugin' }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data-e2e-${{ env.MODE_ENGINE_PAIR }}
           path: bin/coverage/e2e/
           if-no-files-found: error
-      -
-        name: Test standalone mode
+
+      - name: Test standalone mode
         if: ${{ matrix.mode == 'standalone' }}
         run: |
           rm -f /usr/local/bin/docker-compose
           cp bin/build/docker-compose /usr/local/bin
           make e2e-compose-standalone
-      - 
-        name: e2e Test Summary
+
+      - name: e2e Test Summary
         uses: test-summary/action@v2
         with:
           paths: /tmp/report/report.xml       
