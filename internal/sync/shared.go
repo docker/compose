@@ -16,8 +16,6 @@ package sync
 
 import (
 	"context"
-
-	"github.com/compose-spec/compose-go/v2/types"
 )
 
 // PathMapping contains the Compose service and modified host system path.
@@ -38,5 +36,5 @@ type PathMapping struct {
 }
 
 type Syncer interface {
-	Sync(ctx context.Context, service types.ServiceConfig, paths []PathMapping) error
+	Sync(ctx context.Context, service string, paths []*PathMapping) error
 }

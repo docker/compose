@@ -485,96 +485,6 @@ func TestWatchCountInnerFile(t *testing.T) {
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
 }
 
-func TestWatchCountInnerFileWithIgnore(t *testing.T) {
-	f := newNotifyFixture(t)
-
-	root := f.paths[0]
-	ignore, _ := NewDockerPatternMatcher(root, []string{
-		"a",
-		"!a/b",
-	})
-	f.setIgnore(ignore)
-
-	a := f.JoinPath(root, "a")
-	b := f.JoinPath(a, "b")
-	file := f.JoinPath(b, "bigFile")
-	f.WriteFile(file, "hello")
-	f.assertEvents(b, file)
-
-	expectedWatches := 3
-	if isRecursiveWatcher() {
-		expectedWatches = 1
-	}
-	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
-}
-
-func TestIgnoreCreatedDir(t *testing.T) {
-	f := newNotifyFixture(t)
-
-	root := f.paths[0]
-	ignore, _ := NewDockerPatternMatcher(root, []string{"a/b"})
-	f.setIgnore(ignore)
-
-	a := f.JoinPath(root, "a")
-	b := f.JoinPath(a, "b")
-	file := f.JoinPath(b, "bigFile")
-	f.WriteFile(file, "hello")
-	f.assertEvents(a)
-
-	expectedWatches := 2
-	if isRecursiveWatcher() {
-		expectedWatches = 1
-	}
-	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
-}
-
-func TestIgnoreCreatedDirWithExclusions(t *testing.T) {
-	f := newNotifyFixture(t)
-
-	root := f.paths[0]
-	ignore, _ := NewDockerPatternMatcher(root,
-		[]string{
-			"a/b",
-			"c",
-			"!c/d",
-		})
-	f.setIgnore(ignore)
-
-	a := f.JoinPath(root, "a")
-	b := f.JoinPath(a, "b")
-	file := f.JoinPath(b, "bigFile")
-	f.WriteFile(file, "hello")
-	f.assertEvents(a)
-
-	expectedWatches := 2
-	if isRecursiveWatcher() {
-		expectedWatches = 1
-	}
-	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
-}
-
-func TestIgnoreInitialDir(t *testing.T) {
-	f := newNotifyFixture(t)
-
-	root := f.TempDir("root")
-	ignore, _ := NewDockerPatternMatcher(root, []string{"a/b"})
-	f.setIgnore(ignore)
-
-	a := f.JoinPath(root, "a")
-	b := f.JoinPath(a, "b")
-	file := f.JoinPath(b, "bigFile")
-	f.WriteFile(file, "hello")
-	f.watch(root)
-
-	f.assertEvents()
-
-	expectedWatches := 3
-	if isRecursiveWatcher() {
-		expectedWatches = 2
-	}
-	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
-}
-
 func isRecursiveWatcher() bool {
 	return runtime.GOOS == "darwin" || runtime.GOOS == "windows"
 }
@@ -585,7 +495,6 @@ type notifyFixture struct {
 	out    *bytes.Buffer
 	*TempDirFixture
 	notify Notify
-	ignore PathMatcher
 	paths  []string
 	events []FileEvent
 }
@@ -598,17 +507,11 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 		cancel:         cancel,
 		TempDirFixture: NewTempDirFixture(t),
 		paths:          []string{},
-		ignore:         EmptyMatcher{},
 		out:            out,
 	}
 	nf.watch(nf.TempDir("watched"))
 	t.Cleanup(nf.tearDown)
 	return nf
-}
-
-func (f *notifyFixture) setIgnore(ignore PathMatcher) {
-	f.ignore = ignore
-	f.rebuildWatcher()
 }
 
 func (f *notifyFixture) watch(path string) {
@@ -624,7 +527,7 @@ func (f *notifyFixture) rebuildWatcher() {
 	}
 
 	// create a new watcher
-	notify, err := NewWatcher(f.paths, f.ignore)
+	notify, err := NewWatcher(f.paths)
 	if err != nil {
 		f.T().Fatal(err)
 	}
@@ -648,7 +551,7 @@ func (f *notifyFixture) assertEvents(expected ...string) {
 	}
 
 	for i, actual := range f.events {
-		e := FileEvent{expected[i]}
+		e := FileEvent(expected[i])
 		if actual != e {
 			f.T().Fatalf("Got event %v (expected %v)", actual, e)
 		}
@@ -702,16 +605,16 @@ F:
 			f.T().Fatal(err)
 
 		case event := <-f.notify.Events():
-			if strings.Contains(event.Path(), syncPath) {
+			if strings.Contains(string(event), syncPath) {
 				break F
 			}
-			if strings.Contains(event.Path(), anySyncPath) {
+			if strings.Contains(string(event), anySyncPath) {
 				continue
 			}
 
 			// Don't bother tracking duplicate changes to the same path
 			// for testing.
-			if len(f.events) > 0 && f.events[len(f.events)-1].Path() == event.Path() {
+			if len(f.events) > 0 && f.events[len(f.events)-1] == event {
 				continue
 			}
 
