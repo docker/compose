@@ -80,6 +80,9 @@ jobs:
       digest: ${{ fromJSON(steps.bake.outputs.metadata).image-cross['containerimage.digest'] }}
     steps:
       -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
         name: Login to DockerHub
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -105,12 +108,12 @@ jobs:
           bake-target: meta-helper
       -
         name: Build and push image
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@v6
         id: bake
         with:
+          source: .
           files: |
             ./docker-bake.hcl
-            cwd://${{ steps.meta.outputs.bake-file }}
           targets: image-cross
           push: ${{ github.event_name != 'pull_request' }}
           sbom: true
