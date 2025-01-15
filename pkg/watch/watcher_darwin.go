@@ -27,7 +27,6 @@ import (
 
 	pathutil "github.com/docker/compose/v2/internal/paths"
 	"github.com/fsnotify/fsevents"
-	"github.com/sirupsen/logrus"
 )
 
 // A file watcher optimized for Darwin.
@@ -39,7 +38,6 @@ type fseventNotify struct {
 	stop   chan struct{}
 
 	pathsWereWatching map[string]interface{}
-	ignore            PathMatcher
 }
 
 func (d *fseventNotify) loop() {
@@ -59,14 +57,6 @@ func (d *fseventNotify) loop() {
 				if e.Flags&fsevents.ItemIsDir == fsevents.ItemIsDir && e.Flags&fsevents.ItemCreated == fsevents.ItemCreated && isPathWereWatching {
 					// This is the first create for the path that we're watching. We always get exactly one of these
 					// even after we get the HistoryDone event. Skip it.
-					continue
-				}
-
-				ignore, err := d.ignore.Matches(e.Path)
-				if err != nil {
-					logrus.Infof("Error matching path %q: %v", e.Path, err)
-				} else if ignore {
-					logrus.Tracef("Ignoring event for path: %v", e.Path)
 					continue
 				}
 
@@ -118,9 +108,8 @@ func (d *fseventNotify) Errors() chan error {
 	return d.errors
 }
 
-func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
+func newWatcher(paths []string) (Notify, error) {
 	dw := &fseventNotify{
-		ignore: ignore,
 		stream: &fsevents.EventStream{
 			Latency: 50 * time.Millisecond,
 			Flags:   fsevents.FileEvents | fsevents.IgnoreSelf,
