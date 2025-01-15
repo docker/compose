@@ -46,8 +46,6 @@ type naiveNotify struct {
 	// structure, so we can filter the list quickly.
 	notifyList map[string]bool
 
-	ignore PathMatcher
-
 	isWatcherRecursive bool
 	watcher            *fsnotify.Watcher
 	events             chan fsnotify.Event
@@ -122,12 +120,7 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 			return nil
 		}
 
-		shouldSkipDir, err := d.shouldSkipDir(path)
-		if err != nil {
-			return err
-		}
-
-		if shouldSkipDir {
+		if d.shouldSkipDir(path) {
 			logrus.Debugf("Ignoring directory and its contents (recursively): %s", path)
 			return filepath.SkipDir
 		}
@@ -168,14 +161,14 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 
 		if e.Op&fsnotify.Create != fsnotify.Create {
 			if d.shouldNotify(e.Name) {
-				d.wrappedEvents <- FileEvent{e.Name}
+				d.wrappedEvents <- FileEvent(e.Name)
 			}
 			continue
 		}
 
 		if d.isWatcherRecursive {
 			if d.shouldNotify(e.Name) {
-				d.wrappedEvents <- FileEvent{e.Name}
+				d.wrappedEvents <- FileEvent(e.Name)
 			}
 			continue
 		}
@@ -191,7 +184,7 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 			}
 
 			if d.shouldNotify(path) {
-				d.wrappedEvents <- FileEvent{path}
+				d.wrappedEvents <- FileEvent(path)
 			}
 
 			// TODO(dmiller): symlinks 😭
@@ -199,11 +192,7 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 			shouldWatch := false
 			if info.IsDir() {
 				// watch directories unless we can skip them entirely
-				shouldSkipDir, err := d.shouldSkipDir(path)
-				if err != nil {
-					return err
-				}
-				if shouldSkipDir {
+				if d.shouldSkipDir(path) {
 					return filepath.SkipDir
 				}
 
@@ -230,14 +219,6 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 }
 
 func (d *naiveNotify) shouldNotify(path string) bool {
-	ignore, err := d.ignore.Matches(path)
-	if err != nil {
-		logrus.Infof("Error matching path %q: %v", path, err)
-	} else if ignore {
-		logrus.Tracef("Ignoring event for path: %v", path)
-		return false
-	}
-
 	if _, ok := d.notifyList[path]; ok {
 		// We generally don't care when directories change at the root of an ADD
 		stat, err := os.Lstat(path)
@@ -253,19 +234,10 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 	return false
 }
 
-func (d *naiveNotify) shouldSkipDir(path string) (bool, error) {
+func (d *naiveNotify) shouldSkipDir(path string) bool {
 	// If path is directly in the notifyList, we should always watch it.
 	if d.notifyList[path] {
-		return false, nil
-	}
-
-	skip, err := d.ignore.MatchesEntireDir(path)
-	if err != nil {
-		return false, fmt.Errorf("shouldSkipDir: %w", err)
-	}
-
-	if skip {
-		return true, nil
+		return false
 	}
 
 	// Suppose we're watching
@@ -282,10 +254,10 @@ func (d *naiveNotify) shouldSkipDir(path string) (bool, error) {
 	//   (i.e., to cover the "path doesn't exist" case).
 	for root := range d.notifyList {
 		if pathutil.IsChild(root, path) || pathutil.IsChild(path, root) {
-			return false, nil
+			return false
 		}
 	}
-	return true, nil
+	return true
 }
 
 func (d *naiveNotify) add(path string) error {
@@ -298,11 +270,7 @@ func (d *naiveNotify) add(path string) error {
 	return nil
 }
 
-func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
-	if ignore == nil {
-		return nil, fmt.Errorf("newWatcher: ignore is nil")
-	}
-
+func newWatcher(paths []string) (Notify, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		if strings.Contains(err.Error(), "too many open files") && runtime.GOOS == "linux" {
@@ -332,7 +300,6 @@ func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 
 	wmw := &naiveNotify{
 		notifyList:         notifyList,
-		ignore:             ignore,
 		watcher:            fsw,
 		events:             fsw.Events,
 		wrappedEvents:      wrappedEvents,
