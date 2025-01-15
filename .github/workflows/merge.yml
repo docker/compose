@@ -114,6 +114,7 @@ jobs:
           source: .
           files: |
             ./docker-bake.hcl
+            ${{ steps.meta.outputs.bake-file }}
           targets: image-cross
           push: ${{ github.event_name != 'pull_request' }}
           sbom: true
