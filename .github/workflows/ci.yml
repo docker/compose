@@ -72,6 +72,9 @@ jobs:
         platform: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
       -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
         name: Prepare
         run: |
           platform=${{ matrix.platform }}
@@ -86,6 +89,7 @@ jobs:
         name: Build
         uses: docker/bake-action@v6
         with:
+          source: .
           targets: release
           set: |
             *.platform=${{ matrix.platform }}
