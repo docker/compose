@@ -229,6 +229,7 @@ type StartOptions struct {
 	// Services passed in the command line to be started
 	Services       []string
 	Watch          bool
+	Prune          bool
 	NavigationMenu bool
 }
 
