@@ -486,7 +486,7 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 				return securityOpts, false, fmt.Errorf("Invalid security-opt: %q", opt)
 			}
 		}
-		if con[0] == "seccomp" && con[1] != "unconfined" {
+		if con[0] == "seccomp" && con[1] != "unconfined" && con[1] != "builtin" {
 			f, err := os.ReadFile(p.RelativePath(con[1]))
 			if err != nil {
 				return securityOpts, false, fmt.Errorf("opening seccomp profile (%s) failed: %w", con[1], err)
