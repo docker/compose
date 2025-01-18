@@ -91,10 +91,25 @@ jobs:
         with:
           source: .
           targets: release
+          provenance: mode=max
+          sbom: true
           set: |
             *.platform=${{ matrix.platform }}
             *.cache-from=type=gha,scope=binary-${{ env.PLATFORM_PAIR }}
             *.cache-to=type=gha,scope=binary-${{ env.PLATFORM_PAIR }},mode=max
+      -
+        name: Rename provenance and sbom
+        working-directory: ./bin/release
+        run: |
+          binname=$(find . -name 'docker-compose-*')
+          filename=$(basename "$binname" | sed -E 's/\.exe$//')
+          mv "provenance.json" "${filename}.provenance.json"
+          mv "sbom-binary.spdx.json" "${filename}.sbom.json"
+          find . -name 'sbom*.json' -exec rm {} \;
+      -
+        name: List artifacts
+        run: |
+          tree -nh ./bin/release
       -
         name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -283,7 +298,11 @@ jobs:
           find . -type f -print0 | sort -z | xargs -r0 shasum -a 256 -b | sed 's# \*\./# *#' > $RUNNER_TEMP/checksums.txt
           shasum -a 256 -U -c $RUNNER_TEMP/checksums.txt
           mv $RUNNER_TEMP/checksums.txt .
-          cat checksums.txt | while read sum file; do echo "$sum $file" > ${file#\*}.sha256; done
+          cat checksums.txt | while read sum file; do
+            if [[ "${file#\*}" == docker-compose-* && "${file#\*}" != *.provenance.json && "${file#\*}" != *.sbom.json ]]; then
+              echo "$sum $file" > ${file#\*}.sha256
+            fi
+          done
       -
         name: License
         run: cp packaging/* ./bin/release/
