@@ -568,8 +568,20 @@ func defaultNetworkSettings(
 			primaryNetworkEndpoint.MacAddress = service.MacAddress
 		}
 	}
-
 	endpointsConfig[primaryNetworkMobyNetworkName] = primaryNetworkEndpoint
+
+	if versions.GreaterThanOrEqualTo(version, "1.48") {
+		for _, n := range service.NetworksByPriority() {
+			cfg := service.Networks[n]
+			if cfg == nil {
+				continue
+			}
+			endpoint := endpointsConfig[n]
+			endpoint.GwPriority = cfg.Priority
+			endpointsConfig[n] = endpoint
+		}
+	}
+
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: endpointsConfig,
 	}
