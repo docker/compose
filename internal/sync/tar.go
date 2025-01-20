@@ -32,7 +32,6 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/archive"
 )
@@ -65,8 +64,8 @@ func NewTar(projectName string, client LowLevelClient) *Tar {
 	}
 }
 
-func (t *Tar) Sync(ctx context.Context, service types.ServiceConfig, paths []PathMapping) error {
-	containers, err := t.client.ContainersForService(ctx, t.projectName, service.Name)
+func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) error {
+	containers, err := t.client.ContainersForService(ctx, t.projectName, service)
 	if err != nil {
 		return err
 	}
@@ -77,7 +76,7 @@ func (t *Tar) Sync(ctx context.Context, service types.ServiceConfig, paths []Pat
 		if _, err := os.Stat(p.HostPath); err != nil && errors.Is(err, fs.ErrNotExist) {
 			pathsToDelete = append(pathsToDelete, p.ContainerPath)
 		} else {
-			pathsToCopy = append(pathsToCopy, p)
+			pathsToCopy = append(pathsToCopy, *p)
 		}
 	}
 

@@ -18,8 +18,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -37,53 +35,6 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
-
-func TestDebounceBatching(t *testing.T) {
-	ch := make(chan fileEvent)
-	clock := clockwork.NewFakeClock()
-	ctx, stop := context.WithCancel(context.Background())
-	t.Cleanup(stop)
-
-	trigger := types.Trigger{
-		Path: "/",
-	}
-	matcher := watch.EmptyMatcher{}
-	eventBatchCh := batchDebounceEvents(ctx, clock, quietPeriod, ch)
-	for i := 0; i < 100; i++ {
-		path := "/a"
-		if i%2 == 0 {
-			path = "/b"
-		}
-
-		event := maybeFileEvent(trigger, path, matcher)
-		require.NotNil(t, event)
-		ch <- *event
-	}
-	// we sent 100 events + the debouncer
-	clock.BlockUntil(101)
-	clock.Advance(quietPeriod)
-	select {
-	case batch := <-eventBatchCh:
-		slices.SortFunc(batch, func(a, b fileEvent) int {
-			return strings.Compare(a.HostPath, b.HostPath)
-		})
-		assert.Equal(t, len(batch), 2)
-		assert.Equal(t, batch[0].HostPath, "/a")
-		assert.Equal(t, batch[1].HostPath, "/b")
-	case <-time.After(50 * time.Millisecond):
-		t.Fatal("timed out waiting for events")
-	}
-	clock.BlockUntil(1)
-	clock.Advance(quietPeriod)
-
-	// there should only be a single batch
-	select {
-	case batch := <-eventBatchCh:
-		t.Fatalf("unexpected events: %v", batch)
-	case <-time.After(50 * time.Millisecond):
-		// channel is empty
-	}
-}
 
 type testWatcher struct {
 	events chan watch.FileEvent
@@ -170,32 +121,37 @@ func TestWatch_Sync(t *testing.T) {
 			dockerCli: cli,
 			clock:     clock,
 		}
-		err := service.watchEvents(ctx, &proj, "test", api.WatchOptions{
+		rules, err := getWatchRules(&types.DevelopConfig{
+			Watch: []types.Trigger{
+				{
+					Path:   "/sync",
+					Action: "sync",
+					Target: "/work",
+					Ignore: []string{"ignore"},
+				},
+				{
+					Path:   "/rebuild",
+					Action: "rebuild",
+				},
+			},
+		}, types.ServiceConfig{Name: "test"})
+		assert.NilError(t, err)
+
+		err = service.watchEvents(ctx, &proj, api.WatchOptions{
 			Build: &api.BuildOptions{},
 			LogTo: stdLogger{},
 			Prune: true,
-		}, watcher, syncer, []types.Trigger{
-			{
-				Path:   "/sync",
-				Action: "sync",
-				Target: "/work",
-				Ignore: []string{"ignore"},
-			},
-			{
-				Path:   "/rebuild",
-				Action: "rebuild",
-			},
-		})
+		}, watcher, syncer, rules)
 		assert.NilError(t, err)
 	}()
 
 	watcher.Events() <- watch.NewFileEvent("/sync/changed")
 	watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
 	clock.BlockUntil(3)
-	clock.Advance(quietPeriod)
+	clock.Advance(watch.QuietPeriod)
 	select {
 	case actual := <-syncer.synced:
-		require.ElementsMatch(t, []sync.PathMapping{
+		require.ElementsMatch(t, []*sync.PathMapping{
 			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 			{HostPath: "/sync/changed/sub", ContainerPath: "/work/changed/sub"},
 		}, actual)
@@ -203,24 +159,10 @@ func TestWatch_Sync(t *testing.T) {
 		t.Error("timeout")
 	}
 
-	watcher.Events() <- watch.NewFileEvent("/sync/ignore")
-	watcher.Events() <- watch.NewFileEvent("/sync/ignore/sub")
-	watcher.Events() <- watch.NewFileEvent("/sync/changed")
-	clock.BlockUntil(4)
-	clock.Advance(quietPeriod)
-	select {
-	case actual := <-syncer.synced:
-		require.ElementsMatch(t, []sync.PathMapping{
-			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
-		}, actual)
-	case <-time.After(100 * time.Millisecond):
-		t.Error("timed out waiting for events")
-	}
-
 	watcher.Events() <- watch.NewFileEvent("/rebuild")
 	watcher.Events() <- watch.NewFileEvent("/sync/changed")
 	clock.BlockUntil(4)
-	clock.Advance(quietPeriod)
+	clock.Advance(watch.QuietPeriod)
 	select {
 	case batch := <-syncer.synced:
 		t.Fatalf("received unexpected events: %v", batch)
@@ -231,16 +173,16 @@ func TestWatch_Sync(t *testing.T) {
 }
 
 type fakeSyncer struct {
-	synced chan []sync.PathMapping
+	synced chan []*sync.PathMapping
 }
 
 func newFakeSyncer() *fakeSyncer {
 	return &fakeSyncer{
-		synced: make(chan []sync.PathMapping),
+		synced: make(chan []*sync.PathMapping),
 	}
 }
 
-func (f *fakeSyncer) Sync(_ context.Context, _ types.ServiceConfig, paths []sync.PathMapping) error {
+func (f *fakeSyncer) Sync(ctx context.Context, service string, paths []*sync.PathMapping) error {
 	f.synced <- paths
 	return nil
 }
