@@ -1,0 +1,11 @@
+services:
+  serviceA:
+    image: "alpine:3.12"
+    environment:
+      - "FOO=bar"
+  serviceB:
+    image: "alpine:3.12"
+    env_file:
+      - publish.env
+    environment:
+      - "BAR=baz"
