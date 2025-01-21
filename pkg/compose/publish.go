@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -35,7 +36,11 @@ func (s *composeService) Publish(ctx context.Context, project *types.Project, re
 }
 
 func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
-	err := s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
+	err := preChecks(project, options)
+	if err != nil {
+		return err
+	}
+	err = s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
 	if err != nil {
 		return err
 	}
@@ -61,6 +66,10 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			Descriptor: layerDescriptor,
 			Data:       f,
 		})
+	}
+
+	if options.WithEnvironment {
+		layers = append(layers, envFileLayers(project)...)
 	}
 
 	if options.ResolveImageDigests {
@@ -119,4 +128,50 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 		}
 	}
 	return override.MarshalYAML()
+}
+
+func preChecks(project *types.Project, options api.PublishOptions) error {
+	if !options.WithEnvironment {
+		for _, service := range project.Services {
+			if len(service.EnvFiles) > 0 {
+				return fmt.Errorf("service %q has env_file declared. To avoid leaking sensitive data, "+
+					"you must either explicitly allow the sending of environment variables by using the --with-env flag,"+
+					" or remove sensitive data from your Compose configuration", service.Name)
+			}
+			if len(service.Environment) > 0 {
+				return fmt.Errorf("service %q has environment variable(s) declared. To avoid leaking sensitive data, "+
+					"you must either explicitly allow the sending of environment variables by using the --with-env flag,"+
+					" or remove sensitive data from your Compose configuration", service.Name)
+			}
+		}
+
+		for _, config := range project.Configs {
+			if config.Environment != "" {
+				return fmt.Errorf("config %q is declare as an environment variable. To avoid leaking sensitive data, "+
+					"you must either explicitly allow the sending of environment variables by using the --with-env flag,"+
+					" or remove sensitive data from your Compose configuration", config.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+func envFileLayers(project *types.Project) []ocipush.Pushable {
+	var layers []ocipush.Pushable
+	for _, service := range project.Services {
+		for _, envFile := range service.EnvFiles {
+			f, err := os.ReadFile(envFile.Path)
+			if err != nil {
+				// if we can't read the file, skip to the next one
+				continue
+			}
+			layerDescriptor := ocipush.DescriptorForEnvFile(envFile.Path, f)
+			layers = append(layers, ocipush.Pushable{
+				Descriptor: layerDescriptor,
+				Data:       f,
+			})
+		}
+	}
+	return layers
 }

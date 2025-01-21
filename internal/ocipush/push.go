@@ -54,6 +54,8 @@ const (
 	// 	> an artifactType field, and tooling to work with artifacts should
 	//	> fallback to the config.mediaType value.
 	ComposeEmptyConfigMediaType = "application/vnd.docker.compose.config.empty.v1+json"
+	// ComposeEnvFileMediaType is the media type for each Env File layer in the image manifest.
+	ComposeEnvFileMediaType = "application/vnd.docker.compose.envfile"
 )
 
 // clientAuthStatusCodes are client (4xx) errors that are authentication
@@ -77,6 +79,18 @@ func DescriptorForComposeFile(path string, content []byte) v1.Descriptor {
 		Annotations: map[string]string{
 			"com.docker.compose.version": api.ComposeVersion,
 			"com.docker.compose.file":    filepath.Base(path),
+		},
+	}
+}
+
+func DescriptorForEnvFile(path string, content []byte) v1.Descriptor {
+	return v1.Descriptor{
+		MediaType: ComposeEnvFileMediaType,
+		Digest:    digest.FromString(string(content)),
+		Size:      int64(len(content)),
+		Annotations: map[string]string{
+			"com.docker.compose.version": api.ComposeVersion,
+			"com.docker.compose.envfile": filepath.Base(path),
 		},
 	}
 }
