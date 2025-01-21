@@ -154,16 +154,45 @@ func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, com
 		if err != nil {
 			return err
 		}
-		if i > 0 {
-			_, err = f.Write([]byte("\n---\n"))
-			if err != nil {
+
+		switch layer.MediaType {
+		case ocipush.ComposeYAMLMediaType:
+			if err := writeComposeFile(layer, i, f, content); err != nil {
 				return err
 			}
+		case ocipush.ComposeEnvFileMediaType:
+			if err := writeEnvFile(layer, local, content); err != nil {
+				return err
+			}
+		case ocipush.ComposeEmptyConfigMediaType:
 		}
-		_, err = f.Write(content)
+	}
+	return nil
+}
+
+func writeComposeFile(layer v1.Descriptor, i int, f *os.File, content []byte) error {
+	if _, ok := layer.Annotations["com.docker.compose.file"]; i > 0 && ok {
+		_, err := f.Write([]byte("\n---\n"))
 		if err != nil {
 			return err
 		}
+	}
+	_, err := f.Write(content)
+	return err
+}
+
+func writeEnvFile(layer v1.Descriptor, local string, content []byte) error {
+	envfilePath, ok := layer.Annotations["com.docker.compose.envfile"]
+	if !ok {
+		return fmt.Errorf("missing annotation com.docker.compose.envfile in layer %q", layer.Digest)
+	}
+	otherFile, err := os.Create(filepath.Join(local, envfilePath))
+	if err != nil {
+		return err
+	}
+	_, err = otherFile.Write(content)
+	if err != nil {
+		return err
 	}
 	return nil
 }

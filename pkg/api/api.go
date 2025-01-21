@@ -422,6 +422,7 @@ const (
 // PublishOptions group options of the Publish API
 type PublishOptions struct {
 	ResolveImageDigests bool
+	WithEnvironment     bool
 
 	OCIVersion OCIVersion
 }
