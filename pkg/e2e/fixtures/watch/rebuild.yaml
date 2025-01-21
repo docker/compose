@@ -1,0 +1,31 @@
+services:
+  a:
+    build:
+      dockerfile_inline: |
+        FROM nginx
+        RUN mkdir /data
+        COPY test /data/a
+    develop:
+      watch:
+        - path: test
+          action: rebuild
+  b:
+    build:
+      dockerfile_inline: |
+        FROM nginx
+        RUN mkdir /data
+        COPY test /data/b
+    develop:
+      watch:
+        - path: test
+          action: rebuild
+  c:
+    build:
+      dockerfile_inline: |
+        FROM nginx
+        RUN mkdir /data
+        COPY test /data/c
+    develop:
+      watch:
+        - path: test
+          action: rebuild
