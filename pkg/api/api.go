@@ -423,6 +423,7 @@ const (
 type PublishOptions struct {
 	ResolveImageDigests bool
 	WithEnvironment     bool
+	AssumeYes           bool
 
 	OCIVersion OCIVersion
 }

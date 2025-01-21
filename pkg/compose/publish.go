@@ -24,9 +24,11 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/util/imagetools"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/ocipush"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/prompt"
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
@@ -36,9 +38,12 @@ func (s *composeService) Publish(ctx context.Context, project *types.Project, re
 }
 
 func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
-	err := preChecks(project, options)
+	accept, err := s.preChecks(project, options)
 	if err != nil {
 		return err
+	}
+	if !accept {
+		return nil
 	}
 	err = s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
 	if err != nil {
@@ -130,31 +135,65 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	return override.MarshalYAML()
 }
 
-func preChecks(project *types.Project, options api.PublishOptions) error {
-	if !options.WithEnvironment {
-		for _, service := range project.Services {
-			if len(service.EnvFiles) > 0 {
-				return fmt.Errorf("service %q has env_file declared. To avoid leaking sensitive data, "+
-					"you must either explicitly allow the sending of environment variables by using the --with-env flag,"+
-					" or remove sensitive data from your Compose configuration", service.Name)
-			}
-			if len(service.Environment) > 0 {
-				return fmt.Errorf("service %q has environment variable(s) declared. To avoid leaking sensitive data, "+
-					"you must either explicitly allow the sending of environment variables by using the --with-env flag,"+
-					" or remove sensitive data from your Compose configuration", service.Name)
+func (s *composeService) preChecks(project *types.Project, options api.PublishOptions) (bool, error) {
+	envVariables, err := s.checkEnvironmentVariables(project, options)
+	if err != nil {
+		return false, err
+	}
+	if !options.AssumeYes && len(envVariables) > 0 {
+		fmt.Println("you are about to publish environment variables within your OCI artifact.\n" +
+			"please double check that you are not leaking sensitive data")
+		for key, val := range envVariables {
+			_, _ = fmt.Fprintln(s.dockerCli.Out(), "Service/Config ", key)
+			for k, v := range val {
+				_, _ = fmt.Fprintf(s.dockerCli.Out(), "%s=%v\n", k, *v)
 			}
 		}
+		return acceptPublishEnvVariables(s.dockerCli)
+	}
+	return true, nil
+}
 
-		for _, config := range project.Configs {
-			if config.Environment != "" {
-				return fmt.Errorf("config %q is declare as an environment variable. To avoid leaking sensitive data, "+
-					"you must either explicitly allow the sending of environment variables by using the --with-env flag,"+
-					" or remove sensitive data from your Compose configuration", config.Name)
-			}
+func (s *composeService) checkEnvironmentVariables(project *types.Project, options api.PublishOptions) (map[string]types.MappingWithEquals, error) {
+	envVarList := map[string]types.MappingWithEquals{}
+	errorList := map[string][]string{}
+
+	for _, service := range project.Services {
+		if len(service.EnvFiles) > 0 {
+			errorList[service.Name] = append(errorList[service.Name], fmt.Sprintf("service %q has env_file declared.", service.Name))
+		}
+		if len(service.Environment) > 0 {
+			errorList[service.Name] = append(errorList[service.Name], fmt.Sprintf("service %q has environment variable(s) declared.", service.Name))
+			envVarList[service.Name] = service.Environment
 		}
 	}
 
-	return nil
+	for _, config := range project.Configs {
+		if config.Environment != "" {
+			errorList[config.Name] = append(errorList[config.Name], fmt.Sprintf("config %q is declare as an environment variable.", config.Name))
+			envVarList[config.Name] = types.NewMappingWithEquals([]string{fmt.Sprintf("%s=%s", config.Name, config.Environment)})
+		}
+	}
+
+	if !options.WithEnvironment && len(errorList) > 0 {
+		errorMsgSuffix := "To avoid leaking sensitive data, you must either explicitly allow the sending of environment variables by using the --with-env flag,\n" +
+			"or remove sensitive data from your Compose configuration"
+		errorMsg := ""
+		for _, errors := range errorList {
+			for _, err := range errors {
+				errorMsg += fmt.Sprintf("%s\n", err)
+			}
+		}
+		return nil, fmt.Errorf("%s%s", errorMsg, errorMsgSuffix)
+
+	}
+	return envVarList, nil
+}
+
+func acceptPublishEnvVariables(cli command.Cli) (bool, error) {
+	msg := "Are you ok to publish these environment variables? [y/N]: "
+	confirm, err := prompt.NewPrompt(cli.In(), cli.Out()).Confirm(msg, false)
+	return confirm, err
 }
 
 func envFileLayers(project *types.Project) []ocipush.Pushable {
