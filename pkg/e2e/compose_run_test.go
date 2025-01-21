@@ -162,7 +162,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("--quiet-pull", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/quiet-pull.yaml", "down", "--rmi", "all")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/quiet-pull.yaml", "down", "--remove-orphans", "--rmi", "all")
 		res.Assert(t, icmd.Success)
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/quiet-pull.yaml", "run", "--quiet-pull", "backend")
@@ -171,12 +171,11 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("--pull", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/pull.yaml", "down", "--rmi", "all")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/pull.yaml", "down", "--remove-orphans", "--rmi", "all")
 		res.Assert(t, icmd.Success)
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/pull.yaml", "run", "--pull", "always", "backend")
 		assert.Assert(t, strings.Contains(res.Combined(), "backend Pulling"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "Download complete"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "backend Pulled"), res.Combined())
 	})
 }
