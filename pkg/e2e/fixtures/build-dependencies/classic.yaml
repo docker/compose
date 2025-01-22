@@ -7,8 +7,8 @@ services:
       dockerfile: base.dockerfile
   service:
     init: true
+    depends_on:
+      - base
     build:
       context: .
-      additional_contexts:
-        base: "service:base"
       dockerfile: service.dockerfile

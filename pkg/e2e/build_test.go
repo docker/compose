@@ -271,14 +271,30 @@ func TestBuildImageDependencies(t *testing.T) {
 	t.Run("ClassicBuilder", func(t *testing.T) {
 		cli := NewCLI(t, WithEnv(
 			"DOCKER_BUILDKIT=0",
+			"COMPOSE_FILE=./fixtures/build-dependencies/classic.yaml",
+		))
+		doTest(t, cli)
+	})
+
+	t.Run("BuildKit by dependency order", func(t *testing.T) {
+		cli := NewCLI(t, WithEnv(
+			"DOCKER_BUILDKIT=1",
+			"COMPOSE_FILE=./fixtures/build-dependencies/classic.yaml",
+		))
+		doTest(t, cli)
+	})
+
+	t.Run("BuildKit by additional contexts", func(t *testing.T) {
+		cli := NewCLI(t, WithEnv(
+			"DOCKER_BUILDKIT=1",
 			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
 		))
 		doTest(t, cli)
 	})
 
-	t.Run("BuildKit", func(t *testing.T) {
+	t.Run("Bake by additional contexts", func(t *testing.T) {
 		cli := NewCLI(t, WithEnv(
-			"DOCKER_BUILDKIT=1",
+			"DOCKER_BUILDKIT=1", "COMPOSE_BAKE=1",
 			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
 		))
 		doTest(t, cli)

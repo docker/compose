@@ -105,14 +105,17 @@ type bakeTarget struct {
 	Tags             []string          `json:"tags,omitempty"`
 	CacheFrom        []string          `json:"cache-from,omitempty"`
 	CacheTo          []string          `json:"cache-to,omitempty"`
+	Target           string            `json:"target,omitempty"`
 	Secrets          []string          `json:"secret,omitempty"`
 	SSH              []string          `json:"ssh,omitempty"`
 	Platforms        []string          `json:"platforms,omitempty"`
-	Target           string            `json:"target,omitempty"`
 	Pull             bool              `json:"pull,omitempty"`
 	NoCache          bool              `json:"no-cache,omitempty"`
+	NetworkMode      string            `json:"network,omitempty"`
+	NoCacheFilter    []string          `json:"no-cache-filter,omitempty"`
 	ShmSize          types.UnitBytes   `json:"shm-size,omitempty"`
 	Ulimits          []string          `json:"ulimits,omitempty"`
+	Call             string            `json:"call,omitempty"`
 	Entitlements     []string          `json:"entitlements,omitempty"`
 	Outputs          []string          `json:"output,omitempty"`
 }
@@ -124,11 +127,6 @@ type buildStatus struct {
 }
 
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
-	cw := progress.ContextWriter(ctx)
-	for name := range serviceToBeBuild {
-		cw.Event(progress.BuildingEvent(name))
-	}
-
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
 	display, err := progressui.NewDisplay(os.Stdout, progressui.DisplayMode(options.Progress))
@@ -191,7 +189,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		cfg.Targets[serviceName] = bakeTarget{
 			Context:          build.Context,
-			Contexts:         additionalContexts(build.AdditionalContexts, service.DependsOn, options.Compatibility),
+			Contexts:         additionalContexts(build.AdditionalContexts),
 			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
 			DockerfileInline: build.DockerfileInline,
 			Args:             args,
@@ -221,7 +219,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
-	logrus.Debugf("bake config:\n%s", string(b))
+	logrus.Debugf("bake build config:\n%s", string(b))
 
 	metadata, err := os.CreateTemp(os.TempDir(), "compose")
 	if err != nil {
@@ -320,6 +318,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
+	cw := progress.ContextWriter(ctx)
 	results := map[string]string{}
 	for name, m := range md {
 		results[name] = m.Digest
@@ -328,14 +327,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	return results, nil
 }
 
-func additionalContexts(contexts types.Mapping, dependencies types.DependsOnConfig, compatibility bool) map[string]string {
+func additionalContexts(contexts types.Mapping) map[string]string {
 	ac := map[string]string{}
-	if compatibility {
-		for name := range dependencies {
-			ac[name] = "target:" + name
-		}
-	}
 	for k, v := range contexts {
+		if target, found := strings.CutPrefix(v, types.ServicePrefix); found {
+			v = "target:" + target
+		}
 		ac[k] = v
 	}
 	return ac
