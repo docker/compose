@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
@@ -71,7 +72,33 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	if options.Deps {
 		policy = types.IncludeDependencies
 	}
-	err := project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
+
+	serviceDeps := false
+	project, err := project.WithServicesTransform(func(serviceName string, service types.ServiceConfig) (types.ServiceConfig, error) {
+		if service.Build != nil {
+			for _, c := range service.Build.AdditionalContexts {
+				if t, found := strings.CutPrefix(c, types.ServicePrefix); found {
+					serviceDeps = true
+					if service.DependsOn == nil {
+						service.DependsOn = map[string]types.ServiceDependency{}
+					}
+					service.DependsOn[t] = types.ServiceDependency{
+						Condition: "build", // non-canonical, but will force dependency graph ordering
+					}
+				}
+			}
+		}
+		return service, nil
+	})
+	if err != nil {
+		return imageIDs, err
+	}
+
+	if serviceDeps {
+		logrus.Infof(`additional_context with "service:"" is better supported when delegating build go bake. Set COMPOSE_BAKE=true`)
+	}
+
+	err = project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
 		}
@@ -536,6 +563,11 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 func toBuildContexts(additionalContexts types.Mapping) map[string]build.NamedContext {
 	namedContexts := map[string]build.NamedContext{}
 	for name, contextPath := range additionalContexts {
+		if _, found := strings.CutPrefix(contextPath, types.ServicePrefix); found {
+			// image we depend on has been build previously, as we run in dependency order.
+			// this assumes use of docker engine builder, so that build can access local images
+			continue
+		}
 		namedContexts[name] = build.NamedContext{Path: contextPath}
 	}
 	return namedContexts
