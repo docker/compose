@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"time"
 
-	pusherrors "github.com/containerd/containerd/remotes/errors"
+	pusherrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/compose/v2/pkg/api"
