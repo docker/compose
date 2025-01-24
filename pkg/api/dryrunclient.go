@@ -424,8 +424,8 @@ func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, 
 	return d.apiClient.ImageCreate(ctx, parentReference, options)
 }
 
-func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string) ([]image.HistoryResponseItem, error) {
-	return d.apiClient.ImageHistory(ctx, imageName)
+func (d *DryRunClient) ImageHistory(ctx context.Context, image string, opts image.HistoryOptions) ([]image.HistoryResponseItem, error) {
+	return d.apiClient.ImageHistory(ctx, image, opts)
 }
 
 func (d *DryRunClient) ImageImport(ctx context.Context, source image.ImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
@@ -436,16 +436,16 @@ func (d *DryRunClient) ImageList(ctx context.Context, options image.ListOptions)
 	return d.apiClient.ImageList(ctx, options)
 }
 
-func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, quiet bool) (image.LoadResponse, error) {
-	return d.apiClient.ImageLoad(ctx, input, quiet)
+func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, opts image.LoadOptions) (image.LoadResponse, error) {
+	return d.apiClient.ImageLoad(ctx, input, opts)
 }
 
 func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options registry.SearchOptions) ([]registry.SearchResult, error) {
 	return d.apiClient.ImageSearch(ctx, term, options)
 }
 
-func (d *DryRunClient) ImageSave(ctx context.Context, images []string) (io.ReadCloser, error) {
-	return d.apiClient.ImageSave(ctx, images)
+func (d *DryRunClient) ImageSave(ctx context.Context, images []string, opts image.SaveOptions) (io.ReadCloser, error) {
+	return d.apiClient.ImageSave(ctx, images, opts)
 }
 
 func (d *DryRunClient) ImageTag(ctx context.Context, imageName, ref string) error {

@@ -199,3 +199,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace github.com/docker/docker => github.com/docker/docker v27.0.2-0.20250123194108-433e9a50ce7b+incompatible
+
+replace github.com/docker/cli => github.com/docker/cli v27.0.2-0.20250124134141-b8879a4eb580+incompatible

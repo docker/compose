@@ -5,7 +5,6 @@
 //
 //	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
 //
-
 // Package mocks is a generated GoMock package.
 package mocks
 
