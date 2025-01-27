@@ -93,19 +93,20 @@ type bakeGroup struct {
 }
 
 type bakeTarget struct {
-	Context    string            `json:"context,omitempty"`
-	Dockerfile string            `json:"dockerfile,omitempty"`
-	Args       map[string]string `json:"args,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	Tags       []string          `json:"tags,omitempty"`
-	CacheFrom  []string          `json:"cache-from,omitempty"`
-	CacheTo    []string          `json:"cache-to,omitempty"`
-	Secrets    []string          `json:"secret,omitempty"`
-	SSH        []string          `json:"ssh,omitempty"`
-	Platforms  []string          `json:"platforms,omitempty"`
-	Target     string            `json:"target,omitempty"`
-	Pull       bool              `json:"pull,omitempty"`
-	NoCache    bool              `json:"no-cache,omitempty"`
+	Context      string            `json:"context,omitempty"`
+	Dockerfile   string            `json:"dockerfile,omitempty"`
+	Args         map[string]string `json:"args,omitempty"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	Tags         []string          `json:"tags,omitempty"`
+	CacheFrom    []string          `json:"cache-from,omitempty"`
+	CacheTo      []string          `json:"cache-to,omitempty"`
+	Secrets      []string          `json:"secret,omitempty"`
+	SSH          []string          `json:"ssh,omitempty"`
+	Platforms    []string          `json:"platforms,omitempty"`
+	Target       string            `json:"target,omitempty"`
+	Pull         bool              `json:"pull,omitempty"`
+	NoCache      bool              `json:"no-cache,omitempty"`
+	Entitlements []string          `json:"entitlements,omitempty"`
 }
 
 type bakeMetadata map[string]buildStatus
@@ -162,12 +163,13 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 			CacheFrom: build.CacheFrom,
 			// CacheTo:    TODO
-			Platforms: build.Platforms,
-			Target:    build.Target,
-			Secrets:   toBakeSecrets(project, build.Secrets),
-			SSH:       toBakeSSH(append(build.SSH, options.SSHs...)),
-			Pull:      options.Pull,
-			NoCache:   options.NoCache,
+			Platforms:    build.Platforms,
+			Target:       build.Target,
+			Secrets:      toBakeSecrets(project, build.Secrets),
+			SSH:          toBakeSSH(append(build.SSH, options.SSHs...)),
+			Pull:         options.Pull,
+			NoCache:      options.NoCache,
+			Entitlements: build.Entitlements,
 		}
 		group.Targets = append(group.Targets, image)
 	}
@@ -236,7 +238,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	err = eg.Wait()
 	if err != nil {
-		return nil, err
+		return nil, WrapCategorisedComposeError(err, BuildFailure)
 	}
 
 	b, err = os.ReadFile(metadata.Name())
@@ -270,11 +272,15 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) 
 	var s []string
 	for _, ref := range secrets {
 		def := project.Secrets[ref.Source]
+		target := ref.Target
+		if target == "" {
+			target = ref.Source
+		}
 		switch {
 		case def.Environment != "":
-			s = append(s, fmt.Sprintf("id=%s,type=env,env=%s", ref.Source, def.Environment))
+			s = append(s, fmt.Sprintf("id=%s,type=env,env=%s", target, def.Environment))
 		case def.File != "":
-			s = append(s, fmt.Sprintf("id=%s,type=file,src=%s", ref.Source, def.File))
+			s = append(s, fmt.Sprintf("id=%s,type=file,src=%s", target, def.File))
 		}
 	}
 	return s
