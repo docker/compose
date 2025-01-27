@@ -155,6 +155,8 @@ type BuildOptions struct {
 	Memory int64
 	// Builder name passed in the command line
 	Builder string
+	// Compatibility let compose run with best backward compatibility
+	Compatibility bool
 }
 
 // Apply mutates project according to build options
