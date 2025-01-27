@@ -154,6 +154,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		image := api.GetImageNameOrDefault(service, project.Name)
 
+		entitlements := build.Entitlements
+		if build.Privileged {
+			entitlements = append(entitlements, "security.insecure")
+		}
+
 		cfg.Targets[image] = bakeTarget{
 			Context:    build.Context,
 			Dockerfile: dockerFilePath(build.Context, build.Dockerfile),
@@ -169,7 +174,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			SSH:          toBakeSSH(append(build.SSH, options.SSHs...)),
 			Pull:         options.Pull,
 			NoCache:      options.NoCache,
-			Entitlements: build.Entitlements,
+			Entitlements: entitlements,
 		}
 		group.Targets = append(group.Targets, image)
 	}
