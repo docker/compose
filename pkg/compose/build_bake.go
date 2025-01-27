@@ -107,6 +107,7 @@ type bakeTarget struct {
 	Pull         bool              `json:"pull,omitempty"`
 	NoCache      bool              `json:"no-cache,omitempty"`
 	Entitlements []string          `json:"entitlements,omitempty"`
+	Outputs      []string          `json:"output,omitempty"`
 }
 
 type bakeMetadata map[string]buildStatus
@@ -138,7 +139,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	var group bakeGroup
 
-	for _, service := range serviceToBeBuild {
+	for serviceName, service := range serviceToBeBuild {
 		if service.Build == nil {
 			continue
 		}
@@ -159,7 +160,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			entitlements = append(entitlements, "security.insecure")
 		}
 
-		cfg.Targets[image] = bakeTarget{
+		outputs := []string{"type=docker"}
+		if options.Push {
+			outputs = append(outputs, "type=image,push=true")
+		}
+
+		cfg.Targets[serviceName] = bakeTarget{
 			Context:    build.Context,
 			Dockerfile: dockerFilePath(build.Context, build.Dockerfile),
 			Args:       args,
@@ -175,8 +181,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Pull:         options.Pull,
 			NoCache:      options.NoCache,
 			Entitlements: entitlements,
+			Outputs:      outputs,
 		}
-		group.Targets = append(group.Targets, image)
+		group.Targets = append(group.Targets, serviceName)
 	}
 
 	cfg.Groups["default"] = group
