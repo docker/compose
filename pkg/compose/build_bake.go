@@ -48,40 +48,33 @@ import (
 )
 
 func buildWithBake(dockerCli command.Cli) (bool, error) {
-	b, ok := os.LookupEnv("COMPOSE_BAKE")
-	if !ok {
-		if dockerCli.ConfigFile().Plugins["compose"]["build"] == "bake" {
-			b, ok = "true", true
-		}
-	}
-	if !ok {
-		return false, nil
-	}
-	bake, err := strconv.ParseBool(b)
-	if err != nil {
-		return false, err
-	}
-	if !bake {
-		return false, nil
-	}
-
 	enabled, err := dockerCli.BuildKitEnabled()
 	if err != nil {
 		return false, err
 	}
 	if !enabled {
-		logrus.Warnf("Docker Compose is configured to build using Bake, but buildkit isn't enabled")
+		return false, nil
 	}
 
 	_, err = manager.GetPlugin("buildx", dockerCli, &cobra.Command{})
 	if err != nil {
 		if manager.IsNotFound(err) {
-			logrus.Warnf("Docker Compose is configured to build using Bake, but buildx isn't installed")
+			logrus.Warn("buildx plugin not installed.")
 			return false, nil
 		}
 		return false, err
 	}
-	return true, err
+
+	b, ok := os.LookupEnv("COMPOSE_BAKE")
+	if !ok {
+		// User can opt-out with COMPOSE_BAKE=false but we use bake by default
+		return true, nil
+	}
+	bake, err := strconv.ParseBool(b)
+	if err != nil {
+		return false, err
+	}
+	return bake, nil
 }
 
 // We _could_ use bake.* types from github.com/docker/buildx but long term plan is to remove buildx as a dependency
