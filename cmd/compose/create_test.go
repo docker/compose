@@ -40,7 +40,9 @@ func TestRunCreate(t *testing.T) {
 	)
 
 	createOpts := createOptions{}
-	buildOpts := buildOptions{}
+	buildOpts := buildOptions{
+		ProjectOptions: &ProjectOptions{},
+	}
 	project := sampleProject()
 	err := runCreate(ctx, nil, backend, createOpts, buildOpts, project, nil)
 	require.NoError(t, err)
@@ -58,7 +60,9 @@ func TestRunCreate_Build(t *testing.T) {
 	createOpts := createOptions{
 		Build: true,
 	}
-	buildOpts := buildOptions{}
+	buildOpts := buildOptions{
+		ProjectOptions: &ProjectOptions{},
+	}
 	project := sampleProject()
 	err := runCreate(ctx, nil, backend, createOpts, buildOpts, project, nil)
 	require.NoError(t, err)

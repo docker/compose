@@ -68,16 +68,17 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		uiMode = "rawjson"
 	}
 	return api.BuildOptions{
-		Pull:     opts.pull,
-		Push:     opts.push,
-		Progress: uiMode,
-		Args:     types.NewMappingWithEquals(opts.args),
-		NoCache:  opts.noCache,
-		Quiet:    opts.quiet,
-		Services: services,
-		Deps:     opts.deps,
-		SSHs:     SSHKeys,
-		Builder:  builderName,
+		Pull:          opts.pull,
+		Push:          opts.push,
+		Progress:      uiMode,
+		Args:          types.NewMappingWithEquals(opts.args),
+		NoCache:       opts.noCache,
+		Quiet:         opts.quiet,
+		Services:      services,
+		Deps:          opts.deps,
+		SSHs:          SSHKeys,
+		Builder:       builderName,
+		Compatibility: opts.Compatibility,
 	}, nil
 }
 

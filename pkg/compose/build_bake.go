@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/util/progress/progressui"
@@ -93,19 +95,25 @@ type bakeGroup struct {
 }
 
 type bakeTarget struct {
-	Context    string            `json:"context,omitempty"`
-	Dockerfile string            `json:"dockerfile,omitempty"`
-	Args       map[string]string `json:"args,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	Tags       []string          `json:"tags,omitempty"`
-	CacheFrom  []string          `json:"cache-from,omitempty"`
-	CacheTo    []string          `json:"cache-to,omitempty"`
-	Secrets    []string          `json:"secret,omitempty"`
-	SSH        []string          `json:"ssh,omitempty"`
-	Platforms  []string          `json:"platforms,omitempty"`
-	Target     string            `json:"target,omitempty"`
-	Pull       bool              `json:"pull,omitempty"`
-	NoCache    bool              `json:"no-cache,omitempty"`
+	Context          string            `json:"context,omitempty"`
+	Contexts         map[string]string `json:"contexts,omitempty"`
+	Dockerfile       string            `json:"dockerfile,omitempty"`
+	DockerfileInline string            `json:"dockerfile-inline,omitempty"`
+	Args             map[string]string `json:"args,omitempty"`
+	Labels           map[string]string `json:"labels,omitempty"`
+	Tags             []string          `json:"tags,omitempty"`
+	CacheFrom        []string          `json:"cache-from,omitempty"`
+	CacheTo          []string          `json:"cache-to,omitempty"`
+	Secrets          []string          `json:"secret,omitempty"`
+	SSH              []string          `json:"ssh,omitempty"`
+	Platforms        []string          `json:"platforms,omitempty"`
+	Target           string            `json:"target,omitempty"`
+	Pull             bool              `json:"pull,omitempty"`
+	NoCache          bool              `json:"no-cache,omitempty"`
+	ShmSize          types.UnitBytes   `json:"shm-size,omitempty"`
+	Ulimits          []string          `json:"ulimits,omitempty"`
+	Entitlements     []string          `json:"entitlements,omitempty"`
+	Outputs          []string          `json:"output,omitempty"`
 }
 
 type bakeMetadata map[string]buildStatus
@@ -136,8 +144,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		Targets: map[string]bakeTarget{},
 	}
 	var group bakeGroup
+	var privileged bool
 
-	for _, service := range serviceToBeBuild {
+	for serviceName, service := range serviceToBeBuild {
 		if service.Build == nil {
 			continue
 		}
@@ -153,23 +162,43 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		image := api.GetImageNameOrDefault(service, project.Name)
 
-		cfg.Targets[image] = bakeTarget{
-			Context:    build.Context,
-			Dockerfile: dockerFilePath(build.Context, build.Dockerfile),
-			Args:       args,
-			Labels:     build.Labels,
-			Tags:       append(build.Tags, image),
+		entitlements := build.Entitlements
+		if slices.Contains(build.Entitlements, "security.insecure") {
+			privileged = true
+		}
+		if build.Privileged {
+			entitlements = append(entitlements, "security.insecure")
+			privileged = true
+		}
+
+		outputs := []string{"type=docker"}
+		if options.Push && service.Image != "" {
+			outputs = append(outputs, "type=image,push=true")
+		}
+
+		cfg.Targets[serviceName] = bakeTarget{
+			Context:          build.Context,
+			Contexts:         additionalContexts(build.AdditionalContexts, service.DependsOn, options.Compatibility),
+			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
+			DockerfileInline: build.DockerfileInline,
+			Args:             args,
+			Labels:           build.Labels,
+			Tags:             append(build.Tags, image),
 
 			CacheFrom: build.CacheFrom,
 			// CacheTo:    TODO
-			Platforms: build.Platforms,
-			Target:    build.Target,
-			Secrets:   toBakeSecrets(project, build.Secrets),
-			SSH:       toBakeSSH(build.SSH),
-			Pull:      options.Pull,
-			NoCache:   options.NoCache,
+			Platforms:    build.Platforms,
+			Target:       build.Target,
+			Secrets:      toBakeSecrets(project, build.Secrets),
+			SSH:          toBakeSSH(append(build.SSH, options.SSHs...)),
+			Pull:         options.Pull,
+			NoCache:      options.NoCache,
+			ShmSize:      build.ShmSize,
+			Ulimits:      toBakeUlimits(build.Ulimits),
+			Entitlements: entitlements,
+			Outputs:      outputs,
 		}
-		group.Targets = append(group.Targets, image)
+		group.Targets = append(group.Targets, serviceName)
 	}
 
 	cfg.Groups["default"] = group
@@ -188,7 +217,14 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, buildx.Path, "bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadata.Name())
+
+	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadata.Name()}
+	mustAllow := buildx.Version != "" && versions.GreaterThanOrEqualTo(buildx.Version[1:], "0.17.0")
+	if privileged && mustAllow {
+		args = append(args, "--allow", "security.insecure")
+	}
+
+	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 	// Remove DOCKER_CLI_PLUGIN... variable so buildx can detect it run standalone
 	cmd.Env = filter(os.Environ(), manager.ReexecEnvvar)
 
@@ -258,6 +294,31 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	return results, nil
 }
 
+func additionalContexts(contexts types.Mapping, dependencies types.DependsOnConfig, compatibility bool) map[string]string {
+	ac := map[string]string{}
+	if compatibility {
+		for name := range dependencies {
+			ac[name] = "target:" + name
+		}
+	}
+	for k, v := range contexts {
+		ac[k] = v
+	}
+	return ac
+}
+
+func toBakeUlimits(ulimits map[string]*types.UlimitsConfig) []string {
+	s := []string{}
+	for u, l := range ulimits {
+		if l.Single > 0 {
+			s = append(s, fmt.Sprintf("%s=%d", u, l.Single))
+		} else {
+			s = append(s, fmt.Sprintf("%s=%d:%d", u, l.Soft, l.Hard))
+		}
+	}
+	return s
+}
+
 func toBakeSSH(ssh types.SSHConfig) []string {
 	var s []string
 	for _, key := range ssh {
@@ -270,11 +331,15 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) 
 	var s []string
 	for _, ref := range secrets {
 		def := project.Secrets[ref.Source]
+		target := ref.Target
+		if target == "" {
+			target = ref.Source
+		}
 		switch {
 		case def.Environment != "":
-			s = append(s, fmt.Sprintf("id=%s,type=env,env=%s", ref.Source, def.Environment))
+			s = append(s, fmt.Sprintf("id=%s,type=env,env=%s", target, def.Environment))
 		case def.File != "":
-			s = append(s, fmt.Sprintf("id=%s,type=file,src=%s", ref.Source, def.File))
+			s = append(s, fmt.Sprintf("id=%s,type=file,src=%s", target, def.File))
 		}
 	}
 	return s
