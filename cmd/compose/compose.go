@@ -44,7 +44,6 @@ import (
 	"github.com/docker/compose/v2/internal/experimental"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/compose"
 	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/remote"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -121,17 +120,9 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 		}()
 
 		err := fn(ctx, cmd, args)
-		var composeErr compose.Error
 		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
 			err = dockercli.StatusError{
 				StatusCode: 130,
-				Status:     compose.CanceledStatus,
-			}
-		}
-		if errors.As(err, &composeErr) {
-			err = dockercli.StatusError{
-				StatusCode: composeErr.GetMetricsFailureCategory().ExitCode,
-				Status:     err.Error(),
 			}
 		}
 		if ui.Mode == ui.ModeJSON {
@@ -307,7 +298,7 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
-		return nil, metrics, compose.WrapComposeError(err)
+		return nil, metrics, err
 	}
 
 	options.WithListeners(func(event string, metadata map[string]any) {
@@ -339,7 +330,7 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 
 	project, err := options.LoadProject(ctx)
 	if err != nil {
-		return nil, metrics, compose.WrapComposeError(err)
+		return nil, metrics, err
 	}
 
 	if project.Name == "" {
@@ -453,7 +444,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 			}
 			_ = cmd.Help()
 			return dockercli.StatusError{
-				StatusCode: compose.CommandSyntaxFailure.ExitCode,
+				StatusCode: 1,
 				Status:     fmt.Sprintf("unknown docker command: %q", "compose "+args[0]),
 			}
 		},

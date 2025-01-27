@@ -62,7 +62,7 @@ func pluginMain() {
 
 		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 			return dockercli.StatusError{
-				StatusCode: compose.CommandSyntaxFailure.ExitCode,
+				StatusCode: 1,
 				Status:     err.Error(),
 			}
 		})

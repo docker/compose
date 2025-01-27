@@ -82,7 +82,7 @@ func TestComposePull(t *testing.T) {
 
 	t.Run("Verify pull failure", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/compose-pull/unknown-image", "pull")
-		res.Assert(t, icmd.Expected{ExitCode: 18, Err: "pull access denied for does_not_exists"})
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "pull access denied for does_not_exists"})
 	})
 
 	t.Run("Verify ignore pull failure", func(t *testing.T) {
