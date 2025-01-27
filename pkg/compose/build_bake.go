@@ -165,7 +165,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Platforms: build.Platforms,
 			Target:    build.Target,
 			Secrets:   toBakeSecrets(project, build.Secrets),
-			SSH:       toBakeSSH(build.SSH),
+			SSH:       toBakeSSH(append(build.SSH, options.SSHs...)),
 			Pull:      options.Pull,
 			NoCache:   options.NoCache,
 		}
