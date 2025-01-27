@@ -106,6 +106,8 @@ type bakeTarget struct {
 	Target       string            `json:"target,omitempty"`
 	Pull         bool              `json:"pull,omitempty"`
 	NoCache      bool              `json:"no-cache,omitempty"`
+	ShmSize      string            `json:"shm-size,omitempty"`
+	Ulimits      []string          `json:"ulimits,omitempty"`
 	Entitlements []string          `json:"entitlements,omitempty"`
 	Outputs      []string          `json:"output,omitempty"`
 }
@@ -180,6 +182,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			SSH:          toBakeSSH(append(build.SSH, options.SSHs...)),
 			Pull:         options.Pull,
 			NoCache:      options.NoCache,
+			ShmSize:      fmt.Sprint(build.ShmSize),
+			Ulimits:      toBakeUlimits(build.Ulimits),
 			Entitlements: entitlements,
 			Outputs:      outputs,
 		}
@@ -270,6 +274,18 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		cw.Event(progress.BuiltEvent(name))
 	}
 	return results, nil
+}
+
+func toBakeUlimits(ulimits map[string]*types.UlimitsConfig) []string {
+	s := []string{}
+	for u, l := range ulimits {
+		if l.Single > 0 {
+			s = append(s, fmt.Sprintf("%s=%d", u, l.Single))
+		} else {
+			s = append(s, fmt.Sprintf("%s=%d:%d", u, l.Soft, l.Hard))
+		}
+	}
+	return s
 }
 
 func toBakeSSH(ssh types.SSHConfig) []string {
