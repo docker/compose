@@ -174,7 +174,7 @@ func TestBuildSSH(t *testing.T) {
 				"--project-directory", "fixtures/build-test/ssh", "build", "--no-cache", "--ssh",
 				"wrong-ssh=./fixtures/build-test/ssh/fake_rsa")
 			res.Assert(t, icmd.Expected{
-				ExitCode: 17,
+				ExitCode: 1,
 				Err:      "unset ssh forward key fake-ssh",
 			})
 		})
@@ -304,7 +304,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
 			"-f", "fixtures/build-test/platforms/compose-unsupported-platform.yml", "build")
 		res.Assert(t, icmd.Expected{
-			ExitCode: 17,
+			ExitCode: 1,
 			Err:      "no match for platform in",
 		})
 	})
@@ -402,7 +402,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 	t.Run("builder does not support multi-arch", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
 		res.Assert(t, icmd.Expected{
-			ExitCode: 17,
+			ExitCode: 1,
 			Err: `Multi-platform build is not supported for the docker driver.
 Switch to a different driver, or turn on the containerd image store, and try again.`,
 		})
@@ -412,7 +412,7 @@ Switch to a different driver, or turn on the containerd image store, and try aga
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
 			"-f", "fixtures/build-test/platforms/compose-service-platform-not-in-build-platforms.yaml", "build")
 		res.Assert(t, icmd.Expected{
-			ExitCode: 15,
+			ExitCode: 1,
 			Err:      `service.build.platforms MUST include service.platform "linux/riscv64"`,
 		})
 	})

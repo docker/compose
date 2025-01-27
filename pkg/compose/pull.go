@@ -211,7 +211,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Text:       "Warning",
 			StatusText: getUnwrappedErrorMessage(err),
 		})
-		return "", WrapCategorisedComposeError(err, PullFailure)
+		return "", err
 	}
 
 	if err != nil {
@@ -221,7 +221,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Text:       "Error",
 			StatusText: getUnwrappedErrorMessage(err),
 		})
-		return "", WrapCategorisedComposeError(err, PullFailure)
+		return "", err
 	}
 
 	dec := json.NewDecoder(stream)
@@ -231,10 +231,10 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			return "", WrapCategorisedComposeError(err, PullFailure)
+			return "", err
 		}
 		if jm.Error != nil {
-			return "", WrapCategorisedComposeError(errors.New(jm.Error.Message), PullFailure)
+			return "", errors.New(jm.Error.Message)
 		}
 		if !quietPull {
 			toPullProgressEvent(service.Name, jm, w)

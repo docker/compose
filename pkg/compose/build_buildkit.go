@@ -48,7 +48,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, service string, op
 			confutil.NewConfig(s.dockerCli),
 			buildx.WithPrefix(p, service, true))
 		if err != nil {
-			return "", WrapCategorisedComposeError(err, BuildFailure)
+			return "", err
 		}
 	}
 
