@@ -65,7 +65,7 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 }
 
 func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
-	project, _, err := watchOpts.ToProject(ctx, dockerCli, nil)
+	project, _, err := watchOpts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
