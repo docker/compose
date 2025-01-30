@@ -39,6 +39,7 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/moby/buildkit/client"
+	"github.com/moby/buildkit/util/gitutil"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -138,6 +139,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	var group bakeGroup
 	var privileged bool
+	var read []string
 
 	for serviceName, service := range serviceToBeBuild {
 		if service.Build == nil {
@@ -168,6 +170,13 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		if options.Push && service.Image != "" {
 			outputs = append(outputs, "type=image,push=true")
 		}
+		read = append(read, build.Context)
+		for _, path := range build.AdditionalContexts {
+			_, err := gitutil.ParseGitRef(path)
+			if !strings.Contains(path, "://") && err != nil {
+				read = append(read, path)
+			}
+		}
 
 		cfg.Targets[serviceName] = bakeTarget{
 			Context:          build.Context,
@@ -196,10 +205,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	cfg.Groups["default"] = group
 
-	b, err := json.Marshal(cfg)
+	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.Debugf("bake config:\n%s", string(b))
 
 	metadata, err := os.CreateTemp(os.TempDir(), "compose")
 	if err != nil {
@@ -213,9 +224,15 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadata.Name()}
 	mustAllow := buildx.Version != "" && versions.GreaterThanOrEqualTo(buildx.Version[1:], "0.17.0")
-	if privileged && mustAllow {
-		args = append(args, "--allow", "security.insecure")
+	if mustAllow {
+		for _, path := range read {
+			args = append(args, "--allow", "fs.read="+path)
+		}
+		if privileged {
+			args = append(args, "--allow", "security.insecure")
+		}
 	}
+	logrus.Debugf("Executing bake with args: %v", args)
 
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 	// Remove DOCKER_CLI_PLUGIN... variable so buildx can detect it run standalone
@@ -250,16 +267,15 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	eg.Go(cmd.Wait)
 	for {
 		decoder := json.NewDecoder(pipe)
-		var s client.SolveStatus
-		err := decoder.Decode(&s)
+		var status client.SolveStatus
+		err := decoder.Decode(&status)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			// bake displays build details at the end of a build, which isn't a json SolveStatus
 			continue
 		}
-		ch <- &s
+		ch <- &status
 	}
 	close(ch) // stop build progress UI
 
