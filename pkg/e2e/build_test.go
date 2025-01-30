@@ -305,7 +305,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 			"-f", "fixtures/build-test/platforms/compose-unsupported-platform.yml", "build")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "no match for platform in",
+			Err:      "no match for platform",
 		})
 	})
 
