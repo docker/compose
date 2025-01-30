@@ -17,12 +17,12 @@
 package compose
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -264,18 +264,23 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
+	var errMessage string
+	scanner := bufio.NewScanner(pipe)
+	scanner.Split(bufio.ScanLines)
+
 	err = cmd.Start()
 	if err != nil {
 		return nil, err
 	}
 	eg.Go(cmd.Wait)
-	for {
-		decoder := json.NewDecoder(pipe)
+	for scanner.Scan() {
+		line := scanner.Text()
+		decoder := json.NewDecoder(strings.NewReader(line))
 		var status client.SolveStatus
 		err := decoder.Decode(&status)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
+			if strings.HasPrefix(line, "ERROR: ") {
+				errMessage = line[7:]
 			}
 			continue
 		}
@@ -285,7 +290,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	err = eg.Wait()
 	if err != nil {
-		return nil, err
+		if errMessage != "" {
+			return nil, errors.New(errMessage)
+		}
+		return nil, fmt.Errorf("failed to execute bake: %w", err)
 	}
 
 	b, err = os.ReadFile(metadata.Name())
