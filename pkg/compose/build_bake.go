@@ -17,12 +17,12 @@
 package compose
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,6 +39,7 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/moby/buildkit/client"
+	"github.com/moby/buildkit/util/gitutil"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -48,40 +49,33 @@ import (
 )
 
 func buildWithBake(dockerCli command.Cli) (bool, error) {
-	b, ok := os.LookupEnv("COMPOSE_BAKE")
-	if !ok {
-		if dockerCli.ConfigFile().Plugins["compose"]["build"] == "bake" {
-			b, ok = "true", true
-		}
-	}
-	if !ok {
-		return false, nil
-	}
-	bake, err := strconv.ParseBool(b)
-	if err != nil {
-		return false, err
-	}
-	if !bake {
-		return false, nil
-	}
-
 	enabled, err := dockerCli.BuildKitEnabled()
 	if err != nil {
 		return false, err
 	}
 	if !enabled {
-		logrus.Warnf("Docker Compose is configured to build using Bake, but buildkit isn't enabled")
+		return false, nil
 	}
 
 	_, err = manager.GetPlugin("buildx", dockerCli, &cobra.Command{})
 	if err != nil {
 		if manager.IsNotFound(err) {
-			logrus.Warnf("Docker Compose is configured to build using Bake, but buildx isn't installed")
+			logrus.Warn("buildx plugin not installed.")
 			return false, nil
 		}
 		return false, err
 	}
-	return true, err
+
+	b, ok := os.LookupEnv("COMPOSE_BAKE")
+	if !ok {
+		// User can opt-out with COMPOSE_BAKE=false but we use bake by default
+		return true, nil
+	}
+	bake, err := strconv.ParseBool(b)
+	if err != nil {
+		return false, err
+	}
+	return bake, nil
 }
 
 // We _could_ use bake.* types from github.com/docker/buildx but long term plan is to remove buildx as a dependency
@@ -145,6 +139,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	var group bakeGroup
 	var privileged bool
+	var read []string
 
 	for serviceName, service := range serviceToBeBuild {
 		if service.Build == nil {
@@ -171,14 +166,25 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			privileged = true
 		}
 
-		outputs := []string{"type=docker"}
-		if options.Push && service.Image != "" {
-			outputs = append(outputs, "type=image,push=true")
+		var output string
+		push := options.Push && service.Image != ""
+		if len(service.Build.Platforms) > 1 {
+			output = fmt.Sprintf("type=image,push=%t", push)
+		} else {
+			output = fmt.Sprintf("type=docker,load=true,push=%t", push)
+		}
+
+		read = append(read, build.Context)
+		for _, path := range build.AdditionalContexts {
+			_, err := gitutil.ParseGitRef(path)
+			if !strings.Contains(path, "://") && err != nil {
+				read = append(read, path)
+			}
 		}
 
 		cfg.Targets[serviceName] = bakeTarget{
 			Context:          build.Context,
-			Contexts:         additionalContexts(build.AdditionalContexts, service.DependsOn, options.Compatibility),
+			Contexts:         additionalContexts(build.AdditionalContexts, service.DependsOn),
 			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
 			DockerfileInline: build.DockerfileInline,
 			Args:             args,
@@ -196,17 +202,19 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			ShmSize:      build.ShmSize,
 			Ulimits:      toBakeUlimits(build.Ulimits),
 			Entitlements: entitlements,
-			Outputs:      outputs,
+			Outputs:      []string{output},
 		}
 		group.Targets = append(group.Targets, serviceName)
 	}
 
 	cfg.Groups["default"] = group
 
-	b, err := json.Marshal(cfg)
+	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.Debugf("bake config:\n%s", string(b))
 
 	metadata, err := os.CreateTemp(os.TempDir(), "compose")
 	if err != nil {
@@ -220,9 +228,20 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadata.Name()}
 	mustAllow := buildx.Version != "" && versions.GreaterThanOrEqualTo(buildx.Version[1:], "0.17.0")
-	if privileged && mustAllow {
-		args = append(args, "--allow", "security.insecure")
+	if mustAllow {
+		for _, path := range read {
+			args = append(args, "--allow", "fs.read="+path)
+		}
+		if privileged {
+			args = append(args, "--allow", "security.insecure")
+		}
 	}
+
+	if options.Builder != "" {
+		args = append(args, "--builder", options.Builder)
+	}
+
+	logrus.Debugf("Executing bake with args: %v", args)
 
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 	// Remove DOCKER_CLI_PLUGIN... variable so buildx can detect it run standalone
@@ -250,29 +269,36 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
+	var errMessage string
+	scanner := bufio.NewScanner(pipe)
+	scanner.Split(bufio.ScanLines)
+
 	err = cmd.Start()
 	if err != nil {
 		return nil, err
 	}
 	eg.Go(cmd.Wait)
-	for {
-		decoder := json.NewDecoder(pipe)
-		var s client.SolveStatus
-		err := decoder.Decode(&s)
+	for scanner.Scan() {
+		line := scanner.Text()
+		decoder := json.NewDecoder(strings.NewReader(line))
+		var status client.SolveStatus
+		err := decoder.Decode(&status)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
+			if strings.HasPrefix(line, "ERROR: ") {
+				errMessage = line[7:]
 			}
-			// bake displays build details at the end of a build, which isn't a json SolveStatus
 			continue
 		}
-		ch <- &s
+		ch <- &status
 	}
 	close(ch) // stop build progress UI
 
 	err = eg.Wait()
 	if err != nil {
-		return nil, err
+		if errMessage != "" {
+			return nil, errors.New(errMessage)
+		}
+		return nil, fmt.Errorf("failed to execute bake: %w", err)
 	}
 
 	b, err = os.ReadFile(metadata.Name())
@@ -294,12 +320,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	return results, nil
 }
 
-func additionalContexts(contexts types.Mapping, dependencies types.DependsOnConfig, compatibility bool) map[string]string {
+func additionalContexts(contexts types.Mapping, dependencies types.DependsOnConfig) map[string]string {
 	ac := map[string]string{}
-	if compatibility {
-		for name := range dependencies {
-			ac[name] = "target:" + name
-		}
+	for name := range dependencies {
+		ac[name] = "target:" + name
 	}
 	for k, v := range contexts {
 		ac[k] = v

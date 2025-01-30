@@ -56,10 +56,8 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	if err != nil {
 		return err
 	}
-	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
-		_, err := s.build(ctx, project, options, nil)
-		return err
-	}, s.stdinfo(), "Building")
+	_, err = s.build(ctx, project, options, nil)
+	return err
 }
 
 //nolint:gocyclo
