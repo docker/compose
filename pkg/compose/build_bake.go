@@ -236,6 +236,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			args = append(args, "--allow", "security.insecure")
 		}
 	}
+
+	if options.Builder != "" {
+		args = append(args, "--builder", options.Builder)
+	}
+
 	logrus.Debugf("Executing bake with args: %v", args)
 
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
