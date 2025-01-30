@@ -166,10 +166,14 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			privileged = true
 		}
 
-		outputs := []string{"type=docker"}
-		if options.Push && service.Image != "" {
-			outputs = append(outputs, "type=image,push=true")
+		var output string
+		push := options.Push && service.Image != ""
+		if len(service.Build.Platforms) > 1 {
+			output = fmt.Sprintf("type=image,push=%t", push)
+		} else {
+			output = fmt.Sprintf("type=docker,load=true,push=%t", push)
 		}
+
 		read = append(read, build.Context)
 		for _, path := range build.AdditionalContexts {
 			_, err := gitutil.ParseGitRef(path)
@@ -198,7 +202,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			ShmSize:      build.ShmSize,
 			Ulimits:      toBakeUlimits(build.Ulimits),
 			Entitlements: entitlements,
-			Outputs:      outputs,
+			Outputs:      []string{output},
 		}
 		group.Targets = append(group.Targets, serviceName)
 	}
