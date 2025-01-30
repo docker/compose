@@ -184,7 +184,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		cfg.Targets[serviceName] = bakeTarget{
 			Context:          build.Context,
-			Contexts:         additionalContexts(build.AdditionalContexts, service.DependsOn, options.Compatibility),
+			Contexts:         additionalContexts(build.AdditionalContexts, service.DependsOn),
 			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
 			DockerfileInline: build.DockerfileInline,
 			Args:             args,
@@ -320,12 +320,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	return results, nil
 }
 
-func additionalContexts(contexts types.Mapping, dependencies types.DependsOnConfig, compatibility bool) map[string]string {
+func additionalContexts(contexts types.Mapping, dependencies types.DependsOnConfig) map[string]string {
 	ac := map[string]string{}
-	if compatibility {
-		for name := range dependencies {
-			ac[name] = "target:" + name
-		}
+	for name := range dependencies {
+		ac[name] = "target:" + name
 	}
 	for k, v := range contexts {
 		ac[k] = v
