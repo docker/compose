@@ -403,8 +403,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err: `Multi-platform build is not supported for the docker driver.
-Switch to a different driver, or turn on the containerd image store, and try again.`,
+			Err:      "Multi-platform build is not supported for the docker driver.",
 		})
 	})
 
