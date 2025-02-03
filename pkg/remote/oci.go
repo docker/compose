@@ -31,6 +31,7 @@ import (
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/ocipush"
+	"github.com/docker/compose/v2/internal/paths"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -47,18 +48,20 @@ func ociRemoteLoaderEnabled() (bool, error) {
 	return false, nil
 }
 
-func NewOCIRemoteLoader(dockerCli command.Cli, offline bool) loader.ResourceLoader {
+func NewOCIRemoteLoader(dockerCli command.Cli, offline bool, downloadDirectory string) loader.ResourceLoader {
 	return ociRemoteLoader{
-		dockerCli: dockerCli,
-		offline:   offline,
-		known:     map[string]string{},
+		dockerCli:         dockerCli,
+		offline:           offline,
+		downloadDirectory: downloadDirectory,
+		known:             map[string]string{},
 	}
 }
 
 type ociRemoteLoader struct {
-	dockerCli command.Cli
-	offline   bool
-	known     map[string]string
+	dockerCli         command.Cli
+	offline           bool
+	known             map[string]string
+	downloadDirectory string
 }
 
 const prefix = "oci://"
@@ -98,12 +101,19 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", err
 		}
 
-		cache, err := cacheDir()
-		if err != nil {
-			return "", fmt.Errorf("initializing remote resource cache: %w", err)
+		if local == "" {
+			cache, err := cacheDir()
+			if err != nil {
+				return "", fmt.Errorf("initializing remote resource cache: %w", err)
+			}
+			local = filepath.Join(cache, descriptor.Digest.Hex())
+		} else {
+			local, err = paths.GetAbsPath(g.downloadDirectory)
+			if err != nil {
+				return "", err
+			}
 		}
 
-		local = filepath.Join(cache, descriptor.Digest.Hex())
 		composeFile := filepath.Join(local, "compose.yaml")
 		if _, err = os.Stat(local); os.IsNotExist(err) {
 			var manifest v1.Manifest
