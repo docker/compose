@@ -9,8 +9,8 @@ after a container is built, but before the container's command is executed) are 
 after restarting.
 
 If you are looking to configure a service's restart policy, refer to
-[restart](https://github.com/compose-spec/compose-spec/blob/master/spec.md#restart)
-or [restart_policy](https://github.com/compose-spec/compose-spec/blob/master/deploy.md#restart_policy).
+[restart](https://github.com/compose-spec/compose-spec/blob/main/spec.md#restart)
+or [restart_policy](https://github.com/compose-spec/compose-spec/blob/main/deploy.md#restart_policy).
 
 ### Options
 
@@ -33,5 +33,5 @@ after a container is built, but before the container's command is executed) are 
 after restarting.
 
 If you are looking to configure a service's restart policy, refer to
-[restart](https://github.com/compose-spec/compose-spec/blob/master/spec.md#restart)
-or [restart_policy](https://github.com/compose-spec/compose-spec/blob/master/deploy.md#restart_policy).
+[restart](https://github.com/compose-spec/compose-spec/blob/main/spec.md#restart)
+or [restart_policy](https://github.com/compose-spec/compose-spec/blob/main/deploy.md#restart_policy).
