@@ -8,7 +8,7 @@
 - [Legacy](#legacy)
 # Docker Compose v2
 
-[![GitHub release](https://img.shields.io/github/release/docker/compose.svg?style=flat-square)](https://github.com/docker/compose/releases/latest)
+[![GitHub release](https://img.shields.io/github/v/release/docker/compose.svg?style=flat-square)](https://github.com/docker/compose/releases/latest)
 [![PkgGoDev](https://img.shields.io/badge/go.dev-docs-007d9c?style=flat-square&logo=go&logoColor=white)](https://pkg.go.dev/github.com/docker/compose/v2)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/docker/compose/ci.yml?label=ci&logo=github&style=flat-square)](https://github.com/docker/compose/actions?query=workflow%3Aci)
 [![Go Report Card](https://goreportcard.com/badge/github.com/docker/compose/v2?style=flat-square)](https://goreportcard.com/report/github.com/docker/compose/v2)
@@ -28,7 +28,7 @@ single command: `docker compose up`.
 ### Windows and macOS
 
 Docker Compose is included in
-[Docker Desktop](https://www.docker.com/products/docker-desktop)
+[Docker Desktop](https://www.docker.com/products/docker-desktop/)
 for Windows and macOS.
 
 ### Linux

@@ -2,10 +2,10 @@
 ### Prerequisites
 
 * Windows:
-  * [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
+  * [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
   * make
 * macOS:
-  * [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
+  * [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)
   * make
 * Linux:
   * [Docker 20.10 or later](https://docs.docker.com/engine/install/)

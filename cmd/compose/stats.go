@@ -56,7 +56,7 @@ func statsCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 'table TEMPLATE':   Print output in table format using the given Go template
 'json':             Print in JSON format
 'TEMPLATE':         Print output using the given Go template.
-Refer to https://docs.docker.com/go/formatting/ for more information about formatting output with templates`)
+Refer to https://docs.docker.com/engine/cli/formatting/ for more information about formatting output with templates`)
 	flags.BoolVar(&opts.noStream, "no-stream", false, "Disable streaming stats and only pull the first result")
 	flags.BoolVar(&opts.noTrunc, "no-trunc", false, "Do not truncate output")
 	return cmd

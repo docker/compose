@@ -24,7 +24,7 @@ options:
         'table TEMPLATE':   Print output in table format using the given Go template
         'json':             Print in JSON format
         'TEMPLATE':         Print output using the given Go template.
-        Refer to https://docs.docker.com/go/formatting/ for more information about formatting output with templates
+        Refer to https://docs.docker.com/engine/cli/formatting/ for more information about formatting output with templates
       deprecated: false
       hidden: false
       experimental: false

@@ -2,7 +2,7 @@
 
 Want to hack on Docker? Awesome!  We have a contributor's guide that explains
 [setting up a Docker development environment and the contribution
-process](https://docs.docker.com/contribute/overview/).
+process](https://docs.docker.com/contribute/).
 
 This page contains information about reporting issues as well as some tips and
 guidelines useful to experienced open source contributors. Finally, make sure
@@ -95,7 +95,7 @@ don't get discouraged!
   <tr>
     <td>Community Slack</td>
     <td>
-      The Docker Community has a dedicated Slack chat to discuss features and issues.  You can sign-up <a href="https://www.docker.com/docker-community" target="_blank">with this link</a>.
+      The Docker Community has a dedicated Slack chat to discuss features and issues.  You can sign-up <a href="https://www.docker.com/community/" target="_blank">with this link</a>.
     </td>
   </tr>
   <tr>
@@ -118,7 +118,7 @@ don't get discouraged!
     <td>Stack Overflow</td>
     <td>
       Stack Overflow has over 17000 Docker questions listed. We regularly
-      monitor <a href="https://stackoverflow.com/search?tab=newest&q=docker" target="_blank">Docker questions</a>
+      monitor <a href="https://stackoverflow.com/questions/tagged/docker" target="_blank">Docker questions</a>
       and so do many other knowledgeable Docker users.
     </td>
   </tr>
@@ -200,7 +200,7 @@ For more details, see the [MAINTAINERS](MAINTAINERS) page.
 The sign-off is a simple line at the end of the explanation for the patch. Your
 signature certifies that you wrote the patch or otherwise have the right to pass
 it on as an open-source patch. The rules are pretty simple: if you can certify
-the below (from [developercertificate.org](http://developercertificate.org/)):
+the below (from [developercertificate.org](https://developercertificate.org/)):
 
 ```
 Developer Certificate of Origin
@@ -252,7 +252,7 @@ commit automatically with `git commit -s`.
 ### How can I become a maintainer?
 
 The procedures for adding new maintainers are explained in the global
-[MAINTAINERS](https://github.com/docker/opensource/blob/master/MAINTAINERS)
+[MAINTAINERS](https://github.com/docker/opensource/blob/main/MAINTAINERS)
 file in the
 [https://github.com/docker/opensource/](https://github.com/docker/opensource/)
 repository.
@@ -311,8 +311,8 @@ The rules:
 2. All code should pass the default levels of
    [`golint`](https://github.com/golang/lint).
 3. All code should follow the guidelines covered in [Effective
-   Go](http://golang.org/doc/effective_go.html) and [Go Code Review
-   Comments](https://github.com/golang/go/wiki/CodeReviewComments).
+   Go](https://go.dev/doc/effective_go) and [Go Code Review
+   Comments](https://go.dev/wiki/CodeReviewComments).
 4. Include code comments. Tell us the why, the history and the context.
 5. Document _all_ declarations and methods, even private ones. Declare
    expectations, caveats and anything else that may be important. If a type
@@ -334,6 +334,6 @@ The rules:
     guidelines. Since you've read all the rules, you now know that.
 
 If you are having trouble getting into the mood of idiomatic Go, we recommend
-reading through [Effective Go](https://golang.org/doc/effective_go.html). The
-[Go Blog](https://blog.golang.org) is also a great resource. Drinking the
+reading through [Effective Go](https://go.dev/doc/effective_go). The
+[Go Blog](https://go.dev/blog/) is also a great resource. Drinking the
 kool-aid is a lot easier than going thirsty.
