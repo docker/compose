@@ -17,6 +17,9 @@
 package compatibility
 
 import (
+	"errors"
+	"os"
+	"os/exec"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -24,9 +27,10 @@ import (
 
 func Test_convert(t *testing.T) {
 	tests := []struct {
-		name string
-		args []string
-		want []string
+		name    string
+		args    []string
+		want    []string
+		wantErr bool
 	}{
 		{
 			name: "compose only",
@@ -93,11 +97,36 @@ func Test_convert(t *testing.T) {
 			args: []string{"--project-name", "compose", "down", "--remove-orphans"},
 			want: []string{"compose", "--project-name", "compose", "down", "--remove-orphans"},
 		},
+		{
+			name: "completion command",
+			args: []string{"__complete", "up"},
+			want: []string{"__complete", "compose", "up"},
+		},
+		{
+			name:    "string flag without argument",
+			args:    []string{"--log-level"},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Convert(tt.args)
-			assert.DeepEqual(t, tt.want, got)
+			if tt.wantErr {
+				if os.Getenv("BE_CRASHER") == "1" {
+					Convert(tt.args)
+					return
+				}
+				cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$")
+				cmd.Env = append(os.Environ(), "BE_CRASHER=1")
+				err := cmd.Run()
+				var e *exec.ExitError
+				if errors.As(err, &e) && !e.Success() {
+					return
+				}
+				t.Fatalf("process ran with err %v, want exit status 1", err)
+			} else {
+				got := Convert(tt.args)
+				assert.DeepEqual(t, tt.want, got)
+			}
 		})
 	}
 }
