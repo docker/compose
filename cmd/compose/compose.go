@@ -150,6 +150,7 @@ type ProjectOptions struct {
 	Progress      string
 	Offline       bool
 	All           bool
+	DownloadDir   string
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -226,7 +227,9 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
 	f.StringVar(&o.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	f.BoolVar(&o.All, "all-resources", false, "Include all resources, even those not used by services")
+	f.StringVar(&o.DownloadDir, "download-dir", "", "Directory to store OCI or GIT Compose configurations")
 	_ = f.MarkHidden("workdir")
+	_ = f.MarkHidden("download-dir")
 }
 
 // get default value for a command line flag that is set by a coma-separated value in environment variable
@@ -372,8 +375,8 @@ func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceL
 	if o.Offline {
 		return nil
 	}
-	git := remote.NewGitRemoteLoader(o.Offline)
-	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
+	git := remote.NewGitRemoteLoader(o.Offline, o.DownloadDir)
+	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline, o.DownloadDir)
 	return []loader.ResourceLoader{git, oci}
 }
 
@@ -534,6 +537,22 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 						return err
 					}
 					opts.EnvFiles[i] = file
+				}
+			}
+
+			if opts.DownloadDir != "" {
+				if len(opts.ConfigPaths) == 0 {
+					return fmt.Errorf("cannot use --download-dir without --file using oci:// or git:// prefix")
+				}
+				remoteResources := false
+				for _, file := range opts.ConfigPaths {
+					if strings.HasPrefix(file, "oci://") || strings.HasPrefix(file, "git://") {
+						remoteResources = true
+						break
+					}
+				}
+				if !remoteResources {
+					return fmt.Errorf("cannot use --download-dir without --file using oci:// or git:// prefix")
 				}
 			}
 
