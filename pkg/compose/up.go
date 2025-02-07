@@ -72,8 +72,28 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	var isTerminated atomic.Bool
 	printer := newLogPrinter(options.Start.Attach)
 
+	var kEvents <-chan keyboard.KeyEvent
+	if options.Start.NavigationMenu {
+		kEvents, err = keyboard.GetKeys(100)
+		if err != nil {
+			logrus.Warnf("could not start menu, an error occurred while starting: %v", err)
+			options.Start.NavigationMenu = false
+		} else {
+			defer keyboard.Close() //nolint:errcheck
+			isWatchConfigured := s.shouldWatch(project)
+			isDockerDesktopActive := s.isDesktopIntegrationActive()
+			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
+			formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.watch)
+		}
+	}
+
 	doneCh := make(chan bool)
 	eg.Go(func() error {
+		if options.Start.NavigationMenu && options.Start.Watch {
+			// Run watch by navigation menu, so we can interactively enable/disable
+			formatter.KeyboardManager.StartWatch(ctx, doneCh, project, options)
+		}
+
 		first := true
 		gracefulTeardown := func() {
 			printer.Cancel()
@@ -87,24 +107,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				return err
 			})
 			first = false
-		}
-
-		var kEvents <-chan keyboard.KeyEvent
-		if options.Start.NavigationMenu {
-			kEvents, err = keyboard.GetKeys(100)
-			if err != nil {
-				logrus.Warn("could not start menu, an error occurred while starting.")
-			} else {
-				defer keyboard.Close() //nolint:errcheck
-				isWatchConfigured := s.shouldWatch(project)
-				isDockerDesktopActive := s.isDesktopIntegrationActive()
-				tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
-
-				formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.watch)
-				if options.Start.Watch {
-					formatter.KeyboardManager.StartWatch(ctx, doneCh, project, options)
-				}
-			}
 		}
 
 		for {
