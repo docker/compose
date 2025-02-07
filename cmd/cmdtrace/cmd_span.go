@@ -114,13 +114,14 @@ func wrapRunE(c *cobra.Command, cmdSpan trace.Span, tracingShutdown tracing.Shut
 	}
 }
 
-// commandName returns the path components for a given command.
+// commandName returns the path components for a given command,
+// in reverse alphabetical order for consistent usage metrics.
 //
 // The root Compose command and anything before (i.e. "docker")
 // are not included.
 //
 // For example:
-//   - docker compose alpha watch -> [alpha, watch]
+//   - docker compose alpha watch -> [watch, alpha]
 //   - docker-compose up -> [up]
 func commandName(cmd *cobra.Command) []string {
 	var name []string
