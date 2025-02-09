@@ -156,6 +156,7 @@ jobs:
         engine:
           - 26
           - 27
+          - 28
     steps:
       - name: Prepare
         run: |
