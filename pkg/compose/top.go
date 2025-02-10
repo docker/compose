@@ -36,16 +36,15 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 	}
 	summary := make([]api.ContainerProcSummary, len(containers))
 	eg, ctx := errgroup.WithContext(ctx)
-	for i, container := range containers {
-		i, container := i, container
+	for i, ctr := range containers {
 		eg.Go(func() error {
-			topContent, err := s.apiClient().ContainerTop(ctx, container.ID, []string{})
+			topContent, err := s.apiClient().ContainerTop(ctx, ctr.ID, []string{})
 			if err != nil {
 				return err
 			}
 			summary[i] = api.ContainerProcSummary{
-				ID:        container.ID,
-				Name:      getCanonicalContainerName(container),
+				ID:        ctr.ID,
+				Name:      getCanonicalContainerName(ctr),
 				Processes: topContent.Processes,
 				Titles:    topContent.Titles,
 			}

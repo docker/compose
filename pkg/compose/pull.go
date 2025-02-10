@@ -113,7 +113,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		imagesBeingPulled[service.Image] = service.Name
 
-		idx, name, service := i, name, service
+		idx := i
 		eg.Go(func() error {
 			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
@@ -316,7 +316,6 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		eg.SetLimit(s.maxConcurrency)
 		pulledImages := make([]string, len(needPull))
 		for i, service := range needPull {
-			i, service := i, service
 			eg.Go(func() error {
 				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				pulledImages[i] = id

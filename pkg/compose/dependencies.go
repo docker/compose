@@ -172,7 +172,6 @@ func (t *graphTraversal) run(ctx context.Context, graph *Graph, eg *errgroup.Gro
 			continue
 		}
 
-		node := node
 		if !t.consume(node.Key) {
 			// another worker already visited this node
 			continue

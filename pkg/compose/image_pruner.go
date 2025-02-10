@@ -202,7 +202,6 @@ func (p *ImagePruner) filterImagesByExistence(ctx context.Context, imageNames []
 
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, img := range imageNames {
-		img := img
 		eg.Go(func() error {
 			_, _, err := p.client.ImageInspectWithRaw(ctx, img)
 			if errdefs.IsNotFound(err) {

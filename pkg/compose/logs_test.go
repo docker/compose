@@ -134,7 +134,6 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	)
 
 	for _, id := range []string{"c1", "c2", "c4"} {
-		id := id
 		api.EXPECT().
 			ContainerInspect(anyCancellableContext(), id).
 			Return(

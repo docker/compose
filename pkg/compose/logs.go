@@ -62,13 +62,12 @@ func (s *composeService) Logs(
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range containers {
-		c := c
+	for _, ctr := range containers {
 		eg.Go(func() error {
-			err := s.logContainers(ctx, consumer, c, options)
+			err := s.logContainers(ctx, consumer, ctr, options)
 			var notImplErr errdefs.ErrNotImplemented
 			if errors.As(err, &notImplErr) {
-				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(c), err.Error())
+				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
 				return nil
 			}
 			return err
