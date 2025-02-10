@@ -11,7 +11,7 @@ Lists running Compose projects
 | `--dry-run`     | `bool`   |         | Execute command in dry run mode            |
 | `--filter`      | `filter` |         | Filter output based on conditions provided |
 | `--format`      | `string` | `table` | Format the output. Values: [table \| json] |
-| `-q`, `--quiet` | `bool`   |         | Only display IDs                           |
+| `-q`, `--quiet` | `bool`   |         | Only display project names                 |
 
 
 <!---MARKER_GEN_END-->
