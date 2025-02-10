@@ -47,11 +47,11 @@ func TestPs(t *testing.T) {
 		count := 0
 		for _, line := range lines[1:3] {
 			if strings.Contains(line, "e2e-ps-busybox-1") {
-				assert.True(t, strings.Contains(line, "127.0.0.1:8001->8000/tcp"))
+				assert.Contains(t, line, "127.0.0.1:8001->8000/tcp")
 				count++
 			}
 			if strings.Contains(line, "e2e-ps-nginx-1") {
-				assert.True(t, strings.Contains(line, "80/tcp, 443/tcp, 8080/tcp"))
+				assert.Contains(t, line, "80/tcp, 443/tcp, 8080/tcp")
 				count++
 			}
 		}
