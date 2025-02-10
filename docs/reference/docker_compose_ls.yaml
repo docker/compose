@@ -39,7 +39,7 @@ options:
       shorthand: q
       value_type: bool
       default_value: "false"
-      description: Only display IDs
+      description: Only display project names
       deprecated: false
       hidden: false
       experimental: false
