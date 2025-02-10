@@ -147,7 +147,8 @@ func TestWatch_Sync(t *testing.T) {
 
 	watcher.Events() <- watch.NewFileEvent("/sync/changed")
 	watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
-	clock.BlockUntil(3)
+	err := clock.BlockUntilContext(ctx, 3)
+	assert.NilError(t, err)
 	clock.Advance(watch.QuietPeriod)
 	select {
 	case actual := <-syncer.synced:
@@ -161,7 +162,8 @@ func TestWatch_Sync(t *testing.T) {
 
 	watcher.Events() <- watch.NewFileEvent("/rebuild")
 	watcher.Events() <- watch.NewFileEvent("/sync/changed")
-	clock.BlockUntil(4)
+	err = clock.BlockUntilContext(ctx, 4)
+	assert.NilError(t, err)
 	clock.Advance(watch.QuietPeriod)
 	select {
 	case batch := <-syncer.synced:
