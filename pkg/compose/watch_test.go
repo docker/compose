@@ -27,7 +27,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
 	"github.com/docker/compose/v2/pkg/watch"
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/jonboulle/clockwork"
@@ -67,11 +67,11 @@ func (s stdLogger) Err(containerName, message string) {
 	fmt.Fprintf(os.Stderr, "%s: %s\n", containerName, message)
 }
 
-func (s stdLogger) Status(container, msg string) {
-	fmt.Printf("%s: %s\n", container, msg)
+func (s stdLogger) Status(containerName, msg string) {
+	fmt.Printf("%s: %s\n", containerName, msg)
 }
 
-func (s stdLogger) Register(container string) {
+func (s stdLogger) Register(containerName string) {
 }
 
 func TestWatch_Sync(t *testing.T) {
@@ -79,7 +79,7 @@ func TestWatch_Sync(t *testing.T) {
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
-	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return([]moby.Container{
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return([]container.Summary{
 		testContainer("test", "123", false),
 	}, nil).AnyTimes()
 	// we expect the image to be pruned

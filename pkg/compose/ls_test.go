@@ -21,13 +21,13 @@ import (
 	"testing"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/docker/api/types/container"
 
-	moby "github.com/docker/docker/api/types"
 	"gotest.tools/v3/assert"
 )
 
 func TestContainersToStacks(t *testing.T) {
-	containers := []moby.Container{
+	containers := []container.Summary{
 		{
 			ID:     "service1",
 			State:  "running",
@@ -69,7 +69,7 @@ func TestStacksMixedStatus(t *testing.T) {
 }
 
 func TestCombinedConfigFiles(t *testing.T) {
-	containersByLabel := map[string][]moby.Container{
+	containersByLabel := map[string][]container.Summary{
 		"project1": {
 			{
 				ID:     "service1",
@@ -113,7 +113,7 @@ func TestCombinedConfigFiles(t *testing.T) {
 		expected := testData[project]
 
 		if expected.Error != nil {
-			assert.Equal(t, err.Error(), expected.Error.Error())
+			assert.Error(t, err, expected.Error.Error())
 		} else {
 			assert.Equal(t, err, expected.Error)
 		}

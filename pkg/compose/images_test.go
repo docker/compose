@@ -21,13 +21,13 @@ import (
 	"strings"
 	"testing"
 
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	compose "github.com/docker/compose/v2/pkg/api"
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 )
 
 func TestImages(t *testing.T) {
@@ -41,16 +41,16 @@ func TestImages(t *testing.T) {
 
 	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
-	listOpts := containerType.ListOptions{All: true, Filters: args}
+	listOpts := container.ListOptions{All: true, Filters: args}
 	image1 := imageInspect("image1", "foo:1", 12345)
 	image2 := imageInspect("image2", "bar:2", 67890)
-	api.EXPECT().ImageInspectWithRaw(anyCancellableContext(), "foo:1").Return(image1, nil, nil)
-	api.EXPECT().ImageInspectWithRaw(anyCancellableContext(), "bar:2").Return(image2, nil, nil)
+	api.EXPECT().ImageInspect(anyCancellableContext(), "foo:1").Return(image1, nil)
+	api.EXPECT().ImageInspect(anyCancellableContext(), "bar:2").Return(image2, nil)
 	c1 := containerDetail("service1", "123", "running", "foo:1")
 	c2 := containerDetail("service1", "456", "running", "bar:2")
-	c2.Ports = []moby.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
+	c2.Ports = []container.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
 	c3 := containerDetail("service2", "789", "exited", "foo:1")
-	api.EXPECT().ContainerList(ctx, listOpts).Return([]moby.Container{c1, c2, c3}, nil)
+	api.EXPECT().ContainerList(ctx, listOpts).Return([]container.Summary{c1, c2, c3}, nil)
 
 	images, err := tested.Images(ctx, strings.ToLower(testProject), compose.ImagesOptions{})
 
@@ -81,22 +81,22 @@ func TestImages(t *testing.T) {
 	assert.DeepEqual(t, images, expected)
 }
 
-func imageInspect(id string, image string, size int64) moby.ImageInspect {
-	return moby.ImageInspect{
+func imageInspect(id string, imageReference string, size int64) image.InspectResponse {
+	return image.InspectResponse{
 		ID: id,
 		RepoTags: []string{
 			"someRepo:someTag",
-			image,
+			imageReference,
 		},
 		Size: size,
 	}
 }
 
-func containerDetail(service string, id string, status string, image string) moby.Container {
-	return moby.Container{
+func containerDetail(service string, id string, status string, imageName string) container.Summary {
+	return container.Summary{
 		ID:     id,
 		Names:  []string{"/" + id},
-		Image:  image,
+		Image:  imageName,
 		Labels: containerLabels(service, false),
 		State:  status,
 	}

@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -45,7 +45,7 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
-	containers.forEach(func(container moby.Container) {
+	containers.forEach(func(container container.Summary) {
 		eg.Go(func() error {
 			err := s.apiClient().ContainerPause(ctx, container.ID)
 			if err == nil {
@@ -76,11 +76,11 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
-	containers.forEach(func(container moby.Container) {
+	containers.forEach(func(ctr container.Summary) {
 		eg.Go(func() error {
-			err = s.apiClient().ContainerUnpause(ctx, container.ID)
+			err = s.apiClient().ContainerUnpause(ctx, ctr.ID)
 			if err == nil {
-				eventName := getContainerProgressName(container)
+				eventName := getContainerProgressName(ctr)
 				w.Event(progress.NewEvent(eventName, progress.Done, "Unpaused"))
 			}
 			return err

@@ -30,7 +30,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-func (s composeService) runHook(ctx context.Context, container moby.Container, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
+func (s composeService) runHook(ctx context.Context, container containerType.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
 	wOut := utils.GetWriter(func(line string) {
 		listener(api.ContainerEvent{
 			Type:      api.HookEventLog,
