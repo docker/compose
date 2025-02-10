@@ -22,25 +22,24 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 )
 
 func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
 	projectName = strings.ToLower(projectName)
-	container, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, service, options.Index)
+	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, service, options.Index)
 	if err != nil {
 		return "", 0, err
 	}
-	for _, p := range container.Ports {
+	for _, p := range ctr.Ports {
 		if p.PrivatePort == port && p.Type == options.Protocol {
 			return p.IP, int(p.PublicPort), nil
 		}
 	}
-	return "", 0, portNotFoundError(options.Protocol, port, container)
+	return "", 0, portNotFoundError(options.Protocol, port, ctr)
 }
 
-func portNotFoundError(protocol string, port uint16, ctr moby.Container) error {
+func portNotFoundError(protocol string, port uint16, ctr container.Summary) error {
 	formatPort := func(protocol string, port uint16) string {
 		return fmt.Sprintf("%d/%s", port, protocol)
 	}

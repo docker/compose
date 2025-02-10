@@ -60,7 +60,7 @@ type DryRunKey struct{}
 // DryRunClient implements APIClient by delegating to implementation functions. This allows lazy init and per-method overrides
 type DryRunClient struct {
 	apiClient  client.APIClient
-	containers []moby.Container
+	containers []containerType.Summary
 	execs      sync.Map
 	resolver   *imagetools.Resolver
 }
@@ -82,7 +82,7 @@ func NewDryRunClient(apiClient client.APIClient, cli command.Cli) (*DryRunClient
 	}
 	return &DryRunClient{
 		apiClient:  apiClient,
-		containers: []moby.Container{},
+		containers: []containerType.Summary{},
 		execs:      sync.Map{},
 		resolver:   imagetools.New(configFile),
 	}, nil
@@ -103,7 +103,7 @@ func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, op
 func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerType.Config, hostConfig *containerType.HostConfig,
 	networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string,
 ) (containerType.CreateResponse, error) {
-	d.containers = append(d.containers, moby.Container{
+	d.containers = append(d.containers, containerType.Summary{
 		ID:     containerName,
 		Names:  []string{containerName},
 		Labels: config.Labels,
@@ -115,7 +115,7 @@ func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerTyp
 	return containerType.CreateResponse{ID: containerName}, nil
 }
 
-func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (moby.ContainerJSON, error) {
+func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (containerType.InspectResponse, error) {
 	containerJSON, err := d.apiClient.ContainerInspect(ctx, container)
 	if err != nil {
 		id := "dryRunId"
@@ -124,20 +124,20 @@ func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (
 				id = container
 			}
 		}
-		return moby.ContainerJSON{
-			ContainerJSONBase: &moby.ContainerJSONBase{
+		return containerType.InspectResponse{
+			ContainerJSONBase: &containerType.ContainerJSONBase{
 				ID:   id,
 				Name: container,
-				State: &moby.ContainerState{
+				State: &containerType.State{
 					Status: "running", // needed for --wait option
-					Health: &moby.Health{
-						Status: moby.Healthy, // needed for healthcheck control
+					Health: &containerType.Health{
+						Status: containerType.Healthy, // needed for healthcheck control
 					},
 				},
 			},
 			Mounts:          nil,
 			Config:          &containerType.Config{},
-			NetworkSettings: &moby.NetworkSettings{},
+			NetworkSettings: &containerType.NetworkSettings{},
 		}, nil
 	}
 	return containerJSON, err
@@ -147,7 +147,7 @@ func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal stri
 	return nil
 }
 
-func (d *DryRunClient) ContainerList(ctx context.Context, options containerType.ListOptions) ([]moby.Container, error) {
+func (d *DryRunClient) ContainerList(ctx context.Context, options containerType.ListOptions) ([]containerType.Summary, error) {
 	caller := getCallingFunction()
 	switch caller {
 	case "start":
@@ -222,14 +222,24 @@ func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options
 	}, nil
 }
 
-func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (moby.ImageInspect, []byte, error) {
+func (d *DryRunClient) ImageInspect(ctx context.Context, imageName string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
 	caller := getCallingFunction()
 	switch caller {
 	case "pullServiceImage", "buildContainerVolumes":
-		return moby.ImageInspect{ID: "dryRunId"}, nil, nil
+		return image.InspectResponse{ID: "dryRunId"}, nil
 	default:
-		return d.apiClient.ImageInspectWithRaw(ctx, imageName)
+		return d.apiClient.ImageInspect(ctx, imageName, options...)
 	}
+}
+
+// Deprecated: Use [DryRunClient.ImageInspect] instead; raw response can be obtained by [client.ImageInspectWithRawResponse] option.
+func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (image.InspectResponse, []byte, error) {
+	var buf bytes.Buffer
+	resp, err := d.ImageInspect(ctx, imageName, client.ImageInspectWithRawResponse(&buf))
+	if err != nil {
+		return image.InspectResponse{}, nil, err
+	}
+	return resp, buf.Bytes(), err
 }
 
 func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
@@ -368,7 +378,7 @@ func (d *DryRunClient) ContainerExport(ctx context.Context, container string) (i
 	return d.apiClient.ContainerExport(ctx, container)
 }
 
-func (d *DryRunClient) ContainerInspectWithRaw(ctx context.Context, container string, getSize bool) (moby.ContainerJSON, []byte, error) {
+func (d *DryRunClient) ContainerInspectWithRaw(ctx context.Context, container string, getSize bool) (containerType.InspectResponse, []byte, error) {
 	return d.apiClient.ContainerInspectWithRaw(ctx, container, getSize)
 }
 
@@ -424,8 +434,8 @@ func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, 
 	return d.apiClient.ImageCreate(ctx, parentReference, options)
 }
 
-func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string) ([]image.HistoryResponseItem, error) {
-	return d.apiClient.ImageHistory(ctx, imageName)
+func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string, options image.HistoryOptions) ([]image.HistoryResponseItem, error) {
+	return d.apiClient.ImageHistory(ctx, imageName, options)
 }
 
 func (d *DryRunClient) ImageImport(ctx context.Context, source image.ImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
@@ -436,16 +446,16 @@ func (d *DryRunClient) ImageList(ctx context.Context, options image.ListOptions)
 	return d.apiClient.ImageList(ctx, options)
 }
 
-func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, quiet bool) (image.LoadResponse, error) {
-	return d.apiClient.ImageLoad(ctx, input, quiet)
+func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, options image.LoadOptions) (image.LoadResponse, error) {
+	return d.apiClient.ImageLoad(ctx, input, options)
 }
 
 func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options registry.SearchOptions) ([]registry.SearchResult, error) {
 	return d.apiClient.ImageSearch(ctx, term, options)
 }
 
-func (d *DryRunClient) ImageSave(ctx context.Context, images []string) (io.ReadCloser, error) {
-	return d.apiClient.ImageSave(ctx, images)
+func (d *DryRunClient) ImageSave(ctx context.Context, images []string, options image.SaveOptions) (io.ReadCloser, error) {
+	return d.apiClient.ImageSave(ctx, images, options)
 }
 
 func (d *DryRunClient) ImageTag(ctx context.Context, imageName, ref string) error {

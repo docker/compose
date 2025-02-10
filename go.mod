@@ -15,7 +15,7 @@ require (
 	github.com/docker/buildx v0.20.1
 	github.com/docker/cli v27.5.1+incompatible
 	github.com/docker/cli-docs-tool v0.9.0
-	github.com/docker/docker v27.5.1+incompatible
+	github.com/docker/docker v28.0.0-rc.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
@@ -182,7 +182,7 @@ require (
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20241007155032-5fefd90f89a9 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect

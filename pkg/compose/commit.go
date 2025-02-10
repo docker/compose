@@ -23,7 +23,7 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
 )
 
 func (s *composeService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
@@ -35,7 +35,7 @@ func (s *composeService) Commit(ctx context.Context, projectName string, options
 func (s *composeService) commit(ctx context.Context, projectName string, options api.CommitOptions) error {
 	projectName = strings.ToLower(projectName)
 
-	container, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
+	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 
 	w := progress.ContextWriter(ctx)
 
-	name := getCanonicalContainerName(container)
+	name := getCanonicalContainerName(ctr)
 	msg := fmt.Sprintf("Commit %s", name)
 
 	w.Event(progress.Event{
@@ -65,7 +65,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return nil
 	}
 
-	response, err := clnt.ContainerCommit(ctx, container.ID, containerType.CommitOptions{
+	response, err := clnt.ContainerCommit(ctx, ctr.ID, container.CommitOptions{
 		Reference: options.Reference,
 		Comment:   options.Comment,
 		Author:    options.Author,
