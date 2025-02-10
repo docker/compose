@@ -40,7 +40,8 @@ func Test_BatchDebounceEvents(t *testing.T) {
 		ch <- FileEvent(path)
 	}
 	// we sent 100 events + the debouncer
-	clock.BlockUntil(101)
+	err := clock.BlockUntilContext(ctx, 101)
+	assert.NilError(t, err)
 	clock.Advance(QuietPeriod)
 	select {
 	case batch := <-eventBatchCh:
@@ -51,7 +52,8 @@ func Test_BatchDebounceEvents(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 		t.Fatal("timed out waiting for events")
 	}
-	clock.BlockUntil(1)
+	err = clock.BlockUntilContext(ctx, 1)
+	assert.NilError(t, err)
 	clock.Advance(QuietPeriod)
 
 	// there should only be a single batch
