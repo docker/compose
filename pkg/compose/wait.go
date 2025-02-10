@@ -35,15 +35,14 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 
 	eg, waitCtx := errgroup.WithContext(ctx)
 	var statusCode int64
-	for _, c := range containers {
-		c := c
+	for _, ctr := range containers {
 		eg.Go(func() error {
 			var err error
-			resultC, errC := s.dockerCli.Client().ContainerWait(waitCtx, c.ID, "")
+			resultC, errC := s.dockerCli.Client().ContainerWait(waitCtx, ctr.ID, "")
 
 			select {
 			case result := <-resultC:
-				_, _ = fmt.Fprintf(s.dockerCli.Out(), "container %q exited with status code %d\n", c.ID, result.StatusCode)
+				_, _ = fmt.Fprintf(s.dockerCli.Out(), "container %q exited with status code %d\n", ctr.ID, result.StatusCode)
 				statusCode = result.StatusCode
 			case err = <-errC:
 			}

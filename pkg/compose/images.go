@@ -82,7 +82,6 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 	l := sync.Mutex{}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, repoTag := range repoTags {
-		repoTag := repoTag
 		eg.Go(func() error {
 			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, repoTag)
 			if err != nil {

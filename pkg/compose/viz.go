@@ -31,7 +31,6 @@ type vizGraph map[*types.ServiceConfig][]*types.ServiceConfig
 func (s *composeService) Viz(_ context.Context, project *types.Project, opts api.VizOptions) (string, error) {
 	graph := make(vizGraph)
 	for _, service := range project.Services {
-		service := service
 		graph[&service] = make([]*types.ServiceConfig, 0, len(service.DependsOn))
 		for dependencyName := range service.DependsOn {
 			// no error should be returned since dependencyName should exist

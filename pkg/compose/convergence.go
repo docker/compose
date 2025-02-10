@@ -205,7 +205,6 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		// Scale UP
 		number := next + i
 		name := getContainerName(project.Name, service, number)
-		i := i
 		eventOpts := tracing.SpanOptions{trace.WithAttributes(attribute.String("container.name", name))}
 		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/scale/up", eventOpts, func(ctx context.Context) error {
 			opts := createOptions{
@@ -470,7 +469,6 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			continue
 		}
 
-		dep, config := dep, config
 		eg.Go(func() error {
 			ticker := time.NewTicker(500 * time.Millisecond)
 			defer ticker.Stop()

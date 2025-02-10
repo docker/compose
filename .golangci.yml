@@ -5,6 +5,7 @@ linters:
   enable-all: false
   disable-all: true
   enable:
+    - copyloopvar
     - depguard
     - errcheck
     - errorlint

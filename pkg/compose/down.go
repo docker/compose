@@ -322,10 +322,9 @@ func (s *composeService) stopContainer(ctx context.Context, w progress.Writer, s
 
 func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, serv *types.ServiceConfig, containers []moby.Container, timeout *time.Duration) error {
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, container := range containers {
-		container := container
+	for _, ctr := range containers {
 		eg.Go(func() error {
-			return s.stopContainer(ctx, w, serv, container, timeout)
+			return s.stopContainer(ctx, w, serv, ctr, timeout)
 		})
 	}
 	return eg.Wait()
@@ -333,10 +332,9 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 
 func (s *composeService) removeContainers(ctx context.Context, containers []moby.Container, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
 	eg, _ := errgroup.WithContext(ctx)
-	for _, container := range containers {
-		container := container
+	for _, ctr := range containers {
 		eg.Go(func() error {
-			return s.stopAndRemoveContainer(ctx, container, service, timeout, volumes)
+			return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
 		})
 	}
 	return eg.Wait()
