@@ -27,20 +27,19 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
-	"github.com/docker/compose/v2/internal/tracing"
 	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	mmount "github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/versions"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -240,12 +239,12 @@ func (c *convergence) stopDependentContainers(ctx context.Context, project *type
 	}
 
 	for _, name := range dependents {
-		dependents := c.getObservedState(name)
-		for i, dependent := range dependents {
+		dependentStates := c.getObservedState(name)
+		for i, dependent := range dependentStates {
 			dependent.State = ContainerExited
-			dependents[i] = dependent
+			dependentStates[i] = dependent
 		}
-		c.setObservedState(name, dependents)
+		c.setObservedState(name, dependentStates)
 	}
 	return nil
 }
