@@ -2,6 +2,9 @@ module github.com/docker/compose/v2
 
 go 1.22.10
 
+// FIXME(thaJeztah): bump_docker branch from https://github.com/docker/buildx/pull/2998
+replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250217115800-dc98db48efd6
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.2
@@ -13,9 +16,9 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.21.0-rc2.0.20250214130609-ef4e9fea83c9 // master (v0.22.0-dev), https://github.com/docker/buildx/pull/2992
-	github.com/docker/cli v28.0.0-rc.1+incompatible
+	github.com/docker/cli v28.0.0-rc.1.0.20250217115424-88a019a9bb16+incompatible // master (v28.0.0-rc.2)
 	github.com/docker/cli-docs-tool v0.9.0
-	github.com/docker/docker v28.0.0-rc.1+incompatible
+	github.com/docker/docker v28.0.0-rc.1.0.20250217105200-57d4d23825f4+incompatible // master (v28.0.0-rc.2)
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203

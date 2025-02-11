@@ -309,7 +309,7 @@ func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force 
 	return nil
 }
 
-func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config containerType.ExecOptions) (moby.IDResponse, error) {
+func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config containerType.ExecOptions) (containerType.ExecCreateResponse, error) {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	id := fmt.Sprintf("%x", b)
@@ -317,7 +317,7 @@ func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string
 		container: container,
 		command:   config.Cmd,
 	})
-	return moby.IDResponse{
+	return containerType.ExecCreateResponse{
 		ID: id,
 	}, nil
 }
@@ -354,7 +354,7 @@ func (d *DryRunClient) ConfigUpdate(ctx context.Context, id string, version swar
 	return d.apiClient.ConfigUpdate(ctx, id, version, config)
 }
 
-func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, options containerType.CommitOptions) (moby.IDResponse, error) {
+func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, options containerType.CommitOptions) (containerType.CommitResponse, error) {
 	return d.apiClient.ContainerCommit(ctx, container, options)
 }
 
@@ -402,11 +402,11 @@ func (d *DryRunClient) ContainerStatsOneShot(ctx context.Context, container stri
 	return d.apiClient.ContainerStatsOneShot(ctx, container)
 }
 
-func (d *DryRunClient) ContainerTop(ctx context.Context, container string, arguments []string) (containerType.ContainerTopOKBody, error) {
+func (d *DryRunClient) ContainerTop(ctx context.Context, container string, arguments []string) (containerType.TopResponse, error) {
 	return d.apiClient.ContainerTop(ctx, container, arguments)
 }
 
-func (d *DryRunClient) ContainerUpdate(ctx context.Context, container string, updateConfig containerType.UpdateConfig) (containerType.ContainerUpdateOKBody, error) {
+func (d *DryRunClient) ContainerUpdate(ctx context.Context, container string, updateConfig containerType.UpdateConfig) (containerType.UpdateResponse, error) {
 	return d.apiClient.ContainerUpdate(ctx, container, updateConfig)
 }
 
@@ -434,8 +434,8 @@ func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, 
 	return d.apiClient.ImageCreate(ctx, parentReference, options)
 }
 
-func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string, options image.HistoryOptions) ([]image.HistoryResponseItem, error) {
-	return d.apiClient.ImageHistory(ctx, imageName, options)
+func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string, options ...client.ImageHistoryOption) ([]image.HistoryResponseItem, error) {
+	return d.apiClient.ImageHistory(ctx, imageName, options...)
 }
 
 func (d *DryRunClient) ImageImport(ctx context.Context, source image.ImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
@@ -446,16 +446,16 @@ func (d *DryRunClient) ImageList(ctx context.Context, options image.ListOptions)
 	return d.apiClient.ImageList(ctx, options)
 }
 
-func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, options image.LoadOptions) (image.LoadResponse, error) {
-	return d.apiClient.ImageLoad(ctx, input, options)
+func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, options ...client.ImageLoadOption) (image.LoadResponse, error) {
+	return d.apiClient.ImageLoad(ctx, input, options...)
 }
 
 func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options registry.SearchOptions) ([]registry.SearchResult, error) {
 	return d.apiClient.ImageSearch(ctx, term, options)
 }
 
-func (d *DryRunClient) ImageSave(ctx context.Context, images []string, options image.SaveOptions) (io.ReadCloser, error) {
-	return d.apiClient.ImageSave(ctx, images, options)
+func (d *DryRunClient) ImageSave(ctx context.Context, images []string, options ...client.ImageSaveOption) (io.ReadCloser, error) {
+	return d.apiClient.ImageSave(ctx, images, options...)
 }
 
 func (d *DryRunClient) ImageTag(ctx context.Context, imageName, ref string) error {

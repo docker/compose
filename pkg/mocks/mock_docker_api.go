@@ -245,10 +245,10 @@ func (mr *MockAPIClientMockRecorder) ContainerAttach(arg0, arg1, arg2 any) *gomo
 }
 
 // ContainerCommit mocks base method.
-func (m *MockAPIClient) ContainerCommit(arg0 context.Context, arg1 string, arg2 container.CommitOptions) (types.IDResponse, error) {
+func (m *MockAPIClient) ContainerCommit(arg0 context.Context, arg1 string, arg2 container.CommitOptions) (container.CommitResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerCommit", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.IDResponse)
+	ret0, _ := ret[0].(container.CommitResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -305,10 +305,10 @@ func (mr *MockAPIClientMockRecorder) ContainerExecAttach(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecCreate mocks base method.
-func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (types.IDResponse, error) {
+func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (container.ExecCreateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecCreate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.IDResponse)
+	ret0, _ := ret[0].(container.ExecCreateResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -596,10 +596,10 @@ func (mr *MockAPIClientMockRecorder) ContainerStop(arg0, arg1, arg2 any) *gomock
 }
 
 // ContainerTop mocks base method.
-func (m *MockAPIClient) ContainerTop(arg0 context.Context, arg1 string, arg2 []string) (container.ContainerTopOKBody, error) {
+func (m *MockAPIClient) ContainerTop(arg0 context.Context, arg1 string, arg2 []string) (container.TopResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerTop", arg0, arg1, arg2)
-	ret0, _ := ret[0].(container.ContainerTopOKBody)
+	ret0, _ := ret[0].(container.TopResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -625,10 +625,10 @@ func (mr *MockAPIClientMockRecorder) ContainerUnpause(arg0, arg1 any) *gomock.Ca
 }
 
 // ContainerUpdate mocks base method.
-func (m *MockAPIClient) ContainerUpdate(arg0 context.Context, arg1 string, arg2 container.UpdateConfig) (container.ContainerUpdateOKBody, error) {
+func (m *MockAPIClient) ContainerUpdate(arg0 context.Context, arg1 string, arg2 container.UpdateConfig) (container.UpdateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerUpdate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(container.ContainerUpdateOKBody)
+	ret0, _ := ret[0].(container.UpdateResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -832,18 +832,23 @@ func (mr *MockAPIClientMockRecorder) ImageCreate(arg0, arg1, arg2 any) *gomock.C
 }
 
 // ImageHistory mocks base method.
-func (m *MockAPIClient) ImageHistory(arg0 context.Context, arg1 string, arg2 image.HistoryOptions) ([]image.HistoryResponseItem, error) {
+func (m *MockAPIClient) ImageHistory(arg0 context.Context, arg1 string, arg2 ...client.ImageHistoryOption) ([]image.HistoryResponseItem, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ImageHistory", arg0, arg1, arg2)
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ImageHistory", varargs...)
 	ret0, _ := ret[0].([]image.HistoryResponseItem)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ImageHistory indicates an expected call of ImageHistory.
-func (mr *MockAPIClientMockRecorder) ImageHistory(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockAPIClientMockRecorder) ImageHistory(arg0, arg1 any, arg2 ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageHistory", reflect.TypeOf((*MockAPIClient)(nil).ImageHistory), arg0, arg1, arg2)
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageHistory", reflect.TypeOf((*MockAPIClient)(nil).ImageHistory), varargs...)
 }
 
 // ImageImport mocks base method.
@@ -913,18 +918,23 @@ func (mr *MockAPIClientMockRecorder) ImageList(arg0, arg1 any) *gomock.Call {
 }
 
 // ImageLoad mocks base method.
-func (m *MockAPIClient) ImageLoad(arg0 context.Context, arg1 io.Reader, arg2 image.LoadOptions) (image.LoadResponse, error) {
+func (m *MockAPIClient) ImageLoad(arg0 context.Context, arg1 io.Reader, arg2 ...client.ImageLoadOption) (image.LoadResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ImageLoad", arg0, arg1, arg2)
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ImageLoad", varargs...)
 	ret0, _ := ret[0].(image.LoadResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ImageLoad indicates an expected call of ImageLoad.
-func (mr *MockAPIClientMockRecorder) ImageLoad(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockAPIClientMockRecorder) ImageLoad(arg0, arg1 any, arg2 ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageLoad", reflect.TypeOf((*MockAPIClient)(nil).ImageLoad), arg0, arg1, arg2)
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageLoad", reflect.TypeOf((*MockAPIClient)(nil).ImageLoad), varargs...)
 }
 
 // ImagePull mocks base method.
@@ -973,18 +983,23 @@ func (mr *MockAPIClientMockRecorder) ImageRemove(arg0, arg1, arg2 any) *gomock.C
 }
 
 // ImageSave mocks base method.
-func (m *MockAPIClient) ImageSave(arg0 context.Context, arg1 []string, arg2 image.SaveOptions) (io.ReadCloser, error) {
+func (m *MockAPIClient) ImageSave(arg0 context.Context, arg1 []string, arg2 ...client.ImageSaveOption) (io.ReadCloser, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ImageSave", arg0, arg1, arg2)
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ImageSave", varargs...)
 	ret0, _ := ret[0].(io.ReadCloser)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ImageSave indicates an expected call of ImageSave.
-func (mr *MockAPIClientMockRecorder) ImageSave(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockAPIClientMockRecorder) ImageSave(arg0, arg1 any, arg2 ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageSave", reflect.TypeOf((*MockAPIClient)(nil).ImageSave), arg0, arg1, arg2)
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageSave", reflect.TypeOf((*MockAPIClient)(nil).ImageSave), varargs...)
 }
 
 // ImageSearch mocks base method.
