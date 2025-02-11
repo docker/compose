@@ -2,8 +2,6 @@ module github.com/docker/compose/v2
 
 go 1.22.10
 
-toolchain go1.23.4
-
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/Microsoft/go-winio v0.6.2
