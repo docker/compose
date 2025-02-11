@@ -245,10 +245,10 @@ func (mr *MockAPIClientMockRecorder) ContainerAttach(arg0, arg1, arg2 any) *gomo
 }
 
 // ContainerCommit mocks base method.
-func (m *MockAPIClient) ContainerCommit(arg0 context.Context, arg1 string, arg2 container.CommitOptions) (types.IDResponse, error) {
+func (m *MockAPIClient) ContainerCommit(arg0 context.Context, arg1 string, arg2 container.CommitOptions) (container.CommitResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerCommit", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.IDResponse)
+	ret0, _ := ret[0].(container.CommitResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -305,10 +305,10 @@ func (mr *MockAPIClientMockRecorder) ContainerExecAttach(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecCreate mocks base method.
-func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (types.IDResponse, error) {
+func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (container.ExecCreateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecCreate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.IDResponse)
+	ret0, _ := ret[0].(container.ExecCreateResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -596,10 +596,10 @@ func (mr *MockAPIClientMockRecorder) ContainerStop(arg0, arg1, arg2 any) *gomock
 }
 
 // ContainerTop mocks base method.
-func (m *MockAPIClient) ContainerTop(arg0 context.Context, arg1 string, arg2 []string) (container.ContainerTopOKBody, error) {
+func (m *MockAPIClient) ContainerTop(arg0 context.Context, arg1 string, arg2 []string) (container.TopResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerTop", arg0, arg1, arg2)
-	ret0, _ := ret[0].(container.ContainerTopOKBody)
+	ret0, _ := ret[0].(container.TopResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -625,10 +625,10 @@ func (mr *MockAPIClientMockRecorder) ContainerUnpause(arg0, arg1 any) *gomock.Ca
 }
 
 // ContainerUpdate mocks base method.
-func (m *MockAPIClient) ContainerUpdate(arg0 context.Context, arg1 string, arg2 container.UpdateConfig) (container.ContainerUpdateOKBody, error) {
+func (m *MockAPIClient) ContainerUpdate(arg0 context.Context, arg1 string, arg2 container.UpdateConfig) (container.UpdateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerUpdate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(container.ContainerUpdateOKBody)
+	ret0, _ := ret[0].(container.UpdateResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
