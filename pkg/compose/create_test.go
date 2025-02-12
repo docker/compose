@@ -22,13 +22,14 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/api/types/network"
 
 	composetypes "github.com/compose-spec/compose-go/v2/types"
-	moby "github.com/docker/docker/api/types"
 	mountTypes "github.com/docker/docker/api/types/mount"
 
 	"gotest.tools/v3/assert"
@@ -140,8 +141,8 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		}),
 	}
 
-	inherit := &moby.Container{
-		Mounts: []moby.MountPoint{
+	inherit := &container.Summary{
+		Mounts: []container.MountPoint{
 			{
 				Type:        composetypes.VolumeTypeVolume,
 				Destination: "/var/myvolume1",
@@ -153,7 +154,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		},
 	}
 
-	mounts, err := buildContainerMountOptions(project, project.Services["myService"], moby.ImageInspect{}, inherit)
+	mounts, err := buildContainerMountOptions(project, project.Services["myService"], image.InspectResponse{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -165,7 +166,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
-	mounts, err = buildContainerMountOptions(project, project.Services["myService"], moby.ImageInspect{}, inherit)
+	mounts, err = buildContainerMountOptions(project, project.Services["myService"], image.InspectResponse{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})

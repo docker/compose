@@ -35,7 +35,6 @@ import (
 	"github.com/docker/compose/v2/internal/sync"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/watch"
-	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -343,7 +342,7 @@ type tarDockerClient struct {
 	s *composeService
 }
 
-func (t tarDockerClient) ContainersForService(ctx context.Context, projectName string, serviceName string) ([]moby.Container, error) {
+func (t tarDockerClient) ContainersForService(ctx context.Context, projectName string, serviceName string) ([]container.Summary, error) {
 	containers, err := t.s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
 	if err != nil {
 		return nil, err
@@ -724,7 +723,7 @@ func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Pr
 		return time.Now(), fmt.Errorf("Could not get created time for service's image")
 	}
 
-	img, _, err := s.apiClient().ImageInspectWithRaw(ctx, containers[0].ImageID)
+	img, err := s.apiClient().ImageInspect(ctx, containers[0].ImageID)
 	if err != nil {
 		return time.Now(), err
 	}

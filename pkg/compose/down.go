@@ -27,7 +27,6 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
-	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	imageapi "github.com/docker/docker/api/types/image"
@@ -297,13 +296,13 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 	return err
 }
 
-func (s *composeService) stopContainer(ctx context.Context, w progress.Writer, service *types.ServiceConfig, container moby.Container, timeout *time.Duration) error {
-	eventName := getContainerProgressName(container)
+func (s *composeService) stopContainer(ctx context.Context, w progress.Writer, service *types.ServiceConfig, ctr containerType.Summary, timeout *time.Duration) error {
+	eventName := getContainerProgressName(ctr)
 	w.Event(progress.StoppingEvent(eventName))
 
 	if service != nil {
 		for _, hook := range service.PreStop {
-			err := s.runHook(ctx, container, *service, hook, nil)
+			err := s.runHook(ctx, ctr, *service, hook, nil)
 			if err != nil {
 				return err
 			}
@@ -311,7 +310,7 @@ func (s *composeService) stopContainer(ctx context.Context, w progress.Writer, s
 	}
 
 	timeoutInSecond := utils.DurationSecondToInt(timeout)
-	err := s.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{Timeout: timeoutInSecond})
+	err := s.apiClient().ContainerStop(ctx, ctr.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 	if err != nil {
 		w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 		return err
@@ -320,7 +319,7 @@ func (s *composeService) stopContainer(ctx context.Context, w progress.Writer, s
 	return nil
 }
 
-func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, serv *types.ServiceConfig, containers []moby.Container, timeout *time.Duration) error {
+func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, serv *types.ServiceConfig, containers []containerType.Summary, timeout *time.Duration) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, ctr := range containers {
 		eg.Go(func() error {
@@ -330,7 +329,7 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 	return eg.Wait()
 }
 
-func (s *composeService) removeContainers(ctx context.Context, containers []moby.Container, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
+func (s *composeService) removeContainers(ctx context.Context, containers []containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for _, ctr := range containers {
 		eg.Go(func() error {
@@ -340,10 +339,10 @@ func (s *composeService) removeContainers(ctx context.Context, containers []moby
 	return eg.Wait()
 }
 
-func (s *composeService) stopAndRemoveContainer(ctx context.Context, container moby.Container, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
+func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
 	w := progress.ContextWriter(ctx)
-	eventName := getContainerProgressName(container)
-	err := s.stopContainer(ctx, w, service, container, timeout)
+	eventName := getContainerProgressName(ctr)
+	err := s.stopContainer(ctx, w, service, ctr, timeout)
 	if errdefs.IsNotFound(err) {
 		w.Event(progress.RemovedEvent(eventName))
 		return nil
@@ -352,7 +351,7 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, container m
 		return err
 	}
 	w.Event(progress.RemovingEvent(eventName))
-	err = s.apiClient().ContainerRemove(ctx, container.ID, containerType.RemoveOptions{
+	err = s.apiClient().ContainerRemove(ctx, ctr.ID, containerType.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: volumes,
 	})

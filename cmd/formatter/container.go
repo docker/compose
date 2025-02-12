@@ -24,7 +24,7 @@ import (
 
 	"github.com/docker/cli/cli/command/formatter"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
 )
@@ -212,9 +212,9 @@ func (c *ContainerContext) Publishers() api.PortPublishers {
 }
 
 func (c *ContainerContext) Ports() string {
-	var ports []types.Port
+	var ports []container.Port
 	for _, publisher := range c.c.Publishers {
-		ports = append(ports, types.Port{
+		ports = append(ports, container.Port{
 			IP:          publisher.URL,
 			PrivatePort: uint16(publisher.TargetPort),
 			PublicPort:  uint16(publisher.PublishedPort),
