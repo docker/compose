@@ -27,7 +27,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.19.0
+	github.com/moby/buildkit v0.20.0-rc3
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/term v0.5.2
 	github.com/morikuni/aec v1.0.0
