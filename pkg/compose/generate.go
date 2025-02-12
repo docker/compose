@@ -24,8 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
-	moby "github.com/docker/docker/api/types"
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
@@ -40,7 +39,7 @@ func (s *composeService) Generate(ctx context.Context, options api.GenerateOptio
 		filtersListNames.Add("name", containerName)
 		filtersListIDs.Add("id", containerName)
 	}
-	containers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
 		Filters: filtersListNames,
 		All:     true,
 	})
@@ -48,16 +47,16 @@ func (s *composeService) Generate(ctx context.Context, options api.GenerateOptio
 		return nil, err
 	}
 
-	containersByIds, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
+	containersByIds, err := s.apiClient().ContainerList(ctx, container.ListOptions{
 		Filters: filtersListIDs,
 		All:     true,
 	})
 	if err != nil {
 		return nil, err
 	}
-	for _, container := range containersByIds {
-		if !utils.Contains(containers, container) {
-			containers = append(containers, container)
+	for _, ctr := range containersByIds {
+		if !utils.Contains(containers, ctr) {
+			containers = append(containers, ctr)
 		}
 	}
 
@@ -68,7 +67,7 @@ func (s *composeService) Generate(ctx context.Context, options api.GenerateOptio
 	return s.createProjectFromContainers(containers, options.ProjectName)
 }
 
-func (s *composeService) createProjectFromContainers(containers []moby.Container, projectName string) (*types.Project, error) {
+func (s *composeService) createProjectFromContainers(containers []container.Summary, projectName string) (*types.Project, error) {
 	project := &types.Project{}
 	services := types.Services{}
 	networks := types.Networks{}
@@ -112,7 +111,7 @@ func (s *composeService) createProjectFromContainers(containers []moby.Container
 	return project, nil
 }
 
-func (s *composeService) extractComposeConfiguration(service *types.ServiceConfig, inspect moby.ContainerJSON, volumes types.Volumes, secrets types.Secrets, networks types.Networks) {
+func (s *composeService) extractComposeConfiguration(service *types.ServiceConfig, inspect container.InspectResponse, volumes types.Volumes, secrets types.Secrets, networks types.Networks) {
 	service.Environment = types.NewMappingWithEquals(inspect.Config.Env)
 	if inspect.Config.Healthcheck != nil {
 		healthConfig := inspect.Config.Healthcheck
@@ -144,7 +143,7 @@ func (s *composeService) extractComposeConfiguration(service *types.ServiceConfi
 	}
 }
 
-func (s *composeService) toComposeHealthCheck(healthConfig *containerType.HealthConfig) *types.HealthCheckConfig {
+func (s *composeService) toComposeHealthCheck(healthConfig *container.HealthConfig) *types.HealthCheckConfig {
 	var healthCheck types.HealthCheckConfig
 	healthCheck.Test = healthConfig.Test
 	if healthConfig.Timeout != 0 {
@@ -170,7 +169,7 @@ func (s *composeService) toComposeHealthCheck(healthConfig *containerType.Health
 	return &healthCheck
 }
 
-func (s *composeService) toComposeVolumes(volumes []moby.MountPoint) (map[string]types.VolumeConfig,
+func (s *composeService) toComposeVolumes(volumes []container.MountPoint) (map[string]types.VolumeConfig,
 	[]types.ServiceVolumeConfig, map[string]types.SecretConfig, []types.ServiceSecretConfig,
 ) {
 	volumeConfigs := make(map[string]types.VolumeConfig)
