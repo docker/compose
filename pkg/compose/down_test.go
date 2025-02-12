@@ -25,8 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	moby "github.com/docker/docker/api/types"
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -49,7 +48,7 @@ func TestDown(t *testing.T) {
 	}
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
-		[]moby.Container{
+		[]container.Summary{
 			testContainer("service1", "123", false),
 			testContainer("service2", "456", false),
 			testContainer("service2", "789", false),
@@ -70,14 +69,14 @@ func TestDown(t *testing.T) {
 			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
 		}, nil)
 
-	stopOptions := containerType.StopOptions{}
+	stopOptions := container.StopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "456", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopOptions).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", containerType.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "456", containerType.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "789", containerType.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "456", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "789", container.RemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{
 		Filters: filters.NewArgs(
@@ -106,7 +105,7 @@ func TestDownWithGivenServices(t *testing.T) {
 	}
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
-		[]moby.Container{
+		[]container.Summary{
 			testContainer("service1", "123", false),
 			testContainer("service2", "456", false),
 			testContainer("service2", "789", false),
@@ -127,10 +126,10 @@ func TestDownWithGivenServices(t *testing.T) {
 			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
 		}, nil)
 
-	stopOptions := containerType.StopOptions{}
+	stopOptions := container.StopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", containerType.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{
 		Filters: filters.NewArgs(
@@ -158,7 +157,7 @@ func TestDownWithSpecifiedServiceButTheServicesAreNotRunning(t *testing.T) {
 	}
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
-		[]moby.Container{
+		[]container.Summary{
 			testContainer("service1", "123", false),
 			testContainer("service2", "456", false),
 			testContainer("service2", "789", false),
@@ -195,7 +194,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	}
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(true)).Return(
-		[]moby.Container{
+		[]container.Summary{
 			testContainer("service1", "123", false),
 			testContainer("service2", "789", false),
 			testContainer("service_orphan", "321", true),
@@ -214,14 +213,14 @@ func TestDownRemoveOrphans(t *testing.T) {
 			},
 		}, nil)
 
-	stopOptions := containerType.StopOptions{}
+	stopOptions := container.StopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "321", stopOptions).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", containerType.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "789", containerType.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "321", containerType.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "789", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "321", container.RemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{
 		Filters: filters.NewArgs(
@@ -246,7 +245,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 	}
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
-		[]moby.Container{testContainer("service1", "123", false)}, nil)
+		[]container.Summary{testContainer("service1", "123", false)}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		volume.ListOptions{
@@ -258,8 +257,8 @@ func TestDownRemoveVolumes(t *testing.T) {
 	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return(nil, nil)
 
-	api.EXPECT().ContainerStop(gomock.Any(), "123", containerType.StopOptions{}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", containerType.RemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "123", container.StopOptions{}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
 
 	api.EXPECT().VolumeRemove(gomock.Any(), "myProject_volume", true).Return(nil)
 
@@ -291,7 +290,7 @@ func TestDownRemoveImages(t *testing.T) {
 	}
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).
-		Return([]moby.Container{
+		Return([]container.Summary{
 			testContainer("service1", "123", false),
 		}, nil).
 		AnyTimes()
@@ -320,7 +319,7 @@ func TestDownRemoveImages(t *testing.T) {
 		"missing-named-image":             false,
 	}
 	for img, exists := range imagesToBeInspected {
-		var resp moby.ImageInspect
+		var resp image.InspectResponse
 		var err error
 		if exists {
 			resp.RepoTags = []string{img}
@@ -328,13 +327,13 @@ func TestDownRemoveImages(t *testing.T) {
 			err = errdefs.NotFound(fmt.Errorf("test specified that image %q should not exist", img))
 		}
 
-		api.EXPECT().ImageInspectWithRaw(gomock.Any(), img).
-			Return(resp, nil, err).
+		api.EXPECT().ImageInspect(gomock.Any(), img).
+			Return(resp, err).
 			AnyTimes()
 	}
 
-	api.EXPECT().ImageInspectWithRaw(gomock.Any(), "registry.example.com/remote-image-tagged:v1.0").
-		Return(moby.ImageInspect{RepoTags: []string{"registry.example.com/remote-image-tagged:v1.0"}}, nil, nil).
+	api.EXPECT().ImageInspect(gomock.Any(), "registry.example.com/remote-image-tagged:v1.0").
+		Return(image.InspectResponse{RepoTags: []string{"registry.example.com/remote-image-tagged:v1.0"}}, nil).
 		AnyTimes()
 
 	localImagesToBeRemoved := []string{
@@ -379,10 +378,10 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 		dockerCli: cli,
 	}
 
-	container := testContainer("service1", "123", false)
+	ctr := testContainer("service1", "123", false)
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
-		[]moby.Container{container}, nil)
+		[]container.Summary{ctr}, nil)
 
 	api.EXPECT().VolumeList(
 		gomock.Any(),
@@ -404,11 +403,11 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 		),
 	}).Return(nil, nil)
 
-	api.EXPECT().ImageInspectWithRaw(gomock.Any(), "testproject-service1").
-		Return(moby.ImageInspect{}, nil, nil)
+	api.EXPECT().ImageInspect(gomock.Any(), "testproject-service1").
+		Return(image.InspectResponse{}, nil)
 
-	api.EXPECT().ContainerStop(gomock.Any(), "123", containerType.StopOptions{}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", containerType.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "123", container.StopOptions{}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
 
 	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1:latest", image.RemoveOptions{}).Return(nil, nil)
 

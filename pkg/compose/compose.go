@@ -25,22 +25,22 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/compose/v2/internal/desktop"
-	"github.com/docker/compose/v2/internal/experimental"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/jonboulle/clockwork"
-
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v2/pkg/api"
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/jonboulle/clockwork"
+
+	"github.com/docker/compose/v2/internal/desktop"
+	"github.com/docker/compose/v2/internal/experimental"
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 var stdioToStdout bool
@@ -139,7 +139,7 @@ func (s *composeService) stdinfo() *streams.Out {
 	return s.dockerCli.Err()
 }
 
-func getCanonicalContainerName(c moby.Container) string {
+func getCanonicalContainerName(c container.Summary) string {
 	if len(c.Names) == 0 {
 		// corner case, sometime happens on removal. return short ID as a safeguard value
 		return c.ID[:12]
@@ -154,7 +154,7 @@ func getCanonicalContainerName(c moby.Container) string {
 	return strings.TrimPrefix(c.Names[0], "/")
 }
 
-func getContainerNameWithoutProject(c moby.Container) string {
+func getContainerNameWithoutProject(c container.Summary) string {
 	project := c.Labels[api.ProjectLabel]
 	defaultName := getDefaultContainerName(project, c.Labels[api.ServiceLabel], c.Labels[api.ContainerNumberLabel])
 	name := getCanonicalContainerName(c)

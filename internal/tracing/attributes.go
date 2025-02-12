@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -140,15 +140,15 @@ func ServiceOptions(service types.ServiceConfig) SpanOptions {
 // For convenience, it's returned as a SpanOptions object to allow it to be
 // passed directly to the wrapping helper methods in this package such as
 // SpanWrapFunc.
-func ContainerOptions(container moby.Container) SpanOptions {
+func ContainerOptions(ctr container.Summary) SpanOptions {
 	attrs := []attribute.KeyValue{
-		attribute.String("container.id", container.ID),
-		attribute.String("container.image", container.Image),
-		unixTimeAttr("container.created_at", container.Created),
+		attribute.String("container.id", ctr.ID),
+		attribute.String("container.image", ctr.Image),
+		unixTimeAttr("container.created_at", ctr.Created),
 	}
 
-	if len(container.Names) != 0 {
-		attrs = append(attrs, attribute.String("container.name", strings.TrimPrefix(container.Names[0], "/")))
+	if len(ctr.Names) != 0 {
+		attrs = append(attrs, attribute.String("container.name", strings.TrimPrefix(ctr.Names[0], "/")))
 	}
 
 	return []trace.SpanStartEventOption{

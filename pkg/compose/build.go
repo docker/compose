@@ -340,7 +340,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 			if err != nil {
 				return nil, err
 			}
-			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, digest)
+			inspect, err := s.apiClient().ImageInspect(ctx, digest)
 			if err != nil {
 				return nil, err
 			}

@@ -23,8 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	moby "github.com/docker/docker/api/types"
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
@@ -48,10 +47,10 @@ func TestKillAll(t *testing.T) {
 	name := strings.ToLower(testProject)
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, containerType.ListOptions{
+	api.EXPECT().ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(projectFilter(name), hasConfigHashLabel()),
 	}).Return(
-		[]moby.Container{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
+		[]container.Summary{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		volume.ListOptions{
@@ -81,12 +80,12 @@ func TestKillSignal(t *testing.T) {
 	}
 
 	name := strings.ToLower(testProject)
-	listOptions := containerType.ListOptions{
+	listOptions := container.ListOptions{
 		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName), hasConfigHashLabel()),
 	}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, listOptions).Return([]moby.Container{testContainer(serviceName, "123", false)}, nil)
+	api.EXPECT().ContainerList(ctx, listOptions).Return([]container.Summary{testContainer(serviceName, "123", false)}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		volume.ListOptions{
@@ -103,12 +102,12 @@ func TestKillSignal(t *testing.T) {
 	assert.NilError(t, err)
 }
 
-func testContainer(service string, id string, oneOff bool) moby.Container {
+func testContainer(service string, id string, oneOff bool) container.Summary {
 	// canonical docker names in the API start with a leading slash, some
 	// parts of Compose code will attempt to strip this off, so make sure
 	// it's consistently present
 	name := "/" + strings.TrimPrefix(id, "/")
-	return moby.Container{
+	return container.Summary{
 		ID:     id,
 		Names:  []string{name},
 		Labels: containerLabels(service, oneOff),
@@ -137,7 +136,7 @@ func anyCancellableContext() gomock.Matcher {
 	return gomock.AssignableToTypeOf(ctxWithCancel)
 }
 
-func projectFilterListOpt(withOneOff bool) containerType.ListOptions {
+func projectFilterListOpt(withOneOff bool) container.ListOptions {
 	filter := filters.NewArgs(
 		projectFilter(strings.ToLower(testProject)),
 		hasConfigHashLabel(),
@@ -145,7 +144,7 @@ func projectFilterListOpt(withOneOff bool) containerType.ListOptions {
 	if !withOneOff {
 		filter.Add("label", fmt.Sprintf("%s=False", compose.OneoffLabel))
 	}
-	return containerType.ListOptions{
+	return container.ListOptions{
 		Filters: filter,
 		All:     true,
 	}

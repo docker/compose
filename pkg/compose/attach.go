@@ -25,7 +25,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/moby/term"
@@ -52,8 +51,8 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 
 	_, _ = fmt.Fprintf(s.stdout(), "Attaching to %s\n", strings.Join(names, ", "))
 
-	for _, container := range containers {
-		err := s.attachContainer(ctx, container, listener)
+	for _, ctr := range containers {
+		err := s.attachContainer(ctx, ctr, listener)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +60,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 	return containers, err
 }
 
-func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener api.ContainerEventListener) error {
+func (s *composeService) attachContainer(ctx context.Context, container containerType.Summary, listener api.ContainerEventListener) error {
 	serviceName := container.Labels[api.ServiceLabel]
 	containerName := getContainerNameWithoutProject(container)
 
