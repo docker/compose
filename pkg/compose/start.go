@@ -31,7 +31,6 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"golang.org/x/sync/errgroup"
 )
@@ -85,26 +84,26 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 			// N.B. this uses the parent context (instead of attachCtx) so that the watch itself can
 			// continue even if one of the log streams fails
 			return s.watchContainers(ctx, project.Name, toWatch, required.Elements(), listener, containers,
-				func(container moby.Container, _ time.Time) error {
-					svc := container.Labels[api.ServiceLabel]
+				func(ctr containerType.Summary, _ time.Time) error {
+					svc := ctr.Labels[api.ServiceLabel]
 					if attachTo.Has(svc) {
-						return s.attachContainer(attachCtx, container, listener)
+						return s.attachContainer(attachCtx, ctr, listener)
 					}
 
 					// HACK: simulate an "attach" event
 					listener(api.ContainerEvent{
 						Type:      api.ContainerEventAttach,
-						Container: getContainerNameWithoutProject(container),
-						ID:        container.ID,
+						Container: getContainerNameWithoutProject(ctr),
+						ID:        ctr.ID,
 						Service:   svc,
 					})
 					return nil
-				}, func(container moby.Container, _ time.Time) error {
+				}, func(ctr containerType.Summary, _ time.Time) error {
 					listener(api.ContainerEvent{
 						Type:      api.ContainerEventAttach,
 						Container: "", // actual name will be set by start event
-						ID:        container.ID,
-						Service:   container.Labels[api.ServiceLabel],
+						ID:        ctr.ID,
+						Service:   ctr.Labels[api.ServiceLabel],
 					})
 					return nil
 				})
@@ -175,7 +174,7 @@ func getDependencyCondition(service types.ServiceConfig, project *types.Project)
 	return ServiceConditionRunningOrHealthy
 }
 
-type containerWatchFn func(container moby.Container, t time.Time) error
+type containerWatchFn func(ctr containerType.Summary, t time.Time) error
 
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
 func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
@@ -197,7 +196,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 	}
 
 	// predicate to tell if a container we receive event for should be considered or ignored
-	ofInterest := func(c moby.Container) bool {
+	ofInterest := func(c containerType.Summary) bool {
 		if len(services) > 0 {
 			// we only watch some services
 			return utils.Contains(services, c.Labels[api.ServiceLabel])
@@ -206,7 +205,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 	}
 
 	// predicate to tell if a container we receive event for should be watched until termination
-	isRequired := func(c moby.Container) bool {
+	isRequired := func(c containerType.Summary) bool {
 		if len(services) > 0 && len(required) > 0 {
 			// we only watch some services
 			return utils.Contains(required, c.Labels[api.ServiceLabel])
@@ -248,7 +247,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				}
 				return err
 			}
-			container := moby.Container{
+			container := containerType.Summary{
 				ID:     inspected.ID,
 				Names:  []string{inspected.Name},
 				Labels: inspected.Config.Labels,

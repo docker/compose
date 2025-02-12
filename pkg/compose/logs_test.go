@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	moby "github.com/docker/docker/api/types"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -51,7 +50,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 		All:     true,
 		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
-		[]moby.Container{
+		[]containerType.Summary{
 			testContainer("service", "c", false),
 		},
 		nil,
@@ -59,8 +58,8 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	api.EXPECT().
 		ContainerInspect(anyCancellableContext(), "c").
-		Return(moby.ContainerJSON{
-			ContainerJSONBase: &moby.ContainerJSONBase{ID: "c"},
+		Return(containerType.InspectResponse{
+			ContainerJSONBase: &containerType.ContainerJSONBase{ID: "c"},
 			Config:            &containerType.Config{Tty: false},
 		}, nil)
 	c1Reader, c1Writer := io.Pipe()
@@ -122,7 +121,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 		All:     true,
 		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
-		[]moby.Container{
+		[]containerType.Summary{
 			testContainer("serviceA", "c1", false),
 			testContainer("serviceA", "c2", false),
 			// serviceB will be filtered out by the project definition to
@@ -137,8 +136,8 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 		api.EXPECT().
 			ContainerInspect(anyCancellableContext(), id).
 			Return(
-				moby.ContainerJSON{
-					ContainerJSONBase: &moby.ContainerJSONBase{ID: id},
+				containerType.InspectResponse{
+					ContainerJSONBase: &containerType.ContainerJSONBase{ID: id},
 					Config:            &containerType.Config{Tty: true},
 				},
 				nil,

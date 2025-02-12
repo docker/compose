@@ -25,17 +25,16 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
-	moby "github.com/docker/docker/api/types"
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-func (s composeService) runHook(ctx context.Context, container moby.Container, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
+func (s composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
 	wOut := utils.GetWriter(func(line string) {
 		listener(api.ContainerEvent{
 			Type:      api.HookEventLog,
-			Container: getContainerNameWithoutProject(container) + " ->",
-			ID:        container.ID,
+			Container: getContainerNameWithoutProject(ctr) + " ->",
+			ID:        ctr.ID,
 			Service:   service.Name,
 			Line:      line,
 		})
@@ -43,7 +42,7 @@ func (s composeService) runHook(ctx context.Context, container moby.Container, s
 	defer wOut.Close() //nolint:errcheck
 
 	detached := listener == nil
-	exec, err := s.apiClient().ContainerExecCreate(ctx, container.ID, containerType.ExecOptions{
+	exec, err := s.apiClient().ContainerExecCreate(ctx, ctr.ID, container.ExecOptions{
 		User:         hook.User,
 		Privileged:   hook.Privileged,
 		Env:          ToMobyEnv(hook.Environment),
@@ -58,12 +57,12 @@ func (s composeService) runHook(ctx context.Context, container moby.Container, s
 	}
 
 	if detached {
-		return s.runWaitExec(ctx, exec, service, listener)
+		return s.runWaitExec(ctx, exec.ID, service, listener)
 	}
 
 	height, width := s.stdout().GetTtySize()
 	consoleSize := &[2]uint{height, width}
-	attach, err := s.apiClient().ContainerExecAttach(ctx, exec.ID, containerType.ExecAttachOptions{
+	attach, err := s.apiClient().ContainerExecAttach(ctx, exec.ID, container.ExecAttachOptions{
 		Tty:         service.Tty,
 		ConsoleSize: consoleSize,
 	})
@@ -91,8 +90,8 @@ func (s composeService) runHook(ctx context.Context, container moby.Container, s
 	return nil
 }
 
-func (s composeService) runWaitExec(ctx context.Context, exec moby.IDResponse, service types.ServiceConfig, listener api.ContainerEventListener) error {
-	err := s.apiClient().ContainerExecStart(ctx, exec.ID, containerType.ExecStartOptions{
+func (s composeService) runWaitExec(ctx context.Context, execID string, service types.ServiceConfig, listener api.ContainerEventListener) error {
+	err := s.apiClient().ContainerExecStart(ctx, execID, container.ExecStartOptions{
 		Detach: listener == nil,
 		Tty:    service.Tty,
 	})
@@ -107,7 +106,7 @@ func (s composeService) runWaitExec(ctx context.Context, exec moby.IDResponse, s
 		case <-ctx.Done():
 			return nil
 		case <-tick.C:
-			inspect, err := s.apiClient().ContainerExecInspect(ctx, exec.ID)
+			inspect, err := s.apiClient().ContainerExecInspect(ctx, execID)
 			if err != nil {
 				return nil
 			}
