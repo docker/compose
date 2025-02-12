@@ -83,8 +83,8 @@ github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb h1:EDmT6Q9Zs+SbUo
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb/go.mod h1:ZjrT6AXHbDs86ZSdt/osfBi5qfexBrKUdONk989Wnk4=
 github.com/compose-spec/compose-go/v2 v2.4.8 h1:7Myl8wDRl/4mRz77S+eyDJymGGEHu0diQdGSSeyq90A=
 github.com/compose-spec/compose-go/v2 v2.4.8/go.mod h1:lFN0DrMxIncJGYAXTfWuajfwj5haBJqrBkarHcnjJKc=
-github.com/containerd/cgroups/v3 v3.0.3 h1:S5ByHZ/h9PMe5IOQoN7E+nMc2UcLEM/V48DGDJ9kip0=
-github.com/containerd/cgroups/v3 v3.0.3/go.mod h1:8HBe7V3aWGLFPd/k03swSIsGjZhHI2WzJmticMgVuz0=
+github.com/containerd/cgroups/v3 v3.0.5 h1:44na7Ud+VwyE7LIoJ8JTNQOa549a8543BmzaJHo6Bzo=
+github.com/containerd/cgroups/v3 v3.0.5/go.mod h1:SA5DLYnXO8pTGYiAHXz94qvLQTKfVM5GEVisn4jpins=
 github.com/containerd/console v1.0.4 h1:F2g4+oChYvBTsASRTz8NP6iIAi97J3TtSAsLbIFn4ro=
 github.com/containerd/console v1.0.4/go.mod h1:YynlIjWYF8myEu6sdkwKIvGQq+cOckRm6So2avqoYAk=
 github.com/containerd/containerd/api v1.8.0 h1:hVTNJKR8fMc/2Tiw60ZRijntNMd1U+JVMyTRdsD2bS0=
@@ -315,8 +315,8 @@ github.com/mitchellh/hashstructure/v2 v2.0.2/go.mod h1:MG3aRVU/N29oo/V/IhBX8GR/z
 github.com/mitchellh/mapstructure v0.0.0-20150613213606-2caf8efc9366/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
-github.com/moby/buildkit v0.19.0 h1:w9G1p7sArvCGNkpWstAqJfRQTXBKukMyMK1bsah1HNo=
-github.com/moby/buildkit v0.19.0/go.mod h1:WiHBFTgWV8eB1AmPxIWsAlKjUACAwm3X/14xOV4VWew=
+github.com/moby/buildkit v0.20.0 h1:aF5RujjQ310Pn6SLL/wQYIrSsPXy0sQ5KvWifwq1h8Y=
+github.com/moby/buildkit v0.20.0/go.mod h1:HYFUIK+iGDRxRgdphZ9Nv0y1Fz7mv0HrU7xZoXx217E=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
 github.com/moby/locker v1.0.1 h1:fOXqR41zeveg4fFODix+1Ch4mj/gT0NE1XJbp/epuBg=
