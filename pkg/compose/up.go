@@ -162,6 +162,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return s.watch(ctx, doneCh, project, options.Start.Services, api.WatchOptions{
 				Build: &buildOpts,
 				LogTo: options.Start.Attach,
+				Prune: options.Start.Prune,
 			})
 		})
 	}
