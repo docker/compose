@@ -18,6 +18,7 @@ import (
 
 	types "github.com/docker/docker/api/types"
 	checkpoint "github.com/docker/docker/api/types/checkpoint"
+	common "github.com/docker/docker/api/types/common"
 	container "github.com/docker/docker/api/types/container"
 	events "github.com/docker/docker/api/types/events"
 	filters "github.com/docker/docker/api/types/filters"
@@ -245,10 +246,10 @@ func (mr *MockAPIClientMockRecorder) ContainerAttach(arg0, arg1, arg2 any) *gomo
 }
 
 // ContainerCommit mocks base method.
-func (m *MockAPIClient) ContainerCommit(arg0 context.Context, arg1 string, arg2 container.CommitOptions) (container.CommitResponse, error) {
+func (m *MockAPIClient) ContainerCommit(arg0 context.Context, arg1 string, arg2 container.CommitOptions) (common.IDResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerCommit", arg0, arg1, arg2)
-	ret0, _ := ret[0].(container.CommitResponse)
+	ret0, _ := ret[0].(common.IDResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -305,10 +306,10 @@ func (mr *MockAPIClientMockRecorder) ContainerExecAttach(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecCreate mocks base method.
-func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (container.ExecCreateResponse, error) {
+func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (common.IDResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecCreate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(container.ExecCreateResponse)
+	ret0, _ := ret[0].(common.IDResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
