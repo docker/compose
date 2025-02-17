@@ -52,7 +52,6 @@ func ServiceConfigsHash(project *types.Project, serviceConfig types.ServiceConfi
 	for _, config := range serviceConfig.Configs {
 		file := project.Configs[config.Source]
 		b, err := createTarForConfig(project, types.FileReferenceConfig(config), types.FileObjectConfig(file))
-
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +68,6 @@ func ServiceSecretsHash(project *types.Project, serviceConfig types.ServiceConfi
 	for _, secret := range serviceConfig.Secrets {
 		file := project.Secrets[secret.Source]
 		b, err := createTarForConfig(project, types.FileReferenceConfig(secret), types.FileObjectConfig(file))
-
 		if err != nil {
 			return nil, err
 		}
@@ -114,11 +112,11 @@ func createTarForConfig(
 
 // NetworkHash computes the configuration hash for a network.
 func NetworkHash(o *types.NetworkConfig) (string, error) {
-	bytes, err := json.Marshal(o)
+	data, err := json.Marshal(o)
 	if err != nil {
 		return "", err
 	}
-	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+	return digest.SHA256.FromBytes(data).Encoded(), nil
 }
 
 // VolumeHash computes the configuration hash for a volume.
@@ -126,9 +124,9 @@ func VolumeHash(o types.VolumeConfig) (string, error) {
 	if o.Driver == "" { // (TODO: jhrotko) This probably should be fixed in compose-go
 		o.Driver = "local"
 	}
-	bytes, err := json.Marshal(o)
+	data, err := json.Marshal(o)
 	if err != nil {
 		return "", err
 	}
-	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+	return digest.SHA256.FromBytes(data).Encoded(), nil
 }

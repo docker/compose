@@ -123,7 +123,6 @@ func CreateTarByPath(path string, modTime time.Time) (*bytes.Buffer, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
