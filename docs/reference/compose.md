@@ -67,7 +67,7 @@ Define and run multi-container applications with Docker
 ## Examples
 
 ### Use `-f` to specify the name and path of one or more Compose files
-Use the `-f` flag to specify the location of a Compose configuration file.
+Use the `-f` flag to specify the location of a Compose [configuration file](/reference/compose-file/).
 
 #### Specifying multiple Compose files
 You can supply multiple `-f` configuration files. When you supply multiple files, Compose combines them into a single
