@@ -994,10 +994,6 @@ func checkContainerConfigs(p types.Project, s types.ServiceConfig) error {
 			continue
 		}
 
-		if config.UID != "" || config.GID != "" || config.Mode != nil {
-			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
-		}
-
 		if _, err := os.Stat(definedConfig.File); os.IsNotExist(err) {
 			logrus.Warnf("config file %s does not exist", definedConfig.Name)
 		}
@@ -1022,10 +1018,6 @@ func checkContainerSecrets(p types.Project, s types.ServiceConfig) error {
 
 		if definedSecret.Environment != "" {
 			continue
-		}
-
-		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
-			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		if _, err := os.Stat(definedSecret.File); os.IsNotExist(err) {
