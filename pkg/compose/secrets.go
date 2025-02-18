@@ -51,7 +51,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		if content == "" {
 			continue
 		}
-    
+
 		if config.Target == "" {
 			config.Target = "/run/secrets/" + config.Source
 		} else if !isAbsTarget(config.Target) {

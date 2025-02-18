@@ -976,7 +976,6 @@ func checkContainerConfigsSecrets(p types.Project, s types.ServiceConfig) error 
 }
 
 func checkContainerConfigs(p types.Project, s types.ServiceConfig) error {
-
 	for _, config := range s.Configs {
 		definedConfig := p.Configs[config.Source]
 		if definedConfig.External {
