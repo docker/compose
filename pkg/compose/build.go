@@ -139,7 +139,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		w     *xprogress.Printer
 	)
 	if buildkitEnabled {
-		if hints.Enabled() {
+		if hints.Enabled() && progress.Mode != progress.ModeQuiet && progress.Mode != progress.ModeJSON {
 			suggest.Do(func() {
 				fmt.Fprintln(s.dockerCli.Out(), bakeSuggest) //nolint:errcheck
 			})
