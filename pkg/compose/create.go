@@ -990,6 +990,10 @@ func checkContainerConfigs(p types.Project, s types.ServiceConfig) error {
 			return errors.New("Docker Compose does not support configs.*.template_driver")
 		}
 
+		if s.ReadOnly {
+			return fmt.Errorf("cannot create config %q in read-only service %q", definedConfig.Name, s.Name)
+		}
+
 		if definedConfig.Environment != "" || definedConfig.Content != "" {
 			continue
 		}
@@ -1014,6 +1018,10 @@ func checkContainerSecrets(p types.Project, s types.ServiceConfig) error {
 		}
 		if definedSecret.TemplateDriver != "" {
 			return errors.New("Docker Compose does not support secrets.*.template_driver")
+		}
+
+		if s.ReadOnly {
+			return fmt.Errorf("cannot create secret %q in read-only service %q", definedSecret.Name, s.Name)
 		}
 
 		if definedSecret.Environment != "" {

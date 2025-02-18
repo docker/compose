@@ -51,10 +51,6 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		if content == "" {
 			continue
 		}
-
-		if service.ReadOnly {
-			return fmt.Errorf("cannot create secret %q in read-only service %s", file.Name, service.Name)
-		}
     
 		if config.Target == "" {
 			config.Target = "/run/secrets/" + config.Source
@@ -98,10 +94,6 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 
 		if content == "" {
 			continue
-		}
-
-		if service.ReadOnly {
-			return fmt.Errorf("cannot create config %q in read-only service %s", file.Name, service.Name)
 		}
 
 		if config.Target == "" {
