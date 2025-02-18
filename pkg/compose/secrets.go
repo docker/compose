@@ -37,7 +37,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		if file.Environment != "" {
 			env, ok := project.Environment[file.Environment]
 			if !ok {
-				return fmt.Errorf("environment variable %q required by file %q is not set", file.Environment, file.Name)
+				return fmt.Errorf("environment variable %q required by secret %q is not set", file.Environment, file.Name)
 			}
 			content = env
 		} else if file.File != "" {
@@ -52,6 +52,10 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 			continue
 		}
 
+		if service.ReadOnly {
+			return fmt.Errorf("cannot create secret %q in read-only service %s", file.Name, service.Name)
+		}
+    
 		if config.Target == "" {
 			config.Target = "/run/secrets/" + config.Source
 		} else if !isAbsTarget(config.Target) {
@@ -81,7 +85,7 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 		if file.Environment != "" {
 			env, ok := project.Environment[file.Environment]
 			if !ok {
-				return fmt.Errorf("environment variable %q required by file %q is not set", file.Environment, file.Name)
+				return fmt.Errorf("environment variable %q required by config %q is not set", file.Environment, file.Name)
 			}
 			content = env
 		} else if file.File != "" {
@@ -94,6 +98,10 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 
 		if content == "" {
 			continue
+		}
+
+		if service.ReadOnly {
+			return fmt.Errorf("cannot create config %q in read-only service %s", file.Name, service.Name)
 		}
 
 		if config.Target == "" {
