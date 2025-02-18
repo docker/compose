@@ -124,13 +124,13 @@ func TestWatch_Sync(t *testing.T) {
 		rules, err := getWatchRules(&types.DevelopConfig{
 			Watch: []types.Trigger{
 				{
-					Path:   "/sync",
+					Path:   []string{"/sync"},
 					Action: "sync",
 					Target: "/work",
 					Ignore: []string{"ignore"},
 				},
 				{
-					Path:   "/rebuild",
+					Path:   []string{"/rebuild"},
 					Action: "rebuild",
 				},
 			},
