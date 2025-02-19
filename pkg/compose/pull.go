@@ -246,7 +246,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		Text:   "Pulled",
 	})
 
-	inspected, _, err := s.apiClient().ImageInspectWithRaw(ctx, service.Image)
+	inspected, err := s.apiClient().ImageInspect(ctx, service.Image)
 	if err != nil {
 		return "", err
 	}

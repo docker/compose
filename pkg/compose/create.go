@@ -36,10 +36,10 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
 	"github.com/docker/compose/v2/pkg/utils"
-	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
@@ -215,7 +215,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	p *types.Project,
 	service types.ServiceConfig,
 	number int,
-	inherit *moby.Container,
+	inherit *container.Summary,
 	opts createOptions,
 ) (createConfigs, error) {
 	labels, err := s.prepareLabels(opts.Labels, service, number)
@@ -274,7 +274,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: service.NetworkMode == "disabled",
-		MacAddress:      macAddress,
+		MacAddress:      macAddress, // FIXME(thaJeztah) this should be moved to networksettings -> EndpointSettings.MacAddress
 		Labels:          labels,
 		StopSignal:      service.StopSignal,
 		Env:             ToMobyEnv(env),
@@ -829,13 +829,13 @@ func (s *composeService) buildContainerVolumes(
 	ctx context.Context,
 	p types.Project,
 	service types.ServiceConfig,
-	inherit *moby.Container,
+	inherit *container.Summary,
 ) ([]string, []mount.Mount, error) {
 	var mounts []mount.Mount
 	var binds []string
 
-	image := api.GetImageNameOrDefault(service, p.Name)
-	imgInspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, image)
+	img := api.GetImageNameOrDefault(service, p.Name)
+	imgInspect, err := s.apiClient().ImageInspect(ctx, img)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -890,7 +890,7 @@ func requireMountAPI(bind *types.ServiceVolumeBind) bool {
 	}
 }
 
-func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
+func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img image.InspectResponse, inherit *container.Summary) ([]mount.Mount, error) {
 	mounts := map[string]mount.Mount{}
 	if inherit != nil {
 		for _, m := range inherit.Mounts {

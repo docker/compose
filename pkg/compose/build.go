@@ -340,7 +340,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 			if err != nil {
 				return nil, err
 			}
-			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, digest)
+			inspect, err := s.apiClient().ImageInspect(ctx, digest)
 			if err != nil {
 				return nil, err
 			}
@@ -406,7 +406,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	sessionConfig := []session.Attachable{
-		authprovider.NewDockerAuthProvider(s.configFile(), nil),
+		authprovider.NewDockerAuthProvider(authprovider.DockerAuthProviderConfig{
+			ConfigFile: s.configFile(),
+		}),
 	}
 	if len(options.SSHs) > 0 || len(service.Build.SSH) > 0 {
 		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, options.SSHs...))

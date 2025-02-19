@@ -12,10 +12,10 @@ require (
 	github.com/containerd/platforms v1.0.0-rc.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/distribution/reference v0.6.0
-	github.com/docker/buildx v0.20.1
-	github.com/docker/cli v27.5.1+incompatible
+	github.com/docker/buildx v0.21.0-rc3
+	github.com/docker/cli v28.0.0-rc.3+incompatible
 	github.com/docker/cli-docs-tool v0.9.0
-	github.com/docker/docker v27.5.1+incompatible
+	github.com/docker/docker v28.0.0-rc.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
@@ -27,7 +27,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.19.0
+	github.com/moby/buildkit v0.20.0-rc3
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/term v0.5.2
 	github.com/morikuni/aec v1.0.0
@@ -51,7 +51,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.32.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
 	golang.org/x/sync v0.11.0
 	golang.org/x/sys v0.30.0
 	google.golang.org/grpc v1.70.0

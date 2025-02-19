@@ -23,8 +23,7 @@ import (
 	"sync"
 
 	"github.com/distribution/reference"
-	moby "github.com/docker/docker/api/types"
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
@@ -35,14 +34,14 @@ import (
 
 func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
 	projectName = strings.ToLower(projectName)
-	allContainers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
+	allContainers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
 		All:     true,
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	if err != nil {
 		return nil, err
 	}
-	containers := []moby.Container{}
+	var containers []container.Summary
 	if len(options.Services) > 0 {
 		// filter service containers
 		for _, c := range allContainers {
@@ -65,14 +64,14 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 		return nil, err
 	}
 	summary := make([]api.ImageSummary, len(containers))
-	for i, container := range containers {
-		img, ok := imageSummaries[container.Image]
+	for i, c := range containers {
+		img, ok := imageSummaries[c.Image]
 		if !ok {
-			return nil, fmt.Errorf("failed to retrieve image for container %s", getCanonicalContainerName(container))
+			return nil, fmt.Errorf("failed to retrieve image for container %s", getCanonicalContainerName(c))
 		}
 
 		summary[i] = img
-		summary[i].ContainerName = getCanonicalContainerName(container)
+		summary[i].ContainerName = getCanonicalContainerName(c)
 	}
 	return summary, nil
 }
@@ -83,7 +82,7 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, repoTag := range repoTags {
 		eg.Go(func() error {
-			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, repoTag)
+			inspect, err := s.apiClient().ImageInspect(ctx, repoTag)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					return nil

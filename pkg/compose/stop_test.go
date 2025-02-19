@@ -22,17 +22,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/compose/v2/pkg/utils"
-
-	compose "github.com/docker/compose/v2/pkg/api"
-	containerType "github.com/docker/docker/api/types/container"
-
-	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	compose "github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func TestStopTimeout(t *testing.T) {
@@ -46,7 +44,7 @@ func TestStopTimeout(t *testing.T) {
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
-		[]moby.Container{
+		[]container.Summary{
 			testContainer("service1", "123", false),
 			testContainer("service1", "456", false),
 			testContainer("service2", "789", false),
@@ -61,7 +59,7 @@ func TestStopTimeout(t *testing.T) {
 		Return([]network.Summary{}, nil)
 
 	timeout := 2 * time.Second
-	stopConfig := containerType.StopOptions{Timeout: utils.DurationSecondToInt(&timeout)}
+	stopConfig := container.StopOptions{Timeout: utils.DurationSecondToInt(&timeout)}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopConfig).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "456", stopConfig).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopConfig).Return(nil)
