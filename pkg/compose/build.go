@@ -436,7 +436,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		return build.Options{}, err
 	}
 	if service.Build.Privileged {
-		allow = append(allow, entitlements.EntitlementSecurityInsecure)
+		allow = append(allow, entitlements.EntitlementSecurityInsecure.String())
 	}
 
 	imageLabels := getImageBuildLabels(project, service)
