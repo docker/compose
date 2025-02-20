@@ -443,6 +443,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		ipv6Address string
 		macAddress  string
 		driverOpts  types.Options
+		gwPriority  int
 	)
 	if config != nil {
 		ipv4Address = config.Ipv4Address
@@ -454,6 +455,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		}
 		macAddress = config.MacAddress
 		driverOpts = config.DriverOpts
+		gwPriority = config.GatewayPriority
 	}
 	return &network.EndpointSettings{
 		Aliases:     getAliases(p, service, serviceIndex, config, useNetworkAliases),
@@ -463,6 +465,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		IPAMConfig:  ipam,
 		MacAddress:  macAddress,
 		DriverOpts:  driverOpts,
+		GwPriority:  gwPriority,
 	}
 }
 
@@ -1325,6 +1328,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 		Attachable: n.Attachable,
 		IPAM:       ipam,
 		EnableIPv6: n.EnableIPv6,
+		EnableIPv4: n.EnableIPv4,
 	}
 
 	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
@@ -1344,6 +1348,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 		}
 		createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
 	}
+
 	networkEventName := fmt.Sprintf("Network %s", n.Name)
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(networkEventName))
