@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
@@ -153,7 +154,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	return multierror.Append(nil, pullErrors...).ErrorOrNil()
 }
 
-func imageAlreadyPresent(serviceImage string, localImages map[string]string) bool {
+func imageAlreadyPresent(serviceImage string, localImages map[string]api.ImageSummary) bool {
 	normalizedImage, err := reference.ParseDockerRef(serviceImage)
 	if err != nil {
 		return false
@@ -288,7 +289,7 @@ func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 	return base64.URLEncoding.EncodeToString(buf), nil
 }
 
-func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
+func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
 	var needPull []types.ServiceConfig
 	for _, service := range project.Services {
 		if service.Image == "" {
@@ -301,6 +302,11 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			}
 		case types.PullPolicyNever, types.PullPolicyBuild:
 			continue
+		case types.PullPolicyRefresh:
+			img, ok := images[service.Image]
+			if ok && !needRefresh(img, service.PullRefresh) {
+				continue
+			}
 		case types.PullPolicyAlways:
 			// force pull
 		}
@@ -314,11 +320,15 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(s.maxConcurrency)
-		pulledImages := make([]string, len(needPull))
+		pulledImages := make([]api.ImageSummary, len(needPull))
 		for i, service := range needPull {
 			eg.Go(func() error {
 				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
-				pulledImages[i] = id
+				pulledImages[i] = api.ImageSummary{
+					ID:          id,
+					Repository:  service.Image,
+					LastTagTime: time.Now(),
+				}
 				if err != nil && isServiceImageToBuild(service, project.Services) {
 					// image can be built, so we can ignore pull failure
 					return nil
@@ -328,12 +338,20 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		err := eg.Wait()
 		for i, service := range needPull {
-			if pulledImages[i] != "" {
+			if pulledImages[i].ID != "" {
 				images[service.Image] = pulledImages[i]
 			}
 		}
 		return err
 	}, s.stdinfo())
+}
+
+func needRefresh(img api.ImageSummary, refresh *types.Duration) bool {
+	refreshAfter := 24 * time.Hour // defaults to daily check
+	if refresh != nil {
+		refreshAfter = time.Duration(*refresh)
+	}
+	return time.Now().After(img.LastTagTime.Add(refreshAfter))
 }
 
 func isServiceImageToBuild(service types.ServiceConfig, services types.Services) bool {
