@@ -532,6 +532,7 @@ type ImageSummary struct {
 	Repository    string
 	Tag           string
 	Size          int64
+	LastTagTime   time.Time
 }
 
 // ServiceStatus hold status about a service
