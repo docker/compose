@@ -101,10 +101,11 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 			}
 			l.Lock()
 			summary[repoTag] = api.ImageSummary{
-				ID:         inspect.ID,
-				Repository: repository,
-				Tag:        tag,
-				Size:       inspect.Size,
+				ID:          inspect.ID,
+				Repository:  repository,
+				Tag:         tag,
+				Size:        inspect.Size,
+				LastTagTime: inspect.Metadata.LastTagTime,
 			}
 			l.Unlock()
 			return nil

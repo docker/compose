@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
@@ -70,7 +71,7 @@ const bakeSuggest = "Compose now can delegate build to bake for better performan
 var suggest sync.Once
 
 //nolint:gocyclo
-func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions, localImages map[string]string) (map[string]string, error) {
+func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions, localImages map[string]api.ImageSummary) (map[string]string, error) {
 	imageIDs := map[string]string{}
 	serviceToBuild := types.Services{}
 
@@ -282,7 +283,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				}
 
 				for name, digest := range builtImages {
-					images[name] = digest
+					images[name] = api.ImageSummary{
+						Repository:  name,
+						ID:          digest,
+						LastTagTime: time.Now(),
+					}
 				}
 				return nil
 			},
@@ -295,19 +300,16 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	// set digest as com.docker.compose.image label so we can detect outdated containers
 	for name, service := range project.Services {
 		image := api.GetImageNameOrDefault(service, project.Name)
-		digest, ok := images[image]
+		img, ok := images[image]
 		if ok {
-			if service.Labels == nil {
-				service.Labels = types.Labels{}
-			}
-			service.CustomLabels.Add(api.ImageDigestLabel, digest)
+			service.CustomLabels.Add(api.ImageDigestLabel, img.ID)
 		}
 		project.Services[name] = service
 	}
 	return nil
 }
 
-func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
+func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]api.ImageSummary, error) {
 	var imageNames []string
 	for _, s := range project.Services {
 		imgName := api.GetImageNameOrDefault(s, project.Name)
@@ -319,14 +321,10 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	if err != nil {
 		return nil, err
 	}
-	images := map[string]string{}
-	for name, info := range imgs {
-		images[name] = info.ID
-	}
 
 	for i, service := range project.Services {
 		imgName := api.GetImageNameOrDefault(service, project.Name)
-		digest, ok := images[imgName]
+		img, ok := imgs[imgName]
 		if !ok {
 			continue
 		}
@@ -335,7 +333,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 			if err != nil {
 				return nil, err
 			}
-			inspect, err := s.apiClient().ImageInspect(ctx, digest)
+			inspect, err := s.apiClient().ImageInspect(ctx, img.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -348,15 +346,15 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 				// there is a local image, but it's for the wrong platform, so
 				// pretend it doesn't exist so that we can pull/build an image
 				// for the correct platform instead
-				delete(images, imgName)
+				delete(imgs, imgName)
 			}
 		}
 
-		project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
+		project.Services[i].CustomLabels.Add(api.ImageDigestLabel, img.ID)
 
 	}
 
-	return images, nil
+	return imgs, nil
 }
 
 // resolveAndMergeBuildArgs returns the final set of build arguments to use for the service image build.
