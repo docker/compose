@@ -193,7 +193,11 @@ func validateFlags(up *upOptions, create *createOptions) error {
 		return fmt.Errorf("--build and --no-build are incompatible")
 	}
 	if up.Detach && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0 || up.watch) {
-		return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
+		if up.wait {
+			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
+		} else {
+			return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
+		}
 	}
 	if create.noInherit && create.noRecreate {
 		return fmt.Errorf("--no-recreate and --renew-anon-volumes are incompatible")
