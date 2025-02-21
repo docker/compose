@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
@@ -153,7 +154,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	return multierror.Append(nil, pullErrors...).ErrorOrNil()
 }
 
-func imageAlreadyPresent(serviceImage string, localImages map[string]string) bool {
+func imageAlreadyPresent(serviceImage string, localImages map[string]api.ImageSummary) bool {
 	normalizedImage, err := reference.ParseDockerRef(serviceImage)
 	if err != nil {
 		return false
@@ -288,23 +289,16 @@ func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 	return base64.URLEncoding.EncodeToString(buf), nil
 }
 
-func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
+func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
 	var needPull []types.ServiceConfig
 	for _, service := range project.Services {
-		if service.Image == "" {
-			continue
+		pull, err := mustPull(service, images)
+		if err != nil {
+			return err
 		}
-		switch service.PullPolicy {
-		case "", types.PullPolicyMissing, types.PullPolicyIfNotPresent:
-			if _, ok := images[service.Image]; ok {
-				continue
-			}
-		case types.PullPolicyNever, types.PullPolicyBuild:
-			continue
-		case types.PullPolicyAlways:
-			// force pull
+		if pull {
+			needPull = append(needPull, service)
 		}
-		needPull = append(needPull, service)
 	}
 	if len(needPull) == 0 {
 		return nil
@@ -314,11 +308,15 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(s.maxConcurrency)
-		pulledImages := make([]string, len(needPull))
+		pulledImages := make([]api.ImageSummary, len(needPull))
 		for i, service := range needPull {
 			eg.Go(func() error {
 				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
-				pulledImages[i] = id
+				pulledImages[i] = api.ImageSummary{
+					ID:          id,
+					Repository:  service.Image,
+					LastTagTime: time.Now(),
+				}
 				if err != nil && isServiceImageToBuild(service, project.Services) {
 					// image can be built, so we can ignore pull failure
 					return nil
@@ -328,12 +326,38 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		err := eg.Wait()
 		for i, service := range needPull {
-			if pulledImages[i] != "" {
+			if pulledImages[i].ID != "" {
 				images[service.Image] = pulledImages[i]
 			}
 		}
 		return err
 	}, s.stdinfo())
+}
+
+func mustPull(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, error) {
+	if service.Image == "" {
+		return false, nil
+	}
+	policy, duration, err := service.GetPullPolicy()
+	if err != nil {
+		return false, err
+	}
+	switch policy {
+	case types.PullPolicyAlways:
+		// force pull
+		return true, nil
+	case types.PullPolicyNever, types.PullPolicyBuild:
+		return false, nil
+	case types.PullPolicyRefresh:
+		img, ok := images[service.Image]
+		if !ok {
+			return true, nil
+		}
+		return time.Now().After(img.LastTagTime.Add(duration)), nil
+	default: // Pull if missing
+		_, ok := images[service.Image]
+		return !ok, nil
+	}
 }
 
 func isServiceImageToBuild(service types.ServiceConfig, services types.Services) bool {
