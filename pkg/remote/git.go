@@ -25,6 +25,8 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/docker/compose/v2/internal/paths"
+
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -45,16 +47,18 @@ func gitRemoteLoaderEnabled() (bool, error) {
 	return false, nil
 }
 
-func NewGitRemoteLoader(offline bool) loader.ResourceLoader {
+func NewGitRemoteLoader(offline bool, downloadDirectory string) loader.ResourceLoader {
 	return gitRemoteLoader{
-		offline: offline,
-		known:   map[string]string{},
+		offline:           offline,
+		known:             map[string]string{},
+		downloadDirectory: downloadDirectory,
 	}
 }
 
 type gitRemoteLoader struct {
-	offline bool
-	known   map[string]string
+	offline           bool
+	known             map[string]string
+	downloadDirectory string
 }
 
 func (g gitRemoteLoader) Accept(path string) bool {
@@ -89,12 +93,20 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", err
 		}
 
-		cache, err := cacheDir()
-		if err != nil {
-			return "", fmt.Errorf("initializing remote resource cache: %w", err)
+		if local == "" {
+			cache, err := cacheDir()
+			if err != nil {
+				return "", fmt.Errorf("initializing remote resource cache: %w", err)
+			}
+			local = cache
+		} else {
+			local, err = paths.GetAbsPath(g.downloadDirectory)
+			if err != nil {
+				return "", err
+			}
 		}
 
-		local = filepath.Join(cache, ref.Commit)
+		local = filepath.Join(local, ref.Commit)
 		if _, err := os.Stat(local); os.IsNotExist(err) {
 			if g.offline {
 				return "", nil
