@@ -100,10 +100,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return imageIDs, err
 	}
 
-	if serviceDeps {
-		logrus.Infof(`additional_context with "service:"" is better supported when delegating build go bake. Set COMPOSE_BAKE=true`)
-	}
-
 	err = project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
@@ -126,6 +122,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 	if bake {
 		return s.doBuildBake(ctx, project, serviceToBuild, options)
+	}
+
+	if serviceDeps {
+		logrus.Infof(`additional_context with "service:"" is better supported when delegating build go bake. Set COMPOSE_BAKE=true`)
 	}
 
 	// Initialize buildkit nodes
