@@ -81,6 +81,7 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 type watchRule struct {
 	types.Trigger
+	include watch.PathMatcher
 	ignore  watch.PathMatcher
 	service string
 }
@@ -88,6 +89,15 @@ type watchRule struct {
 func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 	hostPath := string(event)
 	if !pathutil.IsChild(r.Path, hostPath) {
+		return nil
+	}
+	included, err := r.include.Matches(hostPath)
+	if err != nil {
+		logrus.Warnf("error include matching %q: %v", hostPath, err)
+		return nil
+	}
+	if !included {
+		logrus.Debugf("%s is not matching include pattern", hostPath)
 		return nil
 	}
 	isIgnored, err := r.ignore.Matches(hostPath)
@@ -244,8 +254,19 @@ func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]
 			return nil, err
 		}
 
+		var include watch.PathMatcher
+		if len(trigger.Include) == 0 {
+			include = watch.AnyMatcher{}
+		} else {
+			include, err = watch.NewDockerPatternMatcher(trigger.Path, trigger.Include)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		rules = append(rules, watchRule{
 			Trigger: trigger,
+			include: include,
 			ignore: watch.NewCompositeMatcher(
 				dockerIgnores,
 				watch.EphemeralPathMatcher(),

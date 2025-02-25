@@ -68,6 +68,15 @@ type PathMatcher interface {
 	MatchesEntireDir(file string) (bool, error)
 }
 
+// AnyMatcher is a PathMatcher to match any path
+type AnyMatcher struct{}
+
+func (AnyMatcher) Matches(f string) (bool, error)          { return true, nil }
+func (AnyMatcher) MatchesEntireDir(f string) (bool, error) { return true, nil }
+
+var _ PathMatcher = AnyMatcher{}
+
+// EmptyMatcher is a PathMatcher to match no path
 type EmptyMatcher struct{}
 
 func (EmptyMatcher) Matches(f string) (bool, error)          { return false, nil }
