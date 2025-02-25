@@ -96,6 +96,23 @@ func LoadDockerIgnore(build *types.BuildConfig) (PathMatcher, error) {
 	return NewDockerPatternMatcher(absRoot, patterns)
 }
 
+func GeneralIgnorePatterns(service types.ServiceConfig) (PathMatcher, error) {
+	dockerIgnores, err := LoadDockerIgnore(service.Build)
+	if err != nil {
+		return nil, err
+	}
+
+	// add a hardcoded set of ignores on top of what came from .dockerignore
+	// some of this should likely be configurable (e.g. there could be cases
+	// where you want `.git` to be synced) but this is suitable for now
+	dotGitIgnore, err := NewDockerPatternMatcher("/", []string{".git/"})
+	if err != nil {
+		return nil, err
+	}
+
+	return NewCompositeMatcher(dockerIgnores, dotGitIgnore, EphemeralPathMatcher()), nil
+}
+
 // Make all the patterns use absolute paths.
 func absPatterns(absRoot string, patterns []string) []string {
 	absPatterns := make([]string, 0, len(patterns))

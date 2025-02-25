@@ -80,21 +80,30 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, serv
 
 type watchRule struct {
 	types.Trigger
-	ignore  watch.PathMatcher
-	service string
+	ignore      watch.PathMatcher
+	service     string
+	globPattern watch.PathMatcher
 }
 
-func (r watchRule) Matches(event watch.FileEvent) []*sync.PathMapping {
+func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 	hostPath := string(event)
-	childPaths := []string{}
-	for _, p := range r.Path {
-		if pathutil.IsChild(p, hostPath) {
-			childPaths = append(childPaths, p)
-		}
-	}
-	if len(childPaths) == 0 {
+
+	isGlob := r.IsGlobPath()
+	if !isGlob && !pathutil.IsChild(r.Path, hostPath) {
 		return nil
 	}
+
+	if isGlob {
+		isMatch, err := r.globPattern.Matches(hostPath)
+		if err != nil {
+			logrus.Warnf("error while pattern matching %q: %v", hostPath, err)
+			return nil
+		}
+		if !isMatch {
+			return nil
+		}
+	}
+
 	isIgnored, err := r.ignore.Matches(hostPath)
 	if err != nil {
 		logrus.Warnf("error ignore matching %q: %v", hostPath, err)
@@ -106,29 +115,20 @@ func (r watchRule) Matches(event watch.FileEvent) []*sync.PathMapping {
 		return nil
 	}
 
-	if r.Target == "" {
-		return []*sync.PathMapping{
-			&sync.PathMapping{
-				HostPath: hostPath,
-			},
-		}
-	}
-
-	var res []*sync.PathMapping
-	for _, p := range childPaths {
-		rel, err := filepath.Rel(p, hostPath)
+	var containerPath string
+	if r.Target != "" {
+		rel, err := filepath.Rel(r.AnchorPath(), hostPath)
 		if err != nil {
-			logrus.Warnf("error making %s relative to %s: %v", hostPath, p, err)
+			logrus.Warnf("error making %s relative to %s: %v", hostPath, r.AnchorPath(), err)
 			return nil
 		}
 		// always use Unix-style paths for inside the container
-		containerPath := path.Join(r.Target, filepath.ToSlash(rel))
-		res = append(res, &sync.PathMapping{
-			HostPath:      hostPath,
-			ContainerPath: containerPath,
-		})
+		containerPath = path.Join(r.Target, filepath.ToSlash(rel))
 	}
-	return res
+	return &sync.PathMapping{
+		HostPath:      hostPath,
+		ContainerPath: containerPath,
+	}
 }
 
 func (s *composeService) watch(ctx context.Context, syncChannel chan bool, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
@@ -176,17 +176,13 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 		}
 
 		for _, trigger := range config.Watch {
-			if isSync(trigger) {
-				for _, p := range trigger.Path {
-					if checkIfPathAlreadyBindMounted(p, service.Volumes) {
-						logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", p)
-						continue
-					}
-				}
+			if trigger.IsSyncAction() && isPathBindMounted(trigger.AnchorPath(), service.Volumes) {
+				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
+				continue
 			} else {
 				var initialSync bool
 				success, err := trigger.Extensions.Get("x-initialSync", &initialSync)
-				if err == nil && success && initialSync && isSync(trigger) {
+				if err == nil && success && initialSync && trigger.IsSyncAction() {
 					// Need to check initial files are in container that are meant to be synched from watch action
 					err := s.initialSync(ctx, project, service, trigger, syncer)
 					if err != nil {
@@ -194,7 +190,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 					}
 				}
 			}
-			paths = append(paths, trigger.Path...)
+			paths = append(paths, trigger.AnchorPath())
 		}
 
 		serviceWatchRules, err := getWatchRules(config, service)
@@ -243,44 +239,35 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]watchRule, error) {
 	var rules []watchRule
 
-	dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
-	if err != nil {
-		return nil, err
-	}
-
-	// add a hardcoded set of ignores on top of what came from .dockerignore
-	// some of this should likely be configurable (e.g. there could be cases
-	// where you want `.git` to be synced) but this is suitable for now
-	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{".git/"})
+	general, err := watch.GeneralIgnorePatterns(service)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, trigger := range config.Watch {
-		var ignorePaths []watch.PathMatcher
-
-		for _, p := range trigger.Path {
-			ignore, err := watch.NewDockerPatternMatcher(p, trigger.Ignore)
+		ignore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
+		if err != nil {
+			return nil, err
+		}
+		var glob watch.PathMatcher = watch.EmptyMatcher{}
+		if trigger.IsGlobPath() {
+			glob, err = watch.NewDockerPatternMatcher(trigger.AnchorPath(), []string{trigger.Path})
 			if err != nil {
 				return nil, err
 			}
-			ignorePaths = append(ignorePaths, ignore)
 		}
 
-		ignorePaths = append(ignorePaths, dockerIgnores, dotGitIgnore, watch.EphemeralPathMatcher())
 		rules = append(rules, watchRule{
 			Trigger: trigger,
 			ignore: watch.NewCompositeMatcher(
-				ignorePaths...,
+				general,
+				ignore,
 			),
-			service: service.Name,
+			globPattern: glob,
+			service:     service.Name,
 		})
 	}
 	return rules, nil
-}
-
-func isSync(trigger types.Trigger) bool {
-	return trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart
 }
 
 func (s *composeService) watchEvents(ctx context.Context, project *types.Project, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, rules []watchRule) error {
@@ -327,18 +314,16 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 	}
 
 	for i, trigger := range config.Watch {
-		for j, p := range trigger.Path {
-			if !filepath.IsAbs(p) {
-				trigger.Path[j] = filepath.Join(baseDir, p)
-			}
-			if p, err := filepath.EvalSymlinks(p); err == nil {
-				// this might fail because the path doesn't exist, etc.
-				trigger.Path[j] = p
-			}
-			trigger.Path[j] = filepath.Clean(p)
-			if trigger.Path[j] == "" {
-				return nil, errors.New("watch rules MUST define a path")
-			}
+		if !filepath.IsAbs(trigger.Path) {
+			trigger.Path = filepath.Join(baseDir, trigger.Path)
+		}
+		if p, err := filepath.EvalSymlinks(trigger.Path); err == nil {
+			// this might fail because the path doesn't exist, etc.
+			trigger.Path = p
+		}
+		trigger.Path = filepath.Clean(trigger.Path)
+		if trigger.Path == "" {
+			return nil, errors.New("watch rules MUST define a path")
 		}
 
 		if trigger.Action == types.WatchActionRebuild && service.Build == nil {
@@ -353,7 +338,7 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 	return &config, nil
 }
 
-func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolumeConfig) bool {
+func isPathBindMounted(watchPath string, volumes []types.ServiceVolumeConfig) bool {
 	for _, volume := range volumes {
 		if volume.Bind != nil && strings.HasPrefix(watchPath, volume.Source) {
 			return true
@@ -451,7 +436,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 	for _, event := range batch {
 		for i, rule := range rules {
 			mapping := rule.Matches(event)
-			if len(mapping) == 0 {
+			if mapping == nil {
 				continue
 			}
 
@@ -459,14 +444,14 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 			case types.WatchActionRebuild:
 				rebuild[rule.service] = true
 			case types.WatchActionSync:
-				syncfiles[rule.service] = append(syncfiles[rule.service], mapping...)
+				syncfiles[rule.service] = append(syncfiles[rule.service], mapping)
 			case types.WatchActionRestart:
 				restart[rule.service] = true
 			case types.WatchActionSyncRestart:
-				syncfiles[rule.service] = append(syncfiles[rule.service], mapping...)
+				syncfiles[rule.service] = append(syncfiles[rule.service], mapping)
 				restart[rule.service] = true
 			case types.WatchActionSyncExec:
-				syncfiles[rule.service] = append(syncfiles[rule.service], mapping...)
+				syncfiles[rule.service] = append(syncfiles[rule.service], mapping)
 				// We want to run exec hooks only once after syncfiles if multiple file events match
 				// as we can't compare ServiceHook to sort and compact a slice, collect rule indexes
 				exec[rule.service] = append(exec[rule.service], i)
@@ -631,32 +616,19 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 // Walks develop.watch.path and checks which files should be copied inside the container
 // ignores develop.watch.ignore, Dockerfile, compose files, bind mounted paths and .git
 func (s *composeService) initialSync(ctx context.Context, project *types.Project, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
-	var allIgnores []watch.PathMatcher
-
-	dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
+	ignore, err := watch.GeneralIgnorePatterns(service)
 	if err != nil {
 		return err
 	}
-	allIgnores = append(allIgnores, dockerIgnores)
 
-	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{".git/"})
+	triggerIgnore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
 	if err != nil {
 		return err
-	}
-	allIgnores = append(allIgnores, dotGitIgnore)
-	allIgnores = append(allIgnores, watch.EphemeralPathMatcher())
-
-	for _, p := range trigger.Path {
-		triggerIgnore, err := watch.NewDockerPatternMatcher(p, trigger.Ignore)
-		if err != nil {
-			return err
-		}
-		allIgnores = append(allIgnores, triggerIgnore)
 	}
 	// FIXME .dockerignore
 	ignoreInitialSync := watch.NewCompositeMatcher(
-		allIgnores...,
-	)
+		ignore,
+		triggerIgnore)
 
 	pathsToCopy, err := s.initialSyncFiles(ctx, project, service, trigger, ignoreInitialSync)
 	if err != nil {
@@ -670,66 +642,66 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 //
 //nolint:gocyclo
 func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Project, service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
+	sourcePath := trigger.AnchorPath()
+
+	fi, err := os.Stat(sourcePath)
+	if err != nil {
+		return nil, err
+	}
 	timeImageCreated, err := s.imageCreatedTime(ctx, project, service.Name)
 	if err != nil {
 		return nil, err
 	}
 	var pathsToCopy []*sync.PathMapping
+	switch mode := fi.Mode(); {
+	case mode.IsDir():
+		// process directory
+		err = filepath.WalkDir(sourcePath, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				// handle possible path err, just in case...
+				return err
+			}
+			if sourcePath == path {
+				// walk starts at the root directory
+				return nil
+			}
 
-	for _, p := range trigger.Path {
-		fi, err := os.Stat(p)
-		if err != nil {
-			return nil, err
-		}
-		switch mode := fi.Mode(); {
-		case mode.IsDir():
-			// process directory
-			err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
-				if err != nil {
-					// handle possible path err, just in case...
-					return err
+			if shouldIgnore(filepath.Base(path), ignore) || isPathBindMounted(path, service.Volumes) {
+				// By definition sync ignores bind mounted paths
+				if d.IsDir() {
+					// skip folder
+					return fs.SkipDir
 				}
-				if p == path {
-					// walk starts at the root directory
+				return nil // skip file
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() {
+				if info.ModTime().Before(timeImageCreated) {
+					// skip file if it was modified before image creation
 					return nil
 				}
-				if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
-					// By definition sync ignores bind mounted paths
-					if d.IsDir() {
-						// skip folder
-						return fs.SkipDir
-					}
-					return nil // skip file
-				}
-				info, err := d.Info()
+				rel, err := filepath.Rel(sourcePath, path)
 				if err != nil {
 					return err
 				}
-				if !d.IsDir() {
-					if info.ModTime().Before(timeImageCreated) {
-						// skip file if it was modified before image creation
-						return nil
-					}
-					rel, err := filepath.Rel(p, path)
-					if err != nil {
-						return err
-					}
-					// only copy files (and not full directories)
-					pathsToCopy = append(pathsToCopy, &sync.PathMapping{
-						HostPath:      path,
-						ContainerPath: filepath.Join(trigger.Target, rel),
-					})
-				}
-				return nil
-			})
-		case mode.IsRegular():
-			// process file
-			if fi.ModTime().After(timeImageCreated) && !shouldIgnore(filepath.Base(p), ignore) && !checkIfPathAlreadyBindMounted(p, service.Volumes) {
+				// only copy files (and not full directories)
 				pathsToCopy = append(pathsToCopy, &sync.PathMapping{
-					HostPath:      p,
-					ContainerPath: trigger.Target,
+					HostPath:      path,
+					ContainerPath: filepath.Join(trigger.Target, rel),
 				})
 			}
+			return nil
+		})
+	case mode.IsRegular():
+		// process file
+		if fi.ModTime().After(timeImageCreated) && !shouldIgnore(filepath.Base(sourcePath), ignore) && !isPathBindMounted(sourcePath, service.Volumes) {
+			pathsToCopy = append(pathsToCopy, &sync.PathMapping{
+				HostPath:      sourcePath,
+				ContainerPath: trigger.Target,
+			})
 		}
 	}
 	return pathsToCopy, err

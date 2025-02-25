@@ -124,13 +124,18 @@ func TestWatch_Sync(t *testing.T) {
 		rules, err := getWatchRules(&types.DevelopConfig{
 			Watch: []types.Trigger{
 				{
-					Path:   []string{"/sync"},
+					Path:   "/sync",
 					Action: "sync",
 					Target: "/work",
 					Ignore: []string{"ignore"},
 				},
 				{
-					Path:   []string{"/rebuild"},
+					Path:   "/restart/*/sub",
+					Action: "sync",
+					Target: "/foo",
+				},
+				{
+					Path:   "/rebuild",
 					Action: "rebuild",
 				},
 			},
@@ -147,7 +152,10 @@ func TestWatch_Sync(t *testing.T) {
 
 	watcher.Events() <- watch.NewFileEvent("/sync/changed")
 	watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
-	err := clock.BlockUntilContext(ctx, 3)
+
+	watcher.Events() <- watch.NewFileEvent("/restart/changed")
+	watcher.Events() <- watch.NewFileEvent("/restart/changed/sub")
+	err := clock.BlockUntilContext(ctx, 5)
 	assert.NilError(t, err)
 	clock.Advance(watch.QuietPeriod)
 	select {
@@ -155,6 +163,7 @@ func TestWatch_Sync(t *testing.T) {
 		require.ElementsMatch(t, []*sync.PathMapping{
 			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 			{HostPath: "/sync/changed/sub", ContainerPath: "/work/changed/sub"},
+			{HostPath: "/restart/changed/sub", ContainerPath: "/foo/changed/sub"},
 		}, actual)
 	case <-time.After(100 * time.Millisecond):
 		t.Error("timeout")
@@ -162,7 +171,7 @@ func TestWatch_Sync(t *testing.T) {
 
 	watcher.Events() <- watch.NewFileEvent("/rebuild")
 	watcher.Events() <- watch.NewFileEvent("/sync/changed")
-	err = clock.BlockUntilContext(ctx, 4)
+	err = clock.BlockUntilContext(ctx, 7)
 	assert.NilError(t, err)
 	clock.Advance(watch.QuietPeriod)
 	select {
