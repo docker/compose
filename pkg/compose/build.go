@@ -79,28 +79,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		policy = types.IncludeDependencies
 	}
 
-	serviceDeps := false
-	project, err := project.WithServicesTransform(func(serviceName string, service types.ServiceConfig) (types.ServiceConfig, error) {
-		if service.Build != nil {
-			for _, c := range service.Build.AdditionalContexts {
-				if t, found := strings.CutPrefix(c, types.ServicePrefix); found {
-					serviceDeps = true
-					if service.DependsOn == nil {
-						service.DependsOn = map[string]types.ServiceDependency{}
-					}
-					service.DependsOn[t] = types.ServiceDependency{
-						Condition: "build", // non-canonical, but will force dependency graph ordering
-					}
-				}
-			}
-		}
-		return service, nil
-	})
-	if err != nil {
-		return imageIDs, err
-	}
-
-	err = project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
+	err := project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
 		}
@@ -124,8 +103,24 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return s.doBuildBake(ctx, project, serviceToBuild, options)
 	}
 
-	if serviceDeps {
-		logrus.Infof(`additional_context with "service:"" is better supported when delegating build go bake. Set COMPOSE_BAKE=true`)
+	// Not using bake, additional_context: service:xx is implemented by building images in dependency order
+	project, err = project.WithServicesTransform(func(serviceName string, service types.ServiceConfig) (types.ServiceConfig, error) {
+		if service.Build != nil {
+			for _, c := range service.Build.AdditionalContexts {
+				if t, found := strings.CutPrefix(c, types.ServicePrefix); found {
+					if service.DependsOn == nil {
+						service.DependsOn = map[string]types.ServiceDependency{}
+					}
+					service.DependsOn[t] = types.ServiceDependency{
+						Condition: "build", // non-canonical, but will force dependency graph ordering
+					}
+				}
+			}
+		}
+		return service, nil
+	})
+	if err != nil {
+		return imageIDs, err
 	}
 
 	// Initialize buildkit nodes
@@ -468,7 +463,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 			ContextPath:      service.Build.Context,
 			DockerfileInline: service.Build.DockerfileInline,
 			DockerfilePath:   dockerFilePath(service.Build.Context, service.Build.Dockerfile),
-			NamedContexts:    toBuildContexts(service.Build.AdditionalContexts),
+			NamedContexts:    toBuildContexts(service, project),
 		},
 		CacheFrom:    pb.CreateCaches(cacheFrom.ToPB()),
 		CacheTo:      pb.CreateCaches(cacheTo.ToPB()),
@@ -573,13 +568,15 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 	return ret
 }
 
-func toBuildContexts(additionalContexts types.Mapping) map[string]build.NamedContext {
+func toBuildContexts(service types.ServiceConfig, project *types.Project) map[string]build.NamedContext {
 	namedContexts := map[string]build.NamedContext{}
-	for name, contextPath := range additionalContexts {
-		if _, found := strings.CutPrefix(contextPath, types.ServicePrefix); found {
-			// image we depend on has been build previously, as we run in dependency order.
-			// this assumes use of docker engine builder, so that build can access local images
-			continue
+	for name, contextPath := range service.Build.AdditionalContexts {
+		if strings.HasPrefix(contextPath, types.ServicePrefix) {
+			// image we depend on has been built previously, as we run in dependency order.
+			// so we convert the service reference into an image reference
+			target := contextPath[len(types.ServicePrefix):]
+			image := api.GetImageNameOrDefault(project.Services[target], project.Name)
+			contextPath = "docker-image://" + image
 		}
 		namedContexts[name] = build.NamedContext{Path: contextPath}
 	}

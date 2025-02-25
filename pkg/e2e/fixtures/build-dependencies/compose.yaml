@@ -1,6 +1,5 @@
 services:
   base:
-    image: base
     init: true
     build:
       context: .
