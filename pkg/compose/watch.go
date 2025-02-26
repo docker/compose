@@ -33,6 +33,7 @@ import (
 	ccli "github.com/docker/cli/cli/command/container"
 	pathutil "github.com/docker/compose/v2/internal/paths"
 	"github.com/docker/compose/v2/internal/sync"
+	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/watch"
 	"github.com/docker/docker/api/types/container"
@@ -522,7 +523,16 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
 	// restrict the build to ONLY this service, not any of its dependencies
 	options.Build.Services = services
-	imageNameToIdMap, err := s.build(ctx, project, *options.Build, nil)
+
+	var (
+		imageNameToIdMap map[string]string
+		err              error
+	)
+	err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
+		func(ctx context.Context) error {
+			imageNameToIdMap, err = s.build(ctx, project, *options.Build, nil)
+			return err
+		})(ctx)
 	if err != nil {
 		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Build failed. Error: %v", err))
 		return err
