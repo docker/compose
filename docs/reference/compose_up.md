@@ -55,7 +55,6 @@ If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the contai
 | `-w`, `--watch`                | `bool`        |          | Watch source code and rebuild/refresh containers when files are updated.                                                                            |
 | `-y`, `--y`                    | `bool`        |          | Assume "yes" as answer to all prompts and run non-interactively                                                                                     |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description
@@ -65,8 +64,8 @@ Builds, (re)creates, starts, and attaches to containers for a service.
 Unless they are already running, this command also starts any linked services.
 
 The `docker compose up` command aggregates the output of each container (like `docker compose logs --follow` does).
-One can optionally select a subset of services to attach to using `--attach` flag, or exclude some services using 
-`--no-attach` to prevent output to be flooded by some verbose services. 
+One can optionally select a subset of services to attach to using `--attach` flag, or exclude some services using
+`--no-attach` to prevent output to be flooded by some verbose services.
 
 When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
 background and leaves them running.

@@ -10,7 +10,6 @@ Stops running containers without removing them. They can be started again with `
 | `--dry-run`       | `bool` |         | Execute command in dry run mode       |
 | `-t`, `--timeout` | `int`  | `0`     | Specify a shutdown timeout in seconds |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

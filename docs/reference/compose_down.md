@@ -25,7 +25,6 @@ named volumes.
 | `-t`, `--timeout`  | `int`    | `0`     | Specify a shutdown timeout in seconds                                                                                   |
 | `-v`, `--volumes`  | `bool`   |         | Remove named volumes declared in the "volumes" section of the Compose file and anonymous volumes attached to containers |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

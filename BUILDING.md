@@ -36,6 +36,7 @@ make test
 If you need to update a golden file simply do `go test ./... -test.update-golden`.
 
 ### End-to-end tests
+
 To run e2e tests, the Compose CLI binary needs to be built. All the commands to run e2e tests propose a version
 with the prefix `build-and-e2e` to first build the CLI before executing tests.
 
@@ -50,6 +51,7 @@ make e2e
 ```
 
 Or if you need to build the CLI, run:
+
 ```console
 make build-and-e2e
 ```
@@ -63,6 +65,7 @@ make e2e-compose
 ```
 
 Or if you need to build the CLI, run:
+
 ```console
 make build-and-e2e-compose
 ```
@@ -84,6 +87,7 @@ make build-and-e2e-compose-standalone
 ## Releases
 
 To create a new release:
+
 * Check that the CI is green on the main branch for the commit you want to release
 * Run the release GitHub Actions workflow with a tag of form vx.y.z following existing tags.
 

@@ -13,7 +13,6 @@ Lists running Compose projects
 | `--format`      | `string` | `table` | Format the output. Values: [table \| json] |
 | `-q`, `--quiet` | `bool`   |         | Only display project names                 |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

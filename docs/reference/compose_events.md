@@ -28,7 +28,6 @@ The events that can be received using this can be seen [here](/reference/cli/doc
 | `--dry-run` | `bool` |         | Execute command in dry run mode           |
 | `--json`    | `bool` |         | Output events as a stream of json objects |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

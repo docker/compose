@@ -26,7 +26,6 @@ Removing djangoquickstart_web_run_1 ... done
 | `-s`, `--stop`    | `bool` |         | Stop the containers, if required, before removing   |
 | `-v`, `--volumes` | `bool` |         | Remove any anonymous volumes attached to containers |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

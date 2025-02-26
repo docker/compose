@@ -40,5 +40,4 @@ offer a paid security bounty program at this time.
 This project docs not provide long-term supported versions, and only the current
 release and `main` branch are actively maintained. Docker Compose v1, and the
 corresponding [v1 branch](https://github.com/docker/compose/tree/v1) reached
-EOL and are no longer supported. 
-
+EOL and are no longer supported.

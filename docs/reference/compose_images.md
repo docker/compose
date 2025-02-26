@@ -11,6 +11,4 @@ List images used by the created containers
 | `--format`      | `string` | `table` | Format the output. Values: [table \| json] |
 | `-q`, `--quiet` | `bool`   |         | Only display IDs                           |
 
-
 <!---MARKER_GEN_END-->
-

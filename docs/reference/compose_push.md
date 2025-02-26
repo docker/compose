@@ -4,6 +4,7 @@
 Pushes images for services to their respective registry/repository.
 
 The following assumptions are made:
+
 - You are pushing an image you have built locally
 - You have access to the build key
 
@@ -29,7 +30,6 @@ services:
 | `--include-deps`         | `bool` |         | Also push images of services declared as dependencies  |
 | `-q`, `--quiet`          | `bool` |         | Push without printing progress information             |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description
@@ -37,6 +37,7 @@ services:
 Pushes images for services to their respective registry/repository.
 
 The following assumptions are made:
+
 - You are pushing an image you have built locally
 - You have access to the build key
 

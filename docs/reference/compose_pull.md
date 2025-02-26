@@ -14,13 +14,11 @@ Pulls an image associated with a service defined in a `compose.yaml` file, but d
 | `--policy`               | `string` |         | Apply pull policy ("missing"\|"always")                |
 | `-q`, `--quiet`          | `bool`   |         | Pull without printing progress information             |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description
 
 Pulls an image associated with a service defined in a `compose.yaml` file, but does not start containers based on those images
-
 
 ## Examples
 

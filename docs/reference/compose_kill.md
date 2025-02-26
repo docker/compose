@@ -4,7 +4,7 @@
 Forces running containers to stop by sending a `SIGKILL` signal. Optionally the signal can be passed, for example:
 
 ```console
-$ docker compose kill -s SIGINT
+docker compose kill -s SIGINT
 ```
 
 ### Options
@@ -15,7 +15,6 @@ $ docker compose kill -s SIGINT
 | `--remove-orphans` | `bool`   |           | Remove containers for services not defined in the Compose file |
 | `-s`, `--signal`   | `string` | `SIGKILL` | SIGNAL to send to the container                                |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description
@@ -23,5 +22,5 @@ $ docker compose kill -s SIGINT
 Forces running containers to stop by sending a `SIGKILL` signal. Optionally the signal can be passed, for example:
 
 ```console
-$ docker compose kill -s SIGINT
+docker compose kill -s SIGINT
 ```

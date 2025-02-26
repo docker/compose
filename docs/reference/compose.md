@@ -44,7 +44,6 @@ Define and run multi-container applications with Docker
 | [`wait`](compose_wait.md)       | Block until containers of all (or specified) services stop.                             |
 | [`watch`](compose_watch.md)     | Watch build context for service and rebuild/refresh containers when files are updated   |
 
-
 ### Options
 
 | Name                   | Type          | Default | Description                                                                                         |
@@ -61,15 +60,16 @@ Define and run multi-container applications with Docker
 | `--project-directory`  | `string`      |         | Specify an alternate working directory<br>(default: the path of the, first specified, Compose file) |
 | `-p`, `--project-name` | `string`      |         | Project name                                                                                        |
 
-
 <!---MARKER_GEN_END-->
 
 ## Examples
 
 ### Use `-f` to specify the name and path of one or more Compose files
+
 Use the `-f` flag to specify the location of a Compose [configuration file](/reference/compose-file/).
 
 #### Specifying multiple Compose files
+
 You can supply multiple `-f` configuration files. When you supply multiple files, Compose combines them into a single
 configuration. Compose builds the configuration in the order you supply the files. Subsequent files override and add
 to their predecessors.
@@ -77,7 +77,7 @@ to their predecessors.
 For example, consider this command line:
 
 ```console
-$ docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
+docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
 ```
 
 The `docker-compose.yml` file might specify a `webapp` service.
@@ -91,6 +91,7 @@ services:
     volumes:
       - "/data"
 ```
+
 If the `docker-compose.admin.yml` also specifies this same service, any matching fields override the previous file.
 New values, add to the `webapp` service configuration.
 
@@ -112,6 +113,7 @@ The `-f` flag is optional. If you don’t provide this flag on the command line,
 and its parent directories looking for a `compose.yaml` or `docker-compose.yaml` file.
 
 #### Specifying a path to a single Compose file
+
 You can use the `-f` flag to specify a path to a Compose file that is not located in the current directory, either
 from the command line or by setting up a `COMPOSE_FILE` environment variable in your shell or in an environment file.
 
@@ -120,13 +122,14 @@ have a `compose.yaml` file in a directory called `sandbox/rails`. You can use a 
 get the postgres image for the db service from anywhere by using the `-f` flag as follows:
 
 ```console
-$ docker compose -f ~/sandbox/rails/compose.yaml pull db
+docker compose -f ~/sandbox/rails/compose.yaml pull db
 ```
 
 ### Use `-p` to specify a project name
 
 Each configuration has a project name. Compose sets the project name using
 the following mechanisms, in order of precedence:
+
 - The `-p` command line flag
 - The `COMPOSE_PROJECT_NAME` environment variable
 - The top level `name:` variable from the config file (or the last `name:`
@@ -187,6 +190,7 @@ in attached mode. Alternatively, you can also run `docker compose up --menu=fals
 
 Use `--dry-run` flag to test a command without changing your application stack state.
 Dry Run mode shows you all the steps Compose applies when executing a command, for example:
+
 ```console
 $ docker compose --dry-run up --build -d
 [+] Pulling 1/1
@@ -203,6 +207,7 @@ $ docker compose --dry-run up --build -d
  ✔ DRY-RUN MODE -  Container nginx-golang-mysql-backend-1                                Started                                                                                                                                           0.0s
  ✔ DRY-RUN MODE -  Container nginx-golang-mysql-proxy-1                                  Started                                     Started
 ```
+
 From the example above, you can see that the first step is to pull the image defined by `db` service, then build the `backend` service.  
 Next, the containers are created. The `db` service is started, and the `backend` and `proxy` wait until the `db` service is healthy before starting.
 

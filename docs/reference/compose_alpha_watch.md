@@ -11,6 +11,4 @@ Watch build context for service and rebuild/refresh containers when files are up
 | `--no-up`   |      |         | Do not build & start services before watching |
 | `--quiet`   |      |         | hide build output                             |
 
-
 <!---MARKER_GEN_END-->
-

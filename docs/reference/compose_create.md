@@ -18,6 +18,4 @@ Creates containers for a service
 | `--scale`          | `stringArray` |          | Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present. |
 | `-y`, `--y`        | `bool`        |          | Assume "yes" as answer to all prompts and run non-interactively                               |
 
-
 <!---MARKER_GEN_END-->
-

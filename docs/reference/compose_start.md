@@ -9,7 +9,6 @@ Starts existing containers for a service
 |:------------|:-------|:--------|:--------------------------------|
 | `--dry-run` | `bool` |         | Execute command in dry run mode |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

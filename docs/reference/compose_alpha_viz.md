@@ -14,6 +14,4 @@ EXPERIMENTAL - Generate a graphviz graph from your compose file
 | `--ports`            | `bool` |         | Include service's exposed ports in output graph                                                    |
 | `--spaces`           | `bool` |         | If given, space character ' ' will be used to indent,<br>otherwise tab character '\t' will be used |
 
-
 <!---MARKER_GEN_END-->
-
