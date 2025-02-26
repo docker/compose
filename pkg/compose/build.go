@@ -50,6 +50,8 @@ import (
 	"github.com/moby/buildkit/util/progress/progressui"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	// required to get default driver registered
 	_ "github.com/docker/buildx/driver/docker"
@@ -101,6 +103,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return nil, err
 	}
 	if bake {
+		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "bake"))
 		return s.doBuildBake(ctx, project, serviceToBuild, options)
 	}
 
@@ -197,6 +200,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		serviceName := fmt.Sprintf("Service %s", name)
 
 		if !buildkitEnabled {
+			trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "classic"))
 			cw.Event(progress.BuildingEvent(serviceName))
 			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
@@ -220,6 +224,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			return err
 		}
 
+		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "buildkit"))
 		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
 		if err != nil {
 			return err
