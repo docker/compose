@@ -9,17 +9,17 @@
     "style": "asterisk"
   },
   "extended-ascii": {
-    "ascii-only": true
+    "ascii-only": false
   },
   "fenced-code-language": {
     "allowed_languages": [
       "bash",
-      "go",
       "html",
       "javascript",
       "json",
       "markdown",
-      "text"
+      "text",
+      "go"
     ],
     "language_only": true
   },
@@ -30,7 +30,7 @@
     "style": "---"
   },
   "line-length": {
-    "strict": true,
+    "strict": false,
     "code_blocks": false
   },
   "link-image-style": {
@@ -42,7 +42,7 @@
     "siblings_only": true
   },
   "ol-prefix": {
-    "style": "ordered"
+    "style": "any"
   },
   "proper-names": {
     "code_blocks": false,
@@ -54,6 +54,7 @@
       "markdown-it",
       "markdownlint",
       "Node.js",
+      "Docker",
       "Go"
     ]
   },
