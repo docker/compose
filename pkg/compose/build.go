@@ -63,8 +63,11 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		return err
 	}
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
-		_, err := s.build(ctx, project, options, nil)
-		return err
+		return tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
+			func(ctx context.Context) error {
+				_, err := s.build(ctx, project, options, nil)
+				return err
+			})(ctx)
 	}, s.stdinfo(), "Building")
 }
 
