@@ -1,0 +1,69 @@
+{
+  "code-block-style": {
+    "style": "fenced"
+  },
+  "code-fence-style": {
+    "style": "backtick"
+  },
+  "emphasis-style": {
+    "style": "asterisk"
+  },
+  "extended-ascii": {
+    "ascii-only": true
+  },
+  "fenced-code-language": {
+    "allowed_languages": [
+      "bash",
+      "go",
+      "html",
+      "javascript",
+      "json",
+      "markdown",
+      "text"
+    ],
+    "language_only": true
+  },
+  "heading-style": {
+    "style": "atx"
+  },
+  "hr-style": {
+    "style": "---"
+  },
+  "line-length": {
+    "strict": true,
+    "code_blocks": false
+  },
+  "link-image-style": {
+    "collapsed": false,
+    "shortcut": false,
+    "url_inline": false
+  },
+  "no-duplicate-heading": {
+    "siblings_only": true
+  },
+  "ol-prefix": {
+    "style": "ordered"
+  },
+  "proper-names": {
+    "code_blocks": false,
+    "names": [
+      "Cake.Markdownlint",
+      "CommonMark",
+      "JavaScript",
+      "Markdown",
+      "markdown-it",
+      "markdownlint",
+      "Node.js",
+      "Go"
+    ]
+  },
+  "reference-links-images": {
+    "shortcut_syntax": true
+  },
+  "strong-style": {
+    "style": "asterisk"
+  },
+  "ul-style": {
+    "style": "dash"
+  }
+}
