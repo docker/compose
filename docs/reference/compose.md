@@ -44,6 +44,7 @@ Define and run multi-container applications with Docker
 | [`wait`](compose_wait.md)       | Block until containers of all (or specified) services stop.                             |
 | [`watch`](compose_watch.md)     | Watch build context for service and rebuild/refresh containers when files are updated   |
 
+
 ### Options
 
 | Name                   | Type          | Default | Description                                                                                         |
@@ -77,7 +78,7 @@ to their predecessors.
 For example, consider this command line:
 
 ```console
-docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
+$ docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
 ```
 
 The `docker-compose.yml` file might specify a `webapp` service.
@@ -122,7 +123,7 @@ have a `compose.yaml` file in a directory called `sandbox/rails`. You can use a 
 get the postgres image for the db service from anywhere by using the `-f` flag as follows:
 
 ```console
-docker compose -f ~/sandbox/rails/compose.yaml pull db
+$ docker compose -f ~/sandbox/rails/compose.yaml pull db
 ```
 
 ### Use `-p` to specify a project name
