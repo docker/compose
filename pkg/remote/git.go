@@ -28,6 +28,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/buildkit/util/gitutil"
 )
@@ -45,16 +46,18 @@ func gitRemoteLoaderEnabled() (bool, error) {
 	return false, nil
 }
 
-func NewGitRemoteLoader(offline bool) loader.ResourceLoader {
+func NewGitRemoteLoader(dockerCli command.Cli, offline bool) loader.ResourceLoader {
 	return gitRemoteLoader{
-		offline: offline,
-		known:   map[string]string{},
+		dockerCli: dockerCli,
+		offline:   offline,
+		known:     map[string]string{},
 	}
 }
 
 type gitRemoteLoader struct {
-	offline bool
-	known   map[string]string
+	dockerCli command.Cli
+	offline   bool
+	known     map[string]string
 }
 
 func (g gitRemoteLoader) Accept(path string) bool {

@@ -34,7 +34,10 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const OCI_REMOTE_ENABLED = "COMPOSE_EXPERIMENTAL_OCI_REMOTE"
+const (
+	OCI_REMOTE_ENABLED = "COMPOSE_EXPERIMENTAL_OCI_REMOTE"
+	OciPrefix          = "oci://"
+)
 
 func ociRemoteLoaderEnabled() (bool, error) {
 	if v := os.Getenv(OCI_REMOTE_ENABLED); v != "" {
@@ -61,10 +64,8 @@ type ociRemoteLoader struct {
 	known     map[string]string
 }
 
-const prefix = "oci://"
-
 func (g ociRemoteLoader) Accept(path string) bool {
-	return strings.HasPrefix(path, prefix)
+	return strings.HasPrefix(path, OciPrefix)
 }
 
 func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) {
@@ -82,7 +83,7 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 
 	local, ok := g.known[path]
 	if !ok {
-		ref, err := reference.ParseDockerRef(path[len(prefix):])
+		ref, err := reference.ParseDockerRef(path[len(OciPrefix):])
 		if err != nil {
 			return "", err
 		}
@@ -121,7 +122,6 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		}
 		g.known[path] = local
 	}
-
 	return filepath.Join(local, "compose.yaml"), nil
 }
 
