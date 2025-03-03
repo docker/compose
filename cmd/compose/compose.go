@@ -372,7 +372,7 @@ func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceL
 	if o.Offline {
 		return nil
 	}
-	git := remote.NewGitRemoteLoader(o.Offline)
+	git := remote.NewGitRemoteLoader(dockerCli, o.Offline)
 	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
 	return []loader.ResourceLoader{git, oci}
 }
