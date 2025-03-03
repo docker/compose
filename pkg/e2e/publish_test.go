@@ -107,4 +107,13 @@ FOO=bar`), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), `BAR=baz`), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), `QUIX=`), res.Combined())
 	})
+
+	t.Run("refuse to publish with build section only", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-build-only.yml",
+			"-p", projectName, "alpha", "publish", "test/test", "--with-env", "-y", "--dry-run")
+		res.Assert(t, icmd.Expected{ExitCode: 1})
+		assert.Assert(t, strings.Contains(res.Combined(), "your Compose stack cannot be published as it only contains a build section for service(s):"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "serviceA"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "serviceB"), res.Combined())
+	})
 }
