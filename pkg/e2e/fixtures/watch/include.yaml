@@ -1,0 +1,12 @@
+services:
+  a:
+    build:
+      dockerfile_inline: |
+        FROM nginx
+        RUN mkdir /data/
+    develop:
+      watch:
+        - path: .
+          include: A.*
+          target: /data/
+          action: sync
