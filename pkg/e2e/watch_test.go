@@ -368,3 +368,40 @@ func TestWatchMultiServices(t *testing.T) {
 
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
+
+func TestWatchIncludes(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "test_watch_includes"
+
+	defer c.cleanupWithDown(t, projectName)
+
+	tmpdir := t.TempDir()
+	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
+	CopyFile(t, filepath.Join("fixtures", "watch", "include.yaml"), composeFilePath)
+
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--watch")
+	buffer := bytes.NewBuffer(nil)
+	cmd.Stdout = buffer
+	watch := icmd.StartCmd(cmd)
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		if strings.Contains(watch.Stdout(), "Attaching to ") {
+			return poll.Success()
+		}
+		return poll.Continue("%v", watch.Stdout())
+	})
+
+	require.NoError(t, os.WriteFile(filepath.Join(tmpdir, "B.test"), []byte("test"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpdir, "A.test"), []byte("test"), 0o600))
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		cat := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", "a", "ls", "/data/")
+		if strings.Contains(cat.Stdout(), "A.test") {
+			assert.Check(t, !strings.Contains(cat.Stdout(), "B.test"))
+			return poll.Success()
+		}
+		return poll.Continue("%v", cat.Combined())
+	})
+
+	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
+}
