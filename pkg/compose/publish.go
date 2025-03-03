@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -136,6 +137,9 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 }
 
 func (s *composeService) preChecks(project *types.Project, options api.PublishOptions) (bool, error) {
+	if ok, err := s.checkOnlyBuildSection(project); !ok {
+		return false, err
+	}
 	envVariables, err := s.checkEnvironmentVariables(project, options)
 	if err != nil {
 		return false, err
@@ -213,4 +217,21 @@ func envFileLayers(project *types.Project) []ocipush.Pushable {
 		}
 	}
 	return layers
+}
+
+func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, error) {
+	errorList := []string{}
+	for _, service := range project.Services {
+		if service.Image == "" && service.Build != nil {
+			errorList = append(errorList, service.Name)
+		}
+	}
+	if len(errorList) > 0 {
+		errMsg := "your Compose stack cannot be published as it only contains a build section for service(s):\n"
+		for _, serviceInError := range errorList {
+			errMsg += fmt.Sprintf("- %q\n", serviceInError)
+		}
+		return false, errors.New(errMsg)
+	}
+	return true, nil
 }

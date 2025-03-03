@@ -1,0 +1,9 @@
+services:
+  serviceA:
+    build:
+      context: .
+      dockerfile: Dockerfile
+  serviceB:
+    build:
+      context: .
+      dockerfile: Dockerfile
