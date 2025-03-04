@@ -155,6 +155,15 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 		}
 		return acceptPublishEnvVariables(s.dockerCli)
 	}
+
+	for name, config := range project.Services {
+		for _, volume := range config.Volumes {
+			if volume.Type == types.VolumeTypeBind {
+				return false, fmt.Errorf("cannot publish compose file: service %q relies on bind-mount. You should use volumes", name)
+			}
+		}
+	}
+
 	return true, nil
 }
 

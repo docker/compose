@@ -108,6 +108,12 @@ FOO=bar`), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), `QUIX=`), res.Combined())
 	})
 
+	t.Run("refuse to publish with bind mount", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-bind-mount.yml",
+			"-p", projectName, "alpha", "publish", "test/test", "--dry-run")
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: `cannot publish compose file: service "serviceA" relies on bind-mount. You should use volumes`})
+	})
+
 	t.Run("refuse to publish with build section only", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-build-only.yml",
 			"-p", projectName, "alpha", "publish", "test/test", "--with-env", "-y", "--dry-run")
