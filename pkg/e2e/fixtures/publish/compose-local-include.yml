@@ -1,0 +1,6 @@
+include:
+  - ./another/compose.yml
+
+services:
+  test:
+    image: test

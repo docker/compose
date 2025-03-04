@@ -116,4 +116,10 @@ FOO=bar`), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "serviceA"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "serviceB"), res.Combined())
 	})
+
+	t.Run("refuse to publish with local include", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-local-include.yml",
+			"-p", projectName, "alpha", "publish", "test/test", "--dry-run")
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot publish compose file with local includes"})
+	})
 }

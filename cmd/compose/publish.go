@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
@@ -55,9 +56,13 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 }
 
 func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service, opts publishOptions, repository string) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, nil)
+	project, metrics, err := opts.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return err
+	}
+
+	if metrics.CountIncludesLocal > 0 {
+		return errors.New("cannot publish compose file with local includes")
 	}
 
 	return backend.Publish(ctx, project, repository, api.PublishOptions{
