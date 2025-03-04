@@ -9,7 +9,6 @@ Pauses running containers of a service. They can be unpaused with `docker compos
 |:------------|:-------|:--------|:--------------------------------|
 | `--dry-run` | `bool` |         | Execute command in dry run mode |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

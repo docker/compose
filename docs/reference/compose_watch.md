@@ -12,6 +12,4 @@ Watch build context for service and rebuild/refresh containers when files are up
 | `--prune`   | `bool` |         | Prune dangling images on rebuild              |
 | `--quiet`   | `bool` |         | hide build output                             |
 
-
 <!---MARKER_GEN_END-->
-
