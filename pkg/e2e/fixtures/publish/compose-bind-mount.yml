@@ -1,0 +1,5 @@
+services:
+  serviceA:
+    image: a
+    volumes:
+      - .:/user-data
