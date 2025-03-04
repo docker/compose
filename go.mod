@@ -32,7 +32,7 @@ require (
 	github.com/moby/term v0.5.2
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.1.0
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/otiai10/copy v1.14.1
 	github.com/r3labs/sse v0.0.0-20210224172625-26fe804710bc
 	github.com/sirupsen/logrus v1.9.3
