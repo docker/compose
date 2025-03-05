@@ -224,6 +224,10 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		return err
 	}
 
+	if err := checksForRemoteStack(ctx, dockerCli, project, buildOpts, createOpts.AssumeYes, []string{}); err != nil {
+		return err
+	}
+
 	err = progress.Run(ctx, func(ctx context.Context) error {
 		var buildForDeps *api.BuildOptions
 		if !createOpts.noBuild {

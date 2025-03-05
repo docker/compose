@@ -224,6 +224,10 @@ func runUp(
 	project *types.Project,
 	services []string,
 ) error {
+	if err := checksForRemoteStack(ctx, dockerCli, project, buildOptions, createOptions.AssumeYes, []string{}); err != nil {
+		return err
+	}
+
 	err := createOptions.Apply(project)
 	if err != nil {
 		return err
@@ -301,7 +305,6 @@ func runUp(
 		attachSet.RemoveAll(upOptions.noAttach...)
 		attach = attachSet.Elements()
 	}
-	displayLocationRemoteStack(dockerCli, project, buildOptions)
 
 	timeout := time.Duration(upOptions.waitTimeout) * time.Second
 	return backend.Up(ctx, project, api.UpOptions{
@@ -329,19 +332,4 @@ func setServiceScale(project *types.Project, name string, replicas int) error {
 	service.SetScale(replicas)
 	project.Services[name] = service
 	return nil
-}
-
-func displayLocationRemoteStack(dockerCli command.Cli, project *types.Project, options buildOptions) {
-	if len(options.ProjectOptions.ConfigPaths) == 0 {
-		return
-	}
-	mainComposeFile := options.ProjectOptions.ConfigPaths[0]
-	if ui.Mode != ui.ModeQuiet && ui.Mode != ui.ModeJSON {
-		for _, loader := range options.ProjectOptions.remoteLoaders(dockerCli) {
-			if loader.Accept(mainComposeFile) {
-				_, _ = fmt.Fprintf(dockerCli.Out(), "Your compose stack %q is stored in %q\n", mainComposeFile, project.WorkingDir)
-				return
-			}
-		}
-	}
 }
