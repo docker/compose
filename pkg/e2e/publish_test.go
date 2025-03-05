@@ -91,6 +91,12 @@ or remove sensitive data from your Compose configuration
 		assert.Assert(t, !strings.Contains(res.Combined(), "test/test published"), res.Combined())
 	})
 
+	t.Run("publish with extends", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/compose-with-extends.yml",
+			"-p", projectName, "alpha", "publish", "test/test", "--dry-run")
+		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
+	})
+
 	t.Run("publish list env variables", func(t *testing.T) {
 		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-multi-env-config.yml",
 			"-p", projectName, "alpha", "publish", "test/test", "--with-env", "--dry-run")

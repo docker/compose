@@ -18,10 +18,12 @@ package compose
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
 
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/util/imagetools"
@@ -30,7 +32,32 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
+	"github.com/mikefarah/yq/v4/pkg/yqlib"
+	"github.com/sirupsen/logrus"
+	"gopkg.in/op/go-logging.v1"
 )
+
+// _backend redirects go-logging.v1 (used by yqlib) to logrus
+type _backend struct{}
+
+func (b *_backend) Log(l logging.Level, _ int, r *logging.Record) error {
+	switch l {
+	case logging.CRITICAL, logging.ERROR:
+		logrus.Error(r.Message())
+	case logging.WARNING:
+		logrus.Warn(r.Message())
+	case logging.NOTICE, logging.INFO:
+		logrus.Info(r.Message())
+	case logging.DEBUG:
+
+		logrus.Debug(r.Message())
+	}
+	return nil
+}
+
+func init() {
+	logging.SetBackend(&_backend{})
+}
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
@@ -60,19 +87,27 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Auth: s.configFile(),
 	})
 
+	yqlib.InitExpressionParser()
 	var layers []ocipush.Pushable
+	extFiles := map[string]string{}
 	for _, file := range project.ComposeFiles {
-		f, err := os.ReadFile(file)
+		data, err := processFile(ctx, file, project, extFiles)
 		if err != nil {
 			return err
 		}
 
-		layerDescriptor := ocipush.DescriptorForComposeFile(file, f)
+		layerDescriptor := ocipush.DescriptorForComposeFile(file, data)
 		layers = append(layers, ocipush.Pushable{
 			Descriptor: layerDescriptor,
-			Data:       f,
+			Data:       data,
 		})
 	}
+
+	extLayers, err := processExtends(ctx, project, extFiles)
+	if err != nil {
+		return err
+	}
+	layers = append(layers, extLayers...)
 
 	if options.WithEnvironment {
 		layers = append(layers, envFileLayers(project)...)
@@ -114,6 +149,94 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Status: progress.Done,
 	})
 	return nil
+}
+
+func processExtends(ctx context.Context, project *types.Project, extFiles map[string]string) ([]ocipush.Pushable, error) {
+	var layers []ocipush.Pushable
+	moreExtFiles := map[string]string{}
+	for xf, hash := range extFiles {
+		data, err := processFile(ctx, xf, project, moreExtFiles)
+		if err != nil {
+			return nil, err
+		}
+
+		layerDescriptor := ocipush.DescriptorForComposeFile(hash, data)
+		layerDescriptor.Annotations["com.docker.compose.extends"] = "true"
+		layers = append(layers, ocipush.Pushable{
+			Descriptor: layerDescriptor,
+			Data:       data,
+		})
+	}
+	for f, hash := range moreExtFiles {
+		if _, ok := extFiles[f]; ok {
+			delete(moreExtFiles, f)
+		}
+		extFiles[f] = hash
+	}
+	if len(moreExtFiles) > 0 {
+		extLayers, err := processExtends(ctx, project, moreExtFiles)
+		if err != nil {
+			return nil, err
+		}
+		layers = append(layers, extLayers...)
+	}
+	return layers, nil
+}
+
+func processFile(ctx context.Context, file string, project *types.Project, extFiles map[string]string) ([]byte, error) {
+	f, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	base, err := loader.LoadWithContext(ctx, types.ConfigDetails{
+		WorkingDir:  project.WorkingDir,
+		Environment: project.Environment,
+		ConfigFiles: []types.ConfigFile{
+			{
+				Filename: file,
+				Content:  f,
+			},
+		},
+	}, func(options *loader.Options) {
+		options.SkipValidation = true
+		options.SkipExtends = true
+		options.SkipConsistencyCheck = true
+		options.ResolvePaths = true
+	})
+	if err != nil {
+		return nil, err
+	}
+	for name, service := range base.Services {
+		if service.Extends == nil {
+			continue
+		}
+		xf := service.Extends.File
+		if xf == "" {
+			continue
+		}
+		if _, err = os.Stat(service.Extends.File); os.IsNotExist(err) {
+			// No local file, while we loaded the project successfully: This is actually a remote resource
+			continue
+		}
+
+		hash := fmt.Sprintf("%x.yaml", sha256.Sum256([]byte(xf)))
+		extFiles[xf] = hash
+
+		// FIXME implement without relying on yqlib so we don't get extra dependencies
+		exp := fmt.Sprintf(".services.%s.extends.file = %q", name, hash)
+		encoder := yqlib.NewYamlEncoder(yqlib.YamlPreferences{
+			ColorsEnabled: false,
+		})
+		decoder := yqlib.NewYamlDecoder(yqlib.YamlPreferences{})
+		out, err := yqlib.NewStringEvaluator().Evaluate(exp, string(f), encoder, decoder)
+		if err != nil {
+			return nil, err
+		}
+
+		f = []byte(out)
+	}
+	return f, nil
 }
 
 func (s *composeService) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {

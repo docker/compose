@@ -1,5 +1,5 @@
 include:
-  - ./another/compose.yml
+  - common.yaml
 
 services:
   test:
