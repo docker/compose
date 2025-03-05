@@ -1,0 +1,6 @@
+name: test
+services:
+  test:
+    extends:
+      file: common.yaml
+      service: foo

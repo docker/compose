@@ -43,7 +43,7 @@ func gitRemoteLoaderEnabled() (bool, error) {
 		}
 		return enabled, err
 	}
-	return false, nil
+	return true, nil
 }
 
 func NewGitRemoteLoader(dockerCli command.Cli, offline bool) loader.ResourceLoader {
@@ -73,7 +73,7 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		return "", err
 	}
 	if !enabled {
-		return "", fmt.Errorf("experimental git remote resource is disabled. %q must be set", GIT_REMOTE_ENABLED)
+		return "", fmt.Errorf("git remote resource is disabled by %q", GIT_REMOTE_ENABLED)
 	}
 
 	ref, err := gitutil.ParseGitRef(path)

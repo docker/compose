@@ -1,0 +1,3 @@
+services:
+  foo:
+    image: bar
