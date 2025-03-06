@@ -1,0 +1,8 @@
+services:
+  serviceA:
+    image: nginx:latest
+
+  serviceB:
+    image: nginx:latest
+    env_file:
+      - /doesnotexist/.env
