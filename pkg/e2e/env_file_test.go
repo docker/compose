@@ -30,3 +30,10 @@ func TestRawEnvFile(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dotenv/raw.yaml", "run", "test")
 	assert.Equal(t, strings.TrimSpace(res.Stdout()), "'{\"key\": \"value\"}'")
 }
+
+func TestUnusedMissingEnvFile(t *testing.T) {
+	c := NewParallelCLI(t)
+	defer c.cleanupWithDown(t, "unused_dotenv")
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "up", "-d", "serviceA")
+}
