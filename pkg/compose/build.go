@@ -71,7 +71,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	}, s.stdinfo(), "Building")
 }
 
-const bakeSuggest = "Compose now can delegate build to bake for better performances\nJust set COMPOSE_BAKE=true"
+const bakeSuggest = "Compose can now delegate builds to bake for better performance.\n To do so, set COMPOSE_BAKE=true."
 
 var suggest sync.Once
 
