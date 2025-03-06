@@ -96,6 +96,6 @@ type Pipe struct {
 func (u Pipe) Confirm(message string, defaultValue bool) (bool, error) {
 	_, _ = fmt.Fprint(u.stdout, message)
 	var answer string
-	_, _ = fmt.Scanln(&answer)
+	_, _ = fmt.Fscanln(u.stdin, &answer)
 	return utils.StringToBool(answer), nil
 }

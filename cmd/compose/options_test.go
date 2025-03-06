@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -279,4 +280,115 @@ services:
 		normalizeSpaces(expected),
 		normalizeSpaces(actualOutput),
 		"\nExpected:\n%s\nGot:\n%s", expected, actualOutput)
+}
+
+func TestConfirmRemoteIncludes(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cli := mocks.NewMockCli(ctrl)
+
+	tests := []struct {
+		name       string
+		opts       buildOptions
+		assumeYes  bool
+		userInput  string
+		wantErr    bool
+		errMessage string
+		wantPrompt bool
+		wantOutput string
+	}{
+		{
+			name: "no remote includes",
+			opts: buildOptions{
+				ProjectOptions: &ProjectOptions{
+					ConfigPaths: []string{
+						"docker-compose.yaml",
+						"./local/path/compose.yaml",
+					},
+				},
+			},
+			assumeYes:  false,
+			wantErr:    false,
+			wantPrompt: false,
+		},
+		{
+			name: "assume yes with remote includes",
+			opts: buildOptions{
+				ProjectOptions: &ProjectOptions{
+					ConfigPaths: []string{
+						"oci://registry.example.com/stack:latest",
+						"git://github.com/user/repo.git",
+					},
+				},
+			},
+			assumeYes:  true,
+			wantErr:    false,
+			wantPrompt: false,
+		},
+		{
+			name: "user confirms remote includes",
+			opts: buildOptions{
+				ProjectOptions: &ProjectOptions{
+					ConfigPaths: []string{
+						"oci://registry.example.com/stack:latest",
+						"git://github.com/user/repo.git",
+					},
+				},
+			},
+			assumeYes:  false,
+			userInput:  "y\n",
+			wantErr:    false,
+			wantPrompt: true,
+			wantOutput: "\nWarning: This Compose project includes files from remote sources:\n" +
+				"  - oci://registry.example.com/stack:latest\n" +
+				"  - git://github.com/user/repo.git\n" +
+				"\nRemote includes could potentially be malicious. Make sure you trust the source.\n" +
+				"Do you want to continue? [y/N]: ",
+		},
+		{
+			name: "user rejects remote includes",
+			opts: buildOptions{
+				ProjectOptions: &ProjectOptions{
+					ConfigPaths: []string{
+						"oci://registry.example.com/stack:latest",
+					},
+				},
+			},
+			assumeYes:  false,
+			userInput:  "n\n",
+			wantErr:    true,
+			errMessage: "operation cancelled by user",
+			wantPrompt: true,
+			wantOutput: "\nWarning: This Compose project includes files from remote sources:\n" +
+				"  - oci://registry.example.com/stack:latest\n" +
+				"\nRemote includes could potentially be malicious. Make sure you trust the source.\n" +
+				"Do you want to continue? [y/N]: ",
+		},
+	}
+
+	buf := new(bytes.Buffer)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cli.EXPECT().Out().Return(streams.NewOut(buf)).AnyTimes()
+
+			if tt.wantPrompt {
+				inbuf := io.NopCloser(bytes.NewBufferString(tt.userInput))
+				cli.EXPECT().In().Return(streams.NewIn(inbuf)).AnyTimes()
+			}
+
+			err := confirmRemoteIncludes(cli, tt.opts, tt.assumeYes)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Equal(t, tt.errMessage, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tt.wantOutput != "" {
+				require.Equal(t, tt.wantOutput, buf.String())
+			}
+			buf.Reset()
+		})
+	}
 }
