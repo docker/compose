@@ -29,6 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/internal/tracing"
 	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -102,6 +103,11 @@ func isRemoteConfig(dockerCli command.Cli, options buildOptions) bool {
 func checksForRemoteStack(ctx context.Context, dockerCli command.Cli, project *types.Project, options buildOptions, assumeYes bool, cmdEnvs []string) error {
 	if !isRemoteConfig(dockerCli, options) {
 		return nil
+	}
+	if metrics, ok := ctx.Value(tracing.MetricsKey{}).(tracing.Metrics); ok && metrics.CountIncludesRemote > 0 {
+		if err := confirmRemoteIncludes(dockerCli, options, assumeYes); err != nil {
+			return err
+		}
 	}
 	displayLocationRemoteStack(dockerCli, project, options)
 	return promptForInterpolatedVariables(ctx, dockerCli, options.ProjectOptions, assumeYes, cmdEnvs)
@@ -244,4 +250,42 @@ func displayLocationRemoteStack(dockerCli command.Cli, project *types.Project, o
 	if ui.Mode != ui.ModeQuiet && ui.Mode != ui.ModeJSON {
 		_, _ = fmt.Fprintf(dockerCli.Out(), "Your compose stack %q is stored in %q\n", mainComposeFile, project.WorkingDir)
 	}
+}
+
+func confirmRemoteIncludes(dockerCli command.Cli, options buildOptions, assumeYes bool) error {
+	if assumeYes {
+		return nil
+	}
+
+	var remoteIncludes []string
+	remoteLoaders := options.ProjectOptions.remoteLoaders(dockerCli)
+	for _, cf := range options.ProjectOptions.ConfigPaths {
+		for _, loader := range remoteLoaders {
+			if loader.Accept(cf) {
+				remoteIncludes = append(remoteIncludes, cf)
+				break
+			}
+		}
+	}
+
+	if len(remoteIncludes) == 0 {
+		return nil
+	}
+
+	_, _ = fmt.Fprintln(dockerCli.Out(), "\nWarning: This Compose project includes files from remote sources:")
+	for _, include := range remoteIncludes {
+		_, _ = fmt.Fprintf(dockerCli.Out(), "  - %s\n", include)
+	}
+	_, _ = fmt.Fprintln(dockerCli.Out(), "\nRemote includes could potentially be malicious. Make sure you trust the source.")
+
+	msg := "Do you want to continue? [y/N]: "
+	confirmed, err := prompt.NewPrompt(dockerCli.In(), dockerCli.Out()).Confirm(msg, false)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		return fmt.Errorf("operation cancelled by user")
+	}
+
+	return nil
 }
