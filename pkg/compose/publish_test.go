@@ -44,12 +44,13 @@ func Test_processExtends(t *testing.T) {
 	file, err := processFile(context.TODO(), "testdata/publish/compose.yaml", project, extFiles)
 	assert.NilError(t, err)
 
-	assert.Equal(t, string(file), `name: test
+	v := string(file)
+	assert.Equal(t, v, `name: test
 services:
-    test:
-        extends:
-            file: f8f9ede3d201ec37d5a5e3a77bbadab79af26035e53135e19571f50d541d390c.yaml
-            service: foo
+  test:
+    extends:
+      file: f8f9ede3d201ec37d5a5e3a77bbadab79af26035e53135e19571f50d541d390c.yaml
+      service: foo
 `)
 
 	layers, err := processExtends(context.TODO(), project, extFiles)
