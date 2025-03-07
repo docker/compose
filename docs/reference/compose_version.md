@@ -11,5 +11,4 @@ Show the Docker Compose version information
 | `-f`, `--format` | `string` |         | Format the output. Values: [pretty \| json]. (Default: pretty) |
 | `--short`        | `bool`   |         | Shows only Compose's version number                            |
 
-
 <!---MARKER_GEN_END-->
