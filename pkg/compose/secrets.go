@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -31,12 +32,24 @@ import (
 func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
 	for _, config := range service.Secrets {
 		file := project.Secrets[config.Source]
-		if file.Environment == "" {
-			continue
+		content := file.Content
+
+		if file.Environment != "" {
+			env, ok := project.Environment[file.Environment]
+			if !ok {
+				return fmt.Errorf("environment variable %q required by secret %q is not set", file.Environment, file.Name)
+			}
+			content = env
+		} else if file.File != "" {
+			data, err := os.ReadFile(file.File)
+			if err != nil {
+				return err
+			}
+			content = string(data)
 		}
 
-		if service.ReadOnly {
-			return fmt.Errorf("cannot create secret %q in read-only service %s: `file` is the sole supported option", file.Name, service.Name)
+		if content == "" {
+			continue
 		}
 
 		if config.Target == "" {
@@ -45,11 +58,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 			config.Target = "/run/secrets/" + config.Target
 		}
 
-		env, ok := project.Environment[file.Environment]
-		if !ok {
-			return fmt.Errorf("environment variable %q required by secret %q is not set", file.Environment, file.Name)
-		}
-		b, err := createTar(env, types.FileReferenceConfig(config))
+		b, err := createTar(content, types.FileReferenceConfig(config))
 		if err != nil {
 			return err
 		}
@@ -68,19 +77,23 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 	for _, config := range service.Configs {
 		file := project.Configs[config.Source]
 		content := file.Content
+
 		if file.Environment != "" {
 			env, ok := project.Environment[file.Environment]
 			if !ok {
 				return fmt.Errorf("environment variable %q required by config %q is not set", file.Environment, file.Name)
 			}
 			content = env
-		}
-		if content == "" {
-			continue
+		} else if file.File != "" {
+			data, err := os.ReadFile(file.File)
+			if err != nil {
+				return err
+			}
+			content = string(data)
 		}
 
-		if service.ReadOnly {
-			return fmt.Errorf("cannot create config %q in read-only service %s: `file` is the sole supported option", file.Name, service.Name)
+		if content == "" {
+			continue
 		}
 
 		if config.Target == "" {
