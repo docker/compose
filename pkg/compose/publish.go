@@ -30,34 +30,10 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/ocipush"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose/transform"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
-	"github.com/mikefarah/yq/v4/pkg/yqlib"
-	"github.com/sirupsen/logrus"
-	"gopkg.in/op/go-logging.v1"
 )
-
-// _backend redirects go-logging.v1 (used by yqlib) to logrus
-type _backend struct{}
-
-func (b *_backend) Log(l logging.Level, _ int, r *logging.Record) error {
-	switch l {
-	case logging.CRITICAL, logging.ERROR:
-		logrus.Error(r.Message())
-	case logging.WARNING:
-		logrus.Warn(r.Message())
-	case logging.NOTICE, logging.INFO:
-		logrus.Info(r.Message())
-	case logging.DEBUG:
-
-		logrus.Debug(r.Message())
-	}
-	return nil
-}
-
-func init() {
-	logging.SetBackend(&_backend{})
-}
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
@@ -87,7 +63,6 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Auth: s.configFile(),
 	})
 
-	yqlib.InitExpressionParser()
 	var layers []ocipush.Pushable
 	extFiles := map[string]string{}
 	for _, file := range project.ComposeFiles {
@@ -223,18 +198,10 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 		hash := fmt.Sprintf("%x.yaml", sha256.Sum256([]byte(xf)))
 		extFiles[xf] = hash
 
-		// FIXME implement without relying on yqlib so we don't get extra dependencies
-		exp := fmt.Sprintf(".services.%s.extends.file = %q", name, hash)
-		encoder := yqlib.NewYamlEncoder(yqlib.YamlPreferences{
-			ColorsEnabled: false,
-		})
-		decoder := yqlib.NewYamlDecoder(yqlib.YamlPreferences{})
-		out, err := yqlib.NewStringEvaluator().Evaluate(exp, string(f), encoder, decoder)
+		f, err = transform.ReplaceExtendsFile(f, name, hash)
 		if err != nil {
 			return nil, err
 		}
-
-		f = []byte(out)
 	}
 	return f, nil
 }
