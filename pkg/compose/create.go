@@ -218,7 +218,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	inherit *container.Summary,
 	opts createOptions,
 ) (createConfigs, error) {
-	labels, err := s.prepareLabels(opts.Labels, service, number)
+	labels, err := s.prepareLabels(opts.Labels, p, service, number)
 	if err != nil {
 		return createConfigs{}, err
 	}
@@ -507,17 +507,36 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 	return parsed, unconfined, nil
 }
 
-func (s *composeService) prepareLabels(labels types.Labels, service types.ServiceConfig, number int) (map[string]string, error) {
-	hash, err := ServiceHash(service)
+func (s *composeService) prepareLabels(labels types.Labels, project *types.Project, service types.ServiceConfig, number int) (map[string]string, error) {
+	serviceHash, err := ServiceHash(service)
 	if err != nil {
 		return nil, err
 	}
-	labels[api.ConfigHashLabel] = hash
+
+	serviceNameToConfigHash, err := ServiceConfigsHash(project, service)
+	if err != nil {
+		return nil, err
+	}
+
+	for serviceName, hash := range serviceNameToConfigHash {
+		labels[fmt.Sprintf(api.ServiceConfigsHash, serviceName)] = hash
+	}
+
+	serviceNameToSecretHash, err := ServiceSecretsHash(project, service)
+	if err != nil {
+		return nil, err
+	}
+
+	for serviceName, hash := range serviceNameToSecretHash {
+		labels[fmt.Sprintf(api.ServiceSecretsHash, serviceName)] = hash
+	}
 
 	if number > 0 {
 		// One-off containers are not indexed
 		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 	}
+	labels[api.ConfigHashLabel] = serviceHash
+	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var dependencies []string
 	for s, d := range service.DependsOn {
