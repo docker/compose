@@ -17,11 +17,16 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+
+	"github.com/DefangLabs/secret-detector/pkg/scanner"
+	"github.com/DefangLabs/secret-detector/pkg/secrets"
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -226,15 +231,37 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	return override.MarshalYAML()
 }
 
+//nolint:gocyclo
 func (s *composeService) preChecks(project *types.Project, options api.PublishOptions) (bool, error) {
-	if ok, err := s.checkOnlyBuildSection(project); !ok {
+	if ok, err := s.checkOnlyBuildSection(project); !ok || err != nil {
 		return false, err
+	}
+	if ok, err := s.checkForBindMount(project); !ok || err != nil {
+		return false, err
+	}
+	if options.AssumeYes {
+		return true, nil
+	}
+	detectedSecrets, err := s.checkForSensitiveData(project)
+	if err != nil {
+		return false, err
+	}
+	if len(detectedSecrets) > 0 {
+		fmt.Println("you are about to publish sensitive data within your OCI artifact.\n" +
+			"please double check that you are not leaking sensitive data")
+		for _, val := range detectedSecrets {
+			_, _ = fmt.Fprintln(s.dockerCli.Out(), val.Type)
+			_, _ = fmt.Fprintf(s.dockerCli.Out(), "%q: %s\n", val.Key, val.Value)
+		}
+		if ok, err := acceptPublishSensitiveData(s.dockerCli); err != nil || !ok {
+			return false, err
+		}
 	}
 	envVariables, err := s.checkEnvironmentVariables(project, options)
 	if err != nil {
 		return false, err
 	}
-	if !options.AssumeYes && len(envVariables) > 0 {
+	if len(envVariables) > 0 {
 		fmt.Println("you are about to publish environment variables within your OCI artifact.\n" +
 			"please double check that you are not leaking sensitive data")
 		for key, val := range envVariables {
@@ -243,17 +270,10 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 				_, _ = fmt.Fprintf(s.dockerCli.Out(), "%s=%v\n", k, *v)
 			}
 		}
-		return acceptPublishEnvVariables(s.dockerCli)
-	}
-
-	for name, config := range project.Services {
-		for _, volume := range config.Volumes {
-			if volume.Type == types.VolumeTypeBind {
-				return false, fmt.Errorf("cannot publish compose file: service %q relies on bind-mount. You should use volumes", name)
-			}
+		if ok, err := acceptPublishEnvVariables(s.dockerCli); err != nil || !ok {
+			return false, err
 		}
 	}
-
 	return true, nil
 }
 
@@ -299,6 +319,12 @@ func acceptPublishEnvVariables(cli command.Cli) (bool, error) {
 	return confirm, err
 }
 
+func acceptPublishSensitiveData(cli command.Cli) (bool, error) {
+	msg := "Are you ok to publish these sensitive data? [y/N]: "
+	confirm, err := prompt.NewPrompt(cli.In(), cli.Out()).Confirm(msg, false)
+	return confirm, err
+}
+
 func envFileLayers(project *types.Project) []ocipush.Pushable {
 	var layers []ocipush.Pushable
 	for _, service := range project.Services {
@@ -333,4 +359,100 @@ func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, er
 		return false, errors.New(errMsg)
 	}
 	return true, nil
+}
+
+func (s *composeService) checkForBindMount(project *types.Project) (bool, error) {
+	for name, config := range project.Services {
+		for _, volume := range config.Volumes {
+			if volume.Type == types.VolumeTypeBind {
+				return false, fmt.Errorf("cannot publish compose file: service %q relies on bind-mount. You should use volumes", name)
+			}
+		}
+	}
+	return true, nil
+}
+
+func (s *composeService) checkForSensitiveData(project *types.Project) ([]secrets.DetectedSecret, error) {
+	var allFindings []secrets.DetectedSecret
+	scan := scanner.NewDefaultScanner()
+	// Check all compose files
+	for _, file := range project.ComposeFiles {
+		in, err := composeFileAsByteReader(file, project)
+		if err != nil {
+			return nil, err
+		}
+
+		findings, err := scan.ScanReader(in)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan compose file %s: %w", file, err)
+		}
+		allFindings = append(allFindings, findings...)
+	}
+	for _, service := range project.Services {
+		// Check env files
+		for _, envFile := range service.EnvFiles {
+			findings, err := scan.ScanFile(envFile.Path)
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan env file %s: %w", envFile.Path, err)
+			}
+			allFindings = append(allFindings, findings...)
+		}
+	}
+
+	// Check configs defined by files
+	for _, config := range project.Configs {
+		if config.File != "" {
+			findings, err := scan.ScanFile(config.File)
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan config file %s: %w", config.File, err)
+			}
+			allFindings = append(allFindings, findings...)
+		}
+	}
+
+	// Check secrets defined by files
+	for _, secret := range project.Secrets {
+		if secret.File != "" {
+			findings, err := scan.ScanFile(secret.File)
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan secret file %s: %w", secret.File, err)
+			}
+			allFindings = append(allFindings, findings...)
+		}
+	}
+
+	return allFindings, nil
+}
+
+func composeFileAsByteReader(filePath string, project *types.Project) (io.Reader, error) {
+	composeFile, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
+	}
+	base, err := loader.LoadWithContext(context.TODO(), types.ConfigDetails{
+		WorkingDir:  project.WorkingDir,
+		Environment: project.Environment,
+		ConfigFiles: []types.ConfigFile{
+			{
+				Filename: filePath,
+				Content:  composeFile,
+			},
+		},
+	}, func(options *loader.Options) {
+		options.SkipValidation = true
+		options.SkipExtends = true
+		options.SkipConsistencyCheck = true
+		options.ResolvePaths = true
+		options.SkipInterpolation = true
+		options.SkipResolveEnvironment = true
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	in, err := base.MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewBuffer(in), nil
 }
