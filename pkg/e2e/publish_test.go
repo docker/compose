@@ -134,4 +134,22 @@ FOO=bar`), res.Combined())
 			"-p", projectName, "alpha", "publish", "test/test", "--dry-run")
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot publish compose file with local includes"})
 	})
+
+	t.Run("detect sensitive data", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-sensitive.yml",
+			"-p", projectName, "alpha", "publish", "test/test", "--with-env", "--dry-run")
+		cmd.Stdin = strings.NewReader("n\n")
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+
+		output := res.Combined()
+		assert.Assert(t, strings.Contains(output, "you are about to publish sensitive data within your OCI artifact.\n"), output)
+		assert.Assert(t, strings.Contains(output, "please double check that you are not leaking sensitive data"), output)
+		assert.Assert(t, strings.Contains(output, "AWS Client ID\n\"services.serviceA.environment.AWS_ACCESS_KEY_ID\": A3TX1234567890ABCDEF"), output)
+		assert.Assert(t, strings.Contains(output, "AWS Secret Key\n\"services.serviceA.environment.AWS_SECRET_ACCESS_KEY\": aws\"12345+67890/abcdefghijklm+NOPQRSTUVWXYZ+\""), output)
+		assert.Assert(t, strings.Contains(output, "Github authentication\n\"GITHUB_TOKEN\": ghp_1234567890abcdefghijklmnopqrstuvwxyz"), output)
+		assert.Assert(t, strings.Contains(output, "JSON Web Token\n\"\": eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."+
+			"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw"), output)
+		assert.Assert(t, strings.Contains(output, "Private Key\n\"\": -----BEGIN DSA PRIVATE KEY-----\nwxyz+ABC=\n-----END DSA PRIVATE KEY-----"), output)
+	})
 }
