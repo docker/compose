@@ -54,4 +54,13 @@ func TestConfigFromEnv(t *testing.T) {
 			})
 		res.Assert(t, icmd.Expected{Out: "This is my config"})
 	})
+
+	t.Run("uid", func(t *testing.T) {
+		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/configs/compose.yaml", "run", "uid"),
+			func(cmd *icmd.Cmd) {
+				cmd.Env = append(cmd.Env, "CONFIG=config")
+			})
+		res.Assert(t, icmd.Expected{Out: "This is my config"})
+	})
+
 }

@@ -17,26 +17,21 @@
 package compose
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"fmt"
-	"strconv"
-	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 )
 
 func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
 	for _, config := range service.Secrets {
-		file := project.Secrets[config.Source]
-		if file.Environment == "" {
+		source := project.Secrets[config.Source]
+		content := source.Content
+		if source.Environment != "" {
 			continue
-		}
-
-		if service.ReadOnly {
-			return fmt.Errorf("cannot create secret %q in read-only service %s: `file` is the sole supported option", file.Name, service.Name)
 		}
 
 		if config.Target == "" {
@@ -45,16 +40,18 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 			config.Target = "/run/secrets/" + config.Target
 		}
 
-		env, ok := project.Environment[file.Environment]
-		if !ok {
-			return fmt.Errorf("environment variable %q required by secret %q is not set", file.Environment, file.Name)
-		}
-		b, err := createTar(env, types.FileReferenceConfig(config))
+		var tar *bytes.Buffer
+		b, err := utils.CreateTar([]byte(content), types.FileReferenceConfig(config))
 		if err != nil {
 			return err
 		}
+		tar = b
 
-		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, container.CopyToContainerOptions{
+		if service.ReadOnly {
+			return fmt.Errorf("cannot create secret %q in read-only service %s: `source` is the sole supported option", source.Name, service.Name)
+		}
+
+		err = s.apiClient().CopyToContainer(ctx, id, "/", tar, container.CopyToContainerOptions{
 			CopyUIDGID: config.UID != "" || config.GID != "",
 		})
 		if err != nil {
@@ -66,33 +63,43 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 
 func (s *composeService) injectConfigs(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
 	for _, config := range service.Configs {
-		file := project.Configs[config.Source]
-		content := file.Content
-		if file.Environment != "" {
-			env, ok := project.Environment[file.Environment]
+		source := project.Configs[config.Source]
+		content := source.Content
+		if source.Environment != "" {
+			env, ok := project.Environment[source.Environment]
 			if !ok {
-				return fmt.Errorf("environment variable %q required by config %q is not set", file.Environment, file.Name)
+				return fmt.Errorf("environment variable %q required by config %q is not set", source.Environment, source.Name)
 			}
 			content = env
 		}
-		if content == "" {
-			continue
-		}
-
-		if service.ReadOnly {
-			return fmt.Errorf("cannot create config %q in read-only service %s: `file` is the sole supported option", file.Name, service.Name)
-		}
-
 		if config.Target == "" {
 			config.Target = "/" + config.Source
 		}
 
-		b, err := createTar(content, types.FileReferenceConfig(config))
-		if err != nil {
-			return err
+		var tar *bytes.Buffer
+		switch {
+		case content != "":
+			b, err := utils.CreateTar([]byte(content), types.FileReferenceConfig(config))
+			if err != nil {
+				return err
+			}
+			tar = b
+		case config.UID != "", config.GID != "", config.Mode != nil:
+			b, err := utils.CreateTarByFile(source.File, types.FileReferenceConfig(config))
+			if err != nil {
+				return err
+			}
+			tar = b
+		default:
+			// config is managed by bind mount
+			continue
 		}
 
-		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, container.CopyToContainerOptions{
+		if service.ReadOnly {
+			return fmt.Errorf("cannot create config %q in read-only service %s: `source` is the sole supported option", source.Name, service.Name)
+		}
+
+		err := s.apiClient().CopyToContainer(ctx, id, "/", tar, container.CopyToContainerOptions{
 			CopyUIDGID: config.UID != "" || config.GID != "",
 		})
 		if err != nil {
@@ -100,49 +107,4 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 		}
 	}
 	return nil
-}
-
-func createTar(env string, config types.FileReferenceConfig) (bytes.Buffer, error) {
-	value := []byte(env)
-	b := bytes.Buffer{}
-	tarWriter := tar.NewWriter(&b)
-	mode := uint32(0o444)
-	if config.Mode != nil {
-		mode = *config.Mode
-	}
-
-	var uid, gid int
-	if config.UID != "" {
-		v, err := strconv.Atoi(config.UID)
-		if err != nil {
-			return b, err
-		}
-		uid = v
-	}
-	if config.GID != "" {
-		v, err := strconv.Atoi(config.GID)
-		if err != nil {
-			return b, err
-		}
-		gid = v
-	}
-
-	header := &tar.Header{
-		Name:    config.Target,
-		Size:    int64(len(value)),
-		Mode:    int64(mode),
-		ModTime: time.Now(),
-		Uid:     uid,
-		Gid:     gid,
-	}
-	err := tarWriter.WriteHeader(header)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-	_, err = tarWriter.Write(value)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-	err = tarWriter.Close()
-	return b, err
 }

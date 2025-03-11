@@ -24,6 +24,15 @@ services:
         target: /target
     command: cat /target
 
+  uid:
+    image: alpine
+    configs:
+      - source: from_file
+        target: /target
+        uid: "1024"
+        gid: "1024"
+    command: ls -al /target
+
 configs:
   from_env:
     environment: CONFIG

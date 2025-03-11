@@ -1003,12 +1003,9 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, errors.New("Docker Compose does not support configs.*.template_driver")
 		}
 
-		if definedConfig.Environment != "" || definedConfig.Content != "" {
+		if definedConfig.Environment != "" || definedConfig.Content != "" || config.UID != "" || config.GID != "" || config.Mode != nil {
+			// config will be injected inside container by CopyToContainer
 			continue
-		}
-
-		if config.UID != "" || config.GID != "" || config.Mode != nil {
-			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
@@ -1054,6 +1051,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		}
 
 		if definedSecret.Environment != "" {
+			// secret will be injected inside container by CopyToContainer
 			continue
 		}
 
