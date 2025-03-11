@@ -21,7 +21,9 @@ import (
 	"errors"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -50,7 +52,15 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests")
 	flags.StringVar(&opts.ociVersion, "oci-version", "", "OCI image/artifact specification version (automatically determined by default)")
 	flags.BoolVar(&opts.withEnvironment, "with-env", false, "Include environment variables in the published OCI artifact")
-	flags.BoolVarP(&opts.assumeYes, "y", "y", false, `Assume "yes" as answer to all prompts`)
+	flags.BoolVarP(&opts.assumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts`)
+	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+		// assumeYes was introduced by mistake as `--y`
+		if name == "y" {
+			logrus.Warn("--y is deprecated, please use --yes instead")
+			name = "yes"
+		}
+		return pflag.NormalizedName(name)
+	})
 
 	return cmd
 }
