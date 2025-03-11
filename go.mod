@@ -57,7 +57,7 @@ require (
 	google.golang.org/grpc v1.71.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
-	tags.cncf.io/container-device-interface v0.8.1
+	tags.cncf.io/container-device-interface v1.0.0
 )
 
 require (
