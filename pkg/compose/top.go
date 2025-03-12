@@ -42,13 +42,21 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 			if err != nil {
 				return err
 			}
-			summary[i] = api.ContainerProcSummary{
+			name := getCanonicalContainerName(ctr)
+			s := api.ContainerProcSummary{
 				ID:        ctr.ID,
-				Name:      getCanonicalContainerName(ctr),
+				Name:      name,
 				Processes: topContent.Processes,
 				Titles:    topContent.Titles,
-				Labels:    container.Labels,
+				Service:   name,
 			}
+			if service, exists := ctr.Labels[api.ServiceLabel]; exists {
+				s.Service = service
+			}
+			if replica, exists := ctr.Labels[api.ContainerNumberLabel]; exists {
+				s.Replica = replica
+			}
+			summary[i] = s
 			return nil
 		})
 	}

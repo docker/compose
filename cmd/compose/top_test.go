@@ -213,10 +213,8 @@ func TestRunTopCore(t *testing.T) {
 			Name:      "not used",
 			Titles:    tc.titles,
 			Processes: tc.procs,
-			Labels: map[string]string{
-				api.ServiceLabel:         tc.name,
-				api.ContainerNumberLabel: "1",
-			},
+			Service:   tc.name,
+			Replica:   "1",
 		}
 		all = append(all, summary)
 
