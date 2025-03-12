@@ -630,6 +630,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 		scaleCommand(&opts, dockerCli, backend),
 		statsCommand(&opts, dockerCli),
 		watchCommand(&opts, dockerCli, backend),
+		publishCommand(&opts, dockerCli, backend),
 		alphaCommand(&opts, dockerCli, backend),
 	)
 
