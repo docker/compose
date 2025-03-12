@@ -20,12 +20,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"github.com/docker/compose/v2/pkg/api"
 )
 
 type publishOptions struct {
@@ -46,7 +46,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPublish(ctx, dockerCli, backend, opts, args[0])
 		}),
-		Args: cobra.ExactArgs(1),
+		Args: cli.ExactArgs(1),
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests")

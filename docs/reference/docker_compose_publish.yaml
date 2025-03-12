@@ -1,0 +1,66 @@
+command: docker compose publish
+short: Publish compose application
+long: Publish compose application
+usage: docker compose publish [OPTIONS] REPOSITORY[:TAG]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+    - option: oci-version
+      value_type: string
+      description: |
+        OCI image/artifact specification version (automatically determined by default)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: resolve-image-digests
+      value_type: bool
+      default_value: "false"
+      description: Pin image tags to digests
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: with-env
+      value_type: bool
+      default_value: "false"
+      description: Include environment variables in the published OCI artifact
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: "yes"
+      shorthand: "y"
+      value_type: bool
+      default_value: "false"
+      description: Assume "yes" as answer to all prompts
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+hidden: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

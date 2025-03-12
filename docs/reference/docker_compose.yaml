@@ -22,6 +22,7 @@ cname:
     - docker compose pause
     - docker compose port
     - docker compose ps
+    - docker compose publish
     - docker compose pull
     - docker compose push
     - docker compose restart
@@ -55,6 +56,7 @@ clink:
     - docker_compose_pause.yaml
     - docker_compose_port.yaml
     - docker_compose_ps.yaml
+    - docker_compose_publish.yaml
     - docker_compose_pull.yaml
     - docker_compose_push.yaml
     - docker_compose_restart.yaml
