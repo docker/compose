@@ -523,7 +523,8 @@ type ContainerProcSummary struct {
 	Name      string
 	Processes [][]string
 	Titles    []string
-	Labels    map[string]string
+	Service   string
+	Replica   string
 }
 
 // ImageSummary holds container image description

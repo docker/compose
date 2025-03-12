@@ -80,24 +80,16 @@ func collectTop(containers []api.ContainerProcSummary) (topHeader, []topEntries)
 
 	for _, container := range containers {
 		for _, proc := range container.Processes {
-			svc := container.Name
-			if tmp, ok := container.Labels[api.ServiceLabel]; ok {
-				svc = tmp
+			entry := topEntries{
+				"SERVICE": container.Service,
+				"#":       container.Replica,
 			}
-			replica := "-"
-			if tmp, ok := container.Labels[api.ContainerNumberLabel]; ok {
-				replica = tmp
-			}
-
-			entry := topEntries{"SERVICE": svc, "#": replica}
-
 			for i, title := range container.Titles {
 				if _, exists := header[title]; !exists {
 					header[title] = len(header)
 				}
 				entry[title] = proc[i]
 			}
-
 			entries = append(entries, entry)
 		}
 	}
