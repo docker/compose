@@ -1003,12 +1003,13 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, errors.New("Docker Compose does not support configs.*.template_driver")
 		}
 
-		if definedConfig.Environment != "" || definedConfig.Content != "" {
+		if definedConfig.Environment != "" || definedConfig.Content != "" || config.UID != "" || config.GID != "" || config.Mode != nil {
+			// config will be injected inside container by CopyToContainer
+			mounts[target] = mount.Mount{
+				Type:   types.VolumeTypeVolume,
+				Target: target,
+			}
 			continue
-		}
-
-		if config.UID != "" || config.GID != "" || config.Mode != nil {
-			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
@@ -1053,12 +1054,13 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, errors.New("Docker Compose does not support secrets.*.template_driver")
 		}
 
-		if definedSecret.Environment != "" {
+		if definedSecret.Environment != "" || secret.UID != "" || secret.GID != "" || secret.Mode != nil {
+			// secret will be injected inside container by CopyToContainer
+			mounts[target] = mount.Mount{
+				Type:   types.VolumeTypeVolume,
+				Target: target,
+			}
 			continue
-		}
-
-		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
-			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		if _, err := os.Stat(definedSecret.File); os.IsNotExist(err) {
