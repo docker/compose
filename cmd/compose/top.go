@@ -49,8 +49,10 @@ func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	return topCmd
 }
 
-type topHeader map[string]int // maps a proc title to its output index
-type topEntries map[string]string
+type (
+	topHeader  map[string]int // maps a proc title to its output index
+	topEntries map[string]string
+)
 
 func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opts topOptions, services []string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)

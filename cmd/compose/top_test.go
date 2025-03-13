@@ -316,7 +316,6 @@ func TestRunTopCore(t *testing.T) {
 			multiple   1   root  1    1     0   12:00  ?    00:00:04  -    /entrypoint
 			multiple   1   root  123  1     0   12:00  ?    00:00:42  -    sleep infinity
 		`), buf.String())
-
 	})
 }
 
