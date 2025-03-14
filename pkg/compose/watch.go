@@ -353,8 +353,11 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 
 func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolumeConfig) bool {
 	for _, volume := range volumes {
-		if volume.Bind != nil && strings.HasPrefix(watchPath, volume.Source) {
-			return true
+		if volume.Bind != nil {
+			relPath, err := filepath.Rel(volume.Source, watchPath)
+			if err == nil && !strings.HasPrefix(relPath, "..") {
+				return true
+			}
 		}
 	}
 	return false
