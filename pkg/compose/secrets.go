@@ -45,11 +45,15 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 			config.Target = "/run/secrets/" + config.Target
 		}
 
-		env, ok := project.Environment[file.Environment]
-		if !ok {
-			return fmt.Errorf("environment variable %q required by secret %q is not set", file.Environment, file.Name)
+		content := file.Content
+		if content == "" {
+			env, ok := project.Environment[file.Environment]
+			if !ok {
+				return fmt.Errorf("environment variable %q required by secret %q is not set", file.Environment, file.Name)
+			}
+			content = env
 		}
-		b, err := createTar(env, types.FileReferenceConfig(config))
+		b, err := createTar(content, types.FileReferenceConfig(config))
 		if err != nil {
 			return err
 		}

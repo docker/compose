@@ -1,0 +1,10 @@
+services:
+  included:
+    image: alpine
+    secrets:
+      - my-secret
+    command: cat /run/secrets/my-secret
+
+secrets:
+  my-secret:
+    environment: 'MY_SECRET'
