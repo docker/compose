@@ -10,6 +10,4 @@ Scale services
 | `--dry-run` |      |         | Execute command in dry run mode |
 | `--no-deps` |      |         | Don't start linked services     |
 
-
 <!---MARKER_GEN_END-->
-

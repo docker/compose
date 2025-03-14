@@ -19,7 +19,6 @@ you can use a command such as `docker compose exec web sh` to get an interactive
 | `-u`, `--user`    | `string`      |         | Run the command as this user                                                     |
 | `-w`, `--workdir` | `string`      |         | Path to workdir directory for this command                                       |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

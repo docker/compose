@@ -9,7 +9,6 @@ Displays the running processes
 |:------------|:-------|:--------|:--------------------------------|
 | `--dry-run` | `bool` |         | Execute command in dry run mode |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

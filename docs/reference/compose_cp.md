@@ -13,6 +13,4 @@ Copy files/folders between a service container and the local filesystem
 | `-L`, `--follow-link` | `bool` |         | Always follow symbol link in SRC_PATH                   |
 | `--index`             | `int`  | `0`     | Index of the container if service has multiple replicas |
 
-
 <!---MARKER_GEN_END-->
-

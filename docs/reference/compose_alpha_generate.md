@@ -12,6 +12,4 @@ EXPERIMENTAL - Generate a Compose file from existing containers
 | `--name`        | `string` |         | Project name to set in the Compose file   |
 | `--project-dir` | `string` |         | Directory to use for the project          |
 
-
 <!---MARKER_GEN_END-->
-

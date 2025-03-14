@@ -30,7 +30,6 @@ the canonical format.
 | `--variables`             | `bool`   |         | Print model variables and default values.                                   |
 | `--volumes`               | `bool`   |         | Print the volume names, one per line.                                       |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description
