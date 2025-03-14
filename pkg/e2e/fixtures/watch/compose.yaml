@@ -37,4 +37,7 @@ services:
         RUN mkdir -p /app/config
     init: true
     command: sleep infinity
+    volumes:
+      - ./dat:/app/dat
+      - ./data-logs:/app/data-logs
     develop: *x-dev
