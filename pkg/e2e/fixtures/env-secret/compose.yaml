@@ -1,3 +1,8 @@
+include:
+  - path: child/compose.yaml
+    env_file:
+      - secret.env
+
 services:
   foo:
     image: alpine
