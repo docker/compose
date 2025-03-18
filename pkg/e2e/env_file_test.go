@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 )
 
 func TestRawEnvFile(t *testing.T) {
@@ -36,4 +37,12 @@ func TestUnusedMissingEnvFile(t *testing.T) {
 	defer c.cleanupWithDown(t, "unused_dotenv")
 
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "up", "-d", "serviceA")
+}
+
+func TestRunEnvFile(t *testing.T) {
+	c := NewParallelCLI(t)
+	defer c.cleanupWithDown(t, "run_dotenv")
+
+	res := c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/env_file", "run", "serviceC", "env")
+	res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
 }
