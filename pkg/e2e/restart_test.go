@@ -65,7 +65,7 @@ func TestRestart(t *testing.T) {
 }
 
 func TestRestartWithDependencies(t *testing.T) {
-	c := NewParallelCLI(t, WithEnv(
+	c := NewCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=e2e-restart-deps",
 	))
 	baseService := "nginx"
@@ -80,9 +80,22 @@ func TestRestartWithDependencies(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "restart", baseService)
 	out := res.Combined()
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Restarting", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Healthy", baseService)), out)
 	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), out)
 	assert.Assert(t, !strings.Contains(out, depNoRestart), out)
+
+	c = NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-restart-deps",
+		"LABEL=recreate",
+	))
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose-depends-on.yaml", "up", "-d")
+	out = res.Combined()
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Stopped", depWithRestart)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Recreated", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Healthy", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Running", depNoRestart)), out)
 }
 
 func TestRestartWithProfiles(t *testing.T) {
