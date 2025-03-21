@@ -1,0 +1,42 @@
+name: Markdown Lint Check
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md" # Run only when Markdown files change
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  markdown-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js & Markdownlint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm
+          sudo npm install -g markdownlint-cli
+
+      - name: Run Markdownlint
+        run: |
+          markdownlint "**/*.md" --config .markdownlint.json > markdown-lint-report.txt || true
+
+      - name: Post Lint Report as PR Comment
+        if: github.event_name == 'pull_request'
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            **Markdown Lint Report:**
+            ```
+            $(cat markdown-lint-report.txt)
+            ```
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          allow-repeats: false

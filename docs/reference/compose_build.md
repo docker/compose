@@ -26,7 +26,6 @@ run `docker compose build` to rebuild it.
 | `--ssh`               | `string`      |         | Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent) |
 | `--with-dependencies` | `bool`        |         | Also build dependencies (transitively)                                                                      |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

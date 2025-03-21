@@ -38,7 +38,6 @@ We also like to send gifts&mdash;if you're into Docker swag, make sure to let
 us know. We currently do not offer a paid security bounty program but are not
 ruling it out in the future.
 
-
 ## Reporting other issues
 
 A great way to contribute to the project is to send a detailed report when you
@@ -55,18 +54,18 @@ resolve the issue, please leave a comment.
 
 When reporting issues, always include:
 
-* The output of `docker version`.
-* The output of `docker context show`.
-* The output of `docker info`.
+- The output of `docker version`.
+- The output of `docker context show`.
+- The output of `docker info`.
 
 Also, include the steps required to reproduce the problem if possible and
 applicable. This information will help us review and fix your issue faster.
 When sending lengthy log files, consider posting them as a gist
-(https://gist.github.com).
+(<https://gist.github.com>).
 Don't forget to remove sensitive data from your log files before posting (you
 can replace those parts with "REDACTED").
 
-_Note:_ 
+*Note:*
 Maintainers might request additional information to diagnose an issue,
 if initial reporter doesn't answer within a reasonable delay (a few weeks),
 issue will be closed.
@@ -123,7 +122,6 @@ don't get discouraged!
     </td>
   </tr>
 </table>
-
 
 ### Conventions
 
@@ -267,25 +265,25 @@ We want to keep the Docker community awesome, growing and collaborative. We need
 your help to keep it that way. To help with this we've come up with some general
 guidelines for the community as a whole:
 
-* Be nice: Be courteous, respectful and polite to fellow community members:
+- Be nice: Be courteous, respectful and polite to fellow community members:
   no regional, racial, gender or other abuse will be tolerated. We like
   nice people way better than mean ones!
 
-* Encourage diversity and participation: Make everyone in our community feel
+- Encourage diversity and participation: Make everyone in our community feel
   welcome, regardless of their background and the extent of their
   contributions, and do everything possible to encourage participation in
   our community.
 
-* Keep it legal: Basically, don't get us in trouble. Share only content that
+- Keep it legal: Basically, don't get us in trouble. Share only content that
   you own, do not share private or sensitive information, and don't break
   the law.
 
-* Stay on topic: Make sure that you are posting to the correct channel and
+- Stay on topic: Make sure that you are posting to the correct channel and
   avoid off-topic discussions. Remember when you update an issue or respond
   to an email you are potentially sending it to a large number of people. Please
   consider this before you update. Also, remember that nobody likes spam.
 
-* Don't send emails to the maintainers: There's no need to send emails to the
+- Don't send emails to the maintainers: There's no need to send emails to the
   maintainers to ask them to investigate an issue or to take a look at a
   pull request. Instead of sending an email, GitHub mentions should be
   used to ping maintainers to review a pull request, a proposal or an
@@ -314,7 +312,7 @@ The rules:
    Go](https://go.dev/doc/effective_go) and [Go Code Review
    Comments](https://go.dev/wiki/CodeReviewComments).
 4. Include code comments. Tell us the why, the history and the context.
-5. Document _all_ declarations and methods, even private ones. Declare
+5. Document *all* declarations and methods, even private ones. Declare
    expectations, caveats and anything else that may be important. If a type
    gets exported, having the comments already there will ensure it's ready.
 6. Variable name length should be proportional to its context and no longer.
@@ -329,7 +327,7 @@ The rules:
    part of a util package. Just leave it unexported and well-documented.
 9. All tests should run with `go test` and outside tooling should not be
    required. No, we don't need another unit testing framework. Assertion
-   packages are acceptable if they provide _real_ incremental value.
+   packages are acceptable if they provide *real* incremental value.
 10. Even though we call these "rules" above, they are actually just
     guidelines. Since you've read all the rules, you now know that.
 

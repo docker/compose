@@ -1,11 +1,13 @@
 # Table of Contents
+
 - [Docker Compose v2](#docker-compose-v2)
 - [Where to get Docker Compose](#where-to-get-docker-compose)
-    + [Windows and macOS](#windows-and-macos)
-    + [Linux](#linux)
+  - [Windows and macOS](#windows-and-macos)
+  - [Linux](#linux)
 - [Quick Start](#quick-start)
 - [Contributing](#contributing)
 - [Legacy](#legacy)
+
 # Docker Compose v2
 
 [![GitHub release](https://img.shields.io/github/v/release/docker/compose.svg?style=flat-square)](https://github.com/docker/compose/releases/latest)
@@ -40,16 +42,16 @@ Rename the relevant binary for your OS to `docker-compose` and copy it to `$HOME
 
 Or copy it into one of these folders to install it system-wide:
 
-* `/usr/local/lib/docker/cli-plugins` OR `/usr/local/libexec/docker/cli-plugins`
-* `/usr/lib/docker/cli-plugins` OR `/usr/libexec/docker/cli-plugins`
+- `/usr/local/lib/docker/cli-plugins` OR `/usr/local/libexec/docker/cli-plugins`
+- `/usr/lib/docker/cli-plugins` OR `/usr/libexec/docker/cli-plugins`
 
 (might require making the downloaded file executable with `chmod +x`)
-
 
 Quick Start
 -----------
 
 Using Docker Compose is a three-step process:
+
 1. Define your app's environment with a `Dockerfile` so it can be
    reproduced anywhere.
 2. Define the services that make up your app in `compose.yaml` so
