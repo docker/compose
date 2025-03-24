@@ -191,7 +191,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Context:          build.Context,
 			Contexts:         additionalContexts(build.AdditionalContexts),
 			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
-			DockerfileInline: build.DockerfileInline,
+			DockerfileInline: strings.ReplaceAll(build.DockerfileInline, "${", "$${"),
 			Args:             args,
 			Labels:           build.Labels,
 			Tags:             append(build.Tags, image),
