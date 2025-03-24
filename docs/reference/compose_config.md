@@ -19,6 +19,7 @@ the canonical format.
 | `--hash`                  | `string` |         | Print the service config hash, one per line.                                |
 | `--images`                | `bool`   |         | Print the image names, one per line.                                        |
 | `--no-consistency`        | `bool`   |         | Don't check model consistency - warning: may produce invalid Compose output |
+| `--no-env-resolution`     | `bool`   |         | Don't resolve service env files                                             |
 | `--no-interpolate`        | `bool`   |         | Don't interpolate environment variables                                     |
 | `--no-normalize`          | `bool`   |         | Don't normalize compose model                                               |
 | `--no-path-resolution`    | `bool`   |         | Don't resolve file paths                                                    |

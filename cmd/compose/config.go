@@ -47,6 +47,7 @@ type configOptions struct {
 	noInterpolate       bool
 	noNormalize         bool
 	noResolvePath       bool
+	noResolveEnv        bool
 	services            bool
 	volumes             bool
 	profiles            bool
@@ -135,6 +136,7 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	flags.BoolVar(&opts.noNormalize, "no-normalize", false, "Don't normalize compose model")
 	flags.BoolVar(&opts.noResolvePath, "no-path-resolution", false, "Don't resolve file paths")
 	flags.BoolVar(&opts.noConsistency, "no-consistency", false, "Don't check model consistency - warning: may produce invalid Compose output")
+	flags.BoolVar(&opts.noResolveEnv, "no-env-resolution", false, "Don't resolve service env files")
 
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
@@ -185,6 +187,13 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 
 	if opts.resolveImageDigests {
 		project, err = project.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !opts.noResolveEnv {
+		project, err = project.WithServicesEnvironmentResolved(true)
 		if err != nil {
 			return nil, err
 		}
