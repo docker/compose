@@ -59,6 +59,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: no-env-resolution
+      value_type: bool
+      default_value: "false"
+      description: Don't resolve service env files
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-interpolate
       value_type: bool
       default_value: "false"

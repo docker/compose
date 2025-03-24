@@ -151,6 +151,9 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 			v, ok := envResolver(project.Environment)(s)
 			return v, ok
 		}).RemoveEmpty()
+		if service.Environment == nil {
+			service.Environment = types.MappingWithEquals{}
+		}
 		service.Environment.OverrideBy(serviceOverrideEnv)
 	}
 	for k, v := range opts.Labels {
