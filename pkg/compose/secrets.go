@@ -110,7 +110,7 @@ func createTar(env string, config types.FileReferenceConfig) (bytes.Buffer, erro
 	value := []byte(env)
 	b := bytes.Buffer{}
 	tarWriter := tar.NewWriter(&b)
-	mode := types.FileMode(0o440)
+	mode := types.FileMode(0o444)
 	if config.Mode != nil {
 		mode = *config.Mode
 	}
