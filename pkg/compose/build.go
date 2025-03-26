@@ -263,7 +263,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool) error {
 	for name, service := range project.Services {
-		if service.Image == "" && service.Build == nil {
+		x := false
+		if _, ok := service.Extensions["x-external"]; ok {
+			x = true
+		}
+
+		if !x && service.Image == "" && service.Build == nil {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
 		}
 	}
