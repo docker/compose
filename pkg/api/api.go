@@ -155,6 +155,8 @@ type BuildOptions struct {
 	Memory int64
 	// Builder name passed in the command line
 	Builder string
+	// Print don't actually run builder but print equivalent build config
+	Print bool
 }
 
 // Apply mutates project according to build options

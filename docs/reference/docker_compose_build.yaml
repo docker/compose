@@ -96,6 +96,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: print
+      value_type: bool
+      default_value: "false"
+      description: Print equivalent bake file
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: progress
       value_type: string
       default_value: auto

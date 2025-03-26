@@ -44,6 +44,7 @@ type buildOptions struct {
 	ssh     string
 	builder string
 	deps    bool
+	print   bool
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -76,6 +77,8 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		Quiet:    opts.quiet,
 		Services: services,
 		Deps:     opts.deps,
+		Memory:   int64(opts.memory),
+		Print:    opts.print,
 		SSHs:     SSHKeys,
 		Builder:  builderName,
 	}, nil
@@ -131,6 +134,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	flags.VarP(&opts.memory, "memory", "m", "Set memory limit for the build container. Not supported by BuildKit.")
 	flags.StringVar(&p.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
 	flags.MarkHidden("progress") //nolint:errcheck
+	flags.BoolVar(&opts.print, "print", false, "Print equivalent bake file")
 
 	return cmd
 }
@@ -150,6 +154,5 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 		return err
 	}
 
-	apiBuildOptions.Memory = int64(opts.memory)
 	return backend.Build(ctx, project, apiBuildOptions)
 }

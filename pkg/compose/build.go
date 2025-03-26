@@ -105,7 +105,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	if err != nil {
 		return nil, err
 	}
-	if bake {
+	if bake || options.Print {
 		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "bake"))
 		return s.doBuildBake(ctx, project, serviceToBuild, options)
 	}
