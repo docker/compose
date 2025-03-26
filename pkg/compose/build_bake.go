@@ -219,6 +219,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
+	if options.Print {
+		_, err = fmt.Fprintln(s.stdinfo(), string(b))
+		return nil, err
+	}
 	logrus.Debugf("bake build config:\n%s", string(b))
 
 	metadata, err := os.CreateTemp(os.TempDir(), "compose")
