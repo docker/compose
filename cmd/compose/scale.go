@@ -51,7 +51,7 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 			}
 			return runScale(ctx, dockerCli, backend, opts, serviceTuples)
 		}),
-		ValidArgsFunction: completeServiceNames(dockerCli, p),
+		ValidArgsFunction: completeScaleArgs(dockerCli, p),
 	}
 	flags := scaleCmd.Flags()
 	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services")

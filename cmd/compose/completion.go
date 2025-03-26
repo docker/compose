@@ -90,3 +90,13 @@ func completeProfileNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 		return values, cobra.ShellCompDirectiveNoFileComp
 	}
 }
+
+func completeScaleArgs(cli command.Cli, p *ProjectOptions) cobra.CompletionFunc {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		completions, directive := completeServiceNames(cli, p)(cmd, args, toComplete)
+		for i, completion := range completions {
+			completions[i] = completion + "="
+		}
+		return completions, directive
+	}
+}
