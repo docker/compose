@@ -335,6 +335,9 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 }
 
 func mustPull(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, error) {
+	if service.External != nil {
+		return false, nil
+	}
 	if service.Image == "" {
 		return false, nil
 	}
