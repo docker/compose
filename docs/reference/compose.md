@@ -78,10 +78,10 @@ to their predecessors.
 For example, consider this command line:
 
 ```console
-$ docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
+$ docker compose -f compose.yaml -f compose.admin.yaml run backup_db
 ```
 
-The `docker-compose.yml` file might specify a `webapp` service.
+The `compose.yaml` file might specify a `webapp` service.
 
 ```yaml
 services:
@@ -92,7 +92,7 @@ services:
     volumes:
       - "/data"
 ```
-If the `docker-compose.admin.yml` also specifies this same service, any matching fields override the previous file.
+If the `compose.admin.yaml` also specifies this same service, any matching fields override the previous file.
 New values, add to the `webapp` service configuration.
 
 ```yaml
@@ -207,4 +207,4 @@ $ docker compose --dry-run up --build -d
 From the example above, you can see that the first step is to pull the image defined by `db` service, then build the `backend` service.  
 Next, the containers are created. The `db` service is started, and the `backend` and `proxy` wait until the `db` service is healthy before starting.
 
-Dry Run mode works with almost all commands. You cannot use Dry Run mode with a command that doesn't change the state of a Compose stack such as `ps`, `ls`, `logs` for example.  
+Dry Run mode works with almost all commands. You cannot use Dry Run mode with a command that doesn't change the state of a Compose stack such as `ps`, `ls`, `logs` for example.
