@@ -20,7 +20,6 @@ or [restart_policy](https://github.com/compose-spec/compose-spec/blob/main/deplo
 | `--no-deps`       | `bool` |         | Don't restart dependent services      |
 | `-t`, `--timeout` | `int`  | `0`     | Specify a shutdown timeout in seconds |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

@@ -14,6 +14,4 @@ Create a new image from a service container's changes
 | `-m`, `--message` | `string` |         | Commit message                                             |
 | `-p`, `--pause`   | `bool`   | `true`  | Pause container during commit                              |
 
-
 <!---MARKER_GEN_END-->
-

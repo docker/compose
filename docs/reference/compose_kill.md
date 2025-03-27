@@ -15,7 +15,6 @@ $ docker compose kill -s SIGINT
 | `--remove-orphans` | `bool`   |           | Remove containers for services not defined in the Compose file |
 | `-s`, `--signal`   | `string` | `SIGKILL` | SIGNAL to send to the container                                |
 
-
 <!---MARKER_GEN_END-->
 
 ## Description

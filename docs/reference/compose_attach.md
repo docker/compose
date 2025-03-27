@@ -13,5 +13,4 @@ Attach local standard input, output, and error streams to a service's running co
 | `--no-stdin`    | `bool`   |         | Do not attach STDIN                                       |
 | `--sig-proxy`   | `bool`   | `true`  | Proxy all received signals to the process                 |
 
-
 <!---MARKER_GEN_END-->

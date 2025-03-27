@@ -13,6 +13,4 @@ Publish compose application
 | `--with-env`              | `bool`   |         | Include environment variables in the published OCI artifact                    |
 | `-y`, `--yes`             | `bool`   |         | Assume "yes" as answer to all prompts                                          |
 
-
 <!---MARKER_GEN_END-->
-
