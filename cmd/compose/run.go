@@ -67,6 +67,7 @@ type runOptions struct {
 	noDeps        bool
 	ignoreOrphans bool
 	removeOrphans bool
+	quiet         bool
 	quietPull     bool
 }
 
@@ -180,6 +181,14 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 					options.noTty = !options.tty
 				}
 			}
+			if options.quiet {
+				progress.Mode = progress.ModeQuiet
+				devnull, err := os.Open(os.DevNull)
+				if err != nil {
+					return err
+				}
+				os.Stdout = devnull
+			}
 			createOpts.pullChanged = cmd.Flags().Changed("pull")
 			return nil
 		}),
@@ -222,6 +231,8 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.BoolVar(&options.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to")
 	flags.BoolVarP(&options.servicePorts, "service-ports", "P", false, "Run command with all service's ports enabled and mapped to the host")
 	flags.StringVar(&createOpts.Pull, "pull", "policy", `Pull image before running ("always"|"missing"|"never")`)
+	flags.BoolVarP(&options.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
+	flags.BoolVar(&buildOpts.quiet, "quiet-build", false, "Suppress progress output from the build process")
 	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container")
 	flags.BoolVar(&options.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
