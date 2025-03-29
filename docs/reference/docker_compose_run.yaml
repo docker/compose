@@ -200,6 +200,27 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: quiet
+      shorthand: q
+      value_type: bool
+      default_value: "false"
+      description: Don't print anything to STDOUT
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: quiet-build
+      value_type: bool
+      default_value: "false"
+      description: Suppress progress output from the build process
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: quiet-pull
       value_type: bool
       default_value: "false"
