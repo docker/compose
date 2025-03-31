@@ -550,10 +550,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 			}
 
 			composeCmd := cmd
-			for {
-				if composeCmd.Name() == PluginName {
-					break
-				}
+			for composeCmd.Name() != PluginName {
 				if !composeCmd.HasParent() {
 					return fmt.Errorf("error parsing command line, expected %q", PluginName)
 				}

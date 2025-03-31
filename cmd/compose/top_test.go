@@ -220,8 +220,8 @@ func TestRunTopCore(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			header, entries := collectTop([]api.ContainerProcSummary{summary})
-			assert.EqualValues(t, tc.header, header)
-			assert.EqualValues(t, tc.entries, entries)
+			assert.Equal(t, tc.header, header)
+			assert.Equal(t, tc.entries, entries)
 
 			var buf bytes.Buffer
 			err := topPrint(&buf, header, entries)
@@ -233,7 +233,7 @@ func TestRunTopCore(t *testing.T) {
 
 	t.Run("all", func(t *testing.T) {
 		header, entries := collectTop(all)
-		assert.EqualValues(t, topHeader{
+		assert.Equal(t, topHeader{
 			"SERVICE": 0,
 			"#":       1,
 			"UID":     2,
@@ -246,7 +246,7 @@ func TestRunTopCore(t *testing.T) {
 			"GID":     9,
 			"CMD":     10,
 		}, header)
-		assert.EqualValues(t, []topEntries{
+		assert.Equal(t, []topEntries{
 			{
 				"SERVICE": "simple",
 				"#":       "1",

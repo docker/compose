@@ -486,7 +486,7 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 			if strings.Contains(opt, ":") {
 				con = strings.SplitN(opt, ":", 2)
 			} else {
-				return securityOpts, false, fmt.Errorf("Invalid security-opt: %q", opt)
+				return securityOpts, false, fmt.Errorf("invalid security-opt: %q", opt)
 			}
 		}
 		if con[0] == "seccomp" && con[1] != "unconfined" && con[1] != "builtin" {
@@ -997,10 +997,10 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 		}
 
 		if definedConfig.Driver != "" {
-			return nil, errors.New("Docker Compose does not support configs.*.driver")
+			return nil, errors.New("Docker Compose does not support configs.*.driver") //nolint:staticcheck
 		}
 		if definedConfig.TemplateDriver != "" {
-			return nil, errors.New("Docker Compose does not support configs.*.template_driver")
+			return nil, errors.New("Docker Compose does not support configs.*.template_driver") //nolint:staticcheck
 		}
 
 		if definedConfig.Environment != "" || definedConfig.Content != "" {
@@ -1047,10 +1047,10 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		}
 
 		if definedSecret.Driver != "" {
-			return nil, errors.New("Docker Compose does not support secrets.*.driver")
+			return nil, errors.New("Docker Compose does not support secrets.*.driver") //nolint:staticcheck
 		}
 		if definedSecret.TemplateDriver != "" {
-			return nil, errors.New("Docker Compose does not support secrets.*.template_driver")
+			return nil, errors.New("Docker Compose does not support secrets.*.template_driver") //nolint:staticcheck
 		}
 
 		if definedSecret.Environment != "" {

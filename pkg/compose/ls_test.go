@@ -104,7 +104,7 @@ func TestCombinedConfigFiles(t *testing.T) {
 	}{
 		"project1": {ConfigFiles: "/home/docker-compose.yaml", Error: nil},
 		"project2": {ConfigFiles: "/home/project2-docker-compose.yaml", Error: nil},
-		"project3": {ConfigFiles: "", Error: fmt.Errorf("No label %q set on container %q of compose project", api.ConfigFilesLabel, "service4")},
+		"project3": {ConfigFiles: "", Error: fmt.Errorf("no label %q set on container %q of compose project", api.ConfigFilesLabel, "service4")},
 	}
 
 	for project, containers := range containersByLabel {

@@ -754,7 +754,7 @@ func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Pr
 		return time.Now(), err
 	}
 	if len(containers) == 0 {
-		return time.Now(), fmt.Errorf("Could not get created time for service's image")
+		return time.Now(), fmt.Errorf("could not get created time for service's image")
 	}
 
 	img, err := s.apiClient().ImageInspect(ctx, containers[0].ImageID)

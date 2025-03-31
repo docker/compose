@@ -1,9 +1,8 @@
+version: "2"
 run:
   concurrency: 2
-  timeout: 10m
 linters:
-  enable-all: false
-  disable-all: true
+  default: none
   enable:
     - copyloopvar
     - depguard
@@ -11,73 +10,74 @@ linters:
     - errorlint
     - gocritic
     - gocyclo
-    - gofumpt
-    - goimports
     - gomodguard
-    - revive
-    - gosimple
     - govet
     - ineffassign
     - lll
     - misspell
     - nakedret
     - nolintlint
+    - revive
     - staticcheck
     - testifylint
-    - typecheck
     - unconvert
     - unparam
     - unused
-linters-settings:
-  revive:
-    rules:
-      - name: package-comments
-        disabled: true
-  depguard:
-    rules:
-      all:
-        deny:
-          - pkg: io/ioutil
-            desc: 'io/ioutil package has been deprecated'
-          - pkg: gopkg.in/yaml.v2
-            desc: 'compose-go uses yaml.v3'
-  gomodguard:
-    blocked:
-      modules:
-        - github.com/pkg/errors:
-            recommendations:
-              - errors
-              - fmt
-      versions:
-        - github.com/distribution/distribution:
-            reason: "use distribution/reference"
-        - gotest.tools:
-            version: "< 3.0.0"
-            reason: "deprecated, pre-modules version"
-  gocritic:
-    # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
-    # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
-    enabled-tags:
-      - diagnostic
-      - opinionated
-      - style
-    disabled-checks:
-      - paramTypeCombine
-      - unnamedResult
-      - whyNoLint
-  gocyclo:
-    min-complexity: 16
-  lll:
-    line-length: 200
+  settings:
+    depguard:
+      rules:
+        all:
+          deny:
+            - pkg: io/ioutil
+              desc: io/ioutil package has been deprecated
+            - pkg: gopkg.in/yaml.v2
+              desc: compose-go uses yaml.v3
+    gocritic:
+      disabled-checks:
+        - paramTypeCombine
+        - unnamedResult
+        - whyNoLint
+      enabled-tags:
+        - diagnostic
+        - opinionated
+        - style
+    gocyclo:
+      min-complexity: 16
+    gomodguard:
+      blocked:
+        modules:
+          - github.com/pkg/errors:
+              recommendations:
+                - errors
+                - fmt
+        versions:
+          - github.com/distribution/distribution:
+              reason: use distribution/reference
+          - gotest.tools:
+              version: < 3.0.0
+              reason: deprecated, pre-modules version
+    lll:
+      line-length: 200
+    revive:
+      rules:
+        - name: package-comments
+          disabled: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  # golangci hides some golint warnings (the warning about exported things
-  # without documentation for example), this will make it show them anyway.
-  exclude-use-default: false
-  # Maximum issues count per one linter.
-  # Set to 0 to disable.
-  # Default: 50
   max-issues-per-linter: 0
-  # Maximum count of issues with the same text.
-  # Set to 0 to disable.
-  # Default: 3
   max-same-issues: 0
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
