@@ -149,7 +149,7 @@ func TestGitBranchSwitch(t *testing.T) {
 	f.assertEvents(path)
 
 	// Make sure there are no errors in the out stream
-	assert.Equal(t, "", f.out.String())
+	assert.Empty(t, f.out.String())
 }
 
 func TestWatchesAreRecursive(t *testing.T) {

@@ -238,7 +238,7 @@ func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Pro
 			link := fmt.Sprintf("docker-desktop://dashboard/apps/%s", project.Name)
 			err := open.Run(link)
 			if err != nil {
-				err = fmt.Errorf("Could not open Docker Desktop")
+				err = fmt.Errorf("could not open Docker Desktop")
 				lk.keyboardError("View", err)
 			}
 			return err
@@ -255,7 +255,7 @@ func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Proje
 			link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s", project.Name)
 			err := open.Run(link)
 			if err != nil {
-				err = fmt.Errorf("Could not open Docker Desktop Compose UI")
+				err = fmt.Errorf("could not open Docker Desktop Compose UI")
 				lk.keyboardError("View Config", err)
 			}
 			return err
@@ -269,7 +269,7 @@ func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Proje
 			link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
 			err := open.Run(link)
 			if err != nil {
-				err = fmt.Errorf("Could not open Docker Desktop Compose UI")
+				err = fmt.Errorf("could not open Docker Desktop Compose UI")
 				lk.keyboardError("Watch Docs", err)
 			}
 			return err
@@ -299,7 +299,7 @@ func (lk *LogKeyboard) StartWatch(ctx context.Context, doneCh chan bool, project
 		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
 			func(ctx context.Context) error {
 				if options.Create.Build == nil {
-					err := fmt.Errorf("Cannot run watch mode with flag --no-build")
+					err := fmt.Errorf("cannot run watch mode with flag --no-build")
 					lk.keyboardError("Watch", err)
 					return err
 				}

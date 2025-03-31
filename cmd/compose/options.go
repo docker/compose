@@ -246,7 +246,7 @@ func displayInterpolationVariables(writer io.Writer, varsInfo []varInfo) {
 }
 
 func displayLocationRemoteStack(dockerCli command.Cli, project *types.Project, options buildOptions) {
-	mainComposeFile := options.ProjectOptions.ConfigPaths[0]
+	mainComposeFile := options.ProjectOptions.ConfigPaths[0] //nolint:staticcheck
 	if ui.Mode != ui.ModeQuiet && ui.Mode != ui.ModeJSON {
 		_, _ = fmt.Fprintf(dockerCli.Out(), "Your compose stack %q is stored in %q\n", mainComposeFile, project.WorkingDir)
 	}
@@ -258,8 +258,8 @@ func confirmRemoteIncludes(dockerCli command.Cli, options buildOptions, assumeYe
 	}
 
 	var remoteIncludes []string
-	remoteLoaders := options.ProjectOptions.remoteLoaders(dockerCli)
-	for _, cf := range options.ProjectOptions.ConfigPaths {
+	remoteLoaders := options.ProjectOptions.remoteLoaders(dockerCli) //nolint:staticcheck
+	for _, cf := range options.ProjectOptions.ConfigPaths {          //nolint:staticcheck
 		for _, loader := range remoteLoaders {
 			if loader.Accept(cf) {
 				remoteIncludes = append(remoteIncludes, cf)

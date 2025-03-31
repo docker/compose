@@ -274,7 +274,7 @@ func newWatcher(paths []string) (Notify, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		if strings.Contains(err.Error(), "too many open files") && runtime.GOOS == "linux" {
-			return nil, fmt.Errorf("Hit OS limits creating a watcher.\n" +
+			return nil, fmt.Errorf("hit OS limits creating a watcher.\n" +
 				"Run 'sysctl fs.inotify.max_user_instances' to check your inotify limits.\n" +
 				"To raise them, run 'sudo sysctl fs.inotify.max_user_instances=1024'")
 		}
@@ -317,7 +317,7 @@ func greatestExistingAncestors(paths []string) ([]string, error) {
 	for _, p := range paths {
 		newP, err := greatestExistingAncestor(p)
 		if err != nil {
-			return nil, fmt.Errorf("Finding ancestor of %s: %w", p, err)
+			return nil, fmt.Errorf("finding ancestor of %s: %w", p, err)
 		}
 		result = append(result, newP)
 	}

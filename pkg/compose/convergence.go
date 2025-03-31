@@ -47,7 +47,7 @@ import (
 const (
 	doubledContainerNameWarning = "WARNING: The %q service is using the custom container name %q. " +
 		"Docker requires each container to have a unique name. " +
-		"Remove the custom name to scale the service.\n"
+		"Remove the custom name to scale the service"
 )
 
 // convergence manages service's container lifecycle.

@@ -98,7 +98,7 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 		if exitErr.ExitCode() == -1 {
 			t.Fatalf("`compose up` was killed: %v", err)
 		}
-		require.EqualValues(t, 130, exitErr.ExitCode())
+		require.Equal(t, 130, exitErr.ExitCode())
 	}
 
 	RequireServiceState(t, c, "app", "exited")

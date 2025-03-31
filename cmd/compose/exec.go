@@ -86,7 +86,7 @@ func runExec(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 	if err != nil {
 		return err
 	}
-	projectOptions, err := opts.composeOptions.toProjectOptions()
+	projectOptions, err := opts.composeOptions.toProjectOptions() //nolint:staticcheck
 	if err != nil {
 		return err
 	}

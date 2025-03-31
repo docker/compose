@@ -70,7 +70,7 @@ func combinedConfigFiles(containers []container.Summary) (string, error) {
 	for _, c := range containers {
 		files, ok := c.Labels[api.ConfigFilesLabel]
 		if !ok {
-			return "", fmt.Errorf("No label %q set on container %q of compose project", api.ConfigFilesLabel, c.ID)
+			return "", fmt.Errorf("no label %q set on container %q of compose project", api.ConfigFilesLabel, c.ID)
 		}
 
 		for _, f := range strings.Split(files, ",") {
@@ -120,7 +120,7 @@ func groupContainerByLabel(containers []container.Summary, labelName string) (ma
 	for _, c := range containers {
 		label, ok := c.Labels[labelName]
 		if !ok {
-			return nil, nil, fmt.Errorf("No label %q set on container %q of compose project", labelName, c.ID)
+			return nil, nil, fmt.Errorf("no label %q set on container %q of compose project", labelName, c.ID)
 		}
 		labelContainers, ok := containersByLabel[label]
 		if !ok {
