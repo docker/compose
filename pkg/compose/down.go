@@ -83,8 +83,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		serviceContainers := containers.filter(isService(service))
 		serv := project.Services[service]
+		if serv.External != nil {
+			return s.runPlugin(ctx, project, serv, "down")
+		}
+		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, serviceContainers, &serv, options.Timeout, options.Volumes)
 		return err
 	}, WithRootNodesAndDown(options.Services))
