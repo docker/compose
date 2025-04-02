@@ -72,17 +72,16 @@ const (
 )
 
 // rawEnv load a dot env file using docker/cli key=value parser, without attempt to interpolate or evaluate values
-func rawEnv(r io.Reader, filename string, lookup func(key string) (string, bool)) (map[string]string, error) {
+func rawEnv(r io.Reader, filename string, vars map[string]string, lookup func(key string) (string, bool)) error {
 	lines, err := kvfile.ParseFromReader(r, lookup)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse env_file %s: %w", filename, err)
+		return fmt.Errorf("failed to parse env_file %s: %w", filename, err)
 	}
-	vars := types.Mapping{}
 	for _, line := range lines {
 		key, value, _ := strings.Cut(line, "=")
 		vars[key] = value
 	}
-	return vars, nil
+	return nil
 }
 
 func init() {

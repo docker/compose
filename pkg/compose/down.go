@@ -84,7 +84,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		serv := project.Services[service]
-		if serv.External != nil {
+		if serv.Provider != nil {
 			return s.runPlugin(ctx, project, serv, "down")
 		}
 		serviceContainers := containers.filter(isService(service))
