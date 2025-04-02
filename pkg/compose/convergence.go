@@ -110,7 +110,7 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 }
 
 func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error { //nolint:gocyclo
-	if service.External != nil {
+	if service.Provider != nil {
 		return c.service.runPlugin(ctx, project, service, "up")
 	}
 	expected, err := getScale(service)

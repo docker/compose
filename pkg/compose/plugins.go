@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,7 +31,6 @@ import (
 	"github.com/docker/cli/cli-plugins/socket"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/errdefs"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -48,8 +48,8 @@ const (
 	SetEnvType = "setenv"
 )
 
-func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string) error {
-	x := *service.External
+func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string) error { //nolint:gocyclo
+	x := *service.Provider
 
 	// Only support Docker CLI plugins for first iteration. Could support any binary from PATH
 	plugin, err := manager.GetPlugin(x.Type, s.dockerCli, &cobra.Command{})
@@ -97,7 +97,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	eg.Go(cmd.Wait)
 
 	decoder := json.NewDecoder(stdout)
-	defer stdout.Close()
+	defer func() { _ = stdout.Close() }()
 
 	variables := types.Mapping{}
 
@@ -106,7 +106,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	for {
 		var msg JsonMessage
 		err = decoder.Decode(&msg)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -132,7 +132,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	err = eg.Wait()
 	if err != nil {
 		pw.Event(progress.ErrorMessageEvent(service.Name, err.Error()))
-		return errors.Wrapf(err, "failed to create external service")
+		return fmt.Errorf("failed to create external service: %s", err.Error())
 	}
 	pw.Event(progress.CreatedEvent(service.Name))
 
