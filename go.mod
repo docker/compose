@@ -1,6 +1,7 @@
 module github.com/docker/compose/v2
 
 go 1.23.8
+toolchain go1.24.1
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -28,7 +29,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/moby/buildkit v0.20.1
+	github.com/moby/buildkit v0.20.2
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/term v0.5.2
 	github.com/morikuni/aec v1.0.0
