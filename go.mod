@@ -4,7 +4,7 @@ go 1.23.8
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/DefangLabs/secret-detector v0.0.0-20250108223530-c2b44d4c1f8f
+	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
@@ -108,7 +108,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.0.0 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -193,7 +193,7 @@ require (
 	google.golang.org/protobuf v1.36.4 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.66.2 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/api v0.31.2 // indirect
 	k8s.io/apimachinery v0.31.2 // indirect
