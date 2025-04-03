@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -32,6 +33,7 @@ type waitOptions struct {
 	services []string
 
 	downProject bool
+	waitTimeout int
 }
 
 func waitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -56,6 +58,7 @@ func waitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	}
 
 	cmd.Flags().BoolVar(&opts.downProject, "down-project", false, "Drops project when the first container stops")
+	cmd.Flags().IntVar(&opts.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 
 	return cmd
 }
@@ -66,8 +69,11 @@ func runWait(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		return 0, err
 	}
 
+	timeout := time.Duration(opts.waitTimeout) * time.Second
+
 	return backend.Wait(ctx, name, api.WaitOptions{
 		Services:                   opts.services,
 		DownProjectOnContainerExit: opts.downProject,
+		WaitTimeout:                timeout,
 	})
 }
