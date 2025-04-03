@@ -12,6 +12,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM busybox
+# This Dockerfile is used to build a service that runs indefinitely.
+# It uses the busybox image and runs the 'sleep infinity' command.
 
+# Use a smaller base image to reduce the overall image size
+FROM busybox:1.32.0-uclibc
+
+# Add metadata about the image
+LABEL maintainer="Docker Compose CLI authors"
+LABEL version="1.0"
+
+# Run the 'sleep infinity' command to keep the container running indefinitely
 RUN sleep infinity
+
+# Add a health check to monitor the health of the container
+HEALTHCHECK CMD pgrep sleep || exit 1
