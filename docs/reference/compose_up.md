@@ -79,3 +79,15 @@ If you want to force Compose to stop and recreate all containers, use the `--for
 
 If the process encounters an error, the exit code for this command is `1`.
 If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the containers are stopped, and the exit code is `0`.
+
+## `--wait-timeout` Option
+
+The `--wait-timeout` option is used to specify the maximum duration in seconds to wait for the project to be running or healthy. This option is useful to prevent the `docker-compose up --wait` command from waiting indefinitely for a service to become healthy.
+
+### Example Usage
+
+```sh
+docker-compose up --wait --wait-timeout 60
+```
+
+In this example, the `docker-compose up` command will wait for the services to be running or healthy for a maximum of 60 seconds. If the services do not become healthy within this time, the command will exit.
