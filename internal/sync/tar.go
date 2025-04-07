@@ -33,7 +33,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/archive"
+	"github.com/moby/go-archive"
 )
 
 type archiveEntry struct {
