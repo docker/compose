@@ -30,6 +30,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/buildkit v0.20.1
 	github.com/moby/patternmatcher v0.6.0
+	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
