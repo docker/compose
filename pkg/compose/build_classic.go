@@ -37,11 +37,10 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/builder/remotecontext/urlutil"
-	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/pkg/streamformatter"
+	"github.com/moby/go-archive"
 
 	"github.com/docker/compose/v2/pkg/api"
 
@@ -131,7 +130,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		excludes = build.TrimBuildFilesFromExcludes(excludes, relDockerfile, false)
 		buildCtx, err = archive.TarWithOptions(contextDir, &archive.TarOptions{
 			ExcludePatterns: excludes,
-			ChownOpts:       &idtools.Identity{},
+			ChownOpts:       &archive.ChownOpts{},
 		})
 		if err != nil {
 			return "", err
