@@ -320,8 +320,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]api.ImageSummary, error) {
 	imageNames := utils.Set[string]{}
 	for _, s := range project.Services {
-		imgName := api.GetImageNameOrDefault(s, project.Name)
-		imageNames.Add(imgName)
+		imageNames.Add(api.GetImageNameOrDefault(s, project.Name))
 		for _, volume := range s.Volumes {
 			if volume.Type == types.VolumeTypeImage {
 				imageNames.Add(volume.Source)

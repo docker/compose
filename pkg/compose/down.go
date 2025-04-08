@@ -282,8 +282,15 @@ func (s *composeService) removeImage(ctx context.Context, image string, w progre
 
 func (s *composeService) removeVolume(ctx context.Context, id string, w progress.Writer) error {
 	resource := fmt.Sprintf("Volume %s", id)
+
+	_, err := s.apiClient().VolumeInspect(ctx, id)
+	if errdefs.IsNotFound(err) {
+		// Already gone
+		return nil
+	}
+
 	w.Event(progress.NewEvent(resource, progress.Working, "Removing"))
-	err := s.apiClient().VolumeRemove(ctx, id, true)
+	err = s.apiClient().VolumeRemove(ctx, id, true)
 	if err == nil {
 		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
 		return nil

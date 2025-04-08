@@ -828,6 +828,7 @@ func getDependentServiceFromMode(mode string) string {
 	return ""
 }
 
+//nolint:gocyclo
 func (s *composeService) buildContainerVolumes(
 	ctx context.Context,
 	p types.Project,
@@ -848,30 +849,37 @@ func (s *composeService) buildContainerVolumes(
 		return nil, nil, err
 	}
 
-MOUNTS:
 	for _, m := range mountOptions {
-		if m.Type == mount.TypeNamedPipe {
-			mounts = append(mounts, m)
-			continue
-		}
-		if m.Type == mount.TypeBind {
+		switch m.Type {
+		case mount.TypeBind:
 			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
 			// see https://github.com/moby/moby/issues/43483
-			for _, v := range service.Volumes {
-				if v.Target == m.Target {
-					switch {
-					case string(m.Type) != v.Type:
-						v.Source = m.Source
-						fallthrough
-					case !requireMountAPI(v.Bind):
-						binds = append(binds, v.String())
-						continue MOUNTS
+			v := findVolumeByTarget(service.Volumes, m.Target)
+			if v != nil {
+				switch {
+				case v.Type != types.VolumeTypeBind:
+					v.Source = m.Source
+					fallthrough
+				case !requireMountAPI(v.Bind):
+					vol := findVolumeByName(p.Volumes, m.Source)
+					if vol != nil {
+						binds = append(binds, toBindString(vol.Name, v))
+						continue
 					}
 				}
 			}
-		}
-		if m.Type == mount.TypeImage {
+		case mount.TypeVolume:
+			v := findVolumeByTarget(service.Volumes, m.Target)
+			vol := findVolumeByName(p.Volumes, m.Source)
+			if v != nil && vol != nil {
+				if _, ok := vol.DriverOpts["device"]; ok && vol.Driver == "local" && vol.DriverOpts["o"] == "bind" {
+					// Looks like a volume, but actually a bind mount which requires the bind API
+					binds = append(binds, toBindString(vol.Name, v))
+					continue
+				}
+			}
+		case mount.TypeImage:
 			version, err := s.RuntimeVersion(ctx)
 			if err != nil {
 				return nil, nil, err
@@ -883,6 +891,42 @@ MOUNTS:
 		mounts = append(mounts, m)
 	}
 	return binds, mounts, nil
+}
+
+func toBindString(name string, v *types.ServiceVolumeConfig) string {
+	access := "rw"
+	if v.ReadOnly {
+		access = "ro"
+	}
+	options := []string{access}
+	if v.Bind != nil && v.Bind.SELinux != "" {
+		options = append(options, v.Bind.SELinux)
+	}
+	if v.Bind != nil && v.Bind.Propagation != "" {
+		options = append(options, v.Bind.Propagation)
+	}
+	if v.Volume != nil && v.Volume.NoCopy {
+		options = append(options, "nocopy")
+	}
+	return fmt.Sprintf("%s:%s:%s", name, v.Target, strings.Join(options, ","))
+}
+
+func findVolumeByName(volumes types.Volumes, name string) *types.VolumeConfig {
+	for _, vol := range volumes {
+		if vol.Name == name {
+			return &vol
+		}
+	}
+	return nil
+}
+
+func findVolumeByTarget(volumes []types.ServiceVolumeConfig, target string) *types.ServiceVolumeConfig {
+	for _, v := range volumes {
+		if v.Target == target {
+			return &v
+		}
+	}
+	return nil
 }
 
 // requireMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
