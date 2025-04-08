@@ -17,6 +17,8 @@
 package remote
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -31,6 +33,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/buildkit/util/gitutil"
+	"github.com/sirupsen/logrus"
 )
 
 const GIT_REMOTE_ENABLED = "COMPOSE_EXPERIMENTAL_GIT_REMOTE"
@@ -169,7 +172,8 @@ func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil
 	cmd = exec.CommandContext(ctx, "git", "fetch", "--depth=1", "origin", ref.Commit)
 	cmd.Env = g.gitCommandEnv()
 	cmd.Dir = path
-	err = cmd.Run()
+
+	err = g.run(cmd)
 	if err != nil {
 		return err
 	}
@@ -181,6 +185,19 @@ func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil
 		return err
 	}
 	return nil
+}
+
+func (g gitRemoteLoader) run(cmd *exec.Cmd) error {
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		output, err := cmd.CombinedOutput()
+		scanner := bufio.NewScanner(bytes.NewBuffer(output))
+		for scanner.Scan() {
+			line := scanner.Text()
+			logrus.Debug(line)
+		}
+		return err
+	}
+	return cmd.Run()
 }
 
 func (g gitRemoteLoader) gitCommandEnv() []string {
