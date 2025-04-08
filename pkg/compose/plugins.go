@@ -50,12 +50,16 @@ const (
 func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string) error {
 	provider := *service.Provider
 
-	path, err := s.getPluginBinaryPath(provider.Type)
+	plugin, err := s.getPluginBinaryPath(provider.Type)
 	if err != nil {
 		return err
 	}
 
-	cmd := s.setupPluginCommand(ctx, project, provider, path, command)
+	if err := s.checkPluginEnabledInDD(ctx, plugin); err != nil {
+		return err
+	}
+
+	cmd := s.setupPluginCommand(ctx, project, provider, plugin.Path, command)
 
 	eg := errgroup.Group{}
 	stdout, err := cmd.StdoutPipe()
@@ -121,13 +125,9 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	return nil
 }
 
-func (s *composeService) getPluginBinaryPath(providerType string) (string, error) {
+func (s *composeService) getPluginBinaryPath(providerType string) (*manager.Plugin, error) {
 	// Only support Docker CLI plugins for first iteration. Could support any binary from PATH
-	plugin, err := manager.GetPlugin(providerType, s.dockerCli, &cobra.Command{})
-	if err != nil {
-		return "", err
-	}
-	return plugin.Path, nil
+	return manager.GetPlugin(providerType, s.dockerCli, &cobra.Command{})
 }
 
 func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, provider types.ServiceProviderConfig, path, command string) *exec.Cmd {
@@ -142,7 +142,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 
 	// Use docker/cli mechanism to propagate termination signal to child process
 	server, err := socket.NewPluginServer(nil)
-	if err != nil {
+	if err == nil {
 		defer server.Close() //nolint:errcheck
 		cmd.Cancel = server.Close
 		cmd.Env = replace(cmd.Env, socket.EnvKey, server.Addr().String())
@@ -155,4 +155,25 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	otel.GetTextMapPropagator().Inject(ctx, &carrier)
 	cmd.Env = append(cmd.Env, types.Mapping(carrier).Values()...)
 	return cmd
+}
+
+func (s *composeService) checkPluginEnabledInDD(ctx context.Context, plugin *manager.Plugin) error {
+	if integrationEnabled := s.isDesktopIntegrationActive(); !integrationEnabled {
+		return fmt.Errorf("you should enable Docker Desktop integration to use %q provider services", plugin.Name)
+	}
+
+	// Until we support more use cases, check explicitly status of model runner
+	if plugin.Name == "model" {
+		cmd := exec.CommandContext(ctx, "docker", "model", "status")
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+				return fmt.Errorf("you should enable model runner to use %q provider services: %s", plugin.Name, err.Error())
+			}
+		}
+	} else {
+		return fmt.Errorf("unsupported provider %q", plugin.Name)
+	}
+	return nil
 }
