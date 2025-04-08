@@ -254,6 +254,8 @@ func TestDownRemoveVolumes(t *testing.T) {
 		Return(volume.ListResponse{
 			Volumes: []*volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
+	api.EXPECT().VolumeInspect(gomock.Any(), "myProject_volume").
+		Return(volume.Volume{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return(nil, nil)
 
