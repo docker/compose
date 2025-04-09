@@ -174,3 +174,22 @@ func TestUpRecreateVolumes_IgnoreBinds(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/bind.yaml", "--project-name", projectName, "up", "-d")
 	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
 }
+
+func TestImageVolume(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-image-volume"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	version := c.RunDockerCmd(t, "version", "-f", "{{.Server.Version}}")
+	major, _, found := strings.Cut(version.Combined(), ".")
+	assert.Assert(t, found)
+	if major == "26" || major == "27" {
+		t.Skip("Skipping test due to docker version < 28")
+	}
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/volumes/compose.yaml", "--project-name", projectName, "up", "with_image")
+	out := res.Combined()
+	assert.Check(t, strings.Contains(out, "index.html"))
+}
