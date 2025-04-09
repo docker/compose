@@ -84,7 +84,9 @@ func (c *Client) Ping(ctx context.Context) (*PingResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -113,7 +115,9 @@ func (c *Client) FeatureFlags(ctx context.Context) (FeatureFlagResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -143,7 +147,9 @@ func (c *Client) GetFileSharesConfig(ctx context.Context) (*GetFileSharesConfigR
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, newHTTPStatusCodeError(resp)
@@ -181,7 +187,9 @@ func (c *Client) CreateFileShare(ctx context.Context, r CreateFileShareRequest) 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(resp.Body)
@@ -223,7 +231,9 @@ func (c *Client) ListFileShares(ctx context.Context) ([]FileShareSession, error)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, newHTTPStatusCodeError(resp)
@@ -246,7 +256,9 @@ func (c *Client) DeleteFileShare(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return newHTTPStatusCodeError(resp)
