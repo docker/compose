@@ -83,6 +83,8 @@ github.com/cloudflare/cfssl v0.0.0-20180223231731-4e2dcbde5004 h1:lkAMpLVBDaj17e
 github.com/cloudflare/cfssl v0.0.0-20180223231731-4e2dcbde5004/go.mod h1:yMWuSON2oQp+43nFtAV/uvKQIFpSPerB57DCt9t8sSA=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb h1:EDmT6Q9Zs+SbUoc7Ik9EfrFqcylYqgPZ9ANSbTAntnE=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb/go.mod h1:ZjrT6AXHbDs86ZSdt/osfBi5qfexBrKUdONk989Wnk4=
+github.com/compose-spec/compose-go/v2 v2.5.1-0.20250409070949-8e1a035095ca h1:4dH4DudeDunWTYetcJxQE65osreQKvaLtFLdl9CcqME=
+github.com/compose-spec/compose-go/v2 v2.5.1-0.20250409070949-8e1a035095ca/go.mod h1:vPlkN0i+0LjLf9rv52lodNMUTJF5YHVfHVGLLIP67NA=
 github.com/containerd/cgroups/v3 v3.0.5 h1:44na7Ud+VwyE7LIoJ8JTNQOa549a8543BmzaJHo6Bzo=
 github.com/containerd/cgroups/v3 v3.0.5/go.mod h1:SA5DLYnXO8pTGYiAHXz94qvLQTKfVM5GEVisn4jpins=
 github.com/containerd/console v1.0.4 h1:F2g4+oChYvBTsASRTz8NP6iIAi97J3TtSAsLbIFn4ro=
@@ -167,8 +169,6 @@ github.com/fvbommel/sortorder v1.1.0 h1:fUmoe+HLsBTctBDoaBwpQo5N+nrCp8g/BjKb/6ZQ
 github.com/fvbommel/sortorder v1.1.0/go.mod h1:uk88iVf1ovNn1iLfgUVU2F9o5eO30ui720w+kxuqRs0=
 github.com/fxamacker/cbor/v2 v2.7.0 h1:iM5WgngdRBanHcxugY4JySA0nk1wZorNOpTgCMedv5E=
 github.com/fxamacker/cbor/v2 v2.7.0/go.mod h1:pxXPTn3joSm21Gbwsv0w9OSA2y1HFR9qXEeXQVeNoDQ=
-github.com/glours/compose-go/v2 v2.0.0-20250403082600-80aa75f06535 h1:S/P6v3QxsMpkKn+2OSMPNkfSkadSjSHoMGAc/eBZgMU=
-github.com/glours/compose-go/v2 v2.0.0-20250403082600-80aa75f06535/go.mod h1:vPlkN0i+0LjLf9rv52lodNMUTJF5YHVfHVGLLIP67NA=
 github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
 github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9GBnD5lWE=
 github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=

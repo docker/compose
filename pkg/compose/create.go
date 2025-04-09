@@ -871,6 +871,15 @@ MOUNTS:
 				}
 			}
 		}
+		if m.Type == mount.TypeImage {
+			version, err := s.RuntimeVersion(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+			if versions.LessThan(version, "1.48") {
+				return nil, nil, fmt.Errorf("volume with type=image require Docker Engine v28 or later")
+			}
+		}
 		mounts = append(mounts, m)
 	}
 	return binds, mounts, nil
@@ -1125,7 +1134,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
-	bind, vol, tmpfs := buildMountOptions(volume)
+	bind, vol, tmpfs, img := buildMountOptions(volume)
 
 	if bind != nil {
 		volume.Type = types.VolumeTypeBind
@@ -1140,37 +1149,35 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		BindOptions:   bind,
 		VolumeOptions: vol,
 		TmpfsOptions:  tmpfs,
+		ImageOptions:  img,
 	}, nil
 }
 
-func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
+func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions, *mount.ImageOptions) {
+	if volume.Type != types.VolumeTypeBind && volume.Bind != nil {
+		logrus.Warnf("mount of type `%s` should not define `bind` option", volume.Type)
+	}
+	if volume.Type != types.VolumeTypeVolume && volume.Volume != nil {
+		logrus.Warnf("mount of type `%s` should not define `volume` option", volume.Type)
+	}
+	if volume.Type != types.VolumeTypeTmpfs && volume.Tmpfs != nil {
+		logrus.Warnf("mount of type `%s` should not define `tmpfs` option", volume.Type)
+	}
+	if volume.Type != types.VolumeTypeImage && volume.Image != nil {
+		logrus.Warnf("mount of type `%s` should not define `image` option", volume.Type)
+	}
+
 	switch volume.Type {
 	case "bind":
-		if volume.Volume != nil {
-			logrus.Warnf("mount of type `bind` should not define `volume` option")
-		}
-		if volume.Tmpfs != nil {
-			logrus.Warnf("mount of type `bind` should not define `tmpfs` option")
-		}
-		return buildBindOption(volume.Bind), nil, nil
+		return buildBindOption(volume.Bind), nil, nil, nil
 	case "volume":
-		if volume.Bind != nil {
-			logrus.Warnf("mount of type `volume` should not define `bind` option")
-		}
-		if volume.Tmpfs != nil {
-			logrus.Warnf("mount of type `volume` should not define `tmpfs` option")
-		}
-		return nil, buildVolumeOptions(volume.Volume), nil
+		return nil, buildVolumeOptions(volume.Volume), nil, nil
 	case "tmpfs":
-		if volume.Bind != nil {
-			logrus.Warnf("mount of type `tmpfs` should not define `bind` option")
-		}
-		if volume.Volume != nil {
-			logrus.Warnf("mount of type `tmpfs` should not define `volume` option")
-		}
-		return nil, nil, buildTmpfsOptions(volume.Tmpfs)
+		return nil, nil, buildTmpfsOptions(volume.Tmpfs), nil
+	case "image":
+		return nil, nil, nil, buildImageOptions(volume.Image)
 	}
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 
 func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
@@ -1199,7 +1206,7 @@ func buildVolumeOptions(vol *types.ServiceVolumeVolume) *mount.VolumeOptions {
 	return &mount.VolumeOptions{
 		NoCopy:  vol.NoCopy,
 		Subpath: vol.Subpath,
-		// Labels:       , // FIXME missing from model ?
+		Labels:  vol.Labels,
 		// DriverConfig: , // FIXME missing from model ?
 	}
 }
@@ -1211,6 +1218,15 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 	return &mount.TmpfsOptions{
 		SizeBytes: int64(tmpfs.Size),
 		Mode:      os.FileMode(tmpfs.Mode),
+	}
+}
+
+func buildImageOptions(image *types.ServiceVolumeImage) *mount.ImageOptions {
+	if image == nil {
+		return nil
+	}
+	return &mount.ImageOptions{
+		Subpath: image.SubPath,
 	}
 }
 

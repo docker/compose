@@ -1,0 +1,10 @@
+services:
+  with_image:
+    image: alpine
+    command: "ls -al /mnt/image"
+    volumes:
+      - type: image
+        source: nginx:alpine
+        target: /mnt/image
+        image:
+          subpath: usr/share/nginx/html/

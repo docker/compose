@@ -290,15 +290,28 @@ func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
-	var needPull []types.ServiceConfig
-	for _, service := range project.Services {
+	needPull := map[string]types.ServiceConfig{}
+	for name, service := range project.Services {
 		pull, err := mustPull(service, images)
 		if err != nil {
 			return err
 		}
 		if pull {
-			needPull = append(needPull, service)
+			needPull[name] = service
 		}
+		for i, vol := range service.Volumes {
+			if vol.Type == types.VolumeTypeImage {
+				if _, ok := images[vol.Source]; !ok {
+					// Hack: create a fake ServiceConfig so we pull missing volume image
+					n := fmt.Sprintf("%s:volume %d", name, i)
+					needPull[n] = types.ServiceConfig{
+						Name:  n,
+						Image: vol.Source,
+					}
+				}
+			}
+		}
+
 	}
 	if len(needPull) == 0 {
 		return nil
@@ -308,11 +321,11 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(s.maxConcurrency)
-		pulledImages := make([]api.ImageSummary, len(needPull))
-		for i, service := range needPull {
+		pulledImages := map[string]api.ImageSummary{}
+		for name, service := range needPull {
 			eg.Go(func() error {
 				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
-				pulledImages[i] = api.ImageSummary{
+				pulledImages[name] = api.ImageSummary{
 					ID:          id,
 					Repository:  service.Image,
 					LastTagTime: time.Now(),
