@@ -25,6 +25,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/moby/sys/atomicwriter"
 )
 
 func (s *composeService) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
@@ -41,11 +42,11 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		return err
 	}
 
-	if options.Output == "" && s.dockerCli.Out().IsTerminal() {
-		return fmt.Errorf("output option is required when exporting to terminal")
-	}
-
-	if err := command.ValidateOutputPath(options.Output); err != nil {
+	if options.Output == "" {
+		if s.dockerCli.Out().IsTerminal() {
+			return fmt.Errorf("output option is required when exporting to terminal")
+		}
+	} else if err := command.ValidateOutputPath(options.Output); err != nil {
 		return fmt.Errorf("failed to export container: %w", err)
 	}
 
@@ -83,9 +84,14 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		if options.Output == "" {
 			_, err := io.Copy(s.dockerCli.Out(), responseBody)
 			return err
-		}
+		} else {
+			writer, err := atomicwriter.New(options.Output, 0o600)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = writer.Close() }()
 
-		if err := command.CopyToFile(options.Output, responseBody); err != nil {
+			_, err = io.Copy(writer, responseBody)
 			return err
 		}
 	}
