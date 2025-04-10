@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"golang.org/x/sync/errgroup"
@@ -45,6 +46,8 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 				_, _ = fmt.Fprintf(s.dockerCli.Out(), "container %q exited with status code %d\n", ctr.ID, result.StatusCode)
 				statusCode = result.StatusCode
 			case err = <-errC:
+			case <-time.After(options.WaitTimeout):
+				err = fmt.Errorf("timeout reached while waiting for container %q", ctr.ID)
 			}
 
 			return err
