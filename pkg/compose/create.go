@@ -862,11 +862,12 @@ func (s *composeService) buildContainerVolumes(
 					v.Source = m.Source
 					fallthrough
 				case !requireMountAPI(v.Bind):
-					vol := findVolumeByName(p.Volumes, m.Source)
-					if vol != nil {
-						binds = append(binds, toBindString(vol.Name, v))
-						continue
+					source := m.Source
+					if vol := findVolumeByName(p.Volumes, m.Source); vol != nil {
+						source = m.Source
 					}
+					binds = append(binds, toBindString(source, v))
+					continue
 				}
 			}
 		case mount.TypeVolume:
