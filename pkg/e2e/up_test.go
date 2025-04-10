@@ -61,7 +61,6 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 		"-f=./fixtures/ups-deps-stop/orphan.yaml",
 		"up",
 		"--wait",
-		"--detach",
 		"orphan",
 	)
 	RequireServiceState(t, c, "orphan", "running")
