@@ -17,13 +17,16 @@
 package compose
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
+	composeloader "github.com/compose-spec/compose-go/v2/loader"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -154,7 +157,16 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		},
 	}
 
-	mounts, err := buildContainerMountOptions(project, project.Services["myService"], image.InspectResponse{}, inherit)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mock, cli := prepareMocks(mockCtrl)
+	s := composeService{
+		dockerCli: cli,
+	}
+	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(image.InspectResponse{}, nil)
+
+	mounts, err := s.buildContainerMountOptions(context.TODO(), project, project.Services["myService"], inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -166,7 +178,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
-	mounts, err = buildContainerMountOptions(project, project.Services["myService"], image.InspectResponse{}, inherit)
+	mounts, err = s.buildContainerMountOptions(context.TODO(), project, project.Services["myService"], inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -320,4 +332,124 @@ func TestCreateEndpointSettings(t *testing.T) {
 		IPAddress:   "10.16.17.18",
 		IPv6Gateway: "fdb4:7a7f:373a:3f0c::42",
 	}))
+}
+
+func Test_buildContainerVolumes(t *testing.T) {
+	pwd, err := os.Getwd()
+	assert.NilError(t, err)
+
+	tests := []struct {
+		name   string
+		yaml   string
+		binds  []string
+		mounts []mountTypes.Mount
+	}{
+		{
+			name: "bind mount local path",
+			yaml: `
+services:
+  test:
+    volumes:
+      - ./data:/data
+`,
+			binds:  []string{filepath.Join(pwd, "data") + ":/data:rw"},
+			mounts: nil,
+		},
+		{
+			name: "bind mount, not create host path",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          create_host_path: false
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:        "bind",
+					Source:      filepath.Join(pwd, "data"),
+					Target:      "/data",
+					BindOptions: &mountTypes.BindOptions{CreateMountpoint: false},
+				},
+			},
+		},
+		{
+			name: "mount volume",
+			yaml: `
+services:
+  test:
+    volumes:
+      - data:/data
+volumes:
+  data:
+    name: my_volume
+`,
+			binds:  []string{"my_volume:/data:rw"},
+			mounts: nil,
+		},
+		{
+			name: "mount volume, readonly",
+			yaml: `
+services:
+  test:
+    volumes:
+      - data:/data:ro
+volumes:
+  data:
+    name: my_volume
+`,
+			binds:  []string{"my_volume:/data:ro"},
+			mounts: nil,
+		},
+		{
+			name: "mount volume subpath",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: data
+        target: /data
+        volume:
+          subpath: test/
+volumes:
+  data: 
+    name: my_volume
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:          "volume",
+					Source:        "my_volume",
+					Target:        "/data",
+					VolumeOptions: &mountTypes.VolumeOptions{Subpath: "test/"},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := composeloader.LoadWithContext(context.TODO(), composetypes.ConfigDetails{
+				ConfigFiles: []composetypes.ConfigFile{
+					{
+						Filename: "test",
+						Content:  []byte(tt.yaml),
+					},
+				},
+			}, func(options *composeloader.Options) {
+				options.SkipValidation = true
+				options.SkipConsistencyCheck = true
+			})
+			assert.NilError(t, err)
+			s := &composeService{}
+			binds, mounts, err := s.buildContainerVolumes(context.TODO(), *p, p.Services["test"], nil)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, tt.binds, binds)
+			assert.DeepEqual(t, tt.mounts, mounts)
+		})
+	}
 }
