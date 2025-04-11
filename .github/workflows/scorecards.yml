@@ -7,9 +7,6 @@ on:
   push:
     branches: [ "main" ]
 
-# Declare default permissions as read only.
-permissions: read-all
-
 jobs:
   analysis:
     name: Scorecards analysis
@@ -19,6 +16,18 @@ jobs:
       security-events: write
       # Used to receive a badge.
       id-token: write
+      # read permissions to all the other objects
+      actions: read
+      attestations: read
+      checks: read
+      contents: read
+      deployments: read
+      issues: read
+      discussions: read
+      packages: read
+      pages: read
+      pull-requests: read
+      statuses: read
     
     steps:
       - name: "Checkout code"
