@@ -403,5 +403,5 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if urlutil.IsGitURL(ctxName) || filepath.IsAbs(dockerfile) {
 		return dockerfile
 	}
-	return filepath.Join(ctxName, dockerfile)
+	return dockerfile
 }
