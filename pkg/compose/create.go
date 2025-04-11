@@ -39,7 +39,6 @@ import (
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
@@ -828,7 +827,6 @@ func getDependentServiceFromMode(mode string) string {
 	return ""
 }
 
-//nolint:gocyclo
 func (s *composeService) buildContainerVolumes(
 	ctx context.Context,
 	p types.Project,
@@ -838,13 +836,7 @@ func (s *composeService) buildContainerVolumes(
 	var mounts []mount.Mount
 	var binds []string
 
-	img := api.GetImageNameOrDefault(service, p.Name)
-	imgInspect, err := s.apiClient().ImageInspect(ctx, img)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	mountOptions, err := buildContainerMountOptions(p, service, imgInspect, inherit)
+	mountOptions, err := s.buildContainerMountOptions(ctx, p, service, inherit)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -857,11 +849,10 @@ func (s *composeService) buildContainerVolumes(
 			// see https://github.com/moby/moby/issues/43483
 			v := findVolumeByTarget(service.Volumes, m.Target)
 			if v != nil {
-				switch {
-				case v.Type != types.VolumeTypeBind:
+				if v.Type != types.VolumeTypeBind {
 					v.Source = m.Source
-					fallthrough
-				case !requireMountAPI(v.Bind):
+				}
+				if !bindRequiresMountAPI(v.Bind) {
 					source := m.Source
 					if vol := findVolumeByName(p.Volumes, m.Source); vol != nil {
 						source = m.Source
@@ -874,8 +865,8 @@ func (s *composeService) buildContainerVolumes(
 			v := findVolumeByTarget(service.Volumes, m.Target)
 			vol := findVolumeByName(p.Volumes, m.Source)
 			if v != nil && vol != nil {
-				if _, ok := vol.DriverOpts["device"]; ok && vol.Driver == "local" && vol.DriverOpts["o"] == "bind" {
-					// Looks like a volume, but actually a bind mount which requires the bind API
+				// Prefer the bind API if no advanced option is used, to preserve backward compatibility
+				if !volumeRequiresMountAPI(v.Volume) {
 					binds = append(binds, toBindString(vol.Name, v))
 					continue
 				}
@@ -930,9 +921,9 @@ func findVolumeByTarget(volumes []types.ServiceVolumeConfig, target string) *typ
 	return nil
 }
 
-// requireMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
+// bindRequiresMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
 // options which require use of Mount API
-func requireMountAPI(bind *types.ServiceVolumeBind) bool {
+func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
 	switch {
 	case bind == nil:
 		return false
@@ -947,7 +938,24 @@ func requireMountAPI(bind *types.ServiceVolumeBind) bool {
 	}
 }
 
-func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img image.InspectResponse, inherit *container.Summary) ([]mount.Mount, error) {
+// volumeRequiresMountAPI check if Volume declaration can be implemented by the plain old Bind API or uses any of the advanced
+// options which require use of Mount API
+func volumeRequiresMountAPI(vol *types.ServiceVolumeVolume) bool {
+	switch {
+	case vol == nil:
+		return false
+	case len(vol.Labels) > 0:
+		return true
+	case vol.Subpath != "":
+		return true
+	case vol.NoCopy:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *composeService) buildContainerMountOptions(ctx context.Context, p types.Project, service types.ServiceConfig, inherit *container.Summary) ([]mount.Mount, error) {
 	mounts := map[string]mount.Mount{}
 	if inherit != nil {
 		for _, m := range inherit.Mounts {
@@ -957,6 +965,11 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img imag
 			src := m.Source
 			if m.Type == "volume" {
 				src = m.Name
+			}
+
+			img, err := s.apiClient().ImageInspect(ctx, api.GetImageNameOrDefault(service, p.Name))
+			if err != nil {
+				return nil, err
 			}
 
 			if img.Config != nil {
@@ -971,7 +984,7 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img imag
 				}
 			}
 			volumes := []types.ServiceVolumeConfig{}
-			for _, v := range s.Volumes {
+			for _, v := range service.Volumes {
 				if v.Target != m.Destination || v.Source != "" {
 					volumes = append(volumes, v)
 					continue
@@ -984,11 +997,11 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img imag
 					ReadOnly: !m.RW,
 				}
 			}
-			s.Volumes = volumes
+			service.Volumes = volumes
 		}
 	}
 
-	mounts, err := fillBindMounts(p, s, mounts)
+	mounts, err := fillBindMounts(p, service, mounts)
 	if err != nil {
 		return nil, err
 	}
