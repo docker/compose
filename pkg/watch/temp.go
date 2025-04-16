@@ -31,7 +31,7 @@ func NewDir(prefix string) (*TempDir, error) {
 	return NewDirAtRoot("", prefix)
 }
 
-// NewDir creates a new TempDir at the given root.
+// NewDirAtRoot creates a new TempDir at the given root.
 func NewDirAtRoot(root, prefix string) (*TempDir, error) {
 	tmpDir, err := os.MkdirTemp(root, prefix)
 	if err != nil {
