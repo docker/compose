@@ -25,7 +25,7 @@ import (
 
 const QuietPeriod = 500 * time.Millisecond
 
-// batchDebounceEvents groups identical file events within a sliding time window and writes the results to the returned
+// BatchDebounceEvents groups identical file events within a sliding time window and writes the results to the returned
 // channel.
 //
 // The returned channel is closed when the debouncer is stopped via context cancellation or by closing the input channel.
