@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -322,9 +323,12 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(s.maxConcurrency)
 		pulledImages := map[string]api.ImageSummary{}
+		var mutex sync.Mutex
 		for name, service := range needPull {
 			eg.Go(func() error {
 				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				mutex.Lock()
+				defer mutex.Unlock()
 				pulledImages[name] = api.ImageSummary{
 					ID:          id,
 					Repository:  service.Image,
