@@ -220,7 +220,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	if options.Print {
-		_, err = fmt.Fprintln(s.stdinfo(), string(b))
+		_, err = fmt.Fprintln(s.stdout(), string(b))
 		return nil, err
 	}
 	logrus.Debugf("bake build config:\n%s", string(b))
