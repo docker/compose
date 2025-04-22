@@ -157,6 +157,8 @@ type BuildOptions struct {
 	Builder string
 	// Print don't actually run builder but print equivalent build config
 	Print bool
+	// Check let builder validate build configuration
+	Check bool
 }
 
 // Apply mutates project according to build options

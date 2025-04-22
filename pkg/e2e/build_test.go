@@ -300,8 +300,8 @@ func TestBuildImageDependencies(t *testing.T) {
 			"DOCKER_BUILDKIT=1", "COMPOSE_BAKE=1",
 			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
 		))
-		doTest(t, cli, "build")
-		doTest(t, cli, "build", "service")
+		doTest(t, cli, "--verbose", "build")
+		doTest(t, cli, "--verbose", "build", "service")
 	})
 }
 
