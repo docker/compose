@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/internal/desktop"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -154,13 +153,6 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 		volumeName := vol.Name
 		ops = append(ops, func() error {
 			return s.removeVolume(ctx, volumeName, w)
-		})
-	}
-
-	if s.manageDesktopFileSharesEnabled(ctx) {
-		ops = append(ops, func() error {
-			desktop.RemoveFileSharesForProject(ctx, s.desktopCli, project.Name)
-			return nil
 		})
 	}
 

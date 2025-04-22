@@ -22,16 +22,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/internal/desktop"
-	pathutil "github.com/docker/compose/v2/internal/paths"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
@@ -155,58 +151,6 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		ids[k] = id
 	}
 
-	err := func() error {
-		if s.manageDesktopFileSharesEnabled(ctx) {
-			// collect all the bind mount paths and try to set up file shares in
-			// Docker Desktop for them
-			var paths []string
-			for _, svcName := range project.ServiceNames() {
-				svc := project.Services[svcName]
-				for _, vol := range svc.Volumes {
-					if vol.Type != string(mount.TypeBind) {
-						continue
-					}
-					p := filepath.Clean(vol.Source)
-					if !filepath.IsAbs(p) {
-						return fmt.Errorf("file share path is not absolute: %s", p)
-					}
-					if fi, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
-						// actual directory will be implicitly created when the
-						// file share is initialized if it doesn't exist, so
-						// need to filter out any that should not be auto-created
-						if vol.Bind != nil && !vol.Bind.CreateHostPath {
-							logrus.Debugf("Skipping creating file share for %q: does not exist and `create_host_path` is false", p)
-							continue
-						}
-					} else if err != nil {
-						// if we can't read the path, we won't be able to make
-						// a file share for it
-						logrus.Debugf("Skipping creating file share for %q: %v", p, err)
-						continue
-					} else if !fi.IsDir() {
-						// ignore files & special types (e.g. Unix sockets)
-						logrus.Debugf("Skipping creating file share for %q: not a directory", p)
-						continue
-					}
-
-					paths = append(paths, p)
-				}
-			}
-
-			// remove duplicate/unnecessary child paths and sort them for predictability
-			paths = pathutil.EncompassingPaths(paths)
-			sort.Strings(paths)
-
-			fileShareManager := desktop.NewFileShareManager(s.desktopCli, project.Name, paths)
-			if err := fileShareManager.EnsureExists(ctx); err != nil {
-				return fmt.Errorf("initializing file shares: %w", err)
-			}
-		}
-		return nil
-	}()
-	if err != nil {
-		progress.ContextWriter(ctx).TailMsgf("Failed to prepare Synchronized file shares: %v", err)
-	}
 	return ids, nil
 }
 
