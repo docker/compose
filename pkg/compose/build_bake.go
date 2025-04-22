@@ -176,12 +176,16 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			privileged = true
 		}
 
-		var output string
+		var outputs []string
+		var call string
 		push := options.Push && service.Image != ""
-		if len(service.Build.Platforms) > 1 {
-			output = fmt.Sprintf("type=image,push=%t", push)
-		} else {
-			output = fmt.Sprintf("type=docker,load=true,push=%t", push)
+		switch {
+		case options.Check:
+			call = "lint"
+		case len(service.Build.Platforms) > 1:
+			outputs = []string{fmt.Sprintf("type=image,push=%t", push)}
+		default:
+			outputs = []string{fmt.Sprintf("type=docker,load=true,push=%t", push)}
 		}
 
 		read = append(read, build.Context)
@@ -212,7 +216,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			ShmSize:      build.ShmSize,
 			Ulimits:      toBakeUlimits(build.Ulimits),
 			Entitlements: entitlements,
-			Outputs:      []string{output},
+
+			Outputs: outputs,
+			Call:    call,
 		}
 		group.Targets = append(group.Targets, serviceName)
 	}
@@ -284,7 +290,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
-	var errMessage string
+	var errMessage []string
 	scanner := bufio.NewScanner(pipe)
 	scanner.Split(bufio.ScanLines)
 
@@ -300,7 +306,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		err := decoder.Decode(&status)
 		if err != nil {
 			if strings.HasPrefix(line, "ERROR: ") {
-				errMessage = line[7:]
+				errMessage = append(errMessage, line[7:])
+			} else {
+				errMessage = append(errMessage, line)
 			}
 			continue
 		}
@@ -310,8 +318,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	err = eg.Wait()
 	if err != nil {
-		if errMessage != "" {
-			return nil, errors.New(errMessage)
+		if len(errMessage) > 0 {
+			return nil, errors.New(strings.Join(errMessage, "\n"))
 		}
 		return nil, fmt.Errorf("failed to execute bake: %w", err)
 	}

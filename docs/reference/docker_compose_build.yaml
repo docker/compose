@@ -33,6 +33,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: check
+      value_type: bool
+      default_value: "false"
+      description: Check build configuration
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: compress
       value_type: bool
       default_value: "true"

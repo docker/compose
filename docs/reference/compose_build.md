@@ -17,6 +17,7 @@ run `docker compose build` to rebuild it.
 |:----------------------|:--------------|:--------|:------------------------------------------------------------------------------------------------------------|
 | `--build-arg`         | `stringArray` |         | Set build-time variables for services                                                                       |
 | `--builder`           | `string`      |         | Set builder to use                                                                                          |
+| `--check`             | `bool`        |         | Check build configuration                                                                                   |
 | `--dry-run`           | `bool`        |         | Execute command in dry run mode                                                                             |
 | `-m`, `--memory`      | `bytes`       | `0`     | Set memory limit for the build container. Not supported by BuildKit.                                        |
 | `--no-cache`          | `bool`        |         | Do not use cache when building the image                                                                    |
