@@ -1,0 +1,7 @@
+services:
+  test:
+    image: alpine
+    command: ip link show
+    networks:
+      default:
+        interface_name: foobar
