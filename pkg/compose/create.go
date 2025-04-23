@@ -154,6 +154,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	return ids, nil
 }
 
+//nolint:gocyclo
 func (s *composeService) getCreateConfigs(ctx context.Context,
 	p *types.Project,
 	service types.ServiceConfig,
@@ -246,7 +247,10 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	networkMode, networkingConfig := defaultNetworkSettings(p, service, number, links, opts.UseNetworkAliases, apiVersion)
+	networkMode, networkingConfig, err := defaultNetworkSettings(p, service, number, links, opts.UseNetworkAliases, apiVersion)
+	if err != nil {
+		return createConfigs{}, err
+	}
 	portBindings := buildContainerPortBindingOptions(service)
 
 	// MISC
@@ -356,7 +360,7 @@ func (s *composeService) prepareContainerMACAddress(ctx context.Context, service
 		}
 
 		if len(withMacAddress) > 1 {
-			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine 1.44 or later (currently: %s)", strings.Join(withMacAddress, ", "), version)
+			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine v25 or later", strings.Join(withMacAddress, ", "))
 		}
 
 		if mainNw != nil && mainNw.MacAddress != "" {
@@ -379,6 +383,8 @@ func getAliases(project *types.Project, service types.ServiceConfig, serviceInde
 }
 
 func createEndpointSettings(p *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, links []string, useNetworkAliases bool) *network.EndpointSettings {
+	const ifname = "com.docker.network.endpoint.ifname"
+
 	config := service.Networks[networkKey]
 	var ipam *network.EndpointIPAMConfig
 	var (
@@ -398,6 +404,15 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		}
 		macAddress = config.MacAddress
 		driverOpts = config.DriverOpts
+		if config.InterfaceName != "" {
+			if driverOpts == nil {
+				driverOpts = map[string]string{}
+			}
+			if name, ok := driverOpts[ifname]; ok && name != config.InterfaceName {
+				logrus.Warnf("ignoring services.%s.networks.%s.interface_name as %s driver_opts is already declared", service.Name, networkKey, ifname)
+			}
+			driverOpts[ifname] = config.InterfaceName
+		}
 		gwPriority = config.GatewayPriority
 	}
 	return &network.EndpointSettings{
@@ -471,20 +486,17 @@ func (s *composeService) prepareLabels(labels types.Labels, service types.Servic
 }
 
 // defaultNetworkSettings determines the container.NetworkMode and corresponding network.NetworkingConfig (nil if not applicable).
-func defaultNetworkSettings(
-	project *types.Project,
-	service types.ServiceConfig,
-	serviceIndex int,
-	links []string,
-	useNetworkAliases bool,
+func defaultNetworkSettings(project *types.Project,
+	service types.ServiceConfig, serviceIndex int,
+	links []string, useNetworkAliases bool,
 	version string,
-) (container.NetworkMode, *network.NetworkingConfig) {
+) (container.NetworkMode, *network.NetworkingConfig, error) {
 	if service.NetworkMode != "" {
-		return container.NetworkMode(service.NetworkMode), nil
+		return container.NetworkMode(service.NetworkMode), nil, nil
 	}
 
 	if len(project.Networks) == 0 {
-		return "none", nil
+		return "none", nil, nil
 	}
 
 	var primaryNetworkKey string
@@ -515,6 +527,14 @@ func defaultNetworkSettings(
 		}
 	}
 
+	if versions.LessThan(version, "1.49") {
+		for _, config := range service.Networks {
+			if config != nil && config.InterfaceName != "" {
+				return "", nil, fmt.Errorf("interface_name requires Docker Engine v28.1 or later")
+			}
+		}
+	}
+
 	endpointsConfig[primaryNetworkMobyNetworkName] = primaryNetworkEndpoint
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: endpointsConfig,
@@ -523,7 +543,7 @@ func defaultNetworkSettings(
 	// From the Engine API docs:
 	// > Supported standard values are: bridge, host, none, and container:<name|id>.
 	// > Any other value is taken as a custom network's name to which this container should connect to.
-	return container.NetworkMode(primaryNetworkMobyNetworkName), networkConfig
+	return container.NetworkMode(primaryNetworkMobyNetworkName), networkConfig, nil
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
