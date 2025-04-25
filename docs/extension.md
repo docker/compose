@@ -26,13 +26,13 @@ the resource(s) needed to run a service.
 - Another Docker CLI plugin (typically, `model` to run `docker-model`)
 - An executable in user's `PATH`
 
-To be a valid Compose extension, provider command *MUST* accept subcommand `compose` (which can be hidden)
+To be a valid Compose extension, provider command *MUST* accept a `compose` command (which can be hidden)
 with subcommands `up` and `down`.
 
 ## Up lifecycle
 
 To execute an application's `up` lifecycle, Compose executes the provider's `compose up` command, passing 
-the project name, service name and additional options. The `provider.options` are translated 
+the project name, service name, and additional options. The `provider.options` are translated 
 into command line flags. For example:
 ```console
 awesomecloud compose --project-name <NAME> up --type=mysql --size=256 "database"

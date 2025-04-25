@@ -55,11 +55,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
-	if err := s.checkPluginEnabledInDD(ctx, plugin); err != nil {
-		return err
-	}
-
-	cmd := s.setupPluginCommand(ctx, project, service, plugin.Path, command)
+	cmd := s.setupPluginCommand(ctx, project, service, plugin, command)
 
 	variables, err := s.executePlugin(ctx, cmd, command, service)
 	if err != nil {
@@ -148,9 +144,18 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 	return variables, nil
 }
 
-func (s *composeService) getPluginBinaryPath(providerType string) (*manager.Plugin, error) {
-	// Only support Docker CLI plugins for first iteration. Could support any binary from PATH
-	return manager.GetPlugin(providerType, s.dockerCli, &cobra.Command{})
+func (s *composeService) getPluginBinaryPath(provider string) (path string, err error) {
+	if provider == "compose" {
+		return "", errors.New("'compose' is not a valid provider type")
+	}
+	plugin, err := manager.GetPlugin(provider, s.dockerCli, &cobra.Command{})
+	if err == nil {
+		path = plugin.Path
+	}
+	if manager.IsNotFound(err) {
+		path, err = exec.LookPath(provider)
+	}
+	return path, err
 }
 
 func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) *exec.Cmd {
@@ -181,25 +186,4 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	otel.GetTextMapPropagator().Inject(ctx, &carrier)
 	cmd.Env = append(cmd.Env, types.Mapping(carrier).Values()...)
 	return cmd
-}
-
-func (s *composeService) checkPluginEnabledInDD(ctx context.Context, plugin *manager.Plugin) error {
-	if integrationEnabled := s.isDesktopIntegrationActive(); !integrationEnabled {
-		return fmt.Errorf("you should enable Docker Desktop integration to use %q provider services", plugin.Name)
-	}
-
-	// Until we support more use cases, check explicitly status of model runner
-	if plugin.Name == "model" {
-		cmd := exec.CommandContext(ctx, "docker", "model", "status")
-		_, err := cmd.CombinedOutput()
-		if err != nil {
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
-				return fmt.Errorf("you should enable model runner to use %q provider services: %s", plugin.Name, err.Error())
-			}
-		}
-	} else {
-		return fmt.Errorf("unsupported provider %q", plugin.Name)
-	}
-	return nil
 }
