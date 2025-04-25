@@ -69,6 +69,8 @@ const (
 	ComposeEnvFiles = "COMPOSE_ENV_FILES"
 	// ComposeMenu defines if the navigation menu should be rendered. Can be also set via --menu
 	ComposeMenu = "COMPOSE_MENU"
+	// ComposeProgress defines type of progress output, if --progress isn't used
+	ComposeProgress = "COMPOSE_PROGRESS"
 )
 
 // rawEnv load a dot env file using docker/cli key=value parser, without attempt to interpolate or evaluate values
@@ -228,7 +230,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
-	f.StringVar(&o.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
+	f.StringVar(&o.Progress, "progress", defaultStringVar(ComposeProgress, string(buildkit.AutoMode)), fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	f.BoolVar(&o.All, "all-resources", false, "Include all resources, even those not used by services")
 	_ = f.MarkHidden("workdir")
 }
@@ -238,6 +240,14 @@ func defaultStringArrayVar(env string) []string {
 	return strings.FieldsFunc(os.Getenv(env), func(c rune) bool {
 		return c == ','
 	})
+}
+
+// get default value for a command line flag from the env variable, if the env variable is not set, it returns the provided default value 'def'
+func defaultStringVar(env, def string) string {
+	if v, ok := os.LookupEnv(env); ok {
+		return v
+	}
+	return def
 }
 
 func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cli, services ...string) (*types.Project, string, error) {

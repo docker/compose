@@ -19,7 +19,6 @@ package progress
 import (
 	"context"
 	"io"
-	"os"
 	"sync"
 
 	"github.com/docker/cli/cli/streams"
@@ -121,9 +120,6 @@ func NewWriter(ctx context.Context, out *streams.Out, progressTitle string) (Wri
 	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
 	if !ok {
 		dryRun = false
-	}
-	if v, ok := os.LookupEnv("COMPOSE_PROGRESS"); ok && Mode == ModeAuto {
-		Mode = v
 	}
 	if Mode == ModeQuiet {
 		return quiet{}, nil
