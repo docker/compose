@@ -52,9 +52,19 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 
 	plugin, err := s.getPluginBinaryPath(provider.Type)
 	if err != nil {
-		return err
+		if !strings.Contains(err.Error(), "Error: No such CLI plugin") {
+			return err
+		}
+		// look if there is a binary with this name in the path
+		path, err := exec.LookPath(provider.Type)
+		if err != nil {
+			return err
+		}
+		plugin = &manager.Plugin{
+			Name: provider.Type,
+			Path: path,
+		}
 	}
-
 	if err := s.checkPluginEnabledInDD(ctx, plugin); err != nil {
 		return err
 	}
@@ -195,8 +205,7 @@ func (s *composeService) checkPluginEnabledInDD(ctx context.Context, plugin *man
 				return fmt.Errorf("you should enable model runner to use %q provider services: %s", plugin.Name, err.Error())
 			}
 		}
-	} else {
-		return fmt.Errorf("unsupported provider %q", plugin.Name)
+		return err
 	}
 	return nil
 }
