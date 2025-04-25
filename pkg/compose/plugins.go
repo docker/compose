@@ -59,7 +59,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
-	cmd := s.setupPluginCommand(ctx, project, provider, plugin.Path, command)
+	cmd := s.setupPluginCommand(ctx, project, service, plugin.Path, command)
 
 	variables, err := s.executePlugin(ctx, cmd, command, service)
 	if err != nil {
@@ -153,11 +153,14 @@ func (s *composeService) getPluginBinaryPath(providerType string) (*manager.Plug
 	return manager.GetPlugin(providerType, s.dockerCli, &cobra.Command{})
 }
 
-func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, provider types.ServiceProviderConfig, path, command string) *exec.Cmd {
+func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) *exec.Cmd {
+	provider := *service.Provider
+
 	args := []string{"compose", "--project-name", project.Name, command}
 	for k, v := range provider.Options {
 		args = append(args, fmt.Sprintf("--%s=%s", k, v))
 	}
+	args = append(args, service.Name)
 
 	cmd := exec.CommandContext(ctx, path, args...)
 	// Remove DOCKER_CLI_PLUGIN... variable so plugin can detect it run standalone
