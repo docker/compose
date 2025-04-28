@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -1126,28 +1127,22 @@ func isUnixAbs(p string) bool {
 }
 
 func isWindowsAbs(p string) bool {
-	if strings.HasPrefix(p, "\\\\") {
-		return true
-	}
-	if len(p) > 2 && p[1] == ':' {
-		return p[2] == '\\'
-	}
-	return false
+	return paths.IsWindowsAbs(p)
 }
 
 func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
 	source := volume.Source
-	// on windows, filepath.IsAbs(source) is false for unix style abs path like /var/run/docker.sock.
-	// do not replace these with  filepath.Abs(source) that will include a default drive.
-	if volume.Type == types.VolumeTypeBind && !filepath.IsAbs(source) && !strings.HasPrefix(source, "/") {
-		// volume source has already been prefixed with workdir if required, by compose-go project loader
-		var err error
-		source, err = filepath.Abs(source)
-		if err != nil {
-			return mount.Mount{}, err
+	switch volume.Type {
+	case types.VolumeTypeBind:
+		if !filepath.IsAbs(source) && !isUnixAbs(source) && !isWindowsAbs(source) {
+			// volume source has already been prefixed with workdir if required, by compose-go project loader
+			var err error
+			source, err = filepath.Abs(source)
+			if err != nil {
+				return mount.Mount{}, err
+			}
 		}
-	}
-	if volume.Type == types.VolumeTypeVolume {
+	case types.VolumeTypeVolume:
 		if volume.Source != "" {
 			pVolume, ok := project.Volumes[volume.Source]
 			if ok {
