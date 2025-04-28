@@ -85,7 +85,16 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		policy = types.IncludeDependencies
 	}
 
-	err := project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
+	if len(options.Services) > 0 {
+		// As user requested some services to be built, also include those used as additional_contexts
+		options.Services = addBuildDependencies(options.Services, project)
+	}
+	project, err := project.WithSelectedServices(options.Services)
+	if err != nil {
+		return nil, err
+	}
+
+	err = project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
 		}
@@ -612,4 +621,22 @@ func parsePlatforms(service types.ServiceConfig) ([]specs.Platform, error) {
 	}
 
 	return ret, nil
+}
+
+func addBuildDependencies(services []string, project *types.Project) []string {
+	servicesWithDependencies := utils.NewSet(services...)
+	for _, service := range services {
+		b := project.Services[service].Build
+		if b != nil {
+			for _, target := range b.AdditionalContexts {
+				if s, found := strings.CutPrefix(target, types.ServicePrefix); found {
+					servicesWithDependencies.Add(s)
+				}
+			}
+		}
+	}
+	if len(servicesWithDependencies) > len(services) {
+		return addBuildDependencies(servicesWithDependencies.Elements(), project)
+	}
+	return servicesWithDependencies.Elements()
 }

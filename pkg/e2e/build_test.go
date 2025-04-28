@@ -117,14 +117,14 @@ func TestLocalComposeBuild(t *testing.T) {
 		})
 
 		t.Run(env+" rebuild when up --build", func(t *testing.T) {
-			res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "up", "-d", "--build")
+			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d", "--build")
 
 			res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
 			res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
 		})
 
 		t.Run(env+" build --push ignored for unnamed images", func(t *testing.T) {
-			res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "build", "--push", "nginx")
+			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build", "--push", "nginx")
 			assert.Assert(t, !strings.Contains(res.Stdout(), "failed to push"), res.Stdout())
 		})
 
@@ -232,7 +232,7 @@ func TestBuildTags(t *testing.T) {
 }
 
 func TestBuildImageDependencies(t *testing.T) {
-	doTest := func(t *testing.T, cli *CLI) {
+	doTest := func(t *testing.T, cli *CLI, args ...string) {
 		resetState := func() {
 			cli.RunDockerComposeCmd(t, "down", "--rmi=all", "-t=0")
 			res := cli.RunDockerOrExitError(t, "image", "rm", "build-dependencies-service")
@@ -250,7 +250,7 @@ func TestBuildImageDependencies(t *testing.T) {
 			Err:      "No such image: build-dependencies-service",
 		})
 
-		res = cli.RunDockerComposeCmd(t, "build")
+		res = cli.RunDockerComposeCmd(t, args...)
 		t.Log(res.Combined())
 
 		res = cli.RunDockerCmd(t,
@@ -273,7 +273,8 @@ func TestBuildImageDependencies(t *testing.T) {
 			"DOCKER_BUILDKIT=0",
 			"COMPOSE_FILE=./fixtures/build-dependencies/classic.yaml",
 		))
-		doTest(t, cli)
+		doTest(t, cli, "build")
+		doTest(t, cli, "build", "--with-dependencies", "service")
 	})
 
 	t.Run("BuildKit by dependency order", func(t *testing.T) {
@@ -281,7 +282,8 @@ func TestBuildImageDependencies(t *testing.T) {
 			"DOCKER_BUILDKIT=1",
 			"COMPOSE_FILE=./fixtures/build-dependencies/classic.yaml",
 		))
-		doTest(t, cli)
+		doTest(t, cli, "build")
+		doTest(t, cli, "build", "--with-dependencies", "service")
 	})
 
 	t.Run("BuildKit by additional contexts", func(t *testing.T) {
@@ -289,7 +291,8 @@ func TestBuildImageDependencies(t *testing.T) {
 			"DOCKER_BUILDKIT=1",
 			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
 		))
-		doTest(t, cli)
+		doTest(t, cli, "build")
+		doTest(t, cli, "build", "service")
 	})
 
 	t.Run("Bake by additional contexts", func(t *testing.T) {
@@ -297,7 +300,8 @@ func TestBuildImageDependencies(t *testing.T) {
 			"DOCKER_BUILDKIT=1", "COMPOSE_BAKE=1",
 			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
 		))
-		doTest(t, cli)
+		doTest(t, cli, "build")
+		doTest(t, cli, "build", "service")
 	})
 }
 
