@@ -27,7 +27,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	ui "github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 	buildkit "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/spf13/cobra"
 
@@ -141,12 +140,10 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 }
 
 func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, opts buildOptions, services []string) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
-
-	services = addBuildDependencies(services, project)
 
 	if err := applyPlatforms(project, false); err != nil {
 		return err
@@ -158,22 +155,4 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	return backend.Build(ctx, project, apiBuildOptions)
-}
-
-func addBuildDependencies(services []string, project *types.Project) []string {
-	servicesWithDependencies := utils.NewSet(services...)
-	for _, service := range services {
-		build := project.Services[service].Build
-		if build != nil {
-			for _, target := range build.AdditionalContexts {
-				if s, found := strings.CutPrefix(target, types.ServicePrefix); found {
-					servicesWithDependencies.Add(s)
-				}
-			}
-		}
-	}
-	if len(servicesWithDependencies) > len(services) {
-		return addBuildDependencies(servicesWithDependencies.Elements(), project)
-	}
-	return servicesWithDependencies.Elements()
 }
