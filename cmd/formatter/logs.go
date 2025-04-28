@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +30,8 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/pkg/jsonmessage"
 )
+
+var colorCodeRegexp = regexp.MustCompile(`\033\[[0-9;]*m`)
 
 // LogConsumer consume logs from services and format them
 type logConsumer struct {
@@ -40,6 +43,7 @@ type logConsumer struct {
 	color      bool
 	prefix     bool
 	timestamp  bool
+	colorCode  string
 }
 
 // NewLogConsumer creates a new LogConsumer
@@ -53,6 +57,7 @@ func NewLogConsumer(ctx context.Context, stdout, stderr io.Writer, color, prefix
 		color:      color,
 		prefix:     prefix,
 		timestamp:  timestamp,
+		colorCode:  "",
 	}
 }
 
@@ -126,9 +131,14 @@ func (l *logConsumer) write(w io.Writer, container, message string) {
 	timestamp := time.Now().Format(jsonmessage.RFC3339NanoFixed)
 	for _, line := range strings.Split(message, "\n") {
 		if l.timestamp {
-			_, _ = fmt.Fprintf(w, "%s%s%s\n", p.prefix, timestamp, line)
+			_, _ = fmt.Fprintf(w, "%s%s%s%s\n", p.prefix, timestamp, l.colorCode, line)
 		} else {
-			_, _ = fmt.Fprintf(w, "%s%s\n", p.prefix, line)
+			_, _ = fmt.Fprintf(w, "%s%s%s\n", p.prefix, l.colorCode, line)
+		}
+
+		colorCodes := colorCodeRegexp.FindAllString(line, -1)
+		if len(colorCodes) > 0 {
+			l.colorCode = colorCodes[len(colorCodes)-1]
 		}
 	}
 
