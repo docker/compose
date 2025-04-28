@@ -124,6 +124,7 @@ type bakeMetadata map[string]buildStatus
 
 type buildStatus struct {
 	Digest string `json:"containerimage.digest"`
+	Image  string `json:"image.name"`
 }
 
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
@@ -142,9 +143,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		Groups:  map[string]bakeGroup{},
 		Targets: map[string]bakeTarget{},
 	}
-	var group bakeGroup
-	var privileged bool
-	var read []string
+	var (
+		group          bakeGroup
+		privileged     bool
+		read           []string
+		expectedImages = make(map[string]string, len(serviceToBeBuild)) // service name -> expected image
+	)
 
 	for serviceName, service := range serviceToBeBuild {
 		if service.Build == nil {
@@ -161,6 +165,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 
 		image := api.GetImageNameOrDefault(service, project.Name)
+		expectedImages[serviceName] = image
 
 		entitlements := build.Entitlements
 		if slices.Contains(build.Entitlements, "security.insecure") {
@@ -324,8 +329,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	cw := progress.ContextWriter(ctx)
 	results := map[string]string{}
-	for name, m := range md {
-		results[name] = m.Digest
+	for service, name := range expectedImages {
+		built, ok := md[service] // bake target == service name
+		if !ok {
+			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", service)
+		}
+		results[name] = built.Digest
 		cw.Event(progress.BuiltEvent(name))
 	}
 	return results, nil
