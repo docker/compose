@@ -78,6 +78,10 @@ func (s *composeService) ToMobyHealthCheck(ctx context.Context, check *compose.H
 		} else {
 			startInterval = time.Duration(*check.StartInterval)
 		}
+		if check.StartPeriod == nil {
+			// see https://github.com/moby/moby/issues/48874
+			return nil, errors.New("healthcheck.start_interval requires healthcheck.start_period to be set")
+		}
 	}
 	return &container.HealthConfig{
 		Test:          test,
