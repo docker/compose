@@ -26,6 +26,8 @@ the resource(s) needed to run a service.
 - Another Docker CLI plugin (typically, `model` to run `docker-model`)
 - An executable in user's `PATH`
 
+If `provider.type` doesn't resolve into any of those, Compose will report an error and interrupt the `up` command.
+
 To be a valid Compose extension, provider command *MUST* accept a `compose` command (which can be hidden)
 with subcommands `up` and `down`.
 
