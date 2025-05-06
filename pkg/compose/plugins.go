@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -55,7 +56,10 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
-	cmd := s.setupPluginCommand(ctx, project, service, plugin, command)
+	cmd, err := s.setupPluginCommand(ctx, project, service, plugin, command)
+	if err != nil {
+		return err
+	}
 
 	variables, err := s.executePlugin(ctx, cmd, command, service)
 	if err != nil {
@@ -158,18 +162,21 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 	return path, err
 }
 
-func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) *exec.Cmd {
+func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) (*exec.Cmd, error) {
 	provider := *service.Provider
 
-	args := []string{"compose", "--project-name", project.Name, command}
-	for k, v := range provider.Options {
-		args = append(args, fmt.Sprintf("--%s=%s", k, v))
-	}
-	args = append(args, service.Name)
+	args := []string{"compose", "--project-name", project.Name, command, service.Name}
 
 	cmd := exec.CommandContext(ctx, path, args...)
 	// Remove DOCKER_CLI_PLUGIN... variable so plugin can detect it run standalone
 	cmd.Env = filter(os.Environ(), manager.ReexecEnvvar)
+
+	opts, err := json.Marshal(provider.Options)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd.Stdin = bytes.NewBuffer(opts)
 
 	// Use docker/cli mechanism to propagate termination signal to child process
 	server, err := socket.NewPluginServer(nil)
@@ -185,5 +192,5 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, &carrier)
 	cmd.Env = append(cmd.Env, types.Mapping(carrier).Values()...)
-	return cmd
+	return cmd, nil
 }
