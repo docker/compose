@@ -124,12 +124,15 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 				return runEnvironment(ctx, dockerCli, opts, args)
 			}
 
+			if opts.Format == "" {
+				opts.Format = "yaml"
+			}
 			return runConfig(ctx, dockerCli, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
+	flags.StringVar(&opts.Format, "format", "", "Format the output. Values: [yaml | json]")
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything")
 	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables")
@@ -408,7 +411,16 @@ func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions
 
 	variables := template.ExtractVariables(model, template.DefaultPattern)
 
-	return formatter.Print(variables, "", dockerCli.Out(), func(w io.Writer) {
+	if opts.Format == "yaml" {
+		result, err := yaml.Marshal(variables)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(result))
+		return nil
+	}
+
+	return formatter.Print(variables, opts.Format, dockerCli.Out(), func(w io.Writer) {
 		for name, variable := range variables {
 			_, _ = fmt.Fprintf(w, "%s\t%t\t%s\t%s\n", name, variable.Required, variable.DefaultValue, variable.PresenceValue)
 		}
