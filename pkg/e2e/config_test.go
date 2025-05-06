@@ -46,4 +46,25 @@ func TestLocalComposeConfig(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--no-interpolate")
 		res.Assert(t, icmd.Expected{Out: `- ${PORT:-8080}:80`})
 	})
+
+	t.Run("--variables --format json", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--variables", "--format", "json")
+		res.Assert(t, icmd.Expected{Out: `{
+    "PORT": {
+        "Name": "PORT",
+        "DefaultValue": "8080",
+        "PresenceValue": "",
+        "Required": false
+    }
+}`})
+	})
+
+	t.Run("--variables --format yaml", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--variables", "--format", "yaml")
+		res.Assert(t, icmd.Expected{Out: `PORT:
+    name: PORT
+    defaultvalue: "8080"
+    presencevalue: ""
+    required: false`})
+	})
 }

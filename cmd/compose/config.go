@@ -416,7 +416,7 @@ func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(result))
+		fmt.Print(string(result))
 		return nil
 	}
 
