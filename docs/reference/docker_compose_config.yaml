@@ -21,7 +21,6 @@ options:
       swarm: false
     - option: format
       value_type: string
-      default_value: yaml
       description: 'Format the output. Values: [yaml | json]'
       deprecated: false
       hidden: false
