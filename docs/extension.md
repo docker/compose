@@ -34,10 +34,16 @@ with subcommands `up` and `down`.
 ## Up lifecycle
 
 To execute an application's `up` lifecycle, Compose executes the provider's `compose up` command, passing 
-the project name, service name, and additional options. The `provider.options` are translated 
-into command line flags. For example:
+the project name, service name, and additional options. The `provider.options` are marshalled into a JSON 
+document and set as command line stdin. 
+
+Illustration example will execute:
 ```console
-awesomecloud compose --project-name <NAME> up --type=mysql --size=256 "database"
+awesomecloud compose --project-name <NAME> up "database"
+```
+Command will get stdin set to JSON content:
+```json
+{"type": "mysql", "size": "256"}
 ```
 
 > __Note:__ `project-name` _should_ be used by the provider to tag resources
