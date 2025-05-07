@@ -52,11 +52,11 @@ func buildWithBake(dockerCli command.Cli) (bool, error) {
 	b, ok := os.LookupEnv("COMPOSE_BAKE")
 	if !ok {
 		if dockerCli.ConfigFile().Plugins["compose"]["build"] == "bake" {
-			b, ok = "true", true
+			return true, nil
 		}
 	}
 	if !ok {
-		return false, nil
+		return true, nil
 	}
 	bake, err := strconv.ParseBool(b)
 	if err != nil {
