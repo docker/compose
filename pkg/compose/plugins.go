@@ -33,7 +33,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-	"golang.org/x/sync/errgroup"
 )
 
 type JsonMessage struct {
@@ -75,23 +74,6 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 }
 
 func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, command string, service types.ServiceConfig) (types.Mapping, error) {
-	eg := errgroup.Group{}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-	eg.Go(cmd.Wait)
-
-	decoder := json.NewDecoder(stdout)
-	defer func() { _ = stdout.Close() }()
-
-	variables := types.Mapping{}
-
 	pw := progress.ContextWriter(ctx)
 	var action string
 	switch command {
@@ -104,6 +86,22 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 	default:
 		return nil, fmt.Errorf("unsupported plugin command: %s", command)
 	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	decoder := json.NewDecoder(stdout)
+	defer func() { _ = stdout.Close() }()
+
+	variables := types.Mapping{}
+
 	for {
 		var msg JsonMessage
 		err = decoder.Decode(&msg)
@@ -130,10 +128,10 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 		}
 	}
 
-	err = eg.Wait()
+	err = cmd.Wait()
 	if err != nil {
 		pw.Event(progress.ErrorMessageEvent(service.Name, err.Error()))
-		return nil, fmt.Errorf("failed to %s external service: %s", action, err.Error())
+		return nil, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
 	}
 	switch command {
 	case "up":
