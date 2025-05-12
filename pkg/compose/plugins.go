@@ -161,7 +161,9 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 
 	args := []string{"compose", "--project-name", project.Name, command}
 	for k, v := range provider.Options {
-		args = append(args, fmt.Sprintf("--%s=%s", k, v))
+		for _, value := range v {
+			args = append(args, fmt.Sprintf("--%s=%s", k, value))
+		}
 	}
 	args = append(args, service.Name)
 
