@@ -168,8 +168,15 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	args = append(args, service.Name)
 
 	cmd := exec.CommandContext(ctx, path, args...)
-	// Remove DOCKER_CLI_PLUGIN... variable so plugin can detect it run standalone
-	cmd.Env = filter(os.Environ(), manager.ReexecEnvvar)
+	// exec provider command with same environment Compose is running
+	env := types.NewMapping(os.Environ())
+	// but remove DOCKER_CLI_PLUGIN... variable so plugin can detect it run standalone
+	delete(env, manager.ReexecEnvvar)
+	// and add the explicit environment variables set for service
+	for key, val := range service.Environment.RemoveEmpty().ToMapping() {
+		env[key] = val
+	}
+	cmd.Env = env.Values()
 
 	// Use docker/cli mechanism to propagate termination signal to child process
 	server, err := socket.NewPluginServer(nil)
