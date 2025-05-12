@@ -113,10 +113,10 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 		}
 		switch msg.Type {
 		case ErrorType:
-			pw.Event(progress.ErrorMessageEvent(service.Name, "error"))
+			pw.Event(progress.NewEvent(service.Name, progress.Error, msg.Message))
 			return nil, errors.New(msg.Message)
 		case InfoType:
-			pw.Event(progress.ErrorMessageEvent(service.Name, msg.Message))
+			pw.Event(progress.NewEvent(service.Name, progress.Working, msg.Message))
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
