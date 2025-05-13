@@ -85,11 +85,17 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		policy = types.IncludeDependencies
 	}
 
+	var err error
 	if len(options.Services) > 0 {
 		// As user requested some services to be built, also include those used as additional_contexts
 		options.Services = addBuildDependencies(options.Services, project)
+		// Some build dependencies we just introduced may not be enabled
+		project, err = project.WithServicesEnabled(options.Services...)
+		if err != nil {
+			return nil, err
+		}
 	}
-	project, err := project.WithSelectedServices(options.Services)
+	project, err = project.WithSelectedServices(options.Services)
 	if err != nil {
 		return nil, err
 	}
