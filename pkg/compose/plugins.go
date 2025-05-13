@@ -30,6 +30,7 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/socket"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -44,6 +45,7 @@ const (
 	ErrorType  = "error"
 	InfoType   = "info"
 	SetEnvType = "setenv"
+	DebugType  = "debug"
 )
 
 func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string) error {
@@ -123,6 +125,8 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 				return nil, fmt.Errorf("invalid response from plugin: %s", msg.Message)
 			}
 			variables[key] = val
+		case DebugType:
+			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
 			return nil, fmt.Errorf("invalid response from plugin: %s", msg.Type)
 		}
