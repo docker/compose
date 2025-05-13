@@ -54,8 +54,9 @@ JSON messages MUST include a `type` and a `message` attribute.
 
 `type` can be either:
 - `info`: Reports status updates to the user. Compose will render message as the service state in the progress UI
-- `error`: Lest the user know something went wrong with details about the error. Compose will render the message as the reason for the service failure.
+- `error`: Let's the user know something went wrong with details about the error. Compose will render the message as the reason for the service failure.
 - `setenv`: Let's the plugin tell Compose how dependent services can access the created resource. See next section for further details.
+- `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
 
 ```mermaid
 sequenceDiagram
