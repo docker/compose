@@ -307,9 +307,6 @@ jobs:
             fi
           done
       -
-        name: License
-        run: cp packaging/* ./bin/release/
-      -
         name: List artifacts
         run: |
           tree -nh ./bin/release
