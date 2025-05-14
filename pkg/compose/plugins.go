@@ -155,7 +155,7 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 		path = plugin.Path
 	}
 	if manager.IsNotFound(err) {
-		path, err = exec.LookPath(provider)
+		path, err = exec.LookPath(executable(provider))
 	}
 	return path, err
 }
