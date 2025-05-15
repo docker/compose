@@ -204,6 +204,16 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		Platform:     platform,
 	})
 
+	if ctx.Err() != nil {
+		w.Event(progress.Event{
+			ID:         service.Name,
+			Status:     progress.Warning,
+			Text:       "Warning",
+			StatusText: "Interrupted",
+		})
+		return "", nil
+	}
+
 	// check if has error and the service has a build section
 	// then the status should be warning instead of error
 	if err != nil && service.Build != nil {
