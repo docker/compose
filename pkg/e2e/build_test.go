@@ -128,6 +128,11 @@ func TestLocalComposeBuild(t *testing.T) {
 			assert.Assert(t, !strings.Contains(res.Stdout(), "failed to push"), res.Stdout())
 		})
 
+		t.Run(env+" build --quiet", func(t *testing.T) {
+			res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build", "--quiet")
+			res.Assert(t, icmd.Expected{Out: ""})
+		})
+
 		t.Run(env+" cleanup build project", func(t *testing.T) {
 			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
 			c.RunDockerOrExitError(t, "rmi", "-f", "build-test-nginx")

@@ -261,6 +261,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if options.Builder != "" {
 		args = append(args, "--builder", options.Builder)
 	}
+	if options.Quiet {
+		args = append(args, "--progress=quiet")
+	}
 
 	logrus.Debugf("Executing bake with args: %v", args)
 
