@@ -46,6 +46,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: lock-image-digests
+      value_type: bool
+      default_value: "false"
+      description: Produces an override file with image digests
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-consistency
       value_type: bool
       default_value: "false"

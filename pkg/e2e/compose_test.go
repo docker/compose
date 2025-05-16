@@ -235,7 +235,7 @@ func TestCompatibility(t *testing.T) {
 }
 
 func TestConfig(t *testing.T) {
-	const projectName = "compose-e2e-convert"
+	const projectName = "compose-e2e-config"
 	c := NewParallelCLI(t)
 
 	wd, err := os.Getwd()
@@ -253,24 +253,24 @@ services:
       default: null
 networks:
   default:
-    name: compose-e2e-convert_default
+    name: compose-e2e-config_default
 `, projectName, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
 	})
 }
 
 func TestConfigInterpolate(t *testing.T) {
-	const projectName = "compose-e2e-convert-interpolate"
+	const projectName = "compose-e2e-config-interpolate"
 	c := NewParallelCLI(t)
 
 	wd, err := os.Getwd()
 	assert.NilError(t, err)
 
-	t.Run("convert", func(t *testing.T) {
+	t.Run("config", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose-interpolate.yaml", "-p", projectName, "config", "--no-interpolate")
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
 networks:
   default:
-    name: compose-e2e-convert-interpolate_default
+    name: compose-e2e-config-interpolate_default
 services:
   nginx:
     build:
