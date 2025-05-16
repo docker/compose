@@ -56,6 +56,7 @@ type configOptions struct {
 	noConsistency       bool
 	variables           bool
 	environment         bool
+	lockImageDigests    bool
 }
 
 func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
@@ -98,6 +99,9 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 			if p.Compatibility {
 				opts.noNormalize = true
 			}
+			if opts.lockImageDigests {
+				opts.resolveImageDigests = true
+			}
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
@@ -133,6 +137,7 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "", "Format the output. Values: [yaml | json]")
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests")
+	flags.BoolVar(&opts.lockImageDigests, "lock-image-digests", false, "Produces an override file with image digests")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything")
 	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables")
 	flags.BoolVar(&opts.noNormalize, "no-normalize", false, "Don't normalize compose model")
@@ -208,6 +213,10 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 		}
 	}
 
+	if opts.lockImageDigests {
+		project = imagesOnly(project)
+	}
+
 	var content []byte
 	switch opts.Format {
 	case "json":
@@ -223,6 +232,18 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 	return content, nil
 }
 
+// imagesOnly return project with all attributes removed but service.images
+func imagesOnly(project *types.Project) *types.Project {
+	digests := types.Services{}
+	for name, config := range project.Services {
+		digests[name] = types.ServiceConfig{
+			Image: config.Image,
+		}
+	}
+	project = &types.Project{Services: digests}
+	return project
+}
+
 func runConfigNoInterpolate(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) ([]byte, error) {
 	// we can't use ToProject, so the model we render here is only partially resolved
 	model, err := opts.ToModel(ctx, dockerCli, services)
@@ -234,6 +255,23 @@ func runConfigNoInterpolate(ctx context.Context, dockerCli command.Cli, opts con
 		err = resolveImageDigests(ctx, dockerCli, model)
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	if opts.lockImageDigests {
+		for key, e := range model {
+			if key != "services" {
+				delete(model, key)
+			} else {
+				for _, s := range e.(map[string]any) {
+					service := s.(map[string]any)
+					for key := range service {
+						if key != "image" {
+							delete(service, key)
+						}
+					}
+				}
+			}
 		}
 	}
 
