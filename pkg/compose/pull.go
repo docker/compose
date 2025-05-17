@@ -298,7 +298,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			return err
 		}
 		if pull {
-			needPull[name] = service
+			 needPull[name] = service
 		}
 		for i, vol := range service.Volumes {
 			if vol.Type == types.VolumeTypeImage {
@@ -323,12 +323,13 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(s.maxConcurrency)
 		pulledImages := map[string]api.ImageSummary{}
-		var mutex sync.Mutex
+		var imagesMutex sync.Mutex
+		var pulledImagesMutex sync.Mutex
 		for name, service := range needPull {
 			eg.Go(func() error {
 				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
-				mutex.Lock()
-				defer mutex.Unlock()
+				pulledImagesMutex.Lock()
+				defer pulledImagesMutex.Unlock()
 				pulledImages[name] = api.ImageSummary{
 					ID:          id,
 					Repository:  service.Image,
@@ -343,11 +344,11 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		err := eg.Wait()
 		for i, service := range needPull {
-			mutex.Lock()
+			imagesMutex.Lock()
 			if pulledImages[i].ID != "" {
 				images[service.Image] = pulledImages[i]
 			}
-			mutex.Unlock()
+			imagesMutex.Unlock()
 		}
 		return err
 	}, s.stdinfo())
