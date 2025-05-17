@@ -298,7 +298,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			return err
 		}
 		if pull {
-			needPull[name] = service
+			 needPull[name] = service
 		}
 		for i, vol := range service.Volumes {
 			if vol.Type == types.VolumeTypeImage {
@@ -343,9 +343,11 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		err := eg.Wait()
 		for i, service := range needPull {
+			mutex.Lock()
 			if pulledImages[i].ID != "" {
 				images[service.Image] = pulledImages[i]
 			}
+			mutex.Unlock()
 		}
 		return err
 	}, s.stdinfo())
