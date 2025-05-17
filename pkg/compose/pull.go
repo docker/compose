@@ -298,7 +298,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			return err
 		}
 		if pull {
-			 needPull[name] = service
+			needPull[name] = service
 		}
 		for i, vol := range service.Volumes {
 			if vol.Type == types.VolumeTypeImage {
