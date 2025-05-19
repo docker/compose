@@ -85,9 +85,8 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Aliases: []string{"convert"}, // for backward compatibility with Cloud integrations
-		Use:     "config [OPTIONS] [SERVICE...]",
-		Short:   "Parse, resolve and render compose file in canonical format",
+		Use:   "config [OPTIONS] [SERVICE...]",
+		Short: "Parse, resolve and render compose file in canonical format",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.quiet {
 				devnull, err := os.Open(os.DevNull)

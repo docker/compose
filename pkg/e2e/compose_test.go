@@ -242,7 +242,7 @@ func TestConfig(t *testing.T) {
 	assert.NilError(t, err)
 
 	t.Run("up", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "convert")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "config")
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
 services:
   nginx:
@@ -266,7 +266,7 @@ func TestConfigInterpolate(t *testing.T) {
 	assert.NilError(t, err)
 
 	t.Run("convert", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose-interpolate.yaml", "-p", projectName, "convert", "--no-interpolate")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose-interpolate.yaml", "-p", projectName, "config", "--no-interpolate")
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
 networks:
   default:
