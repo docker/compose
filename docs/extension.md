@@ -105,3 +105,7 @@ into its runtime environment.
 
 `down` lifecycle is equivalent to `up` with the `<provider> compose --project-name <NAME> down <SERVICE>` command.
 The provider is responsible for releasing all resources associated with the service. 
+
+## Examples
+
+See [example](examples/provider.go) for illustration on implementing this API in a command line 
