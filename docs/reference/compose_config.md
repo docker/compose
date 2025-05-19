@@ -5,10 +5,6 @@
 It merges the Compose files set by `-f` flags, resolves variables in the Compose file, and expands short-notation into
 the canonical format.
 
-### Aliases
-
-`docker compose config`, `docker compose convert`
-
 ### Options
 
 | Name                      | Type     | Default | Description                                                                 |
