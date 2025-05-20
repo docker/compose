@@ -482,7 +482,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	attests := map[string]*string{}
-	attests["provenance"] = options.Provenance
+	if !options.Provenance {
+		attests["provenance"] = nil
+	}
 
 	return build.Options{
 		Inputs: build.Inputs{
