@@ -35,17 +35,18 @@ import (
 
 type buildOptions struct {
 	*ProjectOptions
-	quiet   bool
-	pull    bool
-	push    bool
-	args    []string
-	noCache bool
-	memory  cliopts.MemBytes
-	ssh     string
-	builder string
-	deps    bool
-	print   bool
-	check   bool
+	quiet      bool
+	pull       bool
+	push       bool
+	args       []string
+	noCache    bool
+	memory     cliopts.MemBytes
+	ssh        string
+	builder    string
+	deps       bool
+	print      bool
+	check      bool
+	provenance string
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -69,20 +70,27 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	if uiMode == ui.ModeJSON {
 		uiMode = "rawjson"
 	}
+	var provenance *string
+	// empty when set by up, run or create functions and "none" when set by the user from the build command
+	if opts.provenance != "" && opts.provenance != "none" {
+		provenance = &opts.provenance
+	}
+
 	return api.BuildOptions{
-		Pull:     opts.pull,
-		Push:     opts.push,
-		Progress: uiMode,
-		Args:     types.NewMappingWithEquals(opts.args),
-		NoCache:  opts.noCache,
-		Quiet:    opts.quiet,
-		Services: services,
-		Deps:     opts.deps,
-		Memory:   int64(opts.memory),
-		Print:    opts.print,
-		Check:    opts.check,
-		SSHs:     SSHKeys,
-		Builder:  builderName,
+		Pull:       opts.pull,
+		Push:       opts.push,
+		Progress:   uiMode,
+		Args:       types.NewMappingWithEquals(opts.args),
+		NoCache:    opts.noCache,
+		Quiet:      opts.quiet,
+		Services:   services,
+		Deps:       opts.deps,
+		Memory:     int64(opts.memory),
+		Print:      opts.print,
+		Check:      opts.check,
+		SSHs:       SSHKeys,
+		Builder:    builderName,
+		Provenance: provenance,
 	}, nil
 }
 
@@ -123,6 +131,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	flags.StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	flags.StringVar(&opts.builder, "builder", "", "Set builder to use")
 	flags.BoolVar(&opts.deps, "with-dependencies", false, "Also build dependencies (transitively)")
+	flags.StringVar(&opts.provenance, "provenance", "min", "Set provenance mode (none|min|max)")
 
 	flags.Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	flags.MarkHidden("parallel") //nolint:errcheck

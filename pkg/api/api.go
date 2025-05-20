@@ -159,6 +159,8 @@ type BuildOptions struct {
 	Print bool
 	// Check let builder validate build configuration
 	Check bool
+	// Provenance
+	Provenance *string
 }
 
 // Apply mutates project according to build options

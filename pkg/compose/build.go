@@ -481,6 +481,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		return build.Options{}, err
 	}
 
+	attests := map[string]*string{}
+	attests["provenance"] = options.Provenance
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:      service.Build.Context,
@@ -504,6 +507,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Session:      sessionConfig,
 		Allow:        allow,
 		SourcePolicy: sp,
+		Attests:      attests,
 	}, nil
 }
 
