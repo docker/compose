@@ -126,6 +126,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: provenance
+      value_type: string
+      default_value: max
+      description: Set provenance mode (none|min|max)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: pull
       value_type: bool
       default_value: "false"
