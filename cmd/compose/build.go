@@ -46,7 +46,7 @@ type buildOptions struct {
 	deps       bool
 	print      bool
 	check      bool
-	provenance string
+	provenance bool
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -70,11 +70,6 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	if uiMode == ui.ModeJSON {
 		uiMode = "rawjson"
 	}
-	var provenance *string
-	// empty when set by up, run or create functions and "none" when set by the user from the build command
-	if opts.provenance != "" && opts.provenance != "none" {
-		provenance = &opts.provenance
-	}
 
 	return api.BuildOptions{
 		Pull:       opts.pull,
@@ -90,7 +85,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		Check:      opts.check,
 		SSHs:       SSHKeys,
 		Builder:    builderName,
-		Provenance: provenance,
+		Provenance: opts.provenance,
 	}, nil
 }
 
@@ -131,7 +126,6 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	flags.StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	flags.StringVar(&opts.builder, "builder", "", "Set builder to use")
 	flags.BoolVar(&opts.deps, "with-dependencies", false, "Also build dependencies (transitively)")
-	flags.StringVar(&opts.provenance, "provenance", "min", "Set provenance mode (none|min|max)")
 
 	flags.Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	flags.MarkHidden("parallel") //nolint:errcheck
@@ -162,6 +156,7 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	apiBuildOptions, err := opts.toAPIBuildOptions(services)
+	apiBuildOptions.Provenance = true
 	if err != nil {
 		return err
 	}

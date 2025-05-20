@@ -160,7 +160,7 @@ type BuildOptions struct {
 	// Check let builder validate build configuration
 	Check bool
 	// Provenance
-	Provenance *string
+	Provenance bool
 }
 
 // Apply mutates project according to build options
