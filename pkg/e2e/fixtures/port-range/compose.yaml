@@ -4,3 +4,13 @@ services:
     scale: 5
     ports:
       - "6005-6015:80"
+
+  b:
+    image: nginx:alpine
+    ports:
+      - 80
+
+  c:
+    image: nginx:alpine
+    ports:
+      - 80

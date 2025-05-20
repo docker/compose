@@ -650,9 +650,14 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	return created, err
 }
 
+// force sequential calls to ContainerStart to prevent race condition in engine assigning ports from ranges
+var startMx sync.Mutex
+
 func (s *composeService) startContainer(ctx context.Context, ctr containerType.Summary) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(ctr), progress.Working, "Restart"))
+	startMx.Lock()
+	defer startMx.Unlock()
 	err := s.apiClient().ContainerStart(ctx, ctr.ID, containerType.StartOptions{})
 	if err != nil {
 		return err
