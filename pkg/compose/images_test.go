@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -42,9 +43,10 @@ func TestImages(t *testing.T) {
 	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
 	listOpts := container.ListOptions{All: true, Filters: args}
+	api.EXPECT().ServerVersion(gomock.Any()).Return(types.Version{APIVersion: "1.96"}, nil).AnyTimes()
 	image1 := imageInspect("image1", "foo:1", 12345)
 	image2 := imageInspect("image2", "bar:2", 67890)
-	api.EXPECT().ImageInspect(anyCancellableContext(), "foo:1").Return(image1, nil)
+	api.EXPECT().ImageInspect(anyCancellableContext(), "foo:1").Return(image1, nil).MaxTimes(2)
 	api.EXPECT().ImageInspect(anyCancellableContext(), "bar:2").Return(image2, nil)
 	c1 := containerDetail("service1", "123", "running", "foo:1")
 	c2 := containerDetail("service1", "456", "running", "bar:2")
@@ -54,27 +56,24 @@ func TestImages(t *testing.T) {
 
 	images, err := tested.Images(ctx, strings.ToLower(testProject), compose.ImagesOptions{})
 
-	expected := []compose.ImageSummary{
-		{
-			ID:            "image1",
-			ContainerName: "123",
-			Repository:    "foo",
-			Tag:           "1",
-			Size:          12345,
+	expected := map[string]compose.ImageSummary{
+		"123": {
+			ID:         "image1",
+			Repository: "foo",
+			Tag:        "1",
+			Size:       12345,
 		},
-		{
-			ID:            "image2",
-			ContainerName: "456",
-			Repository:    "bar",
-			Tag:           "2",
-			Size:          67890,
+		"456": {
+			ID:         "image2",
+			Repository: "bar",
+			Tag:        "2",
+			Size:       67890,
 		},
-		{
-			ID:            "image1",
-			ContainerName: "789",
-			Repository:    "foo",
-			Tag:           "1",
-			Size:          12345,
+		"789": {
+			ID:         "image1",
+			Repository: "foo",
+			Tag:        "1",
+			Size:       12345,
 		},
 	}
 	assert.NilError(t, err)

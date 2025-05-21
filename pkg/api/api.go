@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/platforms"
 	"github.com/docker/cli/opts"
 )
 
@@ -78,7 +79,7 @@ type Service interface {
 	// Publish executes the equivalent to a `compose publish`
 	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`
-	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	Images(ctx context.Context, projectName string, options ImagesOptions) (map[string]ImageSummary, error)
 	// MaxConcurrency defines upper limit for concurrent operations against engine API
 	MaxConcurrency(parallel int)
 	// DryRunMode defines if dry run applies to the command
@@ -535,12 +536,12 @@ type ContainerProcSummary struct {
 
 // ImageSummary holds container image description
 type ImageSummary struct {
-	ID            string
-	ContainerName string
-	Repository    string
-	Tag           string
-	Size          int64
-	LastTagTime   time.Time
+	ID          string
+	Repository  string
+	Tag         string
+	Platform    platforms.Platform
+	Size        int64
+	LastTagTime time.Time
 }
 
 // ServiceStatus hold status about a service
