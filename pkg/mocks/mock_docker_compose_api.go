@@ -5,7 +5,6 @@
 //
 //	mockgen -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go Service
 //
-
 // Package mocks is a generated GoMock package.
 package mocks
 
@@ -199,10 +198,10 @@ func (mr *MockServiceMockRecorder) Generate(ctx, options any) *gomock.Call {
 }
 
 // Images mocks base method.
-func (m *MockService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
+func (m *MockService) Images(ctx context.Context, projectName string, options api.ImagesOptions) (map[string]api.ImageSummary, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Images", ctx, projectName, options)
-	ret0, _ := ret[0].([]api.ImageSummary)
+	ret0, _ := ret[0].(map[string]api.ImageSummary)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
