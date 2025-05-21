@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
-	"sort"
 	"strings"
+	"time"
 
+	"github.com/containerd/platforms"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
@@ -86,13 +88,10 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		return nil
 	}
 
-	sort.Slice(images, func(i, j int) bool {
-		return images[i].ContainerName < images[j].ContainerName
-	})
-
 	return formatter.Print(images, opts.Format, dockerCli.Out(),
 		func(w io.Writer) {
-			for _, img := range images {
+			for _, container := range slices.Sorted(maps.Keys(images)) {
+				img := images[container]
 				id := stringid.TruncateID(img.ID)
 				size := units.HumanSizeWithPrecision(float64(img.Size), 3)
 				repo := img.Repository
@@ -103,8 +102,10 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 				if tag == "" {
 					tag = "<none>"
 				}
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", img.ContainerName, repo, tag, id, size)
+				created := units.HumanDuration(time.Now().UTC().Sub(img.LastTagTime)) + " ago"
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+					container, repo, tag, platforms.Format(img.Platform), id, size, created)
 			}
 		},
-		"CONTAINER", "REPOSITORY", "TAG", "IMAGE ID", "SIZE")
+		"CONTAINER", "REPOSITORY", "TAG", "PLATFORM", "IMAGE ID", "SIZE", "CREATED")
 }

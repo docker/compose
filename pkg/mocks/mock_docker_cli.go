@@ -5,7 +5,6 @@
 //
 //	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
 //
-
 // Package mocks is a generated GoMock package.
 package mocks
 
@@ -16,12 +15,8 @@ import (
 	configfile "github.com/docker/cli/cli/config/configfile"
 	docker "github.com/docker/cli/cli/context/docker"
 	store "github.com/docker/cli/cli/context/store"
-	store0 "github.com/docker/cli/cli/manifest/store"
-	client "github.com/docker/cli/cli/registry/client"
 	streams "github.com/docker/cli/cli/streams"
-	trust "github.com/docker/cli/cli/trust"
-	client0 "github.com/docker/docker/client"
-	client1 "github.com/theupdateframework/notary/client"
+	client "github.com/docker/docker/client"
 	metric "go.opentelemetry.io/otel/metric"
 	resource "go.opentelemetry.io/otel/sdk/resource"
 	trace "go.opentelemetry.io/otel/trace"
@@ -85,10 +80,10 @@ func (mr *MockCliMockRecorder) BuildKitEnabled() *gomock.Call {
 }
 
 // Client mocks base method.
-func (m *MockCli) Client() client0.APIClient {
+func (m *MockCli) Client() client.APIClient {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Client")
-	ret0, _ := ret[0].(client0.APIClient)
+	ret0, _ := ret[0].(client.APIClient)
 	return ret0
 }
 
@@ -224,20 +219,6 @@ func (mr *MockCliMockRecorder) In() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "In", reflect.TypeOf((*MockCli)(nil).In))
 }
 
-// ManifestStore mocks base method.
-func (m *MockCli) ManifestStore() store0.Store {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ManifestStore")
-	ret0, _ := ret[0].(store0.Store)
-	return ret0
-}
-
-// ManifestStore indicates an expected call of ManifestStore.
-func (mr *MockCliMockRecorder) ManifestStore() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ManifestStore", reflect.TypeOf((*MockCli)(nil).ManifestStore))
-}
-
 // MeterProvider mocks base method.
 func (m *MockCli) MeterProvider() metric.MeterProvider {
 	m.ctrl.T.Helper()
@@ -252,21 +233,6 @@ func (mr *MockCliMockRecorder) MeterProvider() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MeterProvider", reflect.TypeOf((*MockCli)(nil).MeterProvider))
 }
 
-// NotaryClient mocks base method.
-func (m *MockCli) NotaryClient(arg0 trust.ImageRefAndAuth, arg1 []string) (client1.Repository, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NotaryClient", arg0, arg1)
-	ret0, _ := ret[0].(client1.Repository)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// NotaryClient indicates an expected call of NotaryClient.
-func (mr *MockCliMockRecorder) NotaryClient(arg0, arg1 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotaryClient", reflect.TypeOf((*MockCli)(nil).NotaryClient), arg0, arg1)
-}
-
 // Out mocks base method.
 func (m *MockCli) Out() *streams.Out {
 	m.ctrl.T.Helper()
@@ -279,20 +245,6 @@ func (m *MockCli) Out() *streams.Out {
 func (mr *MockCliMockRecorder) Out() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Out", reflect.TypeOf((*MockCli)(nil).Out))
-}
-
-// RegistryClient mocks base method.
-func (m *MockCli) RegistryClient(arg0 bool) client.RegistryClient {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RegistryClient", arg0)
-	ret0, _ := ret[0].(client.RegistryClient)
-	return ret0
-}
-
-// RegistryClient indicates an expected call of RegistryClient.
-func (mr *MockCliMockRecorder) RegistryClient(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegistryClient", reflect.TypeOf((*MockCli)(nil).RegistryClient), arg0)
 }
 
 // Resource mocks base method.

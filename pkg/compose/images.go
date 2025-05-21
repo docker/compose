@@ -24,15 +24,18 @@ import (
 	"sync"
 
 	cerrdefs "github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
+func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) (map[string]api.ImageSummary, error) {
 	projectName = strings.ToLower(projectName)
 	allContainers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
 		All:     true,
@@ -53,27 +56,61 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 		containers = allContainers
 	}
 
-	images := []string{}
-	for _, c := range containers {
-		if !slices.Contains(images, c.Image) {
-			images = append(images, c.Image)
-		}
-	}
-	imageSummaries, err := s.getImageSummaries(ctx, images)
+	version, err := s.RuntimeVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
-	summary := make([]api.ImageSummary, len(containers))
-	for i, c := range containers {
-		img, ok := imageSummaries[c.Image]
-		if !ok {
-			return nil, fmt.Errorf("failed to retrieve image for container %s", getCanonicalContainerName(c))
-		}
+	withPlatform := versions.GreaterThanOrEqualTo(version, "1.49")
 
-		summary[i] = img
-		summary[i].ContainerName = getCanonicalContainerName(c)
+	summary := map[string]api.ImageSummary{}
+	var mux sync.Mutex
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, c := range containers {
+		eg.Go(func() error {
+			image, err := s.apiClient().ImageInspect(ctx, c.Image)
+			if err != nil {
+				return err
+			}
+			id := image.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
+
+			if withPlatform && c.ImageManifestDescriptor != nil && c.ImageManifestDescriptor.Platform != nil {
+				image, err = s.apiClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
+				if err != nil {
+					return err
+				}
+			}
+
+			var repository, tag string
+			ref, err := reference.ParseDockerRef(c.Image)
+			if err == nil {
+				// ParseDockerRef will reject a local image ID
+				repository = reference.FamiliarName(ref)
+				if tagged, ok := ref.(reference.Tagged); ok {
+					tag = tagged.Tag()
+				}
+			}
+
+			mux.Lock()
+			defer mux.Unlock()
+			summary[getCanonicalContainerName(c)] = api.ImageSummary{
+				ID:         id,
+				Repository: repository,
+				Tag:        tag,
+				Platform: platforms.Platform{
+					Architecture: image.Architecture,
+					OS:           image.Os,
+					OSVersion:    image.OsVersion,
+					Variant:      image.Variant,
+				},
+				Size:        image.Size,
+				LastTagTime: image.Metadata.LastTagTime,
+			}
+			return nil
+		})
 	}
-	return summary, nil
+
+	err = eg.Wait()
+	return summary, err
 }
 
 func (s *composeService) getImageSummaries(ctx context.Context, repoTags []string) (map[string]api.ImageSummary, error) {
