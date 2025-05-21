@@ -595,6 +595,13 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	w.Event(progress.CreatingEvent(eventName))
 	ctr, err = s.createMobyContainer(ctx, project, service, name, number, nil, opts, w)
 	if err != nil {
+		if ctx.Err() == nil {
+			w.Event(progress.Event{
+				ID:         eventName,
+				Status:     progress.Error,
+				StatusText: err.Error(),
+			})
+		}
 		return
 	}
 	w.Event(progress.CreatedEvent(eventName))
@@ -603,10 +610,19 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 
 func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
 	replaced containerType.Summary, inherit bool, timeout *time.Duration,
-) (containerType.Summary, error) {
-	var created containerType.Summary
+) (created containerType.Summary, err error) {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Working, "Recreate"))
+	eventName := getContainerProgressName(replaced)
+	w.Event(progress.NewEvent(eventName, progress.Working, "Recreate"))
+	defer func() {
+		if err != nil && ctx.Err() == nil {
+			w.Event(progress.Event{
+				ID:         eventName,
+				Status:     progress.Error,
+				StatusText: err.Error(),
+			})
+		}
+	}()
 
 	number, err := strconv.Atoi(replaced.Labels[api.ContainerNumberLabel])
 	if err != nil {
@@ -646,7 +662,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 		return created, err
 	}
 
-	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Done, "Recreated"))
+	w.Event(progress.NewEvent(eventName, progress.Done, "Recreated"))
 	return created, err
 }
 

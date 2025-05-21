@@ -208,7 +208,6 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		w.Event(progress.Event{
 			ID:         service.Name,
 			Status:     progress.Warning,
-			Text:       "Warning",
 			StatusText: "Interrupted",
 		})
 		return "", nil
