@@ -260,6 +260,7 @@ func runUp(
 		if err != nil {
 			return err
 		}
+		bo.Services = services
 		build = &bo
 	}
 
