@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	gsync "sync"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -43,6 +44,68 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
+
+type WatchFunc func(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error)
+
+type Watcher struct {
+	project *types.Project
+	options api.WatchOptions
+	watchFn WatchFunc
+	stopFn  func()
+	errCh   chan error
+}
+
+func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc) (*Watcher, error) {
+	for i := range project.Services {
+		service := project.Services[i]
+
+		if service.Develop != nil && service.Develop.Watch != nil {
+			build := options.Create.Build
+			build.Quiet = true
+			return &Watcher{
+				project: project,
+				options: api.WatchOptions{
+					LogTo: options.Start.Attach,
+					Build: build,
+				},
+				watchFn: w,
+				errCh:   make(chan error),
+			}, nil
+		}
+	}
+	// none of the services is eligible to watch
+	return nil, fmt.Errorf("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
+}
+
+// ensure state changes are atomic
+var mx gsync.Mutex
+
+func (w *Watcher) Start(ctx context.Context) error {
+	mx.Lock()
+	defer mx.Unlock()
+	ctx, cancelFunc := context.WithCancel(ctx)
+	w.stopFn = cancelFunc
+	wait, err := w.watchFn(ctx, w.project, w.options)
+	if err != nil {
+		return err
+	}
+	go func() {
+		w.errCh <- wait()
+	}()
+	return nil
+}
+
+func (w *Watcher) Stop() error {
+	mx.Lock()
+	defer mx.Unlock()
+	if w.stopFn == nil {
+		return nil
+	}
+	w.stopFn()
+	w.stopFn = nil
+	err := <-w.errCh
+	return err
+}
 
 // getSyncImplementation returns an appropriate sync implementation for the
 // project.
@@ -63,20 +126,12 @@ func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syn
 	return sync.NewTar(project.Name, tarDockerClient{s: s}), nil
 }
 
-func (s *composeService) shouldWatch(project *types.Project) bool {
-	var shouldWatch bool
-	for i := range project.Services {
-		service := project.Services[i]
-
-		if service.Develop != nil && service.Develop.Watch != nil {
-			shouldWatch = true
-		}
+func (s *composeService) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) error {
+	wait, err := s.watch(ctx, project, options)
+	if err != nil {
+		return err
 	}
-	return shouldWatch
-}
-
-func (s *composeService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
-	return s.watch(ctx, nil, project, services, options)
+	return wait()
 }
 
 type watchRule struct {
@@ -127,14 +182,14 @@ func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 	}
 }
 
-func (s *composeService) watch(ctx context.Context, syncChannel chan bool, project *types.Project, services []string, options api.WatchOptions) error { //nolint: gocyclo
+func (s *composeService) watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) { //nolint: gocyclo
 	var err error
-	if project, err = project.WithSelectedServices(services); err != nil {
-		return err
+	if project, err = project.WithSelectedServices(options.Services); err != nil {
+		return nil, err
 	}
 	syncer, err := s.getSyncImplementation(project)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	options.LogTo.Register(api.WatchLogger)
@@ -146,7 +201,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 	for serviceName, service := range project.Services {
 		config, err := loadDevelopmentConfig(service, project)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if service.Develop != nil {
@@ -160,10 +215,10 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 		for _, trigger := range config.Watch {
 			if trigger.Action == types.WatchActionRebuild {
 				if service.Build == nil {
-					return fmt.Errorf("can't watch service %q with action %s without a build context", service.Name, types.WatchActionRebuild)
+					return nil, fmt.Errorf("can't watch service %q with action %s without a build context", service.Name, types.WatchActionRebuild)
 				}
 				if options.Build == nil {
-					return fmt.Errorf("--no-build is incompatible with watch action %s in service %s", types.WatchActionRebuild, service.Name)
+					return nil, fmt.Errorf("--no-build is incompatible with watch action %s in service %s", types.WatchActionRebuild, service.Name)
 				}
 				// set the service to always be built - watch triggers `Up()` when it receives a rebuild event
 				service.PullPolicy = types.PullPolicyBuild
@@ -182,7 +237,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 					// Need to check initial files are in container that are meant to be synched from watch action
 					err := s.initialSync(ctx, project, service, trigger, syncer)
 					if err != nil {
-						return err
+						return nil, err
 					}
 				}
 			}
@@ -191,45 +246,37 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 
 		serviceWatchRules, err := getWatchRules(config, service)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		rules = append(rules, serviceWatchRules...)
 	}
 
 	if len(paths) == 0 {
-		return fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
+		return nil, fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
 	watcher, err := watch.NewWatcher(paths)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = watcher.Start()
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	defer func() {
-		if err := watcher.Close(); err != nil {
-			logrus.Debugf("Error closing watcher: %v", err)
-		}
-	}()
 
 	eg.Go(func() error {
 		return s.watchEvents(ctx, project, options, watcher, syncer, rules)
 	})
 	options.LogTo.Log(api.WatchLogger, "Watch enabled")
 
-	for {
-		select {
-		case <-ctx.Done():
-			return eg.Wait()
-		case <-syncChannel:
-			options.LogTo.Log(api.WatchLogger, "Watch disabled")
-			return nil
+	return func() error {
+		err := eg.Wait()
+		if werr := watcher.Close(); werr != nil {
+			logrus.Debugf("Error closing Watcher: %v", werr)
 		}
-	}
+		return err
+	}, nil
 }
 
 func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]watchRule, error) {
@@ -295,8 +342,13 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 		case <-ctx.Done():
 			options.LogTo.Log(api.WatchLogger, "Watch disabled")
 			return nil
-		case err := <-watcher.Errors():
-			options.LogTo.Err(api.WatchLogger, "Watch disabled with errors")
+		case err, open := <-watcher.Errors():
+			if err != nil {
+				options.LogTo.Err(api.WatchLogger, "Watch disabled with errors: "+err.Error())
+			}
+			if open {
+				continue
+			}
 			return err
 		case batch := <-batchEvents:
 			start := time.Now()

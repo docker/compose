@@ -29,9 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/watch"
 	"github.com/eiannone/keyboard"
-	"github.com/hashicorp/go-multierror"
 	"github.com/skratchdot/open-golang/open"
 )
 
@@ -71,26 +69,13 @@ func (ke *KeyboardError) error() string {
 }
 
 type KeyboardWatch struct {
-	Watcher  watch.Notify
 	Watching bool
-	WatchFn  func(ctx context.Context, doneCh chan bool, project *types.Project, services []string, options api.WatchOptions) error
-	Ctx      context.Context
-	Cancel   context.CancelFunc
+	Watcher  Toggle
 }
 
-func (kw *KeyboardWatch) isWatching() bool {
-	return kw.Watching
-}
-
-func (kw *KeyboardWatch) switchWatching() {
-	kw.Watching = !kw.Watching
-}
-
-func (kw *KeyboardWatch) newContext(ctx context.Context) context.CancelFunc {
-	ctx, cancel := context.WithCancel(ctx)
-	kw.Ctx = ctx
-	kw.Cancel = cancel
-	return cancel
+type Toggle interface {
+	Start(context.Context) error
+	Stop() error
 }
 
 type KEYBOARD_LOG_LEVEL int
@@ -110,31 +95,21 @@ type LogKeyboard struct {
 	signalChannel         chan<- os.Signal
 }
 
-var (
-	KeyboardManager *LogKeyboard
-	eg              multierror.Group
-)
+// FIXME(ndeloof) we should avoid use of such a global reference. see use in logConsumer
+var KeyboardManager *LogKeyboard
 
-func NewKeyboardManager(ctx context.Context, isDockerDesktopActive, isWatchConfigured bool,
-	sc chan<- os.Signal,
-	watchFn func(ctx context.Context,
-		doneCh chan bool,
-		project *types.Project,
-		services []string,
-		options api.WatchOptions,
-	) error,
-) {
-	km := LogKeyboard{}
-	km.IsDockerDesktopActive = isDockerDesktopActive
-	km.IsWatchConfigured = isWatchConfigured
-	km.logLevel = INFO
-
-	km.Watch.Watching = false
-	km.Watch.WatchFn = watchFn
-
-	km.signalChannel = sc
-
-	KeyboardManager = &km
+func NewKeyboardManager(isDockerDesktopActive bool, sc chan<- os.Signal, w bool, watcher Toggle) *LogKeyboard {
+	KeyboardManager = &LogKeyboard{
+		Watch: KeyboardWatch{
+			Watching: w,
+			Watcher:  watcher,
+		},
+		IsDockerDesktopActive: isDockerDesktopActive,
+		IsWatchConfigured:     true,
+		logLevel:              INFO,
+		signalChannel:         sc,
+	}
+	return KeyboardManager
 }
 
 func (lk *LogKeyboard) ClearKeyboardInfo() {
@@ -233,48 +208,51 @@ func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Pro
 	if !lk.IsDockerDesktopActive {
 		return
 	}
-	eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/gui", tracing.SpanOptions{},
-		func(ctx context.Context) error {
-			link := fmt.Sprintf("docker-desktop://dashboard/apps/%s", project.Name)
-			err := open.Run(link)
-			if err != nil {
-				err = fmt.Errorf("could not open Docker Desktop")
-				lk.keyboardError("View", err)
-			}
-			return err
-		}),
-	)
+	go func() {
+		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui", tracing.SpanOptions{},
+			func(ctx context.Context) error {
+				link := fmt.Sprintf("docker-desktop://dashboard/apps/%s", project.Name)
+				err := open.Run(link)
+				if err != nil {
+					err = fmt.Errorf("could not open Docker Desktop")
+					lk.keyboardError("View", err)
+				}
+				return err
+			})()
+	}()
 }
 
 func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Project) {
 	if !lk.IsDockerDesktopActive {
 		return
 	}
-	eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/composeview", tracing.SpanOptions{},
-		func(ctx context.Context) error {
-			link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s", project.Name)
-			err := open.Run(link)
-			if err != nil {
-				err = fmt.Errorf("could not open Docker Desktop Compose UI")
-				lk.keyboardError("View Config", err)
-			}
-			return err
-		}),
-	)
+	go func() {
+		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/composeview", tracing.SpanOptions{},
+			func(ctx context.Context) error {
+				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s", project.Name)
+				err := open.Run(link)
+				if err != nil {
+					err = fmt.Errorf("could not open Docker Desktop Compose UI")
+					lk.keyboardError("View Config", err)
+				}
+				return err
+			})()
+	}()
 }
 
 func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Project) {
-	eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/watch", tracing.SpanOptions{},
-		func(ctx context.Context) error {
-			link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
-			err := open.Run(link)
-			if err != nil {
-				err = fmt.Errorf("could not open Docker Desktop Compose UI")
-				lk.keyboardError("Watch Docs", err)
-			}
-			return err
-		}),
-	)
+	go func() {
+		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/watch", tracing.SpanOptions{},
+			func(ctx context.Context) error {
+				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
+				err := open.Run(link)
+				if err != nil {
+					err = fmt.Errorf("could not open Docker Desktop Compose UI")
+					lk.keyboardError("Watch Docs", err)
+				}
+				return err
+			})()
+	}()
 }
 
 func (lk *LogKeyboard) keyboardError(prefix string, err error) {
@@ -288,39 +266,34 @@ func (lk *LogKeyboard) keyboardError(prefix string, err error) {
 	}()
 }
 
-func (lk *LogKeyboard) StartWatch(ctx context.Context, doneCh chan bool, project *types.Project, options api.UpOptions) {
+func (lk *LogKeyboard) ToggleWatch(ctx context.Context, options api.UpOptions) {
 	if !lk.IsWatchConfigured {
 		return
 	}
-	lk.Watch.switchWatching()
-	if !lk.Watch.isWatching() {
-		lk.Watch.Cancel()
+	if lk.Watch.Watching {
+		err := lk.Watch.Watcher.Stop()
+		if err != nil {
+			options.Start.Attach.Err(api.WatchLogger, err.Error())
+		} else {
+			lk.Watch.Watching = false
+		}
 	} else {
-		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
-			func(ctx context.Context) error {
-				if options.Create.Build == nil {
-					err := fmt.Errorf("cannot run watch mode with flag --no-build")
-					lk.keyboardError("Watch", err)
+		go func() {
+			_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
+				func(ctx context.Context) error {
+					err := lk.Watch.Watcher.Start(ctx)
+					if err != nil {
+						options.Start.Attach.Err(api.WatchLogger, err.Error())
+					} else {
+						lk.Watch.Watching = true
+					}
 					return err
-				}
-
-				lk.Watch.newContext(ctx)
-				buildOpts := *options.Create.Build
-				buildOpts.Quiet = true
-				err := lk.Watch.WatchFn(lk.Watch.Ctx, doneCh, project, options.Start.Services, api.WatchOptions{
-					Build: &buildOpts,
-					LogTo: options.Start.Attach,
-				})
-				if err != nil {
-					lk.Watch.switchWatching()
-					options.Start.Attach.Err(api.WatchLogger, err.Error())
-				}
-				return err
-			}))
+				})()
+		}()
 	}
 }
 
-func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Context, doneCh chan bool, project *types.Project, options api.UpOptions) {
+func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEvent, project *types.Project, options api.UpOptions) {
 	switch kRune := event.Rune; kRune {
 	case 'v':
 		lk.openDockerDesktop(ctx, project)
@@ -331,15 +304,16 @@ func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Cont
 				lk.openDDWatchDocs(ctx, project)
 			}
 			// either way we mark menu/watch as an error
-			eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
-				func(ctx context.Context) error {
-					err := fmt.Errorf("watch is not yet configured. Learn more: %s", ansiColor(CYAN, "https://docs.docker.com/compose/file-watch/"))
-					lk.keyboardError("Watch", err)
-					return err
-				}))
-			return
+			go func() {
+				_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/watch", tracing.SpanOptions{},
+					func(ctx context.Context) error {
+						err := fmt.Errorf("watch is not yet configured. Learn more: %s", ansiColor(CYAN, "https://docs.docker.com/compose/file-watch/"))
+						lk.keyboardError("Watch", err)
+						return err
+					})()
+			}()
 		}
-		lk.StartWatch(ctx, doneCh, project, options)
+		lk.ToggleWatch(ctx, options)
 	case 'o':
 		lk.openDDComposeUI(ctx, project)
 	}
@@ -350,10 +324,6 @@ func (lk *LogKeyboard) HandleKeyEvents(event keyboard.KeyEvent, ctx context.Cont
 		ShowCursor()
 
 		lk.logLevel = NONE
-		if lk.Watch.Watching && lk.Watch.Cancel != nil {
-			lk.Watch.Cancel()
-			_ = eg.Wait().ErrorOrNil() // Need to print this ?
-		}
 		// will notify main thread to kill and will handle gracefully
 		lk.signalChannel <- syscall.SIGINT
 	case keyboard.KeyEnter:
