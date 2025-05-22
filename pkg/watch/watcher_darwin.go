@@ -83,10 +83,11 @@ func (d *fseventNotify) Start() error {
 
 	numberOfWatches.Add(int64(len(d.stream.Paths)))
 
-	d.stream.Start() //nolint:errcheck // FIXME(thaJeztah): should this return an error?
-
+	err := d.stream.Start()
+	if err != nil {
+		return err
+	}
 	go d.loop()
-
 	return nil
 }
 

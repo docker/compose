@@ -85,7 +85,7 @@ type Service interface {
 	// DryRunMode defines if dry run applies to the command
 	DryRunMode(ctx context.Context, dryRun bool) (context.Context, error)
 	// Watch services' development context and sync/notify/rebuild/restart on changes
-	Watch(ctx context.Context, project *types.Project, services []string, options WatchOptions) error
+	Watch(ctx context.Context, project *types.Project, options WatchOptions) error
 	// Viz generates a graphviz graph of the project services
 	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	// Wait blocks until at least one of the services' container exits
@@ -127,9 +127,10 @@ const WatchLogger = "#watch"
 
 // WatchOptions group options of the Watch API
 type WatchOptions struct {
-	Build *BuildOptions
-	LogTo LogConsumer
-	Prune bool
+	Build    *BuildOptions
+	LogTo    LogConsumer
+	Prune    bool
+	Services []string
 }
 
 // BuildOptions group options of the Build API

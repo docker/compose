@@ -513,17 +513,17 @@ func (mr *MockServiceMockRecorder) Wait(ctx, projectName, options any) *gomock.C
 }
 
 // Watch mocks base method.
-func (m *MockService) Watch(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
+func (m *MockService) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Watch", ctx, project, services, options)
+	ret := m.ctrl.Call(m, "Watch", ctx, project, options)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Watch indicates an expected call of Watch.
-func (mr *MockServiceMockRecorder) Watch(ctx, project, services, options any) *gomock.Call {
+func (mr *MockServiceMockRecorder) Watch(ctx, project, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockService)(nil).Watch), ctx, project, services, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockService)(nil).Watch), ctx, project, options)
 }
 
 // MockLogConsumer is a mock of LogConsumer interface.
