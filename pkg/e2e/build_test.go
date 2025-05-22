@@ -298,6 +298,7 @@ func TestBuildImageDependencies(t *testing.T) {
 		))
 		doTest(t, cli, "build")
 		doTest(t, cli, "build", "service")
+		doTest(t, cli, "up", "--build", "service")
 	})
 
 	t.Run("Bake by additional contexts", func(t *testing.T) {
@@ -307,6 +308,7 @@ func TestBuildImageDependencies(t *testing.T) {
 		))
 		doTest(t, cli, "--verbose", "build")
 		doTest(t, cli, "--verbose", "build", "service")
+		doTest(t, cli, "--verbose", "up", "--build", "service")
 	})
 }
 
