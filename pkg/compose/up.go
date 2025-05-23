@@ -72,6 +72,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	var isTerminated atomic.Bool
 	printer := newLogPrinter(options.Start.Attach)
 
+	watcher := NewWatcher(project, options, s.watch)
+
+	var navigationMenu *formatter.LogKeyboard
 	var kEvents <-chan keyboard.KeyEvent
 	if options.Start.NavigationMenu {
 		kEvents, err = keyboard.GetKeys(100)
@@ -80,20 +83,14 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			options.Start.NavigationMenu = false
 		} else {
 			defer keyboard.Close() //nolint:errcheck
-			isWatchConfigured := s.shouldWatch(project)
 			isDockerDesktopActive := s.isDesktopIntegrationActive()
-			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isWatchConfigured)
-			formatter.NewKeyboardManager(ctx, isDockerDesktopActive, isWatchConfigured, signalChan, s.watch)
+			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, watcher != nil)
+			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, signalChan, options.Start.Watch, watcher)
 		}
 	}
 
 	doneCh := make(chan bool)
 	eg.Go(func() error {
-		if options.Start.NavigationMenu && options.Start.Watch {
-			// Run watch by navigation menu, so we can interactively enable/disable
-			formatter.KeyboardManager.StartWatch(ctx, doneCh, project, options)
-		}
-
 		first := true
 		gracefulTeardown := func() {
 			printer.Cancel()
@@ -112,6 +109,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		for {
 			select {
 			case <-doneCh:
+				if watcher != nil {
+					return watcher.Stop()
+				}
 				return nil
 			case <-ctx.Done():
 				if first {
@@ -137,7 +137,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				})
 				return nil
 			case event := <-kEvents:
-				formatter.KeyboardManager.HandleKeyEvents(event, ctx, doneCh, project, options)
+				navigationMenu.HandleKeyEvents(event, ctx, doneCh, project, options)
 			}
 		}
 	})
@@ -157,15 +157,11 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	})
 
-	if options.Start.Watch && !options.Start.NavigationMenu {
-		eg.Go(func() error {
-			buildOpts := *options.Create.Build
-			buildOpts.Quiet = true
-			return s.watch(ctx, doneCh, project, options.Start.Services, api.WatchOptions{
-				Build: &buildOpts,
-				LogTo: options.Start.Attach,
-			})
-		})
+	if options.Start.Watch {
+		err = watcher.Start(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	// We use the parent context without cancellation as we manage sigterm to stop the stack
