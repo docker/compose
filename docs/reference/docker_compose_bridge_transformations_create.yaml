@@ -1,0 +1,36 @@
+command: docker compose bridge transformations create
+short: Create a new transformation
+long: Create a new transformation
+usage: docker compose bridge transformations create [OPTION] PATH
+pname: docker compose bridge transformations
+plink: docker_compose_bridge_transformations.yaml
+options:
+    - option: from
+      shorthand: f
+      value_type: string
+      description: |
+        Existing transformation to copy (default: docker/compose-bridge-kubernetes)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+hidden: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

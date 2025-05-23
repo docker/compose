@@ -1,0 +1,59 @@
+command: docker compose bridge convert
+short: |
+    Convert compose files to Kubernetes manifests, Helm charts, or another model
+long: |
+    Convert compose files to Kubernetes manifests, Helm charts, or another model
+usage: docker compose bridge convert
+pname: docker compose bridge
+plink: docker_compose_bridge.yaml
+options:
+    - option: output
+      shorthand: o
+      value_type: string
+      default_value: out
+      description: The output directory for the Kubernetes resources
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: templates
+      value_type: string
+      description: Directory containing transformation templates
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: transformation
+      shorthand: t
+      value_type: stringArray
+      default_value: '[]'
+      description: |
+        Transformation to apply to compose model (default: docker/compose-bridge-kubernetes)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+hidden: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+
