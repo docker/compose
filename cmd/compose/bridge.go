@@ -29,7 +29,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/bridge"
 )
 
@@ -47,13 +46,27 @@ func bridgeCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 }
 
 func convertCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
-	return &cobra.Command{
+	convertOpts := bridge.ConvertOptions{}
+	cmd := &cobra.Command{
 		Use:   "convert",
 		Short: "Convert compose files to Kubernetes manifests, Helm charts, or another model",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return api.ErrNotImplemented
+			return runConvert(ctx, dockerCli, p, convertOpts)
 		}),
 	}
+	flags := cmd.Flags()
+	flags.StringVarP(&convertOpts.Output, "output", "o", "out", "The output directory for the Kubernetes resources")
+	flags.StringArrayVarP(&convertOpts.Transformations, "transformation", "t", nil, "Transformation to apply to compose model (default: docker/compose-bridge-kubernetes)")
+	flags.StringVar(&convertOpts.Templates, "templates", "", "Directory containing transformation templates")
+	return cmd
+}
+
+func runConvert(ctx context.Context, dockerCli command.Cli, p *ProjectOptions, opts bridge.ConvertOptions) error {
+	project, _, err := p.ToProject(ctx, dockerCli, nil)
+	if err != nil {
+		return err
+	}
+	return bridge.Convert(ctx, dockerCli, project, opts)
 }
 
 func transformersCommand(dockerCli command.Cli) *cobra.Command {
