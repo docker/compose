@@ -1,0 +1,47 @@
+command: docker compose bridge transformations list
+aliases: docker compose bridge transformations list, docker compose bridge transformations ls
+short: List available transformations
+long: List available transformations
+usage: docker compose bridge transformations list
+pname: docker compose bridge transformations
+plink: docker_compose_bridge_transformations.yaml
+options:
+    - option: format
+      value_type: string
+      default_value: table
+      description: 'Format the output. Values: [table | json]'
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: quiet
+      shorthand: q
+      value_type: bool
+      default_value: "false"
+      description: Only display transformer names
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"
+      description: Execute command in dry run mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+deprecated: false
+hidden: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+
