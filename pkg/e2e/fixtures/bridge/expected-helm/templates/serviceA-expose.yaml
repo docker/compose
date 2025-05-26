@@ -1,0 +1,19 @@
+#! serviceA-expose.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: servicea
+    namespace: {{ .Values.namespace }}
+    labels:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceA
+        app.kubernetes.io/managed-by: Helm
+spec:
+    selector:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceA
+    ports:
+        - name: servicea-8080
+          port: 8080
+          targetPort: servicea-8080

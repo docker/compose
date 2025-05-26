@@ -1,0 +1,13 @@
+#! values.yaml
+# Namespace
+namespace: bridge
+# Services variables
+
+serviceA:
+    image: alpine
+    imagePullPolicy: IfNotPresent
+serviceB:
+    image: alpine
+    imagePullPolicy: IfNotPresent
+
+# You can apply the same logic to loop on networks, volumes, secrets and configs...

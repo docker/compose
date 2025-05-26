@@ -1,0 +1,44 @@
+#! serviceA-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: servicea
+    namespace: bridge
+    labels:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceA
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: bridge
+            com.docker.compose.service: serviceA
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: bridge
+                com.docker.compose.service: serviceA
+                com.docker.compose.network.private-network: "true"
+        spec:
+            containers:
+                - name: servicea
+                  image: alpine
+                  imagePullPolicy: IfNotPresent
+                  ports:
+                    - name: servicea-8080
+                      containerPort: 8080
+                  volumeMounts:
+                    - name: etc-my-config1-txt
+                      mountPath: /etc/my-config1.txt
+                      subPath: my-config
+                      readOnly: true
+            volumes:
+                - name: etc-my-config1-txt
+                  configMap:
+                    name: bridge
+                    items:
+                        - key: my-config
+                          path: my-config

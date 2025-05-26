@@ -1,0 +1,18 @@
+#! serviceB-expose.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: serviceb
+    namespace: bridge
+    labels:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceB
+spec:
+    selector:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceB
+    ports:
+        - name: serviceb-8082
+          port: 8082
+          targetPort: serviceb-8082

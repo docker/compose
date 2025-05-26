@@ -1,0 +1,16 @@
+#! kustomization.yaml
+# Generated code, do not edit
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+    - 0-bridge-namespace.yaml
+    - bridge-configs.yaml
+    - my-secrets-secret.yaml
+    - private-network-network-policy.yaml
+    - public-network-network-policy.yaml
+    - serviceA-deployment.yaml
+    - serviceA-expose.yaml
+    - serviceA-service.yaml
+    - serviceB-deployment.yaml
+    - serviceB-expose.yaml
+    - serviceB-service.yaml

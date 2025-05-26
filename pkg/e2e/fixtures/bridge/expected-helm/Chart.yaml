@@ -1,0 +1,12 @@
+#! Chart.yaml
+apiVersion: v2
+name: bridge
+version: 0.0.1
+# kubeVersion: >= 1.29.1
+description: A generated Helm Chart for bridge generated via compose-bridge.
+type: application
+keywords:
+    - bridge
+appVersion: 'v0.0.1'
+sources:
+annotations:

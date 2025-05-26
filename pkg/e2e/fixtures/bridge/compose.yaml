@@ -1,0 +1,31 @@
+services:
+  serviceA:
+    image: alpine
+    build: .
+    ports:
+      - 80:8080
+    networks:
+      - private-network
+    configs:
+      - source: my-config
+        target: /etc/my-config1.txt
+  serviceB:
+    image: alpine
+    build: .
+    ports:
+      - 8081:8082
+    secrets:
+      - my-secrets
+    networks:
+      - private-network
+      - public-network
+configs:
+  my-config:
+    file: my-config.txt
+secrets:
+  my-secrets:
+    file: not-so-secret.txt
+networks:
+  private-network:
+    internal: true
+  public-network: {}
