@@ -1,0 +1,21 @@
+#! serviceB-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: serviceb-published
+    namespace: {{ .Values.namespace }}
+    labels:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceB
+        app.kubernetes.io/managed-by: Helm
+spec:
+    type: LoadBalancer
+    selector:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceB
+    ports:
+        - name: serviceb-8081
+          port: 8081
+          protocol: TCP
+          targetPort: serviceb-8082

@@ -1,0 +1,23 @@
+# check if there is at least one published port
+
+#! serviceA-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: servicea-published
+    namespace: bridge
+    labels:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceA
+spec:
+    selector:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceA
+    ports:
+        - name: servicea-80
+          port: 80
+          protocol: TCP
+          targetPort: servicea-8080
+
+# check if there is at least one published port

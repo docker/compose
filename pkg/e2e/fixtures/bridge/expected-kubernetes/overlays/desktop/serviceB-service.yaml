@@ -1,0 +1,9 @@
+#! serviceB-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: serviceb-published
+    namespace: bridge
+spec:
+    type: LoadBalancer

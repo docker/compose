@@ -1,0 +1,13 @@
+# check if there is at least one published port
+
+#! serviceA-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: servicea-published
+    namespace: bridge
+spec:
+    type: LoadBalancer
+
+# check if there is at least one published port

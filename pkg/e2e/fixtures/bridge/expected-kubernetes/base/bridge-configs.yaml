@@ -1,0 +1,12 @@
+#! bridge-configs.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: bridge
+    namespace: bridge
+    labels:
+        com.docker.compose.project: bridge
+data:
+    my-config: |
+        My config file

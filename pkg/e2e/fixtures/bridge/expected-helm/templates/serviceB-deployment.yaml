@@ -1,0 +1,46 @@
+#! serviceB-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: serviceb
+    namespace: {{ .Values.namespace }}
+    labels:
+        com.docker.compose.project: bridge
+        com.docker.compose.service: serviceB
+        app.kubernetes.io/managed-by: Helm
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: bridge
+            com.docker.compose.service: serviceB
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: bridge
+                com.docker.compose.service: serviceB
+                com.docker.compose.network.private-network: "true"
+                com.docker.compose.network.public-network: "true"
+        spec:
+            containers:
+                - name: serviceb
+                  image: {{ .Values.serviceB.image }}
+                  imagePullPolicy: {{ .Values.serviceB.imagePullPolicy }}
+                  ports:
+                    - name: serviceb-8082
+                      containerPort: 8082
+                  volumeMounts:
+                    - name: run-secrets-my-secrets
+                      mountPath: /run/secrets/my-secrets
+                      subPath: my-secrets
+                      readOnly: true
+            volumes:
+                - name: run-secrets-my-secrets
+                  secret:
+                    secretName: my-secrets
+                    items:
+                        - key: my-secrets
+                          path: my-secrets
