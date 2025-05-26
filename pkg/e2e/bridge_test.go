@@ -17,7 +17,7 @@
 package e2e
 
 import (
-	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,7 +31,7 @@ func TestConvertAndTransformList(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	t.Run("kubernetes manifests", func(t *testing.T) {
-		kubedir := fmt.Sprintf("%s/kubernetes", tmpDir)
+		kubedir := filepath.Join(tmpDir, "kubernetes")
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge/compose.yaml", "--project-name", projectName, "bridge", "convert",
 			"--output", kubedir)
 		assert.NilError(t, res.Error)
@@ -41,7 +41,7 @@ func TestConvertAndTransformList(t *testing.T) {
 	})
 
 	t.Run("helm charts", func(t *testing.T) {
-		helmDir := fmt.Sprintf("%s/helm", tmpDir)
+		helmDir := filepath.Join(tmpDir, "helm")
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge/compose.yaml", "--project-name", projectName, "bridge", "convert",
 			"--output", helmDir, "--transformation", "docker/compose-bridge-helm")
 		assert.NilError(t, res.Error)

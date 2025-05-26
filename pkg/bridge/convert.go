@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 
@@ -110,9 +111,14 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 			return err
 		}
 
+		user, err := user.Current()
+		if err != nil {
+			return err
+		}
 		created, err := dockerCli.Client().ContainerCreate(ctx, &container.Config{
 			Image: transformation,
 			Env:   []string{"LICENSE_AGREEMENT=true"},
+			User:  user.Uid,
 		}, &container.HostConfig{
 			AutoRemove: true,
 			Binds:      binds,
