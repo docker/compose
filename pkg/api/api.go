@@ -19,12 +19,12 @@ package api
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/opts"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 // Service manages a compose project
@@ -175,13 +175,13 @@ func (o BuildOptions) Apply(project *types.Project) error {
 			continue
 		}
 		if platform != "" {
-			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, platform) {
+			if len(service.Build.Platforms) > 0 && !slices.Contains(service.Build.Platforms, platform) {
 				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", name, platform)
 			}
 			service.Platform = platform
 		}
 		if service.Platform != "" {
-			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, service.Platform) {
+			if len(service.Build.Platforms) > 0 && !slices.Contains(service.Build.Platforms, service.Platform) {
 				return fmt.Errorf("service %q build configuration does not support platform: %s", name, service.Platform)
 			}
 		}

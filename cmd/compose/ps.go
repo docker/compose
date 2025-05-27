@@ -20,12 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/docker/cli/cli/command"
 	cliformatter "github.com/docker/cli/cli/command/formatter"
@@ -101,7 +101,7 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 		names := project.ServiceNames()
 		if len(services) > 0 {
 			for _, service := range services {
-				if !utils.StringContains(names, service) {
+				if !slices.Contains(names, service) {
 					return fmt.Errorf("no such service: %s", service)
 				}
 			}
@@ -139,7 +139,7 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 		services := []string{}
 		for _, c := range containers {
 			s := c.Service
-			if !utils.StringContains(services, s) {
+			if !slices.Contains(services, s) {
 				services = append(services, s)
 			}
 		}

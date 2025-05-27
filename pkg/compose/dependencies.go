@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -434,7 +435,7 @@ func (g *Graph) HasCycles() (bool, error) {
 		path := []string{
 			vertex.Key,
 		}
-		if !utils.StringContains(discovered, vertex.Key) && !utils.StringContains(finished, vertex.Key) {
+		if !slices.Contains(discovered, vertex.Key) && !slices.Contains(finished, vertex.Key) {
 			var err error
 			discovered, finished, err = g.visit(vertex.Key, path, discovered, finished)
 			if err != nil {
@@ -451,11 +452,11 @@ func (g *Graph) visit(key string, path []string, discovered []string, finished [
 
 	for _, v := range g.Vertices[key].Children {
 		path := append(path, v.Key)
-		if utils.StringContains(discovered, v.Key) {
+		if slices.Contains(discovered, v.Key) {
 			return nil, nil, fmt.Errorf("cycle found: %s", strings.Join(path, " -> "))
 		}
 
-		if !utils.StringContains(finished, v.Key) {
+		if !slices.Contains(finished, v.Key) {
 			if _, _, err := g.visit(v.Key, path, discovered, finished); err != nil {
 				return nil, nil, err
 			}

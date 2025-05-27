@@ -18,11 +18,11 @@ package compose
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
@@ -51,7 +51,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 
 	w := progress.ContextWriter(ctx)
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		if !utils.StringContains(options.Services, service) {
+		if !slices.Contains(options.Services, service) {
 			return nil
 		}
 		serv := project.Services[service]

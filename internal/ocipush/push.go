@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"time"
 
 	pusherrors "github.com/containerd/containerd/v2/core/remotes/errors"
@@ -157,14 +158,7 @@ func isNonAuthClientError(statusCode int) bool {
 		// not a client error
 		return false
 	}
-	for _, v := range clientAuthStatusCodes {
-		if statusCode == v {
-			// client auth error
-			return false
-		}
-	}
-	// any other 4xx client error
-	return true
+	return !slices.Contains(clientAuthStatusCodes, statusCode)
 }
 
 func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pushable, error) {
