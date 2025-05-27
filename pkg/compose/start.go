@@ -265,7 +265,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				if _, ok := watched[container.ID]; ok {
 					eType := api.ContainerEventStopped
 					if slices.Contains(replaced, container.ID) {
-						utils.Remove(replaced, container.ID)
+						replaced = slices.DeleteFunc(replaced, func(e string) bool { return e == container.ID })
 						eType = api.ContainerEventRecreated
 					}
 					listener(api.ContainerEvent{
@@ -292,7 +292,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 
 				eType := api.ContainerEventExit
 				if slices.Contains(replaced, container.ID) {
-					utils.Remove(replaced, container.ID)
+					replaced = slices.DeleteFunc(replaced, func(e string) bool { return e == container.ID })
 					eType = api.ContainerEventRecreated
 				}
 

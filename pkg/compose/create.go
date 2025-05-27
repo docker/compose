@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -32,7 +33,6 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -1312,8 +1312,8 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	}
 
 	// NetworkList Matches all or part of a network name, so we have to filter for a strict match
-	networks = utils.Filter(networks, func(net network.Summary) bool {
-		return net.Name == n.Name
+	networks = slices.DeleteFunc(networks, func(net network.Summary) bool {
+		return net.Name != n.Name
 	})
 
 	for _, net := range networks {
@@ -1436,18 +1436,19 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	if len(networks) == 0 {
 		// in this instance, n.Name is really an ID
 		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
-		if err != nil && !errdefs.IsNotFound(err) {
+		if err == nil {
+			networks = append(networks, sn)
+		} else if !errdefs.IsNotFound(err) {
 			return "", err
 		}
-		networks = append(networks, sn)
+
 	}
 
 	// NetworkList API doesn't return the exact name match, so we can retrieve more than one network with a request
-	networks = utils.Filter(networks, func(net network.Inspect) bool {
-		// later in this function, the name is changed the to ID.
+	networks = slices.DeleteFunc(networks, func(net network.Inspect) bool {
 		// this function is called during the rebuild stage of `compose watch`.
 		// we still require just one network back, but we need to run the search on the ID
-		return net.Name == n.Name || net.ID == n.Name
+		return net.Name != n.Name && net.ID != n.Name
 	})
 
 	switch len(networks) {
