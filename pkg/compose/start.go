@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -199,7 +200,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 	ofInterest := func(c containerType.Summary) bool {
 		if len(services) > 0 {
 			// we only watch some services
-			return utils.Contains(services, c.Labels[api.ServiceLabel])
+			return slices.Contains(services, c.Labels[api.ServiceLabel])
 		}
 		return true
 	}
@@ -208,7 +209,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 	isRequired := func(c containerType.Summary) bool {
 		if len(services) > 0 && len(required) > 0 {
 			// we only watch some services
-			return utils.Contains(required, c.Labels[api.ServiceLabel])
+			return slices.Contains(required, c.Labels[api.ServiceLabel])
 		}
 		return true
 	}
@@ -263,7 +264,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				}
 				if _, ok := watched[container.ID]; ok {
 					eType := api.ContainerEventStopped
-					if utils.Contains(replaced, container.ID) {
+					if slices.Contains(replaced, container.ID) {
 						utils.Remove(replaced, container.ID)
 						eType = api.ContainerEventRecreated
 					}
@@ -290,7 +291,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 				}
 
 				eType := api.ContainerEventExit
-				if utils.Contains(replaced, container.ID) {
+				if slices.Contains(replaced, container.ID) {
 					utils.Remove(replaced, container.ID)
 					eType = api.ContainerEventRecreated
 				}
