@@ -16,24 +16,15 @@
 
 package utils
 
-import "reflect"
-
-// Contains helps to detect if a non-comparable struct is part of an array
-// only use this method if you can't rely on existing golang Contains function of slices (https://pkg.go.dev/golang.org/x/exp/slices#Contains)
-func Contains[T any](origin []T, element T) bool {
-	for _, v := range origin {
-		if reflect.DeepEqual(v, element) {
-			return true
-		}
-	}
-	return false
-}
+import (
+	"slices"
+)
 
 // Remove removes all elements from origin slice
-func Remove[T any](origin []T, elements ...T) []T {
+func Remove[T comparable](origin []T, elements ...T) []T {
 	var filtered []T
 	for _, v := range origin {
-		if !Contains(elements, v) {
+		if !slices.Contains(elements, v) {
 			filtered = append(filtered, v)
 		}
 	}

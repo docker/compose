@@ -19,11 +19,11 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
@@ -54,8 +54,11 @@ func (s *composeService) Generate(ctx context.Context, options api.GenerateOptio
 	if err != nil {
 		return nil, err
 	}
+
 	for _, ctr := range containersByIds {
-		if !utils.Contains(containers, ctr) {
+		if !slices.ContainsFunc(containers, func(summary container.Summary) bool {
+			return summary.ID == ctr.ID
+		}) {
 			containers = append(containers, ctr)
 		}
 	}

@@ -26,8 +26,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 // ServiceStatus indicates the status of a service
@@ -120,7 +118,7 @@ func WithRootNodesAndDown(nodes []string) func(*graphTraversal) {
 
 			t.ignored = map[string]struct{}{}
 			for k := range graph.Vertices {
-				if !utils.Contains(want, k) {
+				if !slices.Contains(want, k) {
 					t.ignored[k] = struct{}{}
 				}
 			}
