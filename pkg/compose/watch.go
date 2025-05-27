@@ -578,7 +578,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 		return err
 	}
 
-	p, err := project.WithSelectedServices(services)
+	p, err := project.WithSelectedServices(services, types.IncludeDependents)
 	if err != nil {
 		return err
 	}
