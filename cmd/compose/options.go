@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -32,7 +33,6 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {
@@ -44,7 +44,7 @@ func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {
 
 		// default platform only applies if the service doesn't specify
 		if defaultPlatform != "" && service.Platform == "" {
-			if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, defaultPlatform) {
+			if len(service.Build.Platforms) > 0 && !slices.Contains(service.Build.Platforms, defaultPlatform) {
 				return fmt.Errorf("service %q build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: %s", name, defaultPlatform)
 			}
 			service.Platform = defaultPlatform
@@ -52,7 +52,7 @@ func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {
 
 		if service.Platform != "" {
 			if len(service.Build.Platforms) > 0 {
-				if !utils.StringContains(service.Build.Platforms, service.Platform) {
+				if !slices.Contains(service.Build.Platforms, service.Platform) {
 					return fmt.Errorf("service %q build configuration does not support platform: %s", name, service.Platform)
 				}
 			}

@@ -19,11 +19,11 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/sirupsen/logrus"
@@ -74,7 +74,7 @@ func combinedConfigFiles(containers []container.Summary) (string, error) {
 		}
 
 		for _, f := range strings.Split(files, ",") {
-			if !utils.StringContains(configFiles, f) {
+			if !slices.Contains(configFiles, f) {
 				configFiles = append(configFiles, f)
 			}
 		}

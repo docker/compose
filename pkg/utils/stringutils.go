@@ -21,16 +21,6 @@ import (
 	"strings"
 )
 
-// StringContains check if an array contains a specific value
-func StringContains(array []string, needle string) bool {
-	for _, val := range array {
-		if val == needle {
-			return true
-		}
-	}
-	return false
-}
-
 // StringToBool converts a string to a boolean ignoring errors
 func StringToBool(s string) bool {
 	s = strings.ToLower(strings.TrimSpace(s))

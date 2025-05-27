@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -29,7 +30,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
@@ -45,7 +45,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	if len(options.Services) > 0 {
 		// filter service containers
 		for _, c := range allContainers {
-			if utils.StringContains(options.Services, c.Labels[api.ServiceLabel]) {
+			if slices.Contains(options.Services, c.Labels[api.ServiceLabel]) {
 				containers = append(containers, c)
 			}
 		}
@@ -55,7 +55,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 
 	images := []string{}
 	for _, c := range containers {
-		if !utils.StringContains(images, c.Image) {
+		if !slices.Contains(images, c.Image) {
 			images = append(images, c.Image)
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 
@@ -30,7 +31,6 @@ import (
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type imageOptions struct {
@@ -76,7 +76,7 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 			if i := strings.IndexRune(img.ID, ':'); i >= 0 {
 				id = id[i+1:]
 			}
-			if !utils.StringContains(ids, id) {
+			if !slices.Contains(ids, id) {
 				ids = append(ids, id)
 			}
 		}

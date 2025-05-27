@@ -101,7 +101,7 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 
 		return tracing.SpanWrapFunc("service/apply", tracing.ServiceOptions(service), func(ctx context.Context) error {
 			strategy := options.RecreateDependencies
-			if utils.StringContains(options.Services, name) {
+			if slices.Contains(options.Services, name) {
 				strategy = options.Recreate
 			}
 			return c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)

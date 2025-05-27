@@ -19,12 +19,12 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 )
@@ -124,7 +124,7 @@ func matches(c container.Summary, predicates ...containerPredicate) bool {
 func isService(services ...string) containerPredicate {
 	return func(c container.Summary) bool {
 		service := c.Labels[api.ServiceLabel]
-		return utils.StringContains(services, service)
+		return slices.Contains(services, service)
 	}
 }
 
@@ -145,7 +145,7 @@ func isOrphaned(project *types.Project) containerPredicate {
 		}
 		// Service that is not defined in the compose model
 		service := c.Labels[api.ServiceLabel]
-		return !utils.StringContains(services, service)
+		return !slices.Contains(services, service)
 	}
 }
 

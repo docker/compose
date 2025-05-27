@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/buger/goterm"
 	"github.com/docker/go-units"
@@ -77,7 +77,7 @@ func (w *ttyWriter) Event(e Event) {
 }
 
 func (w *ttyWriter) event(e Event) {
-	if !utils.StringContains(w.eventIDs, e.ID) {
+	if !slices.Contains(w.eventIDs, e.ID) {
 		w.eventIDs = append(w.eventIDs, e.ID)
 	}
 	if _, ok := w.events[e.ID]; ok {
