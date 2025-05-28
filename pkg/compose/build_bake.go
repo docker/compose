@@ -420,8 +420,15 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
-	if urlutil.IsGitURL(ctxName) || filepath.IsAbs(dockerfile) {
+	if urlutil.IsGitURL(ctxName) {
 		return dockerfile
 	}
-	return filepath.Join(ctxName, dockerfile)
+	if !filepath.IsAbs(dockerfile) {
+		dockerfile = filepath.Join(ctxName, dockerfile)
+	}
+	symlinks, err := filepath.EvalSymlinks(dockerfile)
+	if err == nil {
+		return symlinks
+	}
+	return dockerfile
 }
