@@ -55,7 +55,7 @@ type Watcher struct {
 	errCh   chan error
 }
 
-func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc) (*Watcher, error) {
+func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, listener api.ContainerEventListener) (*Watcher, error) {
 	for i := range project.Services {
 		service := project.Services[i]
 
@@ -65,8 +65,9 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc) (*Wa
 			return &Watcher{
 				project: project,
 				options: api.WatchOptions{
-					LogTo: options.Start.Attach,
-					Build: build,
+					LogTo:    options.Start.Attach,
+					Build:    build,
+					Listener: listener,
 				},
 				watchFn: w,
 				errCh:   make(chan error),
@@ -638,7 +639,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 		Project:  p,
 		Services: services,
 		AttachTo: services,
-	}, nil)
+	}, options.Listener)
 	if err != nil {
 		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Application failed to start after update. Error: %v", err))
 	}

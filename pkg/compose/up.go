@@ -30,6 +30,7 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
@@ -74,7 +75,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 	var watcher *Watcher
 	if options.Start.Watch {
-		watcher, err = NewWatcher(project, options, s.watch)
+		watcher, err = NewWatcher(project, options, s.watch, printer.HandleEvent)
 		if err != nil {
 			return err
 		}
@@ -173,6 +174,24 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 	// We use the parent context without cancellation as we manage sigterm to stop the stack
 	err = s.start(context.WithoutCancel(ctx), project.Name, options.Start, printer.HandleEvent)
+	if err != nil {
+		return err
+	}
+
+	// it's possible to have a required service whose log output is not desired
+	// (i.e. it's not in the attach set), so watch everything and then filter
+	// calls to attach; this ensures that `watchContainers` blocks until all
+	// required containers have exited, even if their output is not being shown
+	attachTo := utils.NewSet[string](options.Start.AttachTo...)
+	required := utils.NewSet[string](options.Start.Services...)
+	toWatch := attachTo.Union(required).Elements()
+
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, toWatch...)
+	if err != nil {
+		return err
+	}
+
+	err = s.watchContainers(ctx, project.Name, toWatch, required.Elements(), printer.HandleEvent, containers, nil)
 	if err != nil && !isTerminated.Load() { // Ignore error if the process is terminated
 		return err
 	}

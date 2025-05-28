@@ -130,6 +130,7 @@ type WatchOptions struct {
 	LogTo    LogConsumer
 	Prune    bool
 	Services []string
+	Listener ContainerEventListener
 }
 
 // BuildOptions group options of the Build API
