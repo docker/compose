@@ -114,14 +114,6 @@ func (s *composeService) Logs(
 					return err
 				})
 				return nil
-			}, func(c container.Summary, t time.Time) error {
-				printer.HandleEvent(api.ContainerEvent{
-					Type:      api.ContainerEventAttach,
-					Container: "", // actual name will be set by start event
-					ID:        c.ID,
-					Service:   c.Labels[api.ServiceLabel],
-				})
-				return nil
 			})
 			printer.Stop()
 			return err
