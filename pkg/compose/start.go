@@ -24,12 +24,11 @@ import (
 	"strings"
 	"time"
 
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/errdefs"
-
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
+	containerType "github.com/docker/docker/api/types/container"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/filters"
@@ -238,7 +237,7 @@ func (s *composeService) watchContainers(ctx context.Context, //nolint:gocyclo
 			}()
 			inspected, err := s.apiClient().ContainerInspect(ctx, event.Container)
 			if err != nil {
-				if errdefs.IsNotFound(err) {
+				if cerrdefs.IsNotFound(err) {
 					// it's possible to get "destroy" or "kill" events but not
 					// be able to inspect in time before they're gone from the
 					// API, so just remove the watch without erroring
