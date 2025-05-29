@@ -112,14 +112,14 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 			return err
 		}
 
-		user, err := user.Current()
+		usr, err := user.Current()
 		if err != nil {
 			return err
 		}
 		created, err := dockerCli.Client().ContainerCreate(ctx, &container.Config{
 			Image: transformation,
 			Env:   []string{"LICENSE_AGREEMENT=true"},
-			User:  user.Uid,
+			User:  usr.Uid,
 		}, &container.HostConfig{
 			AutoRemove: true,
 			Binds:      binds,
@@ -140,11 +140,11 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 }
 
 // LoadAdditionalResources loads additional resources from the project, such as image references, secrets, configs and exposed ports
-func LoadAdditionalResources(ctx context.Context, cli command.Cli, project *types.Project) (*types.Project, error) {
+func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project *types.Project) (*types.Project, error) {
 	for name, service := range project.Services {
 		imageName := api.GetImageNameOrDefault(service, project.Name)
 
-		inspect, err := inspectWithPull(ctx, cli, imageName)
+		inspect, err := inspectWithPull(ctx, dockerCLI, imageName)
 		if err != nil {
 			return nil, err
 		}
