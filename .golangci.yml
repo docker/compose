@@ -30,6 +30,10 @@ linters:
           deny:
             - pkg: io/ioutil
               desc: io/ioutil package has been deprecated
+            - pkg: golang.org/x/exp/maps
+              desc: use stdlib maps package
+            - pkg: golang.org/x/exp/slices
+              desc: use stdlib slices package
             - pkg: gopkg.in/yaml.v2
               desc: compose-go uses yaml.v3
     gocritic:
