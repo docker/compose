@@ -34,6 +34,7 @@ import (
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/checkpoint"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
@@ -205,18 +206,18 @@ func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path stri
 	return nil
 }
 
-func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options moby.ImageBuildOptions) (moby.ImageBuildResponse, error) {
+func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options build.ImageBuildOptions) (build.ImageBuildResponse, error) {
 	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
 		Status:   fmt.Sprintf("%[1]sSuccessfully built: dryRunID\n%[1]sSuccessfully tagged: %[2]s\n", DRYRUN_PREFIX, options.Tags[0]),
 		Progress: &jsonmessage.JSONProgress{},
 		ID:       "",
 	})
 	if err != nil {
-		return moby.ImageBuildResponse{}, err
+		return build.ImageBuildResponse{}, err
 	}
 	rc := io.NopCloser(bytes.NewReader(jsonMessage))
 
-	return moby.ImageBuildResponse{
+	return build.ImageBuildResponse{
 		Body:   rc,
 		OSType: "",
 	}, nil
@@ -334,11 +335,11 @@ func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, co
 
 // Functions delegated to original APIClient (not used by Compose or not modifying the Compose stack
 
-func (d *DryRunClient) ConfigList(ctx context.Context, options moby.ConfigListOptions) ([]swarm.Config, error) {
+func (d *DryRunClient) ConfigList(ctx context.Context, options swarm.ConfigListOptions) ([]swarm.Config, error) {
 	return d.apiClient.ConfigList(ctx, options)
 }
 
-func (d *DryRunClient) ConfigCreate(ctx context.Context, config swarm.ConfigSpec) (moby.ConfigCreateResponse, error) {
+func (d *DryRunClient) ConfigCreate(ctx context.Context, config swarm.ConfigSpec) (swarm.ConfigCreateResponse, error) {
 	return d.apiClient.ConfigCreate(ctx, config)
 }
 
@@ -422,7 +423,7 @@ func (d *DryRunClient) DistributionInspect(ctx context.Context, imageName, encod
 	return d.apiClient.DistributionInspect(ctx, imageName, encodedRegistryAuth)
 }
 
-func (d *DryRunClient) BuildCachePrune(ctx context.Context, opts moby.BuildCachePruneOptions) (*moby.BuildCachePruneReport, error) {
+func (d *DryRunClient) BuildCachePrune(ctx context.Context, opts build.CachePruneOptions) (*build.CachePruneReport, error) {
 	return d.apiClient.BuildCachePrune(ctx, opts)
 }
 
@@ -470,11 +471,11 @@ func (d *DryRunClient) NodeInspectWithRaw(ctx context.Context, nodeID string) (s
 	return d.apiClient.NodeInspectWithRaw(ctx, nodeID)
 }
 
-func (d *DryRunClient) NodeList(ctx context.Context, options moby.NodeListOptions) ([]swarm.Node, error) {
+func (d *DryRunClient) NodeList(ctx context.Context, options swarm.NodeListOptions) ([]swarm.Node, error) {
 	return d.apiClient.NodeList(ctx, options)
 }
 
-func (d *DryRunClient) NodeRemove(ctx context.Context, nodeID string, options moby.NodeRemoveOptions) error {
+func (d *DryRunClient) NodeRemove(ctx context.Context, nodeID string, options swarm.NodeRemoveOptions) error {
 	return d.apiClient.NodeRemove(ctx, nodeID, options)
 }
 
@@ -538,15 +539,15 @@ func (d *DryRunClient) PluginCreate(ctx context.Context, createContext io.Reader
 	return d.apiClient.PluginCreate(ctx, createContext, options)
 }
 
-func (d *DryRunClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options moby.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
+func (d *DryRunClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options swarm.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
 	return d.apiClient.ServiceCreate(ctx, service, options)
 }
 
-func (d *DryRunClient) ServiceInspectWithRaw(ctx context.Context, serviceID string, options moby.ServiceInspectOptions) (swarm.Service, []byte, error) {
+func (d *DryRunClient) ServiceInspectWithRaw(ctx context.Context, serviceID string, options swarm.ServiceInspectOptions) (swarm.Service, []byte, error) {
 	return d.apiClient.ServiceInspectWithRaw(ctx, serviceID, options)
 }
 
-func (d *DryRunClient) ServiceList(ctx context.Context, options moby.ServiceListOptions) ([]swarm.Service, error) {
+func (d *DryRunClient) ServiceList(ctx context.Context, options swarm.ServiceListOptions) ([]swarm.Service, error) {
 	return d.apiClient.ServiceList(ctx, options)
 }
 
@@ -554,7 +555,7 @@ func (d *DryRunClient) ServiceRemove(ctx context.Context, serviceID string) erro
 	return d.apiClient.ServiceRemove(ctx, serviceID)
 }
 
-func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options moby.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
+func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options swarm.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
 	return d.apiClient.ServiceUpdate(ctx, serviceID, version, service, options)
 }
 
@@ -570,7 +571,7 @@ func (d *DryRunClient) TaskInspectWithRaw(ctx context.Context, taskID string) (s
 	return d.apiClient.TaskInspectWithRaw(ctx, taskID)
 }
 
-func (d *DryRunClient) TaskList(ctx context.Context, options moby.TaskListOptions) ([]swarm.Task, error) {
+func (d *DryRunClient) TaskList(ctx context.Context, options swarm.TaskListOptions) ([]swarm.Task, error) {
 	return d.apiClient.TaskList(ctx, options)
 }
 
@@ -582,7 +583,7 @@ func (d *DryRunClient) SwarmJoin(ctx context.Context, req swarm.JoinRequest) err
 	return d.apiClient.SwarmJoin(ctx, req)
 }
 
-func (d *DryRunClient) SwarmGetUnlockKey(ctx context.Context) (moby.SwarmUnlockKeyResponse, error) {
+func (d *DryRunClient) SwarmGetUnlockKey(ctx context.Context) (swarm.UnlockKeyResponse, error) {
 	return d.apiClient.SwarmGetUnlockKey(ctx)
 }
 
@@ -602,11 +603,11 @@ func (d *DryRunClient) SwarmUpdate(ctx context.Context, version swarm.Version, s
 	return d.apiClient.SwarmUpdate(ctx, version, swarmSpec, flags)
 }
 
-func (d *DryRunClient) SecretList(ctx context.Context, options moby.SecretListOptions) ([]swarm.Secret, error) {
+func (d *DryRunClient) SecretList(ctx context.Context, options swarm.SecretListOptions) ([]swarm.Secret, error) {
 	return d.apiClient.SecretList(ctx, options)
 }
 
-func (d *DryRunClient) SecretCreate(ctx context.Context, secret swarm.SecretSpec) (moby.SecretCreateResponse, error) {
+func (d *DryRunClient) SecretCreate(ctx context.Context, secret swarm.SecretSpec) (swarm.SecretCreateResponse, error) {
 	return d.apiClient.SecretCreate(ctx, secret)
 }
 
