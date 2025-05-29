@@ -19,14 +19,13 @@ package compose
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/docker/cli/cli/command"
-
 	"github.com/compose-spec/compose-go/v2/types"
-	"golang.org/x/exp/maps"
-
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -60,7 +59,7 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 }
 
 func runScale(ctx context.Context, dockerCli command.Cli, backend api.Service, opts scaleOptions, serviceReplicaTuples map[string]int) error {
-	services := maps.Keys(serviceReplicaTuples)
+	services := slices.Sorted(maps.Keys(serviceReplicaTuples))
 	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
