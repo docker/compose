@@ -26,6 +26,7 @@ import (
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/command"
 	cli "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
@@ -33,8 +34,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/docker/go-connections/nat"
 	"gopkg.in/yaml.v3"
 )
 
@@ -151,7 +152,7 @@ func LoadAdditionalResources(ctx context.Context, cli command.Cli, project *type
 		exposed := utils.Set[string]{}
 		exposed.AddAll(service.Expose...)
 		for port := range inspect.Config.ExposedPorts {
-			exposed.Add(port.Port())
+			exposed.Add(nat.Port(port).Port())
 		}
 		for _, port := range service.Ports {
 			exposed.Add(strconv.Itoa(int(port.Target)))
@@ -197,7 +198,7 @@ func loadFileObject(conf types.FileObjectConfig) (types.FileObjectConfig, error)
 
 func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName string) (image.InspectResponse, error) {
 	inspect, err := dockerCli.Client().ImageInspect(ctx, imageName)
-	if errdefs.IsNotFound(err) {
+	if cerrdefs.IsNotFound(err) {
 		var stream io.ReadCloser
 		stream, err = dockerCli.Client().ImagePull(ctx, imageName, image.PullOptions{})
 		if err != nil {

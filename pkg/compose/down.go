@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -30,7 +31,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	imageapi "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/errdefs"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -219,7 +219,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 			continue
 		}
 		nw, err := s.apiClient().NetworkInspect(ctx, net.ID, network.InspectOptions{})
-		if errdefs.IsNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			w.Event(progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
 			return nil
 		}
@@ -233,7 +233,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		}
 
 		if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
-			if errdefs.IsNotFound(err) {
+			if cerrdefs.IsNotFound(err) {
 				continue
 			}
 			w.Event(progress.ErrorEvent(eventName))
@@ -261,11 +261,11 @@ func (s *composeService) removeImage(ctx context.Context, image string, w progre
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
 	}
-	if errdefs.IsConflict(err) {
+	if cerrdefs.IsConflict(err) {
 		w.Event(progress.NewEvent(id, progress.Warning, "Resource is still in use"))
 		return nil
 	}
-	if errdefs.IsNotFound(err) {
+	if cerrdefs.IsNotFound(err) {
 		w.Event(progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
 		return nil
 	}
@@ -276,7 +276,7 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 	resource := fmt.Sprintf("Volume %s", id)
 
 	_, err := s.apiClient().VolumeInspect(ctx, id)
-	if errdefs.IsNotFound(err) {
+	if cerrdefs.IsNotFound(err) {
 		// Already gone
 		return nil
 	}
@@ -287,11 +287,11 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
 		return nil
 	}
-	if errdefs.IsConflict(err) {
+	if cerrdefs.IsConflict(err) {
 		w.Event(progress.NewEvent(resource, progress.Warning, "Resource is still in use"))
 		return nil
 	}
-	if errdefs.IsNotFound(err) {
+	if cerrdefs.IsNotFound(err) {
 		w.Event(progress.NewEvent(resource, progress.Done, "Warning: No resource found to remove"))
 		return nil
 	}
@@ -345,7 +345,7 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 	w := progress.ContextWriter(ctx)
 	eventName := getContainerProgressName(ctr)
 	err := s.stopContainer(ctx, w, service, ctr, timeout)
-	if errdefs.IsNotFound(err) {
+	if cerrdefs.IsNotFound(err) {
 		w.Event(progress.RemovedEvent(eventName))
 		return nil
 	}
@@ -357,7 +357,7 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 		Force:         true,
 		RemoveVolumes: volumes,
 	})
-	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
+	if err != nil && !cerrdefs.IsNotFound(err) && !cerrdefs.IsConflict(err) {
 		w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 		return err
 	}

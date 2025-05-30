@@ -23,11 +23,11 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -204,7 +204,7 @@ func (p *ImagePruner) filterImagesByExistence(ctx context.Context, imageNames []
 	for _, img := range imageNames {
 		eg.Go(func() error {
 			_, err := p.client.ImageInspect(ctx, img)
-			if errdefs.IsNotFound(err) {
+			if cerrdefs.IsNotFound(err) {
 				// err on the side of caution: only skip if we successfully
 				// queried the API and got back a definitive "not exists"
 				return nil

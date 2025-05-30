@@ -30,6 +30,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
@@ -41,7 +42,6 @@ import (
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/api/types/versions"
 	volumetypes "github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
@@ -1253,7 +1253,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, project *types.Proje
 	}
 
 	id, err := s.resolveOrCreateNetwork(ctx, project, name, n)
-	if errdefs.IsConflict(err) {
+	if cerrdefs.IsConflict(err) {
 		// Maybe another execution of `docker compose up|run` created same network
 		// let's retry once
 		return s.resolveOrCreateNetwork(ctx, project, name, n)
@@ -1438,7 +1438,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
 		if err == nil {
 			networks = append(networks, sn)
-		} else if !errdefs.IsNotFound(err) {
+		} else if !cerrdefs.IsNotFound(err) {
 			return "", err
 		}
 
@@ -1475,7 +1475,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 func (s *composeService) ensureVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project, assumeYes bool) (string, error) {
 	inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name)
 	if err != nil {
-		if !errdefs.IsNotFound(err) {
+		if !cerrdefs.IsNotFound(err) {
 			return "", err
 		}
 		if volume.External {

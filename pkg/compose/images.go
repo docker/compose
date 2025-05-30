@@ -23,10 +23,10 @@ import (
 	"strings"
 	"sync"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -84,7 +84,7 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 		eg.Go(func() error {
 			inspect, err := s.apiClient().ImageInspect(ctx, repoTag)
 			if err != nil {
-				if errdefs.IsNotFound(err) {
+				if cerrdefs.IsNotFound(err) {
 					return nil
 				}
 				return fmt.Errorf("unable to get image '%s': %w", repoTag, err)

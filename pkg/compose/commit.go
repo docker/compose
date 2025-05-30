@@ -69,7 +69,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		Reference: options.Reference,
 		Comment:   options.Comment,
 		Author:    options.Author,
-		Changes:   options.Changes.GetAll(),
+		Changes:   options.Changes.GetSlice(),
 		Pause:     options.Pause,
 	})
 	if err != nil {
