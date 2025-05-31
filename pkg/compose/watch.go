@@ -197,7 +197,7 @@ func (s *composeService) watch(ctx context.Context, syncChannel chan bool, proje
 	}
 
 	if len(paths) == 0 {
-		return fmt.Errorf("none of the selected services is configured for watch, consider setting an 'develop' section")
+		return fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
 	watcher, err := watch.NewWatcher(paths)
