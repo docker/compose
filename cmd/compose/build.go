@@ -27,7 +27,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	ui "github.com/docker/compose/v2/pkg/progress"
-	buildkit "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -137,7 +136,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	flags.Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
 	flags.MarkHidden("no-rm") //nolint:errcheck
 	flags.VarP(&opts.memory, "memory", "m", "Set memory limit for the build container. Not supported by BuildKit.")
-	flags.StringVar(&p.Progress, "progress", string(buildkit.AutoMode), fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
+	flags.StringVar(&p.Progress, "progress", "", fmt.Sprintf(`Set type of ui output (%s)`, strings.Join(printerModes, ", ")))
 	flags.MarkHidden("progress") //nolint:errcheck
 	flags.BoolVar(&opts.print, "print", false, "Print equivalent bake file")
 	flags.BoolVar(&opts.check, "check", false, "Check build configuration")

@@ -18,6 +18,7 @@ package progress
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -121,29 +122,30 @@ func NewWriter(ctx context.Context, out *streams.Out, progressTitle string) (Wri
 	if !ok {
 		dryRun = false
 	}
-	if Mode == ModeQuiet {
+	switch Mode {
+	case ModeQuiet:
 		return quiet{}, nil
-	}
-
-	tty := Mode == ModeTTY
-	if Mode == ModeAuto && isTerminal {
-		tty = true
-	}
-	if tty {
-		return newTTYWriter(out, dryRun, progressTitle)
-	}
-	if Mode == ModeJSON {
+	case ModeJSON:
 		return &jsonWriter{
 			out:    out,
 			done:   make(chan bool),
 			dryRun: dryRun,
 		}, nil
+	case ModeTTY:
+		return newTTYWriter(out, dryRun, progressTitle)
+	case ModeAuto, "":
+		if isTerminal {
+			return newTTYWriter(out, dryRun, progressTitle)
+		}
+		fallthrough
+	case ModePlain:
+		return &plainWriter{
+			out:    out,
+			done:   make(chan bool),
+			dryRun: dryRun,
+		}, nil
 	}
-	return &plainWriter{
-		out:    out,
-		done:   make(chan bool),
-		dryRun: dryRun,
-	}, nil
+	return nil, fmt.Errorf("unknown progress mode: %s", Mode)
 }
 
 func newTTYWriter(out io.Writer, dryRun bool, progressTitle string) (Writer, error) {
