@@ -31,9 +31,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	cerrdefs "github.com/containerd/errdefs"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/prompt"
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -45,6 +42,10 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
+
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/prompt"
 )
 
 type createOptions struct {
@@ -1262,6 +1263,9 @@ func (s *composeService) ensureNetwork(ctx context.Context, project *types.Proje
 }
 
 func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (string, error) { //nolint:gocyclo
+	// This is containers that could be left after a diverged network was removed
+	var dangledContainers Containers
+
 	// First, try to find a unique network matching by name or ID
 	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
 	if err == nil {
@@ -1295,7 +1299,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 				return inspect.ID, nil
 			}
 
-			err = s.removeDivergedNetwork(ctx, project, name, n)
+			dangledContainers, err = s.removeDivergedNetwork(ctx, project, name, n)
 			if err != nil {
 				return "", err
 			}
@@ -1392,10 +1396,16 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
 	w.Event(progress.CreatedEvent(networkEventName))
+
+	err = s.connectNetwork(ctx, n.Name, dangledContainers, nil)
+	if err != nil {
+		return "", err
+	}
+
 	return resp.ID, nil
 }
 
-func (s *composeService) removeDivergedNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) error {
+func (s *composeService) removeDivergedNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (Containers, error) {
 	// Remove services attached to this network to force recreation
 	var services []string
 	for _, service := range project.Services.Filter(func(config types.ServiceConfig) bool {
@@ -1412,13 +1422,54 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 		Project:  project,
 	})
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, services...)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.disconnectNetwork(ctx, n.Name, containers)
+	if err != nil {
+		return nil, err
 	}
 
 	err = s.apiClient().NetworkRemove(ctx, n.Name)
 	eventName := fmt.Sprintf("Network %s", n.Name)
 	progress.ContextWriter(ctx).Event(progress.RemovedEvent(eventName))
-	return err
+	return containers, err
+}
+
+func (s *composeService) disconnectNetwork(
+	ctx context.Context,
+	network string,
+	containers Containers,
+) error {
+	for _, c := range containers {
+		err := s.apiClient().NetworkDisconnect(ctx, network, c.ID, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *composeService) connectNetwork(
+	ctx context.Context,
+	network string,
+	containers Containers,
+	config *network.EndpointSettings,
+) error {
+	for _, c := range containers {
+		err := s.apiClient().NetworkConnect(ctx, network, c.ID, config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.NetworkConfig) (string, error) {
