@@ -191,7 +191,6 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		case ContainerCreated:
 		case ContainerRestarting:
 		case ContainerExited:
-			w.Event(progress.CreatedEvent(name))
 		default:
 			container := container
 			eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/start", tracing.ContainerOptions(container), func(ctx context.Context) error {

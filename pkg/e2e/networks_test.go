@@ -199,3 +199,24 @@ func TestInterfaceName(t *testing.T) {
 	})
 	res.Assert(t, icmd.Expected{Out: "foobar@"})
 }
+
+func TestNetworkRecreate(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "network_recreate"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/network-recreate/compose.yaml", "--project-name", projectName, "up", "-d")
+
+	c = NewCLI(t, WithEnv("FOO=bar"))
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-recreate/compose.yaml", "--project-name", projectName, "--progress=plain", "up", "-d")
+	err := res.Stderr()
+	fmt.Println(err)
+	res.Assert(t, icmd.Expected{Err: `
+ Container network_recreate-web-1  Stopped
+ Network network_recreate_test  Removed
+ Network network_recreate_test  Creating
+ Network network_recreate_test  Created
+ Container network_recreate-web-1  Starting
+ Container network_recreate-web-1  Started`})
+}

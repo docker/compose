@@ -1,0 +1,10 @@
+services:
+  web:
+    image: nginx
+    networks:
+      - test
+
+networks:
+  test:
+    labels:
+      - foo=${FOO:-foo}
