@@ -524,3 +524,15 @@ func TestBuildEntitlements(t *testing.T) {
 		}
 	})
 }
+
+func TestBuildDependsOn(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-f", "fixtures/build-dependencies/compose-depends_on.yaml", "down", "--rmi=local")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-dependencies/compose-depends_on.yaml", "--progress=plain", "up", "test2")
+	out := res.Combined()
+	assert.Check(t, strings.Contains(out, "test1  Built"))
+}
