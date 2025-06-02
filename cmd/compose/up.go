@@ -261,6 +261,7 @@ func runUp(
 			return err
 		}
 		bo.Services = services
+		bo.Deps = !upOptions.noDeps
 		build = &bo
 	}
 
