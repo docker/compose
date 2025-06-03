@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -34,7 +33,6 @@ import (
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/hints"
 	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
@@ -70,10 +68,6 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 			})(ctx)
 	}, s.stdinfo(), "Building")
 }
-
-const bakeSuggest = "Compose can now delegate builds to bake for better performance.\n To do so, set COMPOSE_BAKE=true."
-
-var suggest sync.Once
 
 //nolint:gocyclo
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions, localImages map[string]api.ImageSummary) (map[string]string, error) {
@@ -156,11 +150,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		w     *xprogress.Printer
 	)
 	if buildkitEnabled {
-		if hints.Enabled() && progress.Mode != progress.ModeQuiet && progress.Mode != progress.ModeJSON {
-			suggest.Do(func() {
-				fmt.Fprintln(s.dockerCli.Out(), bakeSuggest) //nolint:errcheck
-			})
-		}
 		builderName := options.Builder
 		if builderName == "" {
 			builderName = os.Getenv("BUILDX_BUILDER")

@@ -51,12 +51,7 @@ import (
 func buildWithBake(dockerCli command.Cli) (bool, error) {
 	b, ok := os.LookupEnv("COMPOSE_BAKE")
 	if !ok {
-		if dockerCli.ConfigFile().Plugins["compose"]["build"] == "bake" {
-			b, ok = "true", true
-		}
-	}
-	if !ok {
-		return false, nil
+		b = "true"
 	}
 	bake, err := strconv.ParseBool(b)
 	if err != nil {
@@ -72,6 +67,7 @@ func buildWithBake(dockerCli command.Cli) (bool, error) {
 	}
 	if !enabled {
 		logrus.Warnf("Docker Compose is configured to build using Bake, but buildkit isn't enabled")
+		return false, nil
 	}
 
 	_, err = manager.GetPlugin("buildx", dockerCli, &cobra.Command{})
