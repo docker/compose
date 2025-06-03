@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -161,12 +162,23 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 }
 
 func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) *exec.Cmd {
+	cmdOptionsMetadata := s.getPluginMetadata(path)
+	var currentCommandMetadata CommandMetadata
+	switch command {
+	case "up":
+		currentCommandMetadata = cmdOptionsMetadata.Up
+	case "down":
+		currentCommandMetadata = cmdOptionsMetadata.Down
+	}
+	commandMetadataIsEmpty := len(currentCommandMetadata.Parameters) == 0
 	provider := *service.Provider
 
 	args := []string{"compose", "--project-name", project.Name, command}
 	for k, v := range provider.Options {
 		for _, value := range v {
-			args = append(args, fmt.Sprintf("--%s=%s", k, value))
+			if _, ok := currentCommandMetadata.GetParameter(k); commandMetadataIsEmpty || ok {
+				args = append(args, fmt.Sprintf("--%s=%s", k, value))
+			}
 		}
 	}
 	args = append(args, service.Name)
@@ -197,4 +209,50 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	otel.GetTextMapPropagator().Inject(ctx, &carrier)
 	cmd.Env = append(cmd.Env, types.Mapping(carrier).Values()...)
 	return cmd
+}
+
+func (s *composeService) getPluginMetadata(path string) ProviderMetadata {
+	cmd := exec.Command(path, "compose", "metadata")
+	stdout := &bytes.Buffer{}
+	cmd.Stdout = stdout
+
+	if err := cmd.Run(); err != nil {
+		logrus.Debugf("failed to start plugin metadata command: %v", err)
+		return ProviderMetadata{}
+	}
+
+	var metadata ProviderMetadata
+	if err := json.Unmarshal(stdout.Bytes(), &metadata); err != nil {
+		output, _ := io.ReadAll(stdout)
+		logrus.Debugf("failed to decode plugin metadata: %v - %s", err, output)
+		return ProviderMetadata{}
+	}
+	return metadata
+}
+
+type ProviderMetadata struct {
+	Description string          `json:"description"`
+	Up          CommandMetadata `json:"up"`
+	Down        CommandMetadata `json:"down"`
+}
+
+type CommandMetadata struct {
+	Parameters []ParametersMetadata `json:"parameters"`
+}
+
+type ParametersMetadata struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Type        string `json:"type"`
+	Default     string `json:"default,omitempty"`
+}
+
+func (c CommandMetadata) GetParameter(paramName string) (ParametersMetadata, bool) {
+	for _, p := range c.Parameters {
+		if p.Name == paramName {
+			return p, true
+		}
+	}
+	return ParametersMetadata{}, false
 }

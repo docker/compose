@@ -17,11 +17,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func main() {
@@ -43,16 +45,27 @@ func composeCommand() *cobra.Command {
 		TraverseChildren: true,
 	}
 	c.PersistentFlags().String("project-name", "", "compose project name") // unused
-	c.AddCommand(&cobra.Command{
+	upCmd := &cobra.Command{
 		Use:  "up",
 		Run:  up,
 		Args: cobra.ExactArgs(1),
-	})
-	c.AddCommand(&cobra.Command{
+	}
+	upCmd.Flags().String("type", "", "Database type (mysql, postgres, etc.)")
+	_ = upCmd.MarkFlagRequired("type")
+	upCmd.Flags().Int("size", 10, "Database size in GB")
+	upCmd.Flags().String("name", "", "Name of the database to be created")
+	_ = upCmd.MarkFlagRequired("name")
+
+	downCmd := &cobra.Command{
 		Use:  "down",
 		Run:  down,
 		Args: cobra.ExactArgs(1),
-	})
+	}
+	downCmd.Flags().String("name", "", "Name of the database to be deleted")
+	_ = downCmd.MarkFlagRequired("name")
+
+	c.AddCommand(upCmd, downCmd)
+	c.AddCommand(metadataCommand(upCmd, downCmd))
 	return c
 }
 
@@ -71,4 +84,59 @@ func up(_ *cobra.Command, args []string) {
 
 func down(_ *cobra.Command, _ []string) {
 	fmt.Printf(`{ "type": "error", "message": "Permission error" }%s`, lineSeparator)
+}
+
+func metadataCommand(upCmd, downCmd *cobra.Command) *cobra.Command {
+	return &cobra.Command{
+		Use: "metadata",
+		Run: func(cmd *cobra.Command, _ []string) {
+			metadata(upCmd, downCmd)
+		},
+		Args: cobra.NoArgs,
+	}
+}
+
+func metadata(upCmd, downCmd *cobra.Command) {
+	metadata := ProviderMetadata{}
+	metadata.Description = "Manage services on AwesomeCloud"
+	metadata.Up = commandParameters(upCmd)
+	metadata.Down = commandParameters(downCmd)
+	jsonMetadata, err := json.Marshal(metadata)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(jsonMetadata))
+}
+
+func commandParameters(cmd *cobra.Command) CommandMetadata {
+	cmdMetadata := CommandMetadata{}
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_, isRequired := f.Annotations[cobra.BashCompOneRequiredFlag]
+		cmdMetadata.Parameters = append(cmdMetadata.Parameters, Metadata{
+			Name:        f.Name,
+			Description: f.Usage,
+			Required:    isRequired,
+			Type:        f.Value.Type(),
+			Default:     f.DefValue,
+		})
+	})
+	return cmdMetadata
+}
+
+type ProviderMetadata struct {
+	Description string          `json:"description"`
+	Up          CommandMetadata `json:"up"`
+	Down        CommandMetadata `json:"down"`
+}
+
+type CommandMetadata struct {
+	Parameters []Metadata `json:"parameters"`
+}
+
+type Metadata struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Type        string `json:"type"`
+	Default     string `json:"default,omitempty"`
 }

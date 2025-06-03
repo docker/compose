@@ -20,6 +20,7 @@ the resource(s) needed to run a service.
       options:
         type: mysql
         size: 256
+        name: myAwesomeCloudDB
 ```
 
 `provider.type` tells Compose the binary to run, which can be either:
@@ -104,7 +105,71 @@ into its runtime environment.
 ## Down lifecycle
 
 `down` lifecycle is equivalent to `up` with the `<provider> compose --project-name <NAME> down <SERVICE>` command.
-The provider is responsible for releasing all resources associated with the service. 
+The provider is responsible for releasing all resources associated with the service.
+
+## Provide metadata about options
+
+Compose extensions *MAY* optionally implement a `metadata` subcommand to provide information about the parameters accepted by the `up` and `down` commands.  
+
+The `metadata` subcommand takes no parameters and returns a JSON structure on the `stdout` channel that describes the parameters accepted by both the `up` and `down` commands, including whether each parameter is mandatory or optional.
+
+```console
+awesomecloud compose metadata
+```
+
+The expected JSON output format is:
+```json
+{
+  "description": "Manage services on AwesomeCloud",
+  "up": {
+    "parameters": [
+      {
+        "name": "type",
+        "description": "Database type (mysql, postgres, etc.)",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "name": "size",
+        "description": "Database size in GB",
+        "required": false,
+        "type": "integer",
+        "default": "10"
+      },
+      {
+        "name": "name",
+        "description": "Name of the database to be created",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  },
+  "down": {
+    "parameters": [
+      {
+        "name": "name",
+        "description": "Name of the database to be removed",
+        "required": true,
+        "type": "string"
+      }
+    ]
+  }
+}
+```
+The top elements are:
+- `description`: Human-readable description of the provider
+- `up`: Object describing the parameters accepted by the `up` command
+- `down`: Object describing the parameters accepted by the `down` command
+
+And for each command parameter, you should include the following properties:
+- `name`: The parameter name (without `--` prefix)
+- `description`: Human-readable description of the parameter
+- `required`: Boolean indicating if the parameter is mandatory
+- `type`: Parameter type (`string`, `integer`, `boolean`, etc.)
+- `default`: Default value (optional, only for non-required parameters)
+- `enum`: List of possible values supported by the parameter separated by `,` (optional, only for parameters with a limited set of values)
+
+This metadata allows Compose and other tools to understand the provider's interface and provide better user experience, such as validation, auto-completion, and documentation generation.
 
 ## Examples
 
