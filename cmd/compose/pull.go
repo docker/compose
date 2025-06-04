@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/morikuni/aec"
@@ -97,7 +98,7 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pullOptions, services []string) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
