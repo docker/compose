@@ -368,6 +368,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 				Variant:      inspect.Variant,
 			}
 			if !platforms.NewMatcher(platform).Match(actual) {
+				logrus.Debugf("local image %s doesn't match expected platform %s", service.Image, service.Platform)
 				// there is a local image, but it's for the wrong platform, so
 				// pretend it doesn't exist so that we can pull/build an image
 				// for the correct platform instead
