@@ -60,7 +60,10 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
-	cmd := s.setupPluginCommand(ctx, project, service, plugin, command)
+	cmd, err := s.setupPluginCommand(ctx, project, service, plugin, command)
+	if err != nil {
+		return err
+	}
 
 	variables, err := s.executePlugin(ctx, cmd, command, service)
 	if err != nil {
@@ -164,7 +167,7 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 	return path, err
 }
 
-func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) *exec.Cmd {
+func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) (*exec.Cmd, error) {
 	cmdOptionsMetadata := s.getPluginMetadata(path, service.Provider.Type)
 	var currentCommandMetadata CommandMetadata
 	switch command {
@@ -175,6 +178,9 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	}
 	commandMetadataIsEmpty := len(currentCommandMetadata.Parameters) == 0
 	provider := *service.Provider
+	if err := currentCommandMetadata.CheckRequiredParameters(provider); !commandMetadataIsEmpty && err != nil {
+		return nil, err
+	}
 
 	args := []string{"compose", "--project-name", project.Name, command}
 	for k, v := range provider.Options {
@@ -211,7 +217,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, &carrier)
 	cmd.Env = append(cmd.Env, types.Mapping(carrier).Values()...)
-	return cmd
+	return cmd, nil
 }
 
 func (s *composeService) getPluginMetadata(path, command string) ProviderMetadata {
@@ -269,4 +275,15 @@ func (c CommandMetadata) GetParameter(paramName string) (ParameterMetadata, bool
 		}
 	}
 	return ParameterMetadata{}, false
+}
+
+func (c CommandMetadata) CheckRequiredParameters(provider types.ServiceProviderConfig) error {
+	for _, p := range c.Parameters {
+		if p.Required {
+			if _, ok := provider.Options[p.Name]; !ok {
+				return fmt.Errorf("required parameter %q is missing from provider %q definition", p.Name, provider.Type)
+			}
+		}
+	}
+	return nil
 }
