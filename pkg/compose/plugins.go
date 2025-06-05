@@ -25,11 +25,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/socket"
+	"github.com/docker/cli/cli/config"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -43,10 +45,11 @@ type JsonMessage struct {
 }
 
 const (
-	ErrorType  = "error"
-	InfoType   = "info"
-	SetEnvType = "setenv"
-	DebugType  = "debug"
+	ErrorType                 = "error"
+	InfoType                  = "info"
+	SetEnvType                = "setenv"
+	DebugType                 = "debug"
+	providerMetadataDirectory = "compose/providers"
 )
 
 func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string) error {
@@ -162,7 +165,7 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 }
 
 func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) *exec.Cmd {
-	cmdOptionsMetadata := s.getPluginMetadata(path)
+	cmdOptionsMetadata := s.getPluginMetadata(path, service.Provider.Type)
 	var currentCommandMetadata CommandMetadata
 	switch command {
 	case "up":
@@ -211,7 +214,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	return cmd
 }
 
-func (s *composeService) getPluginMetadata(path string) ProviderMetadata {
+func (s *composeService) getPluginMetadata(path, command string) ProviderMetadata {
 	cmd := exec.Command(path, "compose", "metadata")
 	stdout := &bytes.Buffer{}
 	cmd.Stdout = stdout
@@ -227,6 +230,17 @@ func (s *composeService) getPluginMetadata(path string) ProviderMetadata {
 		logrus.Debugf("failed to decode plugin metadata: %v - %s", err, output)
 		return ProviderMetadata{}
 	}
+	// Save metadata into docker home directory to be used by Docker LSP tool
+	// Just log the error as it's not a critical error for the main flow
+	metadataDir := filepath.Join(config.Dir(), providerMetadataDirectory)
+	if err := os.MkdirAll(metadataDir, 0o700); err == nil {
+		metadataFilePath := filepath.Join(metadataDir, command+".json")
+		if err := os.WriteFile(metadataFilePath, stdout.Bytes(), 0o600); err != nil {
+			logrus.Debugf("failed to save plugin metadata: %v", err)
+		}
+	} else {
+		logrus.Debugf("failed to create plugin metadata directory: %v", err)
+	}
 	return metadata
 }
 
@@ -237,10 +251,10 @@ type ProviderMetadata struct {
 }
 
 type CommandMetadata struct {
-	Parameters []ParametersMetadata `json:"parameters"`
+	Parameters []ParameterMetadata `json:"parameters"`
 }
 
-type ParametersMetadata struct {
+type ParameterMetadata struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Required    bool   `json:"required"`
@@ -248,11 +262,11 @@ type ParametersMetadata struct {
 	Default     string `json:"default,omitempty"`
 }
 
-func (c CommandMetadata) GetParameter(paramName string) (ParametersMetadata, bool) {
+func (c CommandMetadata) GetParameter(paramName string) (ParameterMetadata, bool) {
 	for _, p := range c.Parameters {
 		if p.Name == paramName {
 			return p, true
 		}
 	}
-	return ParametersMetadata{}, false
+	return ParameterMetadata{}, false
 }
