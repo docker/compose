@@ -62,7 +62,7 @@ func (s *composeService) Logs(
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, ctr := range containers {
 		eg.Go(func() error {
-			err := s.logContainers(ctx, consumer, ctr, options)
+			err := s.logContainer(ctx, consumer, ctr, options)
 			if errdefs.IsNotImplemented(err) {
 				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
 				return nil
@@ -72,34 +72,21 @@ func (s *composeService) Logs(
 	}
 
 	if options.Follow {
-		containers = containers.filter(isRunning())
 		printer := newLogPrinter(consumer)
-		eg.Go(func() error {
-			_, err := printer.Run(api.CascadeIgnore, "", nil)
-			return err
-		})
+		eg.Go(printer.Run)
 
-		for _, c := range containers {
-			printer.HandleEvent(api.ContainerEvent{
-				Type:      api.ContainerEventAttach,
-				Container: getContainerNameWithoutProject(c),
-				ID:        c.ID,
-				Service:   c.Labels[api.ServiceLabel],
-			})
-		}
-
-		eg.Go(func() error {
-			err := s.watchContainers(ctx, projectName, options.Services, nil, printer.HandleEvent, containers, func(c container.Summary, t time.Time) error {
-				printer.HandleEvent(api.ContainerEvent{
-					Type:      api.ContainerEventAttach,
-					Container: getContainerNameWithoutProject(c),
-					ID:        c.ID,
-					Service:   c.Labels[api.ServiceLabel],
-				})
+		monitor := newMonitor(s.apiClient(), options.Project)
+		monitor.withListener(func(event api.ContainerEvent) {
+			if event.Type == api.ContainerEventStarted {
 				eg.Go(func() error {
-					err := s.logContainers(ctx, consumer, c, api.LogOptions{
+					ctr, err := s.apiClient().ContainerInspect(ctx, event.ID)
+					if err != nil {
+						return err
+					}
+
+					err = s.doLogContainer(ctx, consumer, event.Source, ctr, api.LogOptions{
 						Follow:     options.Follow,
-						Since:      t.Format(time.RFC3339Nano),
+						Since:      time.Unix(0, event.Time).Format(time.RFC3339Nano),
 						Until:      options.Until,
 						Tail:       options.Tail,
 						Timestamps: options.Timestamps,
@@ -110,31 +97,28 @@ func (s *composeService) Logs(
 					}
 					return err
 				})
-				return nil
-			}, func(c container.Summary, t time.Time) error {
-				printer.HandleEvent(api.ContainerEvent{
-					Type:      api.ContainerEventAttach,
-					Container: "", // actual name will be set by start event
-					ID:        c.ID,
-					Service:   c.Labels[api.ServiceLabel],
-				})
-				return nil
-			})
-			printer.Stop()
-			return err
+			}
+		})
+		eg.Go(func() error {
+			defer printer.Stop()
+			return monitor.Start(ctx)
 		})
 	}
 
 	return eg.Wait()
 }
 
-func (s *composeService) logContainers(ctx context.Context, consumer api.LogConsumer, c container.Summary, options api.LogOptions) error {
-	cnt, err := s.apiClient().ContainerInspect(ctx, c.ID)
+func (s *composeService) logContainer(ctx context.Context, consumer api.LogConsumer, c container.Summary, options api.LogOptions) error {
+	ctr, err := s.apiClient().ContainerInspect(ctx, c.ID)
 	if err != nil {
 		return err
 	}
+	name := getContainerNameWithoutProject(c)
+	return s.doLogContainer(ctx, consumer, name, ctr, options)
+}
 
-	r, err := s.apiClient().ContainerLogs(ctx, cnt.ID, container.LogsOptions{
+func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {
+	r, err := s.apiClient().ContainerLogs(ctx, ctr.ID, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     options.Follow,
@@ -148,11 +132,10 @@ func (s *composeService) logContainers(ctx context.Context, consumer api.LogCons
 	}
 	defer r.Close() //nolint:errcheck
 
-	name := getContainerNameWithoutProject(c)
 	w := utils.GetWriter(func(line string) {
 		consumer.Log(name, line)
 	})
-	if cnt.Config.Tty {
+	if ctr.Config.Tty {
 		_, err = io.Copy(w, r)
 	} else {
 		_, err = stdcopy.StdCopy(w, w, r)
