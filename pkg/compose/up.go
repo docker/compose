@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -31,6 +32,7 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -72,7 +74,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	var isTerminated atomic.Bool
 
 	printer := newLogPrinter(options.Start.Attach)
-	eg.Go(printer.Run)
 
 	watcher, err := NewWatcher(project, options, s.watch)
 	if err != nil && options.Start.Watch {
@@ -98,7 +99,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
-			printer.Stop()
 			_, _ = fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
 			eg.Go(func() error {
 				err := s.Stop(context.WithoutCancel(ctx), project.Name, api.StopOptions{
@@ -155,7 +155,8 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	}
 
-	monitor := newMonitor(s.apiClient(), project)
+	monitor := newMonitor(s.apiClient(), project.Name)
+	monitor.withServices(options.Start.Services)
 	monitor.withListener(printer.HandleEvent)
 
 	var exitCode int
@@ -164,8 +165,11 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		// detect first container to exit to trigger application shutdown
 		monitor.withListener(func(event api.ContainerEvent) {
 			if once && event.Type == api.ContainerEventExited {
+				if options.Start.OnExit == api.CascadeFail && event.ExitCode == 0 {
+					return
+				}
+				once = false
 				exitCode = event.ExitCode
-				printer.Stop()
 				_, _ = fmt.Fprintln(s.stdinfo(), "Aborting on container exit...")
 				eg.Go(func() error {
 					return progress.Run(ctx, func(ctx context.Context) error {
@@ -175,7 +179,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 						})
 					}, s.stdinfo())
 				})
-				once = false
 			}
 		})
 	}
@@ -192,29 +195,35 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	}
 
 	monitor.withListener(func(event api.ContainerEvent) {
-		mustAttach := false
-		switch event.Type {
-		case api.ContainerEventCreated:
-			// A container has been added to the application (scale)
-			mustAttach = true
-		case api.ContainerEventStarted:
-			// A container is restarting - need to re-attach
-			mustAttach = event.Restarting
+		if event.Type != api.ContainerEventStarted {
+			return
 		}
-		if mustAttach {
+		if event.Restarting || event.Container.Labels[api.ContainerReplaceLabel] != "" {
 			eg.Go(func() error {
-				// FIXME as container already started, we might miss the very first logs
-				return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)
+				ctr, err := s.apiClient().ContainerInspect(ctx, event.ID)
+				if err != nil {
+					return err
+				}
+
+				err = s.doLogContainer(ctx, options.Start.Attach, event.Source, ctr, api.LogOptions{
+					Follow: true,
+					Since:  ctr.State.StartedAt,
+				})
+				var notImplErr errdefs.ErrNotImplemented
+				if errors.As(err, &notImplErr) {
+					// container may be configured with logging_driver: none
+					// as container already started, we might miss the very first logs. But still better than none
+					return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)
+				}
+				return err
 			})
 		}
 	})
 
 	eg.Go(func() error {
 		err := monitor.Start(ctx)
-		fmt.Println("monitor complete")
 		// Signal for the signal-handler goroutines to stop
 		close(doneCh)
-		printer.Stop()
 		return err
 	})
 
