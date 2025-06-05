@@ -192,7 +192,6 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 		return nil, err
 	}
 	eg, ctx := errgroup.WithContext(ctx)
-	options.LogTo.Register(api.WatchLogger)
 
 	var (
 		rules []watchRule

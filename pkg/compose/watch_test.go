@@ -71,9 +71,6 @@ func (s stdLogger) Status(containerName, msg string) {
 	fmt.Printf("%s: %s\n", containerName, msg)
 }
 
-func (s stdLogger) Register(containerName string) {
-}
-
 func TestWatch_Sync(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)

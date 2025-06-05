@@ -189,8 +189,6 @@ func (l *testLogConsumer) Err(containerName, message string) {
 
 func (l *testLogConsumer) Status(containerName, msg string) {}
 
-func (l *testLogConsumer) Register(containerName string) {}
-
 func (l *testLogConsumer) LogsForContainer(containerName string) []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()

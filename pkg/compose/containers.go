@@ -128,12 +128,6 @@ func isService(services ...string) containerPredicate {
 	}
 }
 
-func isRunning() containerPredicate {
-	return func(c container.Summary) bool {
-		return c.State == "running"
-	}
-}
-
 // isOrphaned is a predicate to select containers without a matching service definition in compose project
 func isOrphaned(project *types.Project) containerPredicate {
 	services := append(project.ServiceNames(), project.DisabledServiceNames()...)
