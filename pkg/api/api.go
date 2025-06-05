@@ -649,7 +649,6 @@ type LogConsumer interface {
 	Log(containerName, message string)
 	Err(containerName, message string)
 	Status(container, msg string)
-	Register(container string)
 }
 
 // ContainerEventListener is a callback to process ContainerEvent from services
@@ -657,16 +656,18 @@ type ContainerEventListener func(event ContainerEvent)
 
 // ContainerEvent notify an event has been collected on source container implementing Service
 type ContainerEvent struct {
-	Type int
-	// Container is the name of the container _without the project prefix_.
+	Type      int
+	Time      int64
+	Container *ContainerSummary
+	// Source is the name of the container _without the project prefix_.
 	//
 	// This is only suitable for display purposes within Compose, as it's
 	// not guaranteed to be unique across services.
-	Container string
-	ID        string
-	Service   string
-	Line      string
-	// ContainerEventExit only
+	Source  string
+	ID      string
+	Service string
+	Line    string
+	// ContainerEventExited only
 	ExitCode   int
 	Restarting bool
 }
@@ -676,17 +677,19 @@ const (
 	ContainerEventLog = iota
 	// ContainerEventErr is a ContainerEvent of type log on stderr. Line is set
 	ContainerEventErr
-	// ContainerEventAttach is a ContainerEvent of type attach. First event sent about a container
-	ContainerEventAttach
+	// ContainerEventStarted let consumer know a container has been started
+	ContainerEventStarted
+	// ContainerEventRestarted let consumer know a container has been restarted
+	ContainerEventRestarted
 	// ContainerEventStopped is a ContainerEvent of type stopped.
 	ContainerEventStopped
+	// ContainerEventCreated let consumer know a new container has been created
+	ContainerEventCreated
 	// ContainerEventRecreated let consumer know container stopped but his being replaced
 	ContainerEventRecreated
-	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
-	ContainerEventExit
+	// ContainerEventExited is a ContainerEvent of type exit. ExitCode is set
+	ContainerEventExited
 	// UserCancel user cancelled compose up, we are stopping containers
-	UserCancel
-	// HookEventLog is a ContainerEvent of type log on stdout by service hook
 	HookEventLog
 )
 

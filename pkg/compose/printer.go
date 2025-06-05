@@ -26,8 +26,7 @@ import (
 // logPrinter watch application containers and collect their logs
 type logPrinter interface {
 	HandleEvent(event api.ContainerEvent)
-	Run(cascade api.Cascade, exitCodeFrom string, stopFn func() error) (int, error)
-	Cancel()
+	Run() error
 	Stop()
 }
 
@@ -47,11 +46,6 @@ func newLogPrinter(consumer api.LogConsumer) logPrinter {
 		stop:     sync.Once{},
 	}
 	return &printer
-}
-
-func (p *printer) Cancel() {
-	// note: HandleEvent is used to ensure this doesn't deadlock
-	p.HandleEvent(api.ContainerEvent{Type: api.UserCancel})
 }
 
 func (p *printer) Stop() {
@@ -78,82 +72,25 @@ func (p *printer) HandleEvent(event api.ContainerEvent) {
 	}
 }
 
-//nolint:gocyclo
-func (p *printer) Run(cascade api.Cascade, exitCodeFrom string, stopFn func() error) (int, error) {
-	var (
-		aborting bool
-		exitCode int
-	)
+func (p *printer) Run() error {
 	defer p.Stop()
 
 	// containers we are tracking. Use true when container is running, false after we receive a stop|die signal
-	containers := map[string]bool{}
 	for {
 		select {
 		case <-p.stopCh:
-			return exitCode, nil
+			return nil
 		case event := <-p.queue:
-			container, id := event.Container, event.ID
 			switch event.Type {
-			case api.UserCancel:
-				aborting = true
-			case api.ContainerEventAttach:
-				if attached, ok := containers[id]; ok && attached {
-					continue
-				}
-				containers[id] = true
-				p.consumer.Register(container)
-			case api.ContainerEventExit, api.ContainerEventStopped, api.ContainerEventRecreated:
-				if !aborting && containers[id] {
-					p.consumer.Status(container, fmt.Sprintf("exited with code %d", event.ExitCode))
-					if event.Type == api.ContainerEventRecreated {
-						p.consumer.Status(container, "has been recreated")
-					}
-				}
-				containers[id] = false
-				if !event.Restarting {
-					delete(containers, id)
-				}
-
-				if cascade == api.CascadeStop {
-					if !aborting {
-						aborting = true
-						err := stopFn()
-						if err != nil {
-							return 0, err
-						}
-					}
-				}
-				if event.Type == api.ContainerEventExit {
-					if cascade == api.CascadeFail && event.ExitCode != 0 {
-						exitCodeFrom = event.Service
-						if !aborting {
-							aborting = true
-							err := stopFn()
-							if err != nil {
-								return 0, err
-							}
-						}
-					}
-					if cascade == api.CascadeStop && exitCodeFrom == "" {
-						exitCodeFrom = event.Service
-					}
-				}
-
-				if exitCodeFrom == event.Service && (event.Type == api.ContainerEventExit || event.Type == api.ContainerEventStopped) {
-					// Container was interrupted or exited, let's capture exit code
-					exitCode = event.ExitCode
-				}
-				if len(containers) == 0 {
-					// Last container terminated, done
-					return exitCode, nil
+			case api.ContainerEventExited, api.ContainerEventStopped, api.ContainerEventRecreated, api.ContainerEventRestarted:
+				p.consumer.Status(event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
+				if event.Type == api.ContainerEventRecreated {
+					p.consumer.Status(event.Source, "has been recreated")
 				}
 			case api.ContainerEventLog, api.HookEventLog:
-				p.consumer.Log(container, event.Line)
+				p.consumer.Log(event.Source, event.Line)
 			case api.ContainerEventErr:
-				if !aborting {
-					p.consumer.Err(container, event.Line)
-				}
+				p.consumer.Err(event.Source, event.Line)
 			}
 		}
 	}
