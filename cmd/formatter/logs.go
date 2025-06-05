@@ -183,7 +183,3 @@ func (l logDecorator) Status(container, msg string) {
 	l.decorated.Status(container, msg)
 	l.After()
 }
-
-func (l logDecorator) Register(container string) {
-	l.decorated.Register(container)
-}
