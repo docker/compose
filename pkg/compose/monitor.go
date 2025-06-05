@@ -20,7 +20,6 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
@@ -34,23 +33,23 @@ import (
 
 type monitor struct {
 	api     client.APIClient
-	project *types.Project
+	project string
 	// services tells us which service to consider and those we can ignore, maybe ran by a concurrent compose command
 	services  map[string]bool
 	listeners []api.ContainerEventListener
 }
 
-func newMonitor(api client.APIClient, project *types.Project) *monitor {
-	services := map[string]bool{}
-	if project != nil {
-		for name := range project.Services {
-			services[name] = true
-		}
-	}
+func newMonitor(api client.APIClient, project string) *monitor {
 	return &monitor{
 		api:      api,
 		project:  project,
-		services: services,
+		services: map[string]bool{},
+	}
+}
+
+func (c *monitor) withServices(services []string) {
+	for _, name := range services {
+		c.services[name] = true
 	}
 }
 
@@ -62,7 +61,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	initialState, err := c.api.ContainerList(ctx, container.ListOptions{
 		All: true,
 		Filters: filters.NewArgs(
-			projectFilter(c.project.Name),
+			projectFilter(c.project),
 			oneOffFilter(false),
 			hasConfigHashLabel(),
 		),
@@ -78,22 +77,24 @@ func (c *monitor) Start(ctx context.Context) error {
 			containers.Add(ctr.ID)
 		}
 	}
-
 	restarting := utils.Set[string]{}
 
 	evtCh, errCh := c.api.Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("type", "container"),
-			projectFilter(c.project.Name)),
+			projectFilter(c.project)),
 	})
 	for {
+		if len(containers) == 0 {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			return nil
 		case err := <-errCh:
 			return err
 		case event := <-evtCh:
-			if !c.services[event.Actor.Attributes[api.ServiceLabel]] {
+			if len(c.services) > 0 && !c.services[event.Actor.Attributes[api.ServiceLabel]] {
 				continue
 			}
 			ctr, err := c.getContainerSummary(event)
@@ -103,24 +104,35 @@ func (c *monitor) Start(ctx context.Context) error {
 
 			switch event.Action {
 			case events.ActionCreate:
-				containers.Add(ctr.ID)
+				if len(c.services) == 0 || c.services[ctr.Labels[api.ServiceLabel]] {
+					containers.Add(ctr.ID)
+				}
+				evtType := api.ContainerEventCreated
+				if _, ok := ctr.Labels[api.ContainerReplaceLabel]; ok {
+					evtType = api.ContainerEventRecreated
+				}
 				for _, listener := range c.listeners {
-					listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventCreated))
+					listener(newContainerEvent(event.TimeNano, ctr, evtType))
 				}
 				logrus.Debugf("container %s created", ctr.Name)
 			case events.ActionStart:
 				restarted := restarting.Has(ctr.ID)
-				for _, listener := range c.listeners {
-					listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventStarted, func(e *api.ContainerEvent) {
-						e.Restarting = restarted
-					}))
-				}
 				if restarted {
 					logrus.Debugf("container %s restarted", ctr.Name)
+					for _, listener := range c.listeners {
+						listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventStarted, func(e *api.ContainerEvent) {
+							e.Restarting = restarted
+						}))
+					}
 				} else {
 					logrus.Debugf("container %s started", ctr.Name)
+					for _, listener := range c.listeners {
+						listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventStarted))
+					}
 				}
-				containers.Add(ctr.ID)
+				if len(c.services) == 0 || c.services[ctr.Labels[api.ServiceLabel]] {
+					containers.Add(ctr.ID)
+				}
 			case events.ActionRestart:
 				for _, listener := range c.listeners {
 					listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventRestarted))
@@ -159,9 +171,6 @@ func (c *monitor) Start(ctx context.Context) error {
 				}
 			}
 		}
-		if len(containers) == 0 {
-			return nil
-		}
 	}
 }
 
@@ -192,7 +201,7 @@ func (c *monitor) getContainerSummary(event events.Message) (*api.ContainerSumma
 	ctr := &api.ContainerSummary{
 		ID:      event.Actor.ID,
 		Name:    event.Actor.Attributes["name"],
-		Project: c.project.Name,
+		Project: c.project,
 		Service: event.Actor.Attributes[api.ServiceLabel],
 		Labels:  event.Actor.Attributes, // More than just labels, but that'c the closest the API gives us
 	}

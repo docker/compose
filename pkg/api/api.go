@@ -667,7 +667,7 @@ type ContainerEvent struct {
 	ID      string
 	Service string
 	Line    string
-	// ContainerEventExited only
+	// ExitCode is only set on ContainerEventExited events
 	ExitCode   int
 	Restarting bool
 }

@@ -635,13 +635,18 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if inherit {
 		inherited = &replaced
 	}
+
+	replacedContainerName := service.ContainerName
+	if replacedContainerName == "" {
+		replacedContainerName = service.Name + api.Separator + strconv.Itoa(number)
+	}
 	name := getContainerName(project.Name, service, number)
 	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
 	opts := createOptions{
 		AutoRemove:        false,
 		AttachStdin:       false,
 		UseNetworkAliases: true,
-		Labels:            mergeLabels(service.Labels, service.CustomLabels).Add(api.ContainerReplaceLabel, replaced.ID),
+		Labels:            mergeLabels(service.Labels, service.CustomLabels).Add(api.ContainerReplaceLabel, replacedContainerName),
 	}
 	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited, opts, w)
 	if err != nil {
@@ -659,7 +664,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 		return created, err
 	}
 
-	err = s.apiClient().ContainerRename(ctx, created.ID, name)
+	err = s.apiClient().ContainerRename(ctx, tmpName, name)
 	if err != nil {
 		return created, err
 	}
