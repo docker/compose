@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
@@ -75,9 +74,10 @@ func (s *composeService) Logs(
 
 	if options.Follow {
 		printer := newLogPrinter(consumer)
-		eg.Go(printer.Run)
 
-		monitor := newMonitor(s.apiClient(), options.Project)
+		monitor := newMonitor(s.apiClient(), projectName)
+		monitor.withServices(options.Services)
+		monitor.withListener(printer.HandleEvent)
 		monitor.withListener(func(event api.ContainerEvent) {
 			if event.Type == api.ContainerEventStarted {
 				eg.Go(func() error {
@@ -88,7 +88,7 @@ func (s *composeService) Logs(
 
 					err = s.doLogContainer(ctx, consumer, event.Source, ctr, api.LogOptions{
 						Follow:     options.Follow,
-						Since:      time.Unix(0, event.Time).Format(time.RFC3339Nano),
+						Since:      ctr.State.StartedAt,
 						Until:      options.Until,
 						Tail:       options.Tail,
 						Timestamps: options.Timestamps,
@@ -103,7 +103,6 @@ func (s *composeService) Logs(
 			}
 		})
 		eg.Go(func() error {
-			defer printer.Stop()
 			return monitor.Start(ctx)
 		})
 	}
