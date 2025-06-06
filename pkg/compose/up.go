@@ -72,12 +72,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	var isTerminated atomic.Bool
 	printer := newLogPrinter(options.Start.Attach)
 
-	var watcher *Watcher
-	if options.Start.Watch {
-		watcher, err = NewWatcher(project, options, s.watch)
-		if err != nil {
-			return err
-		}
+	watcher, err := NewWatcher(project, options, s.watch)
+	if err != nil && options.Start.Watch {
+		return err
 	}
 
 	var navigationMenu *formatter.LogKeyboard
