@@ -640,23 +640,23 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 		UseNetworkAliases: true,
 		Labels:            mergeLabels(service.Labels, service.CustomLabels).Add(api.ContainerReplaceLabel, replaced.ID),
 	}
-	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited, opts, w)
-	if err != nil {
-		return created, err
-	}
-
 	timeoutInSecond := utils.DurationSecondToInt(timeout)
 	err = s.apiClient().ContainerStop(ctx, replaced.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 	if err != nil {
 		return created, err
 	}
 
-	err = s.apiClient().ContainerRemove(ctx, replaced.ID, containerType.RemoveOptions{})
+	err = s.apiClient().ContainerRename(ctx, replaced.ID, tmpName)
 	if err != nil {
 		return created, err
 	}
 
-	err = s.apiClient().ContainerRename(ctx, created.ID, name)
+	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, opts, w)
+	if err != nil {
+		return created, err
+	}
+
+	err = s.apiClient().ContainerRemove(ctx, replaced.ID, containerType.RemoveOptions{})
 	if err != nil {
 		return created, err
 	}
