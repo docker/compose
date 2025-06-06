@@ -59,6 +59,12 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
+	// Temporary implementation of use_api_socket until we get actual support inside docker engine
+	project, err := s.useAPISocket(project)
+	if err != nil {
+		return "", err
+	}
+
 	err = progress.Run(ctx, func(ctx context.Context) error {
 		return s.startDependencies(ctx, project, opts)
 	}, s.stdinfo())
@@ -171,7 +177,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 
 func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {
 	var dependencies []string
-	for name, _ := range project.Services {
+	for name := range project.Services {
 		if name != options.Service {
 			dependencies = append(dependencies, name)
 		}
