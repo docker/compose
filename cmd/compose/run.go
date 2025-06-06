@@ -271,22 +271,6 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		return err
 	}
 
-	err = progress.Run(ctx, func(ctx context.Context) error {
-		var buildForDeps *api.BuildOptions
-		if !createOpts.noBuild {
-			// allow dependencies needing build to be implicitly selected
-			bo, err := buildOpts.toAPIBuildOptions(nil)
-			if err != nil {
-				return err
-			}
-			buildForDeps = &bo
-		}
-		return startDependencies(ctx, backend, *project, buildForDeps, options)
-	}, dockerCli.Err())
-	if err != nil {
-		return err
-	}
-
 	labels := types.Labels{}
 	for _, s := range options.labels {
 		parts := strings.SplitN(s, "=", 2)
@@ -298,9 +282,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 
 	var buildForRun *api.BuildOptions
 	if !createOpts.noBuild {
-		// dependencies have already been started above, so only the service
-		// being run might need to be built at this point
-		bo, err := buildOpts.toAPIBuildOptions([]string{options.Service})
+		bo, err := buildOpts.toAPIBuildOptions(project.ServiceNames())
 		if err != nil {
 			return err
 		}
@@ -314,7 +296,12 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 
 	// start container and attach to container streams
 	runOpts := api.RunOptions{
-		Build:             buildForRun,
+		CreateOptions: api.CreateOptions{
+			Build:         buildForRun,
+			RemoveOrphans: options.removeOrphans,
+			IgnoreOrphans: options.ignoreOrphans,
+			QuietPull:     options.quietPull,
+		},
 		Name:              options.name,
 		Service:           options.Service,
 		Command:           options.Command,
@@ -332,7 +319,6 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		UseNetworkAliases: options.useAliases,
 		NoDeps:            options.noDeps,
 		Index:             0,
-		QuietPull:         options.quietPull,
 	}
 
 	for name, service := range project.Services {
@@ -351,35 +337,4 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
-}
-
-func startDependencies(ctx context.Context, backend api.Service, project types.Project, buildOpts *api.BuildOptions, options runOptions) error {
-	dependencies := types.Services{}
-	var requestedService types.ServiceConfig
-	for name, service := range project.Services {
-		if name != options.Service {
-			dependencies[name] = service
-		} else {
-			requestedService = service
-		}
-	}
-
-	project.Services = dependencies
-	project.DisabledServices[options.Service] = requestedService
-	err := backend.Create(ctx, &project, api.CreateOptions{
-		Build:         buildOpts,
-		IgnoreOrphans: options.ignoreOrphans,
-		RemoveOrphans: options.removeOrphans,
-		QuietPull:     options.quietPull,
-	})
-	if err != nil {
-		return err
-	}
-
-	if len(dependencies) > 0 {
-		return backend.Start(ctx, project.Name, api.StartOptions{
-			Project: &project,
-		})
-	}
-	return nil
 }
