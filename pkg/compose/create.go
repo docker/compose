@@ -114,6 +114,13 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 				"--remove-orphans flag to clean it up.", orphans.names())
 		}
 	}
+
+	// Temporary implementation of use_api_socket until we get actual support inside docker engine
+	project, err = s.useAPISocket(project)
+	if err != nil {
+		return err
+	}
+
 	return newConvergence(options.Services, observedState, networks, volumes, s).apply(ctx, project, options)
 }
 
