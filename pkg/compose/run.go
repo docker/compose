@@ -28,6 +28,7 @@ import (
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/pkg/stringid"
 )
 
@@ -58,6 +59,13 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
+	err = progress.Run(ctx, func(ctx context.Context) error {
+		return s.startDependencies(ctx, project, opts)
+	}, s.stdinfo())
+	if err != nil {
+		return "", err
+	}
+
 	service, err := project.GetService(opts.Service)
 	if err != nil {
 		return "", err
@@ -159,4 +167,34 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	for k, v := range opts.Labels {
 		service.Labels = service.Labels.Add(k, v)
 	}
+}
+
+func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {
+	var dependencies []string
+	for name, _ := range project.Services {
+		if name != options.Service {
+			dependencies = append(dependencies, name)
+		}
+	}
+
+	project, err := project.WithSelectedServices(dependencies)
+	if err != nil {
+		return err
+	}
+	err = s.Create(ctx, project, api.CreateOptions{
+		Build:         options.Build,
+		IgnoreOrphans: options.IgnoreOrphans,
+		RemoveOrphans: options.RemoveOrphans,
+		QuietPull:     options.QuietPull,
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(dependencies) > 0 {
+		return s.Start(ctx, project.Name, api.StartOptions{
+			Project: project,
+		})
+	}
+	return nil
 }
