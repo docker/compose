@@ -351,7 +351,7 @@ type RemoveOptions struct {
 
 // RunOptions group options of the Run API
 type RunOptions struct {
-	Build *BuildOptions
+	CreateOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
 	Name              string
@@ -371,8 +371,6 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
-	// QuietPull makes the pulling process quiet
-	QuietPull bool
 	// used by exec
 	Index int
 }
