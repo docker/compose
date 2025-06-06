@@ -295,9 +295,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	// Use docker/cli mechanism to propagate termination signal to child process
 	server, err := socket.NewPluginServer(nil)
-	if err != nil {
+	if err == nil {
 		defer server.Close() //nolint:errcheck
-		cmd.Cancel = server.Close
 		cmd.Env = replace(cmd.Env, socket.EnvKey, server.Addr().String())
 	}
 
