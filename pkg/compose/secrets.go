@@ -25,10 +25,38 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/docker/api/types/container"
 )
 
 func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
+	if hasAPISocket(service) {
+		// Generate a "secret" for the authconfig for the API socket.
+		creds, err := s.dockerCli.ConfigFile().GetAllCredentials()
+		if err != nil {
+			return fmt.Errorf("resolving credentials failed: %w", err)
+		}
+
+		// Create a new config file with just the auth.
+		newConfig := &configfile.ConfigFile{
+			AuthConfigs: creds,
+		}
+		var configBuf bytes.Buffer
+		if err := newConfig.SaveToWriter(&configBuf); err != nil {
+			return fmt.Errorf("saving creds for API socket: %w", err)
+		}
+
+		mode := types.FileMode(0o400)
+		b, err := createTar(configBuf.String(), types.FileReferenceConfig{
+			Target: dockerConfigPathInContainer,
+			Mode:   &mode,
+		})
+
+		if err = s.apiClient().CopyToContainer(ctx, id, "/", &b, container.CopyToContainerOptions{}); err != nil {
+			return fmt.Errorf("copying creds for API socket: %w", err)
+		}
+	}
+
 	for _, config := range service.Secrets {
 		file := project.Secrets[config.Source]
 		if file.Environment == "" {
@@ -40,9 +68,9 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 		}
 
 		if config.Target == "" {
-			config.Target = "/run/secrets/" + config.Source
+			config.Target = secretsDir + config.Source
 		} else if !isAbsTarget(config.Target) {
-			config.Target = "/run/secrets/" + config.Target
+			config.Target = secretsDir + config.Target
 		}
 
 		content := file.Content

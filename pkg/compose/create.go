@@ -48,6 +48,11 @@ import (
 	"github.com/docker/compose/v2/pkg/prompt"
 )
 
+const (
+	secretsDir                  = "/run/secrets/"
+	dockerConfigPathInContainer = secretsDir + "/docker/config.json"
+)
+
 type createOptions struct {
 	AutoRemove        bool
 	AttachStdin       bool
@@ -188,6 +193,12 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	proxyConfig := types.MappingWithEquals(s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil))
 	env := proxyConfig.OverrideBy(service.Environment)
 
+	if hasAPISocket(service) {
+		// Inject the Docker API socket credentials path in the environment.
+		p := dockerConfigPathInContainer
+		env["DOCKER_CONFIG"] = &p
+	}
+
 	var mainNwName string
 	var mainNw *types.ServiceNetworkConfig
 	if len(service.Networks) > 0 {
@@ -319,6 +330,16 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		Links:     links,
 	}
 	return cfgs, nil
+}
+
+func hasAPISocket(service types.ServiceConfig) bool {
+	for _, v := range service.Volumes {
+		if v.Type == "api-socket" {
+			return true
+		}
+	}
+
+	return false
 }
 
 // prepareContainerMACAddress handles the service-level mac_address field and the newer mac_address field added to service
@@ -967,7 +988,7 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 		}
 	}
 
-	mounts, err := fillBindMounts(p, service, mounts)
+	mounts, err := s.fillBindMounts(p, service, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -979,16 +1000,16 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	return values, nil
 }
 
-func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.Mount) (map[string]mount.Mount, error) {
-	for _, v := range s.Volumes {
-		bindMount, err := buildMount(p, v)
+func (s *composeService) fillBindMounts(p types.Project, service types.ServiceConfig, m map[string]mount.Mount) (map[string]mount.Mount, error) {
+	for _, v := range service.Volumes {
+		bindMount, err := s.buildMount(p, v)
 		if err != nil {
 			return nil, err
 		}
 		m[bindMount.Target] = bindMount
 	}
 
-	secrets, err := buildContainerSecretMounts(p, s)
+	secrets, err := s.buildContainerSecretMounts(p, service)
 	if err != nil {
 		return nil, err
 	}
@@ -999,7 +1020,7 @@ func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.M
 		m[s.Target] = s
 	}
 
-	configs, err := buildContainerConfigMounts(p, s)
+	configs, err := s.buildContainerConfigMounts(p, service)
 	if err != nil {
 		return nil, err
 	}
@@ -1012,11 +1033,11 @@ func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.M
 	return m, nil
 }
 
-func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
+func (s *composeService) buildContainerConfigMounts(p types.Project, service types.ServiceConfig) ([]mount.Mount, error) {
 	mounts := map[string]mount.Mount{}
 
 	configsBaseDir := "/"
-	for _, config := range s.Configs {
+	for _, config := range service.Configs {
 		target := config.Target
 		if config.Target == "" {
 			target = configsBaseDir + config.Source
@@ -1044,7 +1065,7 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
-		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
+		bindMount, err := s.buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedConfig.File,
 			Target:   target,
@@ -1062,11 +1083,10 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 	return values, nil
 }
 
-func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
+func (s *composeService) buildContainerSecretMounts(p types.Project, service types.ServiceConfig) ([]mount.Mount, error) {
 	mounts := map[string]mount.Mount{}
 
-	secretsDir := "/run/secrets/"
-	for _, secret := range s.Secrets {
+	for _, secret := range service.Secrets {
 		target := secret.Target
 		if secret.Target == "" {
 			target = secretsDir + secret.Source
@@ -1098,7 +1118,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			logrus.Warnf("secret file %s does not exist", definedSecret.Name)
 		}
 
-		mnt, err := buildMount(p, types.ServiceVolumeConfig{
+		mnt, err := s.buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
@@ -1131,7 +1151,7 @@ func isWindowsAbs(p string) bool {
 	return paths.IsWindowsAbs(p)
 }
 
-func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
+func (s *composeService) buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
 	source := volume.Source
 	switch volume.Type {
 	case types.VolumeTypeBind:
@@ -1152,14 +1172,32 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
+	vtype := mount.Type(volume.Type)
+	if volume.Type == "api-socket" { // TODO: use VolumeTypeAPISocket when compose-go PR merged
+		vtype = mount.TypeBind // rewrite to a bind mount
+
+		if volume.Source == "" {
+			socketPath := s.dockerCli.DockerEndpoint().Host
+			if !strings.HasPrefix(socketPath, "unix://") {
+				return mount.Mount{}, fmt.Errorf("flag --use-api-socket can only be used with unix sockets: docker endpoint %s incompatible", socketPath)
+			}
+			socketPath = strings.TrimPrefix(socketPath, "unix://") // should we confirm absolute path?
+			volume.Source = socketPath
+		}
+
+		if volume.Target == "" {
+			volume.Target = "/var/run/docker.sock"
+		}
+	}
+
 	bind, vol, tmpfs, img := buildMountOptions(volume)
 
 	if bind != nil {
-		volume.Type = types.VolumeTypeBind
+		vtype = mount.TypeBind
 	}
 
 	return mount.Mount{
-		Type:          mount.Type(volume.Type),
+		Type:          vtype,
 		Source:        source,
 		Target:        volume.Target,
 		ReadOnly:      volume.ReadOnly,
@@ -1172,7 +1210,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 }
 
 func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions, *mount.ImageOptions) {
-	if volume.Type != types.VolumeTypeBind && volume.Bind != nil {
+	if volume.Type != types.VolumeTypeBind && volume.Type != "api-socket" && volume.Bind != nil { // TODO: use VolumeTypeAPISocket when compose-go PR merged
 		logrus.Warnf("mount of type `%s` should not define `bind` option", volume.Type)
 	}
 	if volume.Type != types.VolumeTypeVolume && volume.Volume != nil {
@@ -1188,6 +1226,8 @@ func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *m
 	switch volume.Type {
 	case "bind":
 		return buildBindOption(volume.Bind), nil, nil, nil
+	case "api-socket":
+		return nil, nil, nil, nil // defer to defaults when binding the API socket
 	case "volume":
 		return nil, buildVolumeOptions(volume.Volume), nil, nil
 	case "tmpfs":
@@ -1202,6 +1242,7 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 	if bind == nil {
 		return nil
 	}
+
 	opts := &mount.BindOptions{
 		Propagation:      mount.Propagation(bind.Propagation),
 		CreateMountpoint: bind.CreateHostPath,
