@@ -87,6 +87,14 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		}
 		return nil
 	}
+	if opts.Format == "json" {
+		// Convert map to slice
+		var imageList []api.ImageSummary
+		for _, img := range images {
+			imageList = append(imageList, img)
+		}
+		return formatter.Print(imageList, opts.Format, dockerCli.Out(), nil)
+	}
 
 	return formatter.Print(images, opts.Format, dockerCli.Out(),
 		func(w io.Writer) {
