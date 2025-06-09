@@ -96,13 +96,13 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
-			printer.Cancel()
 			_, _ = fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
 			eg.Go(func() error {
 				err := s.Stop(context.WithoutCancel(ctx), project.Name, api.StopOptions{
 					Services: options.Create.Services,
 					Project:  project,
 				})
+				printer.Cancel()
 				isTerminated.Store(true)
 				return err
 			})
