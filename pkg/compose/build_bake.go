@@ -144,7 +144,20 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		privileged     bool
 		read           []string
 		expectedImages = make(map[string]string, len(serviceToBeBuild)) // service name -> expected image
+		targets        = make(map[string]string, len(serviceToBeBuild)) // service name -> build target
 	)
+
+	// produce a unique ID for service used as bake target
+	for serviceName := range serviceToBeBuild {
+		t := strings.ReplaceAll(serviceName, ".", "_")
+		for {
+			if _, ok := targets[serviceName]; !ok {
+				targets[serviceName] = t
+				break
+			}
+			t += "_"
+		}
+	}
 
 	for serviceName, service := range serviceToBeBuild {
 		if service.Build == nil {
@@ -192,9 +205,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			}
 		}
 
-		cfg.Targets[serviceName] = bakeTarget{
+		target := targets[serviceName]
+		cfg.Targets[target] = bakeTarget{
 			Context:          build.Context,
-			Contexts:         additionalContexts(build.AdditionalContexts),
+			Contexts:         additionalContexts(build.AdditionalContexts, targets),
 			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
 			DockerfileInline: strings.ReplaceAll(build.DockerfileInline, "${", "$${"),
 			Args:             args,
@@ -216,7 +230,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Outputs: outputs,
 			Call:    call,
 		}
-		group.Targets = append(group.Targets, serviceName)
+		group.Targets = append(group.Targets, target)
 	}
 
 	cfg.Groups["default"] = group
@@ -340,7 +354,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	cw := progress.ContextWriter(ctx)
 	results := map[string]string{}
 	for service, name := range expectedImages {
-		built, ok := md[service] // bake target == service name
+		built, ok := md[targets[service]]
 		if !ok {
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", service)
 		}
@@ -350,11 +364,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	return results, nil
 }
 
-func additionalContexts(contexts types.Mapping) map[string]string {
+func additionalContexts(contexts types.Mapping, targets map[string]string) map[string]string {
 	ac := map[string]string{}
 	for k, v := range contexts {
 		if target, found := strings.CutPrefix(v, types.ServicePrefix); found {
-			v = "target:" + target
+			v = "target:" + targets[target]
 		}
 		ac[k] = v
 	}
