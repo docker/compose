@@ -148,7 +148,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	)
 
 	// produce a unique ID for service used as bake target
-	for serviceName := range serviceToBeBuild {
+	for serviceName := range project.Services {
 		t := strings.ReplaceAll(serviceName, ".", "_")
 		for {
 			if _, ok := targets[serviceName]; !ok {
@@ -159,7 +159,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 	}
 
-	for serviceName, service := range serviceToBeBuild {
+	for serviceName, service := range project.Services {
 		if service.Build == nil {
 			continue
 		}
@@ -230,7 +230,14 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Outputs: outputs,
 			Call:    call,
 		}
-		group.Targets = append(group.Targets, target)
+	}
+
+	// create a bake group with targets for services to build
+	for serviceName, service := range serviceToBeBuild {
+		if service.Build == nil {
+			continue
+		}
+		group.Targets = append(group.Targets, targets[serviceName])
 	}
 
 	cfg.Groups["default"] = group
