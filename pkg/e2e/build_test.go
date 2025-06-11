@@ -536,3 +536,31 @@ func TestBuildDependsOn(t *testing.T) {
 	out := res.Combined()
 	assert.Check(t, strings.Contains(out, "test1  Built"))
 }
+
+func TestBuildSubset(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/subset/compose.yaml", "down", "--rmi=local")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/subset/compose.yaml", "build", "main")
+	out := res.Combined()
+	assert.Check(t, strings.Contains(out, "main  Built"))
+}
+
+func TestBuildDependentImage(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "down", "--rmi=local")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "build", "firstbuild")
+	out := res.Combined()
+	assert.Check(t, strings.Contains(out, "firstbuild  Built"))
+
+	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "build", "secondbuild")
+	out = res.Combined()
+	assert.Check(t, strings.Contains(out, "secondbuild  Built"))
+}

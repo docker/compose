@@ -1,0 +1,14 @@
+services:
+  main:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+    entrypoint: ["echo", "Hello from main"]
+    depends_on:
+      - dep1
+
+  dep1:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+    entrypoint: ["echo", "Hello from dep1"]
