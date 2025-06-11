@@ -174,7 +174,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 
 		image := api.GetImageNameOrDefault(service, project.Name)
-		expectedImages[serviceName] = image
+
+		if _, ok := serviceToBeBuild[serviceName]; ok {
+			expectedImages[serviceName] = image
+		}
 
 		entitlements := build.Entitlements
 		if slices.Contains(build.Entitlements, "security.insecure") {
