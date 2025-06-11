@@ -259,6 +259,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			break
 		}
 	}
+	defer func() {
+		_ = os.Remove(metadataFile)
+	}()
 
 	buildx, err := manager.GetPlugin("buildx", s.dockerCli, &cobra.Command{})
 	if err != nil {
