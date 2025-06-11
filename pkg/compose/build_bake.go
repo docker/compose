@@ -140,11 +140,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		Targets: map[string]bakeTarget{},
 	}
 	var (
-		group          bakeGroup
-		privileged     bool
-		read           []string
-		expectedImages = make(map[string]string, len(serviceToBeBuild)) // service name -> expected image
-		targets        = make(map[string]string, len(serviceToBeBuild)) // service name -> build target
+		group      bakeGroup
+		privileged bool
+		read       []string
+		targets    = make(map[string]string, len(serviceToBeBuild)) // service name -> build target
 	)
 
 	// produce a unique ID for service used as bake target
@@ -172,9 +171,6 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			}
 			args[k] = *v
 		}
-
-		image := api.GetImageNameOrDefault(service, project.Name)
-		expectedImages[serviceName] = image
 
 		entitlements := build.Entitlements
 		if slices.Contains(build.Entitlements, "security.insecure") {
@@ -213,7 +209,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			DockerfileInline: strings.ReplaceAll(build.DockerfileInline, "${", "$${"),
 			Args:             args,
 			Labels:           build.Labels,
-			Tags:             append(build.Tags, image),
+			Tags:             append(build.Tags, api.GetImageNameOrDefault(service, project.Name)),
 
 			CacheFrom: build.CacheFrom,
 			// CacheTo:    TODO
@@ -360,10 +356,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	cw := progress.ContextWriter(ctx)
 	results := map[string]string{}
-	for service, name := range expectedImages {
-		built, ok := md[targets[service]]
+	for name := range serviceToBeBuild {
+		target := targets[name]
+		built, ok := md[target]
 		if !ok {
-			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", service)
+			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
 		results[name] = built.Digest
 		cw.Event(progress.BuiltEvent(name))
