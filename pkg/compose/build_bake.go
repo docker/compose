@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -253,20 +254,22 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	logrus.Debugf("bake build config:\n%s", string(b))
 
-	metadata, err := os.CreateTemp(os.TempDir(), "compose")
-	if err != nil {
-		return nil, err
+	var metadataFile string
+	for {
+		// we don't use os.CreateTemp here as we need a temporary file name, but don't want it actually created
+		// as bake relies on atomicwriter and this creates conflict during rename
+		metadataFile = filepath.Join(os.TempDir(), fmt.Sprintf("compose-build-metadataFile-%d.json", rand.Int31()))
+		if _, err = os.Stat(metadataFile); os.IsNotExist(err) {
+			break
+		}
 	}
-	defer func() {
-		_ = os.Remove(metadata.Name())
-	}()
 
 	buildx, err := manager.GetPlugin("buildx", s.dockerCli, &cobra.Command{})
 	if err != nil {
 		return nil, err
 	}
 
-	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadata.Name()}
+	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadataFile}
 	mustAllow := buildx.Version != "" && versions.GreaterThanOrEqualTo(buildx.Version[1:], "0.17.0")
 	if mustAllow {
 		// FIXME we should prompt user about this, but this is a breaking change in UX
@@ -347,7 +350,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, fmt.Errorf("failed to execute bake: %w", err)
 	}
 
-	b, err = os.ReadFile(metadata.Name())
+	b, err = os.ReadFile(metadataFile)
 	if err != nil {
 		return nil, err
 	}
