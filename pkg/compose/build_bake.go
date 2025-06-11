@@ -114,6 +114,7 @@ type bakeTarget struct {
 	Ulimits          []string          `json:"ulimits,omitempty"`
 	Call             string            `json:"call,omitempty"`
 	Entitlements     []string          `json:"entitlements,omitempty"`
+	ExtraHosts       map[string]string `json:"extra-hosts,omitempty"`
 	Outputs          []string          `json:"output,omitempty"`
 }
 
@@ -223,6 +224,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			ShmSize:      build.ShmSize,
 			Ulimits:      toBakeUlimits(build.Ulimits),
 			Entitlements: entitlements,
+			ExtraHosts:   toBakeExtraHosts(build.ExtraHosts),
 
 			Outputs: outputs,
 			Call:    call,
@@ -371,6 +373,14 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		cw.Event(progress.BuiltEvent(name))
 	}
 	return results, nil
+}
+
+func toBakeExtraHosts(hosts types.HostsList) map[string]string {
+	m := make(map[string]string)
+	for k, v := range hosts {
+		m[k] = strings.Join(v, ",")
+	}
+	return m
 }
 
 func additionalContexts(contexts types.Mapping, targets map[string]string) map[string]string {
