@@ -564,3 +564,19 @@ func TestBuildDependentImage(t *testing.T) {
 	out = res.Combined()
 	assert.Check(t, strings.Contains(out, "secondbuild  Built"))
 }
+
+func TestBuildSubDependencies(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "down", "--rmi=local")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "build", "main")
+	out := res.Combined()
+	assert.Check(t, strings.Contains(out, "main  Built"))
+
+	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "up", "--build", "main")
+	out = res.Combined()
+	assert.Check(t, strings.Contains(out, "main  Built"))
+}

@@ -628,7 +628,11 @@ func parsePlatforms(service types.ServiceConfig) ([]specs.Platform, error) {
 func addBuildDependencies(services []string, project *types.Project) []string {
 	servicesWithDependencies := utils.NewSet(services...)
 	for _, service := range services {
-		b := project.Services[service].Build
+		s, ok := project.Services[service]
+		if !ok {
+			s = project.DisabledServices[service]
+		}
+		b := s.Build
 		if b != nil {
 			for _, target := range b.AdditionalContexts {
 				if s, found := strings.CutPrefix(target, types.ServicePrefix); found {
