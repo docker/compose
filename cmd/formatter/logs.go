@@ -56,10 +56,6 @@ func NewLogConsumer(ctx context.Context, stdout, stderr io.Writer, color, prefix
 	}
 }
 
-func (l *logConsumer) Register(name string) {
-	l.register(name)
-}
-
 func (l *logConsumer) register(name string) *presenter {
 	var p *presenter
 	root, _, found := strings.Cut(name, " ")
