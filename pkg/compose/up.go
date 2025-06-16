@@ -70,15 +70,12 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(signalChan)
 	var isTerminated atomic.Bool
-	printer := newLogPrinter(options.Start.Attach)
 
-	watcher, err := NewWatcher(project, options, s.watch)
-	if err != nil && options.Start.Watch {
-		return err
-	}
-
-	var navigationMenu *formatter.LogKeyboard
-	var kEvents <-chan keyboard.KeyEvent
+	var (
+		logConsumer    = options.Start.Attach
+		navigationMenu *formatter.LogKeyboard
+		kEvents        <-chan keyboard.KeyEvent
+	)
 	if options.Start.NavigationMenu {
 		kEvents, err = keyboard.GetKeys(100)
 		if err != nil {
@@ -87,10 +84,22 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		} else {
 			defer keyboard.Close() //nolint:errcheck
 			isDockerDesktopActive := s.isDesktopIntegrationActive()
-			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, watcher != nil)
-			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, signalChan, options.Start.Watch, watcher)
+			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive)
+			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, signalChan)
+			logConsumer = navigationMenu.Decorate(logConsumer)
 		}
 	}
+
+	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
+	if err != nil && options.Start.Watch {
+		return err
+	}
+
+	if navigationMenu != nil && watcher != nil {
+		navigationMenu.EnableWatch(options.Start.Watch, watcher)
+	}
+
+	printer := newLogPrinter(logConsumer)
 
 	doneCh := make(chan bool)
 	eg.Go(func() error {

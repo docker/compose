@@ -55,7 +55,7 @@ type Watcher struct {
 	errCh   chan error
 }
 
-func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc) (*Watcher, error) {
+func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, consumer api.LogConsumer) (*Watcher, error) {
 	for i := range project.Services {
 		service := project.Services[i]
 
@@ -65,7 +65,7 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc) (*Wa
 			return &Watcher{
 				project: project,
 				options: api.WatchOptions{
-					LogTo: options.Start.Attach,
+					LogTo: consumer,
 					Build: build,
 				},
 				watchFn: w,

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"reflect"
 	"syscall"
 	"time"
 
@@ -70,12 +69,12 @@ func (ke *KeyboardError) error() string {
 }
 
 type KeyboardWatch struct {
-	Watching     bool
-	Watcher      Toggle
-	IsConfigured bool
+	Watching bool
+	Watcher  Feature
 }
 
-type Toggle interface {
+// Feature is an compose feature that can be started/stopped by a menu command
+type Feature interface {
 	Start(context.Context) error
 	Stop() error
 }
@@ -90,31 +89,26 @@ const (
 
 type LogKeyboard struct {
 	kError                KeyboardError
-	Watch                 KeyboardWatch
+	Watch                 *KeyboardWatch
 	IsDockerDesktopActive bool
 	logLevel              KEYBOARD_LOG_LEVEL
 	signalChannel         chan<- os.Signal
 }
 
-// FIXME(ndeloof) we should avoid use of such a global reference. see use in logConsumer
-var KeyboardManager *LogKeyboard
-
-func NewKeyboardManager(isDockerDesktopActive bool, sc chan<- os.Signal, w bool, watcher Toggle) *LogKeyboard {
-	KeyboardManager = &LogKeyboard{
-		Watch: KeyboardWatch{
-			Watching:     w,
-			Watcher:      watcher,
-			IsConfigured: !reflect.ValueOf(watcher).IsNil(),
-		},
+func NewKeyboardManager(isDockerDesktopActive bool, sc chan<- os.Signal) *LogKeyboard {
+	return &LogKeyboard{
 		IsDockerDesktopActive: isDockerDesktopActive,
 		logLevel:              INFO,
 		signalChannel:         sc,
 	}
-	return KeyboardManager
 }
 
-func (lk *LogKeyboard) ClearKeyboardInfo() {
-	lk.clearNavigationMenu()
+func (lk *LogKeyboard) Decorate(l api.LogConsumer) api.LogConsumer {
+	return logDecorator{
+		decorated: l,
+		Before:    lk.clearNavigationMenu,
+		After:     lk.PrintKeyboardInfo,
+	}
 }
 
 func (lk *LogKeyboard) PrintKeyboardInfo() {
@@ -185,7 +179,7 @@ func (lk *LogKeyboard) navigationMenu() string {
 		watchInfo = navColor("   ")
 	}
 	isEnabled := " Enable"
-	if lk.Watch.Watching {
+	if lk.Watch != nil && lk.Watch.Watching {
 		isEnabled = " Disable"
 	}
 	watchInfo = watchInfo + shortcutKeyColor("w") + navColor(isEnabled+" Watch")
@@ -268,7 +262,7 @@ func (lk *LogKeyboard) keyboardError(prefix string, err error) {
 }
 
 func (lk *LogKeyboard) ToggleWatch(ctx context.Context, options api.UpOptions) {
-	if !lk.Watch.IsConfigured {
+	if lk.Watch == nil {
 		return
 	}
 	if lk.Watch.Watching {
@@ -299,7 +293,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	case 'v':
 		lk.openDockerDesktop(ctx, project)
 	case 'w':
-		if !lk.Watch.IsConfigured {
+		if lk.Watch == nil {
 			// we try to open watch docs if DD is installed
 			if lk.IsDockerDesktopActive {
 				lk.openDDWatchDocs(ctx, project)
@@ -330,6 +324,13 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	case keyboard.KeyEnter:
 		NewLine()
 		lk.printNavigationMenu()
+	}
+}
+
+func (lk *LogKeyboard) EnableWatch(enabled bool, watcher Feature) {
+	lk.Watch = &KeyboardWatch{
+		Watching: enabled,
+		Watcher:  watcher,
 	}
 }
 
