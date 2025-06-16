@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"reflect"
 	"syscall"
 	"time"
 
@@ -69,8 +70,9 @@ func (ke *KeyboardError) error() string {
 }
 
 type KeyboardWatch struct {
-	Watching bool
-	Watcher  Toggle
+	Watching     bool
+	Watcher      Toggle
+	IsConfigured bool
 }
 
 type Toggle interface {
@@ -90,7 +92,6 @@ type LogKeyboard struct {
 	kError                KeyboardError
 	Watch                 KeyboardWatch
 	IsDockerDesktopActive bool
-	IsWatchConfigured     bool
 	logLevel              KEYBOARD_LOG_LEVEL
 	signalChannel         chan<- os.Signal
 }
@@ -101,11 +102,11 @@ var KeyboardManager *LogKeyboard
 func NewKeyboardManager(isDockerDesktopActive bool, sc chan<- os.Signal, w bool, watcher Toggle) *LogKeyboard {
 	KeyboardManager = &LogKeyboard{
 		Watch: KeyboardWatch{
-			Watching: w,
-			Watcher:  watcher,
+			Watching:     w,
+			Watcher:      watcher,
+			IsConfigured: !reflect.ValueOf(watcher).IsNil(),
 		},
 		IsDockerDesktopActive: isDockerDesktopActive,
-		IsWatchConfigured:     true,
 		logLevel:              INFO,
 		signalChannel:         sc,
 	}
@@ -267,7 +268,7 @@ func (lk *LogKeyboard) keyboardError(prefix string, err error) {
 }
 
 func (lk *LogKeyboard) ToggleWatch(ctx context.Context, options api.UpOptions) {
-	if !lk.IsWatchConfigured {
+	if !lk.Watch.IsConfigured {
 		return
 	}
 	if lk.Watch.Watching {
@@ -298,7 +299,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	case 'v':
 		lk.openDockerDesktop(ctx, project)
 	case 'w':
-		if !lk.IsWatchConfigured {
+		if !lk.Watch.IsConfigured {
 			// we try to open watch docs if DD is installed
 			if lk.IsDockerDesktopActive {
 				lk.openDDWatchDocs(ctx, project)
