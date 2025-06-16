@@ -180,11 +180,6 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 
 		ctx = context.WithValue(ctx, tracing.MetricsKey{}, metrics)
 
-		project, err = project.WithServicesEnvironmentResolved(true)
-		if err != nil {
-			return err
-		}
-
 		return fn(ctx, project, args)
 	})
 }

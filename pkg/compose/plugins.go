@@ -70,15 +70,12 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
-	for name, s := range project.Services {
-		if _, ok := s.DependsOn[service.Name]; ok {
-			prefix := strings.ToUpper(service.Name) + "_"
-			for key, val := range variables {
-				s.Environment[prefix+key] = &val
-			}
-			project.Services[name] = s
-		}
+	mux.Lock()
+	prefix := strings.ToUpper(service.Name) + "_"
+	for key, val := range variables {
+		project.Environment[prefix+key] = val
 	}
+	mux.Unlock()
 	return nil
 }
 

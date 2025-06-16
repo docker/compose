@@ -1,0 +1,9 @@
+services:
+  test:
+    image: alpine
+    command: env
+    environment:
+      FOO: ${FOO}
+      BAR: bar_from_environment
+    env_file:
+     - env_file.env
