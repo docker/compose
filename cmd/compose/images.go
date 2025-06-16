@@ -19,26 +19,31 @@ package compose
 import (
 	"context"
 	"fmt"
-	"io"
-	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/containerd/platforms"
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/cli/cli/command"
+	cliformatter "github.com/docker/cli/cli/command/formatter"
+	cliflags "github.com/docker/cli/cli/flags"
+)
+
+const (
+	defaultImageTableFormat = "table {{.ContainerName}}\t{{.Repository}}\t{{.Tag}}\t{{.Platform}}\t{{.ID}}\t{{.Size}}\t{{.Created}}"
 )
 
 type imageOptions struct {
 	*ProjectOptions
-	Quiet  bool
-	Format string
+	Quiet   bool
+	Format  string
+	noTrunc bool
 }
 
 func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -53,7 +58,7 @@ func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
-	imgCmd.Flags().StringVar(&opts.Format, "format", "table", "Format the output. Values: [table | json]")
+	imgCmd.Flags().StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
 	imgCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return imgCmd
 }
@@ -87,56 +92,107 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		}
 		return nil
 	}
-	if opts.Format == "json" {
 
-		type img struct {
-			ID            string    `json:"ID"`
-			ContainerName string    `json:"ContainerName"`
-			Repository    string    `json:"Repository"`
-			Tag           string    `json:"Tag"`
-			Platform      string    `json:"Platform"`
-			Size          int64     `json:"Size"`
-			LastTagTime   time.Time `json:"LastTagTime"`
-		}
-		// Convert map to slice
-		var imageList []img
-		for ctr, i := range images {
-			imageList = append(imageList, img{
-				ContainerName: ctr,
-				ID:            i.ID,
-				Repository:    i.Repository,
-				Tag:           i.Tag,
-				Platform:      platforms.Format(i.Platform),
-				Size:          i.Size,
-				LastTagTime:   i.LastTagTime,
-			})
-		}
-		json, err := formatter.ToJSON(imageList, "", "")
-		if err != nil {
-			return err
-		}
-		_, err = fmt.Fprintln(dockerCli.Out(), json)
-		return err
+	var format cliformatter.Format
+
+	if opts.Format == cliformatter.TableFormatKey {
+		format = cliformatter.Format(defaultImageTableFormat)
+	} else {
+		format = cliformatter.Format(opts.Format)
 	}
 
-	return formatter.Print(images, opts.Format, dockerCli.Out(),
-		func(w io.Writer) {
-			for _, container := range slices.Sorted(maps.Keys(images)) {
-				img := images[container]
-				id := stringid.TruncateID(img.ID)
-				size := units.HumanSizeWithPrecision(float64(img.Size), 3)
-				repo := img.Repository
-				if repo == "" {
-					repo = "<none>"
-				}
-				tag := img.Tag
-				if tag == "" {
-					tag = "<none>"
-				}
-				created := units.HumanDuration(time.Now().UTC().Sub(img.LastTagTime)) + " ago"
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-					container, repo, tag, platforms.Format(img.Platform), id, size, created)
+	imageCtx := cliformatter.Context{
+		Output: dockerCli.Out(),
+		Format: format,
+		Trunc:  false,
+	}
+
+	return ImageWrite(imageCtx, images)
+}
+
+// ImageWrite renders the context for a list of images
+func ImageWrite(ctx cliformatter.Context, images map[string]api.ImageSummary) error {
+	render := func(format func(subContext cliformatter.SubContext) error) error {
+		for container, image := range images {
+			err := format(&ImageContext{i: image, container: container, cliFormat: ctx.Format})
+			if err != nil {
+				return err
 			}
-		},
-		"CONTAINER", "REPOSITORY", "TAG", "PLATFORM", "IMAGE ID", "SIZE", "CREATED")
+		}
+		return nil
+	}
+	return ctx.Write(NewImageContext(), render)
+}
+
+// ImageContext is a struct used for rendering a list of images in a Go template.
+type ImageContext struct {
+	cliformatter.HeaderContext
+	i         api.ImageSummary
+	container string
+	cliFormat cliformatter.Format
+}
+
+func NewImageContext() *ImageContext {
+	imageCtx := ImageContext{}
+	imageCtx.Header = cliformatter.SubHeaderContext{
+		"ID":            "IMAGE ID",
+		"ContainerName": "CONTAINER",
+		"Repository":    "REPOSITORY",
+		"Tag":           "TAG",
+		"Size":          "SIZE",
+		"Platform":      "PLATFORM",
+		"LastTagTime":   "LAST TAG TIME",
+		"Created":       "CREATED",
+	}
+	return &imageCtx
+}
+
+func (i *ImageContext) MarshalJSON() ([]byte, error) {
+	return cliformatter.MarshalJSON(i)
+}
+
+func (i *ImageContext) ID() string {
+	if i.cliFormat.IsJSON() {
+		return i.i.ID
+	}
+	return stringid.TruncateID(i.i.ID)
+}
+
+func (i *ImageContext) ContainerName() string {
+	return i.container
+}
+
+func (i *ImageContext) Repository() string {
+	repo := i.i.Repository
+	if repo == "" {
+		repo = "<none>"
+	}
+	return repo
+}
+
+func (i *ImageContext) Tag() string {
+	tag := i.i.Tag
+	if tag == "" {
+		tag = "<none>"
+	}
+	return tag
+}
+
+func (i *ImageContext) Size() string {
+	if i.cliFormat.IsJSON() {
+		return strconv.FormatInt(i.i.Size, 10)
+	}
+	return units.HumanSizeWithPrecision(float64(i.i.Size), 3)
+}
+
+func (i *ImageContext) LastTagTime() string {
+	return i.i.LastTagTime.String()
+}
+
+func (i *ImageContext) Created() string {
+	return units.HumanDuration(time.Now().UTC().Sub(i.i.LastTagTime)) + " ago"
+}
+
+func (i *ImageContext) Platform() string {
+	return platforms.Format(i.i.Platform)
 }
