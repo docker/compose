@@ -88,12 +88,35 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		return nil
 	}
 	if opts.Format == "json" {
-		// Convert map to slice
-		var imageList []api.ImageSummary
-		for _, img := range images {
-			imageList = append(imageList, img)
+
+		type img struct {
+			ID            string    `json:"ID"`
+			ContainerName string    `json:"ContainerName"`
+			Repository    string    `json:"Repository"`
+			Tag           string    `json:"Tag"`
+			Platform      string    `json:"Platform"`
+			Size          int64     `json:"Size"`
+			LastTagTime   time.Time `json:"LastTagTime"`
 		}
-		return formatter.Print(imageList, opts.Format, dockerCli.Out(), nil)
+		// Convert map to slice
+		var imageList []img
+		for ctr, i := range images {
+			imageList = append(imageList, img{
+				ContainerName: ctr,
+				ID:            i.ID,
+				Repository:    i.Repository,
+				Tag:           i.Tag,
+				Platform:      platforms.Format(i.Platform),
+				Size:          i.Size,
+				LastTagTime:   i.LastTagTime,
+			})
+		}
+		json, err := formatter.ToJSON(imageList, "", "")
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(dockerCli.Out(), json)
+		return err
 	}
 
 	return formatter.Print(images, opts.Format, dockerCli.Out(),
