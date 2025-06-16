@@ -19,16 +19,19 @@ package compose
 import (
 	"context"
 	"fmt"
-	"io"
-	"strings"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/cmd/formatter"
+	cliformatter "github.com/docker/cli/cli/command/formatter"
+	cliflags "github.com/docker/cli/cli/flags"
 
 	"github.com/docker/cli/opts"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
+)
+
+const (
+	defaultStackTableFormat = "table {{.Name}}\t{{.Status}}\t{{.ConfigFiles}}"
 )
 
 type lsOptions struct {
@@ -49,7 +52,7 @@ func listCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
-	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "table", "Format the output. Values: [table | json]")
+	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "table", cliflags.FormatHelp)
 	lsCmd.Flags().BoolVarP(&lsOpts.Quiet, "quiet", "q", false, "Only display project names")
 	lsCmd.Flags().Var(&lsOpts.Filter, "filter", "Filter output based on conditions provided")
 	lsCmd.Flags().BoolVarP(&lsOpts.All, "all", "a", false, "Show all stopped Compose projects")
@@ -91,28 +94,66 @@ func runList(ctx context.Context, dockerCli command.Cli, backend api.Service, ls
 		return nil
 	}
 
-	view := viewFromStackList(stackList)
-	return formatter.Print(view, lsOpts.Format, dockerCli.Out(), func(w io.Writer) {
-		for _, stack := range view {
-			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", stack.Name, stack.Status, stack.ConfigFiles)
-		}
-	}, "NAME", "STATUS", "CONFIG FILES")
-}
+	var format cliformatter.Format
 
-type stackView struct {
-	Name        string
-	Status      string
-	ConfigFiles string
-}
-
-func viewFromStackList(stackList []api.Stack) []stackView {
-	retList := make([]stackView, len(stackList))
-	for i, s := range stackList {
-		retList[i] = stackView{
-			Name:        s.Name,
-			Status:      strings.TrimSpace(fmt.Sprintf("%s %s", s.Status, s.Reason)),
-			ConfigFiles: s.ConfigFiles,
-		}
+	if lsOpts.Format == cliformatter.TableFormatKey {
+		format = cliformatter.Format(defaultStackTableFormat)
+	} else {
+		format = cliformatter.Format(lsOpts.Format)
 	}
-	return retList
+
+	stackCtx := cliformatter.Context{
+		Output: dockerCli.Out(),
+		Format: format,
+		Trunc:  false,
+	}
+
+	return StackWrite(stackCtx, stackList)
+}
+
+// StackWrite renders the context for a list of stacks
+func StackWrite(ctx cliformatter.Context, stacks []api.Stack) error {
+	render := func(format func(subContext cliformatter.SubContext) error) error {
+		for _, stack := range stacks {
+			err := format(&StackContext{s: stack, cliFormat: ctx.Format})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return ctx.Write(NewStackContext(), render)
+}
+
+// StackContext is a struct used for rendering a list of stacks in a Go template.
+type StackContext struct {
+	cliformatter.HeaderContext
+	s         api.Stack
+	cliFormat cliformatter.Format
+}
+
+func NewStackContext() *StackContext {
+	stackCtx := StackContext{}
+	stackCtx.Header = cliformatter.SubHeaderContext{
+		"Name":        "NAME",
+		"Status":      "STATUS",
+		"ConfigFiles": "CONFIG FILES",
+	}
+	return &stackCtx
+}
+
+func (s *StackContext) MarshalJSON() ([]byte, error) {
+	return cliformatter.MarshalJSON(s)
+}
+
+func (s *StackContext) Name() string {
+	return s.s.Name
+}
+
+func (s *StackContext) Status() string {
+	return s.s.Status
+}
+
+func (s *StackContext) ConfigFiles() string {
+	return s.s.ConfigFiles
 }
