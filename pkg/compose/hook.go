@@ -48,7 +48,6 @@ func (s composeService) runHook(ctx context.Context, ctr container.Summary, serv
 		Env:          ToMobyEnv(hook.Environment),
 		WorkingDir:   hook.WorkingDir,
 		Cmd:          hook.Command,
-		Detach:       detached,
 		AttachStdout: !detached,
 		AttachStderr: !detached,
 	})
