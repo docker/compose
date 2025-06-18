@@ -18,7 +18,9 @@ package compose
 
 import (
 	"context"
+	"slices"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/api/types/filters"
@@ -29,6 +31,26 @@ func (s *composeService) Volumes( ctx context.Context, project *types.Project, o
 
 	projectName := project.Name
 
+	allContainers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var containers []container.Summary
+
+	if len(options.Services) > 0 {
+		// filter service containers
+		for _, c := range allContainers {
+			if slices.Contains(options.Services, c.Labels[api.ServiceLabel]) {
+				containers = append(containers, c)
+			}
+		}
+	} else {
+		containers = allContainers
+	}
+
 	volumesResponse, err := s.apiClient().VolumeList(ctx, volume.ListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
@@ -38,5 +60,27 @@ func (s *composeService) Volumes( ctx context.Context, project *types.Project, o
 
 	projectVolumes := volumesResponse.Volumes
 
-	return projectVolumes, nil
+	if len(options.Services) == 0 {
+		return projectVolumes, nil
+	}
+
+	var volumes []api.VolumesSummary
+
+	// create a name lookup of volumes used by containers
+	serviceVolumes := make(map[string]bool)
+
+	for _, container := range containers {
+		for _, mount := range container.Mounts {
+			serviceVolumes[mount.Name] = true
+		}
+	}
+
+	// append if volumes in this project are in serviceVolumes
+	for _, v := range projectVolumes {
+		if serviceVolumes[v.Name] {
+			volumes = append(volumes, v)
+		}
+	}
+
+	return volumes, nil
 }
