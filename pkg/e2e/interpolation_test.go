@@ -43,6 +43,7 @@ func Test_interpolation(t *testing.T) {
 	env := getEnv(res.Combined())
 
 	assert.Check(t, slices.Contains(env, "FOO=FOO-from-dot-env"))
+	assert.Check(t, slices.Contains(env, "BAR=bar_from_environment"))
 	assert.Check(t, slices.Contains(env, "ZOT=FOO-from-dot-env"))
 	assert.Check(t, slices.Contains(env, "QIX=some FOO-from-dot-env value"))
 	assert.Check(t, slices.Contains(env, "BAR_FROM_ENV_FILE=bar_from_environment"))
@@ -66,8 +67,32 @@ func Test_interpolationWithInclude(t *testing.T) {
 	env := getEnv(res.Combined())
 
 	assert.Check(t, slices.Contains(env, "FOO=FOO-from-include"))
+	assert.Check(t, slices.Contains(env, "BAR=bar_from_environment"))
 	assert.Check(t, slices.Contains(env, "ZOT=FOO-from-include"))
 	assert.Check(t, slices.Contains(env, "QIX=some FOO-from-include value"))
+
+	assert.Check(t, slices.Contains(env, "BY_PROVIDER_FROM_ENV=https://magic.cloud/example"))
+	assert.Check(t, slices.Contains(env, "BY_PROVIDER_FROM_ENV_FILE=https://magic.cloud/example"))
+}
+
+func Test_interpolationWithExtends(t *testing.T) {
+	provider, err := findExecutable("example-provider")
+	assert.NilError(t, err)
+	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	c := NewParallelCLI(t, WithEnv("PATH="+path))
+
+	const projectName = "interpolation-extends"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/interpolation/extends/compose.yaml", "--project-name", projectName, "up")
+	env := getEnv(res.Combined())
+
+	assert.Check(t, slices.Contains(env, "FOO=FOO-from-extends"))
+	assert.Check(t, slices.Contains(env, "BAR=BAR-from-extends"))
+	assert.Check(t, slices.Contains(env, "ZOT=FOO-from-extends"))
+	assert.Check(t, slices.Contains(env, "QIX=some FOO-from-extends value"))
 
 	assert.Check(t, slices.Contains(env, "BY_PROVIDER_FROM_ENV=https://magic.cloud/example"))
 	assert.Check(t, slices.Contains(env, "BY_PROVIDER_FROM_ENV_FILE=https://magic.cloud/example"))

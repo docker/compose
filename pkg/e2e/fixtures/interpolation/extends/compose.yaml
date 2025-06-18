@@ -1,0 +1,12 @@
+services:
+  test:
+    extends:
+      service: test
+      file: ../compose.yaml
+    environment:
+      - BAR=BAR-from-extends
+
+  example:
+    extends:
+      service: example
+      file: ../compose.yaml
