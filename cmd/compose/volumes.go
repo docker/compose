@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/formatter"
@@ -39,13 +40,12 @@ func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	}
 
 	cmd := &cobra.Command{
-		Use:   "volumes [OPTIONS]",
+		Use:   "volumes [OPTIONS] [SERVICE...]",
 		Short: "List volumes",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runVol(ctx, dockerCli, backend, options)
+			return runVol(ctx, dockerCli, backend, args, options)
 		}),
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: noCompletion(),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 
 	cmd.Flags().BoolVarP(&options.Quiet, "quiet", "q", false, "Only display volume names")
@@ -54,13 +54,26 @@ func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	return cmd
 }
 
-func runVol(ctx context.Context, dockerCli command.Cli, backend api.Service, options volumesOptions) error {
-	project, _, err := options.projectOrName(ctx, dockerCli, []string{}...)
+func runVol(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, options volumesOptions) error {
+	project, _, err := options.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}
 
+	names := project.ServiceNames()
+
+	if len(services) == 0 {
+		services = names
+	}
+
+	for _, service := range services {
+		if !slices.Contains(names, service) {
+			return fmt.Errorf("no such service: %s", service)
+		}
+	}
+
 	volumes, err := backend.Volumes(ctx, project, api.VolumesOptions{
+		Services: services,
 	})
 	if err != nil {
 		return err
