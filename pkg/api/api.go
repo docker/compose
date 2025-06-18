@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
 	"github.com/docker/cli/opts"
+	"github.com/docker/docker/api/types/volume"
 )
 
 // Service manages a compose project
@@ -98,7 +99,14 @@ type Service interface {
 	Commit(ctx context.Context, projectName string, options CommitOptions) error
 	// Generate generates a Compose Project from existing containers
 	Generate(ctx context.Context, options GenerateOptions) (*types.Project, error)
+	// Volumes executes the equivalent to a `docker volume ls`
+	Volumes(ctx context.Context, project *types.Project, options VolumesOptions) ([]VolumesSummary, error)
 }
+
+type VolumesOptions struct {
+}
+
+type VolumesSummary = *volume.Volume
 
 type ScaleOptions struct {
 	Services []string
