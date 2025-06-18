@@ -104,6 +104,7 @@ type Service interface {
 }
 
 type VolumesOptions struct {
+	Services []string
 }
 
 type VolumesSummary = *volume.Volume
