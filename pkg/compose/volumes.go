@@ -20,15 +20,14 @@ import (
 	"context"
 	"slices"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 )
 
-func (s *composeService) Volumes( ctx context.Context, project *types.Project, options api.VolumesOptions) ([]api.VolumesSummary, error) {
-
+func (s *composeService) Volumes(ctx context.Context, project *types.Project, options api.VolumesOptions) ([]api.VolumesSummary, error) {
 	projectName := project.Name
 
 	allContainers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
