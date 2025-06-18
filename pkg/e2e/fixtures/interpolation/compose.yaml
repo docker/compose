@@ -3,7 +3,18 @@ services:
     image: alpine
     command: env
     environment:
-      FOO: ${FOO}
-      BAR: bar_from_environment
+      - FOO
+      - BAR=bar_from_environment
+      - BY_PROVIDER_FROM_ENV=${EXAMPLE_URL}
     env_file:
      - env_file.env
+    depends_on:
+      - example
+
+  example:
+    provider:
+      type: example-provider
+      options:
+        type: test
+        name: example
+        size: 0
