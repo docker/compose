@@ -43,6 +43,7 @@ Define and run multi-container applications with Docker
 | [`unpause`](compose_unpause.md) | Unpause services                                                                        |
 | [`up`](compose_up.md)           | Create and start containers                                                             |
 | [`version`](compose_version.md) | Show the Docker Compose version information                                             |
+| [`volumes`](compose_volumes.md) | List volumes                                                                            |
 | [`wait`](compose_wait.md)       | Block until containers of all (or specified) services stop.                             |
 | [`watch`](compose_watch.md)     | Watch build context for service and rebuild/refresh containers when files are updated   |
 
