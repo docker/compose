@@ -80,8 +80,8 @@ github.com/cloudflare/cfssl v0.0.0-20180223231731-4e2dcbde5004 h1:lkAMpLVBDaj17e
 github.com/cloudflare/cfssl v0.0.0-20180223231731-4e2dcbde5004/go.mod h1:yMWuSON2oQp+43nFtAV/uvKQIFpSPerB57DCt9t8sSA=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb h1:EDmT6Q9Zs+SbUoc7Ik9EfrFqcylYqgPZ9ANSbTAntnE=
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb/go.mod h1:ZjrT6AXHbDs86ZSdt/osfBi5qfexBrKUdONk989Wnk4=
-github.com/compose-spec/compose-go/v2 v2.6.5-0.20250605125952-a0d3b94b8dc9 h1:VULSSHxkc7u/U349sHp1RbnWAcnf7JD0HY3rGeZrMaM=
-github.com/compose-spec/compose-go/v2 v2.6.5-0.20250605125952-a0d3b94b8dc9/go.mod h1:TmjkIB9W73fwVxkYY+u2uhMbMUakjiif79DlYgXsyvU=
+github.com/compose-spec/compose-go/v2 v2.6.5 h1:H7xP5OMKdkN2p0brx01slxIU6dE/q6ybbG+jozPtIqk=
+github.com/compose-spec/compose-go/v2 v2.6.5/go.mod h1:TmjkIB9W73fwVxkYY+u2uhMbMUakjiif79DlYgXsyvU=
 github.com/containerd/cgroups/v3 v3.0.5 h1:44na7Ud+VwyE7LIoJ8JTNQOa549a8543BmzaJHo6Bzo=
 github.com/containerd/cgroups/v3 v3.0.5/go.mod h1:SA5DLYnXO8pTGYiAHXz94qvLQTKfVM5GEVisn4jpins=
 github.com/containerd/console v1.0.4 h1:F2g4+oChYvBTsASRTz8NP6iIAi97J3TtSAsLbIFn4ro=
