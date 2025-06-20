@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/builder"
-	"github.com/docker/buildx/controller/pb"
 	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
@@ -483,8 +482,8 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 			DockerfilePath:   dockerFilePath(service.Build.Context, service.Build.Dockerfile),
 			NamedContexts:    toBuildContexts(service, project),
 		},
-		CacheFrom:    pb.CreateCaches(cacheFrom.ToPB()),
-		CacheTo:      pb.CreateCaches(cacheTo.ToPB()),
+		CacheFrom:    build.CreateCaches(cacheFrom),
+		CacheTo:      build.CreateCaches(cacheTo),
 		NoCache:      service.Build.NoCache,
 		Pull:         service.Build.Pull,
 		BuildArgs:    flatten(resolveAndMergeBuildArgs(s.dockerCli, project, service, options)),
