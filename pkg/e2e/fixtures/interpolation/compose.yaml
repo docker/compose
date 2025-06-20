@@ -6,6 +6,7 @@ services:
       - FOO
       - BAR=bar_from_environment
       - BY_PROVIDER_FROM_ENV=${EXAMPLE_URL}
+      - INTERPOLATED=${TEST1}-${TEST2}
     env_file:
      - env_file.env
     depends_on:
