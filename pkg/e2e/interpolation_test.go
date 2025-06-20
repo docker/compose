@@ -118,6 +118,7 @@ func TestInterpolationInEnvFile(t *testing.T) {
 	env := getEnv(res.Combined(), false)
 	assert.Check(t, slices.Contains(env, "BY_OS_FROM_ENV_FILE=OS_TO_ENV_FILE_VALUE"), env)
 	assert.Check(t, slices.Contains(env, "BY_IMPLICIT_ENV_FILE=IMPLICIT_ENV_FILE_VALUE"), env)
+	assert.Check(t, slices.Contains(env, "BY_CMD_FROM_ENV_FILE=CMD_TO_ENV_FILE_DEFAULT_VALUE"), env)
 
 	t.Log("interpolation in env file from command env and explicit env file")
 	cmd = c.NewDockerComposeCmd(t, "-f", "fixtures/interpolation/compose.yaml", "--project-name", projectName,
