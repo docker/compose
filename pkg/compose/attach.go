@@ -61,41 +61,37 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 }
 
 func (s *composeService) attachContainer(ctx context.Context, container containerType.Summary, listener api.ContainerEventListener) error {
-	serviceName := container.Labels[api.ServiceLabel]
-	containerName := getContainerNameWithoutProject(container)
+	service := container.Labels[api.ServiceLabel]
+	name := getContainerNameWithoutProject(container)
+	return s.doAttachContainer(ctx, service, container.ID, name, listener)
+}
 
-	listener(api.ContainerEvent{
-		Type:      api.ContainerEventAttach,
-		Container: containerName,
-		ID:        container.ID,
-		Service:   serviceName,
-	})
-
-	wOut := utils.GetWriter(func(line string) {
-		listener(api.ContainerEvent{
-			Type:      api.ContainerEventLog,
-			Container: containerName,
-			ID:        container.ID,
-			Service:   serviceName,
-			Line:      line,
-		})
-	})
-	wErr := utils.GetWriter(func(line string) {
-		listener(api.ContainerEvent{
-			Type:      api.ContainerEventErr,
-			Container: containerName,
-			ID:        container.ID,
-			Service:   serviceName,
-			Line:      line,
-		})
-	})
-
-	inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)
+func (s *composeService) doAttachContainer(ctx context.Context, service, id, name string, listener api.ContainerEventListener) error {
+	inspect, err := s.apiClient().ContainerInspect(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	_, _, err = s.attachContainerStreams(ctx, container.ID, inspect.Config.Tty, nil, wOut, wErr)
+	wOut := utils.GetWriter(func(line string) {
+		listener(api.ContainerEvent{
+			Type:    api.ContainerEventLog,
+			Source:  name,
+			ID:      id,
+			Service: service,
+			Line:    line,
+		})
+	})
+	wErr := utils.GetWriter(func(line string) {
+		listener(api.ContainerEvent{
+			Type:    api.ContainerEventErr,
+			Source:  name,
+			ID:      id,
+			Service: service,
+			Line:    line,
+		})
+	})
+
+	_, _, err = s.attachContainerStreams(ctx, id, inspect.Config.Tty, nil, wOut, wErr)
 	return err
 }
 
