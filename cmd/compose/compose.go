@@ -636,6 +636,7 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 		publishCommand(&opts, dockerCli, backend),
 		alphaCommand(&opts, dockerCli, backend),
 		bridgeCommand(&opts, dockerCli),
+		volumesCommand(&opts, dockerCli, backend),
 	)
 
 	c.Flags().SetInterspersed(false)
