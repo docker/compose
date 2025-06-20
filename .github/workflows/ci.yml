@@ -190,6 +190,9 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Build example provider
+        run: make example-provider
+
       - name: Build
         uses: docker/bake-action@v6
         with:

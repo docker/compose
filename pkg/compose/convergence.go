@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
 	containerType "github.com/docker/docker/api/types/container"
@@ -109,7 +110,27 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 	})
 }
 
+// mutation of project.Environment requires a mutex as we create services concurrently
+var mux sync.Mutex
+
 func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error { //nolint:gocyclo
+	mux.Lock()
+	for key, val := range service.Environment {
+		if val != nil {
+			newVal, err := dotenv.ExpandVariables(*val, nil, project.Environment.Resolve)
+			if err != nil {
+				return err
+			}
+			service.Environment[key] = &newVal
+		}
+	}
+
+	err := service.WithEnvironmentResolved(false, project)
+	mux.Unlock()
+	if err != nil {
+		return err
+	}
+
 	if service.Provider != nil {
 		return c.service.runPlugin(ctx, project, service, "up")
 	}

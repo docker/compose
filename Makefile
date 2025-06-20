@@ -74,7 +74,8 @@ install: binary
 	install $(or $(DESTDIR),./bin/build)/docker-compose ~/.docker/cli-plugins/docker-compose
 
 .PHONY: e2e-compose
-e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
+e2e-compose: example-provider
+    ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
 	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -v $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
@@ -156,3 +157,6 @@ pre-commit: validate check-dependencies lint build test e2e-compose
 help: ## Show help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+example-provider:
+	go build -o bin/build/example-provider docs/examples/provider.go
