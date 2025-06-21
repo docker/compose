@@ -213,8 +213,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Labels:           build.Labels,
 			Tags:             append(build.Tags, api.GetImageNameOrDefault(service, project.Name)),
 
-			CacheFrom: build.CacheFrom,
-			// CacheTo:    TODO
+			CacheFrom:    build.CacheFrom,
+			CacheTo:      build.CacheTo,
 			Platforms:    build.Platforms,
 			Target:       build.Target,
 			Secrets:      toBakeSecrets(project, build.Secrets),
