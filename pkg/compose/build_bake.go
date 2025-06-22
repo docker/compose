@@ -215,6 +215,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 			CacheFrom:    build.CacheFrom,
 			CacheTo:      build.CacheTo,
+			NetworkMode:  build.Network,
 			Platforms:    build.Platforms,
 			Target:       build.Target,
 			Secrets:      toBakeSecrets(project, build.Secrets),
