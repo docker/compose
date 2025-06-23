@@ -115,9 +115,10 @@ var mux sync.Mutex
 
 func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error { //nolint:gocyclo
 	mux.Lock()
+	service.LoaderEnv.OverrideBy(project.Environment)
 	for key, val := range service.Environment {
 		if val != nil {
-			newVal, err := dotenv.ExpandVariables(*val, nil, project.Environment.Resolve)
+			newVal, err := dotenv.ExpandVariables(*val, nil, service.LoaderEnv.Resolve)
 			if err != nil {
 				return err
 			}
@@ -125,7 +126,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		}
 	}
 
-	err := service.WithEnvironmentResolved(false, project)
+	err := service.WithEnvironmentResolved(false)
 	mux.Unlock()
 	if err != nil {
 		return err
