@@ -303,7 +303,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		cmd.Env = replace(cmd.Env, socket.EnvKey, server.Addr().String())
 	}
 
-	cmd.Env = append(cmd.Env, fmt.Sprintf("DOCKER_CONTEXT=%s", s.dockerCli.CurrentContext()))
+	cmd.Env = append(cmd.Env,
+		fmt.Sprintf("DOCKER_CONTEXT=%s", s.dockerCli.CurrentContext()),
+		fmt.Sprintf("DOCKER_HOST=%s", s.dockerCli.DockerEndpoint().Host),
+	)
 
 	// propagate opentelemetry context to child process, see https://github.com/open-telemetry/oteps/blob/main/text/0258-env-context-baggage-carriers.md
 	carrier := propagation.MapCarrier{}
