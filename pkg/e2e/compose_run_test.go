@@ -196,4 +196,18 @@ func TestLocalComposeRun(t *testing.T) {
 			"front", "env")
 		res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
 	})
+
+	t.Run("compose run -rm with stop signal", func(t *testing.T) {
+		projectName := "run-test"
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "-f", "./fixtures/ps-test/compose.yaml", "run", "--rm", "-d", "nginx")
+		res.Assert(t, icmd.Success)
+
+		res = c.RunDockerCmd(t, "ps", "--quiet", "--filter", "name=run-test-nginx")
+		containerID := strings.TrimSpace(res.Stdout())
+
+		res = c.RunDockerCmd(t, "stop", containerID)
+		res.Assert(t, icmd.Success)
+		res = c.RunDockerCmd(t, "ps", "--all", "--filter", "name=run-test-nginx", "--format", "'{{.Names}}'")
+		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test-nginx"), res.Stdout())
+	})
 }
