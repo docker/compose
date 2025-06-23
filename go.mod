@@ -205,7 +205,7 @@ require (
 )
 
 exclude (
-	// FIXME(thaJeztah): remoove this once kubernetes updated their dependencies to no longer need this.
+	// FIXME(thaJeztah): remove this once kubernetes updated their dependencies to no longer need this.
 	//
 	// For additional details, see this PR and links mentioned in that PR:
 	// https://github.com/kubernetes-sigs/kustomize/pull/5830#issuecomment-2569960859
