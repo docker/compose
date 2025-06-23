@@ -190,8 +190,10 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 		project.Services = dependencies
 		project.DisabledServices[options.Service] = requestedService
 	}
+	project.DisabledServices[options.Service] = requestedService
+	delete(project.Services, options.Service)
 
-	err := s.Create(ctx, project, api.CreateOptions{
+	err = s.Create(ctx, project, api.CreateOptions{
 		Build:         options.Build,
 		IgnoreOrphans: options.IgnoreOrphans,
 		RemoveOrphans: options.RemoveOrphans,
