@@ -134,6 +134,40 @@ func TestInterpolationInEnvFile(t *testing.T) {
 	assert.Check(t, slices.Contains(env, "BY_CMD_FROM_ENV_FILE=CMD_TO_ENV_FILE_VALUE"), env)
 }
 
+func TestOverrideFiles(t *testing.T) {
+	provider, err := findExecutable("example-provider")
+	assert.NilError(t, err)
+	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	c := NewParallelCLI(t, WithEnv("PATH="+path))
+
+	const projectName = "interpolation-override"
+
+	t.Run("interpolation from implicit override file", func(t *testing.T) {
+		t.Cleanup(func() {
+			c.cleanupWithDown(t, projectName)
+		})
+
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/interpolation", "--project-name", projectName, "up")
+		env := getEnv(res.Combined(), false)
+
+		assert.Check(t, slices.Contains(env, "BY_IMPLICIT_OVERRIDE_FILE=implicit_override_value"), env)
+		assert.Check(t, slices.Contains(env, "BY_IMPLICIT_OVERRIDE_FROM_IMPLICIT_ENV_FILE=IMPLICIT_ENV_FILE_TO_OVERRIDE_VALUE"), env)
+	})
+
+	t.Run("interpolation from explicit override file", func(t *testing.T) {
+		t.Cleanup(func() {
+			c.cleanupWithDown(t, projectName)
+		})
+
+		res := c.RunDockerComposeCmd(t, "-f", "fixtures/interpolation/compose.yaml",
+			"-f", "fixtures/interpolation/override/override.yaml", "--project-name", projectName, "up")
+		env := getEnv(res.Combined(), false)
+
+		assert.Check(t, slices.Contains(env, "BY_EXPLICIT_OVERRIDE_FILE=explicit_override_value"), env)
+		assert.Check(t, slices.Contains(env, "BY_EXPLICIT_OVERRIDE_FROM_IMPLICIT_ENV_FILE=IMPLICIT_ENV_FILE_TO_OVERRIDE_VALUE"), env)
+	})
+}
+
 func getEnv(out string, run bool) []string {
 	var env []string
 	scanner := bufio.NewScanner(strings.NewReader(out))

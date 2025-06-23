@@ -1,0 +1,5 @@
+services:
+  test:
+    environment:
+      - EXPLICIT_OVERRIDE_FILE=explicit_override_value
+      - EXPLICIT_OVERRIDE_FROM_IMPLICIT_ENV_FILE=${IMPLICIT_ENV_FILE_TO_OVERRIDE}
