@@ -176,18 +176,22 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 }
 
 func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {
-	var dependencies []string
-	for name := range project.Services {
+	dependencies := types.Services{}
+	var requestedService types.ServiceConfig
+	for name, service := range project.Services {
 		if name != options.Service {
-			dependencies = append(dependencies, name)
+			dependencies[name] = service
+		} else {
+			requestedService = service
 		}
 	}
 
-	project, err := project.WithSelectedServices(dependencies)
-	if err != nil {
-		return err
+	if len(dependencies) > 0 {
+		project.Services = dependencies
+		project.DisabledServices[options.Service] = requestedService
 	}
-	err = s.Create(ctx, project, api.CreateOptions{
+
+	err := s.Create(ctx, project, api.CreateOptions{
 		Build:         options.Build,
 		IgnoreOrphans: options.IgnoreOrphans,
 		RemoveOrphans: options.RemoveOrphans,
