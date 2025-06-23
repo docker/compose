@@ -1,4 +1,3 @@
-version: "3.6"
 services:
   service_a:
     image: bash

@@ -210,4 +210,10 @@ func TestLocalComposeRun(t *testing.T) {
 		res = c.RunDockerCmd(t, "ps", "--all", "--filter", "name=run-test-nginx", "--format", "'{{.Names}}'")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test-nginx"), res.Stdout())
 	})
+
+	t.Run("compose run --env", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "--env", "FOO=BAR",
+			"front", "env")
+		res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
+	})
 }
