@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -31,6 +32,7 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -70,6 +72,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(signalChan)
 	var isTerminated atomic.Bool
+
 	printer := newLogPrinter(options.Start.Attach)
 
 	watcher, err := NewWatcher(project, options, s.watch)
@@ -96,7 +99,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
-			printer.Cancel()
 			_, _ = fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
 			eg.Go(func() error {
 				err := s.Stop(context.WithoutCancel(ctx), project.Name, api.StopOptions{
@@ -146,21 +148,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	})
 
-	var exitCode int
-	eg.Go(func() error {
-		code, err := printer.Run(options.Start.OnExit, options.Start.ExitCodeFrom, func() error {
-			_, _ = fmt.Fprintln(s.stdinfo(), "Aborting on container exit...")
-			return progress.Run(ctx, func(ctx context.Context) error {
-				return s.Stop(ctx, project.Name, api.StopOptions{
-					Services: options.Create.Services,
-					Project:  project,
-				})
-			}, s.stdinfo())
-		})
-		exitCode = code
-		return err
-	})
-
 	if options.Start.Watch && watcher != nil {
 		err = watcher.Start(ctx)
 		if err != nil {
@@ -168,16 +155,83 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	}
 
+	monitor := newMonitor(s.apiClient(), project.Name)
+	monitor.withServices(options.Start.Services)
+	monitor.withListener(printer.HandleEvent)
+
+	var exitCode int
+	if options.Start.OnExit != api.CascadeIgnore {
+		once := true
+		// detect first container to exit to trigger application shutdown
+		monitor.withListener(func(event api.ContainerEvent) {
+			if once && event.Type == api.ContainerEventExited {
+				if options.Start.OnExit == api.CascadeFail && event.ExitCode == 0 {
+					return
+				}
+				once = false
+				exitCode = event.ExitCode
+				_, _ = fmt.Fprintln(s.stdinfo(), "Aborting on container exit...")
+				eg.Go(func() error {
+					return progress.Run(ctx, func(ctx context.Context) error {
+						return s.Stop(ctx, project.Name, api.StopOptions{
+							Services: options.Create.Services,
+							Project:  project,
+						})
+					}, s.stdinfo())
+				})
+			}
+		})
+	}
+
+	if options.Start.ExitCodeFrom != "" {
+		once := true
+		// capture exit code from first container to exit with selected service
+		monitor.withListener(func(event api.ContainerEvent) {
+			if once && event.Type == api.ContainerEventExited && event.Service == options.Start.ExitCodeFrom {
+				exitCode = event.ExitCode
+				once = false
+			}
+		})
+	}
+
+	monitor.withListener(func(event api.ContainerEvent) {
+		if event.Type != api.ContainerEventStarted {
+			return
+		}
+		if event.Restarting || event.Container.Labels[api.ContainerReplaceLabel] != "" {
+			eg.Go(func() error {
+				ctr, err := s.apiClient().ContainerInspect(ctx, event.ID)
+				if err != nil {
+					return err
+				}
+
+				err = s.doLogContainer(ctx, options.Start.Attach, event.Source, ctr, api.LogOptions{
+					Follow: true,
+					Since:  ctr.State.StartedAt,
+				})
+				var notImplErr errdefs.ErrNotImplemented
+				if errors.As(err, &notImplErr) {
+					// container may be configured with logging_driver: none
+					// as container already started, we might miss the very first logs. But still better than none
+					return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)
+				}
+				return err
+			})
+		}
+	})
+
+	eg.Go(func() error {
+		err := monitor.Start(ctx)
+		// Signal for the signal-handler goroutines to stop
+		close(doneCh)
+		return err
+	})
+
 	// We use the parent context without cancellation as we manage sigterm to stop the stack
 	err = s.start(context.WithoutCancel(ctx), project.Name, options.Start, printer.HandleEvent)
 	if err != nil && !isTerminated.Load() { // Ignore error if the process is terminated
 		return err
 	}
-
-	// Signal for the signal-handler goroutines to stop
-	close(doneCh)
-
-	printer.Stop()
 
 	err = eg.Wait().ErrorOrNil()
 	if exitCode != 0 {
