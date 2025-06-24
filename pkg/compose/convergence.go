@@ -756,14 +756,7 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 			}
 		}
 	}
-
-	err = s.injectSecrets(ctx, project, service, created.ID)
-	if err != nil {
-		return created, err
-	}
-
-	err = s.injectConfigs(ctx, project, service, created.ID)
-	return created, err
+	return created, nil
 }
 
 // getLinks mimics V1 compose/service.py::Service::_get_links()
@@ -897,6 +890,17 @@ func (s *composeService) startService(ctx context.Context,
 		if ctr.State == ContainerRunning {
 			continue
 		}
+
+		err = s.injectSecrets(ctx, project, service, ctr.ID)
+		if err != nil {
+			return err
+		}
+
+		err = s.injectConfigs(ctx, project, service, ctr.ID)
+		if err != nil {
+			return err
+		}
+
 		eventName := getContainerProgressName(ctr)
 		w.Event(progress.StartingEvent(eventName))
 		err = s.apiClient().ContainerStart(ctx, ctr.ID, containerType.StartOptions{})
