@@ -127,7 +127,14 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err != nil {
 		return "", err
 	}
-	return created.ID, nil
+
+	err = s.injectSecrets(ctx, project, service, created.ID)
+	if err != nil {
+		return created.ID, err
+	}
+
+	err = s.injectConfigs(ctx, project, service, created.ID)
+	return created.ID, err
 }
 
 func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
