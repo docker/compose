@@ -282,7 +282,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 
 	var buildForRun *api.BuildOptions
 	if !createOpts.noBuild {
-		bo, err := buildOpts.toAPIBuildOptions(project.ServiceNames())
+		bo, err := buildOpts.toAPIBuildOptions(nil)
 		if err != nil {
 			return err
 		}
