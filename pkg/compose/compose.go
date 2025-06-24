@@ -314,6 +314,8 @@ var runtimeVersion runtimeVersionCache
 func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 	runtimeVersion.once.Do(func() {
 		version, err := s.dockerCli.Client().ServerVersion(ctx)
+		fmt.Println("APIVersion == " + version.APIVersion)
+		fmt.Println("Version == " + version.Version)
 		if err != nil {
 			runtimeVersion.err = err
 		}
