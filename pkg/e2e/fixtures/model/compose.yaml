@@ -1,0 +1,9 @@
+services:
+  test:
+    image: alpine/curl
+    models:
+      - foo
+
+models:
+  foo:
+    model: ai/smollm2
