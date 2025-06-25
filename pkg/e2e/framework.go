@@ -52,6 +52,9 @@ var (
 	// DockerBuildxExecutableName is the Os dependent Buildx plugin binary name
 	DockerBuildxExecutableName = "docker-buildx"
 
+	// DockerModelExecutableName is the Os dependent Docker-Model plugin binary name
+	DockerModelExecutableName = "docker-model"
+
 	// WindowsExecutableSuffix is the Windows executable suffix
 	WindowsExecutableSuffix = ".exe"
 )
@@ -162,6 +165,13 @@ func initializePlugins(t testing.TB, configDir string) {
 		}
 		// We don't need a functional scan plugin, but a valid plugin binary
 		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerScanExecutableName))
+
+		modelPlugin, err := findPluginExecutable(DockerModelExecutableName)
+		if err != nil {
+			t.Logf("WARNING: docker-model cli-plugin not found")
+		} else {
+			CopyFile(t, modelPlugin, filepath.Join(configDir, "cli-plugins", DockerModelExecutableName))
+		}
 	}
 }
 
