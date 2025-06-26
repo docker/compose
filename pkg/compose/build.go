@@ -172,7 +172,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if options.Quiet {
 			options.Progress = progress.ModeQuiet
 		}
-		if options.Progress == "" {
+		if options.Progress == progress.ModeAuto {
 			options.Progress = os.Getenv("BUILDKIT_PROGRESS")
 		}
 		w, err = xprogress.NewPrinter(progressCtx, os.Stdout, progressui.DisplayMode(options.Progress),
