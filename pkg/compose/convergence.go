@@ -563,6 +563,9 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 	} else if service.GetScale() == 0 {
 		// don't wait for the dependency which configured to have 0 containers running
 		return false, nil
+	} else if service.Provider != nil {
+		// don't wait for provider services
+		return false, nil
 	}
 	return true, nil
 }
