@@ -21,7 +21,6 @@ import (
 )
 
 func TestComposeModel(t *testing.T) {
-	t.Skip("require model-cli on GHA runners")
 	c := NewParallelCLI(t)
 	defer c.cleanupWithDown(t, "model-test")
 

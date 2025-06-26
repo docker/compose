@@ -224,13 +224,23 @@ func findPluginExecutable(pluginExecutableName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bin, err := filepath.Abs(filepath.Join(userDir, dockerUserDir, pluginExecutableName))
-	if err != nil {
-		return "", err
+	candidates := []string{
+		filepath.Join(userDir, dockerUserDir),
+		"/usr/local/lib/docker/cli-plugins",
+		"/usr/local/libexec/docker/cli-plugins",
+		"/usr/lib/docker/cli-plugins",
+		"/usr/libexec/docker/cli-plugins",
 	}
-	if _, err := os.Stat(bin); err == nil {
-		return bin, nil
+	for _, path := range candidates {
+		bin, err := filepath.Abs(filepath.Join(path, pluginExecutableName))
+		if err != nil {
+			return "", err
+		}
+		if _, err := os.Stat(bin); err == nil {
+			return bin, nil
+		}
 	}
+
 	return "", fmt.Errorf("plugin not found %s: %w", pluginExecutableName, os.ErrNotExist)
 }
 
