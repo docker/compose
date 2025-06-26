@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -67,24 +68,28 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	if err != nil {
 		return fmt.Errorf("error unmarshalling available models: %w", err)
 	}
+	var availableModels []string
+	for _, model := range models {
+		availableModels = append(availableModels, model.Tags...)
+	}
 
 	eg, gctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return s.setModelEndpointVariable(gctx, dockerModel, project)
 	})
 
-MODELS:
 	for name, config := range project.Models {
-		for _, model := range models {
-			if slices.Contains(model.Tags, config.Model) {
-				continue MODELS
-			}
-		}
 		if config.Name == "" {
 			config.Name = name
 		}
 		eg.Go(func() error {
-			return s.pullModel(gctx, dockerModel, config, quietPull)
+			if !slices.Contains(availableModels, config.Model) {
+				err = s.pullModel(gctx, dockerModel, config, quietPull)
+				if err != nil {
+					return err
+				}
+			}
+			return s.configureModel(gctx, dockerModel, config)
 		})
 	}
 	return eg.Wait()
@@ -140,6 +145,22 @@ func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plu
 	return err
 }
 
+func (s *composeService) configureModel(ctx context.Context, dockerModel *manager.Plugin, config types.ModelConfig) error {
+	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]
+	args := []string{"configure"}
+	if config.ContextSize > 0 {
+		args = append(args, "--context-size", strconv.Itoa(config.ContextSize))
+	}
+	args = append(args, config.Model)
+	if len(config.RuntimeFlags) != 0 {
+		args = append(args, "--")
+		args = append(args, config.RuntimeFlags...)
+	}
+	cmd := exec.CommandContext(ctx, dockerModel.Path, args...)
+	s.setupChildProcess(ctx, cmd)
+	return cmd.Run()
+}
+
 func (s *composeService) setModelEndpointVariable(ctx context.Context, dockerModel *manager.Plugin, project *types.Project) error {
 	cmd := exec.CommandContext(ctx, dockerModel.Path, "status", "--json")
 	s.setupChildProcess(ctx, cmd)
@@ -160,8 +181,8 @@ func (s *composeService) setModelEndpointVariable(ctx context.Context, dockerMod
 	for _, service := range project.Services {
 		for model, modelConfig := range service.Models {
 			var variable string
-			if modelConfig != nil && modelConfig.Variable != "" {
-				variable = modelConfig.Variable
+			if modelConfig != nil && modelConfig.EndpointVariable != "" {
+				variable = modelConfig.EndpointVariable
 			} else {
 				variable = strings.ToUpper(model) + "_URL"
 			}
