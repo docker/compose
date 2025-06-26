@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -321,16 +322,22 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	var errMessage []string
-	scanner := bufio.NewScanner(pipe)
-	scanner.Split(bufio.ScanLines)
+	reader := bufio.NewReader(pipe)
 
 	err = cmd.Start()
 	if err != nil {
 		return nil, err
 	}
 	eg.Go(cmd.Wait)
-	for scanner.Scan() {
-		line := scanner.Text()
+	for {
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			} else {
+				return nil, fmt.Errorf("failed to execute bake: %w", readErr)
+			}
+		}
 		decoder := json.NewDecoder(strings.NewReader(line))
 		var status client.SolveStatus
 		err := decoder.Decode(&status)
