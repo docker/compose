@@ -183,6 +183,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up Docker Model
+        run: |
+          sudo apt-get install docker-model-plugin
+          docker model version
+          docker info
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
