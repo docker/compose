@@ -187,7 +187,6 @@ jobs:
         run: |
           sudo apt-get install docker-model-plugin
           docker model version
-          docker info
 
       - name: Set up Go
         uses: actions/setup-go@v5
