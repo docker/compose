@@ -96,11 +96,8 @@ type LogKeyboard struct {
 	signalChannel         chan<- os.Signal
 }
 
-// FIXME(ndeloof) we should avoid use of such a global reference. see use in logConsumer
-var KeyboardManager *LogKeyboard
-
 func NewKeyboardManager(isDockerDesktopActive bool, sc chan<- os.Signal, w bool, watcher Toggle) *LogKeyboard {
-	KeyboardManager = &LogKeyboard{
+	return &LogKeyboard{
 		Watch: KeyboardWatch{
 			Watching:     w,
 			Watcher:      watcher,
@@ -110,11 +107,14 @@ func NewKeyboardManager(isDockerDesktopActive bool, sc chan<- os.Signal, w bool,
 		logLevel:              INFO,
 		signalChannel:         sc,
 	}
-	return KeyboardManager
 }
 
-func (lk *LogKeyboard) ClearKeyboardInfo() {
-	lk.clearNavigationMenu()
+func (lk *LogKeyboard) Decorate(l api.LogConsumer) api.LogConsumer {
+	return logDecorator{
+		decorated: l,
+		Before:    lk.clearNavigationMenu,
+		After:     lk.PrintKeyboardInfo,
+	}
 }
 
 func (lk *LogKeyboard) PrintKeyboardInfo() {
