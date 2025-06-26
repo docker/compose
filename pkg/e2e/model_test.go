@@ -21,6 +21,7 @@ import (
 )
 
 func TestComposeModel(t *testing.T) {
+	t.Skip("waiting for docker-model release")
 	c := NewParallelCLI(t)
 	defer c.cleanupWithDown(t, "model-test")
 
