@@ -1,0 +1,14 @@
+services:
+  sample:
+    image: nginx
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'echo "In the pre-stop" >> /data/log.txt'
+  test:
+    image: nginx
+    post_start:
+      - command: sh -c 'echo env'
+volumes:
+  data:
+    name: sample-data

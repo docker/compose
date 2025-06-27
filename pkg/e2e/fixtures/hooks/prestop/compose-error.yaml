@@ -1,0 +1,10 @@
+services:
+  sample:
+    image: nginx
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'command in error'
+volumes:
+  data:
+    name: sample-data
