@@ -18,12 +18,11 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"io"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -64,8 +63,7 @@ func (s *composeService) Logs(
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			err := s.logContainers(ctx, consumer, ctr, options)
-			var notImplErr errdefs.ErrNotImplemented
-			if errors.As(err, &notImplErr) {
+			if errdefs.IsNotImplemented(err) {
 				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
 				return nil
 			}
@@ -106,8 +104,7 @@ func (s *composeService) Logs(
 						Tail:       options.Tail,
 						Timestamps: options.Timestamps,
 					})
-					var notImplErr errdefs.ErrNotImplemented
-					if errors.As(err, &notImplErr) {
+					if errdefs.IsNotImplemented(err) {
 						// ignore
 						return nil
 					}

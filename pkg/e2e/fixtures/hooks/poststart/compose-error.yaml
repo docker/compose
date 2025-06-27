@@ -1,0 +1,6 @@
+services:
+
+  test:
+    image: alpine
+    post_start:
+      - command: sh -c 'echo env'

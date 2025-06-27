@@ -64,6 +64,9 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 	}
 
 	for name, service := range project.Services {
+		if !service.UseAPISocket {
+			continue
+		}
 		service.Volumes = append(service.Volumes, types.ServiceVolumeConfig{
 			Type:   types.VolumeTypeBind,
 			Source: socket,

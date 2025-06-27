@@ -580,3 +580,19 @@ func TestBuildSubDependencies(t *testing.T) {
 	out = res.Combined()
 	assert.Check(t, strings.Contains(out, "main  Built"))
 }
+
+func TestBuildLongOutputLine(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "down", "--rmi=local")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "build", "long-line")
+	out := res.Combined()
+	assert.Check(t, strings.Contains(out, "long-line  Built"))
+
+	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "up", "--build", "long-line")
+	out = res.Combined()
+	assert.Check(t, strings.Contains(out, "long-line  Built"))
+}

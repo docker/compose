@@ -127,7 +127,14 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err != nil {
 		return "", err
 	}
-	return created.ID, nil
+
+	err = s.injectSecrets(ctx, project, service, created.ID)
+	if err != nil {
+		return created.ID, err
+	}
+
+	err = s.injectConfigs(ctx, project, service, created.ID)
+	return created.ID, err
 }
 
 func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
@@ -176,18 +183,9 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 }
 
 func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {
-	var dependencies []string
-	for name := range project.Services {
-		if name != options.Service {
-			dependencies = append(dependencies, name)
-		}
-	}
+	project = project.WithServicesDisabled(options.Service)
 
-	project, err := project.WithSelectedServices(dependencies)
-	if err != nil {
-		return err
-	}
-	err = s.Create(ctx, project, api.CreateOptions{
+	err := s.Create(ctx, project, api.CreateOptions{
 		Build:         options.Build,
 		IgnoreOrphans: options.IgnoreOrphans,
 		RemoveOrphans: options.RemoveOrphans,
@@ -197,7 +195,7 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 		return err
 	}
 
-	if len(dependencies) > 0 {
+	if len(project.Services) > 0 {
 		return s.Start(ctx, project.Name, api.StartOptions{
 			Project: project,
 		})

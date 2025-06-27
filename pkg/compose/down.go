@@ -306,6 +306,10 @@ func (s *composeService) stopContainer(ctx context.Context, w progress.Writer, s
 		for _, hook := range service.PreStop {
 			err := s.runHook(ctx, ctr, *service, hook, nil)
 			if err != nil {
+				// Ignore errors indicating that some containers were already stopped or removed.
+				if cerrdefs.IsNotFound(err) || cerrdefs.IsConflict(err) {
+					return nil
+				}
 				return err
 			}
 		}

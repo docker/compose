@@ -563,6 +563,9 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 	} else if service.GetScale() == 0 {
 		// don't wait for the dependency which configured to have 0 containers running
 		return false, nil
+	} else if service.Provider != nil {
+		// don't wait for provider services
+		return false, nil
 	}
 	return true, nil
 }
@@ -756,14 +759,7 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 			}
 		}
 	}
-
-	err = s.injectSecrets(ctx, project, service, created.ID)
-	if err != nil {
-		return created, err
-	}
-
-	err = s.injectConfigs(ctx, project, service, created.ID)
-	return created, err
+	return created, nil
 }
 
 // getLinks mimics V1 compose/service.py::Service::_get_links()
@@ -897,6 +893,17 @@ func (s *composeService) startService(ctx context.Context,
 		if ctr.State == ContainerRunning {
 			continue
 		}
+
+		err = s.injectSecrets(ctx, project, service, ctr.ID)
+		if err != nil {
+			return err
+		}
+
+		err = s.injectConfigs(ctx, project, service, ctr.ID)
+		if err != nil {
+			return err
+		}
+
 		eventName := getContainerProgressName(ctr)
 		w.Event(progress.StartingEvent(eventName))
 		err = s.apiClient().ContainerStart(ctx, ctr.ID, containerType.StartOptions{})

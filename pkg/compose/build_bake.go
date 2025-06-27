@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -213,8 +214,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Labels:           build.Labels,
 			Tags:             append(build.Tags, api.GetImageNameOrDefault(service, project.Name)),
 
-			CacheFrom: build.CacheFrom,
-			// CacheTo:    TODO
+			CacheFrom:    build.CacheFrom,
+			CacheTo:      build.CacheTo,
+			NetworkMode:  build.Network,
 			Platforms:    build.Platforms,
 			Target:       build.Target,
 			Secrets:      toBakeSecrets(project, build.Secrets),
@@ -302,7 +304,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		cmd.Env = replace(cmd.Env, socket.EnvKey, server.Addr().String())
 	}
 
-	cmd.Env = append(cmd.Env, fmt.Sprintf("DOCKER_CONTEXT=%s", s.dockerCli.CurrentContext()))
+	cmd.Env = append(cmd.Env,
+		fmt.Sprintf("DOCKER_CONTEXT=%s", s.dockerCli.CurrentContext()),
+		fmt.Sprintf("DOCKER_HOST=%s", s.dockerCli.DockerEndpoint().Host),
+	)
 
 	// propagate opentelemetry context to child process, see https://github.com/open-telemetry/oteps/blob/main/text/0258-env-context-baggage-carriers.md
 	carrier := propagation.MapCarrier{}
@@ -317,16 +322,22 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	var errMessage []string
-	scanner := bufio.NewScanner(pipe)
-	scanner.Split(bufio.ScanLines)
+	reader := bufio.NewReader(pipe)
 
 	err = cmd.Start()
 	if err != nil {
 		return nil, err
 	}
 	eg.Go(cmd.Wait)
-	for scanner.Scan() {
-		line := scanner.Text()
+	for {
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			} else {
+				return nil, fmt.Errorf("failed to execute bake: %w", readErr)
+			}
+		}
 		decoder := json.NewDecoder(strings.NewReader(line))
 		var status client.SolveStatus
 		err := decoder.Decode(&status)
