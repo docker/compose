@@ -52,7 +52,7 @@ func (s *composeService) Exec(ctx context.Context, projectName string, options a
 	err = container.RunExec(ctx, s.dockerCli, target.ID, exec)
 	var sterr cli.StatusError
 	if errors.As(err, &sterr) {
-		return sterr.StatusCode, nil
+		return sterr.StatusCode, err
 	}
 	return 0, err
 }
