@@ -37,6 +37,7 @@ cname:
     - docker compose unpause
     - docker compose up
     - docker compose version
+    - docker compose volumes
     - docker compose wait
     - docker compose watch
 clink:
@@ -72,6 +73,7 @@ clink:
     - docker_compose_unpause.yaml
     - docker_compose_up.yaml
     - docker_compose_version.yaml
+    - docker_compose_volumes.yaml
     - docker_compose_wait.yaml
     - docker_compose_watch.yaml
 options:
