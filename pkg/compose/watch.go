@@ -234,7 +234,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 				var initialSync bool
 				success, err := trigger.Extensions.Get("x-initialSync", &initialSync)
 				if err == nil && success && initialSync && isSync(trigger) {
-					// Need to check initial files are in container that are meant to be synched from watch action
+					// Need to check initial files are in container that are meant to be synced from watch action
 					err := s.initialSync(ctx, project, service, trigger, syncer)
 					if err != nil {
 						return nil, err
@@ -395,7 +395,7 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 			return nil, fmt.Errorf("service %s doesn't have a build section, can't apply %s on watch", types.WatchActionRebuild, service.Name)
 		}
 		if trigger.Action == types.WatchActionSyncExec && len(trigger.Exec.Command) == 0 {
-			return nil, fmt.Errorf("can't watch with action %q on service %s wihtout a command", types.WatchActionSyncExec, service.Name)
+			return nil, fmt.Errorf("can't watch with action %q on service %s without a command", types.WatchActionSyncExec, service.Name)
 		}
 
 		config.Watch[i] = trigger
@@ -813,7 +813,7 @@ func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Pr
 	if err != nil {
 		return time.Now(), err
 	}
-	// Need to get oldest one?
+	// Need to get the oldest one?
 	timeCreated, err := time.Parse(time.RFC3339Nano, img.Created)
 	if err != nil {
 		return time.Now(), err
