@@ -123,6 +123,11 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return "", err
 	}
 
+	err = s.ensureModels(ctx, project, opts.QuietPull)
+	if err != nil {
+		return "", err
+	}
+
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, -1, createOpts)
 	if err != nil {
 		return "", err
