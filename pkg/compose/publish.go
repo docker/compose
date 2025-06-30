@@ -236,8 +236,20 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 	if ok, err := s.checkOnlyBuildSection(project); !ok || err != nil {
 		return false, err
 	}
-	if ok, err := s.checkForBindMount(project); !ok || err != nil {
-		return false, err
+	bindMounts := s.checkForBindMount(project)
+	if len(bindMounts) > 0 {
+		fmt.Println("you are about to publish bind mounts declaration within your OCI artifact.\n" +
+			"only the bind mount declarations will be added to the OCI artifact\n" +
+			"please double check that you are not mounting potential sensitive directories or data")
+		for key, val := range bindMounts {
+			_, _ = fmt.Fprintln(s.dockerCli.Out(), key)
+			for _, v := range val {
+				_, _ = fmt.Fprintf(s.dockerCli.Out(), "%s\n", v.String())
+			}
+		}
+		if ok, err := acceptPublishBindMountDeclarations(s.dockerCli); err != nil || !ok {
+			return false, err
+		}
 	}
 	if options.AssumeYes {
 		return true, nil
@@ -325,6 +337,12 @@ func acceptPublishSensitiveData(cli command.Cli) (bool, error) {
 	return confirm, err
 }
 
+func acceptPublishBindMountDeclarations(cli command.Cli) (bool, error) {
+	msg := "Are you ok to publish these bind mount declarations? [y/N]: "
+	confirm, err := prompt.NewPrompt(cli.In(), cli.Out()).Confirm(msg, false)
+	return confirm, err
+}
+
 func envFileLayers(project *types.Project) []ocipush.Pushable {
 	var layers []ocipush.Pushable
 	for _, service := range project.Services {
@@ -361,15 +379,20 @@ func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, er
 	return true, nil
 }
 
-func (s *composeService) checkForBindMount(project *types.Project) (bool, error) {
-	for name, config := range project.Services {
+func (s *composeService) checkForBindMount(project *types.Project) map[string][]types.ServiceVolumeConfig {
+	allFindings := map[string][]types.ServiceVolumeConfig{}
+	for serviceName, config := range project.Services {
+		bindMounts := []types.ServiceVolumeConfig{}
 		for _, volume := range config.Volumes {
 			if volume.Type == types.VolumeTypeBind {
-				return false, fmt.Errorf("cannot publish compose file: service %q relies on bind-mount. You should use volumes", name)
+				bindMounts = append(bindMounts, volume)
 			}
 		}
+		if len(bindMounts) > 0 {
+			allFindings[serviceName] = bindMounts
+		}
 	}
-	return true, nil
+	return allFindings
 }
 
 func (s *composeService) checkForSensitiveData(project *types.Project) ([]secrets.DetectedSecret, error) {
