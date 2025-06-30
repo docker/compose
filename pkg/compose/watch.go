@@ -395,7 +395,7 @@ func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) 
 			return nil, fmt.Errorf("service %s doesn't have a build section, can't apply %s on watch", types.WatchActionRebuild, service.Name)
 		}
 		if trigger.Action == types.WatchActionSyncExec && len(trigger.Exec.Command) == 0 {
-			return nil, fmt.Errorf("can't watch with action %q on service %s wihtout a command", types.WatchActionSyncExec, service.Name)
+			return nil, fmt.Errorf("can't watch with action %q on service %s without a command", types.WatchActionSyncExec, service.Name)
 		}
 
 		config.Watch[i] = trigger

@@ -229,7 +229,7 @@ func (a *ArchiveBuilder) writeEntry(entry archiveEntry) error {
 	return nil
 }
 
-// tarPath writes the given source path into tarWriter at the given dest (recursively for directories).
+// entriesForPath writes the given source path into tarWriter at the given dest (recursively for directories).
 // e.g. tarring my_dir --> dest d: d/file_a, d/file_b
 // If source path does not exist, quietly skips it and returns no err
 func (a *ArchiveBuilder) entriesForPath(localPath, containerPath string) ([]archiveEntry, error) {
