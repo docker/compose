@@ -18,8 +18,8 @@ package compose
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -41,11 +41,9 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 		return project, nil
 	}
 
-	socket := s.dockerCli.DockerEndpoint().Host
-	if !strings.HasPrefix(socket, "unix://") {
-		return nil, fmt.Errorf("use_api_socket can only be used with unix sockets: docker endpoint %s is incompatible", socket)
+	if s.dockerCli.ServerInfo().OSType == "windows" {
+		return nil, errors.New("use_api_socket can't be used with a Windows Docker Engine")
 	}
-	socket = strings.TrimPrefix(socket, "unix://") // should we confirm absolute path?
 
 	creds, err := s.dockerCli.ConfigFile().GetAllCredentials()
 	if err != nil {
@@ -69,7 +67,7 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 		}
 		service.Volumes = append(service.Volumes, types.ServiceVolumeConfig{
 			Type:   types.VolumeTypeBind,
-			Source: socket,
+			Source: "/var/run/docker.sock",
 			Target: "/var/run/docker.sock",
 		})
 
