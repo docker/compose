@@ -74,7 +74,7 @@ install: binary
 	install $(or $(DESTDIR),./bin/build)/docker-compose ~/.docker/cli-plugins/docker-compose
 
 .PHONY: e2e-compose
-e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
+e2e-compose: example-provider ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
 	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -v $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
@@ -86,6 +86,10 @@ build-and-e2e-compose: build e2e-compose ## Compile the compose cli-plugin and r
 
 .PHONY: build-and-e2e-compose-standalone
 build-and-e2e-compose-standalone: build e2e-compose-standalone ## Compile the compose cli-plugin and run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
+
+.PHONY: example-provider
+example-provider: ## build example provider for e2e tests
+	go build -o bin/build/example-provider docs/examples/provider.go
 
 .PHONY: mocks
 mocks:

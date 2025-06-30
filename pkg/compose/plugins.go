@@ -27,16 +27,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/cli/cli-plugins/socket"
-	"github.com/docker/cli/cli/config"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
+
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli-plugins/manager"
+	"github.com/docker/cli/cli-plugins/socket"
+	"github.com/docker/cli/cli/config"
 )
 
 type JsonMessage struct {
@@ -51,6 +53,8 @@ const (
 	DebugType                 = "debug"
 	providerMetadataDirectory = "compose/providers"
 )
+
+var mux sync.Mutex
 
 func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string) error {
 	provider := *service.Provider
@@ -70,6 +74,8 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
+	mux.Lock()
+	defer mux.Unlock()
 	for name, s := range project.Services {
 		if _, ok := s.DependsOn[service.Name]; ok {
 			prefix := strings.ToUpper(service.Name) + "_"
