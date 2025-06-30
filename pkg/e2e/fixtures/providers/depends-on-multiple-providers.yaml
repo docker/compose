@@ -1,0 +1,21 @@
+services:
+  test:
+    image: alpine
+    command: env
+    depends_on:
+      - provider1
+      - provider2
+  provider1:
+    provider:
+      type: example-provider
+      options:
+        name: provider1
+        type: test1
+        size: 1
+  provider2:
+    provider:
+      type: example-provider
+      options:
+        name: provider2
+        type: test2
+        size: 2

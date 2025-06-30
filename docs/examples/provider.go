@@ -39,20 +39,30 @@ func main() {
 	}
 }
 
+type options struct {
+	db   string
+	size int
+}
+
 func composeCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:              "compose EVENT",
 		TraverseChildren: true,
 	}
 	c.PersistentFlags().String("project-name", "", "compose project name") // unused
+
+	var options options
 	upCmd := &cobra.Command{
-		Use:  "up",
-		Run:  up,
+		Use: "up",
+		Run: func(_ *cobra.Command, args []string) {
+			up(options, args)
+		},
 		Args: cobra.ExactArgs(1),
 	}
-	upCmd.Flags().String("type", "", "Database type (mysql, postgres, etc.)")
+
+	upCmd.Flags().StringVar(&options.db, "type", "", "Database type (mysql, postgres, etc.)")
 	_ = upCmd.MarkFlagRequired("type")
-	upCmd.Flags().Int("size", 10, "Database size in GB")
+	upCmd.Flags().IntVar(&options.size, "size", 10, "Database size in GB")
 	upCmd.Flags().String("name", "", "Name of the database to be created")
 	_ = upCmd.MarkFlagRequired("name")
 
@@ -71,13 +81,13 @@ func composeCommand() *cobra.Command {
 
 const lineSeparator = "\n"
 
-func up(_ *cobra.Command, args []string) {
+func up(options options, args []string) {
 	servicename := args[0]
 	fmt.Printf(`{ "type": "debug", "message": "Starting %s" }%s`, servicename, lineSeparator)
 
-	for i := 0; i < 100; i += 10 {
+	for i := 0; i < options.size; i += 10 {
 		time.Sleep(1 * time.Second)
-		fmt.Printf(`{ "type": "info", "message": "Processing ... %d%%" }%s`, i, lineSeparator)
+		fmt.Printf(`{ "type": "info", "message": "Processing ... %d%%" }%s`, i*100/options.size, lineSeparator)
 	}
 	fmt.Printf(`{ "type": "setenv", "message": "URL=https://magic.cloud/%s" }%s`, servicename, lineSeparator)
 }
