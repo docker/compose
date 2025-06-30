@@ -239,8 +239,8 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 	bindMounts := s.checkForBindMount(project)
 	if len(bindMounts) > 0 {
 		fmt.Println("you are about to publish bind mounts declaration within your OCI artifact.\n" +
-			"only the bind mount declarations will be added to the OCI artifact\n" +
-			"please double check that you are not mounting potential sensitive directories or data")
+			"only the bind mount declarations will be added to the OCI artifact (not content)\n" +
+			"please double check that you are not mounting potential user's sensitive directories or data")
 		for key, val := range bindMounts {
 			_, _ = fmt.Fprintln(s.dockerCli.Out(), key)
 			for _, v := range val {
