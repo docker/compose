@@ -18,13 +18,16 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -60,7 +63,15 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runExec(ctx, dockerCli, backend, opts)
+			err := runExec(ctx, dockerCli, backend, opts)
+			if err != nil {
+				logrus.Debugf("%v", err)
+				var cliError cli.StatusError
+				if ok := errors.As(err, &cliError); ok {
+					os.Exit(err.(cli.StatusError).StatusCode) //nolint: errorlint
+				}
+			}
+			return err
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
