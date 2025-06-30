@@ -33,8 +33,7 @@ func TestPostStartHookInError(t *testing.T) {
 
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/hooks/poststart/compose-error.yaml", "--project-name", projectName, "up", "-d")
 	res.Assert(t, icmd.Expected{ExitCode: 1})
-	assert.Assert(t, strings.Contains(res.Combined(), "Error response from daemon: container"), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), "is not running"), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), "test hook exited with status 127"), res.Combined())
 }
 
 func TestPostStartHookSuccess(t *testing.T) {

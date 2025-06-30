@@ -1,6 +1,6 @@
 services:
 
   test:
-    image: alpine
+    image: nginx
     post_start:
-      - command: sh -c 'echo env'
+      - command: sh -c 'command in error'
