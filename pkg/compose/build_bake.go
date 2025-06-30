@@ -295,7 +295,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 	// Remove DOCKER_CLI_PLUGIN... variable so buildx can detect it run standalone
-	cmd.Env = filter(os.Environ(), manager.ReexecEnvvar)
+	cmd.Env = filter(project.Environment.Values(), manager.ReexecEnvvar)
 
 	// Use docker/cli mechanism to propagate termination signal to child process
 	server, err := socket.NewPluginServer(nil)
