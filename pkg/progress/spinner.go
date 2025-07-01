@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-type spinner struct {
+type Spinner struct {
 	time  time.Time
 	index int
 	chars []string
@@ -29,7 +29,7 @@ type spinner struct {
 	done  string
 }
 
-func newSpinner() *spinner {
+func NewSpinner() *Spinner {
 	chars := []string{
 		"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
 	}
@@ -40,7 +40,7 @@ func newSpinner() *spinner {
 		done = "-"
 	}
 
-	return &spinner{
+	return &Spinner{
 		index: 0,
 		time:  time.Now(),
 		chars: chars,
@@ -48,7 +48,7 @@ func newSpinner() *spinner {
 	}
 }
 
-func (s *spinner) String() string {
+func (s *Spinner) String() string {
 	if s.stop {
 		return s.done
 	}
@@ -61,10 +61,10 @@ func (s *spinner) String() string {
 	return s.chars[s.index]
 }
 
-func (s *spinner) Stop() {
+func (s *Spinner) Stop() {
 	s.stop = true
 }
 
-func (s *spinner) Restart() {
+func (s *Spinner) Restart() {
 	s.stop = false
 }

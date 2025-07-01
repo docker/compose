@@ -5,6 +5,7 @@
 //
 //	mockgen -destination pkg/mocks/mock_docker_api.go -package mocks github.com/docker/docker/client APIClient
 //
+
 // Package mocks is a generated GoMock package.
 package mocks
 
@@ -16,6 +17,7 @@ import (
 	reflect "reflect"
 
 	types "github.com/docker/docker/api/types"
+	build "github.com/docker/docker/api/types/build"
 	checkpoint "github.com/docker/docker/api/types/checkpoint"
 	common "github.com/docker/docker/api/types/common"
 	container "github.com/docker/docker/api/types/container"
@@ -56,10 +58,10 @@ func (m *MockAPIClient) EXPECT() *MockAPIClientMockRecorder {
 }
 
 // BuildCachePrune mocks base method.
-func (m *MockAPIClient) BuildCachePrune(arg0 context.Context, arg1 types.BuildCachePruneOptions) (*types.BuildCachePruneReport, error) {
+func (m *MockAPIClient) BuildCachePrune(arg0 context.Context, arg1 build.CachePruneOptions) (*build.CachePruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BuildCachePrune", arg0, arg1)
-	ret0, _ := ret[0].(*types.BuildCachePruneReport)
+	ret0, _ := ret[0].(*build.CachePruneReport)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -156,10 +158,10 @@ func (mr *MockAPIClientMockRecorder) Close() *gomock.Call {
 }
 
 // ConfigCreate mocks base method.
-func (m *MockAPIClient) ConfigCreate(arg0 context.Context, arg1 swarm.ConfigSpec) (types.ConfigCreateResponse, error) {
+func (m *MockAPIClient) ConfigCreate(arg0 context.Context, arg1 swarm.ConfigSpec) (swarm.ConfigCreateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConfigCreate", arg0, arg1)
-	ret0, _ := ret[0].(types.ConfigCreateResponse)
+	ret0, _ := ret[0].(swarm.ConfigCreateResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -187,7 +189,7 @@ func (mr *MockAPIClientMockRecorder) ConfigInspectWithRaw(arg0, arg1 any) *gomoc
 }
 
 // ConfigList mocks base method.
-func (m *MockAPIClient) ConfigList(arg0 context.Context, arg1 types.ConfigListOptions) ([]swarm.Config, error) {
+func (m *MockAPIClient) ConfigList(arg0 context.Context, arg1 swarm.ConfigListOptions) ([]swarm.Config, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConfigList", arg0, arg1)
 	ret0, _ := ret[0].([]swarm.Config)
@@ -802,10 +804,10 @@ func (mr *MockAPIClientMockRecorder) HTTPClient() *gomock.Call {
 }
 
 // ImageBuild mocks base method.
-func (m *MockAPIClient) ImageBuild(arg0 context.Context, arg1 io.Reader, arg2 types.ImageBuildOptions) (types.ImageBuildResponse, error) {
+func (m *MockAPIClient) ImageBuild(arg0 context.Context, arg1 io.Reader, arg2 build.ImageBuildOptions) (build.ImageBuildResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageBuild", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.ImageBuildResponse)
+	ret0, _ := ret[0].(build.ImageBuildResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1220,7 +1222,7 @@ func (mr *MockAPIClientMockRecorder) NodeInspectWithRaw(arg0, arg1 any) *gomock.
 }
 
 // NodeList mocks base method.
-func (m *MockAPIClient) NodeList(arg0 context.Context, arg1 types.NodeListOptions) ([]swarm.Node, error) {
+func (m *MockAPIClient) NodeList(arg0 context.Context, arg1 swarm.NodeListOptions) ([]swarm.Node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NodeList", arg0, arg1)
 	ret0, _ := ret[0].([]swarm.Node)
@@ -1235,7 +1237,7 @@ func (mr *MockAPIClientMockRecorder) NodeList(arg0, arg1 any) *gomock.Call {
 }
 
 // NodeRemove mocks base method.
-func (m *MockAPIClient) NodeRemove(arg0 context.Context, arg1 string, arg2 types.NodeRemoveOptions) error {
+func (m *MockAPIClient) NodeRemove(arg0 context.Context, arg1 string, arg2 swarm.NodeRemoveOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NodeRemove", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -1439,10 +1441,10 @@ func (mr *MockAPIClientMockRecorder) RegistryLogin(arg0, arg1 any) *gomock.Call 
 }
 
 // SecretCreate mocks base method.
-func (m *MockAPIClient) SecretCreate(arg0 context.Context, arg1 swarm.SecretSpec) (types.SecretCreateResponse, error) {
+func (m *MockAPIClient) SecretCreate(arg0 context.Context, arg1 swarm.SecretSpec) (swarm.SecretCreateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SecretCreate", arg0, arg1)
-	ret0, _ := ret[0].(types.SecretCreateResponse)
+	ret0, _ := ret[0].(swarm.SecretCreateResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1470,7 +1472,7 @@ func (mr *MockAPIClientMockRecorder) SecretInspectWithRaw(arg0, arg1 any) *gomoc
 }
 
 // SecretList mocks base method.
-func (m *MockAPIClient) SecretList(arg0 context.Context, arg1 types.SecretListOptions) ([]swarm.Secret, error) {
+func (m *MockAPIClient) SecretList(arg0 context.Context, arg1 swarm.SecretListOptions) ([]swarm.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SecretList", arg0, arg1)
 	ret0, _ := ret[0].([]swarm.Secret)
@@ -1528,7 +1530,7 @@ func (mr *MockAPIClientMockRecorder) ServerVersion(arg0 any) *gomock.Call {
 }
 
 // ServiceCreate mocks base method.
-func (m *MockAPIClient) ServiceCreate(arg0 context.Context, arg1 swarm.ServiceSpec, arg2 types.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
+func (m *MockAPIClient) ServiceCreate(arg0 context.Context, arg1 swarm.ServiceSpec, arg2 swarm.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ServiceCreate", arg0, arg1, arg2)
 	ret0, _ := ret[0].(swarm.ServiceCreateResponse)
@@ -1543,7 +1545,7 @@ func (mr *MockAPIClientMockRecorder) ServiceCreate(arg0, arg1, arg2 any) *gomock
 }
 
 // ServiceInspectWithRaw mocks base method.
-func (m *MockAPIClient) ServiceInspectWithRaw(arg0 context.Context, arg1 string, arg2 types.ServiceInspectOptions) (swarm.Service, []byte, error) {
+func (m *MockAPIClient) ServiceInspectWithRaw(arg0 context.Context, arg1 string, arg2 swarm.ServiceInspectOptions) (swarm.Service, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ServiceInspectWithRaw", arg0, arg1, arg2)
 	ret0, _ := ret[0].(swarm.Service)
@@ -1559,7 +1561,7 @@ func (mr *MockAPIClientMockRecorder) ServiceInspectWithRaw(arg0, arg1, arg2 any)
 }
 
 // ServiceList mocks base method.
-func (m *MockAPIClient) ServiceList(arg0 context.Context, arg1 types.ServiceListOptions) ([]swarm.Service, error) {
+func (m *MockAPIClient) ServiceList(arg0 context.Context, arg1 swarm.ServiceListOptions) ([]swarm.Service, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ServiceList", arg0, arg1)
 	ret0, _ := ret[0].([]swarm.Service)
@@ -1603,7 +1605,7 @@ func (mr *MockAPIClientMockRecorder) ServiceRemove(arg0, arg1 any) *gomock.Call 
 }
 
 // ServiceUpdate mocks base method.
-func (m *MockAPIClient) ServiceUpdate(arg0 context.Context, arg1 string, arg2 swarm.Version, arg3 swarm.ServiceSpec, arg4 types.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
+func (m *MockAPIClient) ServiceUpdate(arg0 context.Context, arg1 string, arg2 swarm.Version, arg3 swarm.ServiceSpec, arg4 swarm.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ServiceUpdate", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(swarm.ServiceUpdateResponse)
@@ -1618,10 +1620,10 @@ func (mr *MockAPIClientMockRecorder) ServiceUpdate(arg0, arg1, arg2, arg3, arg4 
 }
 
 // SwarmGetUnlockKey mocks base method.
-func (m *MockAPIClient) SwarmGetUnlockKey(arg0 context.Context) (types.SwarmUnlockKeyResponse, error) {
+func (m *MockAPIClient) SwarmGetUnlockKey(arg0 context.Context) (swarm.UnlockKeyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SwarmGetUnlockKey", arg0)
-	ret0, _ := ret[0].(types.SwarmUnlockKeyResponse)
+	ret0, _ := ret[0].(swarm.UnlockKeyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1735,7 +1737,7 @@ func (mr *MockAPIClientMockRecorder) TaskInspectWithRaw(arg0, arg1 any) *gomock.
 }
 
 // TaskList mocks base method.
-func (m *MockAPIClient) TaskList(arg0 context.Context, arg1 types.TaskListOptions) ([]swarm.Task, error) {
+func (m *MockAPIClient) TaskList(arg0 context.Context, arg1 swarm.TaskListOptions) ([]swarm.Task, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TaskList", arg0, arg1)
 	ret0, _ := ret[0].([]swarm.Task)

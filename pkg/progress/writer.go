@@ -65,6 +65,25 @@ func Run(ctx context.Context, pf progressFunc, out *streams.Out) error {
 	return err
 }
 
+func RunWithLog(ctx context.Context, pf progressFunc, out *streams.Out, logConsumer api.LogConsumer) error {
+	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
+	if !ok {
+		dryRun = false
+	}
+	w := NewMixedWriter(out, logConsumer, dryRun)
+	eg, _ := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		return w.Start(context.Background())
+	})
+	eg.Go(func() error {
+		defer w.Stop()
+		ctx = WithContextWriter(ctx, w)
+		err := pf(ctx)
+		return err
+	})
+	return eg.Wait()
+}
+
 func RunWithTitle(ctx context.Context, pf progressFunc, out *streams.Out, progressTitle string) error {
 	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
 		return "", pf(ctx)
