@@ -34,7 +34,7 @@ func TestLineText(t *testing.T) {
 		StatusText: "Status",
 		endTime:    now,
 		startTime:  now,
-		spinner: &spinner{
+		spinner: &Spinner{
 			chars: []string{"."},
 		},
 	}
@@ -65,7 +65,7 @@ func TestLineTextSingleEvent(t *testing.T) {
 		Status:     Done,
 		StatusText: "Status",
 		startTime:  now,
-		spinner: &spinner{
+		spinner: &Spinner{
 			chars: []string{"."},
 		},
 	}
@@ -87,7 +87,7 @@ func TestErrorEvent(t *testing.T) {
 		Status:     Working,
 		StatusText: "Working",
 		startTime:  time.Now(),
-		spinner: &spinner{
+		spinner: &Spinner{
 			chars: []string{"."},
 		},
 	}
@@ -116,7 +116,7 @@ func TestWarningEvent(t *testing.T) {
 		Status:     Working,
 		StatusText: "Working",
 		startTime:  time.Now(),
-		spinner: &spinner{
+		spinner: &Spinner{
 			chars: []string{"."},
 		},
 	}

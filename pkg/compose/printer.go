@@ -149,9 +149,7 @@ func (p *printer) Run(cascade api.Cascade, exitCodeFrom string, stopFn func() er
 					return exitCode, nil
 				}
 			case api.ContainerEventLog, api.HookEventLog:
-				if !aborting {
-					p.consumer.Log(container, event.Line)
-				}
+				p.consumer.Log(container, event.Line)
 			case api.ContainerEventErr:
 				if !aborting {
 					p.consumer.Err(container, event.Line)

@@ -1428,7 +1428,7 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 	err := s.stop(ctx, project.Name, api.StopOptions{
 		Services: services,
 		Project:  project,
-	})
+	}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1599,7 +1599,7 @@ func (s *composeService) removeDivergedVolume(ctx context.Context, name string, 
 	err := s.stop(ctx, project.Name, api.StopOptions{
 		Services: services,
 		Project:  project,
-	})
+	}, nil)
 	if err != nil {
 		return err
 	}

@@ -236,7 +236,7 @@ func (c *convergence) stopDependentContainers(ctx context.Context, project *type
 	err := c.service.stop(ctx, project.Name, api.StopOptions{
 		Services: dependents,
 		Project:  project,
-	})
+	}, nil)
 	if err != nil {
 		return err
 	}
