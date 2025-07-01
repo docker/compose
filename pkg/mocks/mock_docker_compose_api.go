@@ -5,6 +5,7 @@
 //
 //	mockgen -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go Service
 //
+
 // Package mocks is a generated GoMock package.
 package mocks
 
