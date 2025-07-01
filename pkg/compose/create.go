@@ -36,7 +36,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/api/types/versions"
 	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/go-connections/nat"
@@ -181,15 +180,12 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		return createConfigs{}, err
 	}
 
-	var (
-		runCmd     strslice.StrSlice
-		entrypoint strslice.StrSlice
-	)
+	var runCmd, entrypoint []string
 	if service.Command != nil {
-		runCmd = strslice.StrSlice(service.Command)
+		runCmd = service.Command
 	}
 	if service.Entrypoint != nil {
-		entrypoint = strslice.StrSlice(service.Entrypoint)
+		entrypoint = service.Entrypoint
 	}
 
 	var (
@@ -286,8 +282,8 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		Annotations:    service.Annotations,
 		Binds:          binds,
 		Mounts:         mounts,
-		CapAdd:         strslice.StrSlice(service.CapAdd),
-		CapDrop:        strslice.StrSlice(service.CapDrop),
+		CapAdd:         service.CapAdd,
+		CapDrop:        service.CapDrop,
 		NetworkMode:    networkMode,
 		Init:           service.Init,
 		IpcMode:        container.IpcMode(service.Ipc),
