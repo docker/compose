@@ -17,15 +17,11 @@
 package watch
 
 import (
-	"errors"
 	"expvar"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
-
-	"github.com/tilt-dev/fsnotify"
 )
 
 var numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
@@ -101,10 +97,6 @@ func DesiredWindowsBufferSize() int {
 		}
 	}
 	return defaultBufferSize
-}
-
-func IsWindowsShortReadError(err error) bool {
-	return runtime.GOOS == "windows" && !errors.Is(err, fsnotify.ErrEventOverflow)
 }
 
 type CompositePathMatcher struct {
