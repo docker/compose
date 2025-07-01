@@ -73,9 +73,12 @@ func (l *logConsumer) register(name string) *presenter {
 	} else {
 		cf := monochrome
 		if l.color {
-			if name == api.WatchLogger {
+			switch name {
+			case "":
+				cf = monochrome
+			case api.WatchLogger:
 				cf = makeColorFunc("92")
-			} else {
+			default:
 				cf = nextColor()
 			}
 		}

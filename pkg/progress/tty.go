@@ -110,7 +110,7 @@ func (w *ttyWriter) event(e Event) {
 		w.events[e.ID] = last
 	} else {
 		e.startTime = time.Now()
-		e.spinner = newSpinner()
+		e.spinner = NewSpinner()
 		if e.Status == Done || e.Status == Error {
 			e.stop()
 		}

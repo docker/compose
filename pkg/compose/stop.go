@@ -27,11 +27,11 @@ import (
 
 func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
-		return s.stop(ctx, strings.ToLower(projectName), options)
+		return s.stop(ctx, strings.ToLower(projectName), options, nil)
 	}, s.stdinfo(), "Stopping")
 }
 
-func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions) error {
+func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions, event api.ContainerEventListener) error {
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
@@ -55,6 +55,6 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 			return nil
 		}
 		serv := project.Services[service]
-		return s.stopContainers(ctx, w, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout)
+		return s.stopContainers(ctx, w, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout, event)
 	})
 }

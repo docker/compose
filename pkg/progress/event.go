@@ -60,7 +60,7 @@ type Event struct {
 	Total     int64
 	startTime time.Time
 	endTime   time.Time
-	spinner   *spinner
+	spinner   *Spinner
 }
 
 // ErrorMessageEvent creates a new Error Event with message

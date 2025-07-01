@@ -48,8 +48,8 @@ func (ke *KeyboardError) printError(height int, info string) {
 	if ke.shouldDisplay() {
 		errMessage := ke.err.Error()
 
-		MoveCursor(height-1-extraLines(info)-extraLines(errMessage), 0)
-		ClearLine()
+		moveCursor(height-1-extraLines(info)-extraLines(errMessage), 0)
+		clearLine()
 
 		fmt.Print(errMessage)
 	}
@@ -133,7 +133,7 @@ func (lk *LogKeyboard) createBuffer(lines int) {
 
 	if lines > 0 {
 		allocateSpace(lines)
-		MoveCursorUp(lines)
+		moveCursorUp(lines)
 	}
 }
 
@@ -146,17 +146,17 @@ func (lk *LogKeyboard) printNavigationMenu() {
 		height := goterm.Height()
 		menu := lk.navigationMenu()
 
-		MoveCursorX(0)
-		SaveCursor()
+		carriageReturn()
+		saveCursor()
 
 		lk.kError.printError(height, menu)
 
-		MoveCursor(height-extraLines(menu), 0)
-		ClearLine()
+		moveCursor(height-extraLines(menu), 0)
+		clearLine()
 		fmt.Print(menu)
 
-		MoveCursorX(0)
-		RestoreCursor()
+		carriageReturn()
+		restoreCursor()
 	}
 }
 
@@ -188,15 +188,15 @@ func (lk *LogKeyboard) navigationMenu() string {
 
 func (lk *LogKeyboard) clearNavigationMenu() {
 	height := goterm.Height()
-	MoveCursorX(0)
-	SaveCursor()
+	carriageReturn()
+	saveCursor()
 
-	// ClearLine()
+	// clearLine()
 	for i := 0; i < height; i++ {
-		MoveCursorDown(1)
-		ClearLine()
+		moveCursorDown(1)
+		clearLine()
 	}
-	RestoreCursor()
+	restoreCursor()
 }
 
 func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Project) {
@@ -316,13 +316,13 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	case keyboard.KeyCtrlC:
 		_ = keyboard.Close()
 		lk.clearNavigationMenu()
-		ShowCursor()
+		showCursor()
 
 		lk.logLevel = NONE
 		// will notify main thread to kill and will handle gracefully
 		lk.signalChannel <- syscall.SIGINT
 	case keyboard.KeyEnter:
-		NewLine()
+		newLine()
 		lk.printNavigationMenu()
 	}
 }
@@ -336,9 +336,9 @@ func (lk *LogKeyboard) EnableWatch(enabled bool, watcher Feature) {
 
 func allocateSpace(lines int) {
 	for i := 0; i < lines; i++ {
-		ClearLine()
-		NewLine()
-		MoveCursorX(0)
+		clearLine()
+		newLine()
+		carriageReturn()
 	}
 }
 

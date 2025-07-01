@@ -1,0 +1,9 @@
+services:
+  service1:
+    image: alpine
+    command: /bin/true
+  service2:
+    image: alpine
+    command: ping -c 2 localhost
+    pre_stop:
+      - command: echo "stop hook running..."
