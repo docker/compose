@@ -29,16 +29,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli-plugins/manager"
+	"github.com/docker/cli/cli/config"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
-
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/cli/cli-plugins/socket"
-	"github.com/docker/cli/cli/config"
 )
 
 type JsonMessage struct {
@@ -199,29 +195,11 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	args = append(args, service.Name)
 
 	cmd := exec.CommandContext(ctx, path, args...)
-	// exec provider command with same environment Compose is running
-	env := types.NewMapping(os.Environ())
-	// but remove DOCKER_CLI_PLUGIN... variable so plugin can detect it run standalone
-	delete(env, manager.ReexecEnvvar)
-	// and add the explicit environment variables set for service
-	for key, val := range service.Environment.RemoveEmpty().ToMapping() {
-		env[key] = val
+
+	err := s.prepareShellOut(ctx, project, cmd)
+	if err != nil {
+		return nil, err
 	}
-	cmd.Env = env.Values()
-
-	// Use docker/cli mechanism to propagate termination signal to child process
-	server, err := socket.NewPluginServer(nil)
-	if err == nil {
-		defer server.Close() //nolint:errcheck
-		cmd.Env = replace(cmd.Env, socket.EnvKey, server.Addr().String())
-	}
-
-	cmd.Env = append(cmd.Env, fmt.Sprintf("DOCKER_CONTEXT=%s", s.dockerCli.CurrentContext()))
-
-	// propagate opentelemetry context to child process, see https://github.com/open-telemetry/oteps/blob/main/text/0258-env-context-baggage-carriers.md
-	carrier := propagation.MapCarrier{}
-	otel.GetTextMapPropagator().Inject(ctx, &carrier)
-	cmd.Env = append(cmd.Env, types.Mapping(carrier).Values()...)
 	return cmd, nil
 }
 
