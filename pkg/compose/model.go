@@ -83,20 +83,25 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 			config.Name = name
 		}
 		eg.Go(func() error {
+			w := progress.ContextWriter(gctx)
 			if !slices.Contains(availableModels, config.Model) {
-				err = s.pullModel(gctx, dockerModel, config, quietPull)
+				err = s.pullModel(gctx, dockerModel, config, quietPull, w)
 				if err != nil {
 					return err
 				}
 			}
-			return s.configureModel(gctx, dockerModel, config)
+			err = s.configureModel(gctx, dockerModel, config, w)
+			if err != nil {
+				return err
+			}
+			w.Event(progress.CreatedEvent(config.Name))
+			return nil
 		})
 	}
 	return eg.Wait()
 }
 
-func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plugin, model types.ModelConfig, quietPull bool) error {
-	w := progress.ContextWriter(ctx)
+func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plugin, model types.ModelConfig, quietPull bool, w progress.Writer) error {
 	w.Event(progress.Event{
 		ID:     model.Name,
 		Status: progress.Working,
@@ -145,7 +150,12 @@ func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plu
 	return err
 }
 
-func (s *composeService) configureModel(ctx context.Context, dockerModel *manager.Plugin, config types.ModelConfig) error {
+func (s *composeService) configureModel(ctx context.Context, dockerModel *manager.Plugin, config types.ModelConfig, w progress.Writer) error {
+	w.Event(progress.Event{
+		ID:     config.Name,
+		Status: progress.Working,
+		Text:   "Configuring",
+	})
 	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]
 	args := []string{"configure"}
 	if config.ContextSize > 0 {
