@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -32,8 +31,6 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -51,7 +48,11 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	}
 
 	cmd := exec.CommandContext(ctx, dockerModel.Path, "ls", "--json")
-	s.setupChildProcess(ctx, cmd)
+	err = s.prepareShellOut(ctx, project, cmd)
+	if err != nil {
+		return err
+	}
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("error checking available models: %w", err)
@@ -85,23 +86,18 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		eg.Go(func() error {
 			w := progress.ContextWriter(gctx)
 			if !slices.Contains(availableModels, config.Model) {
-				err = s.pullModel(gctx, dockerModel, config, quietPull, w)
+				err = s.pullModel(gctx, dockerModel, project, config, quietPull, w)
 				if err != nil {
 					return err
 				}
 			}
-			err = s.configureModel(gctx, dockerModel, config, w)
-			if err != nil {
-				return err
-			}
-			w.Event(progress.CreatedEvent(config.Name))
-			return nil
+			return s.configureModel(gctx, dockerModel, project, config, w)
 		})
 	}
 	return eg.Wait()
 }
 
-func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plugin, model types.ModelConfig, quietPull bool, w progress.Writer) error {
+func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plugin, project *types.Project, model types.ModelConfig, quietPull bool, w progress.Writer) error {
 	w.Event(progress.Event{
 		ID:     model.Name,
 		Status: progress.Working,
@@ -109,8 +105,10 @@ func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plu
 	})
 
 	cmd := exec.CommandContext(ctx, dockerModel.Path, "pull", model.Model)
-	s.setupChildProcess(ctx, cmd)
-
+	err := s.prepareShellOut(ctx, project, cmd)
+	if err != nil {
+		return err
+	}
 	stream, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -150,7 +148,7 @@ func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plu
 	return err
 }
 
-func (s *composeService) configureModel(ctx context.Context, dockerModel *manager.Plugin, config types.ModelConfig, w progress.Writer) error {
+func (s *composeService) configureModel(ctx context.Context, dockerModel *manager.Plugin, project *types.Project, config types.ModelConfig, w progress.Writer) error {
 	w.Event(progress.Event{
 		ID:     config.Name,
 		Status: progress.Working,
@@ -167,13 +165,20 @@ func (s *composeService) configureModel(ctx context.Context, dockerModel *manage
 		args = append(args, config.RuntimeFlags...)
 	}
 	cmd := exec.CommandContext(ctx, dockerModel.Path, args...)
-	s.setupChildProcess(ctx, cmd)
+	err := s.prepareShellOut(ctx, project, cmd)
+	if err != nil {
+		return err
+	}
 	return cmd.Run()
 }
 
 func (s *composeService) setModelVariables(ctx context.Context, dockerModel *manager.Plugin, project *types.Project) error {
 	cmd := exec.CommandContext(ctx, dockerModel.Path, "status", "--json")
-	s.setupChildProcess(ctx, cmd)
+	err := s.prepareShellOut(ctx, project, cmd)
+	if err != nil {
+		return err
+	}
+
 	statusOut, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("error checking docker-model status: %w", err)
@@ -209,19 +214,6 @@ func (s *composeService) setModelVariables(ctx context.Context, dockerModel *man
 		}
 	}
 	return nil
-}
-
-func (s *composeService) setupChildProcess(gctx context.Context, cmd *exec.Cmd) {
-	// exec provider command with same environment Compose is running
-	env := types.NewMapping(os.Environ())
-	// but remove DOCKER_CLI_PLUGIN... variable so plugin can detect it run standalone
-	delete(env, manager.ReexecEnvvar)
-	// propagate opentelemetry context to child process, see https://github.com/open-telemetry/oteps/blob/main/text/0258-env-context-baggage-carriers.md
-	carrier := propagation.MapCarrier{}
-	otel.GetTextMapPropagator().Inject(gctx, &carrier)
-	env.Merge(types.Mapping(carrier))
-	env["DOCKER_CONTEXT"] = s.dockerCli.CurrentContext()
-	cmd.Env = env.Values()
 }
 
 type Model struct {

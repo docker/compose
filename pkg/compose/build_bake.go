@@ -34,7 +34,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/cli/cli-plugins/socket"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -45,8 +44,6 @@ import (
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -294,25 +291,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	logrus.Debugf("Executing bake with args: %v", args)
 
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
-	// Remove DOCKER_CLI_PLUGIN... variable so buildx can detect it run standalone
-	cmd.Env = filter(project.Environment.Values(), manager.ReexecEnvvar)
 
-	// Use docker/cli mechanism to propagate termination signal to child process
-	server, err := socket.NewPluginServer(nil)
-	if err == nil {
-		defer server.Close() //nolint:errcheck
-		cmd.Env = replace(cmd.Env, socket.EnvKey, server.Addr().String())
+	err = s.prepareShellOut(ctx, project, cmd)
+	if err != nil {
+		return nil, err
 	}
-
-	cmd.Env = append(cmd.Env,
-		fmt.Sprintf("DOCKER_CONTEXT=%s", s.dockerCli.CurrentContext()),
-		fmt.Sprintf("DOCKER_HOST=%s", s.dockerCli.DockerEndpoint().Host),
-	)
-
-	// propagate opentelemetry context to child process, see https://github.com/open-telemetry/oteps/blob/main/text/0258-env-context-baggage-carriers.md
-	carrier := propagation.MapCarrier{}
-	otel.GetTextMapPropagator().Inject(ctx, &carrier)
-	cmd.Env = append(cmd.Env, types.Mapping(carrier).Values()...)
 
 	cmd.Stdout = s.stdout()
 	cmd.Stdin = bytes.NewBuffer(b)
@@ -441,22 +424,6 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) 
 		}
 	}
 	return s
-}
-
-func filter(environ []string, variable string) []string {
-	prefix := variable + "="
-	filtered := make([]string, 0, len(environ))
-	for _, val := range environ {
-		if !strings.HasPrefix(val, prefix) {
-			filtered = append(filtered, val)
-		}
-	}
-	return filtered
-}
-
-func replace(environ []string, variable, value string) []string {
-	filtered := filter(environ, variable)
-	return append(filtered, fmt.Sprintf("%s=%s", variable, value))
 }
 
 func dockerFilePath(ctxName string, dockerfile string) string {
