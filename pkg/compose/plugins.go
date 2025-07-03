@@ -170,7 +170,7 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 }
 
 func (s *composeService) setupPluginCommand(ctx context.Context, project *types.Project, service types.ServiceConfig, path, command string) (*exec.Cmd, error) {
-	cmdOptionsMetadata := s.getPluginMetadata(path, service.Provider.Type)
+	cmdOptionsMetadata := s.getPluginMetadata(path, service.Provider.Type, project)
 	var currentCommandMetadata CommandMetadata
 	switch command {
 	case "up":
@@ -178,8 +178,9 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	case "down":
 		currentCommandMetadata = cmdOptionsMetadata.Down
 	}
-	commandMetadataIsEmpty := len(currentCommandMetadata.Parameters) == 0
+
 	provider := *service.Provider
+	commandMetadataIsEmpty := cmdOptionsMetadata.IsEmpty()
 	if err := currentCommandMetadata.CheckRequiredParameters(provider); !commandMetadataIsEmpty && err != nil {
 		return nil, err
 	}
@@ -203,8 +204,13 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	return cmd, nil
 }
 
-func (s *composeService) getPluginMetadata(path, command string) ProviderMetadata {
+func (s *composeService) getPluginMetadata(path, command string, project *types.Project) ProviderMetadata {
 	cmd := exec.Command(path, "compose", "metadata")
+	err := s.prepareShellOut(context.Background(), project, cmd)
+	if err != nil {
+		logrus.Debugf("failed to prepare plugin metadata command: %v", err)
+		return ProviderMetadata{}
+	}
 	stdout := &bytes.Buffer{}
 	cmd.Stdout = stdout
 
@@ -237,6 +243,10 @@ type ProviderMetadata struct {
 	Description string          `json:"description"`
 	Up          CommandMetadata `json:"up"`
 	Down        CommandMetadata `json:"down"`
+}
+
+func (p ProviderMetadata) IsEmpty() bool {
+	return p.Description == "" && p.Up.Parameters == nil && p.Down.Parameters == nil
 }
 
 type CommandMetadata struct {
