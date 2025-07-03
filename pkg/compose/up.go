@@ -72,7 +72,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	var isTerminated atomic.Bool
 
 	var (
-		logConsumer    = options.Start.Attach
+		logConsumer    api.LogConsumer = options.Start.Attach
 		navigationMenu *formatter.LogKeyboard
 		kEvents        <-chan keyboard.KeyEvent
 	)
@@ -90,6 +90,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	}
 
+	tui := formatter.NewStopping(logConsumer)
+	defer tui.Close()
+	logConsumer = tui
+
 	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
 	if err != nil && options.Start.Watch {
 		return err
@@ -105,10 +109,16 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
-			printer.Cancel()
-			_, _ = fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
+			tui.ApplicationTermination()
+			ctx = context.WithoutCancel(ctx)
+			w := progress.NewMixedWriter(s.stdinfo(), logConsumer, s.dryRun)
 			eg.Go(func() error {
-				err := s.Stop(context.WithoutCancel(ctx), project.Name, api.StopOptions{
+				return w.Start(context.Background())
+			})
+			eg.Go(func() error {
+				defer w.Stop()
+				ctx = progress.WithContextWriter(ctx, w)
+				err = s.stop(ctx, project.Name, api.StopOptions{
 					Services: options.Create.Services,
 					Project:  project,
 				})

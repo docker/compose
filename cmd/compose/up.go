@@ -171,7 +171,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
-	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
+	flags.BoolVar(&up.navigationMenu, "menu", false, "ApplicationTermination interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
 	flags.BoolVarP(&create.AssumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		// assumeYes was introduced by mistake as `--y`
