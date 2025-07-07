@@ -15,6 +15,7 @@ the canonical format.
 | `--hash`                  | `string` |         | Print the service config hash, one per line.                                |
 | `--images`                | `bool`   |         | Print the image names, one per line.                                        |
 | `--lock-image-digests`    | `bool`   |         | Produces an override file with image digests                                |
+| `--models`                | `bool`   |         | Print the model names, one per line.                                        |
 | `--networks`              | `bool`   |         | Print the network names, one per line.                                      |
 | `--no-consistency`        | `bool`   |         | Don't check model consistency - warning: may produce invalid Compose output |
 | `--no-env-resolution`     | `bool`   |         | Don't resolve service env files                                             |
