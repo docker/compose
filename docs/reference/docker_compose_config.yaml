@@ -56,6 +56,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: models
+      value_type: bool
+      default_value: "false"
+      description: Print the model names, one per line.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: networks
       value_type: bool
       default_value: "false"
