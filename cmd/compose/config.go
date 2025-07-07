@@ -50,7 +50,7 @@ type configOptions struct {
 	noResolveEnv        bool
 	services            bool
 	volumes             bool
-	networks			bool
+	networks            bool
 	profiles            bool
 	images              bool
 	hash                string
