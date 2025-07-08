@@ -596,3 +596,15 @@ func TestBuildLongOutputLine(t *testing.T) {
 	out = res.Combined()
 	assert.Check(t, strings.Contains(out, "long-line  Built"))
 }
+
+func TestBuildDependentImageWithProfile(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/profiles/compose.yaml", "down", "--rmi=local")
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/profiles/compose.yaml", "build", "secret-build-test")
+	out := res.Combined()
+	assert.Check(t, strings.Contains(out, "secret-build-test  Built"))
+}
