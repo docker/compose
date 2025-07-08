@@ -98,6 +98,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: dev
+      value_type: bool
+      default_value: "false"
+      description: Enable development mode.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: exit-code-from
       value_type: string
       description: |

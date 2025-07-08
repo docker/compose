@@ -225,7 +225,8 @@ type CreateOptions struct {
 	// QuietPull makes the pulling process quiet
 	QuietPull bool
 	// AssumeYes assume "yes" as answer to all prompts and run non-interactively
-	AssumeYes bool
+	AssumeYes   bool
+	Development bool
 }
 
 // StartOptions group options of the Start API

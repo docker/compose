@@ -32,6 +32,7 @@ If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the contai
 | `--attach-dependencies`        | `bool`        |          | Automatically attach to log output of dependent services                                                                                            |
 | `--build`                      | `bool`        |          | Build images before starting containers                                                                                                             |
 | `-d`, `--detach`               | `bool`        |          | Detached mode: Run containers in the background                                                                                                     |
+| `--dev`                        | `bool`        |          | Enable development mode.                                                                                                                            |
 | `--dry-run`                    | `bool`        |          | Execute command in dry run mode                                                                                                                     |
 | `--exit-code-from`             | `string`      |          | Return the exit code of the selected service container. Implies --abort-on-container-exit                                                           |
 | `--force-recreate`             | `bool`        |          | Recreate containers even if their configuration and image haven't changed                                                                           |
