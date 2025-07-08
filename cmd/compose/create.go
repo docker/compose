@@ -49,6 +49,7 @@ type createOptions struct {
 	quietPull     bool
 	scale         []string
 	AssumeYes     bool
+	Development   bool
 }
 
 func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -120,6 +121,7 @@ func runCreate(ctx context.Context, _ command.Cli, backend api.Service, createOp
 		Timeout:              createOpts.GetTimeout(),
 		QuietPull:            createOpts.quietPull,
 		AssumeYes:            createOpts.AssumeYes,
+		Development:          createOpts.Development,
 	})
 }
 
