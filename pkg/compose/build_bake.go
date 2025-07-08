@@ -305,7 +305,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	var errMessage []string
-	reader := bufio.NewReader(pipe)
+	reader := bufio.NewReader(io.TeeReader(pipe, os.Stderr))
 
 	err = cmd.Start()
 	if err != nil {
