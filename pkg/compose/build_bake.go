@@ -436,9 +436,10 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if !filepath.IsAbs(dockerfile) {
 		dockerfile = filepath.Join(ctxName, dockerfile)
 	}
-	symlinks, err := filepath.EvalSymlinks(dockerfile)
+	dir := filepath.Dir(dockerfile)
+	symlinks, err := filepath.EvalSymlinks(dir)
 	if err == nil {
-		return symlinks
+		return filepath.Join(symlinks, filepath.Base(dockerfile))
 	}
 	return dockerfile
 }
