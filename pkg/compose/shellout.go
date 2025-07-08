@@ -23,6 +23,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/context/docker"
+	"github.com/docker/compose/v2/internal"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
@@ -41,6 +42,7 @@ func (s *composeService) prepareShellOut(gctx context.Context, project *types.Pr
 	env.Merge(types.Mapping(carrier))
 
 	env["DOCKER_CONTEXT"] = s.dockerCli.CurrentContext()
+	env["USER_AGENT"] = "compose/" + internal.Version
 
 	metadata, err := s.dockerCli.ContextStore().GetMetadata(s.dockerCli.CurrentContext())
 	if err != nil {
