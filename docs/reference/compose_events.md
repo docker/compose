@@ -23,10 +23,12 @@ The events that can be received using this can be seen [here](/reference/cli/doc
 
 ### Options
 
-| Name        | Type   | Default | Description                               |
-|:------------|:-------|:--------|:------------------------------------------|
-| `--dry-run` | `bool` |         | Execute command in dry run mode           |
-| `--json`    | `bool` |         | Output events as a stream of json objects |
+| Name        | Type     | Default | Description                               |
+|:------------|:---------|:--------|:------------------------------------------|
+| `--dry-run` | `bool`   |         | Execute command in dry run mode           |
+| `--json`    | `bool`   |         | Output events as a stream of json objects |
+| `--since`   | `string` |         | Show all events created since timestamp   |
+| `--until`   | `string` |         | Stream events until this timestamp        |
 
 
 <!---MARKER_GEN_END-->

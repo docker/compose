@@ -32,6 +32,8 @@ func (s *composeService) Events(ctx context.Context, projectName string, options
 	projectName = strings.ToLower(projectName)
 	evts, errors := s.apiClient().Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
+		Since:   options.Since,
+		Until:   options.Until,
 	})
 	for {
 		select {
