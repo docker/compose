@@ -145,6 +145,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 }
 
 func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, opts buildOptions, services []string) error {
+	opts.All = true // do not drop resources as build may involve some dependencies by additional_contexts
 	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
