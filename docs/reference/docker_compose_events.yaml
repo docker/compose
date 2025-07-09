@@ -34,6 +34,24 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: since
+      value_type: string
+      description: Show all events created since timestamp
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: until
+      value_type: string
+      description: Stream events until this timestamp
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 inherited_options:
     - option: dry-run
       value_type: bool

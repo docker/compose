@@ -29,7 +29,9 @@ import (
 
 type eventsOpts struct {
 	*composeOptions
-	json bool
+	json  bool
+	since string
+	until string
 }
 
 func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -48,6 +50,8 @@ func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	}
 
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Output events as a stream of json objects")
+	cmd.Flags().StringVar(&opts.since, "since", "", "Show all events created since timestamp")
+	cmd.Flags().StringVar(&opts.until, "until", "", "Stream events until this timestamp")
 	return cmd
 }
 
@@ -59,6 +63,8 @@ func runEvents(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 
 	return backend.Events(ctx, name, api.EventsOptions{
 		Services: services,
+		Since:    opts.since,
+		Until:    opts.until,
 		Consumer: func(event api.Event) error {
 			if opts.json {
 				marshal, err := json.Marshal(map[string]interface{}{

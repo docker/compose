@@ -398,6 +398,8 @@ type AttachOptions struct {
 type EventsOptions struct {
 	Services []string
 	Consumer func(event Event) error
+	Since    string
+	Until    string
 }
 
 // Event is a container runtime event served by Events API
