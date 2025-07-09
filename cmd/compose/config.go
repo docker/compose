@@ -393,8 +393,10 @@ func runModels(ctx context.Context, dockerCli command.Cli, opts configOptions) e
 	if err != nil {
 		return err
 	}
-	for n := range project.Models {
-		_, _ = fmt.Fprintln(dockerCli.Out(), n)
+	for _, model := range project.Models {
+		if model.Model != "" {
+			_, _ = fmt.Fprintln(dockerCli.Out(), model.Model)
+		}
 	}
 	return nil
 }
