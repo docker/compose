@@ -181,6 +181,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 		}
 		return pflag.NormalizedName(name)
 	})
+	flags.BoolVar(&create.Development, "dev", false, "Enable development mode.")
 	return upCmd
 }
 
@@ -276,6 +277,7 @@ func runUp(
 		Timeout:              createOptions.GetTimeout(),
 		QuietPull:            createOptions.quietPull,
 		AssumeYes:            createOptions.AssumeYes,
+		Development:          createOptions.Development,
 	}
 
 	if upOptions.noStart {
