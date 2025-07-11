@@ -90,6 +90,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	}
 
+	tui := formatter.NewStopping(logConsumer)
+	defer tui.Close()
+	logConsumer = tui
+
 	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
 	if err != nil && options.Start.Watch {
 		return err
@@ -105,16 +109,16 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
-			printer.Cancel()
-			_, _ = fmt.Fprintln(s.stdinfo(), "Gracefully stopping... (press Ctrl+C again to force)")
+			tui.ApplicationTermination()
 			eg.Go(func() error {
-				err := s.Stop(context.WithoutCancel(ctx), project.Name, api.StopOptions{
-					Services: options.Create.Services,
-					Project:  project,
-				})
-				isTerminated.Store(true)
-				return err
+				return progress.RunWithLog(context.WithoutCancel(ctx), func(ctx context.Context) error {
+					return s.stop(ctx, project.Name, api.StopOptions{
+						Services: options.Create.Services,
+						Project:  project,
+					}, printer.HandleEvent)
+				}, s.stdinfo(), logConsumer)
 			})
+			isTerminated.Store(true)
 			first = false
 		}
 
@@ -159,12 +163,15 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		code, err := printer.Run(options.Start.OnExit, options.Start.ExitCodeFrom, func() error {
 			_, _ = fmt.Fprintln(s.stdinfo(), "Aborting on container exit...")
-			return progress.Run(ctx, func(ctx context.Context) error {
-				return s.Stop(ctx, project.Name, api.StopOptions{
-					Services: options.Create.Services,
-					Project:  project,
-				})
-			}, s.stdinfo())
+			eg.Go(func() error {
+				return progress.RunWithLog(context.WithoutCancel(ctx), func(ctx context.Context) error {
+					return s.stop(ctx, project.Name, api.StopOptions{
+						Services: options.Create.Services,
+						Project:  project,
+					}, printer.HandleEvent)
+				}, s.stdinfo(), logConsumer)
+			})
+			return nil
 		})
 		exitCode = code
 		return err
