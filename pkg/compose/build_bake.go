@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -290,6 +291,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 	logrus.Debugf("Executing bake with args: %v", args)
 
+	if s.dryRun {
+		return dryRunBake(ctx, cfg), nil
+	}
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 
 	err = s.prepareShellOut(ctx, project, cmd)
@@ -442,4 +446,31 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 		return filepath.Join(symlinks, filepath.Base(dockerfile))
 	}
 	return dockerfile
+}
+
+func dryRunBake(ctx context.Context, cfg bakeConfig) map[string]string {
+	w := progress.ContextWriter(ctx)
+	bakeResponse := map[string]string{}
+	for name, target := range cfg.Targets {
+		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
+		displayDryRunBuildEvent(w, name, dryRunUUID, target.Tags[0])
+		bakeResponse[name] = dryRunUUID
+	}
+	for name := range bakeResponse {
+		w.Event(progress.BuiltEvent(name))
+	}
+	return bakeResponse
+}
+
+func displayDryRunBuildEvent(w progress.Writer, name string, dryRunUUID, tag string) {
+	w.Event(progress.Event{
+		ID:     name + " ==>",
+		Status: progress.Done,
+		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
+	})
+	w.Event(progress.Event{
+		ID:     name + " ==> ==>",
+		Status: progress.Done,
+		Text:   fmt.Sprintf(`naming to %s`, tag),
+	})
 }

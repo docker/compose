@@ -70,16 +70,7 @@ func (s composeService) dryRunBuildResponse(ctx context.Context, name string, op
 	w := progress.ContextWriter(ctx)
 	buildResponse := map[string]*client.SolveResponse{}
 	dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-	w.Event(progress.Event{
-		ID:     "==>",
-		Status: progress.Done,
-		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
-	})
-	w.Event(progress.Event{
-		ID:     "==> ==>",
-		Status: progress.Done,
-		Text:   fmt.Sprintf(`naming to %s`, options.Tags[0]),
-	})
+	displayDryRunBuildEvent(w, name, dryRunUUID, options.Tags[0])
 	buildResponse[name] = &client.SolveResponse{ExporterResponse: map[string]string{
 		"containerimage.digest": dryRunUUID,
 	}}
