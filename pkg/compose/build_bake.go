@@ -141,10 +141,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		Targets: map[string]bakeTarget{},
 	}
 	var (
-		group      bakeGroup
-		privileged bool
-		read       []string
-		targets    = make(map[string]string, len(serviceToBeBuild)) // service name -> build target
+		group          bakeGroup
+		privileged     bool
+		read           []string
+		expectedImages = make(map[string]string, len(serviceToBeBuild)) // service name -> expected image
+		targets        = make(map[string]string, len(serviceToBeBuild)) // service name -> build target
 	)
 
 	// produce a unique ID for service used as bake target
@@ -203,6 +204,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			}
 		}
 
+		image := api.GetImageNameOrDefault(service, project.Name)
+		expectedImages[serviceName] = image
+
 		target := targets[serviceName]
 		cfg.Targets[target] = bakeTarget{
 			Context:          build.Context,
@@ -211,7 +215,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			DockerfileInline: strings.ReplaceAll(build.DockerfileInline, "${", "$${"),
 			Args:             args,
 			Labels:           labels,
-			Tags:             append(build.Tags, api.GetImageNameOrDefault(service, project.Name)),
+			Tags:             append(build.Tags, image),
 
 			CacheFrom:    build.CacheFrom,
 			CacheTo:      build.CacheTo,
@@ -363,13 +367,14 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	cw := progress.ContextWriter(ctx)
 	results := map[string]string{}
 	for name := range serviceToBeBuild {
+		image := expectedImages[name]
 		target := targets[name]
 		built, ok := md[target]
 		if !ok {
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
-		results[name] = built.Digest
-		cw.Event(progress.BuiltEvent(name))
+		results[image] = built.Digest
+		cw.Event(progress.BuiltEvent(image))
 	}
 	return results, nil
 }
