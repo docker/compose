@@ -164,6 +164,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			continue
 		}
 		build := *service.Build
+		labels := getImageBuildLabels(project, service)
 
 		args := types.Mapping{}
 		for k, v := range resolveAndMergeBuildArgs(s.dockerCli, project, service, options) {
@@ -209,7 +210,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
 			DockerfileInline: strings.ReplaceAll(build.DockerfileInline, "${", "$${"),
 			Args:             args,
-			Labels:           build.Labels,
+			Labels:           labels,
 			Tags:             append(build.Tags, api.GetImageNameOrDefault(service, project.Name)),
 
 			CacheFrom:    build.CacheFrom,
