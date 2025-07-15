@@ -826,7 +826,7 @@ func (s *composeService) buildContainerVolumes(
 				if v.Type != types.VolumeTypeBind {
 					v.Source = m.Source
 				}
-				if !bindRequiresMountAPI(v.Bind) {
+				if !bindRequiresMountAPI(v) {
 					source := m.Source
 					if vol := findVolumeByName(p.Volumes, m.Source); vol != nil {
 						source = m.Source
@@ -840,7 +840,7 @@ func (s *composeService) buildContainerVolumes(
 			vol := findVolumeByName(p.Volumes, m.Source)
 			if v != nil && vol != nil {
 				// Prefer the bind API if no advanced option is used, to preserve backward compatibility
-				if !volumeRequiresMountAPI(v.Volume) {
+				if !volumeRequiresMountAPI(v) {
 					binds = append(binds, toBindString(vol.Name, v))
 					continue
 				}
@@ -897,15 +897,17 @@ func findVolumeByTarget(volumes []types.ServiceVolumeConfig, target string) *typ
 
 // bindRequiresMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
 // options which require use of Mount API
-func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
+func bindRequiresMountAPI(v *types.ServiceVolumeConfig) bool {
 	switch {
-	case bind == nil:
+	case v.Mount != nil:
+		return *v.Mount
+	case v.Bind == nil:
 		return false
-	case !bind.CreateHostPath:
+	case !v.Bind.CreateHostPath:
 		return true
-	case bind.Propagation != "":
+	case v.Bind.Propagation != "":
 		return true
-	case bind.Recursive != "":
+	case v.Bind.Recursive != "":
 		return true
 	default:
 		return false
@@ -914,15 +916,17 @@ func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
 
 // volumeRequiresMountAPI check if Volume declaration can be implemented by the plain old Bind API or uses any of the advanced
 // options which require use of Mount API
-func volumeRequiresMountAPI(vol *types.ServiceVolumeVolume) bool {
+func volumeRequiresMountAPI(v *types.ServiceVolumeConfig) bool {
 	switch {
-	case vol == nil:
+	case v.Mount != nil:
+		return *v.Mount
+	case v.Volume == nil:
 		return false
-	case len(vol.Labels) > 0:
+	case len(v.Volume.Labels) > 0:
 		return true
-	case vol.Subpath != "":
+	case v.Volume.Subpath != "":
 		return true
-	case vol.NoCopy:
+	case v.Volume.NoCopy:
 		return true
 	default:
 		return false
