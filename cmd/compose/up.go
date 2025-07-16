@@ -223,6 +223,7 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
+//nolint:gocyclo
 func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
@@ -330,7 +331,7 @@ func runUp(
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
 			Services:       services,
-			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain",
+			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain" && dockerCli.In().IsTerminal(),
 		},
 	})
 }
