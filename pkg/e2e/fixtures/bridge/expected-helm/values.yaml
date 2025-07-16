@@ -1,8 +1,25 @@
 #! values.yaml
+# Project Name
+projectName: bridge
 # Namespace
 namespace: bridge
+# Default deployment settings
+deployment:
+    strategy: Recreate
+    defaultReplicas: 1
+# Default resource limits
+resources:
+    defaultCpuLimit: "100m"
+    defaultMemoryLimit: "512Mi"
+# Service settings
+service:
+    type: LoadBalancer
+# Storage settings
+storage:
+    defaultStorageClass: "hostpath"
+    defaultSize: "100Mi"
+    defaultAccessMode: "ReadWriteOnce"
 # Services variables
-
 serviceA:
     image: alpine
     imagePullPolicy: IfNotPresent
