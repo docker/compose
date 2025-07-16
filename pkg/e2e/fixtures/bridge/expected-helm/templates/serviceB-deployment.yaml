@@ -10,13 +10,13 @@ metadata:
         com.docker.compose.service: serviceB
         app.kubernetes.io/managed-by: Helm
 spec:
-    replicas: 1
+    replicas: {{ .Values.deployment.defaultReplicas }}
     selector:
         matchLabels:
             com.docker.compose.project: bridge
             com.docker.compose.service: serviceB
     strategy:
-        type: Recreate
+        type: {{ .Values.deployment.strategy }}
     template:
         metadata:
             labels:
@@ -29,6 +29,10 @@ spec:
                 - name: serviceb
                   image: {{ .Values.serviceB.image }}
                   imagePullPolicy: {{ .Values.serviceB.imagePullPolicy }}
+                  resources:
+                    limits:
+                        cpu: {{ .Values.resources.defaultCpuLimit }}
+                        memory: {{ .Values.resources.defaultMemoryLimit }}
                   ports:
                     - name: serviceb-8082
                       containerPort: 8082

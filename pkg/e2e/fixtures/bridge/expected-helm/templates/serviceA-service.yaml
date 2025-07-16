@@ -12,7 +12,7 @@ metadata:
         com.docker.compose.service: serviceA
         app.kubernetes.io/managed-by: Helm
 spec:
-    type: LoadBalancer
+    type: {{ .Values.service.type }}
     selector:
         com.docker.compose.project: bridge
         com.docker.compose.service: serviceA

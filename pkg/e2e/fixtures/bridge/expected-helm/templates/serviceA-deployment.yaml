@@ -10,13 +10,13 @@ metadata:
         com.docker.compose.service: serviceA
         app.kubernetes.io/managed-by: Helm
 spec:
-    replicas: 1
+    replicas: {{ .Values.deployment.defaultReplicas }}
     selector:
         matchLabels:
             com.docker.compose.project: bridge
             com.docker.compose.service: serviceA
     strategy:
-        type: Recreate
+        type: {{ .Values.deployment.strategy }}
     template:
         metadata:
             labels:
@@ -28,6 +28,10 @@ spec:
                 - name: servicea
                   image: {{ .Values.serviceA.image }}
                   imagePullPolicy: {{ .Values.serviceA.imagePullPolicy }}
+                  resources:
+                    limits:
+                        cpu: {{ .Values.resources.defaultCpuLimit }}
+                        memory: {{ .Values.resources.defaultMemoryLimit }}
                   ports:
                     - name: servicea-8080
                       containerPort: 8080
@@ -39,7 +43,7 @@ spec:
             volumes:
                 - name: etc-my-config1-txt
                   configMap:
-                    name: bridge
+                    name: {{ .Values.projectName }}
                     items:
                         - key: my-config
                           path: my-config

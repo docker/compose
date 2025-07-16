@@ -3,8 +3,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-    name: bridge
-    namespace: bridge
+    name: {{ .Values.projectName }}
+    namespace: {{ .Values.namespace }}
     labels:
         com.docker.compose.project: bridge
 data:
