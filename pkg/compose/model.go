@@ -39,73 +39,67 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		return nil
 	}
 
-	dockerModel, err := manager.GetPlugin("model", s.dockerCli, &cobra.Command{})
-	if err != nil {
-		if errdefs.IsNotFound(err) {
-			return fmt.Errorf("'models' support requires Docker Model plugin")
-		}
-		return err
-	}
-
-	cmd := exec.CommandContext(ctx, dockerModel.Path, "ls", "--json")
-	err = s.prepareShellOut(ctx, project, cmd)
+	api, err := s.newModelAPI(project)
 	if err != nil {
 		return err
 	}
+	availableModels, err := api.ListModels(ctx)
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error checking available models: %w", err)
-	}
-
-	type AvailableModel struct {
-		Id      string   `json:"id"`
-		Tags    []string `json:"tags"`
-		Created int      `json:"created"`
-	}
-
-	models := []AvailableModel{}
-	err = json.Unmarshal(output, &models)
-	if err != nil {
-		return fmt.Errorf("error unmarshalling available models: %w", err)
-	}
-	var availableModels []string
-	for _, model := range models {
-		availableModels = append(availableModels, model.Tags...)
-	}
-
-	eg, gctx := errgroup.WithContext(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return s.setModelVariables(gctx, dockerModel, project)
+		return api.SetModelVariables(ctx, project)
 	})
 
+	w := progress.ContextWriter(ctx)
 	for name, config := range project.Models {
 		if config.Name == "" {
 			config.Name = name
 		}
 		eg.Go(func() error {
-			w := progress.ContextWriter(gctx)
 			if !slices.Contains(availableModels, config.Model) {
-				err = s.pullModel(gctx, dockerModel, project, config, quietPull, w)
+				err = api.PullModel(ctx, config, quietPull, w)
 				if err != nil {
 					return err
 				}
 			}
-			return s.configureModel(gctx, dockerModel, project, config, w)
+			return api.ConfigureModel(ctx, config, w)
 		})
 	}
 	return eg.Wait()
 }
 
-func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plugin, project *types.Project, model types.ModelConfig, quietPull bool, w progress.Writer) error {
+type modelAPI struct {
+	path    string
+	env     []string
+	prepare func(ctx context.Context, cmd *exec.Cmd) error
+}
+
+func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) {
+	dockerModel, err := manager.GetPlugin("model", s.dockerCli, &cobra.Command{})
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("'models' support requires Docker Model plugin")
+		}
+		return nil, err
+	}
+	return &modelAPI{
+		path: dockerModel.Path,
+		prepare: func(ctx context.Context, cmd *exec.Cmd) error {
+			return s.prepareShellOut(ctx, project.Environment, cmd)
+		},
+		env: project.Environment.Values(),
+	}, nil
+}
+
+func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, w progress.Writer) error {
 	w.Event(progress.Event{
 		ID:     model.Name,
 		Status: progress.Working,
 		Text:   "Pulling",
 	})
 
-	cmd := exec.CommandContext(ctx, dockerModel.Path, "pull", model.Model)
-	err := s.prepareShellOut(ctx, project, cmd)
+	cmd := exec.CommandContext(ctx, m.path, "pull", model.Model)
+	err := m.prepare(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -148,7 +142,7 @@ func (s *composeService) pullModel(ctx context.Context, dockerModel *manager.Plu
 	return err
 }
 
-func (s *composeService) configureModel(ctx context.Context, dockerModel *manager.Plugin, project *types.Project, config types.ModelConfig, w progress.Writer) error {
+func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, w progress.Writer) error {
 	w.Event(progress.Event{
 		ID:     config.Name,
 		Status: progress.Working,
@@ -164,17 +158,17 @@ func (s *composeService) configureModel(ctx context.Context, dockerModel *manage
 		args = append(args, "--")
 		args = append(args, config.RuntimeFlags...)
 	}
-	cmd := exec.CommandContext(ctx, dockerModel.Path, args...)
-	err := s.prepareShellOut(ctx, project, cmd)
+	cmd := exec.CommandContext(ctx, m.path, args...)
+	err := m.prepare(ctx, cmd)
 	if err != nil {
 		return err
 	}
 	return cmd.Run()
 }
 
-func (s *composeService) setModelVariables(ctx context.Context, dockerModel *manager.Plugin, project *types.Project) error {
-	cmd := exec.CommandContext(ctx, dockerModel.Path, "status", "--json")
-	err := s.prepareShellOut(ctx, project, cmd)
+func (m *modelAPI) SetModelVariables(ctx context.Context, project *types.Project) error {
+	cmd := exec.CommandContext(ctx, m.path, "status", "--json")
+	err := m.prepare(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -227,4 +221,34 @@ type Model struct {
 		Architecture string `json:"architecture"`
 		Size         string `json:"size"`
 	} `json:"config"`
+}
+
+func (m *modelAPI) ListModels(ctx context.Context) ([]string, error) {
+	cmd := exec.CommandContext(ctx, m.path, "ls", "--json")
+	err := m.prepare(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error checking available models: %w", err)
+	}
+
+	type AvailableModel struct {
+		Id      string   `json:"id"`
+		Tags    []string `json:"tags"`
+		Created int      `json:"created"`
+	}
+
+	models := []AvailableModel{}
+	err = json.Unmarshal(output, &models)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling available models: %w", err)
+	}
+	var availableModels []string
+	for _, model := range models {
+		availableModels = append(availableModels, model.Tags...)
+	}
+	return availableModels, nil
 }

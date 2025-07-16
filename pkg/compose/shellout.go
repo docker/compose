@@ -29,10 +29,8 @@ import (
 )
 
 // prepareShellOut prepare a shell-out command to be ran by Compose
-func (s *composeService) prepareShellOut(gctx context.Context, project *types.Project, cmd *exec.Cmd) error {
-	// exec command with same environment Compose is running
-	env := types.NewMapping(project.Environment.Values())
-
+func (s *composeService) prepareShellOut(gctx context.Context, env types.Mapping, cmd *exec.Cmd) error {
+	env = env.Clone()
 	// remove DOCKER_CLI_PLUGIN... variable so a docker-cli plugin will detect it run standalone
 	delete(env, manager.ReexecEnvvar)
 
