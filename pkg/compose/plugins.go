@@ -197,7 +197,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 
 	cmd := exec.CommandContext(ctx, path, args...)
 
-	err := s.prepareShellOut(ctx, project, cmd)
+	err := s.prepareShellOut(ctx, project.Environment, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 
 func (s *composeService) getPluginMetadata(path, command string, project *types.Project) ProviderMetadata {
 	cmd := exec.Command(path, "compose", "metadata")
-	err := s.prepareShellOut(context.Background(), project, cmd)
+	err := s.prepareShellOut(context.Background(), project.Environment, cmd)
 	if err != nil {
 		logrus.Debugf("failed to prepare plugin metadata command: %v", err)
 		return ProviderMetadata{}

@@ -301,7 +301,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 
-	err = s.prepareShellOut(ctx, project, cmd)
+	err = s.prepareShellOut(ctx, project.Environment, cmd)
 	if err != nil {
 		return nil, err
 	}
