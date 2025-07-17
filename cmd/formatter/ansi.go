@@ -18,8 +18,6 @@ package formatter
 
 import (
 	"fmt"
-
-	"github.com/acarl005/stripansi"
 )
 
 var disableAnsi bool
@@ -78,30 +76,10 @@ func clearLine() {
 	fmt.Print(ansi("[2K"))
 }
 
-func moveCursorUp(lines int) {
-	if disableAnsi {
-		return
-	}
-	// Does not add new lines
-	fmt.Print(ansi(fmt.Sprintf("[%dA", lines)))
-}
-
 func moveCursorDown(lines int) {
 	if disableAnsi {
 		return
 	}
 	// Does not add new lines
 	fmt.Print(ansi(fmt.Sprintf("[%dB", lines)))
-}
-
-func newLine() {
-	// Like \n
-	fmt.Print("\012")
-}
-
-func lenAnsi(s string) int {
-	// len has into consideration ansi codes, if we want
-	// the len of the actual len(string) we need to strip
-	// all ansi codes
-	return len(stripansi.Strip(s))
 }

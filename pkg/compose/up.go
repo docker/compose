@@ -35,7 +35,6 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
-	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
@@ -73,39 +72,15 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	defer signal.Stop(signalChan)
 	var isTerminated atomic.Bool
 
-	var (
-		logConsumer    = options.Start.Attach
-		navigationMenu *formatter.LogKeyboard
-		kEvents        <-chan keyboard.KeyEvent
-	)
-	if options.Start.NavigationMenu {
-		kEvents, err = keyboard.GetKeys(100)
-		if err != nil {
-			logrus.Warnf("could not start menu, an error occurred while starting: %v", err)
-			options.Start.NavigationMenu = false
-		} else {
-			defer keyboard.Close() //nolint:errcheck
-			isDockerDesktopActive := s.isDesktopIntegrationActive()
-			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive)
-			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, signalChan)
-			logConsumer = navigationMenu.Decorate(logConsumer)
-		}
-	}
-
-	tui := formatter.NewStopping(logConsumer)
+	tui := formatter.NewStopping(options.Start.Attach)
 	defer tui.Close()
-	logConsumer = tui
 
-	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
+	watcher, err := NewWatcher(project, options, s.watch, tui)
 	if err != nil && options.Start.Watch {
 		return err
 	}
 
-	if navigationMenu != nil && watcher != nil {
-		navigationMenu.EnableWatch(options.Start.Watch, watcher)
-	}
-
-	printer := newLogPrinter(logConsumer)
+	printer := newLogPrinter(tui)
 
 	doneCh := make(chan bool)
 	eg.Go(func() error {
@@ -118,7 +93,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 						Services: options.Create.Services,
 						Project:  project,
 					}, printer.HandleEvent)
-				}, s.stdinfo(), logConsumer)
+				}, s.stdinfo(), tui)
 			})
 			isTerminated.Store(true)
 			first = false
@@ -155,8 +130,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					return err
 				})
 				return nil
-			case event := <-kEvents:
-				navigationMenu.HandleKeyEvents(ctx, event, project, options)
 			}
 		}
 	})
@@ -194,7 +167,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 							Services: options.Create.Services,
 							Project:  project,
 						}, printer.HandleEvent)
-					}, s.stdinfo(), logConsumer)
+					}, s.stdinfo(), tui)
 				})
 			}
 		})

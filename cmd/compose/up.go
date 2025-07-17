@@ -33,7 +33,6 @@ import (
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
-	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
@@ -44,23 +43,21 @@ type composeOptions struct {
 
 type upOptions struct {
 	*composeOptions
-	Detach                bool
-	noStart               bool
-	noDeps                bool
-	cascadeStop           bool
-	cascadeFail           bool
-	exitCodeFrom          string
-	noColor               bool
-	noPrefix              bool
-	attachDependencies    bool
-	attach                []string
-	noAttach              []string
-	timestamp             bool
-	wait                  bool
-	waitTimeout           int
-	watch                 bool
-	navigationMenu        bool
-	navigationMenuChanged bool
+	Detach             bool
+	noStart            bool
+	noDeps             bool
+	cascadeStop        bool
+	cascadeFail        bool
+	exitCodeFrom       string
+	noColor            bool
+	noPrefix           bool
+	attachDependencies bool
+	attach             []string
+	noAttach           []string
+	timestamp          bool
+	wait               bool
+	waitTimeout        int
+	watch              bool
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) (*types.Project, error) {
@@ -80,22 +77,6 @@ func (opts upOptions) apply(project *types.Project, services []string) (*types.P
 	}
 
 	return project, nil
-}
-
-func (opts *upOptions) validateNavigationMenu(dockerCli command.Cli) {
-	if !dockerCli.Out().IsTerminal() {
-		opts.navigationMenu = false
-		return
-	}
-	// If --menu flag was not set
-	if !opts.navigationMenuChanged {
-		if envVar, ok := os.LookupEnv(ComposeMenu); ok {
-			opts.navigationMenu = utils.StringToBool(envVar)
-			return
-		}
-		// ...and COMPOSE_MENU env var is not defined we want the default value to be true
-		opts.navigationMenu = true
-	}
 }
 
 func (opts upOptions) OnExit() api.Cascade {
@@ -119,7 +100,6 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			create.pullChanged = cmd.Flags().Changed("pull")
 			create.timeChanged = cmd.Flags().Changed("timeout")
-			up.navigationMenuChanged = cmd.Flags().Changed("menu")
 			if !cmd.Flags().Changed("remove-orphans") {
 				create.removeOrphans = utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
 			}
@@ -133,8 +113,6 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 			if len(up.attach) != 0 && up.attachDependencies {
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
-
-			up.validateNavigationMenu(dockerCli)
 
 			if !p.All && len(project.Services) == 0 {
 				return fmt.Errorf("no service selected")
@@ -171,7 +149,6 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
-	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
 	flags.BoolVarP(&create.AssumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		// assumeYes was introduced by mistake as `--y`
@@ -181,6 +158,10 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 		}
 		return pflag.NormalizedName(name)
 	})
+
+	flags.Bool("menu", false, "DISABLED")
+	_ = flags.MarkHidden("menu")
+
 	return upCmd
 }
 
@@ -223,7 +204,6 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
-//nolint:gocyclo
 func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
@@ -322,16 +302,15 @@ func runUp(
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
-			Project:        project,
-			Attach:         consumer,
-			AttachTo:       attach,
-			ExitCodeFrom:   upOptions.exitCodeFrom,
-			OnExit:         upOptions.OnExit(),
-			Wait:           upOptions.wait,
-			WaitTimeout:    timeout,
-			Watch:          upOptions.watch,
-			Services:       services,
-			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain" && dockerCli.In().IsTerminal(),
+			Project:      project,
+			Attach:       consumer,
+			AttachTo:     attach,
+			ExitCodeFrom: upOptions.exitCodeFrom,
+			OnExit:       upOptions.OnExit(),
+			Wait:         upOptions.wait,
+			WaitTimeout:  timeout,
+			Watch:        upOptions.watch,
+			Services:     services,
 		},
 	})
 }
