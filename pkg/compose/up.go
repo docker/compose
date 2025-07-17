@@ -111,6 +111,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
+			first = false
 			tui.ApplicationTermination()
 			eg.Go(func() error {
 				return progress.RunWithLog(context.WithoutCancel(ctx), func(ctx context.Context) error {
@@ -121,7 +122,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				}, s.stdinfo(), logConsumer)
 			})
 			isTerminated.Store(true)
-			first = false
 		}
 
 		for {
@@ -238,7 +238,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	})
 
 	eg.Go(func() error {
-		err := monitor.Start(ctx)
+		err := monitor.Start(context.Background())
 		// Signal for the signal-handler goroutines to stop
 		close(doneCh)
 		return err
