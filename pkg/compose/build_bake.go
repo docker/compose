@@ -130,10 +130,14 @@ type buildStatus struct {
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
-	out := s.dockerCli.Out()
 	displayMode := progressui.DisplayMode(options.Progress)
-	if !out.IsTerminal() {
-		displayMode = progressui.PlainMode
+	out := options.Out
+	if out == nil {
+		cout := s.dockerCli.Out()
+		if !cout.IsTerminal() {
+			displayMode = progressui.PlainMode
+		}
+		out = cout
 	}
 	display, err := progressui.NewDisplay(out, displayMode)
 	if err != nil {

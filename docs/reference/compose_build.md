@@ -25,7 +25,7 @@ run `docker compose build` to rebuild it.
 | `--provenance`        | `string`      |         | Add a provenance attestation                                                                                |
 | `--pull`              | `bool`        |         | Always attempt to pull a newer version of the image                                                         |
 | `--push`              | `bool`        |         | Push service images                                                                                         |
-| `-q`, `--quiet`       | `bool`        |         | Don't print anything to STDOUT                                                                              |
+| `-q`, `--quiet`       | `bool`        |         | Suppress the build output                                                                                   |
 | `--sbom`              | `string`      |         | Add a SBOM attestation                                                                                      |
 | `--ssh`               | `string`      |         | Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent) |
 | `--with-dependencies` | `bool`        |         | Also build dependencies (transitively)                                                                      |

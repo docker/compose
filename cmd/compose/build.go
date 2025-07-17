@@ -121,7 +121,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.push, "push", false, "Push service images")
-	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
+	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Suppress the build output")
 	flags.BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image")
 	flags.StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services")
 	flags.StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
