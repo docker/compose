@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -397,6 +398,7 @@ func resolveAndMergeBuildArgs(dockerCli command.Cli, project *types.Project, ser
 	return result
 }
 
+//nolint:gocyclo
 func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, options api.BuildOptions) (build.Options, error) {
 	plats, err := parsePlatforms(service)
 	if err != nil {
@@ -471,8 +473,19 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	attests := map[string]*string{}
-	if !options.Provenance {
-		attests["provenance"] = nil
+	if options.Attestations {
+		if service.Build.Provenance != "" {
+			attests["provenance"] = attestation(service.Build.Provenance, "provenance")
+		}
+		if service.Build.SBOM != "" {
+			attests["sbom"] = attestation(service.Build.SBOM, "sbom")
+		}
+	}
+	if options.Provenance != "" {
+		attests["provenance"] = attestation(options.Provenance, "provenance")
+	}
+	if options.SBOM != "" {
+		attests["sbom"] = attestation(options.SBOM, "sbom")
 	}
 
 	return build.Options{
@@ -500,6 +513,16 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		SourcePolicy: sp,
 		Attests:      attests,
 	}, nil
+}
+
+func attestation(attest string, val string) *string {
+	if b, err := strconv.ParseBool(val); err == nil {
+		s := fmt.Sprintf("type=%s,disabled=%t", attest, b)
+		return &s
+	} else {
+		s := fmt.Sprintf("type=%s,%s", attest, val)
+		return &s
+	}
 }
 
 func toUlimitOpt(ulimits map[string]*types.UlimitsConfig) *cliopts.UlimitOpt {
