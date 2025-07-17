@@ -92,10 +92,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	}
 
-	tui := formatter.NewStopping(logConsumer)
-	defer tui.Close()
-	logConsumer = tui
-
 	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
 	if err != nil && options.Start.Watch {
 		return err
@@ -111,8 +107,8 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
-			first = false
-			tui.ApplicationTermination()
+		   first = false
+			fmt.Println("Gracefully Stopping... press Ctrl+C again to force")
 			eg.Go(func() error {
 				return progress.RunWithLog(context.WithoutCancel(ctx), func(ctx context.Context) error {
 					return s.stop(ctx, project.Name, api.StopOptions{
