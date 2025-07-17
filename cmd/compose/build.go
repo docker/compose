@@ -45,7 +45,8 @@ type buildOptions struct {
 	deps       bool
 	print      bool
 	check      bool
-	provenance bool
+	sbom       string
+	provenance string
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -84,6 +85,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		Check:      opts.check,
 		SSHs:       SSHKeys,
 		Builder:    builderName,
+		SBOM:       opts.sbom,
 		Provenance: opts.provenance,
 	}, nil
 }
@@ -125,6 +127,8 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	flags.StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	flags.StringVar(&opts.builder, "builder", "", "Set builder to use")
 	flags.BoolVar(&opts.deps, "with-dependencies", false, "Also build dependencies (transitively)")
+	flags.StringVar(&opts.provenance, "provenance", "", `Add a provenance attestation`)
+	flags.StringVar(&opts.sbom, "sbom", "", `Add a SBOM attestation`)
 
 	flags.Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	flags.MarkHidden("parallel") //nolint:errcheck
@@ -156,7 +160,7 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	apiBuildOptions, err := opts.toAPIBuildOptions(services)
-	apiBuildOptions.Provenance = true
+	apiBuildOptions.Attestations = true
 	if err != nil {
 		return err
 	}
