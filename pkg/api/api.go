@@ -19,6 +19,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -176,6 +177,8 @@ type BuildOptions struct {
 	Provenance string
 	// SBOM generate a SBOM attestation
 	SBOM string
+	// Out is the stream to write build progress
+	Out io.Writer
 }
 
 // Apply mutates project according to build options

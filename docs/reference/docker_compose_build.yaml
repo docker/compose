@@ -158,7 +158,7 @@ options:
       shorthand: q
       value_type: bool
       default_value: "false"
-      description: Don't print anything to STDOUT
+      description: Suppress the build output
       deprecated: false
       hidden: false
       experimental: false
