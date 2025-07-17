@@ -58,6 +58,9 @@ func buildWithBake(dockerCli command.Cli) (bool, error) {
 		return false, err
 	}
 	if !bake {
+		if ok {
+			logrus.Warnf("COMPOSE_BAKE=false is deprecated, support for internal compose builder will be removed in next release")
+		}
 		return false, nil
 	}
 
