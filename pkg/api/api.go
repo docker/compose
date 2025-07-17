@@ -170,8 +170,8 @@ type BuildOptions struct {
 	Print bool
 	// Check let builder validate build configuration
 	Check bool
-	// Provenance
-	Provenance bool
+	// Attestations allows to enable attestations generation
+	Attestations bool
 }
 
 // Apply mutates project according to build options
