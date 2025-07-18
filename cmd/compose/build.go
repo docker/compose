@@ -34,18 +34,17 @@ import (
 
 type buildOptions struct {
 	*ProjectOptions
-	quiet      bool
-	pull       bool
-	push       bool
-	args       []string
-	noCache    bool
-	memory     cliopts.MemBytes
-	ssh        string
-	builder    string
-	deps       bool
-	print      bool
-	check      bool
-	provenance bool
+	quiet   bool
+	pull    bool
+	push    bool
+	args    []string
+	noCache bool
+	memory  cliopts.MemBytes
+	ssh     string
+	builder string
+	deps    bool
+	print   bool
+	check   bool
 }
 
 func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
@@ -71,20 +70,19 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}
 
 	return api.BuildOptions{
-		Pull:       opts.pull,
-		Push:       opts.push,
-		Progress:   uiMode,
-		Args:       types.NewMappingWithEquals(opts.args),
-		NoCache:    opts.noCache,
-		Quiet:      opts.quiet,
-		Services:   services,
-		Deps:       opts.deps,
-		Memory:     int64(opts.memory),
-		Print:      opts.print,
-		Check:      opts.check,
-		SSHs:       SSHKeys,
-		Builder:    builderName,
-		Provenance: opts.provenance,
+		Pull:     opts.pull,
+		Push:     opts.push,
+		Progress: uiMode,
+		Args:     types.NewMappingWithEquals(opts.args),
+		NoCache:  opts.noCache,
+		Quiet:    opts.quiet,
+		Services: services,
+		Deps:     opts.deps,
+		Memory:   int64(opts.memory),
+		Print:    opts.print,
+		Check:    opts.check,
+		SSHs:     SSHKeys,
+		Builder:  builderName,
 	}, nil
 }
 
@@ -156,7 +154,7 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	apiBuildOptions, err := opts.toAPIBuildOptions(services)
-	apiBuildOptions.Provenance = true
+	apiBuildOptions.Attestations = true
 	if err != nil {
 		return err
 	}
