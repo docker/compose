@@ -66,8 +66,6 @@ const (
 	ComposeIgnoreOrphans = "COMPOSE_IGNORE_ORPHANS"
 	// ComposeEnvFiles defines the env files to use if --env-file isn't used
 	ComposeEnvFiles = "COMPOSE_ENV_FILES"
-	// ComposeMenu defines if the navigation menu should be rendered. Can be also set via --menu
-	ComposeMenu = "COMPOSE_MENU"
 	// ComposeProgress defines type of progress output, if --progress isn't used
 	ComposeProgress = "COMPOSE_PROGRESS"
 )

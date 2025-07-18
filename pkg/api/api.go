@@ -244,9 +244,8 @@ type StartOptions struct {
 	Wait        bool
 	WaitTimeout time.Duration
 	// Services passed in the command line to be started
-	Services       []string
-	Watch          bool
-	NavigationMenu bool
+	Services []string
+	Watch    bool
 }
 
 type Cascade int
