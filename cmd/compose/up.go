@@ -165,6 +165,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	flags.BoolVar(&create.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
 	flags.BoolVarP(&create.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers")
 	flags.BoolVar(&create.quietPull, "quiet-pull", false, "Pull without printing progress information")
+	flags.BoolVar(&build.quiet, "quiet-build", false, "Suppress the build output")
 	flags.StringArrayVar(&up.attach, "attach", []string{}, "Restrict attaching to the specified services. Incompatible with --attach-dependencies.")
 	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services")
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
@@ -223,7 +224,6 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
-//nolint:gocyclo
 func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
@@ -331,7 +331,7 @@ func runUp(
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
 			Services:       services,
-			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain" && dockerCli.In().IsTerminal(),
+			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain",
 		},
 	})
 }

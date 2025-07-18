@@ -127,7 +127,11 @@ type buildStatus struct {
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
-	display, err := progressui.NewDisplay(os.Stdout, progressui.DisplayMode(options.Progress))
+	out := options.Out
+	if out == nil {
+		out = os.Stdout
+	}
+	display, err := progressui.NewDisplay(out, progressui.DisplayMode(options.Progress))
 	if err != nil {
 		return nil, err
 	}

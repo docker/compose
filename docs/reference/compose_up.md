@@ -44,6 +44,7 @@ If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the contai
 | `--no-recreate`                | `bool`        |          | If containers already exist, don't recreate them. Incompatible with --force-recreate.                                                               |
 | `--no-start`                   | `bool`        |          | Don't start the services after creating them                                                                                                        |
 | `--pull`                       | `string`      | `policy` | Pull image before running ("always"\|"missing"\|"never")                                                                                            |
+| `--quiet-build`                | `bool`        |          | Suppress the build output                                                                                                                           |
 | `--quiet-pull`                 | `bool`        |          | Pull without printing progress information                                                                                                          |
 | `--remove-orphans`             | `bool`        |          | Remove containers for services not defined in the Compose file                                                                                      |
 | `-V`, `--renew-anon-volumes`   | `bool`        |          | Recreate anonymous volumes instead of retrieving data from the previous containers                                                                  |
