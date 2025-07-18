@@ -125,6 +125,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: provenance
+      value_type: bool
+      default_value: "true"
+      description: |
+        Generate provenance attestation for built images. Shorthand for `--attest=type=provenance`.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: pull
       value_type: bool
       default_value: "false"
