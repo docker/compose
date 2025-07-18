@@ -14,10 +14,10 @@ body:
       required: true
   - type: markdown
     attributes:
-    value: |
-      [Docker Swarm](https://www.mirantis.com/software/swarm/) uses a distinct compose file parser and 
-      as such doesn't support some of the recent features of Docker Compose. Please contact Mirantis
-      if you need assistance with compose file support in Docker Swarm.
+      value: |
+        [Docker Swarm](https://www.mirantis.com/software/swarm/) uses a distinct compose file parser and 
+        as such doesn't support some of the recent features of Docker Compose. Please contact Mirantis
+        if you need assistance with compose file support in Docker Swarm.
   - type: textarea
     attributes:
       label: Steps To Reproduce
