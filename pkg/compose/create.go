@@ -68,6 +68,10 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, cre
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	if options.Development {
+		project = enableDevelopmentMode(project)
+	}
+
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
