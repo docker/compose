@@ -140,6 +140,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	flags.MarkHidden("progress") //nolint:errcheck
 	flags.BoolVar(&opts.print, "print", false, "Print equivalent bake file")
 	flags.BoolVar(&opts.check, "check", false, "Check build configuration")
+	flags.BoolVar(&opts.provenance, "provenance", true, "Generate provenance attestation for built images. Shorthand for `--attest=type=provenance`.")
 
 	return cmd
 }
@@ -156,7 +157,6 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	apiBuildOptions, err := opts.toAPIBuildOptions(services)
-	apiBuildOptions.Provenance = true
 	if err != nil {
 		return err
 	}
