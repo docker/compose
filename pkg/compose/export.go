@@ -25,6 +25,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/moby/moby/client"
 	"github.com/moby/sys/atomicwriter"
 )
 
@@ -57,7 +58,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		Status: progress.Working,
 	})
 
-	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID)
+	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID, client.ContainerExportOptions{})
 	if err != nil {
 		return err
 	}

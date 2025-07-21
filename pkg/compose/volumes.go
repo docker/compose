@@ -21,14 +21,13 @@ import (
 	"slices"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 func (s *composeService) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
-	allContainers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(projectFilter(project)),
+	allContainers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: projectFilter(project),
 	})
 	if err != nil {
 		return nil, err
@@ -38,23 +37,23 @@ func (s *composeService) Volumes(ctx context.Context, project string, options ap
 
 	if len(options.Services) > 0 {
 		// filter service containers
-		for _, c := range allContainers {
+		for _, c := range allContainers.Items {
 			if slices.Contains(options.Services, c.Labels[api.ServiceLabel]) {
 				containers = append(containers, c)
 			}
 		}
 	} else {
-		containers = allContainers
+		containers = allContainers.Items
 	}
 
-	volumesResponse, err := s.apiClient().VolumeList(ctx, volume.ListOptions{
-		Filters: filters.NewArgs(projectFilter(project)),
+	volumesResponse, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
+		Filters: projectFilter(project),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	projectVolumes := volumesResponse.Volumes
+	projectVolumes := volumesResponse.Items
 
 	if len(options.Services) == 0 {
 		return projectVolumes, nil
@@ -65,8 +64,8 @@ func (s *composeService) Volumes(ctx context.Context, project string, options ap
 	// create a name lookup of volumes used by containers
 	serviceVolumes := make(map[string]bool)
 
-	for _, container := range containers {
-		for _, mount := range container.Mounts {
+	for _, ctr := range containers {
+		for _, mount := range ctr.Mounts {
 			serviceVolumes[mount.Name] = true
 		}
 	}

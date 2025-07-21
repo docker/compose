@@ -28,8 +28,8 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/compose"
-	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
+	"github.com/moby/moby/client/pkg/stringid"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/formatter"
