@@ -23,8 +23,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -50,17 +49,14 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 	}
 
-	var containers Containers
-	containers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			oneOffFilter(false),
-		),
-		All: true,
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: projectFilter(project.Name).Add("label", oneOffFilter(false)),
+		All:     true,
 	})
 	if err != nil {
 		return err
 	}
+	containers := Containers(res.Items)
 
 	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)

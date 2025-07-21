@@ -176,7 +176,7 @@ func filterByStatus(containers []api.ContainerSummary, statuses []string) []api.
 
 func hasStatus(c api.ContainerSummary, statuses []string) bool {
 	for _, status := range statuses {
-		if c.State == status {
+		if string(c.State) == status {
 			return true
 		}
 	}
