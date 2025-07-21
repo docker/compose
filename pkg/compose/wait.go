@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -39,15 +40,13 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			var err error
-			resultC, errC := s.apiClient().ContainerWait(waitCtx, ctr.ID, "")
-
+			res := s.apiClient().ContainerWait(waitCtx, ctr.ID, client.ContainerWaitOptions{})
 			select {
-			case result := <-resultC:
+			case result := <-res.Result:
 				_, _ = fmt.Fprintf(s.stdout(), "container %q exited with status code %d\n", ctr.ID, result.StatusCode)
 				statusCode = result.StatusCode
-			case err = <-errC:
+			case err = <-res.Error:
 			}
-
 			return err
 		})
 	}

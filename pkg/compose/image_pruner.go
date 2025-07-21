@@ -25,9 +25,8 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -150,23 +149,19 @@ func (p *ImagePruner) namedImages(ctx context.Context) ([]string, error) {
 // The image name could either have been defined by the user or implicitly
 // created from the project + service name.
 func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error) {
-	imageListOpts := image.ListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(p.project.Name),
-			// TODO(milas): we should really clean up the dangling images as
-			// well (historically we have NOT); need to refactor this to handle
-			// it gracefully without producing confusing CLI output, i.e. we
-			// do not want to print out a bunch of untagged/dangling image IDs,
-			// they should be grouped into a logical operation for the relevant
-			// service
-			filters.Arg("dangling", "false"),
-		),
-	}
-	projectImages, err := p.client.ImageList(ctx, imageListOpts)
+	res, err := p.client.ImageList(ctx, client.ImageListOptions{
+		// TODO(milas): we should really clean up the dangling images as
+		// well (historically we have NOT); need to refactor this to handle
+		// it gracefully without producing confusing CLI output, i.e. we
+		// do not want to print out a bunch of untagged/dangling image IDs,
+		// they should be grouped into a logical operation for the relevant
+		// service
+		Filters: projectFilter(p.project.Name).Add("dangling", "false"),
+	})
 	if err != nil {
 		return nil, err
 	}
-	return projectImages, nil
+	return res.Items, nil
 }
 
 // unlabeledLocalImages are images that match the implicit naming convention

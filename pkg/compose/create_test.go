@@ -17,6 +17,8 @@
 package compose
 
 import (
+	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,10 +26,11 @@ import (
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	mountTypes "github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/moby/moby/api/types/container"
+	mountTypes "github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
@@ -161,7 +164,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	s := composeService{
 		dockerCli: cli,
 	}
-	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(image.InspectResponse{}, nil)
+	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(client.ImageInspectResult{}, nil)
 
 	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
 	sort.Slice(mounts, func(i, j int) bool {
@@ -292,7 +295,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 }
 
 func TestCreateEndpointSettings(t *testing.T) {
-	eps := createEndpointSettings(&composetypes.Project{
+	eps, err := createEndpointSettings(&composetypes.Project{
 		Name: "projName",
 	}, composetypes.ServiceConfig{
 		Name:          "serviceName",
@@ -304,7 +307,7 @@ func TestCreateEndpointSettings(t *testing.T) {
 				Ipv4Address:  "10.16.17.18",
 				Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
 				LinkLocalIPs: []string{"169.254.10.20"},
-				MacAddress:   "10:00:00:00:01",
+				MacAddress:   "02:00:00:00:00:01",
 				DriverOpts: composetypes.Options{
 					"driverOpt1": "optval1",
 					"driverOpt2": "optval2",
@@ -312,15 +315,17 @@ func TestCreateEndpointSettings(t *testing.T) {
 			},
 		},
 	}, 0, "netName", []string{"link1", "link2"}, true)
+	assert.NilError(t, err)
+	macAddr, _ := net.ParseMAC("02:00:00:00:00:01")
 	assert.Check(t, cmp.DeepEqual(eps, &network.EndpointSettings{
 		IPAMConfig: &network.EndpointIPAMConfig{
-			IPv4Address:  "10.16.17.18",
-			IPv6Address:  "fdb4:7a7f:373a:3f0c::42",
-			LinkLocalIPs: []string{"169.254.10.20"},
+			IPv4Address:  netip.MustParseAddr("10.16.17.18").Unmap(),
+			IPv6Address:  netip.MustParseAddr("fdb4:7a7f:373a:3f0c::42"),
+			LinkLocalIPs: []netip.Addr{netip.MustParseAddr("169.254.10.20").Unmap()},
 		},
 		Links:      []string{"link1", "link2"},
 		Aliases:    []string{"containerName", "serviceName", "alias1", "alias2"},
-		MacAddress: "10:00:00:00:01",
+		MacAddress: network.HardwareAddr(macAddr),
 		DriverOpts: map[string]string{
 			"driverOpt1": "optval1",
 			"driverOpt2": "optval2",
@@ -330,9 +335,9 @@ func TestCreateEndpointSettings(t *testing.T) {
 		//  - The IPv6 address here is the container's address, not the gateway.
 		//  - Both fields will be cleared by the daemon, but they could be removed from
 		//    the request.
-		IPAddress:   "10.16.17.18",
-		IPv6Gateway: "fdb4:7a7f:373a:3f0c::42",
-	}))
+		IPAddress:   netip.MustParseAddr("10.16.17.18").Unmap(),
+		IPv6Gateway: netip.MustParseAddr("fdb4:7a7f:373a:3f0c::42"),
+	}, cmpopts.EquateComparable(netip.Addr{})))
 }
 
 func Test_buildContainerVolumes(t *testing.T) {

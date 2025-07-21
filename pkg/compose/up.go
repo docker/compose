@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli"
 	"github.com/eiannone/keyboard"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -252,15 +253,15 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return
 		}
 		eg.Go(func() error {
-			ctr, err := s.apiClient().ContainerInspect(globalCtx, event.ID)
+			res, err := s.apiClient().ContainerInspect(globalCtx, event.ID, client.ContainerInspectOptions{})
 			if err != nil {
 				appendErr(err)
 				return nil
 			}
 
-			err = s.doLogContainer(globalCtx, options.Start.Attach, event.Source, ctr, api.LogOptions{
+			err = s.doLogContainer(globalCtx, options.Start.Attach, event.Source, res.Container, api.LogOptions{
 				Follow: true,
-				Since:  ctr.State.StartedAt,
+				Since:  res.Container.State.StartedAt,
 			})
 			if errdefs.IsNotImplemented(err) {
 				// container may be configured with logging_driver: none

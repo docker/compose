@@ -28,7 +28,8 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
 	"github.com/docker/cli/opts"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/volume"
 )
 
 // LoadListener receives events during project loading.
@@ -154,7 +155,7 @@ type VolumesOptions struct {
 	Services []string
 }
 
-type VolumesSummary = *volume.Volume
+type VolumesSummary = volume.Volume
 
 type ScaleOptions struct {
 	Services []string
@@ -544,9 +545,9 @@ type ContainerSummary struct {
 	Project      string
 	Service      string
 	Created      int64
-	State        string
+	State        container.ContainerState
 	Status       string
-	Health       string
+	Health       container.HealthStatus
 	ExitCode     int
 	Publishers   PortPublishers
 	Labels       map[string]string

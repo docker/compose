@@ -17,11 +17,12 @@
 package compose
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
 
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -36,17 +37,20 @@ func TestPs(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
-	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)), hasConfigHashLabel())
-	args.Add("label", "com.docker.compose.oneoff=False")
-	listOpts := containerType.ListOptions{Filters: args, All: false}
+	listOpts := client.ContainerListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", hasConfigHashLabel(), oneOffFilter(false)),
+		All:     false,
+	}
 	c1, inspect1 := containerDetails("service1", "123", containerType.StateRunning, containerType.Healthy, 0)
 	c2, inspect2 := containerDetails("service1", "456", containerType.StateRunning, "", 0)
-	c2.Ports = []containerType.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
+	c2.Ports = []containerType.PortSummary{{PublicPort: 80, PrivatePort: 90, IP: netip.MustParseAddr("127.0.0.1")}}
 	c3, inspect3 := containerDetails("service2", "789", containerType.StateExited, "", 130)
-	api.EXPECT().ContainerList(t.Context(), listOpts).Return([]containerType.Summary{c1, c2, c3}, nil)
-	api.EXPECT().ContainerInspect(anyCancellableContext(), "123").Return(inspect1, nil)
-	api.EXPECT().ContainerInspect(anyCancellableContext(), "456").Return(inspect2, nil)
-	api.EXPECT().ContainerInspect(anyCancellableContext(), "789").Return(inspect3, nil)
+	api.EXPECT().ContainerList(t.Context(), listOpts).Return(client.ContainerListResult{
+		Items: []containerType.Summary{c1, c2, c3},
+	}, nil)
+	api.EXPECT().ContainerInspect(anyCancellableContext(), "123", gomock.Any()).Return(client.ContainerInspectResult{Container: inspect1}, nil)
+	api.EXPECT().ContainerInspect(anyCancellableContext(), "456", gomock.Any()).Return(client.ContainerInspectResult{Container: inspect2}, nil)
+	api.EXPECT().ContainerInspect(anyCancellableContext(), "789", gomock.Any()).Return(client.ContainerInspectResult{Container: inspect3}, nil)
 
 	containers, err := tested.Ps(t.Context(), strings.ToLower(testProject), compose.PsOptions{})
 
@@ -66,8 +70,7 @@ func TestPs(t *testing.T) {
 		{
 			ID: "456", Name: "456", Names: []string{"/456"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
 			State:      containerType.StateRunning,
-			Health:     "",
-			Publishers: []compose.PortPublisher{{URL: "localhost", TargetPort: 90, PublishedPort: 80}},
+			Publishers: []compose.PortPublisher{{URL: "127.0.0.1", TargetPort: 90, PublishedPort: 80}},
 			Labels: map[string]string{
 				compose.ProjectLabel:     strings.ToLower(testProject),
 				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
@@ -78,7 +81,6 @@ func TestPs(t *testing.T) {
 		{
 			ID: "789", Name: "789", Names: []string{"/789"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service2",
 			State:      containerType.StateExited,
-			Health:     "",
 			ExitCode:   130,
 			Publishers: []compose.PortPublisher{},
 			Labels: map[string]string{
@@ -102,12 +104,10 @@ func containerDetails(service string, id string, status containerType.ContainerS
 		State:  status,
 	}
 	inspect := containerType.InspectResponse{
-		ContainerJSONBase: &containerType.ContainerJSONBase{
-			State: &containerType.State{
-				Status:   status,
-				Health:   &containerType.Health{Status: health},
-				ExitCode: exitCode,
-			},
+		State: &containerType.State{
+			Status:   status,
+			Health:   &containerType.Health{Status: health},
+			ExitCode: exitCode,
 		},
 	}
 	return ctr, inspect

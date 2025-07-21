@@ -22,7 +22,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/client"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -67,18 +67,17 @@ func runStats(ctx context.Context, dockerCli command.Cli, opts statsOptions, ser
 	if err != nil {
 		return err
 	}
-	filter := []filters.KeyValuePair{
-		filters.Arg("label", fmt.Sprintf("%s=%s", api.ProjectLabel, name)),
-	}
+	f := client.Filters{}
+	f.Add("label", fmt.Sprintf("%s=%s", api.ProjectLabel, name))
+
 	if len(service) > 0 {
-		filter = append(filter, filters.Arg("label", fmt.Sprintf("%s=%s", api.ServiceLabel, service[0])))
+		f.Add("label", fmt.Sprintf("%s=%s", api.ServiceLabel, service[0]))
 	}
-	args := filters.NewArgs(filter...)
 	return container.RunStats(ctx, dockerCli, &container.StatsOptions{
 		All:      opts.all,
 		NoStream: opts.noStream,
 		NoTrunc:  opts.noTrunc,
 		Format:   opts.format,
-		Filters:  &args,
+		Filters:  f,
 	})
 }

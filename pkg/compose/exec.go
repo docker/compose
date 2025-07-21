@@ -23,7 +23,7 @@ import (
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/container"
-	containerType "github.com/docker/docker/api/types/container"
+	containerType "github.com/moby/moby/api/types/container"
 
 	"github.com/docker/compose/v5/pkg/api"
 )

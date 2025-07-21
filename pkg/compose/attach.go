@@ -24,8 +24,9 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -69,7 +70,7 @@ func (s *composeService) attachContainer(ctx context.Context, container containe
 }
 
 func (s *composeService) doAttachContainer(ctx context.Context, service, id, name string, listener api.ContainerEventListener) error {
-	inspect, err := s.apiClient().ContainerInspect(ctx, id)
+	inspect, err := s.apiClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		return err
 	}
@@ -93,7 +94,7 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 		})
 	})
 
-	err = s.attachContainerStreams(ctx, id, inspect.Config.Tty, wOut, wErr)
+	err = s.attachContainerStreams(ctx, id, inspect.Container.Config.Tty, wOut, wErr)
 	if err != nil {
 		return err
 	}
@@ -136,7 +137,7 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 }
 
 func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.ReadCloser, error) {
-	cnx, err := s.apiClient().ContainerAttach(ctx, container, containerType.AttachOptions{
+	cnx, err := s.apiClient().ContainerAttach(ctx, container, client.ContainerAttachOptions{
 		Stream: true,
 		Stdin:  false,
 		Stdout: true,
@@ -144,12 +145,12 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 		Logs:   false,
 	})
 	if err == nil {
-		stdout := ContainerStdout{HijackedResponse: cnx}
+		stdout := ContainerStdout{HijackedResponse: cnx.HijackedResponse}
 		return stdout, nil
 	}
 
 	// Fallback to logs API
-	logs, err := s.apiClient().ContainerLogs(ctx, container, containerType.LogsOptions{
+	logs, err := s.apiClient().ContainerLogs(ctx, container, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,

@@ -18,14 +18,15 @@ package formatter
 
 import (
 	"fmt"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/cli/cli/command/formatter"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client/pkg/stringid"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -197,7 +198,7 @@ func (c *ContainerContext) ExitCode() int {
 }
 
 func (c *ContainerContext) State() string {
-	return c.c.State
+	return string(c.c.State)
 }
 
 func (c *ContainerContext) Status() string {
@@ -205,7 +206,7 @@ func (c *ContainerContext) Status() string {
 }
 
 func (c *ContainerContext) Health() string {
-	return c.c.Health
+	return string(c.c.Health)
 }
 
 func (c *ContainerContext) Publishers() api.PortPublishers {
@@ -213,10 +214,16 @@ func (c *ContainerContext) Publishers() api.PortPublishers {
 }
 
 func (c *ContainerContext) Ports() string {
-	var ports []container.Port
+	var ports []container.PortSummary
 	for _, publisher := range c.c.Publishers {
-		ports = append(ports, container.Port{
-			IP:          publisher.URL,
+		var pIP netip.Addr
+		if publisher.URL != "" {
+			if p, err := netip.ParseAddr(publisher.URL); err == nil {
+				pIP = p
+			}
+		}
+		ports = append(ports, container.PortSummary{
+			IP:          pIP,
 			PrivatePort: uint16(publisher.TargetPort),
 			PublicPort:  uint16(publisher.PublishedPort),
 			Type:        publisher.Protocol,

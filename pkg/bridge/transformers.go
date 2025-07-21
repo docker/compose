@@ -23,11 +23,9 @@ import (
 	"path/filepath"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 )
 
 const (
@@ -65,34 +63,39 @@ func CreateTransformer(ctx context.Context, dockerCli command.Cli, options Creat
 		return err
 	}
 
-	created, err := dockerCli.Client().ContainerCreate(ctx, &container.Config{
+	created, err := dockerCli.Client().ContainerCreate(ctx, client.ContainerCreateOptions{
 		Image: options.From,
-	}, &container.HostConfig{}, &network.NetworkingConfig{}, nil, "")
+	})
+
 	defer func() {
-		_ = dockerCli.Client().ContainerRemove(context.Background(), created.ID, container.RemoveOptions{Force: true})
+		_, _ = dockerCli.Client().ContainerRemove(context.Background(), created.ID, client.ContainerRemoveOptions{
+			Force: true,
+		})
 	}()
 
 	if err != nil {
 		return err
 	}
-	content, stat, err := dockerCli.Client().CopyFromContainer(ctx, created.ID, templatesPath)
+	resp, err := dockerCli.Client().CopyFromContainer(ctx, created.ID, client.CopyFromContainerOptions{
+		SourcePath: templatesPath,
+	})
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = content.Close()
+		_ = resp.Content.Close()
 	}()
 
 	srcInfo := archive.CopyInfo{
 		Path:   templatesPath,
 		Exists: true,
-		IsDir:  stat.Mode.IsDir(),
+		IsDir:  resp.Stat.Mode.IsDir(),
 	}
 
-	preArchive := content
+	preArchive := resp.Content
 	if srcInfo.RebaseName != "" {
 		_, srcBase := archive.SplitPathDirEntry(srcInfo.Path)
-		preArchive = archive.RebaseArchiveEntries(content, srcBase, srcInfo.RebaseName)
+		preArchive = archive.RebaseArchiveEntries(resp.Content, srcBase, srcInfo.RebaseName)
 	}
 
 	if err := archive.CopyTo(preArchive, srcInfo, out); err != nil {
@@ -111,10 +114,11 @@ COPY templates /templates
 }
 
 func ListTransformers(ctx context.Context, dockerCli command.Cli) ([]image.Summary, error) {
-	api := dockerCli.Client()
-	return api.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", TransformerLabel, "transformation")),
-		),
+	res, err := dockerCli.Client().ImageList(ctx, client.ImageListOptions{
+		Filters: make(client.Filters).Add("label", fmt.Sprintf("%s=%s", TransformerLabel, "transformation")),
 	})
+	if err != nil {
+		return nil, err
+	}
+	return res.Items, nil
 }

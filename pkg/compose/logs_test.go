@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -43,21 +43,25 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 
-	api.EXPECT().ContainerList(t.Context(), containerType.ListOptions{
+	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
 		All:     true,
-		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
+		Filters: projectFilter(name).Add("label", oneOffFilter(false), hasConfigHashLabel()),
 	}).Return(
-		[]containerType.Summary{
-			testContainer("service", "c", false),
+		client.ContainerListResult{
+			Items: []containerType.Summary{
+				testContainer("service", "c", false),
+			},
 		},
 		nil,
 	)
 
 	api.EXPECT().
-		ContainerInspect(anyCancellableContext(), "c").
-		Return(containerType.InspectResponse{
-			ContainerJSONBase: &containerType.ContainerJSONBase{ID: "c"},
-			Config:            &containerType.Config{Tty: false},
+		ContainerInspect(anyCancellableContext(), "c", gomock.Any()).
+		Return(client.ContainerInspectResult{
+			Container: containerType.InspectResponse{
+				ID:     "c",
+				Config: &containerType.Config{Tty: false},
+			},
 		}, nil)
 	c1Reader, c1Writer := io.Pipe()
 	t.Cleanup(func() {
@@ -112,28 +116,32 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 
-	api.EXPECT().ContainerList(t.Context(), containerType.ListOptions{
+	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
 		All:     true,
-		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
+		Filters: projectFilter(name).Add("label", oneOffFilter(false), hasConfigHashLabel()),
 	}).Return(
-		[]containerType.Summary{
-			testContainer("serviceA", "c1", false),
-			testContainer("serviceA", "c2", false),
-			// serviceB will be filtered out by the project definition to
-			// ensure we ignore "orphan" containers
-			testContainer("serviceB", "c3", false),
-			testContainer("serviceC", "c4", false),
+		client.ContainerListResult{
+			Items: []containerType.Summary{
+				testContainer("serviceA", "c1", false),
+				testContainer("serviceA", "c2", false),
+				// serviceB will be filtered out by the project definition to
+				// ensure we ignore "orphan" containers
+				testContainer("serviceB", "c3", false),
+				testContainer("serviceC", "c4", false),
+			},
 		},
 		nil,
 	)
 
 	for _, id := range []string{"c1", "c2", "c4"} {
 		api.EXPECT().
-			ContainerInspect(anyCancellableContext(), id).
+			ContainerInspect(anyCancellableContext(), id, gomock.Any()).
 			Return(
-				containerType.InspectResponse{
-					ContainerJSONBase: &containerType.ContainerJSONBase{ID: id},
-					Config:            &containerType.Config{Tty: true},
+				client.ContainerInspectResult{
+					Container: containerType.InspectResponse{
+						ID:     id,
+						Config: &containerType.Config{Tty: true},
+					},
 				},
 				nil,
 			)

@@ -26,8 +26,9 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/docker/api/types/container"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -153,7 +154,13 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 
 	// Prepare destination copy info by stat-ing the container path.
 	dstInfo := archive.CopyInfo{Path: dstPath}
-	dstStat, err := s.apiClient().ContainerStatPath(ctx, containerID, dstPath)
+	var dstStat container.PathStat
+	res, err := s.apiClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+		Path: dstPath,
+	})
+	if err == nil {
+		dstStat = res.Stat
+	}
 
 	// If the destination is a symbolic link, we should evaluate it.
 	if err == nil && dstStat.Mode&os.ModeSymlink != 0 {
@@ -165,7 +172,12 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		}
 
 		dstInfo.Path = linkTarget
-		dstStat, err = s.apiClient().ContainerStatPath(ctx, containerID, linkTarget)
+		res, err = s.apiClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+			Path: linkTarget,
+		})
+		if err == nil {
+			dstStat = res.Stat
+		}
 	}
 
 	// Validate the destination path
@@ -232,11 +244,13 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		}
 	}
 
-	options := container.CopyToContainerOptions{
+	_, err = s.apiClient().CopyToContainer(ctx, containerID, client.CopyToContainerOptions{
+		DestinationPath:           resolvedDstPath,
+		Content:                   content,
 		AllowOverwriteDirWithFile: false,
 		CopyUIDGID:                opts.CopyUIDGID,
-	}
-	return s.apiClient().CopyToContainer(ctx, containerID, resolvedDstPath, content, options)
+	})
+	return err
 }
 
 func (s *composeService) copyFromContainer(ctx context.Context, containerID, srcPath, dstPath string, opts api.CopyOptions) error {
@@ -256,7 +270,13 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 	// if client requests to follow symbol link, then must decide target file to be copied
 	var rebaseName string
 	if opts.FollowLink {
-		srcStat, err := s.apiClient().ContainerStatPath(ctx, containerID, srcPath)
+		var srcStat container.PathStat
+		res, err := s.apiClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+			Path: srcPath,
+		})
+		if err == nil {
+			srcStat = res.Stat
+		}
 
 		// If the destination is a symbolic link, we should follow it.
 		if err == nil && srcStat.Mode&os.ModeSymlink != 0 {
@@ -272,28 +292,30 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 		}
 	}
 
-	content, stat, err := s.apiClient().CopyFromContainer(ctx, containerID, srcPath)
+	res, err := s.apiClient().CopyFromContainer(ctx, containerID, client.CopyFromContainerOptions{
+		SourcePath: srcPath,
+	})
 	if err != nil {
 		return err
 	}
-	defer content.Close() //nolint:errcheck
+	defer res.Content.Close() //nolint:errcheck
 
 	if dstPath == "-" {
-		_, err = io.Copy(s.stdout(), content)
+		_, err = io.Copy(s.stdout(), res.Content)
 		return err
 	}
 
 	srcInfo := archive.CopyInfo{
 		Path:       srcPath,
 		Exists:     true,
-		IsDir:      stat.Mode.IsDir(),
+		IsDir:      res.Stat.Mode.IsDir(),
 		RebaseName: rebaseName,
 	}
 
-	preArchive := content
+	preArchive := res.Content
 	if srcInfo.RebaseName != "" {
 		_, srcBase := archive.SplitPathDirEntry(srcInfo.Path)
-		preArchive = archive.RebaseArchiveEntries(content, srcBase, srcInfo.RebaseName)
+		preArchive = archive.RebaseArchiveEntries(res.Content, srcBase, srcInfo.RebaseName)
 	}
 
 	return archive.CopyTo(preArchive, srcInfo, dstPath)
