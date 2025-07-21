@@ -43,6 +43,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/buildkit v0.23.0-rc1.0.20250618182037-9b91d20367db // master
 	github.com/moby/go-archive v0.1.0
+	github.com/moby/moby/api v0.0.0
+	github.com/moby/moby/client v0.0.0-00010101000000-000000000000
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2
@@ -146,8 +148,6 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
-	github.com/moby/moby/api v0.0.0 // indirect
-	github.com/moby/moby/client v0.0.0-00010101000000-000000000000 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect

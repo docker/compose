@@ -24,8 +24,8 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
 	"github.com/sirupsen/logrus"
 )
 

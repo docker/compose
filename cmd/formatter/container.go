@@ -24,9 +24,9 @@ import (
 
 	"github.com/docker/cli/cli/command/formatter"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client/pkg/stringid"
 )
 
 const (
