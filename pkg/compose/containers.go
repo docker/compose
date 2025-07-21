@@ -24,8 +24,8 @@ import (
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -42,32 +42,31 @@ const (
 )
 
 func (s *composeService) getContainers(ctx context.Context, project string, oneOff oneOff, all bool, selectedServices ...string) (Containers, error) {
-	var containers Containers
-	f := getDefaultFilters(project, oneOff, selectedServices...)
-	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(f...),
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: getDefaultFilters(project, oneOff, selectedServices...),
 		All:     all,
 	})
 	if err != nil {
 		return nil, err
 	}
+	containers := Containers(res.Items)
 	if len(selectedServices) > 1 {
 		containers = containers.filter(isService(selectedServices...))
 	}
 	return containers, nil
 }
 
-func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...string) []filters.KeyValuePair {
-	f := []filters.KeyValuePair{projectFilter(projectName)}
+func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...string) client.Filters {
+	f := projectFilter(projectName)
 	if len(selectedServices) == 1 {
-		f = append(f, serviceFilter(selectedServices[0]))
+		f.Add("label", serviceFilter(selectedServices[0]))
 	}
-	f = append(f, hasConfigHashLabel())
+	f.Add("label", hasConfigHashLabel())
 	switch oneOff {
 	case oneOffOnly:
-		f = append(f, oneOffFilter(true))
+		f.Add("label", oneOffFilter(true))
 	case oneOffExclude:
-		f = append(f, oneOffFilter(false))
+		f.Add("label", oneOffFilter(false))
 	case oneOffInclude:
 	}
 	return f
@@ -76,17 +75,16 @@ func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...st
 func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName string, oneOff oneOff, all bool, serviceName string, containerIndex int) (container.Summary, error) {
 	defaultFilters := getDefaultFilters(projectName, oneOff, serviceName)
 	if containerIndex > 0 {
-		defaultFilters = append(defaultFilters, containerNumberFilter(containerIndex))
+		defaultFilters.Add("label", containerNumberFilter(containerIndex))
 	}
-	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(
-			defaultFilters...,
-		),
-		All: all,
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: defaultFilters,
+		All:     all,
 	})
 	if err != nil {
 		return container.Summary{}, err
 	}
+	containers := res.Items
 	if len(containers) < 1 {
 		if containerIndex > 0 {
 			return container.Summary{}, fmt.Errorf("service %q is not running container #%d", serviceName, containerIndex)

@@ -23,10 +23,10 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/jonboulle/clockwork"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -77,21 +77,24 @@ func TestWatch_Sync(t *testing.T) {
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
-	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return([]container.Summary{
-		testContainer("test", "123", false),
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{
+			testContainer("test", "123", false),
+		},
 	}, nil).AnyTimes()
 	// we expect the image to be pruned
-	apiClient.EXPECT().ImageList(gomock.Any(), image.ListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("dangling", "true"),
-			filters.Arg("label", api.ProjectLabel+"=myProjectName"),
-		),
-	}).Return([]image.Summary{
-		{ID: "123"},
-		{ID: "456"},
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: make(client.Filters).
+			Add("dangling", "true").
+			Add("label", api.ProjectLabel+"=myProjectName"),
+	}).Return(client.ImageListResult{
+		Items: []image.Summary{
+			{ID: "123"},
+			{ID: "456"},
+		},
 	}, nil).Times(1)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "123", image.RemoveOptions{}).Times(1)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "456", image.RemoveOptions{}).Times(1)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "123", client.ImageRemoveOptions{}).Times(1)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "456", client.ImageRemoveOptions{}).Times(1)
 	//
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
