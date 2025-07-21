@@ -18,15 +18,13 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -45,23 +43,30 @@ func TestKillAll(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 
-	api.EXPECT().ContainerList(t.Context(), container.ListOptions{
-		Filters: filters.NewArgs(projectFilter(name), hasConfigHashLabel()),
-	}).Return(
-		[]container.Summary{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
+	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
+		Filters: projectFilter(name).Add("label", hasConfigHashLabel()),
+	}).Return(client.ContainerListResult{
+		Items: []container.Summary{
+			testContainer("service1", "123", false),
+			testContainer("service1", "456", false),
+			testContainer("service2", "789", false),
+		},
+	}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
-			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		client.VolumeListOptions{
+			Filters: projectFilter(strings.ToLower(testProject)),
 		}).
-		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]network.Summary{
-			{ID: "abc123", Name: "testProject_default"},
+		Return(client.VolumeListResult{}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+		Return(client.NetworkListResult{
+			Items: []network.Summary{{
+				Network: network.Network{ID: "abc123", Name: "testProject_default"},
+			}},
 		}, nil)
-	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "").Return(nil)
-	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
-	api.EXPECT().ContainerKill(anyCancellableContext(), "789", "").Return(nil)
+	api.EXPECT().ContainerKill(anyCancellableContext(), "123", client.ContainerKillOptions{}).Return(client.ContainerKillResult{}, nil)
+	api.EXPECT().ContainerKill(anyCancellableContext(), "456", client.ContainerKillOptions{}).Return(client.ContainerKillResult{}, nil)
+	api.EXPECT().ContainerKill(anyCancellableContext(), "789", client.ContainerKillOptions{}).Return(client.ContainerKillResult{}, nil)
 
 	err = tested.Kill(t.Context(), name, compose.KillOptions{})
 	assert.NilError(t, err)
@@ -77,22 +82,28 @@ func TestKillSignal(t *testing.T) {
 	assert.NilError(t, err)
 
 	name := strings.ToLower(testProject)
-	listOptions := container.ListOptions{
-		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName), hasConfigHashLabel()),
+	listOptions := client.ContainerListOptions{
+		Filters: projectFilter(name).Add("label", serviceFilter(serviceName), hasConfigHashLabel()),
 	}
 
-	api.EXPECT().ContainerList(t.Context(), listOptions).Return([]container.Summary{testContainer(serviceName, "123", false)}, nil)
+	api.EXPECT().ContainerList(t.Context(), listOptions).Return(client.ContainerListResult{
+		Items: []container.Summary{testContainer(serviceName, "123", false)},
+	}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
-			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		client.VolumeListOptions{
+			Filters: projectFilter(strings.ToLower(testProject)),
 		}).
-		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]network.Summary{
-			{ID: "abc123", Name: "testProject_default"},
+		Return(client.VolumeListResult{}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+		Return(client.NetworkListResult{
+			Items: []network.Summary{{
+				Network: network.Network{ID: "abc123", Name: "testProject_default"},
+			}},
 		}, nil)
-	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
+	api.EXPECT().ContainerKill(anyCancellableContext(), "123", client.ContainerKillOptions{
+		Signal: "SIGTERM",
+	}).Return(client.ContainerKillResult{}, nil)
 
 	err = tested.Kill(t.Context(), name, compose.KillOptions{Services: []string{serviceName}, Signal: "SIGTERM"})
 	assert.NilError(t, err)
@@ -133,15 +144,12 @@ func anyCancellableContext() gomock.Matcher {
 	return gomock.AssignableToTypeOf(ctxWithCancel)
 }
 
-func projectFilterListOpt(withOneOff bool) container.ListOptions {
-	filter := filters.NewArgs(
-		projectFilter(strings.ToLower(testProject)),
-		hasConfigHashLabel(),
-	)
+func projectFilterListOpt(withOneOff bool) client.ContainerListOptions {
+	filter := projectFilter(strings.ToLower(testProject)).Add("label", hasConfigHashLabel())
 	if !withOneOff {
-		filter.Add("label", fmt.Sprintf("%s=False", compose.OneoffLabel))
+		filter.Add("label", oneOffFilter(false))
 	}
-	return container.ListOptions{
+	return client.ContainerListOptions{
 		Filters: filter,
 		All:     true,
 	}

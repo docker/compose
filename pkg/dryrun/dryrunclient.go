@@ -33,21 +33,11 @@ import (
 	"github.com/docker/buildx/builder"
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/checkpoint"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/system"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 var _ client.APIClient = &DryRunClient{}
@@ -64,6 +54,14 @@ type execDetails struct {
 	container string
 	command   []string
 }
+
+type fakeStreamResult struct {
+	io.ReadCloser
+	client.ImagePushResponse // same interface as [client.ImagePullResponse]
+}
+
+func (e fakeStreamResult) Read(p []byte) (int, error) { return e.ReadCloser.Read(p) }
+func (e fakeStreamResult) Close() error               { return e.ReadCloser.Close() }
 
 // NewDryRunClient produces a DryRunClient
 func NewDryRunClient(apiClient client.APIClient, cli command.Cli) (*DryRunClient, error) {
@@ -91,27 +89,25 @@ func getCallingFunction() string {
 
 // All methods and functions which need to be overridden for dry run.
 
-func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options containerType.AttachOptions) (moby.HijackedResponse, error) {
-	return moby.HijackedResponse{}, errors.New("interactive run is not supported in dry-run mode")
+func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options client.ContainerAttachOptions) (client.ContainerAttachResult, error) {
+	return client.ContainerAttachResult{}, errors.New("interactive run is not supported in dry-run mode")
 }
 
-func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerType.Config, hostConfig *containerType.HostConfig,
-	networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string,
-) (containerType.CreateResponse, error) {
+func (d *DryRunClient) ContainerCreate(ctx context.Context, options client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
 	d.containers = append(d.containers, containerType.Summary{
-		ID:     containerName,
-		Names:  []string{containerName},
-		Labels: config.Labels,
+		ID:     options.Name,
+		Names:  []string{options.Name},
+		Labels: options.Config.Labels,
 		HostConfig: struct {
 			NetworkMode string            `json:",omitempty"`
 			Annotations map[string]string `json:",omitempty"`
 		}{},
 	})
-	return containerType.CreateResponse{ID: containerName}, nil
+	return client.ContainerCreateResult{ID: options.Name}, nil
 }
 
-func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (containerType.InspectResponse, error) {
-	containerJSON, err := d.apiClient.ContainerInspect(ctx, container)
+func (d *DryRunClient) ContainerInspect(ctx context.Context, container string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+	containerJSON, err := d.apiClient.ContainerInspect(ctx, container, options)
 	if err != nil {
 		id := "dryRunId"
 		for _, c := range d.containers {
@@ -119,8 +115,8 @@ func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (
 				id = container
 			}
 		}
-		return containerType.InspectResponse{
-			ContainerJSONBase: &containerType.ContainerJSONBase{
+		return client.ContainerInspectResult{
+			Container: containerType.InspectResponse{
 				ID:   id,
 				Name: container,
 				State: &containerType.State{
@@ -129,117 +125,111 @@ func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (
 						Status: containerType.Healthy, // needed for healthcheck control
 					},
 				},
+				Mounts:          nil,
+				Config:          &containerType.Config{},
+				NetworkSettings: &containerType.NetworkSettings{},
 			},
-			Mounts:          nil,
-			Config:          &containerType.Config{},
-			NetworkSettings: &containerType.NetworkSettings{},
 		}, nil
 	}
 	return containerJSON, err
 }
 
-func (d *DryRunClient) ContainerKill(ctx context.Context, container, signal string) error {
-	return nil
+func (d *DryRunClient) ContainerKill(ctx context.Context, container string, options client.ContainerKillOptions) (client.ContainerKillResult, error) {
+	return client.ContainerKillResult{}, nil
 }
 
-func (d *DryRunClient) ContainerList(ctx context.Context, options containerType.ListOptions) ([]containerType.Summary, error) {
+func (d *DryRunClient) ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error) {
 	caller := getCallingFunction()
 	switch caller {
 	case "start":
-		return d.containers, nil
+		return client.ContainerListResult{
+			Items: d.containers,
+		}, nil
 	case "getContainers":
 		if len(d.containers) == 0 {
-			var err error
-			d.containers, err = d.apiClient.ContainerList(ctx, options)
-			return d.containers, err
+			res, err := d.apiClient.ContainerList(ctx, options)
+			if err == nil {
+				d.containers = res.Items
+			}
+			return client.ContainerListResult{
+				Items: d.containers,
+			}, err
 		}
 	}
 	return d.apiClient.ContainerList(ctx, options)
 }
 
-func (d *DryRunClient) ContainerPause(ctx context.Context, container string) error {
-	return nil
+func (d *DryRunClient) ContainerPause(ctx context.Context, container string, options client.ContainerPauseOptions) (client.ContainerPauseResult, error) {
+	return client.ContainerPauseResult{}, nil
 }
 
-func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options containerType.RemoveOptions) error {
-	return nil
+func (d *DryRunClient) ContainerRemove(ctx context.Context, container string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+	return client.ContainerRemoveResult{}, nil
 }
 
-func (d *DryRunClient) ContainerRename(ctx context.Context, container, newContainerName string) error {
-	return nil
+func (d *DryRunClient) ContainerRename(ctx context.Context, container string, options client.ContainerRenameOptions) (client.ContainerRenameResult, error) {
+	return client.ContainerRenameResult{}, nil
 }
 
-func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, options containerType.StopOptions) error {
-	return nil
+func (d *DryRunClient) ContainerRestart(ctx context.Context, container string, options client.ContainerRestartOptions) (client.ContainerRestartResult, error) {
+	return client.ContainerRestartResult{}, nil
 }
 
-func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options containerType.StartOptions) error {
-	return nil
+func (d *DryRunClient) ContainerStart(ctx context.Context, container string, options client.ContainerStartOptions) (client.ContainerStartResult, error) {
+	return client.ContainerStartResult{}, nil
 }
 
-func (d *DryRunClient) ContainerStop(ctx context.Context, container string, options containerType.StopOptions) error {
-	return nil
+func (d *DryRunClient) ContainerStop(ctx context.Context, container string, options client.ContainerStopOptions) (client.ContainerStopResult, error) {
+	return client.ContainerStopResult{}, nil
 }
 
-func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) error {
-	return nil
+func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string, options client.ContainerUnpauseOptions) (client.ContainerUnpauseResult, error) {
+	return client.ContainerUnpauseResult{}, nil
 }
 
-func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, containerType.PathStat, error) {
-	rc := io.NopCloser(strings.NewReader(""))
-	if _, err := d.ContainerStatPath(ctx, container, srcPath); err != nil {
-		return rc, containerType.PathStat{}, fmt.Errorf("could not find the file %s in container %s", srcPath, container)
+func (d *DryRunClient) CopyFromContainer(ctx context.Context, container string, options client.CopyFromContainerOptions) (client.CopyFromContainerResult, error) {
+	if _, err := d.ContainerStatPath(ctx, container, client.ContainerStatPathOptions{Path: options.SourcePath}); err != nil {
+		return client.CopyFromContainerResult{}, fmt.Errorf("could not find the file %s in container %s", options.SourcePath, container)
 	}
-	return rc, containerType.PathStat{}, nil
+	return client.CopyFromContainerResult{}, nil
 }
 
-func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options containerType.CopyToContainerOptions) error {
-	return nil
+func (d *DryRunClient) CopyToContainer(ctx context.Context, container string, options client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+	return client.CopyToContainerResult{}, nil
 }
 
-func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options build.ImageBuildOptions) (build.ImageBuildResponse, error) {
-	rc := io.NopCloser(bytes.NewReader(nil))
-
-	return build.ImageBuildResponse{
-		Body: rc,
+func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options client.ImageBuildOptions) (client.ImageBuildResult, error) {
+	return client.ImageBuildResult{
+		Body: io.NopCloser(bytes.NewReader(nil)),
 	}, nil
 }
 
-func (d *DryRunClient) ImageInspect(ctx context.Context, imageName string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
+func (d *DryRunClient) ImageInspect(ctx context.Context, imageName string, options ...client.ImageInspectOption) (client.ImageInspectResult, error) {
 	caller := getCallingFunction()
 	switch caller {
 	case "pullServiceImage", "buildContainerVolumes":
-		return image.InspectResponse{ID: "dryRunId"}, nil
+		return client.ImageInspectResult{
+			InspectResponse: image.InspectResponse{ID: "dryRunId"},
+		}, nil
 	default:
 		return d.apiClient.ImageInspect(ctx, imageName, options...)
 	}
 }
 
-// Deprecated: Use [DryRunClient.ImageInspect] instead; raw response can be obtained by [client.ImageInspectWithRawResponse] option.
-func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string) (image.InspectResponse, []byte, error) {
-	var buf bytes.Buffer
-	resp, err := d.ImageInspect(ctx, imageName, client.ImageInspectWithRawResponse(&buf))
-	if err != nil {
-		return image.InspectResponse{}, nil, err
-	}
-	return resp, buf.Bytes(), err
-}
-
-func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options client.ImagePullOptions) (client.ImagePullResponse, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
-	rc := io.NopCloser(strings.NewReader(""))
-	return rc, nil
+	return fakeStreamResult{ReadCloser: http.NoBody}, nil
 }
 
-func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options image.PushOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options client.ImagePushOptions) (client.ImagePushResponse, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
-	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
+	jsonMessage, err := json.Marshal(&jsonstream.Message{
 		Status: "Pushed",
-		Progress: &jsonmessage.JSONProgress{
+		Progress: &jsonstream.Progress{
 			Current:    100,
 			Total:      100,
 			Start:      0,
@@ -251,48 +241,48 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options image.
 	if err != nil {
 		return nil, err
 	}
-	rc := io.NopCloser(bytes.NewReader(jsonMessage))
-	return rc, nil
+	return fakeStreamResult{ReadCloser: io.NopCloser(bytes.NewReader(jsonMessage))}, nil
 }
 
-func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options image.RemoveOptions) ([]image.DeleteResponse, error) {
-	return nil, nil
+func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options client.ImageRemoveOptions) (client.ImageRemoveResult, error) {
+	return client.ImageRemoveResult{}, nil
 }
 
-func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, container string, config *network.EndpointSettings) error {
-	return nil
+func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName string, options client.NetworkConnectOptions) (client.NetworkConnectResult, error) {
+	return client.NetworkConnectResult{}, nil
 }
 
-func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options network.CreateOptions) (network.CreateResponse, error) {
-	return network.CreateResponse{
-		ID:      name,
-		Warning: "",
+func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+	return client.NetworkCreateResult{
+		ID: name,
 	}, nil
 }
 
-func (d *DryRunClient) NetworkDisconnect(ctx context.Context, networkName, container string, force bool) error {
-	return nil
+func (d *DryRunClient) NetworkDisconnect(ctx context.Context, networkName string, options client.NetworkDisconnectOptions) (client.NetworkDisconnectResult, error) {
+	return client.NetworkDisconnectResult{}, nil
 }
 
-func (d *DryRunClient) NetworkRemove(ctx context.Context, networkName string) error {
-	return nil
+func (d *DryRunClient) NetworkRemove(ctx context.Context, networkName string, options client.NetworkRemoveOptions) (client.NetworkRemoveResult, error) {
+	return client.NetworkRemoveResult{}, nil
 }
 
-func (d *DryRunClient) VolumeCreate(ctx context.Context, options volume.CreateOptions) (volume.Volume, error) {
-	return volume.Volume{
-		ClusterVolume: nil,
-		Driver:        options.Driver,
-		Labels:        options.Labels,
-		Name:          options.Name,
-		Options:       options.DriverOpts,
+func (d *DryRunClient) VolumeCreate(ctx context.Context, options client.VolumeCreateOptions) (client.VolumeCreateResult, error) {
+	return client.VolumeCreateResult{
+		Volume: volume.Volume{
+			ClusterVolume: nil,
+			Driver:        options.Driver,
+			Labels:        options.Labels,
+			Name:          options.Name,
+			Options:       options.DriverOpts,
+		},
 	}, nil
 }
 
-func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force bool) error {
-	return nil
+func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, options client.VolumeRemoveOptions) (client.VolumeRemoveResult, error) {
+	return client.VolumeRemoveResult{}, nil
 }
 
-func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config containerType.ExecOptions) (containerType.ExecCreateResponse, error) {
+func (d *DryRunClient) ExecCreate(ctx context.Context, container string, config client.ExecCreateOptions) (client.ExecCreateResult, error) {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	id := fmt.Sprintf("%x", b)
@@ -300,347 +290,327 @@ func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string
 		container: container,
 		command:   config.Cmd,
 	})
-	return containerType.ExecCreateResponse{
+	return client.ExecCreateResult{
 		ID: id,
 	}, nil
 }
 
-func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config containerType.ExecStartOptions) error {
+func (d *DryRunClient) ExecStart(ctx context.Context, execID string, config client.ExecStartOptions) (client.ExecStartResult, error) {
 	_, ok := d.execs.LoadAndDelete(execID)
 	if !ok {
-		return fmt.Errorf("invalid exec ID %q", execID)
+		return client.ExecStartResult{}, fmt.Errorf("invalid exec ID %q", execID)
 	}
-	return nil
+	return client.ExecStartResult{}, nil
 }
 
 // Functions delegated to original APIClient (not used by Compose or not modifying the Compose stack)
 
-func (d *DryRunClient) ConfigList(ctx context.Context, options swarm.ConfigListOptions) ([]swarm.Config, error) {
+func (d *DryRunClient) ConfigList(ctx context.Context, options client.ConfigListOptions) (client.ConfigListResult, error) {
 	return d.apiClient.ConfigList(ctx, options)
 }
 
-func (d *DryRunClient) ConfigCreate(ctx context.Context, config swarm.ConfigSpec) (swarm.ConfigCreateResponse, error) {
-	return d.apiClient.ConfigCreate(ctx, config)
+func (d *DryRunClient) ConfigInspect(ctx context.Context, name string, options client.ConfigInspectOptions) (client.ConfigInspectResult, error) {
+	return d.apiClient.ConfigInspect(ctx, name, options)
 }
 
-func (d *DryRunClient) ConfigRemove(ctx context.Context, id string) error {
-	return d.apiClient.ConfigRemove(ctx, id)
+func (d *DryRunClient) ConfigCreate(ctx context.Context, options client.ConfigCreateOptions) (client.ConfigCreateResult, error) {
+	return d.apiClient.ConfigCreate(ctx, options)
 }
 
-func (d *DryRunClient) ConfigInspectWithRaw(ctx context.Context, name string) (swarm.Config, []byte, error) {
-	return d.apiClient.ConfigInspectWithRaw(ctx, name)
+func (d *DryRunClient) ConfigRemove(ctx context.Context, id string, options client.ConfigRemoveOptions) (client.ConfigRemoveResult, error) {
+	return d.apiClient.ConfigRemove(ctx, id, options)
 }
 
-func (d *DryRunClient) ConfigUpdate(ctx context.Context, id string, version swarm.Version, config swarm.ConfigSpec) error {
-	return d.apiClient.ConfigUpdate(ctx, id, version, config)
+func (d *DryRunClient) ConfigUpdate(ctx context.Context, id string, options client.ConfigUpdateOptions) (client.ConfigUpdateResult, error) {
+	return d.apiClient.ConfigUpdate(ctx, id, options)
 }
 
-func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, options containerType.CommitOptions) (containerType.CommitResponse, error) {
+func (d *DryRunClient) ContainerCommit(ctx context.Context, container string, options client.ContainerCommitOptions) (client.ContainerCommitResult, error) {
 	return d.apiClient.ContainerCommit(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]containerType.FilesystemChange, error) {
-	return d.apiClient.ContainerDiff(ctx, container)
+func (d *DryRunClient) ContainerDiff(ctx context.Context, container string, options client.ContainerDiffOptions) (client.ContainerDiffResult, error) {
+	return d.apiClient.ContainerDiff(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config containerType.ExecStartOptions) (moby.HijackedResponse, error) {
-	return moby.HijackedResponse{}, errors.New("interactive exec is not supported in dry-run mode")
+func (d *DryRunClient) ExecAttach(ctx context.Context, execID string, config client.ExecAttachOptions) (client.ExecAttachResult, error) {
+	return client.ExecAttachResult{}, errors.New("interactive exec is not supported in dry-run mode")
 }
 
-func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (containerType.ExecInspect, error) {
-	return d.apiClient.ContainerExecInspect(ctx, execID)
+func (d *DryRunClient) ExecInspect(ctx context.Context, execID string, options client.ExecInspectOptions) (client.ExecInspectResult, error) {
+	return d.apiClient.ExecInspect(ctx, execID, options)
 }
 
-func (d *DryRunClient) ContainerExecResize(ctx context.Context, execID string, options containerType.ResizeOptions) error {
-	return d.apiClient.ContainerExecResize(ctx, execID, options)
+func (d *DryRunClient) ExecResize(ctx context.Context, execID string, options client.ExecResizeOptions) (client.ExecResizeResult, error) {
+	return d.apiClient.ExecResize(ctx, execID, options)
 }
 
-func (d *DryRunClient) ContainerExport(ctx context.Context, container string) (io.ReadCloser, error) {
-	return d.apiClient.ContainerExport(ctx, container)
+func (d *DryRunClient) ContainerExport(ctx context.Context, container string, options client.ContainerExportOptions) (client.ContainerExportResult, error) {
+	return d.apiClient.ContainerExport(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerInspectWithRaw(ctx context.Context, container string, getSize bool) (containerType.InspectResponse, []byte, error) {
-	return d.apiClient.ContainerInspectWithRaw(ctx, container, getSize)
-}
-
-func (d *DryRunClient) ContainerLogs(ctx context.Context, container string, options containerType.LogsOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ContainerLogs(ctx context.Context, container string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error) {
 	return d.apiClient.ContainerLogs(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerResize(ctx context.Context, container string, options containerType.ResizeOptions) error {
+func (d *DryRunClient) ContainerResize(ctx context.Context, container string, options client.ContainerResizeOptions) (client.ContainerResizeResult, error) {
 	return d.apiClient.ContainerResize(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerStatPath(ctx context.Context, container, path string) (containerType.PathStat, error) {
-	return d.apiClient.ContainerStatPath(ctx, container, path)
+func (d *DryRunClient) ContainerStatPath(ctx context.Context, container string, options client.ContainerStatPathOptions) (client.ContainerStatPathResult, error) {
+	return d.apiClient.ContainerStatPath(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerStats(ctx context.Context, container string, stream bool) (containerType.StatsResponseReader, error) {
-	return d.apiClient.ContainerStats(ctx, container, stream)
+func (d *DryRunClient) ContainerStats(ctx context.Context, container string, options client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
+	return d.apiClient.ContainerStats(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerStatsOneShot(ctx context.Context, container string) (containerType.StatsResponseReader, error) {
-	return d.apiClient.ContainerStatsOneShot(ctx, container)
+func (d *DryRunClient) ContainerTop(ctx context.Context, container string, options client.ContainerTopOptions) (client.ContainerTopResult, error) {
+	return d.apiClient.ContainerTop(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerTop(ctx context.Context, container string, arguments []string) (containerType.TopResponse, error) {
-	return d.apiClient.ContainerTop(ctx, container, arguments)
+func (d *DryRunClient) ContainerUpdate(ctx context.Context, container string, options client.ContainerUpdateOptions) (client.ContainerUpdateResult, error) {
+	return d.apiClient.ContainerUpdate(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerUpdate(ctx context.Context, container string, updateConfig containerType.UpdateConfig) (containerType.UpdateResponse, error) {
-	return d.apiClient.ContainerUpdate(ctx, container, updateConfig)
+func (d *DryRunClient) ContainerWait(ctx context.Context, container string, options client.ContainerWaitOptions) client.ContainerWaitResult {
+	return d.apiClient.ContainerWait(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerWait(ctx context.Context, container string, condition containerType.WaitCondition) (<-chan containerType.WaitResponse, <-chan error) {
-	return d.apiClient.ContainerWait(ctx, container, condition)
+func (d *DryRunClient) ContainerPrune(ctx context.Context, options client.ContainerPruneOptions) (client.ContainerPruneResult, error) {
+	return d.apiClient.ContainerPrune(ctx, options)
 }
 
-func (d *DryRunClient) ContainersPrune(ctx context.Context, pruneFilters filters.Args) (containerType.PruneReport, error) {
-	return d.apiClient.ContainersPrune(ctx, pruneFilters)
+func (d *DryRunClient) DistributionInspect(ctx context.Context, imageName string, options client.DistributionInspectOptions) (client.DistributionInspectResult, error) {
+	return d.apiClient.DistributionInspect(ctx, imageName, options)
 }
 
-func (d *DryRunClient) DistributionInspect(ctx context.Context, imageName, encodedRegistryAuth string) (registry.DistributionInspect, error) {
-	return d.apiClient.DistributionInspect(ctx, imageName, encodedRegistryAuth)
-}
-
-func (d *DryRunClient) BuildCachePrune(ctx context.Context, opts build.CachePruneOptions) (*build.CachePruneReport, error) {
+func (d *DryRunClient) BuildCachePrune(ctx context.Context, opts client.BuildCachePruneOptions) (client.BuildCachePruneResult, error) {
 	return d.apiClient.BuildCachePrune(ctx, opts)
 }
 
-func (d *DryRunClient) BuildCancel(ctx context.Context, id string) error {
-	return d.apiClient.BuildCancel(ctx, id)
+func (d *DryRunClient) BuildCancel(ctx context.Context, id string, opts client.BuildCancelOptions) (client.BuildCancelResult, error) {
+	return d.apiClient.BuildCancel(ctx, id, opts)
 }
 
-func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options image.CreateOptions) (io.ReadCloser, error) {
-	return d.apiClient.ImageCreate(ctx, parentReference, options)
-}
-
-func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string, options ...client.ImageHistoryOption) ([]image.HistoryResponseItem, error) {
+func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string, options ...client.ImageHistoryOption) (client.ImageHistoryResult, error) {
 	return d.apiClient.ImageHistory(ctx, imageName, options...)
 }
 
-func (d *DryRunClient) ImageImport(ctx context.Context, source image.ImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageImport(ctx context.Context, source client.ImageImportSource, ref string, options client.ImageImportOptions) (client.ImageImportResult, error) {
 	return d.apiClient.ImageImport(ctx, source, ref, options)
 }
 
-func (d *DryRunClient) ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error) {
+func (d *DryRunClient) ImageList(ctx context.Context, options client.ImageListOptions) (client.ImageListResult, error) {
 	return d.apiClient.ImageList(ctx, options)
 }
 
-func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, options ...client.ImageLoadOption) (image.LoadResponse, error) {
+func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, options ...client.ImageLoadOption) (client.ImageLoadResult, error) {
 	return d.apiClient.ImageLoad(ctx, input, options...)
 }
 
-func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options registry.SearchOptions) ([]registry.SearchResult, error) {
+func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options client.ImageSearchOptions) (client.ImageSearchResult, error) {
 	return d.apiClient.ImageSearch(ctx, term, options)
 }
 
-func (d *DryRunClient) ImageSave(ctx context.Context, images []string, options ...client.ImageSaveOption) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageSave(ctx context.Context, images []string, options ...client.ImageSaveOption) (client.ImageSaveResult, error) {
 	return d.apiClient.ImageSave(ctx, images, options...)
 }
 
-func (d *DryRunClient) ImageTag(ctx context.Context, imageName, ref string) error {
-	return d.apiClient.ImageTag(ctx, imageName, ref)
+func (d *DryRunClient) ImageTag(ctx context.Context, options client.ImageTagOptions) (client.ImageTagResult, error) {
+	return d.apiClient.ImageTag(ctx, options)
 }
 
-func (d *DryRunClient) ImagesPrune(ctx context.Context, pruneFilter filters.Args) (image.PruneReport, error) {
-	return d.apiClient.ImagesPrune(ctx, pruneFilter)
+func (d *DryRunClient) ImagePrune(ctx context.Context, options client.ImagePruneOptions) (client.ImagePruneResult, error) {
+	return d.apiClient.ImagePrune(ctx, options)
 }
 
-func (d *DryRunClient) NodeInspectWithRaw(ctx context.Context, nodeID string) (swarm.Node, []byte, error) {
-	return d.apiClient.NodeInspectWithRaw(ctx, nodeID)
+func (d *DryRunClient) NodeInspect(ctx context.Context, nodeID string, options client.NodeInspectOptions) (client.NodeInspectResult, error) {
+	return d.apiClient.NodeInspect(ctx, nodeID, options)
 }
 
-func (d *DryRunClient) NodeList(ctx context.Context, options swarm.NodeListOptions) ([]swarm.Node, error) {
+func (d *DryRunClient) NodeList(ctx context.Context, options client.NodeListOptions) (client.NodeListResult, error) {
 	return d.apiClient.NodeList(ctx, options)
 }
 
-func (d *DryRunClient) NodeRemove(ctx context.Context, nodeID string, options swarm.NodeRemoveOptions) error {
+func (d *DryRunClient) NodeRemove(ctx context.Context, nodeID string, options client.NodeRemoveOptions) (client.NodeRemoveResult, error) {
 	return d.apiClient.NodeRemove(ctx, nodeID, options)
 }
 
-func (d *DryRunClient) NodeUpdate(ctx context.Context, nodeID string, version swarm.Version, node swarm.NodeSpec) error {
-	return d.apiClient.NodeUpdate(ctx, nodeID, version, node)
+func (d *DryRunClient) NodeUpdate(ctx context.Context, nodeID string, options client.NodeUpdateOptions) (client.NodeUpdateResult, error) {
+	return d.apiClient.NodeUpdate(ctx, nodeID, options)
 }
 
-func (d *DryRunClient) NetworkInspect(ctx context.Context, networkName string, options network.InspectOptions) (network.Inspect, error) {
+func (d *DryRunClient) NetworkInspect(ctx context.Context, networkName string, options client.NetworkInspectOptions) (client.NetworkInspectResult, error) {
 	return d.apiClient.NetworkInspect(ctx, networkName, options)
 }
 
-func (d *DryRunClient) NetworkInspectWithRaw(ctx context.Context, networkName string, options network.InspectOptions) (network.Inspect, []byte, error) {
-	return d.apiClient.NetworkInspectWithRaw(ctx, networkName, options)
-}
-
-func (d *DryRunClient) NetworkList(ctx context.Context, options network.ListOptions) ([]network.Inspect, error) {
+func (d *DryRunClient) NetworkList(ctx context.Context, options client.NetworkListOptions) (client.NetworkListResult, error) {
 	return d.apiClient.NetworkList(ctx, options)
 }
 
-func (d *DryRunClient) NetworksPrune(ctx context.Context, pruneFilter filters.Args) (network.PruneReport, error) {
-	return d.apiClient.NetworksPrune(ctx, pruneFilter)
+func (d *DryRunClient) NetworkPrune(ctx context.Context, options client.NetworkPruneOptions) (client.NetworkPruneResult, error) {
+	return d.apiClient.NetworkPrune(ctx, options)
 }
 
-func (d *DryRunClient) PluginList(ctx context.Context, filter filters.Args) (moby.PluginsListResponse, error) {
-	return d.apiClient.PluginList(ctx, filter)
+func (d *DryRunClient) PluginList(ctx context.Context, options client.PluginListOptions) (client.PluginListResult, error) {
+	return d.apiClient.PluginList(ctx, options)
 }
 
-func (d *DryRunClient) PluginRemove(ctx context.Context, name string, options moby.PluginRemoveOptions) error {
+func (d *DryRunClient) PluginRemove(ctx context.Context, name string, options client.PluginRemoveOptions) (client.PluginRemoveResult, error) {
 	return d.apiClient.PluginRemove(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginEnable(ctx context.Context, name string, options moby.PluginEnableOptions) error {
+func (d *DryRunClient) PluginEnable(ctx context.Context, name string, options client.PluginEnableOptions) (client.PluginEnableResult, error) {
 	return d.apiClient.PluginEnable(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginDisable(ctx context.Context, name string, options moby.PluginDisableOptions) error {
+func (d *DryRunClient) PluginDisable(ctx context.Context, name string, options client.PluginDisableOptions) (client.PluginDisableResult, error) {
 	return d.apiClient.PluginDisable(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginInstall(ctx context.Context, name string, options moby.PluginInstallOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) PluginInstall(ctx context.Context, name string, options client.PluginInstallOptions) (client.PluginInstallResult, error) {
 	return d.apiClient.PluginInstall(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginUpgrade(ctx context.Context, name string, options moby.PluginInstallOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) PluginUpgrade(ctx context.Context, name string, options client.PluginUpgradeOptions) (client.PluginUpgradeResult, error) {
 	return d.apiClient.PluginUpgrade(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginPush(ctx context.Context, name string, registryAuth string) (io.ReadCloser, error) {
-	return d.apiClient.PluginPush(ctx, name, registryAuth)
+func (d *DryRunClient) PluginPush(ctx context.Context, name string, options client.PluginPushOptions) (client.PluginPushResult, error) {
+	return d.apiClient.PluginPush(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginSet(ctx context.Context, name string, args []string) error {
-	return d.apiClient.PluginSet(ctx, name, args)
+func (d *DryRunClient) PluginSet(ctx context.Context, name string, options client.PluginSetOptions) (client.PluginSetResult, error) {
+	return d.apiClient.PluginSet(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginInspectWithRaw(ctx context.Context, name string) (*moby.Plugin, []byte, error) {
-	return d.apiClient.PluginInspectWithRaw(ctx, name)
+func (d *DryRunClient) PluginInspect(ctx context.Context, name string, options client.PluginInspectOptions) (client.PluginInspectResult, error) {
+	return d.apiClient.PluginInspect(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginCreate(ctx context.Context, createContext io.Reader, options moby.PluginCreateOptions) error {
+func (d *DryRunClient) PluginCreate(ctx context.Context, createContext io.Reader, options client.PluginCreateOptions) (client.PluginCreateResult, error) {
 	return d.apiClient.PluginCreate(ctx, createContext, options)
 }
 
-func (d *DryRunClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options swarm.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
-	return d.apiClient.ServiceCreate(ctx, service, options)
+func (d *DryRunClient) ServiceCreate(ctx context.Context, options client.ServiceCreateOptions) (client.ServiceCreateResult, error) {
+	return d.apiClient.ServiceCreate(ctx, options)
 }
 
-func (d *DryRunClient) ServiceInspectWithRaw(ctx context.Context, serviceID string, options swarm.ServiceInspectOptions) (swarm.Service, []byte, error) {
-	return d.apiClient.ServiceInspectWithRaw(ctx, serviceID, options)
+func (d *DryRunClient) ServiceInspect(ctx context.Context, serviceID string, options client.ServiceInspectOptions) (client.ServiceInspectResult, error) {
+	return d.apiClient.ServiceInspect(ctx, serviceID, options)
 }
 
-func (d *DryRunClient) ServiceList(ctx context.Context, options swarm.ServiceListOptions) ([]swarm.Service, error) {
+func (d *DryRunClient) ServiceList(ctx context.Context, options client.ServiceListOptions) (client.ServiceListResult, error) {
 	return d.apiClient.ServiceList(ctx, options)
 }
 
-func (d *DryRunClient) ServiceRemove(ctx context.Context, serviceID string) error {
-	return d.apiClient.ServiceRemove(ctx, serviceID)
+func (d *DryRunClient) ServiceRemove(ctx context.Context, serviceID string, options client.ServiceRemoveOptions) (client.ServiceRemoveResult, error) {
+	return d.apiClient.ServiceRemove(ctx, serviceID, options)
 }
 
-func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options swarm.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
-	return d.apiClient.ServiceUpdate(ctx, serviceID, version, service, options)
+func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, options client.ServiceUpdateOptions) (client.ServiceUpdateResult, error) {
+	return d.apiClient.ServiceUpdate(ctx, serviceID, options)
 }
 
-func (d *DryRunClient) ServiceLogs(ctx context.Context, serviceID string, options containerType.LogsOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ServiceLogs(ctx context.Context, serviceID string, options client.ServiceLogsOptions) (client.ServiceLogsResult, error) {
 	return d.apiClient.ServiceLogs(ctx, serviceID, options)
 }
 
-func (d *DryRunClient) TaskLogs(ctx context.Context, taskID string, options containerType.LogsOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) TaskLogs(ctx context.Context, taskID string, options client.TaskLogsOptions) (client.TaskLogsResult, error) {
 	return d.apiClient.TaskLogs(ctx, taskID, options)
 }
 
-func (d *DryRunClient) TaskInspectWithRaw(ctx context.Context, taskID string) (swarm.Task, []byte, error) {
-	return d.apiClient.TaskInspectWithRaw(ctx, taskID)
+func (d *DryRunClient) TaskInspect(ctx context.Context, taskID string, options client.TaskInspectOptions) (client.TaskInspectResult, error) {
+	return d.apiClient.TaskInspect(ctx, taskID, options)
 }
 
-func (d *DryRunClient) TaskList(ctx context.Context, options swarm.TaskListOptions) ([]swarm.Task, error) {
+func (d *DryRunClient) TaskList(ctx context.Context, options client.TaskListOptions) (client.TaskListResult, error) {
 	return d.apiClient.TaskList(ctx, options)
 }
 
-func (d *DryRunClient) SwarmInit(ctx context.Context, req swarm.InitRequest) (string, error) {
-	return d.apiClient.SwarmInit(ctx, req)
+func (d *DryRunClient) SwarmInit(ctx context.Context, options client.SwarmInitOptions) (client.SwarmInitResult, error) {
+	return d.apiClient.SwarmInit(ctx, options)
 }
 
-func (d *DryRunClient) SwarmJoin(ctx context.Context, req swarm.JoinRequest) error {
-	return d.apiClient.SwarmJoin(ctx, req)
+func (d *DryRunClient) SwarmJoin(ctx context.Context, options client.SwarmJoinOptions) (client.SwarmJoinResult, error) {
+	return d.apiClient.SwarmJoin(ctx, options)
 }
 
-func (d *DryRunClient) SwarmGetUnlockKey(ctx context.Context) (swarm.UnlockKeyResponse, error) {
+func (d *DryRunClient) SwarmGetUnlockKey(ctx context.Context) (client.SwarmGetUnlockKeyResult, error) {
 	return d.apiClient.SwarmGetUnlockKey(ctx)
 }
 
-func (d *DryRunClient) SwarmUnlock(ctx context.Context, req swarm.UnlockRequest) error {
-	return d.apiClient.SwarmUnlock(ctx, req)
+func (d *DryRunClient) SwarmUnlock(ctx context.Context, options client.SwarmUnlockOptions) (client.SwarmUnlockResult, error) {
+	return d.apiClient.SwarmUnlock(ctx, options)
 }
 
-func (d *DryRunClient) SwarmLeave(ctx context.Context, force bool) error {
-	return d.apiClient.SwarmLeave(ctx, force)
+func (d *DryRunClient) SwarmLeave(ctx context.Context, options client.SwarmLeaveOptions) (client.SwarmLeaveResult, error) {
+	return d.apiClient.SwarmLeave(ctx, options)
 }
 
-func (d *DryRunClient) SwarmInspect(ctx context.Context) (swarm.Swarm, error) {
-	return d.apiClient.SwarmInspect(ctx)
+func (d *DryRunClient) SwarmInspect(ctx context.Context, options client.SwarmInspectOptions) (client.SwarmInspectResult, error) {
+	return d.apiClient.SwarmInspect(ctx, options)
 }
 
-func (d *DryRunClient) SwarmUpdate(ctx context.Context, version swarm.Version, swarmSpec swarm.Spec, flags swarm.UpdateFlags) error {
-	return d.apiClient.SwarmUpdate(ctx, version, swarmSpec, flags)
+func (d *DryRunClient) SwarmUpdate(ctx context.Context, options client.SwarmUpdateOptions) (client.SwarmUpdateResult, error) {
+	return d.apiClient.SwarmUpdate(ctx, options)
 }
 
-func (d *DryRunClient) SecretList(ctx context.Context, options swarm.SecretListOptions) ([]swarm.Secret, error) {
+func (d *DryRunClient) SecretList(ctx context.Context, options client.SecretListOptions) (client.SecretListResult, error) {
 	return d.apiClient.SecretList(ctx, options)
 }
 
-func (d *DryRunClient) SecretCreate(ctx context.Context, secret swarm.SecretSpec) (swarm.SecretCreateResponse, error) {
-	return d.apiClient.SecretCreate(ctx, secret)
+func (d *DryRunClient) SecretCreate(ctx context.Context, options client.SecretCreateOptions) (client.SecretCreateResult, error) {
+	return d.apiClient.SecretCreate(ctx, options)
 }
 
-func (d *DryRunClient) SecretRemove(ctx context.Context, id string) error {
-	return d.apiClient.SecretRemove(ctx, id)
+func (d *DryRunClient) SecretRemove(ctx context.Context, id string, options client.SecretRemoveOptions) (client.SecretRemoveResult, error) {
+	return d.apiClient.SecretRemove(ctx, id, options)
 }
 
-func (d *DryRunClient) SecretInspectWithRaw(ctx context.Context, name string) (swarm.Secret, []byte, error) {
-	return d.apiClient.SecretInspectWithRaw(ctx, name)
+func (d *DryRunClient) SecretInspect(ctx context.Context, name string, options client.SecretInspectOptions) (client.SecretInspectResult, error) {
+	return d.apiClient.SecretInspect(ctx, name, options)
 }
 
-func (d *DryRunClient) SecretUpdate(ctx context.Context, id string, version swarm.Version, secret swarm.SecretSpec) error {
-	return d.apiClient.SecretUpdate(ctx, id, version, secret)
+func (d *DryRunClient) SecretUpdate(ctx context.Context, id string, options client.SecretUpdateOptions) (client.SecretUpdateResult, error) {
+	return d.apiClient.SecretUpdate(ctx, id, options)
 }
 
-func (d *DryRunClient) Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error) {
+func (d *DryRunClient) Events(ctx context.Context, options client.EventsListOptions) client.EventsResult {
 	return d.apiClient.Events(ctx, options)
 }
 
-func (d *DryRunClient) Info(ctx context.Context) (system.Info, error) {
-	return d.apiClient.Info(ctx)
+func (d *DryRunClient) Info(ctx context.Context, options client.InfoOptions) (client.SystemInfoResult, error) {
+	return d.apiClient.Info(ctx, options)
 }
 
-func (d *DryRunClient) RegistryLogin(ctx context.Context, auth registry.AuthConfig) (registry.AuthenticateOKBody, error) {
-	return d.apiClient.RegistryLogin(ctx, auth)
+func (d *DryRunClient) RegistryLogin(ctx context.Context, options client.RegistryLoginOptions) (client.RegistryLoginResult, error) {
+	return d.apiClient.RegistryLogin(ctx, options)
 }
 
-func (d *DryRunClient) DiskUsage(ctx context.Context, options moby.DiskUsageOptions) (moby.DiskUsage, error) {
+func (d *DryRunClient) DiskUsage(ctx context.Context, options client.DiskUsageOptions) (client.DiskUsageResult, error) {
 	return d.apiClient.DiskUsage(ctx, options)
 }
 
-func (d *DryRunClient) Ping(ctx context.Context) (moby.Ping, error) {
-	return d.apiClient.Ping(ctx)
+func (d *DryRunClient) Ping(ctx context.Context, options client.PingOptions) (client.PingResult, error) {
+	return d.apiClient.Ping(ctx, options)
 }
 
-func (d *DryRunClient) VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error) {
-	return d.apiClient.VolumeInspect(ctx, volumeID)
+func (d *DryRunClient) VolumeInspect(ctx context.Context, volumeID string, options client.VolumeInspectOptions) (client.VolumeInspectResult, error) {
+	return d.apiClient.VolumeInspect(ctx, volumeID, options)
 }
 
-func (d *DryRunClient) VolumeInspectWithRaw(ctx context.Context, volumeID string) (volume.Volume, []byte, error) {
-	return d.apiClient.VolumeInspectWithRaw(ctx, volumeID)
-}
-
-func (d *DryRunClient) VolumeList(ctx context.Context, opts volume.ListOptions) (volume.ListResponse, error) {
+func (d *DryRunClient) VolumeList(ctx context.Context, opts client.VolumeListOptions) (client.VolumeListResult, error) {
 	return d.apiClient.VolumeList(ctx, opts)
 }
 
-func (d *DryRunClient) VolumesPrune(ctx context.Context, pruneFilter filters.Args) (volume.PruneReport, error) {
-	return d.apiClient.VolumesPrune(ctx, pruneFilter)
+func (d *DryRunClient) VolumePrune(ctx context.Context, options client.VolumePruneOptions) (client.VolumePruneResult, error) {
+	return d.apiClient.VolumePrune(ctx, options)
 }
 
-func (d *DryRunClient) VolumeUpdate(ctx context.Context, volumeID string, version swarm.Version, options volume.UpdateOptions) error {
-	return d.apiClient.VolumeUpdate(ctx, volumeID, version, options)
+func (d *DryRunClient) VolumeUpdate(ctx context.Context, volumeID string, options client.VolumeUpdateOptions) (client.VolumeUpdateResult, error) {
+	return d.apiClient.VolumeUpdate(ctx, volumeID, options)
 }
 
 func (d *DryRunClient) ClientVersion() string {
@@ -651,20 +621,8 @@ func (d *DryRunClient) DaemonHost() string {
 	return d.apiClient.DaemonHost()
 }
 
-func (d *DryRunClient) HTTPClient() *http.Client {
-	return d.apiClient.HTTPClient()
-}
-
-func (d *DryRunClient) ServerVersion(ctx context.Context) (moby.Version, error) {
-	return d.apiClient.ServerVersion(ctx)
-}
-
-func (d *DryRunClient) NegotiateAPIVersion(ctx context.Context) {
-	d.apiClient.NegotiateAPIVersion(ctx)
-}
-
-func (d *DryRunClient) NegotiateAPIVersionPing(ping moby.Ping) {
-	d.apiClient.NegotiateAPIVersionPing(ping)
+func (d *DryRunClient) ServerVersion(ctx context.Context, options client.ServerVersionOptions) (client.ServerVersionResult, error) {
+	return d.apiClient.ServerVersion(ctx, options)
 }
 
 func (d *DryRunClient) DialHijack(ctx context.Context, url, proto string, meta map[string][]string) (net.Conn, error) {
@@ -679,14 +637,14 @@ func (d *DryRunClient) Close() error {
 	return d.apiClient.Close()
 }
 
-func (d *DryRunClient) CheckpointCreate(ctx context.Context, container string, options checkpoint.CreateOptions) error {
+func (d *DryRunClient) CheckpointCreate(ctx context.Context, container string, options client.CheckpointCreateOptions) (client.CheckpointCreateResult, error) {
 	return d.apiClient.CheckpointCreate(ctx, container, options)
 }
 
-func (d *DryRunClient) CheckpointDelete(ctx context.Context, container string, options checkpoint.DeleteOptions) error {
-	return d.apiClient.CheckpointDelete(ctx, container, options)
+func (d *DryRunClient) CheckpointRemove(ctx context.Context, container string, options client.CheckpointRemoveOptions) (client.CheckpointRemoveResult, error) {
+	return d.apiClient.CheckpointRemove(ctx, container, options)
 }
 
-func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options checkpoint.ListOptions) ([]checkpoint.Summary, error) {
+func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options client.CheckpointListOptions) (client.CheckpointListResult, error) {
 	return d.apiClient.CheckpointList(ctx, container, options)
 }

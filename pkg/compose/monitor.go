@@ -21,10 +21,8 @@ import (
 	"strconv"
 
 	"github.com/containerd/errdefs"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -58,10 +56,9 @@ func (c *monitor) withServices(services []string) {
 //nolint:gocyclo
 func (c *monitor) Start(ctx context.Context) error {
 	// collect initial application container
-	initialState, err := c.apiClient.ContainerList(ctx, container.ListOptions{
+	initialState, err := c.apiClient.ContainerList(ctx, client.ContainerListOptions{
 		All: true,
-		Filters: filters.NewArgs(
-			projectFilter(c.project),
+		Filters: projectFilter(c.project).Add("label",
 			oneOffFilter(false),
 			hasConfigHashLabel(),
 		),
@@ -72,17 +69,15 @@ func (c *monitor) Start(ctx context.Context) error {
 
 	// containers is the set if container IDs the application is based on
 	containers := utils.Set[string]{}
-	for _, ctr := range initialState {
+	for _, ctr := range initialState.Items {
 		if len(c.services) == 0 || c.services[ctr.Labels[api.ServiceLabel]] {
 			containers.Add(ctr.ID)
 		}
 	}
 	restarting := utils.Set[string]{}
 
-	evtCh, errCh := c.apiClient.Events(ctx, events.ListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("type", "container"),
-			projectFilter(c.project)),
+	res := c.apiClient.Events(ctx, client.EventsListOptions{
+		Filters: projectFilter(c.project).Add("type", "container"),
 	})
 	for {
 		if len(containers) == 0 {
@@ -91,9 +86,9 @@ func (c *monitor) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case err := <-errCh:
+		case err := <-res.Err:
 			return err
-		case event := <-evtCh:
+		case event := <-res.Messages:
 			if len(c.services) > 0 && !c.services[event.Actor.Attributes[api.ServiceLabel]] {
 				continue
 			}
@@ -140,14 +135,14 @@ func (c *monitor) Start(ctx context.Context) error {
 				logrus.Debugf("container %s restarted", ctr.Name)
 			case events.ActionDie:
 				logrus.Debugf("container %s exited with code %d", ctr.Name, ctr.ExitCode)
-				inspect, err := c.apiClient.ContainerInspect(ctx, event.Actor.ID)
+				inspect, err := c.apiClient.ContainerInspect(ctx, event.Actor.ID, client.ContainerInspectOptions{})
 				if errdefs.IsNotFound(err) {
 					// Source is already removed
 				} else if err != nil {
 					return err
 				}
 
-				if inspect.State != nil && (inspect.State.Restarting || inspect.State.Running) {
+				if inspect.Container.State != nil && (inspect.Container.State.Restarting || inspect.Container.State.Running) {
 					// State.Restarting is set by engine when container is configured to restart on exit
 					// on ContainerRestart it doesn't (see https://github.com/moby/moby/issues/45538)
 					// container state still is reported as "running"

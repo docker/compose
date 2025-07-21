@@ -30,9 +30,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
-	"github.com/docker/docker/api/types/container"
-	mmount "github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/versions"
+	"github.com/moby/moby/api/types/container"
+	mmount "github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
@@ -657,17 +657,19 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	}
 
 	timeoutInSecond := utils.DurationSecondToInt(timeout)
-	err = s.apiClient().ContainerStop(ctx, replaced.ID, container.StopOptions{Timeout: timeoutInSecond})
+	_, err = s.apiClient().ContainerStop(ctx, replaced.ID, client.ContainerStopOptions{Timeout: timeoutInSecond})
 	if err != nil {
 		return created, err
 	}
 
-	err = s.apiClient().ContainerRemove(ctx, replaced.ID, container.RemoveOptions{})
+	_, err = s.apiClient().ContainerRemove(ctx, replaced.ID, client.ContainerRemoveOptions{})
 	if err != nil {
 		return created, err
 	}
 
-	err = s.apiClient().ContainerRename(ctx, tmpName, name)
+	_, err = s.apiClient().ContainerRename(ctx, tmpName, client.ContainerRenameOptions{
+		NewName: name,
+	})
 	if err != nil {
 		return created, err
 	}
@@ -683,7 +685,7 @@ func (s *composeService) startContainer(ctx context.Context, ctr container.Summa
 	s.events.On(newEvent(getContainerProgressName(ctr), api.Working, "Restart"))
 	startMx.Lock()
 	defer startMx.Unlock()
-	err := s.apiClient().ContainerStart(ctx, ctr.ID, container.StartOptions{})
+	_, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
@@ -713,7 +715,13 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		plat = &p
 	}
 
-	response, err := s.apiClient().ContainerCreate(ctx, cfgs.Container, cfgs.Host, cfgs.Network, plat, name)
+	response, err := s.apiClient().ContainerCreate(ctx, client.ContainerCreateOptions{
+		Name:             name,
+		Platform:         plat,
+		Config:           cfgs.Container,
+		HostConfig:       cfgs.Host,
+		NetworkingConfig: cfgs.Network,
+	})
 	if err != nil {
 		return created, err
 	}
@@ -724,42 +732,19 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			Text:   warning,
 		})
 	}
-	inspectedContainer, err := s.apiClient().ContainerInspect(ctx, response.ID)
+	res, err := s.apiClient().ContainerInspect(ctx, response.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return created, err
 	}
 	created = container.Summary{
-		ID:     inspectedContainer.ID,
-		Labels: inspectedContainer.Config.Labels,
-		Names:  []string{inspectedContainer.Name},
+		ID:     res.Container.ID,
+		Labels: res.Container.Config.Labels,
+		Names:  []string{res.Container.Name},
 		NetworkSettings: &container.NetworkSettingsSummary{
-			Networks: inspectedContainer.NetworkSettings.Networks,
+			Networks: res.Container.NetworkSettings.Networks,
 		},
 	}
 
-	apiVersion, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return created, err
-	}
-	// Starting API version 1.44, the ContainerCreate API call takes multiple networks
-	// so we include all the configurations there and can skip the one-by-one calls here
-	if versions.LessThan(apiVersion, APIVersion144) {
-		// the highest-priority network is the primary and is included in the ContainerCreate API
-		// call via container.NetworkMode & network.NetworkingConfig
-		// any remaining networks are connected one-by-one here after creation (but before start)
-		serviceNetworks := service.NetworksByPriority()
-		for _, networkKey := range serviceNetworks {
-			mobyNetworkName := project.Networks[networkKey].Name
-			if string(cfgs.Host.NetworkMode) == mobyNetworkName {
-				// primary network already configured as part of ContainerCreate
-				continue
-			}
-			epSettings := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
-			if err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, created.ID, epSettings); err != nil {
-				return created, err
-			}
-		}
-	}
 	return created, nil
 }
 
@@ -820,10 +805,11 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 
 func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool) (bool, error) {
 	for _, c := range containers {
-		ctr, err := s.apiClient().ContainerInspect(ctx, c.ID)
+		res, err := s.apiClient().ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return false, err
 		}
+		ctr := res.Container
 		name := ctr.Name[1:]
 
 		if ctr.State.Status == container.StateExited {
@@ -855,12 +841,12 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 
 func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
 	for _, c := range containers {
-		ctr, err := s.apiClient().ContainerInspect(ctx, c.ID)
+		res, err := s.apiClient().ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return false, 0, err
 		}
-		if ctr.State != nil && ctr.State.Status == container.StateExited {
-			return true, ctr.State.ExitCode, nil
+		if res.Container.State != nil && res.Container.State.Status == container.StateExited {
+			return true, res.Container.State.ExitCode, nil
 		}
 	}
 	return false, 0, nil
@@ -904,7 +890,7 @@ func (s *composeService) startService(ctx context.Context,
 
 		eventName := getContainerProgressName(ctr)
 		s.events.On(startingEvent(eventName))
-		err = s.apiClient().ContainerStart(ctx, ctr.ID, container.StartOptions{})
+		_, err = s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
 		if err != nil {
 			return err
 		}

@@ -21,10 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -41,25 +39,27 @@ func TestStopTimeout(t *testing.T) {
 	assert.NilError(t, err)
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
-		[]container.Summary{
-			testContainer("service1", "123", false),
-			testContainer("service1", "456", false),
-			testContainer("service2", "789", false),
+		client.ContainerListResult{
+			Items: []container.Summary{
+				testContainer("service1", "123", false),
+				testContainer("service1", "456", false),
+				testContainer("service2", "789", false),
+			},
 		}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
-			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		client.VolumeListOptions{
+			Filters: projectFilter(strings.ToLower(testProject)),
 		}).
-		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]network.Summary{}, nil)
+		Return(client.VolumeListResult{}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+		Return(client.NetworkListResult{}, nil)
 
 	timeout := 2 * time.Second
-	stopConfig := container.StopOptions{Timeout: utils.DurationSecondToInt(&timeout)}
-	api.EXPECT().ContainerStop(gomock.Any(), "123", stopConfig).Return(nil)
-	api.EXPECT().ContainerStop(gomock.Any(), "456", stopConfig).Return(nil)
-	api.EXPECT().ContainerStop(gomock.Any(), "789", stopConfig).Return(nil)
+	stopConfig := client.ContainerStopOptions{Timeout: utils.DurationSecondToInt(&timeout)}
+	api.EXPECT().ContainerStop(gomock.Any(), "123", stopConfig).Return(client.ContainerStopResult{}, nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "456", stopConfig).Return(client.ContainerStopResult{}, nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "789", stopConfig).Return(client.ContainerStopResult{}, nil)
 
 	err = tested.Stop(t.Context(), strings.ToLower(testProject), compose.StopOptions{
 		Timeout: &timeout,

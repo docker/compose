@@ -29,13 +29,15 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
-	buildtypes "github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/pkg/progress"
-	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/moby/go-archive"
+	buildtypes "github.com/moby/moby/api/types/build"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
+	"github.com/moby/moby/client/pkg/progress"
+	"github.com/moby/moby/client/pkg/streamformatter"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -266,7 +268,7 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 	defer response.Body.Close() //nolint:errcheck
 
 	imageID := ""
-	aux := func(msg jsonmessage.JSONMessage) {
+	aux := func(msg jsonstream.Message) {
 		var result buildtypes.Result
 		if err := json.Unmarshal(*msg.Aux, &result); err != nil {
 			logrus.Errorf("Failed to parse aux message: %s", err)
@@ -277,7 +279,7 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 
 	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.FD(), true, aux)
 	if err != nil {
-		var jerr *jsonmessage.JSONError
+		var jerr *jsonstream.Error
 		if errors.As(err, &jerr) {
 			// If no error code is set, default to 1
 			if jerr.Code == 0 {
@@ -291,9 +293,9 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 	return imageID, nil
 }
 
-func imageBuildOptions(proxyConfigs map[string]string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) buildtypes.ImageBuildOptions {
+func imageBuildOptions(proxyConfigs map[string]string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) client.ImageBuildOptions {
 	config := service.Build
-	return buildtypes.ImageBuildOptions{
+	return client.ImageBuildOptions{
 		Version:     buildtypes.BuilderV1,
 		Tags:        config.Tags,
 		NoCache:     config.NoCache,

@@ -17,14 +17,14 @@
 package compose
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -39,22 +39,24 @@ func TestImages(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
-	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
-	listOpts := container.ListOptions{All: true, Filters: args}
-	api.EXPECT().ServerVersion(gomock.Any()).Return(types.Version{APIVersion: "1.96"}, nil).AnyTimes()
+	args := projectFilter(strings.ToLower(testProject))
+	listOpts := client.ContainerListOptions{All: true, Filters: args}
+	api.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).Return(client.ServerVersionResult{APIVersion: "1.96"}, nil).AnyTimes()
 	timeStr1 := "2025-06-06T06:06:06.000000000Z"
 	created1, _ := time.Parse(time.RFC3339Nano, timeStr1)
 	timeStr2 := "2025-03-03T03:03:03.000000000Z"
 	created2, _ := time.Parse(time.RFC3339Nano, timeStr2)
 	image1 := imageInspect("image1", "foo:1", 12345, timeStr1)
 	image2 := imageInspect("image2", "bar:2", 67890, timeStr2)
-	api.EXPECT().ImageInspect(anyCancellableContext(), "foo:1").Return(image1, nil).MaxTimes(2)
-	api.EXPECT().ImageInspect(anyCancellableContext(), "bar:2").Return(image2, nil)
-	c1 := containerDetail("service1", "123", "running", "foo:1")
-	c2 := containerDetail("service1", "456", "running", "bar:2")
-	c2.Ports = []container.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
-	c3 := containerDetail("service2", "789", "exited", "foo:1")
-	api.EXPECT().ContainerList(t.Context(), listOpts).Return([]container.Summary{c1, c2, c3}, nil)
+	api.EXPECT().ImageInspect(anyCancellableContext(), "foo:1").Return(client.ImageInspectResult{InspectResponse: image1}, nil).MaxTimes(2)
+	api.EXPECT().ImageInspect(anyCancellableContext(), "bar:2").Return(client.ImageInspectResult{InspectResponse: image2}, nil)
+	c1 := containerDetail("service1", "123", container.StateRunning, "foo:1")
+	c2 := containerDetail("service1", "456", container.StateRunning, "bar:2")
+	c2.Ports = []container.PortSummary{{PublicPort: 80, PrivatePort: 90, IP: netip.MustParseAddr("127.0.0.1")}}
+	c3 := containerDetail("service2", "789", container.StateExited, "foo:1")
+	api.EXPECT().ContainerList(t.Context(), listOpts).Return(client.ContainerListResult{
+		Items: []container.Summary{c1, c2, c3},
+	}, nil)
 
 	images, err := tested.Images(t.Context(), strings.ToLower(testProject), compose.ImagesOptions{})
 
@@ -97,7 +99,7 @@ func imageInspect(id string, imageReference string, size int64, created string) 
 	}
 }
 
-func containerDetail(service string, id string, status string, imageName string) container.Summary {
+func containerDetail(service string, id string, status container.ContainerState, imageName string) container.Summary {
 	return container.Summary{
 		ID:     id,
 		Names:  []string{"/" + id},
