@@ -23,8 +23,8 @@ import (
 	"time"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/versions"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/versions"
 )
 
 // ToMobyEnv convert into []string

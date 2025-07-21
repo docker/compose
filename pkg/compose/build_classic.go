@@ -31,14 +31,16 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
-	buildtypes "github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/builder/remotecontext/urlutil"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/pkg/progress"
-	"github.com/docker/docker/pkg/streamformatter"
+	"github.com/docker/compose/v2/pkg/compose/internal/urlutil"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/pkg/progress"
+	"github.com/moby/moby/api/pkg/streamformatter"
+	buildtypes "github.com/moby/moby/api/types/build"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -184,7 +186,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 
 	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.FD(), true, aux)
 	if err != nil {
-		var jerr *jsonmessage.JSONError
+		var jerr *jsonstream.Error
 		if errors.As(err, &jerr) {
 			// If no error code is set, default to 1
 			if jerr.Code == 0 {
@@ -202,9 +204,9 @@ func isLocalDir(c string) bool {
 	return err == nil
 }
 
-func imageBuildOptions(dockerCli command.Cli, project *types.Project, service types.ServiceConfig, options api.BuildOptions) buildtypes.ImageBuildOptions {
+func imageBuildOptions(dockerCli command.Cli, project *types.Project, service types.ServiceConfig, options api.BuildOptions) client.ImageBuildOptions {
 	config := service.Build
-	return buildtypes.ImageBuildOptions{
+	return client.ImageBuildOptions{
 		Version:     buildtypes.BuilderV1,
 		Tags:        config.Tags,
 		NoCache:     config.NoCache,

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
@@ -58,7 +58,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 			return err
 		}
 
-		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, container.CopyToContainerOptions{
+		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, client.CopyToContainerOptions{
 			CopyUIDGID: config.UID != "" || config.GID != "",
 		})
 		if err != nil {
@@ -96,7 +96,7 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 			return err
 		}
 
-		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, container.CopyToContainerOptions{
+		err = s.apiClient().CopyToContainer(ctx, id, "/", &b, client.CopyToContainerOptions{
 			CopyUIDGID: config.UID != "" || config.GID != "",
 		})
 		if err != nil {
