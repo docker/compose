@@ -24,7 +24,6 @@ import (
 
 	"github.com/docker/cli/cli/command/formatter"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/container"
 )
@@ -137,7 +136,7 @@ func (c *ContainerContext) MarshalJSON() ([]byte, error) {
 // option being set, the full or truncated ID is returned.
 func (c *ContainerContext) ID() string {
 	if c.trunc {
-		return stringid.TruncateID(c.c.ID)
+		return formatter.TruncateID(c.c.ID)
 	}
 	return c.c.ID
 }

@@ -23,7 +23,7 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/docker/pkg/stringid"
+	stringid "github.com/docker/cli/cli/command/formatter"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/image"
 	"github.com/spf13/cobra"
