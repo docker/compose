@@ -24,9 +24,9 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"

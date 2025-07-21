@@ -30,8 +30,8 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
 )
 
 type copyDirection int

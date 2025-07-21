@@ -24,16 +24,16 @@ import (
 	"testing"
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/network"
+	"github.com/moby/moby/api/types/network"
 
 	composetypes "github.com/compose-spec/compose-go/v2/types"
-	mountTypes "github.com/docker/docker/api/types/mount"
+	mountTypes "github.com/moby/moby/api/types/mount"
 
 	"gotest.tools/v3/assert"
 )

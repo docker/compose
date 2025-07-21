@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/progress"

@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/filters"
 )
 
 func projectFilter(projectName string) filters.KeyValuePair {

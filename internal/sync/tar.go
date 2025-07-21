@@ -31,8 +31,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
 	"golang.org/x/sync/errgroup"
 )
 

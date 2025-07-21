@@ -23,11 +23,11 @@ import (
 	"path/filepath"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
 )
 
 const (

@@ -17,7 +17,7 @@ import (
 	docker "github.com/docker/cli/cli/context/docker"
 	store "github.com/docker/cli/cli/context/store"
 	streams "github.com/docker/cli/cli/streams"
-	client "github.com/docker/docker/client"
+	client "github.com/moby/moby/client"
 	metric "go.opentelemetry.io/otel/metric"
 	resource "go.opentelemetry.io/otel/sdk/resource"
 	trace "go.opentelemetry.io/otel/trace"

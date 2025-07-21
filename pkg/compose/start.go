@@ -24,10 +24,10 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	containerType "github.com/docker/docker/api/types/container"
+	containerType "github.com/moby/moby/api/types/container"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/filters"
 )
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {

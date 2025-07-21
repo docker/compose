@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 

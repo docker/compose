@@ -30,9 +30,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
-	containerType "github.com/docker/docker/api/types/container"
-	mmount "github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/versions"
+	containerType "github.com/moby/moby/api/types/container"
+	mmount "github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/versions"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
@@ -187,11 +187,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		w := progress.ContextWriter(ctx)
 		name := getContainerProgressName(container)
 		switch container.State {
-		case ContainerRunning:
+		case containerType.StateRunning:
 			w.Event(progress.RunningEvent(name))
-		case ContainerCreated:
-		case ContainerRestarting:
-		case ContainerExited:
+		case containerType.StateCreated:
+		case containerType.StateRestarting:
+		case containerType.StateExited:
 		default:
 			container := container
 			eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/start", tracing.ContainerOptions(container), func(ctx context.Context) error {
@@ -245,7 +245,7 @@ func (c *convergence) stopDependentContainers(ctx context.Context, project *type
 	for _, name := range dependents {
 		dependentStates := c.getObservedState(name)
 		for i, dependent := range dependentStates {
-			dependent.State = ContainerExited
+			dependent.State = containerType.StateExited
 			dependentStates[i] = dependent
 		}
 		c.setObservedState(name, dependentStates)
@@ -896,7 +896,7 @@ func (s *composeService) startService(ctx context.Context,
 
 	w := progress.ContextWriter(ctx)
 	for _, ctr := range containers.filter(isService(service.Name)) {
-		if ctr.State == ContainerRunning {
+		if ctr.State == containerType.StateRunning {
 			continue
 		}
 

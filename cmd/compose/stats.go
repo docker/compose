@@ -22,7 +22,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/filters"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
