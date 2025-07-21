@@ -2,6 +2,15 @@ module github.com/docker/compose/v2
 
 go 1.23.10
 
+replace (
+	github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250723202303-bc0ddae9cd0c
+	github.com/docker/cli => github.com/docker/cli v28.3.3-0.20250723114013-df9950aa0673+incompatible
+	github.com/docker/docker => github.com/docker/docker v28.2.3-0.20250723180050-3c8ba1529412+incompatible
+	github.com/moby/buildkit => github.com/moby/buildkit v0.23.0-rc1.0.20250618182037-9b91d20367db // master
+	github.com/moby/moby/api => github.com/moby/moby/api v0.0.0-20250723180050-3c8ba1529412
+	github.com/moby/moby/client => github.com/moby/moby/client v0.0.0-20250723180050-3c8ba1529412
+)
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e
@@ -15,7 +24,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.26.1
-	github.com/docker/cli v28.3.2+incompatible
+	github.com/docker/cli v28.3.3-0.20250723114013-df9950aa0673+incompatible
 	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.3.2+incompatible
 	github.com/docker/go-connections v0.5.0
@@ -31,6 +40,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/buildkit v0.23.0-rc1.0.20250618182037-9b91d20367db // master
 	github.com/moby/go-archive v0.1.0
+	github.com/moby/moby/api v0.0.0
+	github.com/moby/moby/client v0.0.0-00010101000000-000000000000
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2

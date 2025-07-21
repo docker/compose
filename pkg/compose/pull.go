@@ -31,11 +31,11 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	"github.com/docker/cli/cli/config/configfile"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
 	"github.com/hashicorp/go-multierror"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 	"github.com/opencontainers/go-digest"
 	"golang.org/x/sync/errgroup"
 
