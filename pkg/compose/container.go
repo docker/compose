@@ -19,8 +19,8 @@ package compose
 import (
 	"io"
 
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 const (
@@ -37,7 +37,7 @@ var _ io.ReadCloser = ContainerStdout{}
 
 // ContainerStdout implement ReadCloser for moby.HijackedResponse
 type ContainerStdout struct {
-	moby.HijackedResponse
+	client.HijackedResponse
 }
 
 // Read implement io.ReadCloser
@@ -55,7 +55,7 @@ var _ io.WriteCloser = ContainerStdin{}
 
 // ContainerStdin implement WriteCloser for moby.HijackedResponse
 type ContainerStdin struct {
-	moby.HijackedResponse
+	client.HijackedResponse
 }
 
 // Write implement io.WriteCloser
