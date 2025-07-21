@@ -24,10 +24,10 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	containerType "github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/client"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/filters"
 )
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
@@ -52,7 +52,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	}
 
 	var containers Containers
-	containers, err := s.apiClient().ContainerList(ctx, containerType.ListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(project.Name),
 			oneOffFilter(false),

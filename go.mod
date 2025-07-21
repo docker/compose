@@ -2,6 +2,11 @@ module github.com/docker/compose/v2
 
 go 1.24.7
 
+replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250925175445-d7eb9356cc19 // https://github.com/docker/buildx/pull/3326
+
+// Need a replace, because master pseudo-version is considered "older" than the 28.x branch
+replace github.com/docker/cli => github.com/docker/cli v28.3.4-0.20250925164328-6855d70c52fc+incompatible // master
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e
@@ -28,8 +33,10 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/moby/buildkit v0.24.0
+	github.com/moby/buildkit v0.25.0-rc1
 	github.com/moby/go-archive v0.1.0
+	github.com/moby/moby/api v1.52.0-beta.1.0.20250919095748-0967d6ea6ba7
+	github.com/moby/moby/client v0.1.0-beta.0.0.20250919095748-0967d6ea6ba7
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2
@@ -168,7 +175,7 @@ require (
 	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
-	github.com/zclconf/go-cty v1.16.2 // indirect
+	github.com/zclconf/go-cty v1.17.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.60.0 // indirect
@@ -186,7 +193,7 @@ require (
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250528174236-200df99c418a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

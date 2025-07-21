@@ -29,7 +29,7 @@ import (
 	cmd "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/docker/pkg/stringid"
+	"github.com/moby/moby/client/pkg/stringid"
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {

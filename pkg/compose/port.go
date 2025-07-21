@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 )
 
 func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {

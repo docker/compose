@@ -26,11 +26,12 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -56,38 +57,38 @@ func TestDown(t *testing.T) {
 		}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
 	// cleanup properly if duplicates are inadvertently created
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]network.Summary{
-			{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
-			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+			{Network: network.Network{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
+			{Network: network.Network{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
 		}, nil)
 
-	stopOptions := container.StopOptions{}
+	stopOptions := client.ContainerStopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "456", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopOptions).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "456", container.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "789", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "456", client.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "789", client.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(strings.ToLower(testProject)),
 			networkFilter("default")),
 	}).Return([]network.Summary{
-		{ID: "abc123", Name: "myProject_default"},
-		{ID: "def456", Name: "myProject_default"},
+		{Network: network.Network{ID: "abc123", Name: "myProject_default"}},
+		{Network: network.Network{ID: "def456", Name: "myProject_default"}},
 	}, nil)
-	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{ID: "abc123"}, nil)
-	api.EXPECT().NetworkInspect(gomock.Any(), "def456", gomock.Any()).Return(network.Inspect{ID: "def456"}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{Network: network.Network{ID: "abc123"}}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "def456", gomock.Any()).Return(network.Inspect{Network: network.Network{ID: "def456"}}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "def456").Return(nil)
 
@@ -113,32 +114,32 @@ func TestDownWithGivenServices(t *testing.T) {
 		}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
 	// cleanup properly if duplicates are inadvertently created
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]network.Summary{
-			{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
-			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+			{Network: network.Network{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
+			{Network: network.Network{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
 		}, nil)
 
-	stopOptions := container.StopOptions{}
+	stopOptions := client.ContainerStopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(strings.ToLower(testProject)),
 			networkFilter("default")),
 	}).Return([]network.Summary{
-		{ID: "abc123", Name: "myProject_default"},
+		{Network: network.Network{ID: "abc123", Name: "myProject_default"}},
 	}, nil)
-	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{ID: "abc123"}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{Network: network.Network{ID: "abc123"}}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{
@@ -165,17 +166,17 @@ func TestDownWithSpecifiedServiceButTheServicesAreNotRunning(t *testing.T) {
 		}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
 	// cleanup properly if duplicates are inadvertently created
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]network.Summary{
-			{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
-			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
+			{Network: network.Network{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
+			{Network: network.Network{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
 		}, nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{
@@ -201,34 +202,34 @@ func TestDownRemoveOrphans(t *testing.T) {
 		}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]network.Summary{
-			{
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return([]network.Summary{{
+			Network: network.Network{
 				Name:   "myProject_default",
 				Labels: map[string]string{compose.NetworkLabel: "default"},
 			},
-		}, nil)
+		}}, nil)
 
-	stopOptions := container.StopOptions{}
+	stopOptions := client.ContainerStopOptions{}
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopOptions).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "321", stopOptions).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "789", container.RemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "321", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "789", client.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "321", client.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
 		Filters: filters.NewArgs(
 			networkFilter("default"),
 			projectFilter(strings.ToLower(testProject)),
 		),
-	}).Return([]network.Summary{{ID: "abc123", Name: "myProject_default"}}, nil)
-	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{ID: "abc123"}, nil)
+	}).Return([]network.Summary{{Network: network.Network{ID: "abc123", Name: "myProject_default"}}}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{Network: network.Network{ID: "abc123"}}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})
@@ -248,7 +249,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 		[]container.Summary{testContainer("service1", "123", false)}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{
@@ -256,11 +257,11 @@ func TestDownRemoveVolumes(t *testing.T) {
 		}, nil)
 	api.EXPECT().VolumeInspect(gomock.Any(), "myProject_volume").
 		Return(volume.Volume{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return(nil, nil)
 
-	api.EXPECT().ContainerStop(gomock.Any(), "123", container.StopOptions{}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "123", client.ContainerStopOptions{}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
 
 	api.EXPECT().VolumeRemove(gomock.Any(), "myProject_volume", true).Return(nil)
 
@@ -297,7 +298,7 @@ func TestDownRemoveImages(t *testing.T) {
 		}, nil).
 		AnyTimes()
 
-	api.EXPECT().ImageList(gomock.Any(), image.ListOptions{
+	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(strings.ToLower(testProject)),
 			filters.Arg("dangling", "false"),
@@ -345,7 +346,7 @@ func TestDownRemoveImages(t *testing.T) {
 	for _, img := range localImagesToBeRemoved {
 		// test calls down --rmi=local then down --rmi=all, so local images
 		// get "removed" 2x, while other images are only 1x
-		api.EXPECT().ImageRemove(gomock.Any(), img, image.RemoveOptions{}).
+		api.EXPECT().ImageRemove(gomock.Any(), img, client.ImageRemoveOptions{}).
 			Return(nil, nil).
 			Times(2)
 	}
@@ -360,7 +361,7 @@ func TestDownRemoveImages(t *testing.T) {
 		"registry.example.com/remote-image-tagged:v1.0",
 	}
 	for _, img := range otherImagesToBeRemoved {
-		api.EXPECT().ImageRemove(gomock.Any(), img, image.RemoveOptions{}).
+		api.EXPECT().ImageRemove(gomock.Any(), img, client.ImageRemoveOptions{}).
 			Return(nil, nil).
 			Times(1)
 	}
@@ -387,18 +388,18 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{
 			Volumes: []*volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return(nil, nil)
 
 	// ImageList returns no images for the project since they were unlabeled
 	// (created by an older version of Compose)
-	api.EXPECT().ImageList(gomock.Any(), image.ListOptions{
+	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(strings.ToLower(testProject)),
 			filters.Arg("dangling", "false"),
@@ -408,10 +409,10 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	api.EXPECT().ImageInspect(gomock.Any(), "testproject-service1").
 		Return(image.InspectResponse{}, nil)
 
-	api.EXPECT().ContainerStop(gomock.Any(), "123", container.StopOptions{}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", container.RemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "123", client.ContainerStopOptions{}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1:latest", image.RemoveOptions{}).Return(nil, nil)
+	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1:latest", client.ImageRemoveOptions{}).Return(nil, nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Images: "local"})
 	assert.NilError(t, err)
