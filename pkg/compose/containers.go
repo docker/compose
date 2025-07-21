@@ -25,8 +25,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/client"
 )
 
 // Containers is a set of moby Container
@@ -43,7 +44,7 @@ const (
 func (s *composeService) getContainers(ctx context.Context, project string, oneOff oneOff, all bool, selectedServices ...string) (Containers, error) {
 	var containers Containers
 	f := getDefaultFilters(project, oneOff, selectedServices...)
-	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: filters.NewArgs(f...),
 		All:     all,
 	})
@@ -77,7 +78,7 @@ func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName 
 	if containerIndex > 0 {
 		defaultFilters = append(defaultFilters, containerNumberFilter(containerIndex))
 	}
-	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: filters.NewArgs(
 			defaultFilters...,
 		),

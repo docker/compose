@@ -21,10 +21,9 @@ import (
 	"strconv"
 
 	"github.com/containerd/errdefs"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -39,9 +38,9 @@ type monitor struct {
 	listeners []api.ContainerEventListener
 }
 
-func newMonitor(api client.APIClient, project string) *monitor {
+func newMonitor(apiClient client.APIClient, project string) *monitor {
 	return &monitor{
-		api:      api,
+		api:      apiClient,
 		project:  project,
 		services: map[string]bool{},
 	}
@@ -58,7 +57,7 @@ func (c *monitor) withServices(services []string) {
 //nolint:gocyclo
 func (c *monitor) Start(ctx context.Context) error {
 	// collect initial application container
-	initialState, err := c.api.ContainerList(ctx, container.ListOptions{
+	initialState, err := c.api.ContainerList(ctx, client.ContainerListOptions{
 		All: true,
 		Filters: filters.NewArgs(
 			projectFilter(c.project),
@@ -79,7 +78,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	}
 	restarting := utils.Set[string]{}
 
-	evtCh, errCh := c.api.Events(ctx, events.ListOptions{
+	evtCh, errCh := c.api.Events(ctx, client.EventsListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("type", "container"),
 			projectFilter(c.project)),
