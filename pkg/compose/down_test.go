@@ -24,13 +24,13 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/streams"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/errdefs"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -326,7 +326,7 @@ func TestDownRemoveImages(t *testing.T) {
 		if exists {
 			resp.RepoTags = []string{img}
 		} else {
-			err = errdefs.NotFound(fmt.Errorf("test specified that image %q should not exist", img))
+			err = errdefs.ErrNotFound.WithMessage(fmt.Sprintf("test specified that image %q should not exist", img))
 		}
 
 		api.EXPECT().ImageInspect(gomock.Any(), img).

@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -32,7 +31,6 @@ import (
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -222,8 +220,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					Follow: true,
 					Since:  ctr.State.StartedAt,
 				})
-				var notImplErr errdefs.ErrNotImplemented
-				if errors.As(err, &notImplErr) {
+				if cerrdefs.IsNotImplemented(err) {
 					// container may be configured with logging_driver: none
 					// as container already started, we might miss the very first logs. But still better than none
 					return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)
