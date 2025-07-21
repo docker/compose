@@ -33,20 +33,22 @@ import (
 	"github.com/docker/buildx/builder"
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/checkpoint"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/system"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
+	moby "github.com/moby/moby/api/types"
+	"github.com/moby/moby/api/types/build"
+	"github.com/moby/moby/api/types/checkpoint"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/plugin"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/api/types/system"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -97,8 +99,8 @@ func getCallingFunction() string {
 
 // All methods and functions which need to be overridden for dry run.
 
-func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options containerType.AttachOptions) (moby.HijackedResponse, error) {
-	return moby.HijackedResponse{}, errors.New("interactive run is not supported in dry-run mode")
+func (d *DryRunClient) ContainerAttach(ctx context.Context, container string, options containerType.AttachOptions) (client.HijackedResponse, error) {
+	return client.HijackedResponse{}, errors.New("interactive run is not supported in dry-run mode")
 }
 
 func (d *DryRunClient) ContainerCreate(ctx context.Context, config *containerType.Config, hostConfig *containerType.HostConfig,
@@ -258,11 +260,13 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options image.
 	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
 		Status: "Pushed",
 		Progress: &jsonmessage.JSONProgress{
-			Current:    100,
-			Total:      100,
-			Start:      0,
-			HideCounts: false,
-			Units:      "Mb",
+			Progress: jsonstream.Progress{
+				Current:    100,
+				Total:      100,
+				Start:      0,
+				HideCounts: false,
+				Units:      "Mb",
+			},
 		},
 		ID: ref,
 	})
@@ -363,8 +367,8 @@ func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]c
 	return d.apiClient.ContainerDiff(ctx, container)
 }
 
-func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config containerType.ExecStartOptions) (moby.HijackedResponse, error) {
-	return moby.HijackedResponse{}, errors.New("interactive exec is not supported in dry-run mode")
+func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config containerType.ExecStartOptions) (client.HijackedResponse, error) {
+	return client.HijackedResponse{}, errors.New("interactive exec is not supported in dry-run mode")
 }
 
 func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (containerType.ExecInspect, error) {
@@ -395,11 +399,11 @@ func (d *DryRunClient) ContainerStatPath(ctx context.Context, container, path st
 	return d.apiClient.ContainerStatPath(ctx, container, path)
 }
 
-func (d *DryRunClient) ContainerStats(ctx context.Context, container string, stream bool) (containerType.StatsResponseReader, error) {
+func (d *DryRunClient) ContainerStats(ctx context.Context, container string, stream bool) (client.StatsResponseReader, error) {
 	return d.apiClient.ContainerStats(ctx, container, stream)
 }
 
-func (d *DryRunClient) ContainerStatsOneShot(ctx context.Context, container string) (containerType.StatsResponseReader, error) {
+func (d *DryRunClient) ContainerStatsOneShot(ctx context.Context, container string) (client.StatsResponseReader, error) {
 	return d.apiClient.ContainerStatsOneShot(ctx, container)
 }
 
@@ -499,27 +503,27 @@ func (d *DryRunClient) NetworksPrune(ctx context.Context, pruneFilter filters.Ar
 	return d.apiClient.NetworksPrune(ctx, pruneFilter)
 }
 
-func (d *DryRunClient) PluginList(ctx context.Context, filter filters.Args) (moby.PluginsListResponse, error) {
+func (d *DryRunClient) PluginList(ctx context.Context, filter filters.Args) (plugin.ListResponse, error) {
 	return d.apiClient.PluginList(ctx, filter)
 }
 
-func (d *DryRunClient) PluginRemove(ctx context.Context, name string, options moby.PluginRemoveOptions) error {
+func (d *DryRunClient) PluginRemove(ctx context.Context, name string, options client.PluginRemoveOptions) error {
 	return d.apiClient.PluginRemove(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginEnable(ctx context.Context, name string, options moby.PluginEnableOptions) error {
+func (d *DryRunClient) PluginEnable(ctx context.Context, name string, options client.PluginEnableOptions) error {
 	return d.apiClient.PluginEnable(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginDisable(ctx context.Context, name string, options moby.PluginDisableOptions) error {
+func (d *DryRunClient) PluginDisable(ctx context.Context, name string, options client.PluginDisableOptions) error {
 	return d.apiClient.PluginDisable(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginInstall(ctx context.Context, name string, options moby.PluginInstallOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) PluginInstall(ctx context.Context, name string, options client.PluginInstallOptions) (io.ReadCloser, error) {
 	return d.apiClient.PluginInstall(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginUpgrade(ctx context.Context, name string, options moby.PluginInstallOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) PluginUpgrade(ctx context.Context, name string, options client.PluginInstallOptions) (io.ReadCloser, error) {
 	return d.apiClient.PluginUpgrade(ctx, name, options)
 }
 
@@ -531,11 +535,11 @@ func (d *DryRunClient) PluginSet(ctx context.Context, name string, args []string
 	return d.apiClient.PluginSet(ctx, name, args)
 }
 
-func (d *DryRunClient) PluginInspectWithRaw(ctx context.Context, name string) (*moby.Plugin, []byte, error) {
+func (d *DryRunClient) PluginInspectWithRaw(ctx context.Context, name string) (*plugin.Plugin, []byte, error) {
 	return d.apiClient.PluginInspectWithRaw(ctx, name)
 }
 
-func (d *DryRunClient) PluginCreate(ctx context.Context, createContext io.Reader, options moby.PluginCreateOptions) error {
+func (d *DryRunClient) PluginCreate(ctx context.Context, createContext io.Reader, options client.PluginCreateOptions) error {
 	return d.apiClient.PluginCreate(ctx, createContext, options)
 }
 
@@ -635,7 +639,7 @@ func (d *DryRunClient) RegistryLogin(ctx context.Context, auth registry.AuthConf
 	return d.apiClient.RegistryLogin(ctx, auth)
 }
 
-func (d *DryRunClient) DiskUsage(ctx context.Context, options moby.DiskUsageOptions) (moby.DiskUsage, error) {
+func (d *DryRunClient) DiskUsage(ctx context.Context, options system.DiskUsageOptions) (system.DiskUsage, error) {
 	return d.apiClient.DiskUsage(ctx, options)
 }
 
