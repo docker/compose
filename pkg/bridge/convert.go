@@ -26,7 +26,7 @@ import (
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	cerrdefs "github.com/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/command"
 	cli "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
@@ -198,7 +198,7 @@ func loadFileObject(conf types.FileObjectConfig) (types.FileObjectConfig, error)
 
 func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName string) (image.InspectResponse, error) {
 	inspect, err := dockerCli.Client().ImageInspect(ctx, imageName)
-	if cerrdefs.IsNotFound(err) {
+	if errdefs.IsNotFound(err) {
 		var stream io.ReadCloser
 		stream, err = dockerCli.Client().ImagePull(ctx, imageName, image.PullOptions{})
 		if err != nil {

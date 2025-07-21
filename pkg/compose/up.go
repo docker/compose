@@ -25,7 +25,7 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	cerrdefs "github.com/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/tracing"
@@ -142,7 +142,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 						All:      true,
 					})
 					// Ignore errors indicating that some of the containers were already stopped or removed.
-					if cerrdefs.IsNotFound(err) || cerrdefs.IsConflict(err) {
+					if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
 						return nil
 					}
 
@@ -220,7 +220,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					Follow: true,
 					Since:  ctr.State.StartedAt,
 				})
-				if cerrdefs.IsNotImplemented(err) {
+				if errdefs.IsNotImplemented(err) {
 					// container may be configured with logging_driver: none
 					// as container already started, we might miss the very first logs. But still better than none
 					return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)

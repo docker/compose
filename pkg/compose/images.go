@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	cerrdefs "github.com/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/container"
@@ -121,7 +121,7 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 		eg.Go(func() error {
 			inspect, err := s.apiClient().ImageInspect(ctx, repoTag)
 			if err != nil {
-				if cerrdefs.IsNotFound(err) {
+				if errdefs.IsNotFound(err) {
 					return nil
 				}
 				return fmt.Errorf("unable to get image '%s': %w", repoTag, err)
