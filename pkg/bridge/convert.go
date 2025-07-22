@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -112,15 +113,20 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 			return err
 		}
 
-		usr, err := user.Current()
-		if err != nil {
-			return err
-		}
-		created, err := dockerCli.Client().ContainerCreate(ctx, &container.Config{
+		containerConfig := &container.Config{
 			Image: transformation,
 			Env:   []string{"LICENSE_AGREEMENT=true"},
-			User:  usr.Uid,
-		}, &container.HostConfig{
+		}
+		// On POSIX systems, this is a decimal number representing the uid.
+		// On Windows, this is a security identifier (SID) in a string format and the engine isn't able to manage it
+		if runtime.GOOS != "windows" {
+			usr, err := user.Current()
+			if err != nil {
+				return err
+			}
+			containerConfig.User = usr.Uid
+		}
+		created, err := dockerCli.Client().ContainerCreate(ctx, containerConfig, &container.HostConfig{
 			AutoRemove: true,
 			Binds:      binds,
 		}, &network.NetworkingConfig{}, nil, "")
