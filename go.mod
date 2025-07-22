@@ -21,7 +21,7 @@ require (
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-sdk/config v0.1.0-alpha009
 	github.com/docker/go-sdk/image v0.1.0-alpha009
-	github.com/docker/go-sdk/legacyadapters v0.0.0-00010101000000-000000000000
+	github.com/docker/go-sdk/legacyadapters v0.1.0-alpha001
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
 	github.com/fsnotify/fsevents v0.2.0
@@ -220,7 +220,3 @@ exclude (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
-
-replace github.com/docker/go-sdk/config => github.com/docker/go-sdk/config v0.0.0-20250721155554-2c7a2494f82e
-
-replace github.com/docker/go-sdk/legacyadapters => github.com/docker/go-sdk/legacyadapters v0.0.0-20250721155554-2c7a2494f82e
