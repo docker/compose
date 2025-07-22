@@ -28,10 +28,11 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/image"
+	apiimages "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-sdk/config"
+	"github.com/docker/go-sdk/image"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opencontainers/go-digest"
 	"golang.org/x/sync/errgroup"
@@ -181,24 +182,35 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		Status: progress.Working,
 		Text:   "Pulling",
 	})
-	_, auth, err := s.config.AuthConfigForImage(service.Image)
-	if err != nil {
-		return "", err
-	}
-	base64EncodedAuth, err := auth.EncodeBase64()
-	if err != nil {
-		return "", err
-	}
 
 	platform := service.Platform
 	if platform == "" {
 		platform = defaultPlatform
 	}
 
-	stream, err := s.apiClient().ImagePull(ctx, service.Image, image.PullOptions{
-		RegistryAuth: base64EncodedAuth,
-		Platform:     platform,
-	})
+	progressFunc := func(stream io.ReadCloser) error {
+		dec := json.NewDecoder(stream)
+		for {
+			var jm jsonmessage.JSONMessage
+			if err := dec.Decode(&jm); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return err
+			}
+			if jm.Error != nil {
+				return errors.New(jm.Error.Message)
+			}
+			if !quietPull {
+				toPullProgressEvent(service.Name, jm, w)
+			}
+		}
+		return nil
+	}
+
+	err := image.Pull(ctx, service.Image, image.WithPullOptions(apiimages.PullOptions{
+		Platform: platform,
+	}), image.WithPullHandler(progressFunc))
 
 	if ctx.Err() != nil {
 		w.Event(progress.Event{
@@ -231,22 +243,6 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 
-	dec := json.NewDecoder(stream)
-	for {
-		var jm jsonmessage.JSONMessage
-		if err := dec.Decode(&jm); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return "", err
-		}
-		if jm.Error != nil {
-			return "", errors.New(jm.Error.Message)
-		}
-		if !quietPull {
-			toPullProgressEvent(service.Name, jm, w)
-		}
-	}
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Done,
