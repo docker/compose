@@ -192,8 +192,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		tty       = service.Tty
 		stdinOpen = service.StdinOpen
 	)
-
-	proxyConfig := types.MappingWithEquals(s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil))
+	proxyConfig := types.MappingWithEquals(s.config.ParseProxyConfig(s.apiClient().DaemonHost(), nil))
 	env := proxyConfig.OverrideBy(service.Environment)
 
 	var mainNwName string

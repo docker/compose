@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,12 +25,8 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/distribution/reference"
-	"github.com/docker/buildx/driver"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/registry"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -50,14 +45,6 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(s.maxConcurrency)
-
-	info, err := s.apiClient().Info(ctx)
-	if err != nil {
-		return err
-	}
-	if info.IndexServerAddress == "" {
-		info.IndexServerAddress = registry.IndexServer
-	}
 
 	w := progress.ContextWriter(ctx)
 	for _, service := range project.Services {
@@ -79,7 +66,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 
 		for _, tag := range tags {
 			eg.Go(func() error {
-				err := s.pushServiceImage(ctx, tag, info, s.configFile(), w, options.Quiet)
+				err := s.pushServiceImage(ctx, tag, w, options.Quiet)
 				if err != nil {
 					if !options.IgnoreFailures {
 						return err
@@ -93,33 +80,17 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 	return eg.Wait()
 }
 
-func (s *composeService) pushServiceImage(ctx context.Context, tag string, info system.Info, configFile driver.Auth, w progress.Writer, quietPush bool) error {
-	ref, err := reference.ParseNormalizedNamed(tag)
+func (s *composeService) pushServiceImage(ctx context.Context, tag string, w progress.Writer, quietPush bool) error {
+	_, auth, err := s.config.AuthConfigForImage(tag)
 	if err != nil {
 		return err
 	}
-
-	repoInfo, err := registry.ParseRepositoryInfo(ref)
+	authBase64Encoded, err := auth.EncodeBase64()
 	if err != nil {
 		return err
 	}
-
-	key := repoInfo.Index.Name
-	if repoInfo.Index.Official {
-		key = info.IndexServerAddress
-	}
-	authConfig, err := configFile.GetAuthConfig(key)
-	if err != nil {
-		return err
-	}
-
-	buf, err := json.Marshal(authConfig)
-	if err != nil {
-		return err
-	}
-
 	stream, err := s.apiClient().ImagePush(ctx, tag, image.PushOptions{
-		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+		RegistryAuth: authBase64Encoded,
 	})
 	if err != nil {
 		return err

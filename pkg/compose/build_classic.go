@@ -149,14 +149,9 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	progressOutput := streamformatter.NewProgressOutput(progBuff)
 	body := progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
 
-	configFile := s.configFile()
-	creds, err := configFile.GetAllCredentials()
-	if err != nil {
-		return "", err
-	}
-	authConfigs := make(map[string]registry.AuthConfig, len(creds))
-	for k, auth := range creds {
-		authConfigs[k] = registry.AuthConfig(auth)
+	authConfigs := make(map[string]registry.AuthConfig, len(s.config.AuthConfigs))
+	for k, auth := range s.config.AuthConfigs {
+		authConfigs[k] = auth.ToRegistryAuthConfig()
 	}
 	buildOptions := imageBuildOptions(s.dockerCli, project, service, options)
 	imageName := api.GetImageNameOrDefault(service, project.Name)
