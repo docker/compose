@@ -19,6 +19,7 @@ package formatter
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/docker/cli/cli/command"
@@ -91,11 +92,15 @@ func ansiColor(code, s string, formatOpts ...string) string {
 
 // Everything about ansiColorCode color https://hyperskill.org/learn/step/18193
 func ansiColorCode(code string, formatOpts ...string) string {
-	res := "\033["
+	var sb strings.Builder
+	sb.WriteString("\033[")
 	for _, c := range formatOpts {
-		res = fmt.Sprintf("%s%s;", res, c)
+		sb.WriteString(c)
+		sb.WriteString(";")
 	}
-	return fmt.Sprintf("%s%sm", res, code)
+	sb.WriteString(code)
+	sb.WriteString("m")
+	return sb.String()
 }
 
 func makeColorFunc(code string) colorFunc {
