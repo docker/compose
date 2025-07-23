@@ -59,6 +59,9 @@ const (
 	Auto = "auto"
 )
 
+// ansiColorOffset is the offset for basic foreground colors in ANSI escape codes.
+const ansiColorOffset = 30
+
 // SetANSIMode configure formatter for colored output on ANSI-compliant console
 func SetANSIMode(streams command.Streams, ansi string) {
 	if !useAnsi(streams, ansi) {
@@ -127,8 +130,8 @@ func rainbowColor() colorFunc {
 func init() {
 	colors := map[string]colorFunc{}
 	for i, name := range names {
-		colors[name] = makeColorFunc(strconv.Itoa(30 + i))
-		colors["intense_"+name] = makeColorFunc(strconv.Itoa(30+i) + ";1")
+		colors[name] = makeColorFunc(strconv.Itoa(ansiColorOffset + i))
+		colors["intense_"+name] = makeColorFunc(strconv.Itoa(ansiColorOffset+i) + ";1")
 	}
 	rainbow = []colorFunc{
 		colors["cyan"],
