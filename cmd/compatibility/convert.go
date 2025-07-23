@@ -18,7 +18,6 @@ package compatibility
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/docker/compose/v2/cmd/compose"
@@ -52,7 +51,7 @@ func getStringFlags() []string {
 }
 
 // Convert transforms standalone docker-compose args into CLI plugin compliant ones
-func Convert(args []string) []string {
+func Convert(args []string) ([]string, error) {
 	var rootFlags []string
 	command := []string{compose.PluginName}
 	l := len(args)
@@ -87,8 +86,7 @@ ARGS:
 			if arg == flag {
 				i++
 				if i >= l {
-					fmt.Fprintf(os.Stderr, "flag needs an argument: '%s'\n", arg)
-					os.Exit(1)
+					return nil, fmt.Errorf("flag needs an argument: '%s'", arg)
 				}
 				rootFlags = append(rootFlags, arg, args[i])
 				continue ARGS
@@ -103,7 +101,7 @@ ARGS:
 		}
 		command = append(command, arg)
 	}
-	return append(rootFlags, command...)
+	return append(rootFlags, command...), nil
 }
 
 func contains(array []string, needle string) bool {

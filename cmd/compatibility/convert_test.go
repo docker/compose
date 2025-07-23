@@ -17,9 +17,6 @@
 package compatibility
 
 import (
-	"errors"
-	"os"
-	"os/exec"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -110,21 +107,11 @@ func Test_convert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			got, err := Convert(tt.args)
 			if tt.wantErr {
-				if os.Getenv("BE_CRASHER") == "1" {
-					Convert(tt.args)
-					return
-				}
-				cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$")
-				cmd.Env = append(os.Environ(), "BE_CRASHER=1")
-				err := cmd.Run()
-				var e *exec.ExitError
-				if errors.As(err, &e) && !e.Success() {
-					return
-				}
-				t.Fatalf("process ran with err %v, want exit status 1", err)
+				assert.Assert(t, err != nil)
 			} else {
-				got := Convert(tt.args)
+				assert.NilError(t, err)
 				assert.DeepEqual(t, tt.want, got)
 			}
 		})
