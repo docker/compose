@@ -39,6 +39,7 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/container"
+	helpers "github.com/docker/go-sdk/legacyadapters/config" //nolint:staticcheck
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
@@ -416,7 +417,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 
 	sessionConfig := []session.Attachable{
 		authprovider.NewDockerAuthProvider(authprovider.DockerAuthProviderConfig{
-			ConfigFile: s.configFile(),
+			ConfigFile: helpers.ToConfigFile(s.config), //nolint:staticcheck
 		}),
 	}
 	if len(options.SSHs) > 0 || len(service.Build.SSH) > 0 {

@@ -38,6 +38,7 @@ import (
 	"github.com/docker/compose/v2/pkg/compose/transform"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
+	helpers "github.com/docker/go-sdk/legacyadapters/config" //nolint:staticcheck
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
@@ -63,9 +64,8 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 	if err != nil {
 		return err
 	}
-
 	resolver := imagetools.New(imagetools.Opt{
-		Auth: s.configFile(),
+		Auth: helpers.ToConfigFile(s.config), //nolint:staticcheck
 	})
 
 	var layers []ocipush.Pushable
@@ -216,7 +216,7 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	if err != nil {
 		return nil, err
 	}
-	project, err = project.WithImagesResolved(ImageDigestResolver(ctx, s.configFile(), s.apiClient()))
+	project, err = project.WithImagesResolved(ImageDigestResolver(ctx, s.config, s.apiClient()))
 	if err != nil {
 		return nil, err
 	}

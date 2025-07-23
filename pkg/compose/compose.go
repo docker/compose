@@ -27,7 +27,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
 	"github.com/docker/docker/api/types/container"
@@ -36,6 +35,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-sdk/config"
 	"github.com/jonboulle/clockwork"
 
 	"github.com/docker/compose/v2/internal/desktop"
@@ -54,11 +54,17 @@ func init() {
 
 // NewComposeService create a local implementation of the compose.Service API
 func NewComposeService(dockerCli command.Cli) api.Service {
+	configuration, err := config.Load()
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	return &composeService{
 		dockerCli:      dockerCli,
 		clock:          clockwork.NewRealClock(),
 		maxConcurrency: -1,
 		dryRun:         false,
+		config:         configuration,
 	}
 }
 
@@ -66,6 +72,7 @@ type composeService struct {
 	dockerCli   command.Cli
 	desktopCli  *desktop.Client
 	experiments *experimental.State
+	config      config.Config
 
 	clock          clockwork.Clock
 	maxConcurrency int
@@ -89,10 +96,6 @@ func (s *composeService) Close() error {
 
 func (s *composeService) apiClient() client.APIClient {
 	return s.dockerCli.Client()
-}
-
-func (s *composeService) configFile() *configfile.ConfigFile {
-	return s.dockerCli.ConfigFile()
 }
 
 func (s *composeService) MaxConcurrency(i int) {

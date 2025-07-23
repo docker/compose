@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,12 +28,11 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
-	"github.com/docker/buildx/driver"
-	"github.com/docker/cli/cli/config/configfile"
-	"github.com/docker/docker/api/types/image"
+	apiimages "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/registry"
+	"github.com/docker/go-sdk/config"
+	"github.com/docker/go-sdk/image"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opencontainers/go-digest"
 	"golang.org/x/sync/errgroup"
@@ -117,7 +115,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		idx := i
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			_, err := s.pullServiceImage(ctx, service, w, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[idx] = err
 				if service.Build != nil {
@@ -177,32 +175,42 @@ func getUnwrappedErrorMessage(err error) string {
 }
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig,
-	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string,
+	w progress.Writer, quietPull bool, defaultPlatform string,
 ) (string, error) {
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,
 		Text:   "Pulling",
 	})
-	ref, err := reference.ParseNormalizedNamed(service.Image)
-	if err != nil {
-		return "", err
-	}
-
-	encodedAuth, err := encodedAuth(ref, configFile)
-	if err != nil {
-		return "", err
-	}
 
 	platform := service.Platform
 	if platform == "" {
 		platform = defaultPlatform
 	}
 
-	stream, err := s.apiClient().ImagePull(ctx, service.Image, image.PullOptions{
-		RegistryAuth: encodedAuth,
-		Platform:     platform,
-	})
+	progressFunc := func(stream io.ReadCloser) error {
+		dec := json.NewDecoder(stream)
+		for {
+			var jm jsonmessage.JSONMessage
+			if err := dec.Decode(&jm); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return err
+			}
+			if jm.Error != nil {
+				return errors.New(jm.Error.Message)
+			}
+			if !quietPull {
+				toPullProgressEvent(service.Name, jm, w)
+			}
+		}
+		return nil
+	}
+
+	err := image.Pull(ctx, service.Image, image.WithPullOptions(apiimages.PullOptions{
+		Platform: platform,
+	}), image.WithPullHandler(progressFunc))
 
 	if ctx.Err() != nil {
 		w.Event(progress.Event{
@@ -235,22 +243,6 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 
-	dec := json.NewDecoder(stream)
-	for {
-		var jm jsonmessage.JSONMessage
-		if err := dec.Decode(&jm); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return "", err
-		}
-		if jm.Error != nil {
-			return "", errors.New(jm.Error.Message)
-		}
-		if !quietPull {
-			toPullProgressEvent(service.Name, jm, w)
-		}
-	}
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Done,
@@ -265,38 +257,23 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 }
 
 // ImageDigestResolver creates a func able to resolve image digest from a docker ref,
-func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {
+func ImageDigestResolver(ctx context.Context, file config.Config, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {
 	return func(named reference.Named) (digest.Digest, error) {
-		auth, err := encodedAuth(named, file)
+		_, auth, err := file.AuthConfigForImage(named.Name())
 		if err != nil {
 			return "", err
 		}
-		inspect, err := apiClient.DistributionInspect(ctx, named.String(), auth)
+		base64Auth, err := auth.EncodeBase64()
+		if err != nil {
+			return "", err
+		}
+		inspect, err := apiClient.DistributionInspect(ctx, named.String(), base64Auth)
 		if err != nil {
 			return "",
 				fmt.Errorf("failed to resolve digest for %s: %w", named.String(), err)
 		}
 		return inspect.Descriptor.Digest, nil
 	}
-}
-
-func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
-	repoInfo, err := registry.ParseRepositoryInfo(ref)
-	if err != nil {
-		return "", err
-	}
-
-	key := registry.GetAuthConfigKey(repoInfo.Index)
-	authConfig, err := configFile.GetAuthConfig(key)
-	if err != nil {
-		return "", err
-	}
-
-	buf, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(buf), nil
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
@@ -335,7 +312,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		var mutex sync.Mutex
 		for name, service := range needPull {
 			eg.Go(func() error {
-				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				id, err := s.pullServiceImage(ctx, service, w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				mutex.Lock()
 				defer mutex.Unlock()
 				pulledImages[name] = api.ImageSummary{

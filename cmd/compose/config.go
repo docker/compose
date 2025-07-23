@@ -31,6 +31,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/go-sdk/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -203,7 +204,11 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 	}
 
 	if opts.resolveImageDigests {
-		project, err = project.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+		conf, err := config.Load()
+		if err != nil {
+			return nil, err
+		}
+		project, err = project.WithImagesResolved(compose.ImageDigestResolver(ctx, conf, dockerCli.Client()))
 		if err != nil {
 			return nil, err
 		}
@@ -302,8 +307,11 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 			}
 		}
 	}
-
-	p, err = p.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+	conf, err := config.Load()
+	if err != nil {
+		return err
+	}
+	p, err = p.WithImagesResolved(compose.ImageDigestResolver(ctx, conf, dockerCli.Client()))
 	if err != nil {
 		return err
 	}
