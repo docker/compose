@@ -205,7 +205,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		case len(service.Build.Platforms) > 1:
 			outputs = []string{fmt.Sprintf("type=image,push=%t", push)}
 		default:
-			outputs = []string{fmt.Sprintf("type=docker,load=true,push=%t", push)}
+			if push {
+				outputs = []string{"type=registry"}
+			} else {
+				outputs = []string{"type=docker"}
+			}
 		}
 
 		read = append(read, build.Context)
