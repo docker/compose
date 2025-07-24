@@ -52,6 +52,18 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 	}
 
+	if len(options.Services) > 0 {
+		var err error
+		if options.NoDeps {
+			project, err = project.WithSelectedServices(options.Services, types.IgnoreDependencies)
+		} else {
+			project, err = project.WithSelectedServices(options.Services, types.IncludeDependencies)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
 	// use an independent context tied to the errgroup for background attach operations
 	// the primary context is still used for other operations
 	// this means that once any attach operation fails, all other attaches are cancelled,
