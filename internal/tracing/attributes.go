@@ -77,11 +77,13 @@ func ProjectOptions(ctx context.Context, proj *types.Project) SpanOptions {
 		attribute.StringSlice("project.networks", proj.NetworkNames()),
 		attribute.StringSlice("project.secrets", proj.SecretNames()),
 		attribute.StringSlice("project.configs", proj.ConfigNames()),
+		attribute.StringSlice("project.models", proj.ModelNames()),
 		attribute.StringSlice("project.extensions", keys(proj.Extensions)),
 		attribute.StringSlice("project.services.active", proj.ServiceNames()),
 		attribute.StringSlice("project.services.disabled", proj.DisabledServiceNames()),
 		attribute.StringSlice("project.services.build", proj.ServicesWithBuild()),
 		attribute.StringSlice("project.services.depends_on", proj.ServicesWithDependsOn()),
+		attribute.StringSlice("project.services.models", proj.ServicesWithModels()),
 		attribute.StringSlice("project.services.capabilities", capabilities),
 		attribute.StringSlice("project.services.capabilities.gpu", gpu),
 		attribute.StringSlice("project.services.capabilities.tpu", tpu),
@@ -110,6 +112,7 @@ func ServiceOptions(service types.ServiceConfig) SpanOptions {
 		attribute.String("service.name", service.Name),
 		attribute.String("service.image", service.Image),
 		attribute.StringSlice("service.networks", keys(service.Networks)),
+		attribute.StringSlice("service.models", keys(service.Models)),
 	}
 
 	configNames := make([]string, len(service.Configs))
