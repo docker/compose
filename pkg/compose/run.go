@@ -18,6 +18,8 @@ package compose
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -27,9 +29,9 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
+	"github.com/docker/cli/cli/command/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/docker/pkg/stringid"
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
@@ -83,9 +85,9 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return "", err
 	}
 
-	slug := stringid.GenerateRandomID()
+	slug := generateRandomID()
 	if service.ContainerName == "" {
-		service.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, service.Name, stringid.TruncateID(slug), api.Separator)
+		service.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, service.Name, formatter.TruncateID(slug), api.Separator)
 	}
 	one := 1
 	service.Scale = &one
@@ -206,4 +208,15 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 		})
 	}
 	return nil
+}
+
+// generateRandomID returns a unique, 64-character ID consisting of a-z, 0-9.
+func generateRandomID() string {
+	b := make([]byte, 32)
+	for {
+		if _, err := rand.Read(b); err != nil {
+			panic(err) // This shouldn't happen
+		}
+		return hex.EncodeToString(b)
+	}
 }

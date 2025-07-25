@@ -19,7 +19,7 @@ package compose
 import (
 	"io"
 
-	moby "github.com/docker/docker/api/types"
+	moby "github.com/moby/moby/api/types"
 )
 
 const (
