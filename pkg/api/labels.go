@@ -17,8 +17,6 @@
 package api
 
 import (
-	"fmt"
-
 	"github.com/hashicorp/go-version"
 
 	"github.com/docker/compose/v2/internal"
@@ -65,9 +63,6 @@ var ComposeVersion string
 func init() {
 	v, err := version.NewVersion(internal.Version)
 	if err == nil {
-		segments := v.Segments()
-		if len(segments) > 2 {
-			ComposeVersion = fmt.Sprintf("%d.%d.%d", segments[0], segments[1], segments[2])
-		}
+		ComposeVersion = v.Core().String()
 	}
 }
