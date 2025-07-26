@@ -63,7 +63,6 @@ var ComposeVersion string
 func init() {
 	v, err := version.NewVersion(internal.Version)
 	if err == nil {
-		// We are only interested in the core version (e.g., "1.2.3") from the version string.
 		ComposeVersion = v.Core().String()
 	}
 }
