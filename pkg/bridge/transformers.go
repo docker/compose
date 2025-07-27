@@ -34,7 +34,7 @@ const (
 	TransformerLabel        = "com.docker.compose.bridge"
 	DefaultTransformerImage = "docker/compose-bridge-kubernetes"
 
-	templatesPath           = "/templates"
+	templatesPath = "/templates"
 )
 
 type CreateTransformerOptions struct {
