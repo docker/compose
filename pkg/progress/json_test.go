@@ -44,19 +44,21 @@ func TestJsonWriter_Event(t *testing.T) {
 	}
 	w.Event(event)
 
-	var msg jsonMessage
-	err := json.Unmarshal(out.Bytes(), &msg)
+	var actual jsonMessage
+	err := json.Unmarshal(out.Bytes(), &actual)
 	assert.NilError(t, err)
 
-	assert.Equal(t, true, msg.DryRun)
-	assert.Equal(t, false, msg.Tail)
-	assert.Equal(t, "service1", msg.ID)
-	assert.Equal(t, "project", msg.ParentID)
-	assert.Equal(t, "Creating", msg.Text)
-	assert.Equal(t, "Working", msg.Status)
-	assert.Equal(t, int64(50), msg.Current)
-	assert.Equal(t, int64(100), msg.Total)
-	assert.Equal(t, 50, msg.Percent)
+	expected := jsonMessage{
+		DryRun:   true,
+		ID:       event.ID,
+		ParentID: event.ParentID,
+		Text:     event.Text,
+		Status:   event.StatusText,
+		Current:  event.Current,
+		Total:    event.Total,
+		Percent:  event.Percent,
+	}
+	assert.DeepEqual(t, expected, actual)
 }
 
 func TestJsonWriter_TailMsgf(t *testing.T) {
@@ -75,13 +77,13 @@ func TestJsonWriter_TailMsgf(t *testing.T) {
 
 	w.Stop()
 
-	var msg jsonMessage
-	err := json.Unmarshal(out.Bytes(), &msg)
+	var actual jsonMessage
+	err := json.Unmarshal(out.Bytes(), &actual)
 	assert.NilError(t, err)
 
-	assert.Equal(t, false, msg.DryRun)
-	assert.Equal(t, true, msg.Tail)
-	assert.Equal(t, "hello world", msg.Text)
-	assert.Equal(t, "", msg.ID)
-	assert.Equal(t, "", msg.Status)
+	expected := jsonMessage{
+		Tail: true,
+		Text: "hello world",
+	}
+	assert.DeepEqual(t, expected, actual)
 }
