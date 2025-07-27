@@ -58,6 +58,9 @@ func buildWithBake(dockerCli command.Cli) (bool, error) {
 		return false, err
 	}
 	if !bake {
+		if ok {
+			logrus.Warnf("COMPOSE_BAKE=false is deprecated, support for internal compose builder will be removed in next release")
+		}
 		return false, nil
 	}
 
@@ -127,7 +130,16 @@ type buildStatus struct {
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
-	display, err := progressui.NewDisplay(os.Stdout, progressui.DisplayMode(options.Progress))
+	displayMode := progressui.DisplayMode(options.Progress)
+	out := options.Out
+	if out == nil {
+		cout := s.dockerCli.Out()
+		if !cout.IsTerminal() {
+			displayMode = progressui.PlainMode
+		}
+		out = cout
+	}
+	display, err := progressui.NewDisplay(out, displayMode)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +205,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		case len(service.Build.Platforms) > 1:
 			outputs = []string{fmt.Sprintf("type=image,push=%t", push)}
 		default:
-			outputs = []string{fmt.Sprintf("type=docker,load=true,push=%t", push)}
+			if push {
+				outputs = []string{"type=registry"}
+			} else {
+				outputs = []string{"type=docker"}
+			}
 		}
 
 		read = append(read, build.Context)

@@ -133,12 +133,12 @@ func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gi
 	if !commitSHA.MatchString(ref.Commit) {
 		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", ref.Remote, ref.Commit)
 		cmd.Env = g.gitCommandEnv()
-		out, err := cmd.Output()
+		out, err := cmd.CombinedOutput()
 		if err != nil {
 			if cmd.ProcessState.ExitCode() == 2 {
 				return fmt.Errorf("repository does not contain ref %s, output: %q: %w", path, string(out), err)
 			}
-			return err
+			return fmt.Errorf("failed to access repository at %s:\n %s", ref.Remote, out)
 		}
 		if len(out) < 40 {
 			return fmt.Errorf("unexpected git command output: %q", string(out))

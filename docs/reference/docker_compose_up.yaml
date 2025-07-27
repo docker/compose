@@ -211,6 +211,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: quiet-build
+      value_type: bool
+      default_value: "false"
+      description: Suppress the build output
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: quiet-pull
       value_type: bool
       default_value: "false"

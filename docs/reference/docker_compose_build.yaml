@@ -125,6 +125,15 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: provenance
+      value_type: string
+      description: Add a provenance attestation
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: pull
       value_type: bool
       default_value: "false"
@@ -149,7 +158,16 @@ options:
       shorthand: q
       value_type: bool
       default_value: "false"
-      description: Don't print anything to STDOUT
+      description: Suppress the build output
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: sbom
+      value_type: string
+      description: Add a SBOM attestation
       deprecated: false
       hidden: false
       experimental: false

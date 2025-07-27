@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -26,13 +25,12 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	cerrdefs "github.com/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/docker/errdefs"
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -92,10 +90,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	}
 
-	tui := formatter.NewStopping(logConsumer)
-	defer tui.Close()
-	logConsumer = tui
-
 	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
 	if err != nil && options.Start.Watch {
 		return err
@@ -111,7 +105,8 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	eg.Go(func() error {
 		first := true
 		gracefulTeardown := func() {
-			tui.ApplicationTermination()
+			first = false
+			fmt.Println("Gracefully Stopping... press Ctrl+C again to force")
 			eg.Go(func() error {
 				return progress.RunWithLog(context.WithoutCancel(ctx), func(ctx context.Context) error {
 					return s.stop(ctx, project.Name, api.StopOptions{
@@ -121,7 +116,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				}, s.stdinfo(), logConsumer)
 			})
 			isTerminated.Store(true)
-			first = false
 		}
 
 		for {
@@ -148,7 +142,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 						All:      true,
 					})
 					// Ignore errors indicating that some of the containers were already stopped or removed.
-					if cerrdefs.IsNotFound(err) || cerrdefs.IsConflict(err) {
+					if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
 						return nil
 					}
 
@@ -226,8 +220,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 					Follow: true,
 					Since:  ctr.State.StartedAt,
 				})
-				var notImplErr errdefs.ErrNotImplemented
-				if errors.As(err, &notImplErr) {
+				if errdefs.IsNotImplemented(err) {
 					// container may be configured with logging_driver: none
 					// as container already started, we might miss the very first logs. But still better than none
 					return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)
@@ -238,7 +231,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	})
 
 	eg.Go(func() error {
-		err := monitor.Start(ctx)
+		err := monitor.Start(context.Background())
 		// Signal for the signal-handler goroutines to stop
 		close(doneCh)
 		return err

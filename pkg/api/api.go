@@ -19,6 +19,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -170,8 +171,14 @@ type BuildOptions struct {
 	Print bool
 	// Check let builder validate build configuration
 	Check bool
-	// Provenance
-	Provenance bool
+	// Attestations allows to enable attestations generation
+	Attestations bool
+	// Provenance generate a provenance attestation
+	Provenance string
+	// SBOM generate a SBOM attestation
+	SBOM string
+	// Out is the stream to write build progress
+	Out io.Writer
 }
 
 // Apply mutates project according to build options
