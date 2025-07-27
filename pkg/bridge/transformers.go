@@ -33,6 +33,7 @@ import (
 const (
 	TransformerLabel        = "com.docker.compose.bridge"
 	DefaultTransformerImage = "docker/compose-bridge-kubernetes"
+	templatesPath = "/templates"
 )
 
 type CreateTransformerOptions struct {
@@ -73,7 +74,7 @@ func CreateTransformer(ctx context.Context, dockerCli command.Cli, options Creat
 	if err != nil {
 		return err
 	}
-	content, stat, err := dockerCli.Client().CopyFromContainer(ctx, created.ID, "/templates")
+	content, stat, err := dockerCli.Client().CopyFromContainer(ctx, created.ID, templatesPath)
 	if err != nil {
 		return err
 	}
@@ -82,7 +83,7 @@ func CreateTransformer(ctx context.Context, dockerCli command.Cli, options Creat
 	}()
 
 	srcInfo := archive.CopyInfo{
-		Path:   "/templates",
+		Path:   templatesPath,
 		Exists: true,
 		IsDir:  stat.Mode.IsDir(),
 	}
