@@ -29,14 +29,17 @@ import (
 	gsync "sync"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/compose-spec/compose-go/v2/utils"
-	ccli "github.com/docker/cli/cli/command/container"
 	pathutil "github.com/docker/compose/v2/internal/paths"
 	"github.com/docker/compose/v2/internal/sync"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
+	cutils "github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/compose/v2/pkg/watch"
+
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v2/utils"
+	ccli "github.com/docker/cli/cli/command/container"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -61,7 +64,6 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, cons
 
 		if service.Develop != nil && service.Develop.Watch != nil {
 			build := options.Create.Build
-			build.Quiet = true
 			return &Watcher{
 				project: project,
 				options: api.WatchOptions{
@@ -598,6 +600,10 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
 	// restrict the build to ONLY this service, not any of its dependencies
 	options.Build.Services = services
+	options.Build.Progress = progress.ModePlain
+	options.Build.Out = cutils.GetWriter(func(line string) {
+		options.LogTo.Log(api.WatchLogger, line)
+	})
 
 	var (
 		imageNameToIdMap map[string]string

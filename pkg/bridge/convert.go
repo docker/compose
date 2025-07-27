@@ -23,10 +23,11 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	cerrdefs "github.com/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/command"
 	cli "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
@@ -112,15 +113,20 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 			return err
 		}
 
-		usr, err := user.Current()
-		if err != nil {
-			return err
-		}
-		created, err := dockerCli.Client().ContainerCreate(ctx, &container.Config{
+		containerConfig := &container.Config{
 			Image: transformation,
 			Env:   []string{"LICENSE_AGREEMENT=true"},
-			User:  usr.Uid,
-		}, &container.HostConfig{
+		}
+		// On POSIX systems, this is a decimal number representing the uid.
+		// On Windows, this is a security identifier (SID) in a string format and the engine isn't able to manage it
+		if runtime.GOOS != "windows" {
+			usr, err := user.Current()
+			if err != nil {
+				return err
+			}
+			containerConfig.User = usr.Uid
+		}
+		created, err := dockerCli.Client().ContainerCreate(ctx, containerConfig, &container.HostConfig{
 			AutoRemove: true,
 			Binds:      binds,
 		}, &network.NetworkingConfig{}, nil, "")
@@ -198,7 +204,7 @@ func loadFileObject(conf types.FileObjectConfig) (types.FileObjectConfig, error)
 
 func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName string) (image.InspectResponse, error) {
 	inspect, err := dockerCli.Client().ImageInspect(ctx, imageName)
-	if cerrdefs.IsNotFound(err) {
+	if errdefs.IsNotFound(err) {
 		var stream io.ReadCloser
 		stream, err = dockerCli.Client().ImagePull(ctx, imageName, image.PullOptions{})
 		if err != nil {

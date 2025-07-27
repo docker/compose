@@ -42,13 +42,6 @@ func restoreCursor() {
 	fmt.Print(ansi("8"))
 }
 
-func hideCursor() {
-	if disableAnsi {
-		return
-	}
-	fmt.Print(ansi("[?25l"))
-}
-
 func showCursor() {
 	if disableAnsi {
 		return

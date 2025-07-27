@@ -20,6 +20,7 @@ import (
 	"github.com/docker/cli/cli/streams"
 )
 
+// Streams defines the standard streams (stdin, stdout, stderr) used by the CLI.
 type Streams interface {
 	Out() *streams.Out
 	Err() *streams.Out
