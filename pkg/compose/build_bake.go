@@ -133,11 +133,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	displayMode := progressui.DisplayMode(options.Progress)
 	out := options.Out
 	if out == nil {
-		cout := s.dockerCli.Out()
-		if !cout.IsTerminal() {
+		if !s.dockerCli.Out().IsTerminal() {
 			displayMode = progressui.PlainMode
 		}
-		out = cout
+		out = os.Stdout // should be s.dockerCli.Out(), but NewDisplay require access to the underlying *File
 	}
 	display, err := progressui.NewDisplay(out, displayMode)
 	if err != nil {
