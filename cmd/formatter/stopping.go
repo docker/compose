@@ -17,6 +17,7 @@
 package formatter
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -26,12 +27,15 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 )
 
+const tickerInterval = 100 * time.Millisecond
+
 type Stopping struct {
 	api.LogConsumer
 	enabled   bool
 	spinner   *progress.Spinner
 	ticker    *time.Ticker
 	startedAt time.Time
+	cancel    context.CancelFunc
 }
 
 func NewStopping(l api.LogConsumer) *Stopping {
@@ -56,20 +60,27 @@ func (s *Stopping) ApplicationTermination() {
 	s.spinner = progress.NewSpinner()
 	hideCursor()
 	s.startedAt = time.Now()
-	s.ticker = time.NewTicker(100 * time.Millisecond)
+	s.ticker = time.NewTicker(tickerInterval)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+
 	go func() {
 		for {
-			<-s.ticker.C
-			s.print()
+			select {
+			case <-s.ticker.C:
+				s.print()
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 }
 
 func (s *Stopping) Close() {
 	showCursor()
-	if s.ticker != nil {
-		s.ticker.Stop()
-	}
+	s.ticker.Stop()
+	s.cancel()
 	s.clear()
 }
 
