@@ -168,7 +168,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	if len(options.Start.Services) > 0 {
 		monitor.withServices(options.Start.Services)
 	} else {
-		monitor.withServices(project.ServiceNames())
+		monitor.withServices(options.Start.AttachTo)
 	}
 	monitor.withListener(printer.HandleEvent)
 
@@ -226,6 +226,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return
 		}
 		if slices.Contains(attached, event.ID) {
+			return
+		}
+		if !slices.Contains(options.Start.AttachTo, event.Container.Service) {
 			return
 		}
 		eg.Go(func() error {
