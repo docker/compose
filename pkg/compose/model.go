@@ -195,7 +195,7 @@ func (m *modelAPI) SetModelVariables(ctx context.Context, project *types.Project
 			if modelConfig != nil && modelConfig.ModelVariable != "" {
 				variable = modelConfig.ModelVariable
 			} else {
-				variable = varPrefix
+				variable = varPrefix + "_MODEL"
 			}
 			service.Environment[variable] = &model.Model
 
