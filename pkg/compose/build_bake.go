@@ -130,6 +130,9 @@ type buildStatus struct {
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
+	if options.Progress == progress.ModeAuto {
+		options.Progress = os.Getenv("BUILDKIT_PROGRESS")
+	}
 	displayMode := progressui.DisplayMode(options.Progress)
 	out := options.Out
 	if out == nil {
