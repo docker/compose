@@ -28,7 +28,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/filters"
-	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
@@ -47,18 +46,6 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 
 		project, err = s.projectFromName(containers, projectName, options.AttachTo...)
-		if err != nil {
-			return err
-		}
-	}
-
-	// use an independent context tied to the errgroup for background attach operations
-	// the primary context is still used for other operations
-	// this means that once any attach operation fails, all other attaches are cancelled,
-	// but an attach failing won't interfere with the rest of the start
-	eg, attachCtx := errgroup.WithContext(ctx)
-	if listener != nil {
-		_, err := s.attach(attachCtx, project, listener, options.AttachTo)
 		if err != nil {
 			return err
 		}
@@ -111,7 +98,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 	}
 
-	return eg.Wait()
+	return nil
 }
 
 // getDependencyCondition checks if service is depended on by other services

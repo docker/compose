@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"sync/atomic"
 	"syscall"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/eiannone/keyboard"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
@@ -205,29 +207,44 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		})
 	}
 
+	// use an independent context tied to the errgroup for background attach operations
+	// the primary context is still used for other operations
+	// this means that once any attach operation fails, all other attaches are cancelled,
+	// but an attach failing won't interfere with the rest of the start
+	_, attachCtx := errgroup.WithContext(ctx)
+	containers, err := s.attach(attachCtx, project, printer.HandleEvent, options.Start.AttachTo)
+	if err != nil {
+		return err
+	}
+	attached := make([]string, len(containers))
+	for i, ctr := range containers {
+		attached[i] = ctr.ID
+	}
+
 	monitor.withListener(func(event api.ContainerEvent) {
 		if event.Type != api.ContainerEventStarted {
 			return
 		}
-		if event.Restarting || event.Container.Labels[api.ContainerReplaceLabel] != "" {
-			eg.Go(func() error {
-				ctr, err := s.apiClient().ContainerInspect(ctx, event.ID)
-				if err != nil {
-					return err
-				}
-
-				err = s.doLogContainer(ctx, options.Start.Attach, event.Source, ctr, api.LogOptions{
-					Follow: true,
-					Since:  ctr.State.StartedAt,
-				})
-				if errdefs.IsNotImplemented(err) {
-					// container may be configured with logging_driver: none
-					// as container already started, we might miss the very first logs. But still better than none
-					return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)
-				}
-				return err
-			})
+		if slices.Contains(attached, event.ID) {
+			return
 		}
+		eg.Go(func() error {
+			ctr, err := s.apiClient().ContainerInspect(ctx, event.ID)
+			if err != nil {
+				return err
+			}
+
+			err = s.doLogContainer(ctx, options.Start.Attach, event.Source, ctr, api.LogOptions{
+				Follow: true,
+				Since:  ctr.State.StartedAt,
+			})
+			if errdefs.IsNotImplemented(err) {
+				// container may be configured with logging_driver: none
+				// as container already started, we might miss the very first logs. But still better than none
+				return s.doAttachContainer(ctx, event.Service, event.ID, event.Source, printer.HandleEvent)
+			}
+			return err
+		})
 	})
 
 	eg.Go(func() error {
