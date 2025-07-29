@@ -168,7 +168,8 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	if len(options.Start.Services) > 0 {
 		monitor.withServices(options.Start.Services)
 	} else {
-		monitor.withServices(project.ServiceNames())
+		// Start.AttachTo have been already curated with only the services to monitor
+		monitor.withServices(options.Start.AttachTo)
 	}
 	monitor.withListener(printer.HandleEvent)
 
