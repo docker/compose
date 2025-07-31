@@ -29,9 +29,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
-	containerType "github.com/docker/docker/api/types/container"
-	mmount "github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/versions"
+	containerType "github.com/moby/moby/api/types/container"
+	mmount "github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/versions"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"

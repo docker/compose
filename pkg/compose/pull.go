@@ -31,14 +31,14 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	"github.com/docker/cli/cli/config/configfile"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/registry"
 	"github.com/hashicorp/go-multierror"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
 	"github.com/opencontainers/go-digest"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v2/internal/registry"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 )
@@ -281,13 +281,7 @@ func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiCl
 }
 
 func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
-	repoInfo, err := registry.ParseRepositoryInfo(ref)
-	if err != nil {
-		return "", err
-	}
-
-	key := registry.GetAuthConfigKey(repoInfo.Index)
-	authConfig, err := configFile.GetAuthConfig(key)
+	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(ref))
 	if err != nil {
 		return "", err
 	}

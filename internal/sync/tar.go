@@ -32,8 +32,8 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
 )
 
 type archiveEntry struct {

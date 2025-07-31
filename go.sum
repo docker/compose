@@ -129,15 +129,11 @@ github.com/dlclark/regexp2 v1.11.0 h1:G/nrcoOa7ZXlpoa/91N3X7mM3r8eIlMBBJZvsz/mxK
 github.com/dlclark/regexp2 v1.11.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
 github.com/docker/buildx v0.26.1 h1:nlj3bVhHK9fV7g6floRvGhPcR0u2hxCPMmObCS1ZKL4=
 github.com/docker/buildx v0.26.1/go.mod h1:oxMC30cSHPaCCkY2j+EqN7uxFikjSzVC0c44lo9b4Fo=
-github.com/docker/cli v28.3.3+incompatible h1:fp9ZHAr1WWPGdIWBM1b3zLtgCF+83gRdVMTJsUeiyAo=
-github.com/docker/cli v28.3.3+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli-docs-tool v0.10.0 h1:bOD6mKynPQgojQi3s2jgcUWGp/Ebqy1SeCr9VfKQLLU=
 github.com/docker/cli-docs-tool v0.10.0/go.mod h1:5EM5zPnT2E7yCLERZmrDA234Vwn09fzRHP4aX1qwp1U=
 github.com/docker/distribution v2.7.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/distribution v2.8.3+incompatible h1:AtKxIZ36LoNK51+Z6RpzLpddBirtxJnzDrHLEKxTAYk=
 github.com/docker/distribution v2.8.3+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
-github.com/docker/docker v28.3.3+incompatible h1:Dypm25kh4rmk49v1eiVbsAtpAsYURjYkaKubwuBdxEI=
-github.com/docker/docker v28.3.3+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.9.3 h1:gAm/VtF9wgqJMoxzT3Gj5p4AqIjCBS4wrsOh9yRqcz8=
 github.com/docker/docker-credential-helpers v0.9.3/go.mod h1:x+4Gbw9aGmChi3qTLZj8Dfn0TD20M/fuWy0E5+WDeCo=
 github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c h1:lzqkGL9b3znc+ZUgi7FlLnqjQhcXxkNM/quxIjBVMD0=
@@ -325,6 +321,10 @@ github.com/moby/go-archive v0.1.0 h1:Kk/5rdW/g+H8NHdJW2gsXyZ7UnzvJNOy6VKJqueWdcQ
 github.com/moby/go-archive v0.1.0/go.mod h1:G9B+YoujNohJmrIYFBpSd54GTUB4lt9S+xVQvsJyFuo=
 github.com/moby/locker v1.0.1 h1:fOXqR41zeveg4fFODix+1Ch4mj/gT0NE1XJbp/epuBg=
 github.com/moby/locker v1.0.1/go.mod h1:S7SDdo5zpBK84bzzVlKr2V0hz+7x9hWbYC/kq7oQppc=
+github.com/moby/moby/api v0.0.0-20250731152656-4faedf2bec36 h1:2o6bmPZvLOYqE6mQGqnyt+556TMpa26ZtSxvgSpT+98=
+github.com/moby/moby/api v0.0.0-20250731152656-4faedf2bec36/go.mod h1:GNQ0zU3WJGeJIcrLPE3xiQnsnLElvfqXQZZZiOqWuiE=
+github.com/moby/moby/client v0.0.0-20250731152656-4faedf2bec36 h1:o32ntpp76dDd5Hf9+XL09+qs06120KvZl+Ogt+RkYG0=
+github.com/moby/moby/client v0.0.0-20250731152656-4faedf2bec36/go.mod h1:+TFnycF6RuAUAq1tGTjZiSXuRcywpKUGo2dLkJ6tC48=
 github.com/moby/patternmatcher v0.6.0 h1:GmP9lR19aU5GqSSFko+5pRqHi+Ohk1O69aFiKkVGiPk=
 github.com/moby/patternmatcher v0.6.0/go.mod h1:hDPoyOpDY7OrrMDLaYoY3hf52gNCR/YOUYxkhApJIxc=
 github.com/moby/spdystream v0.5.0 h1:7r0J1Si3QO/kjRitvSLVVFUjxMEb/YLj6S9FF62JBCU=
@@ -471,6 +471,10 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/thaJeztah/cli v0.0.0-20250731155432-ce267f1b0e66 h1:akNT9npAkA3VoE4vqet8b7gZysaDx3ZgOg+Q/Heln9I=
+github.com/thaJeztah/cli v0.0.0-20250731155432-ce267f1b0e66/go.mod h1:PnmaRA7hP+mokt+80q1r6bxulIIvKxbaap8NOfsS7/Y=
+github.com/thaJeztah/docker v24.0.0-rc.1.0.20250731154917-67e26016308b+incompatible h1:cy5z2/ifddrrzlFv9jchs+D2dL2inCISWt0gMm7mkXw=
+github.com/thaJeztah/docker v24.0.0-rc.1.0.20250731154917-67e26016308b+incompatible/go.mod h1:eZ6Ef2GDr/8h8se23uenzFTrBHwc9jBEEnfrxqOb0Ss=
 github.com/theupdateframework/notary v0.7.0 h1:QyagRZ7wlSpjT5N2qQAh/pN+DVqgekv4DzbAiAiEL3c=
 github.com/theupdateframework/notary v0.7.0/go.mod h1:c9DRxcmhHmVLDay4/2fUYdISnHqbFDGRSlXPO0AhYWw=
 github.com/tilt-dev/fsnotify v1.4.8-0.20220602155310-fff9c274a375 h1:QB54BJwA6x8QU9nHY3xJSZR2kX9bgpZekRKGkLTmEXA=

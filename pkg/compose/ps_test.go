@@ -21,12 +21,12 @@ import (
 	"strings"
 	"testing"
 
-	containerType "github.com/docker/docker/api/types/container"
+	containerType "github.com/moby/moby/api/types/container"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/filters"
 )
 
 func TestPs(t *testing.T) {
