@@ -29,11 +29,10 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/registry"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v2/internal/registry"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 )
@@ -50,14 +49,6 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(s.maxConcurrency)
-
-	info, err := s.apiClient().Info(ctx)
-	if err != nil {
-		return err
-	}
-	if info.IndexServerAddress == "" {
-		info.IndexServerAddress = registry.IndexServer
-	}
 
 	w := progress.ContextWriter(ctx)
 	for _, service := range project.Services {
@@ -79,7 +70,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 
 		for _, tag := range tags {
 			eg.Go(func() error {
-				err := s.pushServiceImage(ctx, tag, info, s.configFile(), w, options.Quiet)
+				err := s.pushServiceImage(ctx, tag, s.configFile(), w, options.Quiet)
 				if err != nil {
 					if !options.IgnoreFailures {
 						return err
@@ -93,22 +84,13 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 	return eg.Wait()
 }
 
-func (s *composeService) pushServiceImage(ctx context.Context, tag string, info system.Info, configFile driver.Auth, w progress.Writer, quietPush bool) error {
+func (s *composeService) pushServiceImage(ctx context.Context, tag string, configFile driver.Auth, w progress.Writer, quietPush bool) error {
 	ref, err := reference.ParseNormalizedNamed(tag)
 	if err != nil {
 		return err
 	}
 
-	repoInfo, err := registry.ParseRepositoryInfo(ref)
-	if err != nil {
-		return err
-	}
-
-	key := repoInfo.Index.Name
-	if repoInfo.Index.Official {
-		key = info.IndexServerAddress
-	}
-	authConfig, err := configFile.GetAuthConfig(key)
+	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(ref))
 	if err != nil {
 		return err
 	}
