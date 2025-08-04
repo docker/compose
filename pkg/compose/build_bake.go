@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
@@ -75,7 +76,7 @@ func buildWithBake(dockerCli command.Cli) (bool, error) {
 
 	_, err = manager.GetPlugin("buildx", dockerCli, &cobra.Command{})
 	if err != nil {
-		if manager.IsNotFound(err) {
+		if errdefs.IsNotFound(err) {
 			logrus.Warnf("Docker Compose is configured to build using Bake, but buildx isn't installed")
 			return false, nil
 		}

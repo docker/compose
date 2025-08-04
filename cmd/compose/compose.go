@@ -36,7 +36,7 @@ import (
 	composegoutils "github.com/compose-spec/compose-go/v2/utils"
 	"github.com/docker/buildx/util/logutil"
 	dockercli "github.com/docker/cli/cli"
-	"github.com/docker/cli/cli-plugins/manager"
+	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/pkg/kvfile"
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -416,7 +416,7 @@ const PluginName = "compose"
 
 // RunningAsStandalone detects when running as a standalone program
 func RunningAsStandalone() bool {
-	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != PluginName
+	return len(os.Args) < 2 || os.Args[1] != metadata.MetadataSubcommandName && os.Args[1] != PluginName
 }
 
 // RootCommand returns the compose command with its child commands
