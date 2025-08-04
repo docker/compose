@@ -4,12 +4,15 @@
 * Windows:
   * [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
   * make
+  * go (see [go.mod](go.mod) for minimum version)
 * macOS:
   * [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)
   * make
+  * go (see [go.mod](go.mod) for minimum version)
 * Linux:
   * [Docker 20.10 or later](https://docs.docker.com/engine/install/)
   * make
+  * go (see [go.mod](go.mod) for minimum version)
 
 ### Building the CLI
 
