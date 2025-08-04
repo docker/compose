@@ -30,6 +30,7 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -163,7 +164,7 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 	if err == nil {
 		path = plugin.Path
 	}
-	if manager.IsNotFound(err) {
+	if errdefs.IsNotFound(err) {
 		path, err = exec.LookPath(executable(provider))
 	}
 	return path, err

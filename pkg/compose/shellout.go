@@ -21,7 +21,7 @@ import (
 	"os/exec"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli-plugins/manager"
+	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/context/docker"
 	"github.com/docker/compose/v2/internal"
 	"go.opentelemetry.io/otel"
@@ -32,7 +32,7 @@ import (
 func (s *composeService) prepareShellOut(gctx context.Context, env types.Mapping, cmd *exec.Cmd) error {
 	env = env.Clone()
 	// remove DOCKER_CLI_PLUGIN... variable so a docker-cli plugin will detect it run standalone
-	delete(env, manager.ReexecEnvvar)
+	delete(env, metadata.ReexecEnvvar)
 
 	// propagate opentelemetry context to child process, see https://github.com/open-telemetry/oteps/blob/main/text/0258-env-context-baggage-carriers.md
 	carrier := propagation.MapCarrier{}
@@ -42,11 +42,11 @@ func (s *composeService) prepareShellOut(gctx context.Context, env types.Mapping
 	env["DOCKER_CONTEXT"] = s.dockerCli.CurrentContext()
 	env["USER_AGENT"] = "compose/" + internal.Version
 
-	metadata, err := s.dockerCli.ContextStore().GetMetadata(s.dockerCli.CurrentContext())
+	md, err := s.dockerCli.ContextStore().GetMetadata(s.dockerCli.CurrentContext())
 	if err != nil {
 		return err
 	}
-	endpoint, err := docker.EndpointFromContext(metadata)
+	endpoint, err := docker.EndpointFromContext(md)
 	if err != nil {
 		return err
 	}
