@@ -226,6 +226,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		image := api.GetImageNameOrDefault(service, project.Name)
 		expectedImages[serviceName] = image
 
+		pull := service.Build.Pull || options.Pull
+		noCache := service.Build.NoCache || options.NoCache
+
 		target := targets[serviceName]
 		cfg.Targets[target] = bakeTarget{
 			Context:          build.Context,
@@ -243,8 +246,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Target:       build.Target,
 			Secrets:      toBakeSecrets(project, build.Secrets),
 			SSH:          toBakeSSH(append(build.SSH, options.SSHs...)),
-			Pull:         options.Pull,
-			NoCache:      options.NoCache,
+			Pull:         pull,
+			NoCache:      noCache,
 			ShmSize:      build.ShmSize,
 			Ulimits:      toBakeUlimits(build.Ulimits),
 			Entitlements: entitlements,
