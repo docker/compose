@@ -19,6 +19,9 @@ package compose
 import (
 	"context"
 	"io"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
@@ -71,6 +74,11 @@ func (s *composeService) Logs(
 	}
 
 	if options.Follow {
+		signalChan := make(chan os.Signal, 2)
+		defer close(signalChan)
+		signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(signalChan)
+
 		printer := newLogPrinter(consumer)
 
 		monitor := newMonitor(s.apiClient(), projectName)
@@ -106,6 +114,10 @@ func (s *composeService) Logs(
 		eg.Go(func() error {
 			return monitor.Start(ctx)
 		})
+		for {
+			<-signalChan
+			return nil
+		}
 	}
 
 	return eg.Wait()
