@@ -4,7 +4,7 @@ go 1.23.10
 
 replace (
 	github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250805215749-af0516f267b1
-	github.com/moby/buildkit => github.com/moby/buildkit v0.23.0-rc1.0.20250618182037-9b91d20367db // master
+	github.com/moby/buildkit => github.com/moby/buildkit v0.23.0-rc1.0.20250801041656-ee216b9a126b // master
 )
 
 require (

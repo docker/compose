@@ -313,8 +313,8 @@ github.com/mitchellh/hashstructure/v2 v2.0.2/go.mod h1:MG3aRVU/N29oo/V/IhBX8GR/z
 github.com/mitchellh/mapstructure v0.0.0-20150613213606-2caf8efc9366/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
-github.com/moby/buildkit v0.23.0-rc1.0.20250618182037-9b91d20367db h1:ZzrDuG9G1A/RwJvuogNplxCEKsIUQh1CqEnqbOGFgKE=
-github.com/moby/buildkit v0.23.0-rc1.0.20250618182037-9b91d20367db/go.mod h1:v5jMDvQgUyidk3wu3NvVAAd5JJo83nfet9Gf/o0+EAQ=
+github.com/moby/buildkit v0.23.0-rc1.0.20250801041656-ee216b9a126b h1:Ak5OR3pc4U3Goqz/1mmruYtj8APCG7WmOJm3RAK9reE=
+github.com/moby/buildkit v0.23.0-rc1.0.20250801041656-ee216b9a126b/go.mod h1:0gAxVTOAdJJjxg26p/KON0KwGngS9kNHDG7Xg1BsJ5s=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
 github.com/moby/go-archive v0.1.0 h1:Kk/5rdW/g+H8NHdJW2gsXyZ7UnzvJNOy6VKJqueWdcQ=
