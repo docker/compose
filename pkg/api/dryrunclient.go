@@ -207,6 +207,7 @@ func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path stri
 }
 
 func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options build.ImageBuildOptions) (build.ImageBuildResponse, error) {
+	// TODO(thaJeztah): can we use api/types/jsonstream (or api/pkg/xxxxx) for this?
 	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
 		Status:   fmt.Sprintf("%[1]sSuccessfully built: dryRunID\n%[1]sSuccessfully tagged: %[2]s\n", DRYRUN_PREFIX, options.Tags[0]),
 		Progress: &jsonmessage.JSONProgress{},
@@ -255,6 +256,8 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options client
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
+
+	// TODO(thaJeztah): can we use api/types/jsonstream (or api/pkg/xxxxx) for this?
 	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
 		Status: "Pushed",
 		Progress: &jsonmessage.JSONProgress{
