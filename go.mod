@@ -18,7 +18,7 @@ require (
 	github.com/docker/cli v28.3.3+incompatible
 	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.3.3+incompatible
-	github.com/docker/go-connections v0.5.0
+	github.com/docker/go-connections v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
 	github.com/fsnotify/fsevents v0.2.0
