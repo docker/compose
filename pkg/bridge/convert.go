@@ -32,11 +32,11 @@ import (
 	cli "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client/pkg/jsonmessage"
 	"gopkg.in/yaml.v3"
 )
 
@@ -212,7 +212,8 @@ func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName strin
 		}
 		defer func() { _ = stream.Close() }()
 
-		err = jsonmessage.DisplayJSONMessagesToStream(stream, dockerCli.Out(), nil)
+		out := dockerCli.Out()
+		err = jsonmessage.DisplayJSONMessagesStream(stream, out, out.FD(), out.IsTerminal(), nil)
 		if err != nil {
 			return image.InspectResponse{}, err
 		}
