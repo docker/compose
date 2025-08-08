@@ -37,7 +37,7 @@ type fseventNotify struct {
 	errors chan error
 	stop   chan struct{}
 
-	pathsWereWatching map[string]interface{}
+	pathsWereWatching map[string]any
 }
 
 func (d *fseventNotify) loop() {
@@ -71,7 +71,7 @@ func (d *fseventNotify) initAdd(name string) {
 	d.stream.Paths = append(d.stream.Paths, name)
 
 	if d.pathsWereWatching == nil {
-		d.pathsWereWatching = make(map[string]interface{})
+		d.pathsWereWatching = make(map[string]any)
 	}
 	d.pathsWereWatching[name] = struct{}{}
 }

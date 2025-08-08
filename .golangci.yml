@@ -68,6 +68,7 @@ linters:
       rules:
         - name: package-comments
           disabled: true
+        - name: use-any
   exclusions:
     generated: lax
     paths:

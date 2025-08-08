@@ -32,7 +32,7 @@ func (p *noopWriter) Event(Event) {
 func (p *noopWriter) Events([]Event) {
 }
 
-func (p *noopWriter) TailMsgf(_ string, _ ...interface{}) {
+func (p *noopWriter) TailMsgf(_ string, _ ...any) {
 }
 
 func (p *noopWriter) Stop() {

@@ -128,9 +128,9 @@ func defaultBuildOptions() api.BuildOptions {
 
 // deepEqual returns a nice diff on failure vs gomock.Eq when used
 // on structs.
-func deepEqual(x interface{}) gomock.Matcher {
+func deepEqual(x any) gomock.Matcher {
 	return gomock.GotFormatterAdapter(
-		gomock.GotFormatterFunc(func(got interface{}) string {
+		gomock.GotFormatterFunc(func(got any) string {
 			return cmp.Diff(x, got)
 		}),
 		gomock.Eq(x),
@@ -139,7 +139,7 @@ func deepEqual(x interface{}) gomock.Matcher {
 
 func spewAdapter(m gomock.Matcher) gomock.Matcher {
 	return gomock.GotFormatterAdapter(
-		gomock.GotFormatterFunc(func(got interface{}) string {
+		gomock.GotFormatterFunc(func(got any) string {
 			return spew.Sdump(got)
 		}),
 		m,
@@ -154,7 +154,7 @@ func pullPolicy(policy string) gomock.Matcher {
 	return spewAdapter(withPullPolicy{policy: policy})
 }
 
-func (w withPullPolicy) Matches(x interface{}) bool {
+func (w withPullPolicy) Matches(x any) bool {
 	proj, ok := x.(*types.Project)
 	if !ok || proj == nil || len(proj.Services) == 0 {
 		return false

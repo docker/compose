@@ -67,7 +67,7 @@ func runEvents(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		Until:    opts.until,
 		Consumer: func(event api.Event) error {
 			if opts.json {
-				marshal, err := json.Marshal(map[string]interface{}{
+				marshal, err := json.Marshal(map[string]any{
 					"time":       event.Timestamp,
 					"type":       "container",
 					"service":    event.Service,

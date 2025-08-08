@@ -74,7 +74,7 @@ func (p *jsonWriter) Events(events []Event) {
 	}
 }
 
-func (p *jsonWriter) TailMsgf(msg string, args ...interface{}) {
+func (p *jsonWriter) TailMsgf(msg string, args ...any) {
 	message := &jsonMessage{
 		DryRun: p.dryRun,
 		Tail:   true,
