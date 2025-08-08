@@ -100,7 +100,7 @@ func (f *TempDirFixture) JoinPaths(paths []string) []string {
 }
 
 // Returns the full path to the file written.
-func (f *TempDirFixture) WriteFile(path string, contents string) string {
+func (f *TempDirFixture) WriteFile(path, contents string) string {
 	fullPath := f.JoinPath(path)
 	base := filepath.Dir(fullPath)
 	err := os.MkdirAll(base, os.FileMode(0o777))

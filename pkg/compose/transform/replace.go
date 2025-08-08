@@ -23,7 +23,7 @@ import (
 )
 
 // ReplaceExtendsFile changes value for service.extends.file in input yaml stream, preserving formatting
-func ReplaceExtendsFile(in []byte, service string, value string) ([]byte, error) {
+func ReplaceExtendsFile(in []byte, service, value string) ([]byte, error) {
 	var doc yaml.Node
 	err := yaml.Unmarshal(in, &doc)
 	if err != nil {
@@ -78,7 +78,7 @@ func getMapping(root *yaml.Node, key string) (*yaml.Node, error) {
 }
 
 // replace changes yaml node value in stream at position, preserving content
-func replace(in []byte, line int, column int, value string) []byte {
+func replace(in []byte, line, column int, value string) []byte {
 	var out []byte
 	l := 1
 	pos := 0

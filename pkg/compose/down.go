@@ -196,7 +196,7 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 	return ops
 }
 
-func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName string, projectName string, name string, w progress.Writer) error {
+func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName, projectName, name string, w progress.Writer) error {
 	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),

@@ -77,7 +77,7 @@ type Service interface {
 	// Events executes the equivalent to a `compose events`
 	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
-	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
+	Port(ctx context.Context, projectName, service string, port uint16, options PortOptions) (string, int, error)
 	// Publish executes the equivalent to a `compose publish`
 	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`

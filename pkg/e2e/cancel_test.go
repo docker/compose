@@ -84,7 +84,7 @@ func TestComposeCancel(t *testing.T) {
 	})
 }
 
-func StartWithNewGroupID(ctx context.Context, command icmd.Cmd, stdout *utils.SafeBuffer, stderr *utils.SafeBuffer) (*exec.Cmd, error) {
+func StartWithNewGroupID(ctx context.Context, command icmd.Cmd, stdout, stderr *utils.SafeBuffer) (*exec.Cmd, error) {
 	cmd := exec.CommandContext(ctx, command.Command[0], command.Command[1:]...)
 	cmd.Env = command.Env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}

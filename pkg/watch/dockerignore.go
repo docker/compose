@@ -160,7 +160,7 @@ func readDockerignorePatterns(r io.Reader) ([]string, error) {
 	return patterns, nil
 }
 
-func DockerIgnoreTesterFromContents(repoRoot string, contents string) (*dockerPathMatcher, error) {
+func DockerIgnoreTesterFromContents(repoRoot, contents string) (*dockerPathMatcher, error) {
 	patterns, err := ignorefile.ReadAll(strings.NewReader(contents))
 	if err != nil {
 		return nil, fmt.Errorf("error reading .dockerignore: %w", err)

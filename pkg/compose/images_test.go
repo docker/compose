@@ -80,7 +80,7 @@ func TestImages(t *testing.T) {
 	assert.DeepEqual(t, images, expected)
 }
 
-func imageInspect(id string, imageReference string, size int64) image.InspectResponse {
+func imageInspect(id, imageReference string, size int64) image.InspectResponse {
 	return image.InspectResponse{
 		ID: id,
 		RepoTags: []string{
@@ -91,7 +91,7 @@ func imageInspect(id string, imageReference string, size int64) image.InspectRes
 	}
 }
 
-func containerDetail(service string, id string, status string, imageName string) container.Summary {
+func containerDetail(service, id, status, imageName string) container.Summary {
 	return container.Summary{
 		ID:     id,
 		Names:  []string{"/" + id},

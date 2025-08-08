@@ -40,7 +40,6 @@ linters:
               desc: compose-go uses yaml.v3
     gocritic:
       disabled-checks:
-        - paramTypeCombine
         - unnamedResult
         - whyNoLint
       enabled-tags:
@@ -81,6 +80,9 @@ formatters:
   enable:
     - gofumpt
     - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
   exclusions:
     generated: lax
     paths:

@@ -55,7 +55,7 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 
 	var direction copyDirection
 	var serviceName string
-	var copyFunc func(ctx context.Context, containerID string, srcPath string, dstPath string, opts api.CopyOptions) error
+	var copyFunc func(ctx context.Context, containerID, srcPath, dstPath string, opts api.CopyOptions) error
 	if srcService != "" {
 		direction |= fromService
 		serviceName = srcService
@@ -143,7 +143,7 @@ func (s *composeService) listContainersTargetedForCopy(ctx context.Context, proj
 	}
 }
 
-func (s *composeService) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, opts api.CopyOptions) error {
+func (s *composeService) copyToContainer(ctx context.Context, containerID, srcPath, dstPath string, opts api.CopyOptions) error {
 	var err error
 	if srcPath != "-" {
 		// Get an absolute source path.

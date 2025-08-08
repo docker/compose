@@ -515,7 +515,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}, nil
 }
 
-func attestation(attest string, val string) *string {
+func attestation(attest, val string) *string {
 	if b, err := strconv.ParseBool(val); err == nil {
 		s := fmt.Sprintf("type=%s,disabled=%t", attest, b)
 		return &s

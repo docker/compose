@@ -26,7 +26,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func assertServiceStatus(t *testing.T, projectName, service, status string, ps string) {
+func assertServiceStatus(t *testing.T, projectName, service, status, ps string) {
 	// match output with random spaces like:
 	// e2e-start-stop-db-1      alpine:latest "echo hello"     db	1 minutes ago	Exited (0) 1 minutes ago
 	regx := fmt.Sprintf("%s-%s-1.+%s\\s+.+%s.+", projectName, service, service, status)

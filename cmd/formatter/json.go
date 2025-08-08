@@ -29,7 +29,7 @@ func ToStandardJSON(i interface{}) (string, error) {
 }
 
 // ToJSON return a string with the JSON representation of the interface{}
-func ToJSON(i interface{}, prefix string, indentation string) (string, error) {
+func ToJSON(i interface{}, prefix, indentation string) (string, error) {
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)
 	encoder.SetEscapeHTML(false)

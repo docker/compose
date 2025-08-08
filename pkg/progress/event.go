@@ -64,7 +64,7 @@ type Event struct {
 }
 
 // ErrorMessageEvent creates a new Error Event with message
-func ErrorMessageEvent(id string, msg string) Event {
+func ErrorMessageEvent(id, msg string) Event {
 	return NewEvent(id, Error, msg)
 }
 
@@ -164,7 +164,7 @@ func BuiltEvent(id string) Event {
 }
 
 // SkippedEvent creates a new Skipped Event
-func SkippedEvent(id string, reason string) Event {
+func SkippedEvent(id, reason string) Event {
 	return Event{
 		ID:         id,
 		Status:     Warning,

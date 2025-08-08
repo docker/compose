@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-func IsChild(dir string, file string) bool {
+func IsChild(dir, file string) bool {
 	if dir == "" {
 		return false
 	}

@@ -523,7 +523,7 @@ func (d *DryRunClient) PluginUpgrade(ctx context.Context, name string, options m
 	return d.apiClient.PluginUpgrade(ctx, name, options)
 }
 
-func (d *DryRunClient) PluginPush(ctx context.Context, name string, registryAuth string) (io.ReadCloser, error) {
+func (d *DryRunClient) PluginPush(ctx context.Context, name, registryAuth string) (io.ReadCloser, error) {
 	return d.apiClient.PluginPush(ctx, name, registryAuth)
 }
 

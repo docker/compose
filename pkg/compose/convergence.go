@@ -75,7 +75,7 @@ func (c *convergence) setObservedState(serviceName string, containers Containers
 	c.services[serviceName] = containers
 }
 
-func newConvergence(services []string, state Containers, networks map[string]string, volumes map[string]string, s *composeService) *convergence {
+func newConvergence(services []string, state Containers, networks, volumes map[string]string, s *composeService) *convergence {
 	observedState := map[string]Containers{}
 	for _, s := range services {
 		observedState[s] = Containers{}

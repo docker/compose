@@ -245,7 +245,7 @@ func findPluginExecutable(pluginExecutableName string) (string, error) {
 }
 
 // CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
-func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
+func CopyFile(t testing.TB, sourceFile, destinationFile string) {
 	t.Helper()
 
 	src, err := os.Open(sourceFile)

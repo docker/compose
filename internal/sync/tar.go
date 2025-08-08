@@ -43,7 +43,7 @@ type archiveEntry struct {
 }
 
 type LowLevelClient interface {
-	ContainersForService(ctx context.Context, projectName string, serviceName string) ([]container.Summary, error)
+	ContainersForService(ctx context.Context, projectName, serviceName string) ([]container.Summary, error)
 
 	Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error
 	Untar(ctx context.Context, id string, reader io.ReadCloser) error

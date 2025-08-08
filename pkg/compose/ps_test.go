@@ -90,7 +90,7 @@ func TestPs(t *testing.T) {
 	assert.DeepEqual(t, containers, expected)
 }
 
-func containerDetails(service string, id string, status string, health string, exitCode int) (containerType.Summary, containerType.InspectResponse) {
+func containerDetails(service, id, status, health string, exitCode int) (containerType.Summary, containerType.InspectResponse) {
 	container := containerType.Summary{
 		ID:     id,
 		Names:  []string{"/" + id},

@@ -420,7 +420,7 @@ type tarDockerClient struct {
 	s *composeService
 }
 
-func (t tarDockerClient) ContainersForService(ctx context.Context, projectName string, serviceName string) ([]container.Summary, error) {
+func (t tarDockerClient) ContainersForService(ctx context.Context, projectName, serviceName string) ([]container.Summary, error) {
 	containers, err := t.s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
 	if err != nil {
 		return nil, err

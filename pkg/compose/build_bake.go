@@ -458,7 +458,7 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) 
 	return s
 }
 
-func dockerFilePath(ctxName string, dockerfile string) string {
+func dockerFilePath(ctxName, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
@@ -490,7 +490,7 @@ func dryRunBake(ctx context.Context, cfg bakeConfig) map[string]string {
 	return bakeResponse
 }
 
-func displayDryRunBuildEvent(w progress.Writer, name string, dryRunUUID, tag string) {
+func displayDryRunBuildEvent(w progress.Writer, name, dryRunUUID, tag string) {
 	w.Event(progress.Event{
 		ID:     name + " ==>",
 		Status: progress.Done,

@@ -102,7 +102,7 @@ func TestKillSignal(t *testing.T) {
 	assert.NilError(t, err)
 }
 
-func testContainer(service string, id string, oneOff bool) container.Summary {
+func testContainer(service, id string, oneOff bool) container.Summary {
 	// canonical docker names in the API start with a leading slash, some
 	// parts of Compose code will attempt to strip this off, so make sure
 	// it's consistently present

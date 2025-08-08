@@ -43,7 +43,7 @@ const (
 )
 
 // NewContainerFormat returns a Format for rendering using a Context
-func NewContainerFormat(source string, quiet bool, size bool) formatter.Format {
+func NewContainerFormat(source string, quiet, size bool) formatter.Format {
 	switch source {
 	case formatter.TableFormatKey, "": // table formatting is the default if none is set.
 		if quiet {

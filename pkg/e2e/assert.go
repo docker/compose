@@ -26,7 +26,7 @@ import (
 
 // RequireServiceState ensures that the container is in the expected state
 // (running or exited).
-func RequireServiceState(t testing.TB, cli *CLI, service string, state string) {
+func RequireServiceState(t testing.TB, cli *CLI, service, state string) {
 	t.Helper()
 	psRes := cli.RunDockerComposeCmd(t, "ps", "--all", "--format=json", service)
 	var svc map[string]interface{}

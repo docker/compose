@@ -293,7 +293,7 @@ func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, erro
 }
 
 // NewVertex is the constructor function for the Vertex
-func NewVertex(key string, service string, initialStatus ServiceStatus) *Vertex {
+func NewVertex(key, service string, initialStatus ServiceStatus) *Vertex {
 	return &Vertex{
 		Key:      key,
 		Service:  service,
@@ -304,7 +304,7 @@ func NewVertex(key string, service string, initialStatus ServiceStatus) *Vertex 
 }
 
 // AddVertex adds a vertex to the Graph
-func (g *Graph) AddVertex(key string, service string, initialStatus ServiceStatus) {
+func (g *Graph) AddVertex(key, service string, initialStatus ServiceStatus) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -313,7 +313,7 @@ func (g *Graph) AddVertex(key string, service string, initialStatus ServiceStatu
 }
 
 // AddEdge adds a relationship of dependency between vertices `source` and `destination`
-func (g *Graph) AddEdge(source string, destination string) error {
+func (g *Graph) AddEdge(source, destination string) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -445,7 +445,7 @@ func (g *Graph) HasCycles() (bool, error) {
 	return false, nil
 }
 
-func (g *Graph) visit(key string, path []string, discovered []string, finished []string) ([]string, []string, error) {
+func (g *Graph) visit(key string, path, discovered, finished []string) ([]string, []string, error) {
 	discovered = append(discovered, key)
 
 	for _, v := range g.Vertices[key].Children {

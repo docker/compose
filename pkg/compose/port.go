@@ -25,7 +25,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 )
 
-func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
+func (s *composeService) Port(ctx context.Context, projectName, service string, port uint16, options api.PortOptions) (string, int, error) {
 	projectName = strings.ToLower(projectName)
 	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, service, options.Index)
 	if err != nil {

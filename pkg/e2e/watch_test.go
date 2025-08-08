@@ -186,7 +186,7 @@ func doTest(t *testing.T, svcName string) {
 
 	require.NoError(t, os.Mkdir(dataDir, 0o700))
 
-	checkFileContents := func(path string, contents string) poll.Check {
+	checkFileContents := func(path, contents string) poll.Check {
 		return func(pollLog poll.LogT) poll.Result {
 			if r.Cmd.ProcessState != nil {
 				return poll.Error(fmt.Errorf("watch process exited early: %s", r.Cmd.ProcessState))
@@ -348,7 +348,7 @@ func TestWatchMultiServices(t *testing.T) {
 		return poll.Continue("%v", watch.Stdout())
 	})
 
-	waitRebuild := func(service string, expected string) {
+	waitRebuild := func(service, expected string) {
 		poll.WaitOn(t, func(l poll.LogT) poll.Result {
 			cat := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", service, "cat", "/data/"+service)
 			if strings.Contains(cat.Stdout(), expected) {
