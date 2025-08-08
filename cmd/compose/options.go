@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -149,7 +150,7 @@ func promptForInterpolatedVariables(ctx context.Context, dockerCli command.Cli, 
 	}
 
 	if !confirmed {
-		return fmt.Errorf("operation cancelled by user")
+		return errors.New("operation cancelled by user")
 	}
 
 	return nil
@@ -284,7 +285,7 @@ func confirmRemoteIncludes(dockerCli command.Cli, options buildOptions, assumeYe
 		return err
 	}
 	if !confirmed {
-		return fmt.Errorf("operation cancelled by user")
+		return errors.New("operation cancelled by user")
 	}
 
 	return nil

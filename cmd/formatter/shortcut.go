@@ -209,7 +209,7 @@ func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Pro
 				link := fmt.Sprintf("docker-desktop://dashboard/apps/%s", project.Name)
 				err := open.Run(link)
 				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop")
+					err = errors.New("could not open Docker Desktop")
 					lk.keyboardError("View", err)
 				}
 				return err
@@ -227,7 +227,7 @@ func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Proje
 				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s", project.Name)
 				err := open.Run(link)
 				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop Compose UI")
+					err = errors.New("could not open Docker Desktop Compose UI")
 					lk.keyboardError("View Config", err)
 				}
 				return err
@@ -242,7 +242,7 @@ func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Proje
 				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
 				err := open.Run(link)
 				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop Compose UI")
+					err = errors.New("could not open Docker Desktop Compose UI")
 					lk.keyboardError("Watch Docs", err)
 				}
 				return err

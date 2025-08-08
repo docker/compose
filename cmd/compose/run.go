@@ -18,7 +18,7 @@ package compose
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"strings"
 
@@ -165,7 +165,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 				options.Command = args[1:]
 			}
 			if len(options.publish) > 0 && options.servicePorts {
-				return fmt.Errorf("--service-ports and --publish are incompatible")
+				return errors.New("--service-ports and --publish are incompatible")
 			}
 			if cmd.Flags().Changed("entrypoint") {
 				command, err := shellwords.Parse(options.entrypoint)
@@ -176,7 +176,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 			}
 			if cmd.Flags().Changed("tty") {
 				if cmd.Flags().Changed("no-TTY") {
-					return fmt.Errorf("--tty and --no-TTY can't be used together")
+					return errors.New("--tty and --no-TTY can't be used together")
 				} else {
 					options.noTty = !options.tty
 				}
@@ -275,7 +275,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	for _, s := range options.labels {
 		parts := strings.SplitN(s, "=", 2)
 		if len(parts) != 2 {
-			return fmt.Errorf("label must be set as KEY=VALUE")
+			return errors.New("label must be set as KEY=VALUE")
 		}
 		labels[parts[0]] = parts[1]
 	}

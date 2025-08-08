@@ -137,7 +137,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 			up.validateNavigationMenu(dockerCli)
 
 			if !p.All && len(project.Services) == 0 {
-				return fmt.Errorf("no service selected")
+				return errors.New("no service selected")
 			}
 
 			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
@@ -191,35 +191,35 @@ func validateFlags(up *upOptions, create *createOptions) error {
 		up.cascadeStop = true
 	}
 	if up.cascadeStop && up.cascadeFail {
-		return fmt.Errorf("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
+		return errors.New("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
 	}
 	if up.wait {
 		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
-			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
+			return errors.New("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
 		}
 		up.Detach = true
 	}
 	if create.Build && create.noBuild {
-		return fmt.Errorf("--build and --no-build are incompatible")
+		return errors.New("--build and --no-build are incompatible")
 	}
 	if up.Detach && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0 || up.watch) {
 		if up.wait {
-			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
+			return errors.New("--wait cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
 		} else {
-			return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
+			return errors.New("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
 		}
 	}
 	if create.noInherit && create.noRecreate {
-		return fmt.Errorf("--no-recreate and --renew-anon-volumes are incompatible")
+		return errors.New("--no-recreate and --renew-anon-volumes are incompatible")
 	}
 	if create.forceRecreate && create.noRecreate {
-		return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+		return errors.New("--force-recreate and --no-recreate are incompatible")
 	}
 	if create.recreateDeps && create.noRecreate {
-		return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
+		return errors.New("--always-recreate-deps and --no-recreate are incompatible")
 	}
 	if create.noBuild && up.watch {
-		return fmt.Errorf("--no-build and --watch are incompatible")
+		return errors.New("--no-build and --watch are incompatible")
 	}
 	return nil
 }
