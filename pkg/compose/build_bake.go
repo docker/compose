@@ -119,6 +119,7 @@ type bakeTarget struct {
 	Entitlements     []string          `json:"entitlements,omitempty"`
 	ExtraHosts       map[string]string `json:"extra-hosts,omitempty"`
 	Outputs          []string          `json:"output,omitempty"`
+	Attest           []string          `json:"attest,omitempty"`
 }
 
 type bakeMetadata map[string]buildStatus
@@ -255,6 +256,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 			Outputs: outputs,
 			Call:    call,
+			Attest:  toBakeAttest(build),
 		}
 	}
 
@@ -307,6 +309,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		if privileged {
 			args = append(args, "--allow", "security.insecure")
 		}
+	}
+	if options.SBOM != "" {
+		args = append(args, "--sbom="+options.SBOM)
+	}
+	if options.Provenance != "" {
+		args = append(args, "--provenance="+options.Provenance)
 	}
 
 	if options.Builder != "" {
@@ -456,6 +464,30 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) 
 		}
 	}
 	return s
+}
+
+func toBakeAttest(build types.BuildConfig) []string {
+	var attests []string
+
+	// Handle per-service provenance configuration (only from build config, not global options)
+	if build.Provenance != "" {
+		if build.Provenance == "true" {
+			attests = append(attests, "type=provenance")
+		} else if build.Provenance != "false" {
+			attests = append(attests, fmt.Sprintf("type=provenance,%s", build.Provenance))
+		}
+	}
+
+	// Handle per-service SBOM configuration (only from build config, not global options)
+	if build.SBOM != "" {
+		if build.SBOM == "true" {
+			attests = append(attests, "type=sbom")
+		} else if build.SBOM != "false" {
+			attests = append(attests, fmt.Sprintf("type=sbom,%s", build.SBOM))
+		}
+	}
+
+	return attests
 }
 
 func dockerFilePath(ctxName string, dockerfile string) string {
