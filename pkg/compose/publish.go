@@ -236,6 +236,9 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 	if ok, err := s.checkOnlyBuildSection(project); !ok || err != nil {
 		return false, err
 	}
+	if options.AssumeYes {
+		return true, nil
+	}
 	bindMounts := s.checkForBindMount(project)
 	if len(bindMounts) > 0 {
 		fmt.Println("you are about to publish bind mounts declaration within your OCI artifact.\n" +
@@ -250,9 +253,6 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 		if ok, err := acceptPublishBindMountDeclarations(s.dockerCli); err != nil || !ok {
 			return false, err
 		}
-	}
-	if options.AssumeYes {
-		return true, nil
 	}
 	detectedSecrets, err := s.checkForSensitiveData(project)
 	if err != nil {
