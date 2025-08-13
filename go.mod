@@ -2,6 +2,18 @@ module github.com/docker/compose/v2
 
 go 1.23.12
 
+replace (
+	// FIXME(thaJeztah): trying https://github.com/docker/cli/pull/6199
+	github.com/docker/cli => github.com/thaJeztah/cli v0.0.0-20250731155432-ce267f1b0e66
+
+	// FIXME(thaJeztah): trying https://github.com/moby/moby/pull/50475
+	github.com/docker/docker => github.com/thaJeztah/docker v24.0.0-rc.1.0.20250731154917-67e26016308b+incompatible
+
+	// FIXME(thaJeztah): temporarily need to pin on commits, otherwise go modules won't resolve until these are tagged.
+	github.com/moby/moby/api => github.com/moby/moby/api v0.0.0-20250731152656-4faedf2bec36
+	github.com/moby/moby/client => github.com/moby/moby/client v0.0.0-20250731152656-4faedf2bec36
+)
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e
@@ -134,6 +146,8 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
+	github.com/moby/moby/api v0.0.0 // indirect
+	github.com/moby/moby/client v0.0.0-00010101000000-000000000000 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
