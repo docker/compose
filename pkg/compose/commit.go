@@ -23,7 +23,7 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 )
 
 func (s *composeService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {

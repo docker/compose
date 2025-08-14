@@ -16,20 +16,21 @@ import (
 	http "net/http"
 	reflect "reflect"
 
-	types "github.com/docker/docker/api/types"
-	build "github.com/docker/docker/api/types/build"
-	checkpoint "github.com/docker/docker/api/types/checkpoint"
-	common "github.com/docker/docker/api/types/common"
-	container "github.com/docker/docker/api/types/container"
-	events "github.com/docker/docker/api/types/events"
-	filters "github.com/docker/docker/api/types/filters"
-	image "github.com/docker/docker/api/types/image"
-	network "github.com/docker/docker/api/types/network"
-	registry "github.com/docker/docker/api/types/registry"
-	swarm "github.com/docker/docker/api/types/swarm"
-	system "github.com/docker/docker/api/types/system"
-	volume "github.com/docker/docker/api/types/volume"
-	client "github.com/docker/docker/client"
+	types "github.com/moby/moby/api/types"
+	build "github.com/moby/moby/api/types/build"
+	checkpoint "github.com/moby/moby/api/types/checkpoint"
+	common "github.com/moby/moby/api/types/common"
+	container "github.com/moby/moby/api/types/container"
+	events "github.com/moby/moby/api/types/events"
+	filters "github.com/moby/moby/api/types/filters"
+	image "github.com/moby/moby/api/types/image"
+	network "github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/plugin"
+	registry "github.com/moby/moby/api/types/registry"
+	swarm "github.com/moby/moby/api/types/swarm"
+	system "github.com/moby/moby/api/types/system"
+	volume "github.com/moby/moby/api/types/volume"
+	client "github.com/moby/moby/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -232,10 +233,10 @@ func (mr *MockAPIClientMockRecorder) ConfigUpdate(arg0, arg1, arg2, arg3 any) *g
 }
 
 // ContainerAttach mocks base method.
-func (m *MockAPIClient) ContainerAttach(arg0 context.Context, arg1 string, arg2 container.AttachOptions) (types.HijackedResponse, error) {
+func (m *MockAPIClient) ContainerAttach(arg0 context.Context, arg1 string, arg2 container.AttachOptions) (client.HijackedResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerAttach", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.HijackedResponse)
+	ret0, _ := ret[0].(client.HijackedResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -292,10 +293,10 @@ func (mr *MockAPIClientMockRecorder) ContainerDiff(arg0, arg1 any) *gomock.Call 
 }
 
 // ContainerExecAttach mocks base method.
-func (m *MockAPIClient) ContainerExecAttach(arg0 context.Context, arg1 string, arg2 container.ExecStartOptions) (types.HijackedResponse, error) {
+func (m *MockAPIClient) ContainerExecAttach(arg0 context.Context, arg1 string, arg2 container.ExecStartOptions) (client.HijackedResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecAttach", arg0, arg1, arg2)
-	ret0, _ := ret[0].(types.HijackedResponse)
+	ret0, _ := ret[0].(client.HijackedResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -554,10 +555,10 @@ func (mr *MockAPIClientMockRecorder) ContainerStatPath(arg0, arg1, arg2 any) *go
 }
 
 // ContainerStats mocks base method.
-func (m *MockAPIClient) ContainerStats(arg0 context.Context, arg1 string, arg2 bool) (container.StatsResponseReader, error) {
+func (m *MockAPIClient) ContainerStats(arg0 context.Context, arg1 string, arg2 bool) (client.StatsResponseReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerStats", arg0, arg1, arg2)
-	ret0, _ := ret[0].(container.StatsResponseReader)
+	ret0, _ := ret[0].(client.StatsResponseReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -569,10 +570,10 @@ func (mr *MockAPIClientMockRecorder) ContainerStats(arg0, arg1, arg2 any) *gomoc
 }
 
 // ContainerStatsOneShot mocks base method.
-func (m *MockAPIClient) ContainerStatsOneShot(arg0 context.Context, arg1 string) (container.StatsResponseReader, error) {
+func (m *MockAPIClient) ContainerStatsOneShot(arg0 context.Context, arg1 string) (client.StatsResponseReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerStatsOneShot", arg0, arg1)
-	ret0, _ := ret[0].(container.StatsResponseReader)
+	ret0, _ := ret[0].(client.StatsResponseReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -745,10 +746,10 @@ func (mr *MockAPIClientMockRecorder) Dialer() *gomock.Call {
 }
 
 // DiskUsage mocks base method.
-func (m *MockAPIClient) DiskUsage(arg0 context.Context, arg1 types.DiskUsageOptions) (types.DiskUsage, error) {
+func (m *MockAPIClient) DiskUsage(arg0 context.Context, arg1 system.DiskUsageOptions) (system.DiskUsage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DiskUsage", arg0, arg1)
-	ret0, _ := ret[0].(types.DiskUsage)
+	ret0, _ := ret[0].(system.DiskUsage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1280,7 +1281,7 @@ func (mr *MockAPIClientMockRecorder) Ping(arg0 any) *gomock.Call {
 }
 
 // PluginCreate mocks base method.
-func (m *MockAPIClient) PluginCreate(arg0 context.Context, arg1 io.Reader, arg2 types.PluginCreateOptions) error {
+func (m *MockAPIClient) PluginCreate(arg0 context.Context, arg1 io.Reader, arg2 client.PluginCreateOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginCreate", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -1294,7 +1295,7 @@ func (mr *MockAPIClientMockRecorder) PluginCreate(arg0, arg1, arg2 any) *gomock.
 }
 
 // PluginDisable mocks base method.
-func (m *MockAPIClient) PluginDisable(arg0 context.Context, arg1 string, arg2 types.PluginDisableOptions) error {
+func (m *MockAPIClient) PluginDisable(arg0 context.Context, arg1 string, arg2 client.PluginDisableOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginDisable", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -1308,7 +1309,7 @@ func (mr *MockAPIClientMockRecorder) PluginDisable(arg0, arg1, arg2 any) *gomock
 }
 
 // PluginEnable mocks base method.
-func (m *MockAPIClient) PluginEnable(arg0 context.Context, arg1 string, arg2 types.PluginEnableOptions) error {
+func (m *MockAPIClient) PluginEnable(arg0 context.Context, arg1 string, arg2 client.PluginEnableOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginEnable", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -1322,10 +1323,10 @@ func (mr *MockAPIClientMockRecorder) PluginEnable(arg0, arg1, arg2 any) *gomock.
 }
 
 // PluginInspectWithRaw mocks base method.
-func (m *MockAPIClient) PluginInspectWithRaw(arg0 context.Context, arg1 string) (*types.Plugin, []byte, error) {
+func (m *MockAPIClient) PluginInspectWithRaw(arg0 context.Context, arg1 string) (*plugin.Plugin, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginInspectWithRaw", arg0, arg1)
-	ret0, _ := ret[0].(*types.Plugin)
+	ret0, _ := ret[0].(*plugin.Plugin)
 	ret1, _ := ret[1].([]byte)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -1338,7 +1339,7 @@ func (mr *MockAPIClientMockRecorder) PluginInspectWithRaw(arg0, arg1 any) *gomoc
 }
 
 // PluginInstall mocks base method.
-func (m *MockAPIClient) PluginInstall(arg0 context.Context, arg1 string, arg2 types.PluginInstallOptions) (io.ReadCloser, error) {
+func (m *MockAPIClient) PluginInstall(arg0 context.Context, arg1 string, arg2 client.PluginInstallOptions) (io.ReadCloser, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginInstall", arg0, arg1, arg2)
 	ret0, _ := ret[0].(io.ReadCloser)
@@ -1353,10 +1354,10 @@ func (mr *MockAPIClientMockRecorder) PluginInstall(arg0, arg1, arg2 any) *gomock
 }
 
 // PluginList mocks base method.
-func (m *MockAPIClient) PluginList(arg0 context.Context, arg1 filters.Args) (types.PluginsListResponse, error) {
+func (m *MockAPIClient) PluginList(arg0 context.Context, arg1 filters.Args) (plugin.ListResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginList", arg0, arg1)
-	ret0, _ := ret[0].(types.PluginsListResponse)
+	ret0, _ := ret[0].(plugin.ListResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1383,7 +1384,7 @@ func (mr *MockAPIClientMockRecorder) PluginPush(arg0, arg1, arg2 any) *gomock.Ca
 }
 
 // PluginRemove mocks base method.
-func (m *MockAPIClient) PluginRemove(arg0 context.Context, arg1 string, arg2 types.PluginRemoveOptions) error {
+func (m *MockAPIClient) PluginRemove(arg0 context.Context, arg1 string, arg2 client.PluginRemoveOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginRemove", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -1411,7 +1412,7 @@ func (mr *MockAPIClientMockRecorder) PluginSet(arg0, arg1, arg2 any) *gomock.Cal
 }
 
 // PluginUpgrade mocks base method.
-func (m *MockAPIClient) PluginUpgrade(arg0 context.Context, arg1 string, arg2 types.PluginInstallOptions) (io.ReadCloser, error) {
+func (m *MockAPIClient) PluginUpgrade(arg0 context.Context, arg1 string, arg2 client.PluginInstallOptions) (io.ReadCloser, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginUpgrade", arg0, arg1, arg2)
 	ret0, _ := ret[0].(io.ReadCloser)

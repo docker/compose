@@ -19,31 +19,25 @@ package compose
 import (
 	"io"
 
-	moby "github.com/docker/docker/api/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 const (
-	// ContainerCreated created status
-	ContainerCreated = "created"
-	// ContainerRestarting restarting status
-	ContainerRestarting = "restarting"
-	// ContainerRunning running status
-	ContainerRunning = "running"
-	// ContainerRemoving removing status
-	ContainerRemoving = "removing"
-	// ContainerPaused paused status
-	ContainerPaused = "paused"
-	// ContainerExited exited status
-	ContainerExited = "exited"
-	// ContainerDead dead status
-	ContainerDead = "dead"
+	ContainerCreated    = container.StateCreated    // StateCreated indicates the container is created, but not (yet) started.
+	ContainerRunning    = container.StateRunning    // StateRunning indicates that the container is running.
+	ContainerPaused     = container.StatePaused     // StatePaused indicates that the container's current state is paused.
+	ContainerRestarting = container.StateRestarting // StateRestarting indicates that the container is currently restarting.
+	ContainerRemoving   = container.StateRemoving   // StateRemoving indicates that the container is being removed.
+	ContainerExited     = container.StateExited     // StateExited indicates that the container exited.
+	ContainerDead       = container.StateDead       // StateDead indicates that the container failed to be deleted. Containers in this state are attempted to be cleaned up when the daemon restarts.
 )
 
 var _ io.ReadCloser = ContainerStdout{}
 
 // ContainerStdout implement ReadCloser for moby.HijackedResponse
 type ContainerStdout struct {
-	moby.HijackedResponse
+	client.HijackedResponse
 }
 
 // Read implement io.ReadCloser
@@ -61,7 +55,7 @@ var _ io.WriteCloser = ContainerStdin{}
 
 // ContainerStdin implement WriteCloser for moby.HijackedResponse
 type ContainerStdin struct {
-	moby.HijackedResponse
+	client.HijackedResponse
 }
 
 // Write implement io.WriteCloser
