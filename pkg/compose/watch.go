@@ -76,7 +76,7 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, cons
 		}
 	}
 	// none of the services is eligible to watch
-	return nil, fmt.Errorf("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
+	return nil, errors.New("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
 }
 
 // ensure state changes are atomic
@@ -253,7 +253,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	}
 
 	if len(paths) == 0 {
-		return nil, fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
+		return nil, errors.New("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
 	watcher, err := watch.NewWatcher(paths)
@@ -811,7 +811,7 @@ func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Pr
 		return time.Now(), err
 	}
 	if len(containers) == 0 {
-		return time.Now(), fmt.Errorf("could not get created time for service's image")
+		return time.Now(), errors.New("could not get created time for service's image")
 	}
 
 	img, err := s.apiClient().ImageInspect(ctx, containers[0].ImageID)

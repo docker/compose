@@ -66,7 +66,7 @@ func (p *mixedWriter) Events(events []Event) {
 	}
 }
 
-func (p *mixedWriter) TailMsgf(msg string, args ...interface{}) {
+func (p *mixedWriter) TailMsgf(msg string, args ...any) {
 	msg = fmt.Sprintf(msg, args...)
 	p.out.Status("", WarningColor(msg))
 }
