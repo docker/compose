@@ -55,3 +55,47 @@ func Test_addBuildDependencies(t *testing.T) {
 	slices.Sort(expected)
 	assert.DeepEqual(t, services, expected)
 }
+
+func Test_toBakeAttest(t *testing.T) {
+	tests := []struct {
+		name     string
+		build    types.BuildConfig
+		expected []string
+	}{
+		{
+			name:     "no attestations",
+			build:    types.BuildConfig{},
+			expected: nil,
+		},
+		{
+			name:     "provenance",
+			build:    types.BuildConfig{Provenance: "true"},
+			expected: []string{"type=provenance"},
+		},
+		{
+			name:     "max provenance",
+			build:    types.BuildConfig{Provenance: "max"},
+			expected: []string{"type=provenance,mode=max"},
+		},
+		{
+			name:     "sbom",
+			build:    types.BuildConfig{SBOM: "true"},
+			expected: []string{"type=sbom"},
+		},
+		{
+			name: "max provenance and sbom",
+			build: types.BuildConfig{
+				Provenance: "max",
+				SBOM:       "true",
+			},
+			expected: []string{"type=provenance,mode=max", "type=sbom"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := toBakeAttest(tt.build)
+			assert.DeepEqual(t, result, tt.expected)
+		})
+	}
+}
