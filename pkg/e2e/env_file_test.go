@@ -37,6 +37,11 @@ func TestUnusedMissingEnvFile(t *testing.T) {
 	defer c.cleanupWithDown(t, "unused_dotenv")
 
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "up", "-d", "serviceA")
+
+	// Runtime operations should work even with missing env file
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "ps")
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "logs")
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "down")
 }
 
 func TestRunEnvFile(t *testing.T) {
