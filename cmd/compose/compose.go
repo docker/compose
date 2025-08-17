@@ -661,6 +661,10 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 		"profile",
 		completeProfileNames(dockerCli, &opts),
 	)
+	c.RegisterFlagCompletionFunc( //nolint:errcheck
+		"progress",
+		cobra.FixedCompletions(printerModes, cobra.ShellCompDirectiveNoFileComp),
+	)
 
 	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
 	c.Flags().IntVar(&parallel, "parallel", -1, `Control max parallelism, -1 for unlimited`)
