@@ -15,9 +15,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.28.0
-	github.com/docker/cli v28.4.0+incompatible
+	github.com/docker/cli v28.3.4-0.20250828143819-d26f1fd6d378+incompatible // 28.x branch (v28.4.0-dev)
 	github.com/docker/cli-docs-tool v0.10.0
-	github.com/docker/docker v28.4.0+incompatible
+	github.com/docker/docker v28.3.4-0.20250828134822-02b4a1a3decc+incompatible // 28.x branch (v28.4.0-dev)
 	github.com/docker/go-connections v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
