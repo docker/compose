@@ -101,6 +101,10 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		// Convert map to slice
 		var imageList []img
 		for ctr, i := range images {
+			lastTagTime := i.LastTagTime
+			if lastTagTime.IsZero() {
+				lastTagTime = time.Now()
+			}
 			imageList = append(imageList, img{
 				ContainerName: ctr,
 				ID:            i.ID,
@@ -108,7 +112,7 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 				Tag:           i.Tag,
 				Platform:      platforms.Format(i.Platform),
 				Size:          i.Size,
-				LastTagTime:   i.LastTagTime,
+				LastTagTime:   lastTagTime,
 			})
 		}
 		json, err := formatter.ToJSON(imageList, "", "")
