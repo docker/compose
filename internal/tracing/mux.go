@@ -18,8 +18,9 @@ package tracing
 
 import (
 	"context"
+	"errors"
+	"sync"
 
-	"github.com/hashicorp/go-multierror"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -28,23 +29,45 @@ type MuxExporter struct {
 }
 
 func (m MuxExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
-	var eg multierror.Group
-	for i := range m.exporters {
-		exporter := m.exporters[i]
-		eg.Go(func() error {
-			return exporter.ExportSpans(ctx, spans)
-		})
+	var (
+		wg    sync.WaitGroup
+		errMu sync.Mutex
+		errs  = make([]error, 0, len(m.exporters))
+	)
+
+	for _, exporter := range m.exporters {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := exporter.ExportSpans(ctx, spans); err != nil {
+				errMu.Lock()
+				errs = append(errs, err)
+				errMu.Unlock()
+			}
+		}()
 	}
-	return eg.Wait()
+	wg.Wait()
+	return errors.Join(errs...)
 }
 
 func (m MuxExporter) Shutdown(ctx context.Context) error {
-	var eg multierror.Group
-	for i := range m.exporters {
-		exporter := m.exporters[i]
-		eg.Go(func() error {
-			return exporter.Shutdown(ctx)
-		})
+	var (
+		wg    sync.WaitGroup
+		errMu sync.Mutex
+		errs  = make([]error, 0, len(m.exporters))
+	)
+
+	for _, exporter := range m.exporters {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := exporter.Shutdown(ctx); err != nil {
+				errMu.Lock()
+				errs = append(errs, err)
+				errMu.Unlock()
+			}
+		}()
 	}
-	return eg.Wait()
+	wg.Wait()
+	return errors.Join(errs...)
 }
