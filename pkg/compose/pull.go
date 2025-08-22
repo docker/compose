@@ -34,7 +34,6 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/hashicorp/go-multierror"
 	"github.com/opencontainers/go-digest"
 	"golang.org/x/sync/errgroup"
 
@@ -152,7 +151,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	if opts.IgnoreFailures {
 		return nil
 	}
-	return multierror.Append(nil, pullErrors...).ErrorOrNil()
+	return errors.Join(pullErrors...)
 }
 
 func imageAlreadyPresent(serviceImage string, localImages map[string]api.ImageSummary) bool {
