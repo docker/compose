@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -931,9 +932,7 @@ func (s *composeService) startService(ctx context.Context,
 func mergeLabels(ls ...types.Labels) types.Labels {
 	merged := types.Labels{}
 	for _, l := range ls {
-		for k, v := range l {
-			merged[k] = v
-		}
+		maps.Copy(merged, l)
 	}
 	return merged
 }
