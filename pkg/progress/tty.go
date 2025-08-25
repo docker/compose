@@ -126,7 +126,7 @@ func (w *ttyWriter) Events(events []Event) {
 	}
 }
 
-func (w *ttyWriter) TailMsgf(msg string, args ...interface{}) {
+func (w *ttyWriter) TailMsgf(msg string, args ...any) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	msgWithPrefix := msg
