@@ -558,6 +558,7 @@ type ImageSummary struct {
 	Tag         string
 	Platform    platforms.Platform
 	Size        int64
+	Created     time.Time
 	LastTagTime time.Time
 }
 
