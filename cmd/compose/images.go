@@ -103,7 +103,7 @@ func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		for ctr, i := range images {
 			lastTagTime := i.LastTagTime
 			if lastTagTime.IsZero() {
-				lastTagTime = time.Now()
+				lastTagTime = i.Created
 			}
 			imageList = append(imageList, img{
 				ContainerName: ctr,

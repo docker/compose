@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -90,6 +91,11 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 				}
 			}
 
+			created, err := time.Parse(time.RFC3339Nano, image.Created)
+			if err != nil {
+				return err
+			}
+
 			mux.Lock()
 			defer mux.Unlock()
 			summary[getCanonicalContainerName(c)] = api.ImageSummary{
@@ -103,6 +109,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 					Variant:      image.Variant,
 				},
 				Size:        image.Size,
+				Created:     created,
 				LastTagTime: image.Metadata.LastTagTime,
 			}
 			return nil
