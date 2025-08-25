@@ -100,7 +100,7 @@ func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName 
 		IsOneOffLabelTrueX := containers[i].Labels[api.OneoffLabel] == "True"
 		IsOneOffLabelTrueY := containers[j].Labels[api.OneoffLabel] == "True"
 
-		if numberLabelX == numberLabelY {
+		if IsOneOffLabelTrueX || IsOneOffLabelTrueY {
 			return !IsOneOffLabelTrueX && IsOneOffLabelTrueY
 		}
 
