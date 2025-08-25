@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -44,8 +45,12 @@ func TestImages(t *testing.T) {
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
 	listOpts := container.ListOptions{All: true, Filters: args}
 	api.EXPECT().ServerVersion(gomock.Any()).Return(types.Version{APIVersion: "1.96"}, nil).AnyTimes()
-	image1 := imageInspect("image1", "foo:1", 12345)
-	image2 := imageInspect("image2", "bar:2", 67890)
+	timeStr1 := "2025-06-06T06:06:06.000000000Z"
+	created1, _ := time.Parse(time.RFC3339Nano, timeStr1)
+	timeStr2 := "2025-03-03T03:03:03.000000000Z"
+	created2, _ := time.Parse(time.RFC3339Nano, timeStr2)
+	image1 := imageInspect("image1", "foo:1", 12345, timeStr1)
+	image2 := imageInspect("image2", "bar:2", 67890, timeStr2)
 	api.EXPECT().ImageInspect(anyCancellableContext(), "foo:1").Return(image1, nil).MaxTimes(2)
 	api.EXPECT().ImageInspect(anyCancellableContext(), "bar:2").Return(image2, nil)
 	c1 := containerDetail("service1", "123", "running", "foo:1")
@@ -62,32 +67,36 @@ func TestImages(t *testing.T) {
 			Repository: "foo",
 			Tag:        "1",
 			Size:       12345,
+			Created:    created1,
 		},
 		"456": {
 			ID:         "image2",
 			Repository: "bar",
 			Tag:        "2",
 			Size:       67890,
+			Created:    created2,
 		},
 		"789": {
 			ID:         "image1",
 			Repository: "foo",
 			Tag:        "1",
 			Size:       12345,
+			Created:    created1,
 		},
 	}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, images, expected)
 }
 
-func imageInspect(id string, imageReference string, size int64) image.InspectResponse {
+func imageInspect(id string, imageReference string, size int64, created string) image.InspectResponse {
 	return image.InspectResponse{
 		ID: id,
 		RepoTags: []string{
 			"someRepo:someTag",
 			imageReference,
 		},
-		Size: size,
+		Size:    size,
+		Created: created,
 	}
 }
 
