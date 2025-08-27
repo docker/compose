@@ -18,12 +18,16 @@ package compose
 
 import (
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli-plugins/metadata"
-	"github.com/docker/cli/cli/context/docker"
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/internal"
+	"github.com/docker/docker/client"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
@@ -39,23 +43,44 @@ func (s *composeService) prepareShellOut(gctx context.Context, env types.Mapping
 	otel.GetTextMapPropagator().Inject(gctx, &carrier)
 	env.Merge(types.Mapping(carrier))
 
-	env["DOCKER_CONTEXT"] = s.dockerCli.CurrentContext()
-	env["USER_AGENT"] = "compose/" + internal.Version
-
-	md, err := s.dockerCli.ContextStore().GetMetadata(s.dockerCli.CurrentContext())
-	if err != nil {
-		return err
-	}
-	endpoint, err := docker.EndpointFromContext(md)
-	if err != nil {
-		return err
-	}
-	actualHost := s.dockerCli.DockerEndpoint().Host
-	if endpoint.Host != actualHost {
-		// We are running with `--host` or `DOCKER_HOST` which overrides selected context
-		env["DOCKER_HOST"] = actualHost
-	}
-
 	cmd.Env = env.Values()
 	return nil
+}
+
+// propagateDockerEndpoint produces DOCKER_* env vars for a child CLI plugin to target the same docker endpoint
+// `cleanup` func MUST be called after child process completion to enforce removal of cert files
+func (s *composeService) propagateDockerEndpoint() ([]string, func(), error) {
+	cleanup := func() {}
+	env := types.Mapping{}
+	env[command.EnvOverrideContext] = s.dockerCli.CurrentContext()
+	env["USER_AGENT"] = "compose/" + internal.Version
+	endpoint := s.dockerCli.DockerEndpoint()
+	env[client.EnvOverrideHost] = endpoint.Host
+	if endpoint.TLSData != nil {
+		certs, err := os.MkdirTemp("", "compose")
+		if err != nil {
+			return nil, cleanup, err
+		}
+		cleanup = func() {
+			_ = os.RemoveAll(certs)
+		}
+		env[client.EnvOverrideCertPath] = certs
+		if !endpoint.SkipTLSVerify {
+			env[client.EnvTLSVerify] = "1"
+		}
+
+		err = os.WriteFile(filepath.Join(certs, flags.DefaultKeyFile), endpoint.TLSData.Key, 0o600)
+		if err != nil {
+			return nil, cleanup, err
+		}
+		err = os.WriteFile(filepath.Join(certs, flags.DefaultCaFile), endpoint.TLSData.Cert, 0o600)
+		if err != nil {
+			return nil, cleanup, err
+		}
+		err = os.WriteFile(filepath.Join(certs, flags.DefaultCaFile), endpoint.TLSData.CA, 0o600)
+		if err != nil {
+			return nil, cleanup, err
+		}
+	}
+	return env.Values(), cleanup, nil
 }

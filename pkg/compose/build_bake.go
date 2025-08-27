@@ -335,6 +335,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if err != nil {
 		return nil, err
 	}
+	endpoint, cleanup, err := s.propagateDockerEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = append(cmd.Env, endpoint...)
+	defer cleanup()
 
 	cmd.Stdout = s.stdout()
 	cmd.Stdin = bytes.NewBuffer(b)
