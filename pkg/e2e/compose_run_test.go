@@ -216,4 +216,10 @@ func TestLocalComposeRun(t *testing.T) {
 			"front", "env")
 		res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
 	})
+
+	t.Run("compose run --build", func(t *testing.T) {
+		c.cleanupWithDown(t, "run-test", "--rmi=local")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "build", "echo", "hello world")
+		res.Assert(t, icmd.Expected{Out: "hello world"})
+	})
 }

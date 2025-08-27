@@ -32,7 +32,7 @@ import (
 )
 
 func TestLocalComposeBuild(t *testing.T) {
-	for _, env := range []string{"DOCKER_BUILDKIT=0", "DOCKER_BUILDKIT=1", "DOCKER_BUILDKIT=1,COMPOSE-BAKE=1"} {
+	for _, env := range []string{"DOCKER_BUILDKIT=0", "DOCKER_BUILDKIT=1,COMPOSE_BAKE=0", "DOCKER_BUILDKIT=1,COMPOSE_BAKE=1"} {
 		c := NewCLI(t, WithEnv(strings.Split(env, ",")...))
 
 		t.Run(env+" build named and unnamed images", func(t *testing.T) {
