@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	containerType "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/filters"
 )
 
 func TestPs(t *testing.T) {
@@ -42,10 +42,10 @@ func TestPs(t *testing.T) {
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)), hasConfigHashLabel())
 	args.Add("label", "com.docker.compose.oneoff=False")
 	listOpts := containerType.ListOptions{Filters: args, All: false}
-	c1, inspect1 := containerDetails("service1", "123", "running", "healthy", 0)
-	c2, inspect2 := containerDetails("service1", "456", "running", "", 0)
+	c1, inspect1 := containerDetails("service1", "123", containerType.StateRunning, containerType.Healthy, 0)
+	c2, inspect2 := containerDetails("service1", "456", containerType.StateRunning, "", 0)
 	c2.Ports = []containerType.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
-	c3, inspect3 := containerDetails("service2", "789", "exited", "", 130)
+	c3, inspect3 := containerDetails("service2", "789", containerType.StateExited, "", 130)
 	api.EXPECT().ContainerList(ctx, listOpts).Return([]containerType.Summary{c1, c2, c3}, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "123").Return(inspect1, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "456").Return(inspect2, nil)
@@ -56,7 +56,9 @@ func TestPs(t *testing.T) {
 	expected := []compose.ContainerSummary{
 		{
 			ID: "123", Name: "123", Names: []string{"/123"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
-			State: "running", Health: "healthy", Publishers: []compose.PortPublisher{},
+			State:      containerType.StateRunning,
+			Health:     containerType.Healthy,
+			Publishers: []compose.PortPublisher{},
 			Labels: map[string]string{
 				compose.ProjectLabel:     strings.ToLower(testProject),
 				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
@@ -66,7 +68,8 @@ func TestPs(t *testing.T) {
 		},
 		{
 			ID: "456", Name: "456", Names: []string{"/456"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service1",
-			State: "running", Health: "",
+			State:      containerType.StateRunning,
+			Health:     "",
 			Publishers: []compose.PortPublisher{{URL: "localhost", TargetPort: 90, PublishedPort: 80}},
 			Labels: map[string]string{
 				compose.ProjectLabel:     strings.ToLower(testProject),
@@ -77,7 +80,10 @@ func TestPs(t *testing.T) {
 		},
 		{
 			ID: "789", Name: "789", Names: []string{"/789"}, Image: "foo", Project: strings.ToLower(testProject), Service: "service2",
-			State: "exited", Health: "", ExitCode: 130, Publishers: []compose.PortPublisher{},
+			State:      containerType.StateExited,
+			Health:     "",
+			ExitCode:   130,
+			Publishers: []compose.PortPublisher{},
 			Labels: map[string]string{
 				compose.ProjectLabel:     strings.ToLower(testProject),
 				compose.ConfigFilesLabel: "/src/pkg/compose/testdata/compose.yaml",
@@ -90,8 +96,8 @@ func TestPs(t *testing.T) {
 	assert.DeepEqual(t, containers, expected)
 }
 
-func containerDetails(service string, id string, status string, health string, exitCode int) (containerType.Summary, containerType.InspectResponse) {
-	container := containerType.Summary{
+func containerDetails(service string, id string, status containerType.ContainerState, health containerType.HealthStatus, exitCode int) (containerType.Summary, containerType.InspectResponse) {
+	ctr := containerType.Summary{
 		ID:     id,
 		Names:  []string{"/" + id},
 		Image:  "foo",
@@ -107,5 +113,5 @@ func containerDetails(service string, id string, status string, health string, e
 			},
 		},
 	}
-	return container, inspect
+	return ctr, inspect
 }

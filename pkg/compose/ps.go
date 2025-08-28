@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -42,13 +43,13 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 	}
 	summary := make([]api.ContainerSummary, len(containers))
 	eg, ctx := errgroup.WithContext(ctx)
-	for i, container := range containers {
+	for i, ctr := range containers {
 		eg.Go(func() error {
-			publishers := make([]api.PortPublisher, len(container.Ports))
-			sort.Slice(container.Ports, func(i, j int) bool {
-				return container.Ports[i].PrivatePort < container.Ports[j].PrivatePort
+			publishers := make([]api.PortPublisher, len(ctr.Ports))
+			sort.Slice(ctr.Ports, func(i, j int) bool {
+				return ctr.Ports[i].PrivatePort < ctr.Ports[j].PrivatePort
 			})
-			for i, p := range container.Ports {
+			for i, p := range ctr.Ports {
 				publishers[i] = api.PortPublisher{
 					URL:           p.IP,
 					TargetPort:    int(p.PrivatePort),
@@ -57,22 +58,22 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 				}
 			}
 
-			inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)
+			inspect, err := s.apiClient().ContainerInspect(ctx, ctr.ID)
 			if err != nil {
 				return err
 			}
 
 			var (
-				health   string
+				health   container.HealthStatus
 				exitCode int
 			)
 			if inspect.State != nil {
 				switch inspect.State.Status {
-				case "running":
+				case container.StateRunning:
 					if inspect.State.Health != nil {
 						health = inspect.State.Health.Status
 					}
-				case "exited", "dead":
+				case container.StateExited, container.StateDead:
 					exitCode = inspect.State.ExitCode
 				}
 			}
@@ -81,7 +82,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 				local  int
 				mounts []string
 			)
-			for _, m := range container.Mounts {
+			for _, m := range ctr.Mounts {
 				name := m.Name
 				if name == "" {
 					name = m.Source
@@ -93,26 +94,26 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 			}
 
 			var networks []string
-			if container.NetworkSettings != nil {
-				for k := range container.NetworkSettings.Networks {
+			if ctr.NetworkSettings != nil {
+				for k := range ctr.NetworkSettings.Networks {
 					networks = append(networks, k)
 				}
 			}
 
 			summary[i] = api.ContainerSummary{
-				ID:           container.ID,
-				Name:         getCanonicalContainerName(container),
-				Names:        container.Names,
-				Image:        container.Image,
-				Project:      container.Labels[api.ProjectLabel],
-				Service:      container.Labels[api.ServiceLabel],
-				Command:      container.Command,
-				State:        container.State,
-				Status:       container.Status,
-				Created:      container.Created,
-				Labels:       container.Labels,
-				SizeRw:       container.SizeRw,
-				SizeRootFs:   container.SizeRootFs,
+				ID:           ctr.ID,
+				Name:         getCanonicalContainerName(ctr),
+				Names:        ctr.Names,
+				Image:        ctr.Image,
+				Project:      ctr.Labels[api.ProjectLabel],
+				Service:      ctr.Labels[api.ServiceLabel],
+				Command:      ctr.Command,
+				State:        ctr.State,
+				Status:       ctr.Status,
+				Created:      ctr.Created,
+				Labels:       ctr.Labels,
+				SizeRw:       ctr.SizeRw,
+				SizeRootFs:   ctr.SizeRootFs,
 				Mounts:       mounts,
 				LocalVolumes: local,
 				Networks:     networks,

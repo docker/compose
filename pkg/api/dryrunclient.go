@@ -130,7 +130,7 @@ func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (
 				ID:   id,
 				Name: container,
 				State: &containerType.State{
-					Status: "running", // needed for --wait option
+					Status: containerType.StateRunning, // needed for --wait option
 					Health: &containerType.Health{
 						Status: containerType.Healthy, // needed for healthcheck control
 					},
