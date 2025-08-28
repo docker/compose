@@ -828,25 +828,25 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 
 func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool) (bool, error) {
 	for _, c := range containers {
-		container, err := s.apiClient().ContainerInspect(ctx, c.ID)
+		ctr, err := s.apiClient().ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return false, err
 		}
-		name := container.Name[1:]
+		name := ctr.Name[1:]
 
-		if container.State.Status == "exited" {
-			return false, fmt.Errorf("container %s exited (%d)", name, container.State.ExitCode)
+		if ctr.State.Status == containerType.StateExited {
+			return false, fmt.Errorf("container %s exited (%d)", name, ctr.State.ExitCode)
 		}
 
-		if container.Config.Healthcheck == nil && fallbackRunning {
+		if ctr.Config.Healthcheck == nil && fallbackRunning {
 			// Container does not define a health check, but we can fall back to "running" state
-			return container.State != nil && container.State.Status == "running", nil
+			return ctr.State != nil && ctr.State.Status == containerType.StateRunning, nil
 		}
 
-		if container.State == nil || container.State.Health == nil {
+		if ctr.State == nil || ctr.State.Health == nil {
 			return false, fmt.Errorf("container %s has no healthcheck configured", name)
 		}
-		switch container.State.Health.Status {
+		switch ctr.State.Health.Status {
 		case containerType.Healthy:
 			// Continue by checking the next container.
 		case containerType.Unhealthy:
@@ -854,7 +854,7 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 		case containerType.Starting:
 			return false, nil
 		default:
-			return false, fmt.Errorf("container %s had unexpected health status %q", name, container.State.Health.Status)
+			return false, fmt.Errorf("container %s had unexpected health status %q", name, ctr.State.Health.Status)
 		}
 	}
 	return true, nil
@@ -862,12 +862,12 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 
 func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
 	for _, c := range containers {
-		container, err := s.apiClient().ContainerInspect(ctx, c.ID)
+		ctr, err := s.apiClient().ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return false, 0, err
 		}
-		if container.State != nil && container.State.Status == "exited" {
-			return true, container.State.ExitCode, nil
+		if ctr.State != nil && ctr.State.Status == containerType.StateExited {
+			return true, ctr.State.ExitCode, nil
 		}
 	}
 	return false, 0, nil
