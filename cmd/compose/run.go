@@ -120,8 +120,8 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	return project, nil
 }
 
-func (options runOptions) getEnvironment() (types.Mapping, error) {
-	environment := types.NewMappingWithEquals(options.environment).Resolve(os.LookupEnv).ToMapping()
+func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (types.Mapping, error) {
+	environment := types.NewMappingWithEquals(options.environment).Resolve(resolve).ToMapping()
 	for _, file := range options.envFiles {
 		f, err := os.Open(file)
 		if err != nil {
@@ -289,7 +289,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		buildForRun = &bo
 	}
 
-	environment, err := options.getEnvironment()
+	environment, err := options.getEnvironment(project.Environment.Resolve)
 	if err != nil {
 		return err
 	}

@@ -693,7 +693,7 @@ func setEnvWithDotEnv(opts ProjectOptions) error {
 		return nil
 	}
 	for k, v := range envFromFile {
-		if _, ok := os.LookupEnv(k); !ok {
+		if _, ok := os.LookupEnv(k); !ok && strings.HasPrefix(k, "COMPOSE_") {
 			if err = os.Setenv(k, v); err != nil {
 				return nil
 			}
