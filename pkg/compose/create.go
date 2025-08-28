@@ -39,6 +39,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/versions"
 	volumetypes "github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
@@ -1275,7 +1276,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	var dangledContainers Containers
 
 	// First, try to find a unique network matching by name or ID
-	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
+	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{})
 	if err == nil {
 		// NetworkInspect will match on ID prefix, so double check we get the expected one
 		// as looking for network named `db` we could erroneously match network ID `db9086999caf`
@@ -1316,7 +1317,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	// ignore other errors. Typically, an ambiguous request by name results in some generic `invalidParameter` error
 
 	// Either not found, or name is ambiguous - use NetworkList to list by name
-	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
+	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
 	})
 	if err != nil {
@@ -1365,7 +1366,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 		return "", err
 	}
 	n.CustomLabels = n.CustomLabels.Add(api.ConfigHashLabel, hash)
-	createOpts := network.CreateOptions{
+	createOpts := client.NetworkCreateOptions{
 		Labels:     mergeLabels(n.Labels, n.CustomLabels),
 		Driver:     n.Driver,
 		Options:    n.DriverOpts,
@@ -1451,11 +1452,11 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 
 func (s *composeService) disconnectNetwork(
 	ctx context.Context,
-	network string,
+	networkID string,
 	containers Containers,
 ) error {
 	for _, c := range containers {
-		err := s.apiClient().NetworkDisconnect(ctx, network, c.ID, true)
+		err := s.apiClient().NetworkDisconnect(ctx, networkID, c.ID, true)
 		if err != nil {
 			return err
 		}
@@ -1466,12 +1467,12 @@ func (s *composeService) disconnectNetwork(
 
 func (s *composeService) connectNetwork(
 	ctx context.Context,
-	network string,
+	networkID string,
 	containers Containers,
 	config *network.EndpointSettings,
 ) error {
 	for _, c := range containers {
-		err := s.apiClient().NetworkConnect(ctx, network, c.ID, config)
+		err := s.apiClient().NetworkConnect(ctx, networkID, c.ID, config)
 		if err != nil {
 			return err
 		}
@@ -1485,7 +1486,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	// filter is used to look for an exact match to prevent e.g. a network
 	// named `db` from getting erroneously matched to a network with an ID
 	// like `db9086999caf`
-	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
+	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
 	})
 	if err != nil {
@@ -1494,7 +1495,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 
 	if len(networks) == 0 {
 		// in this instance, n.Name is really an ID
-		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
+		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{})
 		if err == nil {
 			networks = append(networks, sn)
 		} else if !errdefs.IsNotFound(err) {

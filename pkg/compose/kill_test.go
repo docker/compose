@@ -27,6 +27,7 @@ import (
 	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -53,11 +54,11 @@ func TestKillAll(t *testing.T) {
 		[]container.Summary{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]network.Summary{
 			{ID: "abc123", Name: "testProject_default"},
 		}, nil)
@@ -88,11 +89,11 @@ func TestKillSignal(t *testing.T) {
 	api.EXPECT().ContainerList(ctx, listOptions).Return([]container.Summary{testContainer(serviceName, "123", false)}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
-		volume.ListOptions{
+		client.VolumeListOptions{
 			Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		}).
 		Return(volume.ListResponse{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), network.ListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]network.Summary{
 			{ID: "abc123", Name: "testProject_default"},
 		}, nil)

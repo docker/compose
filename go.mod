@@ -2,7 +2,7 @@ module github.com/docker/compose/v2
 
 go 1.23.12
 
-replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250805215749-af0516f267b1
+replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250828153321-62592fbd151b // https://github.com/docker/buildx/pull/3326
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -17,7 +17,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.28.0-rc1
-	github.com/docker/cli v28.3.4-0.20250805212551-f1ceb8c55dfa+incompatible
+	github.com/docker/cli v28.3.4-0.20250828115546-8f25f4fb24b8+incompatible // master
 	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.3.4-0.20250828134822-02b4a1a3decc+incompatible // 28.x branch (v28.4.0-dev)
 	github.com/docker/go-connections v0.6.0
@@ -32,8 +32,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/buildkit v0.24.0-rc1
 	github.com/moby/go-archive v0.1.0
-	github.com/moby/moby/api v1.52.0-alpha.1
-	github.com/moby/moby/client v0.1.0-alpha.0
+	github.com/moby/moby/api v1.52.0-alpha.1.0.20250828160303-620b93135e44 // master
+	github.com/moby/moby/client v0.1.0-alpha.0.0.20250828160303-620b93135e44 // master
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2

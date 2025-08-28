@@ -327,10 +327,8 @@ func TestCreateMobyContainer(t *testing.T) {
 
 		apiClient.EXPECT().ContainerInspect(gomock.Any(), gomock.Eq("an-id")).Times(1).Return(
 			container.InspectResponse{
-				ContainerJSONBase: &container.ContainerJSONBase{
-					ID:   "an-id",
-					Name: "a-name",
-				},
+				ID:              "an-id",
+				Name:            "a-name",
 				Config:          &container.Config{},
 				NetworkSettings: &container.NetworkSettings{},
 			}, nil)
@@ -420,10 +418,8 @@ func TestCreateMobyContainer(t *testing.T) {
 
 		apiClient.EXPECT().ContainerInspect(gomock.Any(), gomock.Eq("an-id")).Times(1).Return(
 			container.InspectResponse{
-				ContainerJSONBase: &container.ContainerJSONBase{
-					ID:   "an-id",
-					Name: "a-name",
-				},
+				ID:              "an-id",
+				Name:            "a-name",
 				Config:          &container.Config{},
 				NetworkSettings: &container.NetworkSettings{},
 			}, nil)

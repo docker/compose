@@ -59,8 +59,8 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	api.EXPECT().
 		ContainerInspect(anyCancellableContext(), "c").
 		Return(containerType.InspectResponse{
-			ContainerJSONBase: &containerType.ContainerJSONBase{ID: "c"},
-			Config:            &containerType.Config{Tty: false},
+			ID:     "c",
+			Config: &containerType.Config{Tty: false},
 		}, nil)
 	c1Reader, c1Writer := io.Pipe()
 	t.Cleanup(func() {
@@ -137,8 +137,8 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 			ContainerInspect(anyCancellableContext(), id).
 			Return(
 				containerType.InspectResponse{
-					ContainerJSONBase: &containerType.ContainerJSONBase{ID: id},
-					Config:            &containerType.Config{Tty: true},
+					ID:     id,
+					Config: &containerType.Config{Tty: true},
 				},
 				nil,
 			)

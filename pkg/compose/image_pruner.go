@@ -150,7 +150,7 @@ func (p *ImagePruner) namedImages(ctx context.Context) ([]string, error) {
 // The image name could either have been defined by the user or implicitly
 // created from the project + service name.
 func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error) {
-	imageListOpts := image.ListOptions{
+	return p.client.ImageList(ctx, client.ImageListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(p.project.Name),
 			// TODO(milas): we should really clean up the dangling images as
@@ -161,12 +161,7 @@ func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, 
 			// service
 			filters.Arg("dangling", "false"),
 		),
-	}
-	projectImages, err := p.client.ImageList(ctx, imageListOpts)
-	if err != nil {
-		return nil, err
-	}
-	return projectImages, nil
+	})
 }
 
 // unlabeledLocalImages are images that match the implicit naming convention

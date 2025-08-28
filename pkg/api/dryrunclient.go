@@ -128,14 +128,12 @@ func (d *DryRunClient) ContainerInspect(ctx context.Context, container string) (
 			}
 		}
 		return containerType.InspectResponse{
-			ContainerJSONBase: &containerType.ContainerJSONBase{
-				ID:   id,
-				Name: container,
-				State: &containerType.State{
-					Status: containerType.StateRunning, // needed for --wait option
-					Health: &containerType.Health{
-						Status: containerType.Healthy, // needed for healthcheck control
-					},
+			ID:   id,
+			Name: container,
+			State: &containerType.State{
+				Status: containerType.StateRunning, // needed for --wait option
+				Health: &containerType.Health{
+					Status: containerType.Healthy, // needed for healthcheck control
 				},
 			},
 			Mounts:          nil,
@@ -245,7 +243,7 @@ func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string
 	return resp, buf.Bytes(), err
 }
 
-func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options client.ImagePullOptions) (io.ReadCloser, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -253,7 +251,7 @@ func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options image.
 	return rc, nil
 }
 
-func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options image.PushOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options client.ImagePushOptions) (io.ReadCloser, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -277,7 +275,7 @@ func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options image.
 	return rc, nil
 }
 
-func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options image.RemoveOptions) ([]image.DeleteResponse, error) {
+func (d *DryRunClient) ImageRemove(ctx context.Context, imageName string, options client.ImageRemoveOptions) ([]image.DeleteResponse, error) {
 	return nil, nil
 }
 
@@ -285,7 +283,7 @@ func (d *DryRunClient) NetworkConnect(ctx context.Context, networkName, containe
 	return nil
 }
 
-func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options network.CreateOptions) (network.CreateResponse, error) {
+func (d *DryRunClient) NetworkCreate(ctx context.Context, name string, options client.NetworkCreateOptions) (network.CreateResponse, error) {
 	return network.CreateResponse{
 		ID:      name,
 		Warning: "",
@@ -339,7 +337,7 @@ func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, co
 
 // Functions delegated to original APIClient (not used by Compose or not modifying the Compose stack
 
-func (d *DryRunClient) ConfigList(ctx context.Context, options swarm.ConfigListOptions) ([]swarm.Config, error) {
+func (d *DryRunClient) ConfigList(ctx context.Context, options client.ConfigListOptions) ([]swarm.Config, error) {
 	return d.apiClient.ConfigList(ctx, options)
 }
 
@@ -375,7 +373,7 @@ func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) 
 	return d.apiClient.ContainerExecInspect(ctx, execID)
 }
 
-func (d *DryRunClient) ContainerExecResize(ctx context.Context, execID string, options containerType.ResizeOptions) error {
+func (d *DryRunClient) ContainerExecResize(ctx context.Context, execID string, options client.ContainerResizeOptions) error {
 	return d.apiClient.ContainerExecResize(ctx, execID, options)
 }
 
@@ -391,7 +389,7 @@ func (d *DryRunClient) ContainerLogs(ctx context.Context, container string, opti
 	return d.apiClient.ContainerLogs(ctx, container, options)
 }
 
-func (d *DryRunClient) ContainerResize(ctx context.Context, container string, options containerType.ResizeOptions) error {
+func (d *DryRunClient) ContainerResize(ctx context.Context, container string, options client.ContainerResizeOptions) error {
 	return d.apiClient.ContainerResize(ctx, container, options)
 }
 
@@ -435,7 +433,7 @@ func (d *DryRunClient) BuildCancel(ctx context.Context, id string) error {
 	return d.apiClient.BuildCancel(ctx, id)
 }
 
-func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options image.CreateOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options client.ImageCreateOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageCreate(ctx, parentReference, options)
 }
 
@@ -443,11 +441,11 @@ func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string, optio
 	return d.apiClient.ImageHistory(ctx, imageName, options...)
 }
 
-func (d *DryRunClient) ImageImport(ctx context.Context, source image.ImportSource, ref string, options image.ImportOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImageImport(ctx context.Context, source client.ImageImportSource, ref string, options client.ImageImportOptions) (io.ReadCloser, error) {
 	return d.apiClient.ImageImport(ctx, source, ref, options)
 }
 
-func (d *DryRunClient) ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error) {
+func (d *DryRunClient) ImageList(ctx context.Context, options client.ImageListOptions) ([]image.Summary, error) {
 	return d.apiClient.ImageList(ctx, options)
 }
 
@@ -455,7 +453,7 @@ func (d *DryRunClient) ImageLoad(ctx context.Context, input io.Reader, options .
 	return d.apiClient.ImageLoad(ctx, input, options...)
 }
 
-func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options registry.SearchOptions) ([]registry.SearchResult, error) {
+func (d *DryRunClient) ImageSearch(ctx context.Context, term string, options client.ImageSearchOptions) ([]registry.SearchResult, error) {
 	return d.apiClient.ImageSearch(ctx, term, options)
 }
 
@@ -475,11 +473,11 @@ func (d *DryRunClient) NodeInspectWithRaw(ctx context.Context, nodeID string) (s
 	return d.apiClient.NodeInspectWithRaw(ctx, nodeID)
 }
 
-func (d *DryRunClient) NodeList(ctx context.Context, options swarm.NodeListOptions) ([]swarm.Node, error) {
+func (d *DryRunClient) NodeList(ctx context.Context, options client.NodeListOptions) ([]swarm.Node, error) {
 	return d.apiClient.NodeList(ctx, options)
 }
 
-func (d *DryRunClient) NodeRemove(ctx context.Context, nodeID string, options swarm.NodeRemoveOptions) error {
+func (d *DryRunClient) NodeRemove(ctx context.Context, nodeID string, options client.NodeRemoveOptions) error {
 	return d.apiClient.NodeRemove(ctx, nodeID, options)
 }
 
@@ -487,15 +485,15 @@ func (d *DryRunClient) NodeUpdate(ctx context.Context, nodeID string, version sw
 	return d.apiClient.NodeUpdate(ctx, nodeID, version, node)
 }
 
-func (d *DryRunClient) NetworkInspect(ctx context.Context, networkName string, options network.InspectOptions) (network.Inspect, error) {
+func (d *DryRunClient) NetworkInspect(ctx context.Context, networkName string, options client.NetworkInspectOptions) (network.Inspect, error) {
 	return d.apiClient.NetworkInspect(ctx, networkName, options)
 }
 
-func (d *DryRunClient) NetworkInspectWithRaw(ctx context.Context, networkName string, options network.InspectOptions) (network.Inspect, []byte, error) {
+func (d *DryRunClient) NetworkInspectWithRaw(ctx context.Context, networkName string, options client.NetworkInspectOptions) (network.Inspect, []byte, error) {
 	return d.apiClient.NetworkInspectWithRaw(ctx, networkName, options)
 }
 
-func (d *DryRunClient) NetworkList(ctx context.Context, options network.ListOptions) ([]network.Inspect, error) {
+func (d *DryRunClient) NetworkList(ctx context.Context, options client.NetworkListOptions) ([]network.Inspect, error) {
 	return d.apiClient.NetworkList(ctx, options)
 }
 
@@ -543,15 +541,15 @@ func (d *DryRunClient) PluginCreate(ctx context.Context, createContext io.Reader
 	return d.apiClient.PluginCreate(ctx, createContext, options)
 }
 
-func (d *DryRunClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options swarm.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
+func (d *DryRunClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options client.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
 	return d.apiClient.ServiceCreate(ctx, service, options)
 }
 
-func (d *DryRunClient) ServiceInspectWithRaw(ctx context.Context, serviceID string, options swarm.ServiceInspectOptions) (swarm.Service, []byte, error) {
+func (d *DryRunClient) ServiceInspectWithRaw(ctx context.Context, serviceID string, options client.ServiceInspectOptions) (swarm.Service, []byte, error) {
 	return d.apiClient.ServiceInspectWithRaw(ctx, serviceID, options)
 }
 
-func (d *DryRunClient) ServiceList(ctx context.Context, options swarm.ServiceListOptions) ([]swarm.Service, error) {
+func (d *DryRunClient) ServiceList(ctx context.Context, options client.ServiceListOptions) ([]swarm.Service, error) {
 	return d.apiClient.ServiceList(ctx, options)
 }
 
@@ -559,8 +557,8 @@ func (d *DryRunClient) ServiceRemove(ctx context.Context, serviceID string) erro
 	return d.apiClient.ServiceRemove(ctx, serviceID)
 }
 
-func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options swarm.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
-	return d.apiClient.ServiceUpdate(ctx, serviceID, version, service, options)
+func (d *DryRunClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, spec swarm.ServiceSpec, options client.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
+	return d.apiClient.ServiceUpdate(ctx, serviceID, version, spec, options)
 }
 
 func (d *DryRunClient) ServiceLogs(ctx context.Context, serviceID string, options containerType.LogsOptions) (io.ReadCloser, error) {
@@ -575,7 +573,7 @@ func (d *DryRunClient) TaskInspectWithRaw(ctx context.Context, taskID string) (s
 	return d.apiClient.TaskInspectWithRaw(ctx, taskID)
 }
 
-func (d *DryRunClient) TaskList(ctx context.Context, options swarm.TaskListOptions) ([]swarm.Task, error) {
+func (d *DryRunClient) TaskList(ctx context.Context, options client.TaskListOptions) ([]swarm.Task, error) {
 	return d.apiClient.TaskList(ctx, options)
 }
 
@@ -603,11 +601,11 @@ func (d *DryRunClient) SwarmInspect(ctx context.Context) (swarm.Swarm, error) {
 	return d.apiClient.SwarmInspect(ctx)
 }
 
-func (d *DryRunClient) SwarmUpdate(ctx context.Context, version swarm.Version, swarmSpec swarm.Spec, flags swarm.UpdateFlags) error {
+func (d *DryRunClient) SwarmUpdate(ctx context.Context, version swarm.Version, swarmSpec swarm.Spec, flags client.SwarmUpdateFlags) error {
 	return d.apiClient.SwarmUpdate(ctx, version, swarmSpec, flags)
 }
 
-func (d *DryRunClient) SecretList(ctx context.Context, options swarm.SecretListOptions) ([]swarm.Secret, error) {
+func (d *DryRunClient) SecretList(ctx context.Context, options client.SecretListOptions) ([]swarm.Secret, error) {
 	return d.apiClient.SecretList(ctx, options)
 }
 
@@ -627,7 +625,7 @@ func (d *DryRunClient) SecretUpdate(ctx context.Context, id string, version swar
 	return d.apiClient.SecretUpdate(ctx, id, version, secret)
 }
 
-func (d *DryRunClient) Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error) {
+func (d *DryRunClient) Events(ctx context.Context, options client.EventsListOptions) (<-chan events.Message, <-chan error) {
 	return d.apiClient.Events(ctx, options)
 }
 
@@ -639,7 +637,7 @@ func (d *DryRunClient) RegistryLogin(ctx context.Context, auth registry.AuthConf
 	return d.apiClient.RegistryLogin(ctx, auth)
 }
 
-func (d *DryRunClient) DiskUsage(ctx context.Context, options system.DiskUsageOptions) (system.DiskUsage, error) {
+func (d *DryRunClient) DiskUsage(ctx context.Context, options client.DiskUsageOptions) (system.DiskUsage, error) {
 	return d.apiClient.DiskUsage(ctx, options)
 }
 
@@ -655,7 +653,7 @@ func (d *DryRunClient) VolumeInspectWithRaw(ctx context.Context, volumeID string
 	return d.apiClient.VolumeInspectWithRaw(ctx, volumeID)
 }
 
-func (d *DryRunClient) VolumeList(ctx context.Context, opts volume.ListOptions) (volume.ListResponse, error) {
+func (d *DryRunClient) VolumeList(ctx context.Context, opts client.VolumeListOptions) (volume.ListResponse, error) {
 	return d.apiClient.VolumeList(ctx, opts)
 }
 

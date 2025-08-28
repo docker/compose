@@ -212,9 +212,9 @@ func (c *ContainerContext) Publishers() api.PortPublishers {
 }
 
 func (c *ContainerContext) Ports() string {
-	var ports []container.Port
+	var ports []container.PortSummary
 	for _, publisher := range c.c.Publishers {
-		ports = append(ports, container.Port{
+		ports = append(ports, container.PortSummary{
 			IP:          publisher.URL,
 			PrivatePort: uint16(publisher.TargetPort),
 			PublicPort:  uint16(publisher.PublishedPort),

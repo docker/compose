@@ -24,7 +24,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/filters"
-	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 func (s *composeService) Volumes(ctx context.Context, project *types.Project, options api.VolumesOptions) ([]api.VolumesSummary, error) {
@@ -50,7 +50,7 @@ func (s *composeService) Volumes(ctx context.Context, project *types.Project, op
 		containers = allContainers
 	}
 
-	volumesResponse, err := s.apiClient().VolumeList(ctx, volume.ListOptions{
+	volumesResponse, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	if err != nil {

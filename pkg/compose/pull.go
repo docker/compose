@@ -31,7 +31,6 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
 	"github.com/docker/cli/cli/config/configfile"
-	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/jsonmessage"
 	"github.com/opencontainers/go-digest"
@@ -198,7 +197,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		platform = defaultPlatform
 	}
 
-	stream, err := s.apiClient().ImagePull(ctx, service.Image, image.PullOptions{
+	stream, err := s.apiClient().ImagePull(ctx, service.Image, client.ImagePullOptions{
 		RegistryAuth: encodedAuth,
 		Platform:     platform,
 	})

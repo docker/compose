@@ -44,7 +44,7 @@ func TestPs(t *testing.T) {
 	listOpts := containerType.ListOptions{Filters: args, All: false}
 	c1, inspect1 := containerDetails("service1", "123", containerType.StateRunning, containerType.Healthy, 0)
 	c2, inspect2 := containerDetails("service1", "456", containerType.StateRunning, "", 0)
-	c2.Ports = []containerType.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
+	c2.Ports = []containerType.PortSummary{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
 	c3, inspect3 := containerDetails("service2", "789", containerType.StateExited, "", 130)
 	api.EXPECT().ContainerList(ctx, listOpts).Return([]containerType.Summary{c1, c2, c3}, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "123").Return(inspect1, nil)
@@ -105,12 +105,10 @@ func containerDetails(service string, id string, status containerType.ContainerS
 		State:  status,
 	}
 	inspect := containerType.InspectResponse{
-		ContainerJSONBase: &containerType.ContainerJSONBase{
-			State: &containerType.State{
-				Status:   status,
-				Health:   &containerType.Health{Status: health},
-				ExitCode: exitCode,
-			},
+		State: &containerType.State{
+			Status:   status,
+			Health:   &containerType.Health{Status: health},
+			ExitCode: exitCode,
 		},
 	}
 	return ctr, inspect

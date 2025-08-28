@@ -36,6 +36,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/jsonmessage"
 	"gopkg.in/yaml.v3"
 )
@@ -206,7 +207,7 @@ func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName strin
 	inspect, err := dockerCli.Client().ImageInspect(ctx, imageName)
 	if errdefs.IsNotFound(err) {
 		var stream io.ReadCloser
-		stream, err = dockerCli.Client().ImagePull(ctx, imageName, image.PullOptions{})
+		stream, err = dockerCli.Client().ImagePull(ctx, imageName, client.ImagePullOptions{})
 		if err != nil {
 			return image.InspectResponse{}, err
 		}
