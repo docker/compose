@@ -2,7 +2,10 @@ module github.com/docker/compose/v2
 
 go 1.23.12
 
-replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250828153321-62592fbd151b // https://github.com/docker/buildx/pull/3326
+//replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250828153321-62592fbd151b // https://github.com/docker/buildx/pull/3326
+
+// FIXME(thaJeztah): trying https://github.com/moby/moby/pull/50475
+replace github.com/docker/docker => github.com/thaJeztah/docker v24.0.0-rc.1.0.20250828172021-7be0e68004c1+incompatible
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
