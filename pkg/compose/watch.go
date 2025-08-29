@@ -36,14 +36,14 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 	cutils "github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/compose/v2/pkg/watch"
+	"github.com/moby/moby/client"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
 	ccli "github.com/docker/cli/cli/command/container"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/mitchellh/mapstructure"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -674,7 +674,7 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 }
 
 func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
-	images, err := s.apiClient().ImageList(ctx, image.ListOptions{
+	images, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("dangling", "true"),
 			filters.Arg("label", api.ProjectLabel+"="+projectName),
@@ -687,7 +687,7 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 
 	for _, img := range images {
 		if _, ok := imageNameToIdMap[img.ID]; !ok {
-			_, err := s.apiClient().ImageRemove(ctx, img.ID, image.RemoveOptions{})
+			_, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{})
 			if err != nil {
 				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
 			}

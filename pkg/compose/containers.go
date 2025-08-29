@@ -25,8 +25,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
 )
 
 // Containers is a set of moby Container
@@ -135,7 +135,7 @@ func isOrphaned(project *types.Project) containerPredicate {
 		// One-off container
 		v, ok := c.Labels[api.OneoffLabel]
 		if ok && v == "True" {
-			return c.State == ContainerExited || c.State == ContainerDead
+			return c.State == container.StateExited || c.State == container.StateDead
 		}
 		// Service that is not defined in the compose model
 		service := c.Labels[api.ServiceLabel]

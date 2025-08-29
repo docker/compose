@@ -23,11 +23,12 @@ import (
 	"path/filepath"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
 	"github.com/moby/go-archive"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 const (
@@ -112,7 +113,7 @@ COPY templates /templates
 
 func ListTransformers(ctx context.Context, dockerCli command.Cli) ([]image.Summary, error) {
 	api := dockerCli.Client()
-	return api.ImageList(ctx, image.ListOptions{
+	return api.ImageList(ctx, client.ImageListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=%s", TransformerLabel, "transformation")),
 		),

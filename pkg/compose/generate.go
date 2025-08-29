@@ -25,10 +25,11 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 func (s *composeService) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
@@ -221,7 +222,7 @@ func (s *composeService) toComposeNetwork(networks map[string]*network.EndpointS
 	serviceNetworkConfigs := make(map[string]*types.ServiceNetworkConfig)
 
 	for name, net := range networks {
-		inspect, err := s.apiClient().NetworkInspect(context.Background(), name, network.InspectOptions{})
+		inspect, err := s.apiClient().NetworkInspect(context.Background(), name, client.NetworkInspectOptions{})
 		if err != nil {
 			networkConfigs[name] = types.NetworkConfig{}
 		} else {

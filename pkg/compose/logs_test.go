@@ -24,9 +24,9 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -59,8 +59,8 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	api.EXPECT().
 		ContainerInspect(anyCancellableContext(), "c").
 		Return(containerType.InspectResponse{
-			ContainerJSONBase: &containerType.ContainerJSONBase{ID: "c"},
-			Config:            &containerType.Config{Tty: false},
+			ID:     "c",
+			Config: &containerType.Config{Tty: false},
 		}, nil)
 	c1Reader, c1Writer := io.Pipe()
 	t.Cleanup(func() {
@@ -137,8 +137,8 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 			ContainerInspect(anyCancellableContext(), id).
 			Return(
 				containerType.InspectResponse{
-					ContainerJSONBase: &containerType.ContainerJSONBase{ID: id},
-					Config:            &containerType.Config{Tty: true},
+					ID:     id,
+					Config: &containerType.Config{Tty: true},
 				},
 				nil,
 			)
