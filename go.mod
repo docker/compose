@@ -2,6 +2,18 @@ module github.com/docker/compose/v2
 
 go 1.23.12
 
+replace (
+	// FIXME(thaJeztah): trying https://github.com/docker/cli/pull/6199
+	github.com/docker/cli => github.com/thaJeztah/cli v0.0.0-20250828172313-d1c3c3d88840
+
+	// FIXME(thaJeztah): trying https://github.com/moby/moby/pull/50475
+	github.com/docker/docker => github.com/thaJeztah/docker v24.0.0-rc.1.0.20250828172021-7be0e68004c1+incompatible
+
+	// FIXME(thaJeztah): temporarily need to pin on commits, otherwise go modules won't resolve until these are tagged.
+	github.com/moby/moby/api => github.com/moby/moby/api v1.52.0-alpha.1.0.20250828160303-620b93135e44 // master
+	github.com/moby/moby/client => github.com/moby/moby/client v0.1.0-alpha.0.0.20250828160303-620b93135e44 // master
+)
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e
@@ -15,9 +27,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.28.0-rc1
-	github.com/docker/cli v28.3.3+incompatible
+	github.com/docker/cli v28.3.4-0.20250828143819-d26f1fd6d378+incompatible // 28.x branch (v28.4.0-dev)
 	github.com/docker/cli-docs-tool v0.10.0
-	github.com/docker/docker v28.3.3+incompatible
+	github.com/docker/docker v28.3.4-0.20250828134822-02b4a1a3decc+incompatible // 28.x branch (v28.4.0-dev)
 	github.com/docker/go-connections v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
@@ -61,7 +73,6 @@ require (
 )
 
 require (
-	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
@@ -134,6 +145,8 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
+	github.com/moby/moby/api v1.52.0-alpha.1 // indirect
+	github.com/moby/moby/client v0.0.0-00010101000000-000000000000 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
@@ -168,9 +181,6 @@ require (
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
-	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/zclconf/go-cty v1.16.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
