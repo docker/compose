@@ -175,7 +175,7 @@ func TestUpWithAllResources(t *testing.T) {
 	})
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/resources/compose.yaml", "--all-resources", "--project-name", projectName, "up")
-	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Volume "%s_my_vol"  Created`, projectName)), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Volume %s_my_vol  Created`, projectName)), res.Combined())
 	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Network %s_my_net  Created`, projectName)), res.Combined())
 }
 

@@ -1623,7 +1623,7 @@ func (s *composeService) removeDivergedVolume(ctx context.Context, name string, 
 }
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
-	eventName := fmt.Sprintf("Volume %q", volume.Name)
+	eventName := fmt.Sprintf("Volume %s", volume.Name)
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(eventName))
 	hash, err := VolumeHash(volume)
