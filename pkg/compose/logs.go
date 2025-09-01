@@ -104,6 +104,7 @@ func (s *composeService) Logs(
 			}
 		})
 		eg.Go(func() error {
+			// pass ctx so monitor will immediately stop on SIGINT
 			return monitor.Start(ctx)
 		})
 	}
