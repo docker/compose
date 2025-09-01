@@ -64,7 +64,7 @@ type gitRemoteLoader struct {
 }
 
 func (g gitRemoteLoader) Accept(path string) bool {
-	_, err := gitutil.ParseGitRef(path)
+	_, _, err := gitutil.ParseGitRef(path)
 	return err == nil
 }
 
@@ -79,15 +79,15 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		return "", fmt.Errorf("git remote resource is disabled by %q", GIT_REMOTE_ENABLED)
 	}
 
-	ref, err := gitutil.ParseGitRef(path)
+	ref, _, err := gitutil.ParseGitRef(path)
 	if err != nil {
 		return "", err
 	}
 
 	local, ok := g.known[path]
 	if !ok {
-		if ref.Commit == "" {
-			ref.Commit = "HEAD" // default branch
+		if ref.Ref == "" {
+			ref.Ref = "HEAD" // default branch
 		}
 
 		err = g.resolveGitRef(ctx, path, ref)
@@ -100,7 +100,7 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", fmt.Errorf("initializing remote resource cache: %w", err)
 		}
 
-		local = filepath.Join(cache, ref.Commit)
+		local = filepath.Join(cache, ref.Ref)
 		if _, err := os.Stat(local); os.IsNotExist(err) {
 			if g.offline {
 				return "", nil
@@ -130,8 +130,8 @@ func (g gitRemoteLoader) Dir(path string) string {
 }
 
 func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gitutil.GitRef) error {
-	if !commitSHA.MatchString(ref.Commit) {
-		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", ref.Remote, ref.Commit)
+	if !commitSHA.MatchString(ref.Ref) {
+		cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", ref.Remote, ref.Ref)
 		cmd.Env = g.gitCommandEnv()
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -147,7 +147,7 @@ func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gi
 		if !commitSHA.MatchString(sha) {
 			return fmt.Errorf("invalid commit sha %q", sha)
 		}
-		ref.Commit = sha
+		ref.Ref = sha
 	}
 	return nil
 }
@@ -169,7 +169,7 @@ func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil
 		return err
 	}
 
-	cmd = exec.CommandContext(ctx, "git", "fetch", "--depth=1", "origin", ref.Commit)
+	cmd = exec.CommandContext(ctx, "git", "fetch", "--depth=1", "origin", ref.Ref)
 	cmd.Env = g.gitCommandEnv()
 	cmd.Dir = path
 
@@ -178,7 +178,7 @@ func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil
 		return err
 	}
 
-	cmd = exec.CommandContext(ctx, "git", "checkout", ref.Commit)
+	cmd = exec.CommandContext(ctx, "git", "checkout", ref.Ref)
 	cmd.Dir = path
 	err = cmd.Run()
 	if err != nil {

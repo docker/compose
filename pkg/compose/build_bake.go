@@ -218,7 +218,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		read = append(read, build.Context)
 		for _, path := range build.AdditionalContexts {
-			_, err := gitutil.ParseGitRef(path)
+			_, _, err := gitutil.ParseGitRef(path)
 			if !strings.Contains(path, "://") && err != nil {
 				read = append(read, path)
 			}
