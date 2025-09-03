@@ -89,6 +89,11 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 				eventName := getContainerProgressName(ctr)
 				w.Event(progress.RestartingEvent(eventName))
 				timeout := utils.DurationSecondToInt(options.Timeout)
+				if s.Monitor != nil {
+					// Let monitor know we are restarting container, as there's no way to guess based on engine events
+					s.Monitor.Restarting(ctr.ID)
+				}
+
 				err = s.apiClient().ContainerRestart(ctx, ctr.ID, container.StopOptions{Timeout: timeout})
 				if err != nil {
 					return err

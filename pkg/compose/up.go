@@ -271,6 +271,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		})
 	})
 
+	s.Monitor = monitor
 	eg.Go(func() error {
 		err := monitor.Start(globalCtx)
 		// cancel the global context to terminate signal-handler goroutines

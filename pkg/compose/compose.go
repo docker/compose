@@ -70,6 +70,8 @@ type composeService struct {
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
+
+	Monitor *monitor
 }
 
 // Close releases any connections/resources held by the underlying clients.

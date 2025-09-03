@@ -35,15 +35,17 @@ type monitor struct {
 	api     client.APIClient
 	project string
 	// services tells us which service to consider and those we can ignore, maybe ran by a concurrent compose command
-	services  map[string]bool
-	listeners []api.ContainerEventListener
+	services   map[string]bool
+	listeners  []api.ContainerEventListener
+	restarting chan string
 }
 
 func newMonitor(api client.APIClient, project string) *monitor {
 	return &monitor{
-		api:      api,
-		project:  project,
-		services: map[string]bool{},
+		api:        api,
+		project:    project,
+		services:   map[string]bool{},
+		restarting: make(chan string),
 	}
 }
 
@@ -91,6 +93,8 @@ func (c *monitor) Start(ctx context.Context) error {
 		select {
 		case err := <-errCh:
 			return err
+		case ctr := <-c.restarting:
+			restarting.Add(ctr)
 		case event := <-evtCh:
 			if len(c.services) > 0 && !c.services[event.Actor.Attributes[api.ServiceLabel]] {
 				continue
@@ -99,6 +103,8 @@ func (c *monitor) Start(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+
+			logrus.Debugf("event: Container %s %s", ctr.Name, event.Action)
 
 			switch event.Action {
 			case events.ActionCreate:
@@ -140,7 +146,9 @@ func (c *monitor) Start(ctx context.Context) error {
 				// when a container is in restarting phase, and we stop the application (abort-on-container-exit)
 				// we won't get any additional start+die events, just this stop as a proof container is down
 				logrus.Debugf("container %s stopped", ctr.Name)
-				containers.Remove(ctr.ID)
+				if !restarting.Has(ctr.ID) {
+					containers.Remove(ctr.ID)
+				}
 			case events.ActionDie:
 				logrus.Debugf("container %s exited with code %d", ctr.Name, ctr.ExitCode)
 				inspect, err := c.api.ContainerInspect(ctx, event.Actor.ID)
@@ -165,7 +173,9 @@ func (c *monitor) Start(ctx context.Context) error {
 					for _, listener := range c.listeners {
 						listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventExited))
 					}
-					containers.Remove(ctr.ID)
+					if !restarting.Has(ctr.ID) {
+						containers.Remove(ctr.ID)
+					}
 				}
 			}
 		}
@@ -215,4 +225,8 @@ func (c *monitor) getContainerSummary(event events.Message) (*api.ContainerSumma
 
 func (c *monitor) withListener(listener api.ContainerEventListener) {
 	c.listeners = append(c.listeners, listener)
+}
+
+func (c *monitor) Restarting(id string) {
+	c.restarting <- id
 }
