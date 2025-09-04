@@ -58,7 +58,7 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
-    - option: no-TTY
+    - option: no-tty
       shorthand: T
       value_type: bool
       default_value: "true"
