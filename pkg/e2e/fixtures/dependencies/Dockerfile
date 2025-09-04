@@ -12,5 +12,5 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM busybox:1.35.0
+FROM busybox:1.36.1
 RUN echo "hello"
