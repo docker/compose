@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"os/exec"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli-plugins/metadata"
@@ -33,6 +34,13 @@ func (s *composeService) prepareShellOut(gctx context.Context, env types.Mapping
 	env = env.Clone()
 	// remove DOCKER_CLI_PLUGIN... variable so a docker-cli plugin will detect it run standalone
 	delete(env, metadata.ReexecEnvvar)
+
+	// Remove OpenTelemetry env variables so buildx doesn't attempt to init exporter and timeout
+	for k := range env {
+		if strings.HasPrefix(k, "OTEL_") {
+			delete(env, k)
+		}
+	}
 
 	// propagate opentelemetry context to child process, see https://github.com/open-telemetry/oteps/blob/main/text/0258-env-context-baggage-carriers.md
 	carrier := propagation.MapCarrier{}
