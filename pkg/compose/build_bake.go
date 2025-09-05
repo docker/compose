@@ -473,6 +473,8 @@ func toBakeAttest(build types.BuildConfig) []string {
 	if build.Provenance != "" {
 		if build.Provenance == "true" {
 			attests = append(attests, "type=provenance")
+		} else if build.Provenance == "max" {
+			attests = append(attests, "type=provenance,mode=max")
 		} else if build.Provenance != "false" {
 			attests = append(attests, fmt.Sprintf("type=provenance,%s", build.Provenance))
 		}
