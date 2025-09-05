@@ -186,6 +186,7 @@ func TestInterfaceName(t *testing.T) {
 	c := NewCLI(t)
 
 	version := c.RunDockerCmd(t, "version", "-f", "{{.Server.Version}}")
+	fmt.Println("testing with " + version.Combined())
 	major, _, found := strings.Cut(version.Combined(), ".")
 	assert.Assert(t, found)
 	if major == "26" || major == "27" {
