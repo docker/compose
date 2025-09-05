@@ -5,6 +5,12 @@ long: |-
 
     With this subcommand, you can run arbitrary commands in your services. Commands allocate a TTY by default, so
     you can use a command such as `docker compose exec web sh` to get an interactive prompt.
+
+    By default, Compose will enter container in interactive mode and allocate a TTY, while the equivalent `docker exec`
+    command requires passing `--interactive --tty` flags to get the same behavior. Compose also support those two flags
+    to offer a smooth migration between commands, whenever they are no-op by default. Still, `interactive` can be used to
+    force disabling interactive mode (`--interactive=false`), typically when `docker compose exec` command is used inside
+    a script.
 usage: docker compose exec [OPTIONS] SERVICE COMMAND [ARGS...]
 pname: docker compose
 plink: docker_compose.yaml
@@ -52,7 +58,7 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
-    - option: no-TTY
+    - option: no-tty
       shorthand: T
       value_type: bool
       default_value: "true"
