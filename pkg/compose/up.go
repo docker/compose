@@ -245,7 +245,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		if event.Type != api.ContainerEventStarted {
 			return
 		}
-		if slices.Contains(attached, event.ID) {
+		if slices.Contains(attached, event.ID) && !event.Restarting {
 			return
 		}
 		eg.Go(func() error {

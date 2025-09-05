@@ -42,7 +42,11 @@ func newLogPrinter(consumer api.LogConsumer) logPrinter {
 func (p *printer) HandleEvent(event api.ContainerEvent) {
 	switch event.Type {
 	case api.ContainerEventExited:
-		p.consumer.Status(event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
+		if event.Restarting {
+			p.consumer.Status(event.Source, fmt.Sprintf("exited with code %d (restarting)", event.ExitCode))
+		} else {
+			p.consumer.Status(event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
+		}
 	case api.ContainerEventRecreated:
 		p.consumer.Status(event.Container.Labels[api.ContainerReplaceLabel], "has been recreated")
 	case api.ContainerEventLog, api.HookEventLog:

@@ -136,11 +136,6 @@ func (c *monitor) Start(ctx context.Context) error {
 					listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventRestarted))
 				}
 				logrus.Debugf("container %s restarted", ctr.Name)
-			case events.ActionStop:
-				// when a container is in restarting phase, and we stop the application (abort-on-container-exit)
-				// we won't get any additional start+die events, just this stop as a proof container is down
-				logrus.Debugf("container %s stopped", ctr.Name)
-				containers.Remove(ctr.ID)
 			case events.ActionDie:
 				logrus.Debugf("container %s exited with code %d", ctr.Name, ctr.ExitCode)
 				inspect, err := c.api.ContainerInspect(ctx, event.Actor.ID)
