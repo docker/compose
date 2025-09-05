@@ -43,6 +43,7 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	if err != nil {
 		return err
 	}
+	defer api.Close()
 	availableModels, err := api.ListModels(ctx)
 
 	eg, ctx := errgroup.WithContext(ctx)
@@ -72,6 +73,7 @@ type modelAPI struct {
 	path    string
 	env     []string
 	prepare func(ctx context.Context, cmd *exec.Cmd) error
+	cleanup func()
 }
 
 func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) {
@@ -82,13 +84,22 @@ func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) 
 		}
 		return nil, err
 	}
+	endpoint, cleanup, err := s.propagateDockerEndpoint()
+	if err != nil {
+		return nil, err
+	}
 	return &modelAPI{
 		path: dockerModel.Path,
 		prepare: func(ctx context.Context, cmd *exec.Cmd) error {
 			return s.prepareShellOut(ctx, project.Environment, cmd)
 		},
-		env: project.Environment.Values(),
+		cleanup: cleanup,
+		env:     append(project.Environment.Values(), endpoint...),
 	}, nil
+}
+
+func (m *modelAPI) Close() {
+	m.cleanup()
 }
 
 func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, w progress.Writer) error {
