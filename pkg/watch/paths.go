@@ -17,6 +17,7 @@
 package watch
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,7 +26,7 @@ import (
 func greatestExistingAncestor(path string) (string, error) {
 	if path == string(filepath.Separator) ||
 		path == fmt.Sprintf("%s%s", filepath.VolumeName(path), string(filepath.Separator)) {
-		return "", fmt.Errorf("cannot watch root directory")
+		return "", errors.New("cannot watch root directory")
 	}
 
 	_, err := os.Stat(path)

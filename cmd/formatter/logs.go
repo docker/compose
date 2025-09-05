@@ -86,7 +86,7 @@ func (l *logConsumer) register(name string) *presenter {
 	l.presenters.Store(name, p)
 	l.computeWidth()
 	if l.prefix {
-		l.presenters.Range(func(key, value interface{}) bool {
+		l.presenters.Range(func(key, value any) bool {
 			p := value.(*presenter)
 			p.setPrefix(l.width)
 			return true
@@ -136,7 +136,7 @@ func (l *logConsumer) Status(container, msg string) {
 
 func (l *logConsumer) computeWidth() {
 	width := 0
-	l.presenters.Range(func(key, value interface{}) bool {
+	l.presenters.Range(func(key, value any) bool {
 		p := value.(*presenter)
 		if len(p.name) > width {
 			width = len(p.name)

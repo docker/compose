@@ -34,7 +34,7 @@ type Writer interface {
 	Stop()
 	Event(Event)
 	Events([]Event)
-	TailMsgf(string, ...interface{})
+	TailMsgf(string, ...any)
 }
 
 type writerKey struct{}

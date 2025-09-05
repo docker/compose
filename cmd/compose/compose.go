@@ -513,12 +513,12 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 				}
 			case ui.ModeTTY:
 				if ansi == "never" {
-					return fmt.Errorf("can't use --progress tty while ANSI support is disabled")
+					return errors.New("can't use --progress tty while ANSI support is disabled")
 				}
 				ui.Mode = ui.ModeTTY
 			case ui.ModePlain:
 				if ansi == "always" {
-					return fmt.Errorf("can't use --progress plain while ANSI support is forced")
+					return errors.New("can't use --progress plain while ANSI support is forced")
 				}
 				ui.Mode = ui.ModePlain
 			case ui.ModeQuiet, "none":
