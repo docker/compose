@@ -9,6 +9,7 @@ services:
 
   nginx:
     image: nginx:alpine
+    stop_signal: SIGTERM
     healthcheck:
       test:     "echo | nc -w 5 localhost:80"
       interval: 2s

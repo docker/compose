@@ -3,6 +3,7 @@ services:
     image: nginx:alpine
     init: true
     command: tail -f /dev/null
+    stop_signal: SIGTERM
     depends_on:
       nginx: {condition: service_healthy, restart: true}
 
@@ -10,6 +11,7 @@ services:
     image: nginx:alpine
     init: true
     command: tail -f /dev/null
+    stop_signal: SIGTERM
     depends_on:
       nginx: { condition: service_healthy }
 
@@ -17,6 +19,7 @@ services:
     image: nginx:alpine
     labels:
       TEST: ${LABEL:-test}
+    stop_signal: SIGTERM
     healthcheck:
       test:     "echo | nc -w 5 localhost:80"
       interval: 2s
