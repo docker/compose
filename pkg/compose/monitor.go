@@ -79,7 +79,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	}
 	restarting := utils.Set[string]{}
 
-	evtCh, errCh := c.api.Events(context.Background(), events.ListOptions{
+	evtCh, errCh := c.api.Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("type", "container"),
 			projectFilter(c.project)),
@@ -89,6 +89,8 @@ func (c *monitor) Start(ctx context.Context) error {
 			return nil
 		}
 		select {
+		case <-ctx.Done():
+			return nil
 		case err := <-errCh:
 			return err
 		case event := <-evtCh:
