@@ -589,18 +589,6 @@ func (mr *MockLogConsumerMockRecorder) Log(containerName, message any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockLogConsumer)(nil).Log), containerName, message)
 }
 
-// Register mocks base method.
-func (m *MockLogConsumer) Register(container string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Register", container)
-}
-
-// Register indicates an expected call of Register.
-func (mr *MockLogConsumerMockRecorder) Register(container any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockLogConsumer)(nil).Register), container)
-}
-
 // Status mocks base method.
 func (m *MockLogConsumer) Status(container, msg string) {
 	m.ctrl.T.Helper()

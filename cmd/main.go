@@ -24,7 +24,6 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/cmdtrace"
-	"github.com/docker/docker/client"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -83,12 +82,14 @@ func dockerCliPostInitialize(dockerCli command.Cli) {
 	// HACK(milas): remove once docker/cli#4574 is merged; for now,
 	// set it in a rather roundabout way by grabbing the underlying
 	// concrete client and manually invoking an option on it
-	_ = dockerCli.Apply(func(cli *command.DockerCli) error {
-		if mobyClient, ok := cli.Client().(*client.Client); ok {
-			_ = client.WithUserAgent("compose/" + internal.Version)(mobyClient)
-		}
-		return nil
-	})
+
+	// FIXME(thaJeztah): what's the best way to set the user-agent "after the fact"? Can't we set it when initializing?
+	// _ = dockerCli.Apply(func(cli *command.DockerCli) error {
+	// 	if mobyClient, ok := cli.Client().(*client.Client); ok {
+	// 		_ = client.WithUserAgent("compose/" + internal.Version)(mobyClient)
+	// 	}
+	// 	return nil
+	// })
 }
 
 func main() {
