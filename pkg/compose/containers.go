@@ -135,7 +135,7 @@ func isOrphaned(project *types.Project) containerPredicate {
 		// One-off container
 		v, ok := c.Labels[api.OneoffLabel]
 		if ok && v == "True" {
-			return c.State == ContainerExited || c.State == ContainerDead
+			return c.State == container.StateExited || c.State == container.StateDead
 		}
 		// Service that is not defined in the compose model
 		service := c.Labels[api.ServiceLabel]
