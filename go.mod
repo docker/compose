@@ -2,6 +2,8 @@ module github.com/docker/compose/v2
 
 go 1.24.7
 
+replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250906012503-2bc0c3930112 // https://github.com/docker/buildx/pull/3326
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e
@@ -15,7 +17,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.28.0
-	github.com/docker/cli v28.4.0+incompatible
+	github.com/docker/cli v28.3.4-0.20250905221807-be97096566f2+incompatible // master
 	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.4.0+incompatible
 	github.com/docker/go-connections v0.6.0
@@ -30,6 +32,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/buildkit v0.24.0
 	github.com/moby/go-archive v0.1.0
+	github.com/moby/moby/api v1.52.0-beta.1
+	github.com/moby/moby/client v0.1.0-beta.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2

@@ -25,8 +25,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/moby/term"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -151,7 +152,7 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.WriteCloser, io.ReadCloser, error) {
 	var stdout io.ReadCloser
 	var stdin io.WriteCloser
-	cnx, err := s.apiClient().ContainerAttach(ctx, container, containerType.AttachOptions{
+	cnx, err := s.apiClient().ContainerAttach(ctx, container, client.ContainerAttachOptions{
 		Stream: true,
 		Stdin:  true,
 		Stdout: true,
@@ -165,7 +166,7 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 	}
 
 	// Fallback to logs API
-	logs, err := s.apiClient().ContainerLogs(ctx, container, containerType.LogsOptions{
+	logs, err := s.apiClient().ContainerLogs(ctx, container, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
