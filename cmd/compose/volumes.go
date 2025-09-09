@@ -55,24 +55,21 @@ func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 }
 
 func runVol(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, options volumesOptions) error {
-	project, _, err := options.projectOrName(ctx, dockerCli, services...)
+	project, name, err := options.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}
 
-	names := project.ServiceNames()
-
-	if len(services) == 0 {
-		services = names
-	}
-
-	for _, service := range services {
-		if !slices.Contains(names, service) {
-			return fmt.Errorf("no such service: %s", service)
+	if project != nil {
+		names := project.ServiceNames()
+		for _, service := range services {
+			if !slices.Contains(names, service) {
+				return fmt.Errorf("no such service: %s", service)
+			}
 		}
 	}
 
-	volumes, err := backend.Volumes(ctx, project, api.VolumesOptions{
+	volumes, err := backend.Volumes(ctx, name, api.VolumesOptions{
 		Services: services,
 	})
 	if err != nil {

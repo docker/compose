@@ -20,7 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -59,7 +58,6 @@ func TestVolumes(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	project := &types.Project{Name: testProject}
 	args := filters.NewArgs(projectFilter(testProject))
 	listOpts := container.ListOptions{Filters: args}
 	volumeListArgs := filters.NewArgs(projectFilter(testProject))
@@ -75,14 +73,14 @@ func TestVolumes(t *testing.T) {
 
 	// Test without service filter - should return all project volumes
 	volumeOptions := api.VolumesOptions{}
-	volumes, err := tested.Volumes(ctx, project, volumeOptions)
+	volumes, err := tested.Volumes(ctx, testProject, volumeOptions)
 	expected := []api.VolumesSummary{vol1, vol2, vol3}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, volumes, expected)
 
 	// Test with service filter - should only return volumes used by service1
 	volumeOptions = api.VolumesOptions{Services: []string{"service1"}}
-	volumes, err = tested.Volumes(ctx, project, volumeOptions)
+	volumes, err = tested.Volumes(ctx, testProject, volumeOptions)
 	expected = []api.VolumesSummary{vol1, vol2}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, volumes, expected)

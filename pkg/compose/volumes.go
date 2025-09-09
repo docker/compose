@@ -20,18 +20,15 @@ import (
 	"context"
 	"slices"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 )
 
-func (s *composeService) Volumes(ctx context.Context, project *types.Project, options api.VolumesOptions) ([]api.VolumesSummary, error) {
-	projectName := project.Name
-
+func (s *composeService) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
 	allContainers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+		Filters: filters.NewArgs(projectFilter(project)),
 	})
 	if err != nil {
 		return nil, err
@@ -51,7 +48,7 @@ func (s *composeService) Volumes(ctx context.Context, project *types.Project, op
 	}
 
 	volumesResponse, err := s.apiClient().VolumeList(ctx, volume.ListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+		Filters: filters.NewArgs(projectFilter(project)),
 	})
 	if err != nil {
 		return nil, err

@@ -101,7 +101,7 @@ type Service interface {
 	// Generate generates a Compose Project from existing containers
 	Generate(ctx context.Context, options GenerateOptions) (*types.Project, error)
 	// Volumes executes the equivalent to a `docker volume ls`
-	Volumes(ctx context.Context, project *types.Project, options VolumesOptions) ([]VolumesSummary, error)
+	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
 }
 
 type VolumesOptions struct {
