@@ -499,7 +499,7 @@ func (mr *MockServiceMockRecorder) Viz(ctx, project, options any) *gomock.Call {
 }
 
 // Volumes mocks base method.
-func (m *MockService) Volumes(ctx context.Context, project *types.Project, options api.VolumesOptions) ([]api.VolumesSummary, error) {
+func (m *MockService) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Volumes", ctx, project, options)
 	ret0, _ := ret[0].([]api.VolumesSummary)
@@ -587,18 +587,6 @@ func (m *MockLogConsumer) Log(containerName, message string) {
 func (mr *MockLogConsumerMockRecorder) Log(containerName, message any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockLogConsumer)(nil).Log), containerName, message)
-}
-
-// Register mocks base method.
-func (m *MockLogConsumer) Register(container string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Register", container)
-}
-
-// Register indicates an expected call of Register.
-func (mr *MockLogConsumerMockRecorder) Register(container any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockLogConsumer)(nil).Register), container)
 }
 
 // Status mocks base method.
