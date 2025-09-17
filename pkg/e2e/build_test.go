@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -29,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 )
 
 func TestLocalComposeBuild(t *testing.T) {
@@ -607,4 +609,39 @@ func TestBuildDependentImageWithProfile(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/profiles/compose.yaml", "build", "secret-build-test")
 	out := res.Combined()
 	assert.Check(t, strings.Contains(out, "secret-build-test  Built"))
+}
+
+func TestBuildTLS(t *testing.T) {
+	t.Helper()
+
+	c := NewParallelCLI(t)
+	const dindBuilder = "e2e-dind-builder"
+	tmp := t.TempDir()
+
+	t.Cleanup(func() {
+		c.RunDockerCmd(t, "rm", "-f", dindBuilder)
+		c.RunDockerCmd(t, "context", "rm", dindBuilder)
+	})
+
+	c.RunDockerCmd(t, "run", "--name", dindBuilder, "--privileged", "-p", "2376:2376", "-d", "docker:dind")
+
+	poll.WaitOn(t, func(_ poll.LogT) poll.Result {
+		res := c.RunDockerCmd(t, "logs", dindBuilder)
+		if strings.Contains(res.Combined(), "API listen on [::]:2376") {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for Docker daemon to be running")
+	}, poll.WithTimeout(10*time.Second))
+
+	time.Sleep(1 * time.Second) // wait for dind setup
+	c.RunDockerCmd(t, "cp", dindBuilder+":/certs/client", tmp)
+
+	c.RunDockerCmd(t, "context", "create", dindBuilder, "--docker",
+		fmt.Sprintf("host=tcp://localhost:2376,ca=%s/client/ca.pem,cert=%s/client/cert.pem,key=%s/client/key.pem,skip-tls-verify=1", tmp, tmp, tmp))
+
+	cmd := c.NewDockerComposeCmd(t, "-f", "fixtures/build-test/minimal/compose.yaml", "build")
+	cmd.Env = append(cmd.Env, "DOCKER_CONTEXT="+dindBuilder)
+	cmd.Stdout = os.Stdout
+	res := icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Expected{Err: "Built"})
 }

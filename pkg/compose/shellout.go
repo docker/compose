@@ -65,6 +65,7 @@ func (s *composeService) propagateDockerEndpoint() ([]string, func(), error) {
 			_ = os.RemoveAll(certs)
 		}
 		env[client.EnvOverrideCertPath] = certs
+		env["DOCKER_TLS"] = "1"
 		if !endpoint.SkipTLSVerify {
 			env[client.EnvTLSVerify] = "1"
 		}
@@ -73,7 +74,7 @@ func (s *composeService) propagateDockerEndpoint() ([]string, func(), error) {
 		if err != nil {
 			return nil, cleanup, err
 		}
-		err = os.WriteFile(filepath.Join(certs, flags.DefaultCaFile), endpoint.TLSData.Cert, 0o600)
+		err = os.WriteFile(filepath.Join(certs, flags.DefaultCertFile), endpoint.TLSData.Cert, 0o600)
 		if err != nil {
 			return nil, cleanup, err
 		}
