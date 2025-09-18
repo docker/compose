@@ -50,7 +50,6 @@ type runOptions struct {
 	Detach        bool
 	Remove        bool
 	noTty         bool
-	tty           bool
 	interactive   bool
 	user          string
 	workdir       string
@@ -155,6 +154,10 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	buildOpts := buildOptions{
 		ProjectOptions: p,
 	}
+	// We remove the attribute from the option struct and use a dedicated var, to limit confusion and avoid anyone to use options.tty.
+	// The tty flag is here for convenience and let user do "docker compose run -it" the same way as they use the "docker run" command.
+	var ttyFlag bool
+
 	cmd := &cobra.Command{
 		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service",
@@ -178,7 +181,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 				if cmd.Flags().Changed("no-TTY") {
 					return fmt.Errorf("--tty and --no-TTY can't be used together")
 				} else {
-					options.noTty = !options.tty
+					options.noTty = !ttyFlag
 				}
 			}
 			if options.quiet {
@@ -238,7 +241,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.BoolVar(&options.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 
 	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
-	cmd.Flags().BoolVarP(&options.tty, "tty", "t", true, "Allocate a pseudo-TTY")
+	cmd.Flags().BoolVarP(&ttyFlag, "tty", "t", true, "Allocate a pseudo-TTY")
 	cmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	flags.SetNormalizeFunc(normalizeRunFlags)
