@@ -1,0 +1,9 @@
+services:
+  piped-test:
+    image: alpine
+    command: cat
+    # Service that will receive piped input and echo it back
+  tty-test:
+    image: alpine
+    command: sh -c "if [ -t 0 ]; then echo 'TTY detected'; else echo 'No TTY detected'; fi"
+    # Service to test TTY detection

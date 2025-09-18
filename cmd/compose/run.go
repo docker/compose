@@ -183,7 +183,11 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 				} else {
 					options.noTty = !ttyFlag
 				}
+			} else if !cmd.Flags().Changed("no-TTY") && !cmd.Flags().Changed("interactive") && !dockerCli.In().IsTerminal() {
+				// Check if the command was piped or not, if so, force noTty to tru
+				options.noTty = true
 			}
+
 			if options.quiet {
 				progress.Mode = progress.ModeQuiet
 				devnull, err := os.Open(os.DevNull)
