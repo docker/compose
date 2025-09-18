@@ -231,15 +231,11 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 			if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
 				continue
-			} else {
-				var initialSync bool
-				success, err := trigger.Extensions.Get("x-initialSync", &initialSync)
-				if err == nil && success && initialSync && isSync(trigger) {
-					// Need to check initial files are in container that are meant to be synced from watch action
-					err := s.initialSync(ctx, project, service, trigger, syncer)
-					if err != nil {
-						return nil, err
-					}
+			} else if trigger.InitialSync && isSync(trigger) {
+				// Need to check initial files are in container that are meant to be synced from watch action
+				err := s.initialSync(ctx, project, service, trigger, syncer)
+				if err != nil {
+					return nil, err
 				}
 			}
 			paths = append(paths, trigger.Path)
