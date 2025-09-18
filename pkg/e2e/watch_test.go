@@ -405,3 +405,27 @@ func TestWatchIncludes(t *testing.T) {
 
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
+
+func TestCheckWarningXInitialSyn(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "test_watch_warn_initial_syn"
+
+	defer c.cleanupWithDown(t, projectName)
+
+	tmpdir := t.TempDir()
+	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
+	CopyFile(t, filepath.Join("fixtures", "watch", "x-initialSync.yaml"), composeFilePath)
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "--verbose", "up", "--watch")
+	buffer := bytes.NewBuffer(nil)
+	cmd.Stdout = buffer
+	watch := icmd.StartCmd(cmd)
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		if strings.Contains(watch.Combined(), "x-initialSync is DEPRECATED, please use the official `initial_sync` attribute") {
+			return poll.Success()
+		}
+		return poll.Continue("%v", watch.Stdout())
+	})
+
+	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
+}

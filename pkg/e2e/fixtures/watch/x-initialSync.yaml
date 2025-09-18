@@ -9,7 +9,7 @@ services:
       watch:
         - path: .
           target: /data
-          initial_sync: true
           action: sync+exec
           exec:
             command: echo "SUCCESS"
+          x-initialSync: true
