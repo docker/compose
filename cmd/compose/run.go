@@ -184,7 +184,10 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 					options.noTty = !ttyFlag
 				}
 			} else if !cmd.Flags().Changed("no-TTY") && !cmd.Flags().Changed("interactive") && !dockerCli.In().IsTerminal() {
-				// Check if the command was piped or not, if so, force noTty to tru
+				// while `docker run` requires explicit `-it` flags, Compose enables interactive mode and TTY by default
+				// but when compose is used from a scripr has stdin piped from another command, we just can't
+				// Here, we detect we run "by default" (user didn't passed explicit flags) and disable TTY allocation if
+				// we don't have an actual terminal to attach to for interactive mode
 				options.noTty = true
 			}
 
