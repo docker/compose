@@ -27,6 +27,7 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 func (s composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
@@ -42,7 +43,7 @@ func (s composeService) runHook(ctx context.Context, ctr container.Summary, serv
 	defer wOut.Close() //nolint:errcheck
 
 	detached := listener == nil
-	exec, err := s.apiClient().ContainerExecCreate(ctx, ctr.ID, container.ExecOptions{
+	exec, err := s.apiClient().ContainerExecCreate(ctx, ctr.ID, client.ExecCreateOptions{
 		User:         hook.User,
 		Privileged:   hook.Privileged,
 		Env:          ToMobyEnv(hook.Environment),
@@ -61,7 +62,7 @@ func (s composeService) runHook(ctx context.Context, ctr container.Summary, serv
 
 	height, width := s.stdout().GetTtySize()
 	consoleSize := &[2]uint{height, width}
-	attach, err := s.apiClient().ContainerExecAttach(ctx, exec.ID, container.ExecAttachOptions{
+	attach, err := s.apiClient().ContainerExecAttach(ctx, exec.ID, client.ExecAttachOptions{
 		Tty:         service.Tty,
 		ConsoleSize: consoleSize,
 	})
@@ -90,7 +91,7 @@ func (s composeService) runHook(ctx context.Context, ctr container.Summary, serv
 }
 
 func (s composeService) runWaitExec(ctx context.Context, execID string, service types.ServiceConfig, listener api.ContainerEventListener) error {
-	err := s.apiClient().ContainerExecStart(ctx, execID, container.ExecStartOptions{
+	err := s.apiClient().ContainerExecStart(ctx, execID, client.ExecStartOptions{
 		Detach: listener == nil,
 		Tty:    service.Tty,
 	})

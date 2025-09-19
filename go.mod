@@ -2,10 +2,10 @@ module github.com/docker/compose/v2
 
 go 1.24.9
 
-replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250925175445-d7eb9356cc19 // https://github.com/docker/buildx/pull/3326
+replace github.com/docker/buildx => github.com/thaJeztah/buildx v0.2.1-0.20250930103105-78222aba6f4e // https://github.com/docker/buildx/pull/3326
 
 // Need a replace, because master pseudo-version is considered "older" than the 28.x branch
-replace github.com/docker/cli => github.com/docker/cli v28.3.4-0.20250925164328-6855d70c52fc+incompatible // master
+replace github.com/docker/cli => github.com/docker/cli v28.3.4-0.20250930073105-21e768adb78b+incompatible // master
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -35,8 +35,8 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.25.1
 	github.com/moby/go-archive v0.1.0
-	github.com/moby/moby/api v1.52.0-beta.1.0.20250919095748-0967d6ea6ba7
-	github.com/moby/moby/client v0.1.0-beta.0.0.20250919095748-0967d6ea6ba7
+	github.com/moby/moby/api v1.52.0-beta.1.0.20250930082920-4ca8aedf929f // master
+	github.com/moby/moby/client v0.1.0-beta.0.0.20250930082920-4ca8aedf929f // master
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2
