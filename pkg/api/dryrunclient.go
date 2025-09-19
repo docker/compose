@@ -218,8 +218,7 @@ func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options
 	rc := io.NopCloser(bytes.NewReader(jsonMessage))
 
 	return build.ImageBuildResponse{
-		Body:   rc,
-		OSType: "",
+		Body: rc,
 	}, nil
 }
 
