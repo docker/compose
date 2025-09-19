@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"runtime"
 	"strings"
 	"sync"
@@ -35,7 +34,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	moby "github.com/moby/moby/api/types"
 	"github.com/moby/moby/api/types/build"
-	"github.com/moby/moby/api/types/checkpoint"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
 	"github.com/moby/moby/api/types/filters"
@@ -311,7 +309,7 @@ func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force 
 	return nil
 }
 
-func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config containerType.ExecOptions) (containerType.ExecCreateResponse, error) {
+func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config client.ExecCreateOptions) (containerType.ExecCreateResponse, error) {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	id := fmt.Sprintf("%x", b)
@@ -324,7 +322,7 @@ func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string
 	}, nil
 }
 
-func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config containerType.ExecStartOptions) error {
+func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config client.ExecStartOptions) error {
 	v, ok := d.execs.LoadAndDelete(execID)
 	if !ok {
 		return fmt.Errorf("invalid exec ID %q", execID)
@@ -364,11 +362,11 @@ func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]c
 	return d.apiClient.ContainerDiff(ctx, container)
 }
 
-func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config containerType.ExecStartOptions) (client.HijackedResponse, error) {
+func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config client.ExecStartOptions) (client.HijackedResponse, error) {
 	return client.HijackedResponse{}, errors.New("interactive exec is not supported in dry-run mode")
 }
 
-func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (containerType.ExecInspect, error) {
+func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (client.ExecInspect, error) {
 	return d.apiClient.ContainerExecInspect(ctx, execID)
 }
 
@@ -672,10 +670,6 @@ func (d *DryRunClient) DaemonHost() string {
 	return d.apiClient.DaemonHost()
 }
 
-func (d *DryRunClient) HTTPClient() *http.Client {
-	return d.apiClient.HTTPClient()
-}
-
 func (d *DryRunClient) ServerVersion(ctx context.Context) (moby.Version, error) {
 	return d.apiClient.ServerVersion(ctx)
 }
@@ -708,6 +702,6 @@ func (d *DryRunClient) CheckpointDelete(ctx context.Context, container string, o
 	return d.apiClient.CheckpointDelete(ctx, container, options)
 }
 
-func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options client.CheckpointListOptions) ([]checkpoint.Summary, error) {
+func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options client.CheckpointListOptions) (client.CheckpointListResult, error) {
 	return d.apiClient.CheckpointList(ctx, container, options)
 }

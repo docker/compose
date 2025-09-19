@@ -47,24 +47,6 @@ func (m *MockCli) EXPECT() *MockCliMockRecorder {
 	return m.recorder
 }
 
-// Apply mocks base method.
-func (m *MockCli) Apply(arg0 ...command.CLIOption) error {
-	m.ctrl.T.Helper()
-	varargs := []any{}
-	for _, a := range arg0 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Apply", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Apply indicates an expected call of Apply.
-func (mr *MockCliMockRecorder) Apply(arg0 ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockCli)(nil).Apply), arg0...)
-}
-
 // BuildKitEnabled mocks base method.
 func (m *MockCli) BuildKitEnabled() (bool, error) {
 	m.ctrl.T.Helper()

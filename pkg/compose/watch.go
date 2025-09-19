@@ -439,7 +439,7 @@ func (t tarDockerClient) ContainersForService(ctx context.Context, projectName s
 }
 
 func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
-	execCfg := container.ExecOptions{
+	execCfg := client.ExecCreateOptions{
 		Cmd:          cmd,
 		AttachStdout: false,
 		AttachStderr: true,
@@ -451,7 +451,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	startCheck := container.ExecStartOptions{Tty: false, Detach: false}
+	startCheck := client.ExecStartOptions{Tty: false, Detach: false}
 	conn, err := t.s.apiClient().ContainerExecAttach(ctx, execCreateResp.ID, startCheck)
 	if err != nil {
 		return err
