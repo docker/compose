@@ -13,12 +13,10 @@ import (
 	context "context"
 	io "io"
 	net "net"
-	http "net/http"
 	reflect "reflect"
 
 	types "github.com/moby/moby/api/types"
 	build "github.com/moby/moby/api/types/build"
-	checkpoint "github.com/moby/moby/api/types/checkpoint"
 	common "github.com/moby/moby/api/types/common"
 	container "github.com/moby/moby/api/types/container"
 	events "github.com/moby/moby/api/types/events"
@@ -116,10 +114,10 @@ func (mr *MockAPIClientMockRecorder) CheckpointDelete(arg0, arg1, arg2 any) *gom
 }
 
 // CheckpointList mocks base method.
-func (m *MockAPIClient) CheckpointList(arg0 context.Context, arg1 string, arg2 client.CheckpointListOptions) ([]checkpoint.Summary, error) {
+func (m *MockAPIClient) CheckpointList(arg0 context.Context, arg1 string, arg2 client.CheckpointListOptions) (client.CheckpointListResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckpointList", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]checkpoint.Summary)
+	ret0, _ := ret[0].(client.CheckpointListResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -788,20 +786,6 @@ func (m *MockAPIClient) Events(arg0 context.Context, arg1 client.EventsListOptio
 func (mr *MockAPIClientMockRecorder) Events(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Events", reflect.TypeOf((*MockAPIClient)(nil).Events), arg0, arg1)
-}
-
-// HTTPClient mocks base method.
-func (m *MockAPIClient) HTTPClient() *http.Client {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HTTPClient")
-	ret0, _ := ret[0].(*http.Client)
-	return ret0
-}
-
-// HTTPClient indicates an expected call of HTTPClient.
-func (mr *MockAPIClientMockRecorder) HTTPClient() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HTTPClient", reflect.TypeOf((*MockAPIClient)(nil).HTTPClient))
 }
 
 // ImageBuild mocks base method.

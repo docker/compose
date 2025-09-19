@@ -606,10 +606,10 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 				StatusText: err.Error(),
 			})
 		}
-		return
+		return ctr, err
 	}
 	w.Event(progress.CreatedEvent(eventName))
-	return
+	return ctr, nil
 }
 
 func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,

@@ -189,7 +189,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	if err != nil {
 		return "", err
 	}
-	defer response.Close() //nolint:errcheck
+	defer response.Body.Close() //nolint:errcheck
 
 	imageID := ""
 	aux := func(msg jsonmessage.JSONMessage) {
@@ -201,7 +201,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		}
 	}
 
-	err = jsonmessage.DisplayJSONMessagesStream(response, buildBuff, progBuff.FD(), true, aux)
+	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.FD(), true, aux)
 	if err != nil {
 		var jerr *jsonstream.Error
 		if errors.As(err, &jerr) {

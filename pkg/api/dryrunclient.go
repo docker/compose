@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"runtime"
 	"strings"
 	"sync"
@@ -35,7 +34,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	moby "github.com/moby/moby/api/types"
 	"github.com/moby/moby/api/types/build"
-	"github.com/moby/moby/api/types/checkpoint"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
 	"github.com/moby/moby/api/types/filters"
@@ -670,10 +668,6 @@ func (d *DryRunClient) DaemonHost() string {
 	return d.apiClient.DaemonHost()
 }
 
-func (d *DryRunClient) HTTPClient() *http.Client {
-	return d.apiClient.HTTPClient()
-}
-
 func (d *DryRunClient) ServerVersion(ctx context.Context) (moby.Version, error) {
 	return d.apiClient.ServerVersion(ctx)
 }
@@ -706,6 +700,6 @@ func (d *DryRunClient) CheckpointDelete(ctx context.Context, container string, o
 	return d.apiClient.CheckpointDelete(ctx, container, options)
 }
 
-func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options client.CheckpointListOptions) ([]checkpoint.Summary, error) {
+func (d *DryRunClient) CheckpointList(ctx context.Context, container string, options client.CheckpointListOptions) (client.CheckpointListResult, error) {
 	return d.apiClient.CheckpointList(ctx, container, options)
 }

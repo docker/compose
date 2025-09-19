@@ -68,7 +68,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		Comment:   options.Comment,
 		Author:    options.Author,
 		Changes:   options.Changes.GetSlice(),
-		Pause:     options.Pause,
+		NoPause:   !options.Pause,
 	})
 	if err != nil {
 		return err
