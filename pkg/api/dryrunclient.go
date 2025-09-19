@@ -311,7 +311,7 @@ func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, force 
 	return nil
 }
 
-func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config containerType.ExecOptions) (containerType.ExecCreateResponse, error) {
+func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string, config client.ExecCreateOptions) (containerType.ExecCreateResponse, error) {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	id := fmt.Sprintf("%x", b)
@@ -324,7 +324,7 @@ func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string
 	}, nil
 }
 
-func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config containerType.ExecStartOptions) error {
+func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config client.ExecStartOptions) error {
 	v, ok := d.execs.LoadAndDelete(execID)
 	if !ok {
 		return fmt.Errorf("invalid exec ID %q", execID)
@@ -364,11 +364,11 @@ func (d *DryRunClient) ContainerDiff(ctx context.Context, container string) ([]c
 	return d.apiClient.ContainerDiff(ctx, container)
 }
 
-func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config containerType.ExecStartOptions) (client.HijackedResponse, error) {
+func (d *DryRunClient) ContainerExecAttach(ctx context.Context, execID string, config client.ExecStartOptions) (client.HijackedResponse, error) {
 	return client.HijackedResponse{}, errors.New("interactive exec is not supported in dry-run mode")
 }
 
-func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (containerType.ExecInspect, error) {
+func (d *DryRunClient) ContainerExecInspect(ctx context.Context, execID string) (client.ExecInspect, error) {
 	return d.apiClient.ContainerExecInspect(ctx, execID)
 }
 

@@ -35,8 +35,8 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.25.0-rc1
 	github.com/moby/go-archive v0.1.0
-	github.com/moby/moby/api v1.52.0-beta.1.0.20250919095748-0967d6ea6ba7
-	github.com/moby/moby/client v0.1.0-beta.0.0.20250919095748-0967d6ea6ba7
+	github.com/moby/moby/api v1.52.0-beta.1.0.20250925112644-22016b516bac
+	github.com/moby/moby/client v0.1.0-beta.0.0.20250925112644-22016b516bac
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/moby/term v0.5.2

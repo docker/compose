@@ -293,7 +293,7 @@ func (mr *MockAPIClientMockRecorder) ContainerDiff(arg0, arg1 any) *gomock.Call 
 }
 
 // ContainerExecAttach mocks base method.
-func (m *MockAPIClient) ContainerExecAttach(arg0 context.Context, arg1 string, arg2 container.ExecStartOptions) (client.HijackedResponse, error) {
+func (m *MockAPIClient) ContainerExecAttach(arg0 context.Context, arg1 string, arg2 client.ExecStartOptions) (client.HijackedResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecAttach", arg0, arg1, arg2)
 	ret0, _ := ret[0].(client.HijackedResponse)
@@ -308,7 +308,7 @@ func (mr *MockAPIClientMockRecorder) ContainerExecAttach(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecCreate mocks base method.
-func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 container.ExecOptions) (common.IDResponse, error) {
+func (m *MockAPIClient) ContainerExecCreate(arg0 context.Context, arg1 string, arg2 client.ExecCreateOptions) (common.IDResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecCreate", arg0, arg1, arg2)
 	ret0, _ := ret[0].(common.IDResponse)
@@ -323,10 +323,10 @@ func (mr *MockAPIClientMockRecorder) ContainerExecCreate(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecInspect mocks base method.
-func (m *MockAPIClient) ContainerExecInspect(arg0 context.Context, arg1 string) (container.ExecInspect, error) {
+func (m *MockAPIClient) ContainerExecInspect(arg0 context.Context, arg1 string) (client.ExecInspect, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecInspect", arg0, arg1)
-	ret0, _ := ret[0].(container.ExecInspect)
+	ret0, _ := ret[0].(client.ExecInspect)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -352,7 +352,7 @@ func (mr *MockAPIClientMockRecorder) ContainerExecResize(arg0, arg1, arg2 any) *
 }
 
 // ContainerExecStart mocks base method.
-func (m *MockAPIClient) ContainerExecStart(arg0 context.Context, arg1 string, arg2 container.ExecStartOptions) error {
+func (m *MockAPIClient) ContainerExecStart(arg0 context.Context, arg1 string, arg2 client.ExecStartOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainerExecStart", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
