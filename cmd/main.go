@@ -47,8 +47,15 @@ func pluginMain() {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
-			// compose-specific initialization
-			dockerCliPostInitialize(dockerCli)
+			// compose-specific initialization. This must be called AFTER
+			// plugin.PersistentPreRunE.
+			//
+			// FIXME(milas): remove once https://github.com/docker/cli/pull/4574 is merged; for now,
+			//  set it in a rather roundabout way by grabbing the underlying
+			//  concrete client and manually invoking an option on it
+			if mobyClient, ok := dockerCli.Client().(*client.Client); ok {
+				_ = client.WithUserAgent("compose/" + internal.Version)(mobyClient)
+			}
 
 			if err := cmdtrace.Setup(cmd, dockerCli, os.Args[1:]); err != nil {
 				logrus.Debugf("failed to enable tracing: %v", err)
@@ -73,22 +80,6 @@ func pluginMain() {
 			Vendor:        "Docker Inc.",
 			Version:       internal.Version,
 		})
-}
-
-// dockerCliPostInitialize performs Compose-specific configuration for the
-// command.Cli instance provided by the plugin.Run() initialization.
-//
-// NOTE: This must be called AFTER plugin.PersistentPreRunE.
-func dockerCliPostInitialize(dockerCli command.Cli) {
-	// HACK(milas): remove once docker/cli#4574 is merged; for now,
-	// set it in a rather roundabout way by grabbing the underlying
-	// concrete client and manually invoking an option on it
-	_ = dockerCli.Apply(func(cli *command.DockerCli) error {
-		if mobyClient, ok := cli.Client().(*client.Client); ok {
-			_ = client.WithUserAgent("compose/" + internal.Version)(mobyClient)
-		}
-		return nil
-	})
 }
 
 func main() {
