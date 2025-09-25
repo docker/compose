@@ -1,7 +1,7 @@
 ARG COMPOSE_VERSION=v2.37.0
 FROM docker/compose-bin:${COMPOSE_VERSION} AS compose
 
-FROM debian:bookworm-20250811-slim AS compose-plugin
+FROM debian:bookworm-20250908-slim AS compose-plugin
 WORKDIR /home/compose
 ENV COMPOSE_COMPATIBILITY=true
 # add user
