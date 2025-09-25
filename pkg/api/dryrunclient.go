@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"runtime"
 	"strings"
 	"sync"
@@ -673,10 +672,6 @@ func (d *DryRunClient) ClientVersion() string {
 
 func (d *DryRunClient) DaemonHost() string {
 	return d.apiClient.DaemonHost()
-}
-
-func (d *DryRunClient) HTTPClient() *http.Client {
-	return d.apiClient.HTTPClient()
 }
 
 func (d *DryRunClient) ServerVersion(ctx context.Context) (moby.Version, error) {
