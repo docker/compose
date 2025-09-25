@@ -26,9 +26,10 @@ import (
 	"slices"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/remotes"
 	pusherrors "github.com/containerd/containerd/v2/core/remotes/errors"
+	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
-	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
@@ -67,11 +68,6 @@ var clientAuthStatusCodes = []int{
 	http.StatusProxyAuthRequired,
 }
 
-type Pushable struct {
-	Descriptor v1.Descriptor
-	Data       []byte
-}
-
 func DescriptorForComposeFile(path string, content []byte) v1.Descriptor {
 	return v1.Descriptor{
 		MediaType: ComposeYAMLMediaType,
@@ -81,6 +77,7 @@ func DescriptorForComposeFile(path string, content []byte) v1.Descriptor {
 			"com.docker.compose.version": api.ComposeVersion,
 			"com.docker.compose.file":    filepath.Base(path),
 		},
+		Data: content,
 	}
 }
 
@@ -93,27 +90,23 @@ func DescriptorForEnvFile(path string, content []byte) v1.Descriptor {
 			"com.docker.compose.version": api.ComposeVersion,
 			"com.docker.compose.envfile": filepath.Base(path),
 		},
+		Data: content,
 	}
 }
 
-func PushManifest(
-	ctx context.Context,
-	resolver *imagetools.Resolver,
-	named reference.Named,
-	layers []Pushable,
-	ociVersion api.OCIVersion,
-) error {
+func PushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion) error {
 	// Check if we need an extra empty layer for the manifest config
 	if ociVersion == api.OCIVersion1_1 || ociVersion == "" {
-		if err := resolver.Push(ctx, named, v1.DescriptorEmptyJSON, v1.DescriptorEmptyJSON.Data); err != nil {
+		err := push(ctx, resolver, named, v1.DescriptorEmptyJSON)
+		if err != nil {
 			return err
 		}
 	}
 	// prepare to push the manifest by pushing the layers
 	layerDescriptors := make([]v1.Descriptor, len(layers))
 	for i := range layers {
-		layerDescriptors[i] = layers[i].Descriptor
-		if err := resolver.Push(ctx, named, layers[i].Descriptor, layers[i].Data); err != nil {
+		layerDescriptors[i] = layers[i]
+		if err := push(ctx, resolver, named, layers[i]); err != nil {
 			return err
 		}
 	}
@@ -135,19 +128,38 @@ func PushManifest(
 	return err
 }
 
-func createAndPushManifest(
-	ctx context.Context,
-	resolver *imagetools.Resolver,
-	named reference.Named,
-	layers []v1.Descriptor,
-	ociVersion api.OCIVersion,
-) error {
+func push(ctx context.Context, resolver remotes.Resolver, ref reference.Named, descriptor v1.Descriptor) error {
+	fullRef, err := reference.WithDigest(reference.TagNameOnly(ref), descriptor.Digest)
+	if err != nil {
+		return err
+	}
+
+	pusher, err := resolver.Pusher(ctx, fullRef.String())
+	if err != nil {
+		return err
+	}
+	push, err := pusher.Push(ctx, descriptor)
+	if errdefs.IsAlreadyExists(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = push.Close()
+	}()
+
+	_, err = push.Write(descriptor.Data)
+	return err
+}
+
+func createAndPushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion) error {
 	toPush, err := generateManifest(layers, ociVersion)
 	if err != nil {
 		return err
 	}
 	for _, p := range toPush {
-		err = resolver.Push(ctx, named, p.Descriptor, p.Data)
+		err = push(ctx, resolver, named, p)
 		if err != nil {
 			return err
 		}
@@ -163,8 +175,8 @@ func isNonAuthClientError(statusCode int) bool {
 	return !slices.Contains(clientAuthStatusCodes, statusCode)
 }
 
-func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pushable, error) {
-	var toPush []Pushable
+func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]v1.Descriptor, error) {
+	var toPush []v1.Descriptor
 	var config v1.Descriptor
 	var artifactType string
 	switch ociCompat {
@@ -184,16 +196,17 @@ func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pusha
 			MediaType: ComposeEmptyConfigMediaType,
 			Digest:    digest.FromBytes(configData),
 			Size:      int64(len(configData)),
+			Data:      configData,
 		}
 		// N.B. OCI 1.0 does NOT support specifying the artifact type, so it's
 		//		left as an empty string to omit it from the marshaled JSON
 		artifactType = ""
-		toPush = append(toPush, Pushable{Descriptor: config, Data: configData})
+		toPush = append(toPush, config)
 	case api.OCIVersion1_1:
 		config = v1.DescriptorEmptyJSON
 		artifactType = ComposeProjectArtifactType
 		// N.B. the descriptor has the data embedded in it
-		toPush = append(toPush, Pushable{Descriptor: config, Data: make([]byte, len(config.Data))})
+		toPush = append(toPush, config)
 	default:
 		return nil, fmt.Errorf("unsupported OCI version: %s", ociCompat)
 	}
@@ -220,7 +233,8 @@ func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) ([]Pusha
 			"com.docker.compose.version": api.ComposeVersion,
 		},
 		ArtifactType: artifactType,
+		Data:         manifest,
 	}
-	toPush = append(toPush, Pushable{Descriptor: manifestDescriptor, Data: manifest})
+	toPush = append(toPush, manifestDescriptor)
 	return toPush, nil
 }

@@ -280,7 +280,7 @@ func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiCl
 }
 
 func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
-	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(ref))
+	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(reference.Domain(ref)))
 	if err != nil {
 		return "", err
 	}
