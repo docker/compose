@@ -27,17 +27,18 @@ import (
 
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 	"github.com/DefangLabs/secret-detector/pkg/secrets"
-
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/distribution/reference"
-	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/ocipush"
+	"github.com/docker/compose/v2/internal/registry"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose/transform"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
@@ -64,11 +65,27 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 
-	resolver := imagetools.New(imagetools.Opt{
-		Auth: s.configFile(),
+	config := s.dockerCli.ConfigFile()
+
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Hosts: docker.ConfigureDefaultRegistries(
+			docker.WithAuthorizer(docker.NewDockerAuthorizer(
+				docker.WithAuthCreds(func(host string) (string, string, error) {
+					host = registry.GetAuthConfigKey(host)
+					auth, err := config.GetAuthConfig(host)
+					if err != nil {
+						return "", "", err
+					}
+					if auth.IdentityToken != "" {
+						return "", auth.IdentityToken, nil
+					}
+					return auth.Username, auth.Password, nil
+				}),
+			)),
+		),
 	})
 
-	var layers []ocipush.Pushable
+	var layers []v1.Descriptor
 	extFiles := map[string]string{}
 	for _, file := range project.ComposeFiles {
 		data, err := processFile(ctx, file, project, extFiles)
@@ -77,10 +94,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		}
 
 		layerDescriptor := ocipush.DescriptorForComposeFile(file, data)
-		layers = append(layers, ocipush.Pushable{
-			Descriptor: layerDescriptor,
-			Data:       data,
-		})
+		layers = append(layers, layerDescriptor)
 	}
 
 	extLayers, err := processExtends(ctx, project, extFiles)
@@ -100,10 +114,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		}
 
 		layerDescriptor := ocipush.DescriptorForComposeFile("image-digests.yaml", yaml)
-		layers = append(layers, ocipush.Pushable{
-			Descriptor: layerDescriptor,
-			Data:       yaml,
-		})
+		layers = append(layers, layerDescriptor)
 	}
 
 	w := progress.ContextWriter(ctx)
@@ -131,8 +142,8 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 	return nil
 }
 
-func processExtends(ctx context.Context, project *types.Project, extFiles map[string]string) ([]ocipush.Pushable, error) {
-	var layers []ocipush.Pushable
+func processExtends(ctx context.Context, project *types.Project, extFiles map[string]string) ([]v1.Descriptor, error) {
+	var layers []v1.Descriptor
 	moreExtFiles := map[string]string{}
 	for xf, hash := range extFiles {
 		data, err := processFile(ctx, xf, project, moreExtFiles)
@@ -142,10 +153,7 @@ func processExtends(ctx context.Context, project *types.Project, extFiles map[st
 
 		layerDescriptor := ocipush.DescriptorForComposeFile(hash, data)
 		layerDescriptor.Annotations["com.docker.compose.extends"] = "true"
-		layers = append(layers, ocipush.Pushable{
-			Descriptor: layerDescriptor,
-			Data:       data,
-		})
+		layers = append(layers, layerDescriptor)
 	}
 	for f, hash := range moreExtFiles {
 		if _, ok := extFiles[f]; ok {
@@ -343,8 +351,8 @@ func acceptPublishBindMountDeclarations(cli command.Cli) (bool, error) {
 	return confirm, err
 }
 
-func envFileLayers(project *types.Project) []ocipush.Pushable {
-	var layers []ocipush.Pushable
+func envFileLayers(project *types.Project) []v1.Descriptor {
+	var layers []v1.Descriptor
 	for _, service := range project.Services {
 		for _, envFile := range service.EnvFiles {
 			f, err := os.ReadFile(envFile.Path)
@@ -353,10 +361,7 @@ func envFileLayers(project *types.Project) []ocipush.Pushable {
 				continue
 			}
 			layerDescriptor := ocipush.DescriptorForEnvFile(envFile.Path, f)
-			layers = append(layers, ocipush.Pushable{
-				Descriptor: layerDescriptor,
-				Data:       f,
-			})
+			layers = append(layers, layerDescriptor)
 		}
 	}
 	return layers

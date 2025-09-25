@@ -90,7 +90,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, confi
 		return err
 	}
 
-	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(ref))
+	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(reference.Domain(ref)))
 	if err != nil {
 		return err
 	}

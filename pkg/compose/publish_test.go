@@ -23,7 +23,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/internal/ocipush"
 	"github.com/docker/compose/v2/pkg/api"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gotest.tools/v3/assert"
@@ -58,17 +57,15 @@ services:
 
 	b, err := os.ReadFile("testdata/publish/common.yaml")
 	assert.NilError(t, err)
-	assert.DeepEqual(t, []ocipush.Pushable{
+	assert.DeepEqual(t, []v1.Descriptor{
 		{
-			Descriptor: v1.Descriptor{
-				MediaType: "application/vnd.docker.compose.file+yaml",
-				Digest:    "sha256:d3ba84507b56ec783f4b6d24306b99a15285f0a23a835f0b668c2dbf9c59c241",
-				Size:      32,
-				Annotations: map[string]string{
-					"com.docker.compose.extends": "true",
-					"com.docker.compose.file":    "f8f9ede3d201ec37d5a5e3a77bbadab79af26035e53135e19571f50d541d390c.yaml",
-					"com.docker.compose.version": api.ComposeVersion,
-				},
+			MediaType: "application/vnd.docker.compose.file+yaml",
+			Digest:    "sha256:d3ba84507b56ec783f4b6d24306b99a15285f0a23a835f0b668c2dbf9c59c241",
+			Size:      32,
+			Annotations: map[string]string{
+				"com.docker.compose.extends": "true",
+				"com.docker.compose.file":    "f8f9ede3d201ec37d5a5e3a77bbadab79af26035e53135e19571f50d541d390c.yaml",
+				"com.docker.compose.version": api.ComposeVersion,
 			},
 			Data: b,
 		},
