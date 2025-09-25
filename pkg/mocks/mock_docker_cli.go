@@ -108,20 +108,6 @@ func (mr *MockCliMockRecorder) ConfigFile() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfigFile", reflect.TypeOf((*MockCli)(nil).ConfigFile))
 }
 
-// ContentTrustEnabled mocks base method.
-func (m *MockCli) ContentTrustEnabled() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ContentTrustEnabled")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// ContentTrustEnabled indicates an expected call of ContentTrustEnabled.
-func (mr *MockCliMockRecorder) ContentTrustEnabled() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContentTrustEnabled", reflect.TypeOf((*MockCli)(nil).ContentTrustEnabled))
-}
-
 // ContextStore mocks base method.
 func (m *MockCli) ContextStore() store.Store {
 	m.ctrl.T.Helper()
@@ -162,20 +148,6 @@ func (m *MockCli) CurrentVersion() string {
 func (mr *MockCliMockRecorder) CurrentVersion() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CurrentVersion", reflect.TypeOf((*MockCli)(nil).CurrentVersion))
-}
-
-// DefaultVersion mocks base method.
-func (m *MockCli) DefaultVersion() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DefaultVersion")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// DefaultVersion indicates an expected call of DefaultVersion.
-func (mr *MockCliMockRecorder) DefaultVersion() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefaultVersion", reflect.TypeOf((*MockCli)(nil).DefaultVersion))
 }
 
 // DockerEndpoint mocks base method.
