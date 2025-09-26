@@ -30,13 +30,11 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
 	"github.com/jonboulle/clockwork"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v2/internal/desktop"
 	"github.com/docker/compose/v2/internal/experimental"
@@ -243,7 +241,7 @@ func increment(scale *int) *int {
 }
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
-	opts := volume.ListOptions{
+	opts := client.VolumeListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	}
 	volumes, err := s.apiClient().VolumeList(ctx, opts)
@@ -263,7 +261,7 @@ func (s *composeService) actualVolumes(ctx context.Context, projectName string) 
 }
 
 func (s *composeService) actualNetworks(ctx context.Context, projectName string) (types.Networks, error) {
-	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
+	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	if err != nil {

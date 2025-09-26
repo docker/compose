@@ -21,9 +21,10 @@ import (
 	"testing"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
@@ -59,9 +60,9 @@ func TestVolumes(t *testing.T) {
 
 	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(testProject))
-	listOpts := container.ListOptions{Filters: args}
+	listOpts := client.ContainerListOptions{Filters: args}
 	volumeListArgs := filters.NewArgs(projectFilter(testProject))
-	volumeListOpts := volume.ListOptions{Filters: volumeListArgs}
+	volumeListOpts := client.VolumeListOptions{Filters: volumeListArgs}
 	volumeReturn := volume.ListResponse{
 		Volumes: []*volume.Volume{vol1, vol2, vol3},
 	}

@@ -40,10 +40,10 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
 	ccli "github.com/docker/cli/cli/command/container"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -439,7 +439,7 @@ func (t tarDockerClient) ContainersForService(ctx context.Context, projectName s
 }
 
 func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
-	execCfg := container.ExecOptions{
+	execCfg := client.ExecCreateOptions{
 		Cmd:          cmd,
 		AttachStdout: false,
 		AttachStderr: true,
@@ -451,7 +451,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	startCheck := container.ExecStartOptions{Tty: false, Detach: false}
+	startCheck := client.ExecStartOptions{Tty: false, Detach: false}
 	conn, err := t.s.apiClient().ContainerExecAttach(ctx, execCreateResp.ID, startCheck)
 	if err != nil {
 		return err
@@ -499,7 +499,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 }
 
 func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCloser) error {
-	return t.s.apiClient().CopyToContainer(ctx, id, "/", archive, container.CopyToContainerOptions{
+	return t.s.apiClient().CopyToContainer(ctx, id, "/", archive, client.CopyToContainerOptions{
 		CopyUIDGID: true,
 	})
 }
@@ -684,7 +684,7 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 }
 
 func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
-	images, err := s.apiClient().ImageList(ctx, image.ListOptions{
+	images, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("dangling", "true"),
 			filters.Arg("label", api.ProjectLabel+"="+projectName),
@@ -697,7 +697,7 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 
 	for _, img := range images {
 		if _, ok := imageNameToIdMap[img.ID]; !ok {
-			_, err := s.apiClient().ImageRemove(ctx, img.ID, image.RemoveOptions{})
+			_, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{})
 			if err != nil {
 				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
 			}
@@ -811,7 +811,7 @@ func shouldIgnore(name string, ignore watch.PathMatcher) bool {
 
 // gets the image creation time for a service
 func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Project, serviceName string) (time.Time, error) {
-	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		All: true,
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=%s", api.ProjectLabel, project.Name)),
