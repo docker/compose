@@ -53,7 +53,7 @@ func (p *plainWriter) Events(events []Event) {
 	}
 }
 
-func (p *plainWriter) TailMsgf(msg string, args ...interface{}) {
+func (p *plainWriter) TailMsgf(msg string, args ...any) {
 	msg = fmt.Sprintf(msg, args...)
 	if p.dryRun {
 		msg = api.DRYRUN_PREFIX + msg
