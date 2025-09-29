@@ -186,7 +186,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 		return nil, err
 	}
 
-	args := []string{"compose", "--project-name", project.Name, command}
+	args := []string{"compose", fmt.Sprintf("--project-name=%s", project.Name), command}
 	for k, v := range provider.Options {
 		for _, value := range v {
 			if _, ok := currentCommandMetadata.GetParameter(k); commandMetadataIsEmpty || ok {
