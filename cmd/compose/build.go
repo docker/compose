@@ -160,10 +160,10 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, o
 	}
 
 	apiBuildOptions, err := opts.toAPIBuildOptions(services)
-	apiBuildOptions.Attestations = true
 	if err != nil {
 		return err
 	}
+	apiBuildOptions.Attestations = true
 
 	return backend.Build(ctx, project, apiBuildOptions)
 }
