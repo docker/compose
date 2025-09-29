@@ -156,9 +156,8 @@ jobs:
           - plugin
           - standalone
         engine:
-          - 26
-          - 27
-          - 28
+          - 27 # old stable (latest major - 1)
+          - 28 # current stable
     steps:
       - name: Prepare
         run: |
