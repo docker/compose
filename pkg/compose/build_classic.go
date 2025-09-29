@@ -154,8 +154,17 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		return "", err
 	}
 	authConfigs := make(map[string]registry.AuthConfig, len(creds))
-	for k, auth := range creds {
-		authConfigs[k] = registry.AuthConfig(auth)
+	for k, authConfig := range creds {
+		authConfigs[k] = registry.AuthConfig{
+			Username:      authConfig.Username,
+			Password:      authConfig.Password,
+			ServerAddress: authConfig.ServerAddress,
+
+			// TODO(thaJeztah): Are these expected to be included? See https://github.com/docker/cli/pull/6516#discussion_r2387586472
+			Auth:          authConfig.Auth,
+			IdentityToken: authConfig.IdentityToken,
+			RegistryToken: authConfig.RegistryToken,
+		}
 	}
 	buildOptions := imageBuildOptions(s.dockerCli, project, service, options)
 	imageName := api.GetImageNameOrDefault(service, project.Name)
