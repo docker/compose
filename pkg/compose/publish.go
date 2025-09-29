@@ -29,11 +29,9 @@ import (
 	"github.com/DefangLabs/secret-detector/pkg/secrets"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/internal/ocipush"
-	"github.com/docker/compose/v2/internal/registry"
+	"github.com/docker/compose/v2/internal/oci"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose/transform"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -67,23 +65,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 
 	config := s.dockerCli.ConfigFile()
 
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Hosts: docker.ConfigureDefaultRegistries(
-			docker.WithAuthorizer(docker.NewDockerAuthorizer(
-				docker.WithAuthCreds(func(host string) (string, string, error) {
-					host = registry.GetAuthConfigKey(host)
-					auth, err := config.GetAuthConfig(host)
-					if err != nil {
-						return "", "", err
-					}
-					if auth.IdentityToken != "" {
-						return "", auth.IdentityToken, nil
-					}
-					return auth.Username, auth.Password, nil
-				}),
-			)),
-		),
-	})
+	resolver := oci.NewResolver(config)
 
 	var layers []v1.Descriptor
 	extFiles := map[string]string{}
@@ -93,7 +75,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			return err
 		}
 
-		layerDescriptor := ocipush.DescriptorForComposeFile(file, data)
+		layerDescriptor := oci.DescriptorForComposeFile(file, data)
 		layers = append(layers, layerDescriptor)
 	}
 
@@ -113,7 +95,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			return err
 		}
 
-		layerDescriptor := ocipush.DescriptorForComposeFile("image-digests.yaml", yaml)
+		layerDescriptor := oci.DescriptorForComposeFile("image-digests.yaml", yaml)
 		layers = append(layers, layerDescriptor)
 	}
 
@@ -124,7 +106,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Status: progress.Working,
 	})
 	if !s.dryRun {
-		err = ocipush.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
+		err = oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
 			w.Event(progress.Event{
 				ID:     repository,
@@ -151,7 +133,7 @@ func processExtends(ctx context.Context, project *types.Project, extFiles map[st
 			return nil, err
 		}
 
-		layerDescriptor := ocipush.DescriptorForComposeFile(hash, data)
+		layerDescriptor := oci.DescriptorForComposeFile(hash, data)
 		layerDescriptor.Annotations["com.docker.compose.extends"] = "true"
 		layers = append(layers, layerDescriptor)
 	}
@@ -360,7 +342,7 @@ func envFileLayers(project *types.Project) []v1.Descriptor {
 				// if we can't read the file, skip to the next one
 				continue
 			}
-			layerDescriptor := ocipush.DescriptorForEnvFile(envFile.Path, f)
+			layerDescriptor := oci.DescriptorForEnvFile(envFile.Path, f)
 			layers = append(layers, layerDescriptor)
 		}
 	}
