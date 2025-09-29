@@ -26,11 +26,10 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"
-	"github.com/docker/buildx/store/storeutil"
-	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/internal/ocipush"
+	"github.com/docker/compose/v2/internal/oci"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -88,13 +87,9 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", err
 		}
 
-		opt, err := storeutil.GetImageConfig(g.dockerCli, nil)
-		if err != nil {
-			return "", err
-		}
-		resolver := imagetools.New(opt)
+		resolver := oci.NewResolver(g.dockerCli.ConfigFile())
 
-		content, descriptor, err := resolver.Get(ctx, ref.String())
+		descriptor, content, err := oci.Get(ctx, resolver, ref)
 		if err != nil {
 			return "", err
 		}
@@ -128,7 +123,7 @@ func (g ociRemoteLoader) Dir(path string) string {
 	return g.known[path]
 }
 
-func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest v1.Manifest, ref reference.Named, resolver *imagetools.Resolver) error { //nolint:gocyclo
+func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest v1.Manifest, ref reference.Named, resolver remotes.Resolver) error { //nolint:gocyclo
 	err := os.MkdirAll(local, 0o700)
 	if err != nil {
 		return err
@@ -139,8 +134,8 @@ func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, man
 		return err
 	}
 	defer f.Close() //nolint:errcheck
-	if (manifest.ArtifactType != "" && manifest.ArtifactType != ocipush.ComposeProjectArtifactType) ||
-		(manifest.ArtifactType == "" && manifest.Config.MediaType != ocipush.ComposeEmptyConfigMediaType) {
+	if (manifest.ArtifactType != "" && manifest.ArtifactType != oci.ComposeProjectArtifactType) ||
+		(manifest.ArtifactType == "" && manifest.Config.MediaType != oci.ComposeEmptyConfigMediaType) {
 		return fmt.Errorf("%s is not a compose project OCI artifact, but %s", ref.String(), manifest.ArtifactType)
 	}
 
@@ -149,13 +144,14 @@ func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, man
 		if err != nil {
 			return err
 		}
-		content, _, err := resolver.Get(ctx, digested.String())
+
+		_, content, err := oci.Get(ctx, resolver, digested)
 		if err != nil {
 			return err
 		}
 
 		switch layer.MediaType {
-		case ocipush.ComposeYAMLMediaType:
+		case oci.ComposeYAMLMediaType:
 			target := f
 			_, extends := layer.Annotations["com.docker.compose.extends"]
 			if extends {
@@ -167,11 +163,11 @@ func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, man
 			if err := writeComposeFile(layer, i, target, content); err != nil {
 				return err
 			}
-		case ocipush.ComposeEnvFileMediaType:
+		case oci.ComposeEnvFileMediaType:
 			if err := writeEnvFile(layer, local, content); err != nil {
 				return err
 			}
-		case ocipush.ComposeEmptyConfigMediaType:
+		case oci.ComposeEmptyConfigMediaType:
 		}
 	}
 	return nil
