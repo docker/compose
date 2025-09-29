@@ -176,18 +176,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 	}
 
-	// tmpSecrets stores secret set by environment variables, so we don't have to "pollute" bake process's environment
-	tmpSecrets, err := os.MkdirTemp("", "secrets")
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		rerr := os.RemoveAll(tmpSecrets)
-		if rerr != nil {
-			logrus.Warnf("Failed to removed temporary secrets directory %s: %s", tmpSecrets, rerr.Error())
-		}
-	}()
-
+	var secretsEnv []string
 	for serviceName, service := range project.Services {
 		if service.Build == nil {
 			continue
@@ -244,10 +233,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		target := targets[serviceName]
 
-		secrets, err := toBakeSecrets(project, build.Secrets, tmpSecrets)
-		if err != nil {
-			return nil, err
-		}
+		secrets, env := toBakeSecrets(project, build.Secrets)
+		secretsEnv = append(secretsEnv, env...)
+
 		cfg.Targets[target] = bakeTarget{
 			Context:          build.Context,
 			Contexts:         additionalContexts(build.AdditionalContexts, targets),
@@ -357,6 +345,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 	cmd.Env = append(cmd.Env, endpoint...)
+	cmd.Env = append(cmd.Env, secretsEnv...)
 	defer cleanup()
 
 	cmd.Stdout = s.stdout()
@@ -471,8 +460,9 @@ func toBakeSSH(ssh types.SSHConfig) []string {
 	return s
 }
 
-func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig, tmpSecrets string) ([]string, error) {
+func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) ([]string, []string) {
 	var s []string
+	var env []string
 	for _, ref := range secrets {
 		def := project.Secrets[ref.Source]
 		target := ref.Target
@@ -481,17 +471,13 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig, 
 		}
 		switch {
 		case def.Environment != "":
-			sf := filepath.Join(tmpSecrets, def.Environment)
-			err := os.WriteFile(sf, []byte(project.Environment[def.Environment]), 0o600)
-			if err != nil {
-				return nil, err
-			}
-			s = append(s, fmt.Sprintf("id=%s,type=file,src=%s", target, sf))
+			env = append(env, fmt.Sprintf("%s=%s", def.Environment, project.Environment[def.Environment]))
+			s = append(s, fmt.Sprintf("id=%s,type=env,env=%s", target, def.Environment))
 		case def.File != "":
 			s = append(s, fmt.Sprintf("id=%s,type=file,src=%s", target, def.File))
 		}
 	}
-	return s, nil
+	return s, env
 }
 
 func toBakeAttest(build types.BuildConfig) []string {
