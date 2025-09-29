@@ -34,6 +34,7 @@ type publishOptions struct {
 	ociVersion          string
 	withEnvironment     bool
 	assumeYes           bool
+	app                 bool
 }
 
 func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -53,6 +54,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	flags.StringVar(&opts.ociVersion, "oci-version", "", "OCI image/artifact specification version (automatically determined by default)")
 	flags.BoolVar(&opts.withEnvironment, "with-env", false, "Include environment variables in the published OCI artifact")
 	flags.BoolVarP(&opts.assumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts`)
+	flags.BoolVar(&opts.app, "app", false, "Published compose application (includes referenced images)")
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		// assumeYes was introduced by mistake as `--y`
 		if name == "y" {
@@ -76,7 +78,8 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service,
 	}
 
 	return backend.Publish(ctx, project, repository, api.PublishOptions{
-		ResolveImageDigests: opts.resolveImageDigests,
+		ResolveImageDigests: opts.resolveImageDigests || opts.app,
+		Application:         opts.app,
 		OCIVersion:          api.OCIVersion(opts.ociVersion),
 		WithEnvironment:     opts.withEnvironment,
 		AssumeYes:           opts.assumeYes,

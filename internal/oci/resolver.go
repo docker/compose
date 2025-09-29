@@ -19,12 +19,17 @@ package oci
 import (
 	"context"
 	"io"
+	"net/url"
+	"strings"
 
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/compose/v2/internal/registry"
+	"github.com/moby/buildkit/util/contentutil"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -69,4 +74,61 @@ func Get(ctx context.Context, resolver remotes.Resolver, ref reference.Named) (s
 		return spec.Descriptor{}, nil, err
 	}
 	return descriptor, content, nil
+}
+
+func Copy(ctx context.Context, resolver remotes.Resolver, image reference.Named, named reference.Named) (spec.Descriptor, error) {
+	src, desc, err := resolver.Resolve(ctx, image.String())
+	if err != nil {
+		return spec.Descriptor{}, err
+	}
+	if desc.Annotations == nil {
+		desc.Annotations = make(map[string]string)
+	}
+	// set LabelDistributionSource so push will actually use a registry mount
+	refspec := reference.TrimNamed(image).String()
+	u, err := url.Parse("dummy://" + refspec)
+	if err != nil {
+		return spec.Descriptor{}, err
+	}
+	source, repo := u.Hostname(), strings.TrimPrefix(u.Path, "/")
+	desc.Annotations[labels.LabelDistributionSource+"."+source] = repo
+
+	p, err := resolver.Pusher(ctx, named.Name())
+	if err != nil {
+		return spec.Descriptor{}, err
+	}
+	f, err := resolver.Fetcher(ctx, src)
+	if err != nil {
+		return spec.Descriptor{}, err
+	}
+
+	err = contentutil.CopyChain(ctx,
+		contentutil.FromPusher(p),
+		contentutil.FromFetcher(f), desc)
+	return desc, err
+}
+
+func Push(ctx context.Context, resolver remotes.Resolver, ref reference.Named, descriptor spec.Descriptor) error {
+	pusher, err := resolver.Pusher(ctx, ref.String())
+	if err != nil {
+		return err
+	}
+	ctx = remotes.WithMediaTypeKeyPrefix(ctx, ComposeYAMLMediaType, "artifact-")
+	ctx = remotes.WithMediaTypeKeyPrefix(ctx, ComposeEnvFileMediaType, "artifact-")
+	ctx = remotes.WithMediaTypeKeyPrefix(ctx, ComposeEmptyConfigMediaType, "config-")
+	ctx = remotes.WithMediaTypeKeyPrefix(ctx, spec.MediaTypeEmptyJSON, "config-")
+
+	push, err := pusher.Push(ctx, descriptor)
+	if errdefs.IsAlreadyExists(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = push.Close()
+	}()
+
+	_, err = push.Write(descriptor.Data)
+	return err
 }
