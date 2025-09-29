@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +37,8 @@ import (
 	"github.com/docker/compose/v2/pkg/compose/transform"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/prompt"
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -45,6 +48,7 @@ func (s *composeService) Publish(ctx context.Context, project *types.Project, re
 	}, s.stdinfo(), "Publishing")
 }
 
+//nolint:gocyclo
 func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	accept, err := s.preChecks(project, options)
 	if err != nil {
@@ -106,7 +110,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Status: progress.Working,
 	})
 	if !s.dryRun {
-		err = oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
+		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
 			w.Event(progress.Event{
 				ID:     repository,
@@ -114,6 +118,50 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 				Status: progress.Error,
 			})
 			return err
+		}
+
+		if options.Application {
+			manifests := []v1.Descriptor{}
+			for _, service := range project.Services {
+				ref, err := reference.ParseDockerRef(service.Image)
+				if err != nil {
+					return err
+				}
+
+				manifest, err := oci.Copy(ctx, resolver, ref, named)
+				if err != nil {
+					return err
+				}
+				manifests = append(manifests, manifest)
+			}
+
+			descriptor.Data = nil
+			index, err := json.Marshal(v1.Index{
+				Versioned: specs.Versioned{SchemaVersion: 2},
+				MediaType: v1.MediaTypeImageIndex,
+				Manifests: manifests,
+				Subject:   &descriptor,
+				Annotations: map[string]string{
+					"com.docker.compose.version": api.ComposeVersion,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			imagesDescriptor := v1.Descriptor{
+				MediaType:    v1.MediaTypeImageIndex,
+				ArtifactType: oci.ComposeProjectArtifactType,
+				Digest:       digest.FromString(string(index)),
+				Size:         int64(len(index)),
+				Annotations: map[string]string{
+					"com.docker.compose.version": api.ComposeVersion,
+				},
+				Data: index,
+			}
+			err = oci.Push(ctx, resolver, reference.TrimNamed(named), imagesDescriptor)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	w.Event(progress.Event{

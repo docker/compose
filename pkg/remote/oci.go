@@ -26,11 +26,12 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/oci"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -67,6 +68,7 @@ func (g ociRemoteLoader) Accept(path string) bool {
 	return strings.HasPrefix(path, OciPrefix)
 }
 
+//nolint:gocyclo
 func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) {
 	enabled, err := ociRemoteLoaderEnabled()
 	if err != nil {
@@ -91,7 +93,7 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 
 		descriptor, content, err := oci.Get(ctx, resolver, ref)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to pull OCI resource %q: %w", ref, err)
 		}
 
 		cache, err := cacheDir()
@@ -101,7 +103,35 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 
 		local = filepath.Join(cache, descriptor.Digest.Hex())
 		if _, err = os.Stat(local); os.IsNotExist(err) {
-			var manifest v1.Manifest
+
+			// a Compose application bundle is published as image index
+			if images.IsIndexType(descriptor.MediaType) {
+				var index spec.Index
+				err = json.Unmarshal(content, &index)
+				if err != nil {
+					return "", err
+				}
+				found := false
+				for _, manifest := range index.Manifests {
+					if manifest.ArtifactType != oci.ComposeProjectArtifactType {
+						continue
+					}
+					found = true
+					digested, err := reference.WithDigest(ref, manifest.Digest)
+					if err != nil {
+						return "", err
+					}
+					descriptor, content, err = oci.Get(ctx, resolver, digested)
+					if err != nil {
+						return "", fmt.Errorf("failed to pull OCI resource %q: %w", ref, err)
+					}
+				}
+				if !found {
+					return "", fmt.Errorf("OCI index %s doesn't refer to compose artifacts", ref)
+				}
+			}
+
+			var manifest spec.Manifest
 			err = json.Unmarshal(content, &manifest)
 			if err != nil {
 				return "", err
@@ -123,7 +153,7 @@ func (g ociRemoteLoader) Dir(path string) string {
 	return g.known[path]
 }
 
-func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest v1.Manifest, ref reference.Named, resolver remotes.Resolver) error { //nolint:gocyclo
+func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest spec.Manifest, ref reference.Named, resolver remotes.Resolver) error { //nolint:gocyclo
 	err := os.MkdirAll(local, 0o700)
 	if err != nil {
 		return err
@@ -173,7 +203,7 @@ func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, man
 	return nil
 }
 
-func writeComposeFile(layer v1.Descriptor, i int, f *os.File, content []byte) error {
+func writeComposeFile(layer spec.Descriptor, i int, f *os.File, content []byte) error {
 	if _, ok := layer.Annotations["com.docker.compose.file"]; i > 0 && ok {
 		_, err := f.Write([]byte("\n---\n"))
 		if err != nil {
@@ -184,7 +214,7 @@ func writeComposeFile(layer v1.Descriptor, i int, f *os.File, content []byte) er
 	return err
 }
 
-func writeEnvFile(layer v1.Descriptor, local string, content []byte) error {
+func writeEnvFile(layer spec.Descriptor, local string, content []byte) error {
 	envfilePath, ok := layer.Annotations["com.docker.compose.envfile"]
 	if !ok {
 		return fmt.Errorf("missing annotation com.docker.compose.envfile in layer %q", layer.Digest)

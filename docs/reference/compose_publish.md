@@ -7,6 +7,7 @@ Publish compose application
 
 | Name                      | Type     | Default | Description                                                                    |
 |:--------------------------|:---------|:--------|:-------------------------------------------------------------------------------|
+| `--app`                   | `bool`   |         | Published compose application (includes referenced images)                     |
 | `--dry-run`               | `bool`   |         | Execute command in dry run mode                                                |
 | `--oci-version`           | `string` |         | OCI image/artifact specification version (automatically determined by default) |
 | `--resolve-image-digests` | `bool`   |         | Pin image tags to digests                                                      |

@@ -5,6 +5,16 @@ usage: docker compose alpha publish [OPTIONS] REPOSITORY[:TAG]
 pname: docker compose alpha
 plink: docker_compose_alpha.yaml
 options:
+    - option: app
+      value_type: bool
+      default_value: "false"
+      description: Published compose application (includes referenced images)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: oci-version
       value_type: string
       description: |
