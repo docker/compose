@@ -79,7 +79,7 @@ func runCommit(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		return err
 	}
 
-	commitOptions := api.CommitOptions{
+	return backend.Commit(ctx, projectName, api.CommitOptions{
 		Service:   options.service,
 		Reference: options.reference,
 		Pause:     options.pause,
@@ -87,7 +87,5 @@ func runCommit(ctx context.Context, dockerCli command.Cli, backend api.Service, 
 		Author:    options.author,
 		Changes:   options.changes,
 		Index:     options.index,
-	}
-
-	return backend.Commit(ctx, projectName, commitOptions)
+	})
 }
