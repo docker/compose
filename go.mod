@@ -17,7 +17,7 @@ require (
 	github.com/docker/buildx v0.28.0
 	github.com/docker/cli v28.5.0-rc.1.0.20250929225527-a1061611fd80+incompatible // 28.x (v28.5.0-dev)
 	github.com/docker/cli-docs-tool v0.10.0
-	github.com/docker/docker v28.5.0-rc.1+incompatible
+	github.com/docker/docker v28.5.0-rc.1.0.20250930083127-79f310d4bc02+incompatible // 28.x (v28.5.0-dev)
 	github.com/docker/go-connections v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
