@@ -89,6 +89,9 @@ func (w *Watcher) Start(ctx context.Context) error {
 	w.stopFn = cancelFunc
 	wait, err := w.watchFn(ctx, w.project, w.options)
 	if err != nil {
+		go func() {
+			w.errCh <- err
+		}()
 		return err
 	}
 	go func() {
