@@ -104,7 +104,7 @@ type ContainerContext struct {
 	// used in the template. It's currently only used to detect use of the .Size
 	// field which (if used) automatically sets the '--size' option when making
 	// the API call.
-	FieldsUsed map[string]interface{}
+	FieldsUsed map[string]any
 }
 
 // NewContainerContext creates a new context for rendering containers
@@ -273,7 +273,7 @@ func (c *ContainerContext) Networks() string {
 // Size returns the container's size and virtual size (e.g. "2B (virtual 21.5MB)")
 func (c *ContainerContext) Size() string {
 	if c.FieldsUsed == nil {
-		c.FieldsUsed = map[string]interface{}{}
+		c.FieldsUsed = map[string]any{}
 	}
 	c.FieldsUsed["Size"] = struct{}{}
 	srw := units.HumanSizeWithPrecision(float64(c.c.SizeRw), 3)
