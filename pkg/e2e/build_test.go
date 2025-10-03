@@ -645,3 +645,11 @@ func TestBuildTLS(t *testing.T) {
 	res := icmd.RunCmd(cmd)
 	res.Assert(t, icmd.Expected{Err: "Built"})
 }
+
+func TestBuildEscaped(t *testing.T) {
+	c := NewParallelCLI(t)
+	// ensure local test run does not reuse previously build image
+	c.RunDockerOrExitError(t, "rmi", "build-test-tags")
+	res := c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/build-test/escaped", "build", "--no-cache")
+	res.Assert(t, icmd.Expected{Out: "foo is ${bar}"})
+}
