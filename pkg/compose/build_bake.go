@@ -280,6 +280,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
+	// escape all occurrences of '$' as we interpolated everything that has to
+	b = bytes.ReplaceAll(b, []byte("$"), []byte("$$"))
+
 	if options.Print {
 		_, err = fmt.Fprintln(s.stdout(), string(b))
 		return nil, err
