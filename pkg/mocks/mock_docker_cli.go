@@ -17,7 +17,7 @@ import (
 	docker "github.com/docker/cli/cli/context/docker"
 	store "github.com/docker/cli/cli/context/store"
 	streams "github.com/docker/cli/cli/streams"
-	client "github.com/docker/docker/client"
+	client "github.com/moby/moby/client"
 	metric "go.opentelemetry.io/otel/metric"
 	resource "go.opentelemetry.io/otel/sdk/resource"
 	trace "go.opentelemetry.io/otel/trace"
@@ -45,24 +45,6 @@ func NewMockCli(ctrl *gomock.Controller) *MockCli {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockCli) EXPECT() *MockCliMockRecorder {
 	return m.recorder
-}
-
-// Apply mocks base method.
-func (m *MockCli) Apply(arg0 ...command.CLIOption) error {
-	m.ctrl.T.Helper()
-	varargs := []any{}
-	for _, a := range arg0 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Apply", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Apply indicates an expected call of Apply.
-func (mr *MockCliMockRecorder) Apply(arg0 ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockCli)(nil).Apply), arg0...)
 }
 
 // BuildKitEnabled mocks base method.

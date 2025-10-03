@@ -21,13 +21,13 @@ import (
 	"slices"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/filters"
+	"github.com/moby/moby/client"
 )
 
 func (s *composeService) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
-	allContainers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
+	allContainers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: filters.NewArgs(projectFilter(project)),
 	})
 	if err != nil {
@@ -47,7 +47,7 @@ func (s *composeService) Volumes(ctx context.Context, project string, options ap
 		containers = allContainers
 	}
 
-	volumesResponse, err := s.apiClient().VolumeList(ctx, volume.ListOptions{
+	volumesResponse, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
 		Filters: filters.NewArgs(projectFilter(project)),
 	})
 	if err != nil {
