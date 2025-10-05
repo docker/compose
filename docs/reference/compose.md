@@ -126,6 +126,18 @@ get the postgres image for the db service from anywhere by using the `-f` flag a
 $ docker compose -f ~/sandbox/rails/compose.yaml pull db
 ```
 
+#### Using OCI-published Compose configurations
+
+Docker Compose supports loading configurations directly from [OCI (Open Container Initiative) registries](https://opencontainers.org/).  
+This allows you to **share and reuse Compose applications** as OCI artifacts, the same way you distribute container images.
+
+You can reference an OCI-published Compose file by using the `oci://` scheme in place of a local path.
+
+**Example:**
+```console
+$ docker compose -f oci://ghcr.io/my-org/my-compose-config:latest up
+```
+
 ### Use `-p` to specify a project name
 
 Each configuration has a project name. Compose sets the project name using
