@@ -138,6 +138,8 @@ You can reference an OCI-published Compose file by using the `oci://` scheme in 
 $ docker compose -f oci://ghcr.io/my-org/my-compose-config:latest up
 ```
 
+
+
 ### Use `-p` to specify a project name
 
 Each configuration has a project name. Compose sets the project name using
