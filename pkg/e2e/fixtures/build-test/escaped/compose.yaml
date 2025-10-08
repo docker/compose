@@ -4,3 +4,20 @@ services:
       context: .
       args:
         foo: $${bar}
+
+  echo:
+    build:
+      dockerfile_inline: |
+        FROM bash
+        RUN <<'EOF'
+        echo $(seq 10)
+        EOF
+
+  arg:
+    build:
+      args:
+        BOOL: "true"
+      dockerfile_inline: |
+        FROM alpine:latest
+        ARG BOOL
+        RUN /bin/$${BOOL}
