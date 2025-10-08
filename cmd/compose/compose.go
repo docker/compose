@@ -383,32 +383,38 @@ func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceL
 }
 
 func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	opts := []cli.ProjectOptionsFn{
+		cli.WithWorkingDirectory(o.ProjectDir),
+		// First apply os.Environment, always win
+		cli.WithOsEnv,
 	}
 
-	return cli.NewProjectOptions(o.ConfigPaths,
-		append(po,
-			cli.WithWorkingDirectory(o.ProjectDir),
-			// First apply os.Environment, always win
-			cli.WithOsEnv,
-			// set PWD as this variable is not consistently supported on Windows
-			cli.WithEnv([]string{"PWD=" + pwd}),
-			// Load PWD/.env if present and no explicit --env-file has been set
-			cli.WithEnvFiles(o.EnvFiles...),
-			// read dot env file to populate project environment
-			cli.WithDotEnv,
-			// get compose file path set by COMPOSE_FILE
-			cli.WithConfigFileEnv,
-			// if none was selected, get default compose.yaml file from current dir or parent folder
-			cli.WithDefaultConfigPath,
-			// .. and then, a project directory != PWD maybe has been set so let's load .env file
-			cli.WithEnvFiles(o.EnvFiles...),
-			cli.WithDotEnv,
-			// eventually COMPOSE_PROFILES should have been set
-			cli.WithDefaultProfiles(o.Profiles...),
-			cli.WithName(o.ProjectName))...)
+	if _, present := os.LookupEnv("PWD"); !present {
+		if pwd, err := os.Getwd(); err != nil {
+			return nil, err
+		} else {
+			opts = append(opts, cli.WithEnv([]string{"PWD=" + pwd}))
+		}
+	}
+
+	opts = append(opts,
+		// Load PWD/.env if present and no explicit --env-file has been set
+		cli.WithEnvFiles(o.EnvFiles...),
+		// read dot env file to populate project environment
+		cli.WithDotEnv,
+		// get compose file path set by COMPOSE_FILE
+		cli.WithConfigFileEnv,
+		// if none was selected, get default compose.yaml file from current dir or parent folder
+		cli.WithDefaultConfigPath,
+		// .. and then, a project directory != PWD maybe has been set so let's load .env file
+		cli.WithEnvFiles(o.EnvFiles...),
+		cli.WithDotEnv,
+		// eventually COMPOSE_PROFILES should have been set
+		cli.WithDefaultProfiles(o.Profiles...),
+		cli.WithName(o.ProjectName),
+	)
+
+	return cli.NewProjectOptions(o.ConfigPaths, append(po, opts...)...)
 }
 
 // PluginName is the name of the plugin
