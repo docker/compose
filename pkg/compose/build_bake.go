@@ -184,12 +184,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		build := *service.Build
 		labels := getImageBuildLabels(project, service)
 
-		args := types.Mapping{}
-		for k, v := range resolveAndMergeBuildArgs(s.dockerCli, project, service, options) {
-			if v == nil {
-				continue
-			}
-			args[k] = *v
+		args := resolveAndMergeBuildArgs(s.dockerCli, project, service, options).ToMapping()
+		for k, v := range args {
+			args[k] = strings.ReplaceAll(v, "${", "$${")
 		}
 
 		entitlements := build.Entitlements
@@ -279,9 +276,6 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if err != nil {
 		return nil, err
 	}
-
-	// escape all occurrences of '$' as we interpolated everything that has to
-	b = bytes.ReplaceAll(b, []byte("$"), []byte("$$"))
 
 	if options.Print {
 		_, err = fmt.Fprintln(s.stdout(), string(b))
