@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -55,7 +56,7 @@ func generateCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 func runGenerate(ctx context.Context, backend api.Service, opts generateOptions, containers []string) error {
 	_, _ = fmt.Fprintln(os.Stderr, "generate command is EXPERIMENTAL")
 	if len(containers) == 0 {
-		return fmt.Errorf("at least one container must be specified")
+		return errors.New("at least one container must be specified")
 	}
 	project, err := backend.Generate(ctx, api.GenerateOptions{
 		Containers:  containers,

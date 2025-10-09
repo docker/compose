@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -62,10 +63,10 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.pullChanged = cmd.Flags().Changed("pull")
 			if opts.Build && opts.noBuild {
-				return fmt.Errorf("--build and --no-build are incompatible")
+				return errors.New("--build and --no-build are incompatible")
 			}
 			if opts.forceRecreate && opts.noRecreate {
-				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+				return errors.New("--force-recreate and --no-recreate are incompatible")
 			}
 			return nil
 		}),
