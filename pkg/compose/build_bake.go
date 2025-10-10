@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +40,7 @@ import (
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/google/uuid"
 	"github.com/moby/buildkit/client"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
 	"github.com/moby/buildkit/util/progress/progressui"
@@ -282,13 +283,20 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	logrus.Debugf("bake build config:\n%s", string(b))
 
+	tmpdir := os.TempDir()
 	var metadataFile string
 	for {
 		// we don't use os.CreateTemp here as we need a temporary file name, but don't want it actually created
 		// as bake relies on atomicwriter and this creates conflict during rename
-		metadataFile = filepath.Join(os.TempDir(), fmt.Sprintf("compose-build-metadataFile-%d.json", rand.Int31()))
-		if _, err = os.Stat(metadataFile); os.IsNotExist(err) {
-			break
+		metadataFile = filepath.Join(tmpdir, fmt.Sprintf("compose-build-metadataFile-%s.json", uuid.New().String()))
+		if _, err = os.Stat(metadataFile); err != nil {
+			if os.IsNotExist(err) {
+				break
+			}
+			var pathError *fs.PathError
+			if errors.As(err, &pathError) {
+				return nil, fmt.Errorf("can't acces os.tempDir %s: %w", tmpdir, pathError.Err)
+			}
 		}
 	}
 	defer func() {
@@ -361,9 +369,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		if readErr != nil {
 			if readErr == io.EOF {
 				break
-			} else {
-				return nil, fmt.Errorf("failed to execute bake: %w", readErr)
 			}
+			if errors.Is(readErr, os.ErrClosed) {
+				logrus.Debugf("bake stopped")
+				break
+			}
+			return nil, fmt.Errorf("failed to execute bake: %w", readErr)
 		}
 		decoder := json.NewDecoder(strings.NewReader(line))
 		var status client.SolveStatus
