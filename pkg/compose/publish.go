@@ -50,6 +50,10 @@ func (s *composeService) Publish(ctx context.Context, project *types.Project, re
 
 //nolint:gocyclo
 func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
+	project, err := project.WithProfiles([]string{"*"})
+	if err != nil {
+		return err
+	}
 	accept, err := s.preChecks(project, options)
 	if err != nil {
 		return err
@@ -251,11 +255,7 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 }
 
 func (s *composeService) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
-	project, err := project.WithProfiles([]string{"*"})
-	if err != nil {
-		return nil, err
-	}
-	project, err = project.WithImagesResolved(ImageDigestResolver(ctx, s.configFile(), s.apiClient()))
+	project, err := project.WithImagesResolved(ImageDigestResolver(ctx, s.configFile(), s.apiClient()))
 	if err != nil {
 		return nil, err
 	}
