@@ -37,10 +37,10 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/api/types/versions"
-	"github.com/docker/docker/builder/remotecontext/urlutil"
 	"github.com/moby/buildkit/client"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
 	"github.com/moby/buildkit/util/progress/progressui"
@@ -505,7 +505,7 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
-	if urlutil.IsGitURL(ctxName) {
+	if contextType, _ := build.DetectContextType(ctxName); contextType == build.ContextTypeGit {
 		return dockerfile
 	}
 	if !filepath.IsAbs(dockerfile) {
