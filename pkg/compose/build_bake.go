@@ -40,7 +40,6 @@ import (
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/docker/api/types/versions"
 	"github.com/moby/buildkit/client"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
 	"github.com/moby/buildkit/util/progress/progressui"
@@ -302,15 +301,12 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadataFile}
-	mustAllow := buildx.Version != "" && versions.GreaterThanOrEqualTo(buildx.Version[1:], "0.17.0")
-	if mustAllow {
-		// FIXME we should prompt user about this, but this is a breaking change in UX
-		for _, path := range read {
-			args = append(args, "--allow", "fs.read="+path)
-		}
-		if privileged {
-			args = append(args, "--allow", "security.insecure")
-		}
+	// FIXME we should prompt user about this, but this is a breaking change in UX
+	for _, path := range read {
+		args = append(args, "--allow", "fs.read="+path)
+	}
+	if privileged {
+		args = append(args, "--allow", "security.insecure")
 	}
 	if options.SBOM != "" {
 		args = append(args, "--sbom="+options.SBOM)
