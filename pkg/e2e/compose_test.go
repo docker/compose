@@ -260,7 +260,7 @@ networks:
 
 func TestConfigInterpolate(t *testing.T) {
 	const projectName = "compose-e2e-config-interpolate"
-	c := NewParallelCLI(t)
+	c := NewCLI(t)
 
 	wd, err := os.Getwd()
 	assert.NilError(t, err)
