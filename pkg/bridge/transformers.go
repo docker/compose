@@ -32,7 +32,7 @@ import (
 
 const (
 	TransformerLabel        = "com.docker.compose.bridge"
-	DefaultTransformerImage = "docker/compose-bridge-kubernetes"
+	DefaultTransformerImage = "docker/compose-bridge-kubernetes:v0.0.1"
 
 	templatesPath = "/templates"
 )

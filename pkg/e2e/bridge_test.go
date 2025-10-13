@@ -43,7 +43,7 @@ func TestConvertAndTransformList(t *testing.T) {
 	t.Run("helm charts", func(t *testing.T) {
 		helmDir := filepath.Join(tmpDir, "helm")
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge/compose.yaml", "--project-name", projectName, "bridge", "convert",
-			"--output", helmDir, "--transformation", "docker/compose-bridge-helm")
+			"--output", helmDir, "--transformation", "docker/compose-bridge-helm:v0.0.1")
 		assert.NilError(t, res.Error)
 		assert.Equal(t, res.ExitCode, 0)
 		res = c.RunCmd(t, "diff", "-r", helmDir, "./fixtures/bridge/expected-helm")
