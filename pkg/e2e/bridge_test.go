@@ -25,7 +25,7 @@ import (
 )
 
 func TestConvertAndTransformList(t *testing.T) {
-	c := NewCLI(t)
+	c := NewParallelCLI(t)
 
 	const projectName = "bridge"
 	tmpDir := t.TempDir()
@@ -35,7 +35,7 @@ func TestConvertAndTransformList(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge/compose.yaml", "--project-name", projectName, "bridge", "convert",
 			"--output", kubedir)
 		assert.NilError(t, res.Error)
-		assert.Equal(t, res.ExitCode, 0, res.Combined())
+		assert.Equal(t, res.ExitCode, 0)
 		res = c.RunCmd(t, "diff", "-r", kubedir, "./fixtures/bridge/expected-kubernetes")
 		assert.NilError(t, res.Error, res.Combined())
 	})
@@ -45,7 +45,7 @@ func TestConvertAndTransformList(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge/compose.yaml", "--project-name", projectName, "bridge", "convert",
 			"--output", helmDir, "--transformation", "docker/compose-bridge-helm")
 		assert.NilError(t, res.Error)
-		assert.Equal(t, res.ExitCode, 0, res.Combined())
+		assert.Equal(t, res.ExitCode, 0)
 		res = c.RunCmd(t, "diff", "-r", helmDir, "./fixtures/bridge/expected-helm")
 		assert.NilError(t, res.Error, res.Combined())
 	})

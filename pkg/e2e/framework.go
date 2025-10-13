@@ -127,7 +127,7 @@ func copyLocalConfig(t testing.TB, configDir string) {
 	// copy local config.json if exists
 	localConfig := filepath.Join(os.Getenv("HOME"), ".docker", "config.json")
 	// if no config present just continue
-	if _, err := os.Stat(localConfig); err == nil {
+	if _, err := os.Stat(localConfig); err != nil {
 		// copy the local config.json to the test config dir
 		CopyFile(t, localConfig, filepath.Join(configDir, "config.json"))
 	}
