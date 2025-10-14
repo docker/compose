@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/moby/moby/api/types/container"
 	mmount "github.com/moby/moby/api/types/mount"
-	"github.com/moby/moby/api/types/versions"
 	"github.com/moby/moby/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
@@ -743,29 +742,6 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 		},
 	}
 
-	apiVersion, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return created, err
-	}
-	// Starting API version 1.44, the ContainerCreate API call takes multiple networks
-	// so we include all the configurations there and can skip the one-by-one calls here
-	if versions.LessThan(apiVersion, "1.44") {
-		// the highest-priority network is the primary and is included in the ContainerCreate API
-		// call via container.NetworkMode & network.NetworkingConfig
-		// any remaining networks are connected one-by-one here after creation (but before start)
-		serviceNetworks := service.NetworksByPriority()
-		for _, networkKey := range serviceNetworks {
-			mobyNetworkName := project.Networks[networkKey].Name
-			if string(cfgs.Host.NetworkMode) == mobyNetworkName {
-				// primary network already configured as part of ContainerCreate
-				continue
-			}
-			epSettings := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
-			if err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, created.ID, epSettings); err != nil {
-				return created, err
-			}
-		}
-	}
 	return created, nil
 }
 

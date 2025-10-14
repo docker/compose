@@ -28,7 +28,6 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	containerType "github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -197,9 +196,7 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 
 func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName string, projectName string, name string, w progress.Writer) error {
 	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-			networkFilter(composeNetworkName)),
+		Filters: projectFilter(projectName).Add("label", networkFilter(composeNetworkName)),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list networks: %w", err)

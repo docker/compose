@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/api/types/versions"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
@@ -40,7 +39,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	projectName = strings.ToLower(projectName)
 	allContainers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
-		Filters: filters.NewArgs(projectFilter(projectName)),
+		Filters: projectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err

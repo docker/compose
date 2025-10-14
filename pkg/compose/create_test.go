@@ -18,12 +18,14 @@ package compose
 
 import (
 	"context"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"go.uber.org/mock/gomock"
@@ -295,7 +297,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 }
 
 func TestCreateEndpointSettings(t *testing.T) {
-	eps := createEndpointSettings(&composetypes.Project{
+	eps, err := createEndpointSettings(&composetypes.Project{
 		Name: "projName",
 	}, composetypes.ServiceConfig{
 		Name:          "serviceName",
@@ -315,11 +317,12 @@ func TestCreateEndpointSettings(t *testing.T) {
 			},
 		},
 	}, 0, "netName", []string{"link1", "link2"}, true)
+	assert.NilError(t, err)
 	assert.Check(t, cmp.DeepEqual(eps, &network.EndpointSettings{
 		IPAMConfig: &network.EndpointIPAMConfig{
-			IPv4Address:  "10.16.17.18",
-			IPv6Address:  "fdb4:7a7f:373a:3f0c::42",
-			LinkLocalIPs: []string{"169.254.10.20"},
+			IPv4Address:  netip.MustParseAddr("10.16.17.18").Unmap(),
+			IPv6Address:  netip.MustParseAddr("fdb4:7a7f:373a:3f0c::42"),
+			LinkLocalIPs: []netip.Addr{netip.MustParseAddr("169.254.10.20").Unmap()},
 		},
 		Links:      []string{"link1", "link2"},
 		Aliases:    []string{"containerName", "serviceName", "alias1", "alias2"},
@@ -333,9 +336,9 @@ func TestCreateEndpointSettings(t *testing.T) {
 		//  - The IPv6 address here is the container's address, not the gateway.
 		//  - Both fields will be cleared by the daemon, but they could be removed from
 		//    the request.
-		IPAddress:   "10.16.17.18",
-		IPv6Gateway: "fdb4:7a7f:373a:3f0c::42",
-	}))
+		IPAddress:   netip.MustParseAddr("10.16.17.18").Unmap(),
+		IPv6Gateway: netip.MustParseAddr("fdb4:7a7f:373a:3f0c::42"),
+	}, cmpopts.EquateComparable(netip.Addr{})))
 }
 
 func Test_buildContainerVolumes(t *testing.T) {

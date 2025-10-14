@@ -33,10 +33,8 @@ import (
 	"github.com/docker/buildx/util/imagetools"
 	"github.com/docker/cli/cli/command"
 	moby "github.com/moby/moby/api/types"
-	"github.com/moby/moby/api/types/build"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/api/types/network"
@@ -239,12 +237,11 @@ func (d *DryRunClient) ImageInspectWithRaw(ctx context.Context, imageName string
 	return resp, buf.Bytes(), err
 }
 
-func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options client.ImagePullOptions) (io.ReadCloser, error) {
+func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options client.ImagePullOptions) (client.ImagePullResponse, error) {
 	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
-		return nil, err
+		return client.ImagePullResponse{}, err
 	}
-	rc := io.NopCloser(strings.NewReader(""))
-	return rc, nil
+	return client.ImagePullResponse{}, nil
 }
 
 func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options client.ImagePushOptions) (io.ReadCloser, error) {
@@ -415,7 +412,7 @@ func (d *DryRunClient) ContainerWait(ctx context.Context, container string, cond
 	return d.apiClient.ContainerWait(ctx, container, condition)
 }
 
-func (d *DryRunClient) ContainersPrune(ctx context.Context, pruneFilters filters.Args) (containerType.PruneReport, error) {
+func (d *DryRunClient) ContainersPrune(ctx context.Context, pruneFilters client.Filters) (containerType.PruneReport, error) {
 	return d.apiClient.ContainersPrune(ctx, pruneFilters)
 }
 
@@ -423,12 +420,12 @@ func (d *DryRunClient) DistributionInspect(ctx context.Context, imageName, encod
 	return d.apiClient.DistributionInspect(ctx, imageName, encodedRegistryAuth)
 }
 
-func (d *DryRunClient) BuildCachePrune(ctx context.Context, opts client.BuildCachePruneOptions) (*build.CachePruneReport, error) {
+func (d *DryRunClient) BuildCachePrune(ctx context.Context, opts client.BuildCachePruneOptions) (client.BuildCachePruneResult, error) {
 	return d.apiClient.BuildCachePrune(ctx, opts)
 }
 
-func (d *DryRunClient) BuildCancel(ctx context.Context, id string) error {
-	return d.apiClient.BuildCancel(ctx, id)
+func (d *DryRunClient) BuildCancel(ctx context.Context, id string, opts client.BuildCancelOptions) error {
+	return d.apiClient.BuildCancel(ctx, id, opts)
 }
 
 func (d *DryRunClient) ImageCreate(ctx context.Context, parentReference string, options client.ImageCreateOptions) (io.ReadCloser, error) {
@@ -463,7 +460,7 @@ func (d *DryRunClient) ImageTag(ctx context.Context, imageName, ref string) erro
 	return d.apiClient.ImageTag(ctx, imageName, ref)
 }
 
-func (d *DryRunClient) ImagesPrune(ctx context.Context, pruneFilter filters.Args) (image.PruneReport, error) {
+func (d *DryRunClient) ImagesPrune(ctx context.Context, pruneFilter client.Filters) (image.PruneReport, error) {
 	return d.apiClient.ImagesPrune(ctx, pruneFilter)
 }
 
@@ -495,11 +492,11 @@ func (d *DryRunClient) NetworkList(ctx context.Context, options client.NetworkLi
 	return d.apiClient.NetworkList(ctx, options)
 }
 
-func (d *DryRunClient) NetworksPrune(ctx context.Context, pruneFilter filters.Args) (network.PruneReport, error) {
+func (d *DryRunClient) NetworksPrune(ctx context.Context, pruneFilter client.Filters) (network.PruneReport, error) {
 	return d.apiClient.NetworksPrune(ctx, pruneFilter)
 }
 
-func (d *DryRunClient) PluginList(ctx context.Context, filter filters.Args) (plugin.ListResponse, error) {
+func (d *DryRunClient) PluginList(ctx context.Context, filter client.Filters) (plugin.ListResponse, error) {
 	return d.apiClient.PluginList(ctx, filter)
 }
 
@@ -655,7 +652,7 @@ func (d *DryRunClient) VolumeList(ctx context.Context, opts client.VolumeListOpt
 	return d.apiClient.VolumeList(ctx, opts)
 }
 
-func (d *DryRunClient) VolumesPrune(ctx context.Context, pruneFilter filters.Args) (volume.PruneReport, error) {
+func (d *DryRunClient) VolumesPrune(ctx context.Context, pruneFilter client.Filters) (volume.PruneReport, error) {
 	return d.apiClient.VolumesPrune(ctx, pruneFilter)
 }
 

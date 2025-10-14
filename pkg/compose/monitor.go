@@ -22,7 +22,6 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/events"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
@@ -59,8 +58,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	// collect initial application container
 	initialState, err := c.api.ContainerList(ctx, client.ContainerListOptions{
 		All: true,
-		Filters: filters.NewArgs(
-			projectFilter(c.project),
+		Filters: projectFilter(c.project).Add("label",
 			oneOffFilter(false),
 			hasConfigHashLabel(),
 		),
@@ -79,9 +77,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	restarting := utils.Set[string]{}
 
 	evtCh, errCh := c.api.Events(ctx, client.EventsListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("type", "container"),
-			projectFilter(c.project)),
+		Filters: projectFilter(c.project).Add("type", "container"),
 	})
 	for {
 		if len(containers) == 0 {

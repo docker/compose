@@ -18,6 +18,7 @@ package formatter
 
 import (
 	"fmt"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -214,8 +215,12 @@ func (c *ContainerContext) Publishers() api.PortPublishers {
 func (c *ContainerContext) Ports() string {
 	var ports []container.PortSummary
 	for _, publisher := range c.c.Publishers {
+		var pIP netip.Addr
+		if publisher.URL != "" {
+			pIP, _ = netip.ParseAddr(publisher.URL)
+		}
 		ports = append(ports, container.PortSummary{
-			IP:          publisher.URL,
+			IP:          pIP,
 			PrivatePort: uint16(publisher.TargetPort),
 			PublicPort:  uint16(publisher.PublishedPort),
 			Type:        publisher.Protocol,

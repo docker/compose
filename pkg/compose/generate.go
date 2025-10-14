@@ -26,21 +26,14 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 )
 
 func (s *composeService) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
-	filtersListNames := filters.NewArgs()
-	filtersListIDs := filters.NewArgs()
-	for _, containerName := range options.Containers {
-		filtersListNames.Add("name", containerName)
-		filtersListIDs.Add("id", containerName)
-	}
 	containers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: filtersListNames,
+		Filters: make(client.Filters).Add("name", options.Containers...),
 		All:     true,
 	})
 	if err != nil {
@@ -48,7 +41,7 @@ func (s *composeService) Generate(ctx context.Context, options api.GenerateOptio
 	}
 
 	containersByIds, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: filtersListIDs,
+		Filters: make(client.Filters).Add("id", options.Containers...),
 		All:     true,
 	})
 	if err != nil {
@@ -136,10 +129,10 @@ func (s *composeService) extractComposeConfiguration(service *types.ServiceConfi
 		for key, portBindings := range inspect.HostConfig.PortBindings {
 			for _, portBinding := range portBindings {
 				service.Ports = append(service.Ports, types.ServicePortConfig{
-					Target:    uint32(key.Int()),
+					Target:    uint32(key.Num()),
 					Published: portBinding.HostPort,
-					Protocol:  key.Proto(),
-					HostIP:    portBinding.HostIP,
+					Protocol:  string(key.Proto()),
+					HostIP:    portBinding.HostIP.String(),
 				})
 			}
 		}
