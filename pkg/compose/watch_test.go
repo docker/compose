@@ -29,7 +29,6 @@ import (
 	"github.com/docker/compose/v2/pkg/watch"
 	"github.com/jonboulle/clockwork"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
@@ -82,10 +81,9 @@ func TestWatch_Sync(t *testing.T) {
 	}, nil).AnyTimes()
 	// we expect the image to be pruned
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("dangling", "true"),
-			filters.Arg("label", api.ProjectLabel+"=myProjectName"),
-		),
+		Filters: make(client.Filters).
+			Add("dangling", "true").
+			Add("label", api.ProjectLabel+"=myProjectName"),
 	}).Return([]image.Summary{
 		{ID: "123"},
 		{ID: "456"},

@@ -27,7 +27,6 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/moby/moby/api/types/filters"
 )
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
@@ -53,11 +52,8 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 
 	var containers Containers
 	containers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			oneOffFilter(false),
-		),
-		All: true,
+		Filters: projectFilter(project.Name).Add("label", oneOffFilter(false)),
+		All:     true,
 	})
 	if err != nil {
 		return err

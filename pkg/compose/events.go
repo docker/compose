@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -31,7 +30,7 @@ import (
 func (s *composeService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
 	projectName = strings.ToLower(projectName)
 	evts, errors := s.apiClient().Events(ctx, client.EventsListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+		Filters: projectFilter(projectName),
 		Since:   options.Since,
 		Until:   options.Until,
 	})

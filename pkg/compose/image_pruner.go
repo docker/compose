@@ -25,7 +25,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
@@ -151,16 +150,13 @@ func (p *ImagePruner) namedImages(ctx context.Context) ([]string, error) {
 // created from the project + service name.
 func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error) {
 	return p.client.ImageList(ctx, client.ImageListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(p.project.Name),
-			// TODO(milas): we should really clean up the dangling images as
-			// well (historically we have NOT); need to refactor this to handle
-			// it gracefully without producing confusing CLI output, i.e. we
-			// do not want to print out a bunch of untagged/dangling image IDs,
-			// they should be grouped into a logical operation for the relevant
-			// service
-			filters.Arg("dangling", "false"),
-		),
+		// TODO(milas): we should really clean up the dangling images as
+		// well (historically we have NOT); need to refactor this to handle
+		// it gracefully without producing confusing CLI output, i.e. we
+		// do not want to print out a bunch of untagged/dangling image IDs,
+		// they should be grouped into a logical operation for the relevant
+		// service
+		Filters: projectFilter(p.project.Name).Add("dangling", "false"),
 	})
 }
 

@@ -42,7 +42,6 @@ import (
 	ccli "github.com/docker/cli/cli/command/container"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -688,10 +687,7 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 
 func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
 	images, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("dangling", "true"),
-			filters.Arg("label", api.ProjectLabel+"="+projectName),
-		),
+		Filters: projectFilter(projectName).Add("dangling", "true"),
 	})
 	if err != nil {
 		logrus.Debugf("Failed to list images: %v", err)
@@ -815,10 +811,8 @@ func shouldIgnore(name string, ignore watch.PathMatcher) bool {
 // gets the image creation time for a service
 func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Project, serviceName string) (time.Time, error) {
 	containers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		All: true,
-		Filters: filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", api.ProjectLabel, project.Name)),
-			filters.Arg("label", fmt.Sprintf("%s=%s", api.ServiceLabel, serviceName))),
+		All:     true,
+		Filters: projectFilter(project.Name).Add("label", serviceFilter(serviceName)),
 	})
 	if err != nil {
 		return time.Now(), err

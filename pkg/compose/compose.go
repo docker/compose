@@ -32,7 +32,6 @@ import (
 	"github.com/docker/cli/cli/streams"
 	"github.com/jonboulle/clockwork"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 
@@ -242,7 +241,7 @@ func increment(scale *int) *int {
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
 	opts := client.VolumeListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+		Filters: projectFilter(projectName),
 	}
 	volumes, err := s.apiClient().VolumeList(ctx, opts)
 	if err != nil {
@@ -262,7 +261,7 @@ func (s *composeService) actualVolumes(ctx context.Context, projectName string) 
 
 func (s *composeService) actualNetworks(ctx context.Context, projectName string) (types.Networks, error) {
 	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+		Filters: projectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err
@@ -310,6 +309,7 @@ type runtimeVersionCache struct {
 var runtimeVersion runtimeVersionCache
 
 func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
+	// TODO(thaJeztah): this should use Client.ClientVersion), which has the negotiated version.
 	runtimeVersion.once.Do(func() {
 		version, err := s.dockerCli.Client().ServerVersion(ctx)
 		if err != nil {

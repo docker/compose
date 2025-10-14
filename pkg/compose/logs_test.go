@@ -24,80 +24,79 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/moby/moby/api/pkg/stdcopy"
 	containerType "github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/client"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	compose "github.com/docker/compose/v2/pkg/api"
 )
 
-func TestComposeService_Logs_Demux(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	api, cli := prepareMocks(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
-
-	name := strings.ToLower(testProject)
-
-	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, client.ContainerListOptions{
-		All:     true,
-		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
-	}).Return(
-		[]containerType.Summary{
-			testContainer("service", "c", false),
-		},
-		nil,
-	)
-
-	api.EXPECT().
-		ContainerInspect(anyCancellableContext(), "c").
-		Return(containerType.InspectResponse{
-			ID:     "c",
-			Config: &containerType.Config{Tty: false},
-		}, nil)
-	c1Reader, c1Writer := io.Pipe()
-	t.Cleanup(func() {
-		_ = c1Reader.Close()
-		_ = c1Writer.Close()
-	})
-	c1Stdout := stdcopy.NewStdWriter(c1Writer, stdcopy.Stdout)
-	c1Stderr := stdcopy.NewStdWriter(c1Writer, stdcopy.Stderr)
-	go func() {
-		_, err := c1Stdout.Write([]byte("hello stdout\n"))
-		assert.NoError(t, err, "Writing to fake stdout")
-		_, err = c1Stderr.Write([]byte("hello stderr\n"))
-		assert.NoError(t, err, "Writing to fake stderr")
-		_ = c1Writer.Close()
-	}()
-	api.EXPECT().ContainerLogs(anyCancellableContext(), "c", gomock.Any()).
-		Return(c1Reader, nil)
-
-	opts := compose.LogOptions{
-		Project: &types.Project{
-			Services: types.Services{
-				"service": {Name: "service"},
-			},
-		},
-	}
-
-	consumer := &testLogConsumer{}
-	err := tested.Logs(ctx, name, consumer, opts)
-	require.NoError(t, err)
-
-	require.Equal(
-		t,
-		[]string{"hello stdout", "hello stderr"},
-		consumer.LogsForContainer("c"),
-	)
-}
+// FIXME(thaJeztah): stdcopy.NewStdWriter was moved internal to the daemon, so can no longer be mocked.
+//
+// func TestComposeService_Logs_Demux(t *testing.T) {
+// 	mockCtrl := gomock.NewController(t)
+// 	defer mockCtrl.Finish()
+//
+// 	api, cli := prepareMocks(mockCtrl)
+// 	tested := composeService{
+// 		dockerCli: cli,
+// 	}
+//
+// 	name := strings.ToLower(testProject)
+//
+// 	ctx := context.Background()
+// 	api.EXPECT().ContainerList(ctx, client.ContainerListOptions{
+// 		All:     true,
+// 		Filters: projectFilter(name).Add("label", oneOffFilter(false), hasConfigHashLabel()),
+// 	}).Return(
+// 		[]containerType.Summary{
+// 			testContainer("service", "c", false),
+// 		},
+// 		nil,
+// 	)
+//
+// 	api.EXPECT().
+// 		ContainerInspect(anyCancellableContext(), "c").
+// 		Return(containerType.InspectResponse{
+// 			ID:     "c",
+// 			Config: &containerType.Config{Tty: false},
+// 		}, nil)
+// 	c1Reader, c1Writer := io.Pipe()
+// 	t.Cleanup(func() {
+// 		_ = c1Reader.Close()
+// 		_ = c1Writer.Close()
+// 	})
+// 	c1Stdout := stdcopy.NewStdWriter(c1Writer, stdcopy.Stdout)
+// 	c1Stderr := stdcopy.NewStdWriter(c1Writer, stdcopy.Stderr)
+// 	go func() {
+// 		_, err := c1Stdout.Write([]byte("hello stdout\n"))
+// 		assert.NoError(t, err, "Writing to fake stdout")
+// 		_, err = c1Stderr.Write([]byte("hello stderr\n"))
+// 		assert.NoError(t, err, "Writing to fake stderr")
+// 		_ = c1Writer.Close()
+// 	}()
+// 	api.EXPECT().ContainerLogs(anyCancellableContext(), "c", gomock.Any()).
+// 		Return(c1Reader, nil)
+//
+// 	opts := compose.LogOptions{
+// 		Project: &types.Project{
+// 			Services: types.Services{
+// 				"service": {Name: "service"},
+// 			},
+// 		},
+// 	}
+//
+// 	consumer := &testLogConsumer{}
+// 	err := tested.Logs(ctx, name, consumer, opts)
+// 	require.NoError(t, err)
+//
+// 	require.Equal(
+// 		t,
+// 		[]string{"hello stdout", "hello stderr"},
+// 		consumer.LogsForContainer("c"),
+// 	)
+// }
 
 // TestComposeService_Logs_ServiceFiltering ensures that we do not include
 // logs from out-of-scope services based on the Compose file vs actual state.
@@ -120,7 +119,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
-		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
+		Filters: projectFilter(name).Add("label", oneOffFilter(false), hasConfigHashLabel()),
 	}).Return(
 		[]containerType.Summary{
 			testContainer("serviceA", "c1", false),

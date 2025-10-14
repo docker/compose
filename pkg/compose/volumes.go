@@ -22,13 +22,12 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/filters"
 	"github.com/moby/moby/client"
 )
 
 func (s *composeService) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
 	allContainers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(project)),
+		Filters: projectFilter(project),
 	})
 	if err != nil {
 		return nil, err
@@ -48,7 +47,7 @@ func (s *composeService) Volumes(ctx context.Context, project string, options ap
 	}
 
 	volumesResponse, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
-		Filters: filters.NewArgs(projectFilter(project)),
+		Filters: projectFilter(project),
 	})
 	if err != nil {
 		return nil, err
@@ -65,8 +64,8 @@ func (s *composeService) Volumes(ctx context.Context, project string, options ap
 	// create a name lookup of volumes used by containers
 	serviceVolumes := make(map[string]bool)
 
-	for _, container := range containers {
-		for _, mount := range container.Mounts {
+	for _, ctr := range containers {
+		for _, mount := range ctr.Mounts {
 			serviceVolumes[mount.Name] = true
 		}
 	}

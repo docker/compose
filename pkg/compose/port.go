@@ -33,7 +33,7 @@ func (s *composeService) Port(ctx context.Context, projectName string, service s
 	}
 	for _, p := range ctr.Ports {
 		if p.PrivatePort == port && p.Type == options.Protocol {
-			return p.IP, int(p.PublicPort), nil
+			return p.IP.String(), int(p.PublicPort), nil
 		}
 	}
 	return "", 0, portNotFoundError(options.Protocol, port, ctr)

@@ -16,11 +16,9 @@ import (
 	reflect "reflect"
 
 	types "github.com/moby/moby/api/types"
-	build "github.com/moby/moby/api/types/build"
 	common "github.com/moby/moby/api/types/common"
 	container "github.com/moby/moby/api/types/container"
 	events "github.com/moby/moby/api/types/events"
-	filters "github.com/moby/moby/api/types/filters"
 	image "github.com/moby/moby/api/types/image"
 	network "github.com/moby/moby/api/types/network"
 	plugin "github.com/moby/moby/api/types/plugin"
@@ -57,10 +55,10 @@ func (m *MockAPIClient) EXPECT() *MockAPIClientMockRecorder {
 }
 
 // BuildCachePrune mocks base method.
-func (m *MockAPIClient) BuildCachePrune(arg0 context.Context, arg1 client.BuildCachePruneOptions) (*build.CachePruneReport, error) {
+func (m *MockAPIClient) BuildCachePrune(arg0 context.Context, arg1 client.BuildCachePruneOptions) (client.BuildCachePruneResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BuildCachePrune", arg0, arg1)
-	ret0, _ := ret[0].(*build.CachePruneReport)
+	ret0, _ := ret[0].(client.BuildCachePruneResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -72,17 +70,17 @@ func (mr *MockAPIClientMockRecorder) BuildCachePrune(arg0, arg1 any) *gomock.Cal
 }
 
 // BuildCancel mocks base method.
-func (m *MockAPIClient) BuildCancel(arg0 context.Context, arg1 string) error {
+func (m *MockAPIClient) BuildCancel(arg0 context.Context, arg1 string, arg2 client.BuildCancelOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildCancel", arg0, arg1)
+	ret := m.ctrl.Call(m, "BuildCancel", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BuildCancel indicates an expected call of BuildCancel.
-func (mr *MockAPIClientMockRecorder) BuildCancel(arg0, arg1 any) *gomock.Call {
+func (mr *MockAPIClientMockRecorder) BuildCancel(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildCancel", reflect.TypeOf((*MockAPIClient)(nil).BuildCancel), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildCancel", reflect.TypeOf((*MockAPIClient)(nil).BuildCancel), arg0, arg1, arg2)
 }
 
 // CheckpointCreate mocks base method.
@@ -656,7 +654,7 @@ func (mr *MockAPIClientMockRecorder) ContainerWait(arg0, arg1, arg2 any) *gomock
 }
 
 // ContainersPrune mocks base method.
-func (m *MockAPIClient) ContainersPrune(arg0 context.Context, arg1 filters.Args) (container.PruneReport, error) {
+func (m *MockAPIClient) ContainersPrune(arg0 context.Context, arg1 client.Filters) (container.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ContainersPrune", arg0, arg1)
 	ret0, _ := ret[0].(container.PruneReport)
@@ -909,10 +907,10 @@ func (mr *MockAPIClientMockRecorder) ImageLoad(arg0, arg1 any, arg2 ...any) *gom
 }
 
 // ImagePull mocks base method.
-func (m *MockAPIClient) ImagePull(arg0 context.Context, arg1 string, arg2 client.ImagePullOptions) (io.ReadCloser, error) {
+func (m *MockAPIClient) ImagePull(arg0 context.Context, arg1 string, arg2 client.ImagePullOptions) (client.ImagePullResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImagePull", arg0, arg1, arg2)
-	ret0, _ := ret[0].(io.ReadCloser)
+	ret0, _ := ret[0].(client.ImagePullResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1003,7 +1001,7 @@ func (mr *MockAPIClientMockRecorder) ImageTag(arg0, arg1, arg2 any) *gomock.Call
 }
 
 // ImagesPrune mocks base method.
-func (m *MockAPIClient) ImagesPrune(arg0 context.Context, arg1 filters.Args) (image.PruneReport, error) {
+func (m *MockAPIClient) ImagesPrune(arg0 context.Context, arg1 client.Filters) (image.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImagesPrune", arg0, arg1)
 	ret0, _ := ret[0].(image.PruneReport)
@@ -1160,7 +1158,7 @@ func (mr *MockAPIClientMockRecorder) NetworkRemove(arg0, arg1 any) *gomock.Call 
 }
 
 // NetworksPrune mocks base method.
-func (m *MockAPIClient) NetworksPrune(arg0 context.Context, arg1 filters.Args) (network.PruneReport, error) {
+func (m *MockAPIClient) NetworksPrune(arg0 context.Context, arg1 client.Filters) (network.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NetworksPrune", arg0, arg1)
 	ret0, _ := ret[0].(network.PruneReport)
@@ -1322,7 +1320,7 @@ func (mr *MockAPIClientMockRecorder) PluginInstall(arg0, arg1, arg2 any) *gomock
 }
 
 // PluginList mocks base method.
-func (m *MockAPIClient) PluginList(arg0 context.Context, arg1 filters.Args) (plugin.ListResponse, error) {
+func (m *MockAPIClient) PluginList(arg0 context.Context, arg1 client.Filters) (plugin.ListResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PluginList", arg0, arg1)
 	ret0, _ := ret[0].(plugin.ListResponse)
@@ -1825,7 +1823,7 @@ func (mr *MockAPIClientMockRecorder) VolumeUpdate(arg0, arg1, arg2, arg3 any) *g
 }
 
 // VolumesPrune mocks base method.
-func (m *MockAPIClient) VolumesPrune(arg0 context.Context, arg1 filters.Args) (volume.PruneReport, error) {
+func (m *MockAPIClient) VolumesPrune(arg0 context.Context, arg1 client.Filters) (volume.PruneReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VolumesPrune", arg0, arg1)
 	ret0, _ := ret[0].(volume.PruneReport)
