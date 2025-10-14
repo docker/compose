@@ -1,6 +1,6 @@
 module github.com/docker/compose/v2
 
-go 1.24.7
+go 1.24.9
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
