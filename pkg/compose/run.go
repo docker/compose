@@ -133,12 +133,17 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return "", err
 	}
 
-	err = s.injectSecrets(ctx, project, service, created.ID)
+	ctr, err := s.apiClient().ContainerInspect(ctx, created.ID)
+	if err != nil {
+		return "", err
+	}
+
+	err = s.injectSecrets(ctx, project, service, ctr.ID)
 	if err != nil {
 		return created.ID, err
 	}
 
-	err = s.injectConfigs(ctx, project, service, created.ID)
+	err = s.injectConfigs(ctx, project, service, ctr.ID)
 	return created.ID, err
 }
 

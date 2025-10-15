@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -29,6 +30,7 @@ import (
 )
 
 func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
+	var ctrConfig *container.Config
 	for _, config := range service.Secrets {
 		file := project.Secrets[config.Source]
 		if file.Environment == "" {
@@ -53,6 +55,25 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 			}
 			content = env
 		}
+
+		if config.UID == "" && config.GID == "" {
+			if ctrConfig == nil {
+				ctr, err := s.apiClient().ContainerInspect(ctx, id)
+				if err != nil {
+					return err
+				}
+				ctrConfig = ctr.Config
+			}
+
+			parts := strings.Split(ctrConfig.User, ":")
+			if len(parts) > 0 {
+				config.UID = parts[0]
+			}
+			if len(parts) > 1 {
+				config.GID = parts[1]
+			}
+		}
+
 		b, err := createTar(content, types.FileReferenceConfig(config))
 		if err != nil {
 			return err
@@ -69,6 +90,7 @@ func (s *composeService) injectSecrets(ctx context.Context, project *types.Proje
 }
 
 func (s *composeService) injectConfigs(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
+	var ctrConfig *container.Config
 	for _, config := range service.Configs {
 		file := project.Configs[config.Source]
 		content := file.Content
@@ -89,6 +111,24 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 
 		if config.Target == "" {
 			config.Target = "/" + config.Source
+		}
+
+		if config.UID == "" && config.GID == "" {
+			if ctrConfig == nil {
+				ctr, err := s.apiClient().ContainerInspect(ctx, id)
+				if err != nil {
+					return err
+				}
+				ctrConfig = ctr.Config
+			}
+
+			parts := strings.Split(ctrConfig.User, ":")
+			if len(parts) > 0 {
+				config.UID = parts[0]
+			}
+			if len(parts) > 1 {
+				config.GID = parts[1]
+			}
 		}
 
 		b, err := createTar(content, types.FileReferenceConfig(config))
