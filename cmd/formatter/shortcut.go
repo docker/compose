@@ -321,6 +321,8 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 		lk.logLevel = NONE
 		// will notify main thread to kill and will handle gracefully
 		lk.signalChannel <- syscall.SIGINT
+	case keyboard.KeyCtrlZ:
+		_ = syscall.Kill(0, syscall.SIGSTOP)
 	case keyboard.KeyEnter:
 		newLine()
 		lk.printNavigationMenu()
