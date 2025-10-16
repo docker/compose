@@ -24,14 +24,14 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {
-	list, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(hasProjectLabelFilter(), hasConfigHashLabel()),
+	list, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: make(client.Filters).Add("label", api.ProjectLabel).Add("label", api.ConfigHashLabel),
 		All:     opts.All,
 	})
 	if err != nil {

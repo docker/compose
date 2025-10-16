@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -51,7 +51,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 			})
 			for i, p := range ctr.Ports {
 				publishers[i] = api.PortPublisher{
-					URL:           p.IP,
+					URL:           p.IP.String(),
 					TargetPort:    int(p.PrivatePort),
 					PublishedPort: int(p.PublicPort),
 					Protocol:      p.Type,

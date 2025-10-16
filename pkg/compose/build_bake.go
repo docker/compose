@@ -37,7 +37,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/command/image/build"
+	buildpkg "github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/moby/buildkit/client"
@@ -501,7 +501,7 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
-	if contextType, _ := build.DetectContextType(ctxName); contextType == build.ContextTypeGit {
+	if contextType, _ := buildpkg.DetectContextType(ctxName); contextType == buildpkg.ContextTypeGit {
 		return dockerfile
 	}
 	if !filepath.IsAbs(dockerfile) {
