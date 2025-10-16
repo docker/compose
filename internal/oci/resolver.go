@@ -125,10 +125,13 @@ func Push(ctx context.Context, resolver remotes.Resolver, ref reference.Named, d
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = push.Close()
-	}()
 
 	_, err = push.Write(descriptor.Data)
-	return err
+	if err != nil {
+		// Close the writer on error since Commit won't be called
+		_ = push.Close()
+		return err
+	}
+	// Commit will close the writer
+	return push.Commit(ctx, int64(len(descriptor.Data)), descriptor.Digest)
 }
