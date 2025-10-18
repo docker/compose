@@ -87,7 +87,7 @@ func TestLocalComposeRun(t *testing.T) {
 	t.Run("compose run --volumes", func(t *testing.T) {
 		wd, err := os.Getwd()
 		assert.NilError(t, err)
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "--volumes", wd+":/foo",
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "--volumes", wd+":/foo:z",
 			"back", "/bin/sh", "-c", "ls /foo")
 		res.Assert(t, icmd.Expected{Out: "compose_run_test.go"})
 

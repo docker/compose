@@ -9,6 +9,8 @@ services:
     configs:
       - source: my-config
         target: /etc/my-config1.txt
+    security_opt:
+      - label=disable
   serviceB:
     image: alpine
     build: .
@@ -19,6 +21,8 @@ services:
     networks:
       - private-network
       - public-network
+    security_opt:
+      - label=disable
 configs:
   my-config:
     file: my-config.txt

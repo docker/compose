@@ -4,18 +4,24 @@ services:
     configs:
       - source: from_env
     command: cat /from_env
+    security_opt:
+      - label=disable
 
   from_file:
     image: alpine
     configs:
       - source: from_file
     command: cat /from_file
+    security_opt:
+      - label=disable
 
   inlined:
     image: alpine
     configs:
       - source: inlined
     command: cat /inlined
+    security_opt:
+      - label=disable
 
   target:
     image: alpine
@@ -23,6 +29,8 @@ services:
       - source: inlined
         target: /target
     command: cat /target
+    security_opt:
+      - label=disable
 
 configs:
   from_env:

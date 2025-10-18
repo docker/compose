@@ -4,6 +4,8 @@ services:
     container_name: frontend
     volumes:
       - project-data:/data
+    security_opt:
+      - label=disable
 
 volumes:
   project-data:

@@ -12,6 +12,8 @@ services:
       - backnet
     volumes:
       - data:/test
+    security_opt:
+      - label=disable
   front:
     image: nginx:alpine
     networks:

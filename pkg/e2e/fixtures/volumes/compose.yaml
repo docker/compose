@@ -8,3 +8,5 @@ services:
         target: /mnt/image
         image:
           subpath: usr/share/nginx/html/
+    security_opt:
+      - label=disable

@@ -2,22 +2,24 @@ services:
   nginx:
     build: nginx-build
     volumes:
-      - ./static:/usr/share/nginx/html
+      - "./static:/usr/share/nginx/html:z"
     ports:
       - 8090:80
 
   nginx2:
     build: nginx-build
     volumes:
-      - staticVol:/usr/share/nginx/html:ro
+      - "staticVol:/usr/share/nginx/html:ro,z"
       - /usr/src/app/node_modules
-      - otherVol:/usr/share/nginx/test
+      - "otherVol:/usr/share/nginx/test:z"
     ports:
       - 9090:80
     configs:
       - myconfig
     secrets:
       - mysecret
+    security_opt:
+      - label=disable
 
 volumes:
   staticVol:
