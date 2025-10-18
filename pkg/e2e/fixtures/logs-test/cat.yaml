@@ -3,4 +3,4 @@ services:
     image: alpine
     command: cat /text_file.txt
     volumes:
-      - ${FILE}:/text_file.txt
+      - "${FILE}:/text_file.txt:z"

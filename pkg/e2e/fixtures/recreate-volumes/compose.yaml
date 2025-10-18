@@ -2,7 +2,7 @@ services:
   app:
     image: alpine
     volumes:
-      - my_vol:/my_vol
+      - "my_vol:/my_vol:z"
 
 volumes:
   my_vol:

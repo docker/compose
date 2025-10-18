@@ -38,6 +38,6 @@ services:
     init: true
     command: sleep infinity
     volumes:
-      - ./dat:/app/dat
-      - ./data-logs:/app/data-logs
+      - "./dat:/app/dat:z"
+      - "./data-logs:/app/data-logs:z"
     develop: *x-dev
