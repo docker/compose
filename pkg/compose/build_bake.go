@@ -40,6 +40,7 @@ import (
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/docker/api/types/versions"
 	"github.com/google/uuid"
 	"github.com/moby/buildkit/client"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
@@ -306,6 +307,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	buildx, err := manager.GetPlugin("buildx", s.dockerCli, &cobra.Command{})
 	if err != nil {
 		return nil, err
+	}
+
+	if versions.LessThan(buildx.Version[1:], "0.17.0") {
+		return nil, fmt.Errorf("compose build requires buildx 0.17 or later")
 	}
 
 	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadataFile}
