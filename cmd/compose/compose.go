@@ -40,8 +40,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/pkg/kvfile"
 	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/internal/desktop"
-	"github.com/docker/compose/v2/internal/experimental"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	ui "github.com/docker/compose/v2/pkg/progress"
@@ -89,14 +87,6 @@ func init() {
 	// compose evaluates env file values for interpolation
 	// `raw` format allows to load env_file with the same parser used by docker run --env-file
 	dotenv.RegisterFormat("raw", rawEnv)
-}
-
-type Backend interface {
-	api.Service
-
-	SetDesktopClient(cli *desktop.Client)
-
-	SetExperiments(experiments *experimental.State)
 }
 
 // Command defines a compose CLI command as a func with args
@@ -426,7 +416,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //nolint:gocyclo
+func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command { //nolint:gocyclo
 	// filter out useless commandConn.CloseWrite warning message that can occur
 	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
 	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
@@ -437,7 +427,6 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 		"commandConn.CloseRead:",
 	))
 
-	experiments := experimental.NewState()
 	opts := ProjectOptions{}
 	var (
 		ansi     string
@@ -581,27 +570,6 @@ func RootCommand(dockerCli command.Cli, backend Backend) *cobra.Command { //noli
 			}
 			cmd.SetContext(ctx)
 
-			// (6) Desktop integration
-			var desktopCli *desktop.Client
-			if !dryRun {
-				if desktopCli, err = desktop.NewFromDockerClient(ctx, dockerCli); desktopCli != nil {
-					logrus.Debugf("Enabled Docker Desktop integration (experimental) @ %s", desktopCli.Endpoint())
-					backend.SetDesktopClient(desktopCli)
-				} else if err != nil {
-					// not fatal, Compose will still work but behave as though
-					// it's not running as part of Docker Desktop
-					logrus.Debugf("failed to enable Docker Desktop integration: %v", err)
-				} else {
-					logrus.Trace("Docker Desktop integration not enabled")
-				}
-			}
-
-			// (7) experimental features
-			if err := experiments.Load(ctx, desktopCli); err != nil {
-				logrus.Debugf("Failed to query feature flags from Desktop: %v", err)
-			}
-			backend.SetExperiments(experiments)
-
 			return nil
 		},
 	}
@@ -714,16 +682,4 @@ var printerModes = []string{
 	ui.ModePlain,
 	ui.ModeJSON,
 	ui.ModeQuiet,
-}
-
-func SetUnchangedOption(name string, experimentalFlag bool) bool {
-	var value bool
-	// If the var is defined we use that value first
-	if envVar, ok := os.LookupEnv(name); ok {
-		value = utils.StringToBool(envVar)
-	} else {
-		// if not, we try to get it from experimental feature flag
-		value = experimentalFlag
-	}
-	return value
 }
