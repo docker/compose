@@ -83,7 +83,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			options.Start.NavigationMenu = false
 		} else {
 			defer keyboard.Close() //nolint:errcheck
-			isDockerDesktopActive := s.isDesktopIntegrationActive()
+			isDockerDesktopActive, err := s.isDesktopIntegrationActive(ctx)
+			if err != nil {
+				return err
+			}
 			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive)
 			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, signalChan)
 			logConsumer = navigationMenu.Decorate(logConsumer)

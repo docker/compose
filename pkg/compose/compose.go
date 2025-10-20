@@ -38,8 +38,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/jonboulle/clockwork"
 
-	"github.com/docker/compose/v2/internal/desktop"
-	"github.com/docker/compose/v2/internal/experimental"
 	"github.com/docker/compose/v2/pkg/api"
 )
 
@@ -63,10 +61,7 @@ func NewComposeService(dockerCli command.Cli) api.Service {
 }
 
 type composeService struct {
-	dockerCli   command.Cli
-	desktopCli  *desktop.Client
-	experiments *experimental.State
-
+	dockerCli      command.Cli
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
@@ -80,9 +75,6 @@ func (s *composeService) Close() error {
 	var errs []error
 	if s.dockerCli != nil {
 		errs = append(errs, s.dockerCli.Client().Close())
-	}
-	if s.isDesktopIntegrationActive() {
-		errs = append(errs, s.desktopCli.Close())
 	}
 	return errors.Join(errs...)
 }
@@ -320,8 +312,4 @@ func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 		runtimeVersion.val = version.APIVersion
 	})
 	return runtimeVersion.val, runtimeVersion.err
-}
-
-func (s *composeService) isDesktopIntegrationActive() bool {
-	return s.desktopCli != nil
 }

@@ -17,14 +17,25 @@
 package compose
 
 import (
-	"github.com/docker/compose/v2/internal/desktop"
-	"github.com/docker/compose/v2/internal/experimental"
+	"context"
+	"strings"
 )
 
-func (s *composeService) SetDesktopClient(cli *desktop.Client) {
-	s.desktopCli = cli
-}
+// engineLabelDesktopAddress is used to detect that Compose is running with a
+// Docker Desktop context. When this label is present, the value is an endpoint
+// address for an in-memory socket (AF_UNIX or named pipe).
+const engineLabelDesktopAddress = "com.docker.desktop.address"
 
-func (s *composeService) SetExperiments(experiments *experimental.State) {
-	s.experiments = experiments
+func (s *composeService) isDesktopIntegrationActive(ctx context.Context) (bool, error) {
+	info, err := s.apiClient().Info(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, l := range info.Labels {
+		k, _, ok := strings.Cut(l, "=")
+		if ok && k == engineLabelDesktopAddress {
+			return true, nil
+		}
+	}
+	return false, nil
 }

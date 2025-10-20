@@ -36,10 +36,7 @@ import (
 func pluginMain() {
 	plugin.Run(
 		func(dockerCli command.Cli) *cobra.Command {
-			// TODO(milas): this cast is safe but we should not need to do this,
-			// 	we should expose the concrete service type so that we do not need
-			// 	to rely on the `api.Service` interface internally
-			backend := compose.NewComposeService(dockerCli).(commands.Backend)
+			backend := compose.NewComposeService(dockerCli)
 			cmd := commands.RootCommand(dockerCli, backend)
 			originalPreRunE := cmd.PersistentPreRunE
 			cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
