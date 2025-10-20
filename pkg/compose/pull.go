@@ -159,12 +159,14 @@ func imageAlreadyPresent(serviceImage string, localImages map[string]api.ImageSu
 	if err != nil {
 		return false
 	}
-	tagged, ok := normalizedImage.(reference.NamedTagged)
-	if !ok {
-		return false
+	switch refType := normalizedImage.(type) {
+	case reference.NamedTagged:
+		_, ok := localImages[serviceImage]
+		return ok && refType.Tag() != "latest"
+	default:
+		_, ok := localImages[serviceImage]
+		return ok
 	}
-	_, ok = localImages[serviceImage]
-	return ok && tagged.Tag() != "latest"
 }
 
 func getUnwrappedErrorMessage(err error) string {
