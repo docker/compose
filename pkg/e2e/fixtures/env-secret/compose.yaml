@@ -14,23 +14,6 @@ services:
         mode: 0440
     command: cat /run/secrets/bar
 
-  bar:
-    image: alpine
-    user: "1005"
-    secrets:
-      - source: secret
-        target: bar
-    command: cat /run/secrets/bar
-
-  zot:
-    image: alpine
-    user: "1005:1005"
-    secrets:
-      - source: secret
-        target: bar
-    command: cat /run/secrets/bar
-
-
 secrets:
   secret:
     environment: SECRET

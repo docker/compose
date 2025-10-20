@@ -17,7 +17,6 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 
 	"gotest.tools/v3/icmd"
@@ -40,28 +39,6 @@ func TestSecretFromEnv(t *testing.T) {
 				cmd.Env = append(cmd.Env, "SECRET=BAR")
 			})
 		res.Assert(t, icmd.Expected{Out: "-r--r-----    1 1005     1005"})
-	})
-	t.Run("secret uid from user", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "version", "--format", "{{ .Server.Version }}")
-		if strings.HasPrefix(res.Stdout(), "27.") {
-			t.Skip("USER uid:gid is not supported")
-		}
-		res = icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "bar", "ls", "-al", "/var/run/secrets/bar"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "SECRET=BAR")
-			})
-		res.Assert(t, icmd.Expected{Out: "-r--r--r--    1 1005     root"})
-	})
-	t.Run("secret uid:gid from user", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "version", "--format", "{{ .Server.Version }}")
-		if strings.HasPrefix(res.Stdout(), "27.") {
-			t.Skip("USER uid:gid is not supported")
-		}
-		res = icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "zot", "ls", "-al", "/var/run/secrets/bar"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "SECRET=BAR")
-			})
-		res.Assert(t, icmd.Expected{Out: "-r--r--r--    1 1005     1005"})
 	})
 }
 

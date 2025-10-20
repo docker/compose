@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -46,7 +45,6 @@ func (s *composeService) injectConfigs(ctx context.Context, project *types.Proje
 
 func (s *composeService) injectFileReferences(ctx context.Context, project *types.Project, service types.ServiceConfig, id string, mountType mountType) error {
 	mounts, sources := s.getFilesAndMap(project, service, mountType)
-	var ctrConfig *container.Config
 
 	for _, mount := range mounts {
 		content, err := s.resolveFileContent(project, sources[mount.Source], mountType)
@@ -62,11 +60,6 @@ func (s *composeService) injectFileReferences(ctx context.Context, project *type
 		}
 
 		s.setDefaultTarget(&mount, mountType)
-
-		ctrConfig, err = s.setFileOwnership(ctx, id, &mount, ctrConfig)
-		if err != nil {
-			return err
-		}
 
 		if err := s.copyFileToContainer(ctx, id, content, mount); err != nil {
 			return err
@@ -129,30 +122,6 @@ func (s *composeService) setDefaultTarget(file *types.FileReferenceConfig, mount
 	}
 }
 
-func (s *composeService) setFileOwnership(ctx context.Context, id string, file *types.FileReferenceConfig, ctrConfig *container.Config) (*container.Config, error) {
-	if file.UID != "" || file.GID != "" {
-		return ctrConfig, nil
-	}
-
-	if ctrConfig == nil {
-		ctr, err := s.apiClient().ContainerInspect(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		ctrConfig = ctr.Config
-	}
-
-	parts := strings.Split(ctrConfig.User, ":")
-	if len(parts) > 0 {
-		file.UID = parts[0]
-	}
-	if len(parts) > 1 {
-		file.GID = parts[1]
-	}
-
-	return ctrConfig, nil
-}
-
 func (s *composeService) copyFileToContainer(ctx context.Context, id, content string, file types.FileReferenceConfig) error {
 	b, err := createTar(content, file)
 	if err != nil {
@@ -160,7 +129,7 @@ func (s *composeService) copyFileToContainer(ctx context.Context, id, content st
 	}
 
 	return s.apiClient().CopyToContainer(ctx, id, "/", &b, container.CopyToContainerOptions{
-		CopyUIDGID: true,
+		CopyUIDGID: file.UID != "" || file.GID != "",
 	})
 }
 
