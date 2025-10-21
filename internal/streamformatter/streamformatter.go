@@ -42,8 +42,8 @@ import (
 	"io"
 	"sync"
 
+	"github.com/docker/compose/v2/internal/progress"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/pkg/progress"
 )
 
 const streamNewline = "\r\n"
