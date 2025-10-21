@@ -39,6 +39,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
@@ -65,45 +66,9 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 
-	named, err := reference.ParseDockerRef(repository)
+	layers, err := s.createLayers(ctx, project, options)
 	if err != nil {
 		return err
-	}
-
-	config := s.dockerCli.ConfigFile()
-
-	resolver := oci.NewResolver(config)
-
-	var layers []v1.Descriptor
-	extFiles := map[string]string{}
-	for _, file := range project.ComposeFiles {
-		data, err := processFile(ctx, file, project, extFiles)
-		if err != nil {
-			return err
-		}
-
-		layerDescriptor := oci.DescriptorForComposeFile(file, data)
-		layers = append(layers, layerDescriptor)
-	}
-
-	extLayers, err := processExtends(ctx, project, extFiles)
-	if err != nil {
-		return err
-	}
-	layers = append(layers, extLayers...)
-
-	if options.WithEnvironment {
-		layers = append(layers, envFileLayers(project)...)
-	}
-
-	if options.ResolveImageDigests {
-		yaml, err := s.generateImageDigestsOverride(ctx, project)
-		if err != nil {
-			return err
-		}
-
-		layerDescriptor := oci.DescriptorForComposeFile("image-digests.yaml", yaml)
-		layers = append(layers, layerDescriptor)
 	}
 
 	w := progress.ContextWriter(ctx)
@@ -112,7 +77,22 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Text:   "publishing",
 		Status: progress.Working,
 	})
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		logrus.Debug("publishing layers")
+		for _, layer := range layers {
+			indent, _ := json.MarshalIndent(layer, "", "  ")
+			fmt.Println(string(indent))
+		}
+	}
 	if !s.dryRun {
+		named, err := reference.ParseDockerRef(repository)
+		if err != nil {
+			return err
+		}
+
+		config := s.dockerCli.ConfigFile()
+		resolver := oci.NewResolver(config)
+
 		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
 			w.Event(progress.Event{
@@ -175,11 +155,47 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 	return nil
 }
 
+func (s *composeService) createLayers(ctx context.Context, project *types.Project, options api.PublishOptions) ([]v1.Descriptor, error) {
+	var layers []v1.Descriptor
+	extFiles := map[string]string{}
+	envFiles := map[string]string{}
+	for _, file := range project.ComposeFiles {
+		data, err := processFile(ctx, file, project, extFiles, envFiles)
+		if err != nil {
+			return nil, err
+		}
+
+		layerDescriptor := oci.DescriptorForComposeFile(file, data)
+		layers = append(layers, layerDescriptor)
+	}
+
+	extLayers, err := processExtends(ctx, project, extFiles)
+	if err != nil {
+		return nil, err
+	}
+	layers = append(layers, extLayers...)
+
+	if options.WithEnvironment {
+		layers = append(layers, envFileLayers(envFiles)...)
+	}
+
+	if options.ResolveImageDigests {
+		yaml, err := s.generateImageDigestsOverride(ctx, project)
+		if err != nil {
+			return nil, err
+		}
+
+		layerDescriptor := oci.DescriptorForComposeFile("image-digests.yaml", yaml)
+		layers = append(layers, layerDescriptor)
+	}
+	return layers, nil
+}
+
 func processExtends(ctx context.Context, project *types.Project, extFiles map[string]string) ([]v1.Descriptor, error) {
 	var layers []v1.Descriptor
 	moreExtFiles := map[string]string{}
 	for xf, hash := range extFiles {
-		data, err := processFile(ctx, xf, project, moreExtFiles)
+		data, err := processFile(ctx, xf, project, moreExtFiles, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -204,7 +220,7 @@ func processExtends(ctx context.Context, project *types.Project, extFiles map[st
 	return layers, nil
 }
 
-func processFile(ctx context.Context, file string, project *types.Project, extFiles map[string]string) ([]byte, error) {
+func processFile(ctx context.Context, file string, project *types.Project, extFiles map[string]string, envFiles map[string]string) ([]byte, error) {
 	f, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -230,6 +246,15 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 		return nil, err
 	}
 	for name, service := range base.Services {
+		for i, envFile := range service.EnvFiles {
+			hash := fmt.Sprintf("%x.env", sha256.Sum256([]byte(envFile.Path)))
+			envFiles[envFile.Path] = hash
+			f, err = transform.ReplaceEnvFile(f, name, i, hash)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		if service.Extends == nil {
 			continue
 		}
@@ -376,18 +401,16 @@ func (s *composeService) checkEnvironmentVariables(project *types.Project, optio
 	return envVarList, nil
 }
 
-func envFileLayers(project *types.Project) []v1.Descriptor {
+func envFileLayers(files map[string]string) []v1.Descriptor {
 	var layers []v1.Descriptor
-	for _, service := range project.Services {
-		for _, envFile := range service.EnvFiles {
-			f, err := os.ReadFile(envFile.Path)
-			if err != nil {
-				// if we can't read the file, skip to the next one
-				continue
-			}
-			layerDescriptor := oci.DescriptorForEnvFile(envFile.Path, f)
-			layers = append(layers, layerDescriptor)
+	for file, hash := range files {
+		f, err := os.ReadFile(file)
+		if err != nil {
+			// if we can't read the file, skip to the next one
+			continue
 		}
+		layerDescriptor := oci.DescriptorForEnvFile(hash, f)
+		layers = append(layers, layerDescriptor)
 	}
 	return layers
 }

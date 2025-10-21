@@ -61,6 +61,52 @@ func ReplaceExtendsFile(in []byte, service string, value string) ([]byte, error)
 	return replace(in, file.Line, file.Column, value), nil
 }
 
+// ReplaceEnvFile changes value for service.extends.env_file in input yaml stream, preserving formatting
+func ReplaceEnvFile(in []byte, service string, i int, value string) ([]byte, error) {
+	var doc yaml.Node
+	err := yaml.Unmarshal(in, &doc)
+	if err != nil {
+		return nil, err
+	}
+	if doc.Kind != yaml.DocumentNode {
+		return nil, fmt.Errorf("expected document kind %v, got %v", yaml.DocumentNode, doc.Kind)
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("expected document root to be a mapping, got %v", root.Kind)
+	}
+
+	services, err := getMapping(root, "services")
+	if err != nil {
+		return nil, err
+	}
+
+	target, err := getMapping(services, service)
+	if err != nil {
+		return nil, err
+	}
+
+	envFile, err := getMapping(target, "env_file")
+	if err != nil {
+		return nil, err
+	}
+
+	// env_file can be either a string, sequence of strings, or sequence of mappings with path attribute
+	if envFile.Kind == yaml.SequenceNode {
+		envFile = envFile.Content[i]
+		if envFile.Kind == yaml.MappingNode {
+			envFile, err = getMapping(envFile, "path")
+			if err != nil {
+				return nil, err
+			}
+		}
+		return replace(in, envFile.Line, envFile.Column, value), nil
+	} else {
+		return replace(in, envFile.Line, envFile.Column, value), nil
+	}
+
+}
+
 func getMapping(root *yaml.Node, key string) (*yaml.Node, error) {
 	var node *yaml.Node
 	l := len(root.Content)

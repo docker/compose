@@ -217,8 +217,9 @@ func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, man
 
 func writeComposeFile(layer spec.Descriptor, i int, local string, content []byte) error {
 	file := "compose.yaml"
-	if extends, ok := layer.Annotations["com.docker.compose.extends"]; ok {
-		if err := validatePathInBase(local, extends); err != nil {
+	if _, ok := layer.Annotations["com.docker.compose.extends"]; ok {
+		file = layer.Annotations["com.docker.compose.file"]
+		if err := validatePathInBase(local, file); err != nil {
 			return err
 		}
 	}
