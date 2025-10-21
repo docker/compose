@@ -1,3 +1,37 @@
+/*
+   Copyright 2025 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+// Copied from https://github.com/moby/moby/blob/f8215cc266744ef195a50a70d427c345da2acdbb/pkg/progress/progress.go
+
+/*
+	Copyright 2012-2017 Docker, Inc.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+	  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
 package progress
 
 import (
@@ -41,7 +75,7 @@ type chanOutput chan<- Progress
 func (out chanOutput) WriteProgress(p Progress) error {
 	// FIXME: workaround for panic in #37735
 	defer func() {
-		recover()
+		_ = recover()
 	}()
 	out <- p
 	return nil
@@ -66,7 +100,7 @@ func DiscardOutput() Output {
 
 // Update is a convenience function to write a progress update to the channel.
 func Update(out Output, id, action string) {
-	out.WriteProgress(Progress{ID: id, Action: action})
+	_ = out.WriteProgress(Progress{ID: id, Action: action})
 }
 
 // Updatef is a convenience function to write a printf-formatted progress update
@@ -77,7 +111,7 @@ func Updatef(out Output, id, format string, a ...interface{}) {
 
 // Message is a convenience function to write a progress message to the channel.
 func Message(out Output, id, message string) {
-	out.WriteProgress(Progress{ID: id, Message: message})
+	_ = out.WriteProgress(Progress{ID: id, Message: message})
 }
 
 // Messagef is a convenience function to write a printf-formatted progress
@@ -89,5 +123,5 @@ func Messagef(out Output, id, format string, a ...interface{}) {
 // Aux sends auxiliary information over a progress interface, which will not be
 // formatted for the UI. This is used for things such as push signing.
 func Aux(out Output, a interface{}) {
-	out.WriteProgress(Progress{Aux: a})
+	_ = out.WriteProgress(Progress{Aux: a})
 }
