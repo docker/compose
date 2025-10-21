@@ -1,8 +1,43 @@
+/*
+   Copyright 2025 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+// Copied from https://github.com/moby/moby/blob/f8215cc266744ef195a50a70d427c345da2acdbb/pkg/streamformatter/streamformatter.go
+
+/*
+	Copyright 2012-2017 Docker, Inc.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+	  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
 // Package streamformatter provides helper functions to format a stream.
 package streamformatter
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -31,8 +66,8 @@ func FormatStatus(id, format string, a ...interface{}) []byte {
 
 // FormatError formats the error as a JSON object
 func FormatError(err error) []byte {
-	jsonError, ok := err.(*jsonmessage.JSONError)
-	if !ok {
+	var jsonError *jsonmessage.JSONError
+	if !errors.As(err, &jsonError) {
 		jsonError = &jsonmessage.JSONError{Message: err.Error()}
 	}
 	if b, err := json.Marshal(&jsonmessage.JSONMessage{Error: jsonError, ErrorMessage: err.Error()}); err == nil {
@@ -46,9 +81,9 @@ func (sf *jsonProgressFormatter) formatStatus(id, format string, a ...interface{
 }
 
 // formatProgress formats the progress information for a specified action.
-func (sf *jsonProgressFormatter) formatProgress(id, action string, progress *jsonmessage.JSONProgress, aux interface{}) []byte {
-	if progress == nil {
-		progress = &jsonmessage.JSONProgress{}
+func (sf *jsonProgressFormatter) formatProgress(id, action string, p *jsonmessage.JSONProgress, aux interface{}) []byte {
+	if p == nil {
+		p = &jsonmessage.JSONProgress{}
 	}
 	var auxJSON *json.RawMessage
 	if aux != nil {
@@ -61,8 +96,8 @@ func (sf *jsonProgressFormatter) formatProgress(id, action string, progress *jso
 	}
 	b, err := json.Marshal(&jsonmessage.JSONMessage{
 		Status:          action,
-		ProgressMessage: progress.String(),
-		Progress:        progress,
+		ProgressMessage: p.String(),
+		Progress:        p,
 		ID:              id,
 		Aux:             auxJSON,
 	})
@@ -78,15 +113,15 @@ func (sf *rawProgressFormatter) formatStatus(id, format string, a ...interface{}
 	return []byte(fmt.Sprintf(format, a...) + streamNewline)
 }
 
-func (sf *rawProgressFormatter) formatProgress(id, action string, progress *jsonmessage.JSONProgress, aux interface{}) []byte {
-	if progress == nil {
-		progress = &jsonmessage.JSONProgress{}
+func (sf *rawProgressFormatter) formatProgress(id, action string, p *jsonmessage.JSONProgress, aux interface{}) []byte {
+	if p == nil {
+		p = &jsonmessage.JSONProgress{}
 	}
 	endl := "\r"
-	if progress.String() == "" {
+	if p.String() == "" {
 		endl += "\n"
 	}
-	return []byte(action + " " + progress.String() + endl)
+	return []byte(action + " " + p.String() + endl)
 }
 
 // NewProgressOutput returns a progress.Output object that can be passed to
@@ -156,7 +191,7 @@ func (sf *AuxFormatter) Emit(id string, aux interface{}) error {
 		return err
 	}
 	msgJSON = appendNewline(msgJSON)
-	n, err := sf.Writer.Write(msgJSON)
+	n, err := sf.Write(msgJSON)
 	if n != len(msgJSON) {
 		return io.ErrShortWrite
 	}
