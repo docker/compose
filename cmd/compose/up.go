@@ -26,6 +26,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/prompt"
+	"github.com/docker/compose/v2/pkg/compose"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -109,7 +111,7 @@ func (opts upOptions) OnExit() api.Cascade {
 	}
 }
 
-func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	build := buildOptions{ProjectOptions: p}
@@ -140,7 +142,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 				return fmt.Errorf("no service selected")
 			}
 
-			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
+			return runUp(ctx, dockerCli, backendOptions, create, up, build, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -225,21 +227,21 @@ func validateFlags(up *upOptions, create *createOptions) error {
 }
 
 //nolint:gocyclo
-func runUp(
-	ctx context.Context,
-	dockerCli command.Cli,
-	backend api.Service,
-	createOptions createOptions,
-	upOptions upOptions,
-	buildOptions buildOptions,
-	project *types.Project,
-	services []string,
-) error {
+func runUp(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, createOptions createOptions, upOptions upOptions, buildOptions buildOptions, project *types.Project, services []string, ) error {
 	if err := checksForRemoteStack(ctx, dockerCli, project, buildOptions, createOptions.AssumeYes, []string{}); err != nil {
 		return err
 	}
 
-	err := createOptions.Apply(project)
+	if createOptions.AssumeYes {
+		backendOptions = append(backendOptions, compose.WithPrompt(prompt.Yes))
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
+	if err != nil {
+		return err
+	}
+
+	err = createOptions.Apply(project)
 	if err != nil {
 		return err
 	}
@@ -277,7 +279,6 @@ func runUp(
 		Inherit:              !createOptions.noInherit,
 		Timeout:              createOptions.GetTimeout(),
 		QuietPull:            createOptions.quietPull,
-		AssumeYes:            createOptions.AssumeYes,
 	}
 
 	if upOptions.noStart {

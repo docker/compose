@@ -30,9 +30,9 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/prompt"
 	"github.com/docker/compose/v2/internal/tracing"
 	ui "github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/prompt"
 )
 
 func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {

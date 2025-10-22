@@ -21,6 +21,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ type startOptions struct {
 	*ProjectOptions
 }
 
-func startCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func startCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	opts := startOptions{
 		ProjectOptions: p,
 	}
@@ -36,15 +37,20 @@ func startCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 		Use:   "start [SERVICE...]",
 		Short: "Start services",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runStart(ctx, dockerCli, backend, opts, args)
+			return runStart(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	return startCmd
 }
 
-func runStart(ctx context.Context, dockerCli command.Cli, backend api.Service, opts startOptions, services []string) error {
+func runStart(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, opts startOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
 	if err != nil {
 		return err
 	}

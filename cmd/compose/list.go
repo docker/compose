@@ -24,6 +24,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/pkg/compose"
 
 	"github.com/docker/cli/opts"
 	"github.com/spf13/cobra"
@@ -38,13 +39,13 @@ type lsOptions struct {
 	Filter opts.FilterOpt
 }
 
-func listCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
+func listCommand(dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	lsOpts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls [OPTIONS]",
 		Short: "List running compose projects",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runList(ctx, dockerCli, backend, lsOpts)
+			return runList(ctx, dockerCli, backendOptions, lsOpts)
 		}),
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
@@ -61,9 +62,14 @@ var acceptedListFilters = map[string]bool{
 	"name": true,
 }
 
-func runList(ctx context.Context, dockerCli command.Cli, backend api.Service, lsOpts lsOptions) error {
+func runList(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, lsOpts lsOptions) error {
 	filters := lsOpts.Filter.Value()
 	err := filters.Validate(acceptedListFilters)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
 	if err != nil {
 		return err
 	}

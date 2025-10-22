@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -33,7 +34,7 @@ type killOptions struct {
 	signal        string
 }
 
-func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func killCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	opts := killOptions{
 		ProjectOptions: p,
 	}
@@ -41,7 +42,7 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 		Use:   "kill [OPTIONS] [SERVICE...]",
 		Short: "Force stop service containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runKill(ctx, dockerCli, backend, opts, args)
+			return runKill(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -54,12 +55,17 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return cmd
 }
 
-func runKill(ctx context.Context, dockerCli command.Cli, backend api.Service, opts killOptions, services []string) error {
+func runKill(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, opts killOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
+	if err != nil {
+		return err
+	}
+	
 	return backend.Kill(ctx, name, api.KillOptions{
 		RemoveOrphans: opts.removeOrphans,
 		Project:       project,

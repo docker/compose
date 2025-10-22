@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
+	"github.com/docker/compose/v2/pkg/compose"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 
@@ -142,7 +143,7 @@ func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (t
 	return environment, nil
 }
 
-func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	options := runOptions{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -218,7 +219,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 			}
 
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
+			return runRun(ctx, dockerCli, backendOptions, project, options, createOpts, buildOpts)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -266,7 +267,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Service, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
+func runRun(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions) error {
 	project, err := options.apply(project)
 	if err != nil {
 		return err
@@ -336,6 +337,11 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 			service.StdinOpen = options.interactive
 			project.Services[name] = service
 		}
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
+	if err != nil {
+		return err
 	}
 
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)

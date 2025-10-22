@@ -44,7 +44,6 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/prompt"
 )
 
 type createOptions struct {
@@ -94,7 +93,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	volumes, err := s.ensureProjectVolumes(ctx, project, options.AssumeYes)
+	volumes, err := s.ensureProjectVolumes(ctx, project)
 	if err != nil {
 		return err
 	}
@@ -151,13 +150,13 @@ func (s *composeService) ensureNetworks(ctx context.Context, project *types.Proj
 	return networks, nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project, assumeYes bool) (map[string]string, error) {
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
 	ids := map[string]string{}
 	for k, volume := range project.Volumes {
 		volume.CustomLabels = volume.CustomLabels.Add(api.VolumeLabel, k)
 		volume.CustomLabels = volume.CustomLabels.Add(api.ProjectLabel, project.Name)
 		volume.CustomLabels = volume.CustomLabels.Add(api.VersionLabel, api.ComposeVersion)
-		id, err := s.ensureVolume(ctx, k, volume, project, assumeYes)
+		id, err := s.ensureVolume(ctx, k, volume, project)
 		if err != nil {
 			return nil, err
 		}
@@ -1531,7 +1530,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 }
 
-func (s *composeService) ensureVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project, assumeYes bool) (string, error) {
+func (s *composeService) ensureVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) (string, error) {
 	inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -1563,13 +1562,10 @@ func (s *composeService) ensureVolume(ctx context.Context, name string, volume t
 	}
 	actual, ok := inspected.Labels[api.ConfigHashLabel]
 	if ok && actual != expected {
-		confirm := assumeYes
-		if !assumeYes {
-			msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
-			confirm, err = prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)
-			if err != nil {
-				return "", err
-			}
+		msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
+		confirm, err := s.prompt(msg, false)
+		if err != nil {
+			return "", err
 		}
 		if confirm {
 			err = s.removeDivergedVolume(ctx, name, volume, project)

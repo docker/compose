@@ -48,7 +48,7 @@ type execOpts struct {
 	interactive bool
 }
 
-func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func execCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	opts := execOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -64,7 +64,7 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			err := runExec(ctx, dockerCli, backend, opts)
+			err := runExec(ctx, dockerCli, backendOptions, opts)
 			if err != nil {
 				logrus.Debugf("%v", err)
 				var cliError cli.StatusError
@@ -100,7 +100,7 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return runCmd
 }
 
-func runExec(ctx context.Context, dockerCli command.Cli, backend api.Service, opts execOpts) error {
+func runExec(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, opts execOpts) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
@@ -126,6 +126,11 @@ func runExec(ctx context.Context, dockerCli command.Cli, backend api.Service, op
 		Interactive: opts.interactive,
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
+	if err != nil {
+		return err
+	}
+	
 	exitCode, err := backend.Exec(ctx, projectName, execOpts)
 	if exitCode != 0 {
 		errMsg := fmt.Sprintf("exit status %d", exitCode)

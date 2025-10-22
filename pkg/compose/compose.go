@@ -50,18 +50,71 @@ func init() {
 	}
 }
 
+type Option func(*composeService) error
+
 // NewComposeService create a local implementation of the compose.Service API
-func NewComposeService(dockerCli command.Cli) api.Service {
-	return &composeService{
-		dockerCli:      dockerCli,
+func NewComposeService(dockerCli command.Cli, opts ...Option) (api.Service, error) {
+	s := &composeService{
+		dockerCli: dockerCli,
+		prompt: func(message string, defaultValue bool) (bool, error) {
+			return false, errors.New("compose service has been used without a prompt to interact with user")
+		},
 		clock:          clockwork.NewRealClock(),
 		maxConcurrency: -1,
 		dryRun:         false,
 	}
+	for _, opt := range opts {
+		if err := opt(s); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
 }
 
+// WithPrompt configure a UI component for Compose service to interact with user and confirm actions
+func WithPrompt(prompt Prompt) Option {
+	return func(s *composeService) error {
+		s.prompt = prompt
+		return nil
+	}
+}
+
+// WithMaxConcurrency defines upper limit for concurrent operations against engine API
+func WithMaxConcurrency(maxConcurrency int) Option {
+	return func(s *composeService) error {
+		s.maxConcurrency = maxConcurrency
+		return nil
+	}
+}
+
+// WithDryRun let Compose service run without actually applying change to live resources
+func WithDryRun(s *composeService) error {
+	s.dryRun = true
+	cli, err := command.NewDockerCli()
+	if err != nil {
+		return err
+	}
+
+	options := flags.NewClientOptions()
+	options.Context = s.dockerCli.CurrentContext()
+	err = cli.Initialize(options, command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
+		return api.NewDryRunClient(s.apiClient(), s.dockerCli)
+	}))
+	if err != nil {
+		return err
+	}
+	s.dockerCli = cli
+	return nil
+}
+
+type Prompt func(message string, defaultValue bool) (bool, error)
+
 type composeService struct {
-	dockerCli      command.Cli
+	dockerCli command.Cli
+
+	// prompt is used to interact with user and confirm actions
+	prompt Prompt
+
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
@@ -85,31 +138,6 @@ func (s *composeService) apiClient() client.APIClient {
 
 func (s *composeService) configFile() *configfile.ConfigFile {
 	return s.dockerCli.ConfigFile()
-}
-
-func (s *composeService) MaxConcurrency(i int) {
-	s.maxConcurrency = i
-}
-
-func (s *composeService) DryRunMode(ctx context.Context, dryRun bool) (context.Context, error) {
-	s.dryRun = dryRun
-	if dryRun {
-		cli, err := command.NewDockerCli()
-		if err != nil {
-			return ctx, err
-		}
-
-		options := flags.NewClientOptions()
-		options.Context = s.dockerCli.CurrentContext()
-		err = cli.Initialize(options, command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
-			return api.NewDryRunClient(s.apiClient(), s.dockerCli)
-		}))
-		if err != nil {
-			return ctx, err
-		}
-		s.dockerCli = cli
-	}
-	return context.WithValue(ctx, api.DryRunKey{}, dryRun), nil
 }
 
 func (s *composeService) stdout() *streams.Out {

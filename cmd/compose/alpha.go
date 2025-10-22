@@ -1,5 +1,4 @@
 /*
-
    Copyright 2020 Docker Compose CLI authors
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -16,12 +15,12 @@ package compose
 
 import (
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
 // alphaCommand groups all experimental subcommands
-func alphaCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func alphaCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	cmd := &cobra.Command{
 		Short:  "Experimental commands",
 		Use:    "alpha [COMMAND]",
@@ -31,9 +30,9 @@ func alphaCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 		},
 	}
 	cmd.AddCommand(
-		vizCommand(p, dockerCli, backend),
-		publishCommand(p, dockerCli, backend),
-		generateCommand(p, backend),
+		vizCommand(p, dockerCli, backendOptions),
+		publishCommand(p, dockerCli, backendOptions),
+		generateCommand(p, dockerCli, backendOptions),
 	)
 	return cmd
 }

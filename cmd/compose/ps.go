@@ -26,6 +26,7 @@ import (
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 
 	"github.com/docker/cli/cli/command"
 	cliformatter "github.com/docker/cli/cli/command/formatter"
@@ -64,7 +65,7 @@ func (p *psOptions) parseFilter() error {
 	return nil
 }
 
-func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	opts := psOptions{
 		ProjectOptions: p,
 	}
@@ -75,7 +76,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 			return opts.parseFilter()
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPs(ctx, dockerCli, backend, args, opts)
+			return runPs(ctx, dockerCli, backendOptions, args, opts)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -91,7 +92,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	return psCmd
 }
 
-func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, opts psOptions) error {
+func runPs(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, services []string, opts psOptions) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -109,6 +110,11 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, serv
 			// until user asks to list orphaned services, we only include those declared in project
 			services = names
 		}
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
+	if err != nil {
+		return err
 	}
 
 	containers, err := backend.Ps(ctx, name, api.PsOptions{

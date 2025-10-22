@@ -22,6 +22,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/opts"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +40,7 @@ type commitOptions struct {
 	index int
 }
 
-func commitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func commitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	options := commitOptions{
 		ProjectOptions: p,
 	}
@@ -56,7 +57,7 @@ func commitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runCommit(ctx, dockerCli, backend, options)
+			return runCommit(ctx, dockerCli, backendOptions, options)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -73,8 +74,13 @@ func commitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return cmd
 }
 
-func runCommit(ctx context.Context, dockerCli command.Cli, backend api.Service, options commitOptions) error {
+func runCommit(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, options commitOptions) error {
 	projectName, err := options.toProjectName(ctx, dockerCli)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
 	if err != nil {
 		return err
 	}

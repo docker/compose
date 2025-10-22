@@ -22,6 +22,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/pkg/compose"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/locker"
@@ -36,7 +37,7 @@ type watchOptions struct {
 	noUp  bool
 }
 
-func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func watchCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	watchOpts := watchOptions{
 		ProjectOptions: p,
 	}
@@ -53,7 +54,7 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 			if cmd.Parent().Name() == "alpha" {
 				logrus.Warn("watch command is now available as a top level command")
 			}
-			return runWatch(ctx, dockerCli, backend, watchOpts, buildOpts, args)
+			return runWatch(ctx, dockerCli, backendOptions, watchOpts, buildOpts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -64,7 +65,7 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	return cmd
 }
 
-func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
+func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
 	project, _, err := watchOpts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
@@ -86,6 +87,11 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, w
 	}
 	if err := l.Lock(); err != nil {
 		return fmt.Errorf("cannot take exclusive lock for project %q: %w", project.Name, err)
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
+	if err != nil {
+		return err
 	}
 
 	if !watchOpts.noUp {

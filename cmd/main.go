@@ -30,21 +30,19 @@ import (
 	"github.com/docker/compose/v2/cmd/compatibility"
 	commands "github.com/docker/compose/v2/cmd/compose"
 	"github.com/docker/compose/v2/internal"
-	"github.com/docker/compose/v2/pkg/compose"
 )
 
 func pluginMain() {
 	plugin.Run(
-		func(dockerCli command.Cli) *cobra.Command {
-			backend := compose.NewComposeService(dockerCli)
-			cmd := commands.RootCommand(dockerCli, backend)
+		func(cli command.Cli) *cobra.Command {
+			cmd := commands.RootCommand(cli)
 			originalPreRunE := cmd.PersistentPreRunE
 			cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 				// initialize the dockerCli instance
 				if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 					return err
 				}
-				if err := cmdtrace.Setup(cmd, dockerCli, os.Args[1:]); err != nil {
+				if err := cmdtrace.Setup(cmd, cli, os.Args[1:]); err != nil {
 					logrus.Debugf("failed to enable tracing: %v", err)
 				}
 

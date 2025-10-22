@@ -21,6 +21,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,7 @@ type removeOptions struct {
 	volumes bool
 }
 
-func removeCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func removeCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	opts := removeOptions{
 		ProjectOptions: p,
 	}
@@ -45,7 +46,7 @@ can override this with -v. To list all volumes, use "docker volume ls".
 
 Any data which is not in a volume will be lost.`,
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runRemove(ctx, dockerCli, backend, opts, args)
+			return runRemove(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -59,8 +60,13 @@ Any data which is not in a volume will be lost.`,
 	return cmd
 }
 
-func runRemove(ctx context.Context, dockerCli command.Cli, backend api.Service, opts removeOptions, services []string) error {
+func runRemove(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, opts removeOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
 	if err != nil {
 		return err
 	}

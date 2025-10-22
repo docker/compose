@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/platforms"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ type imageOptions struct {
 	Format string
 }
 
-func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions []compose.Option) *cobra.Command {
 	opts := imageOptions{
 		ProjectOptions: p,
 	}
@@ -49,7 +50,7 @@ func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 		Use:   "images [OPTIONS] [SERVICE...]",
 		Short: "List images used by the created containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runImages(ctx, dockerCli, backend, opts, args)
+			return runImages(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -58,12 +59,17 @@ func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return imgCmd
 }
 
-func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, opts imageOptions, services []string) error {
+func runImages(ctx context.Context, dockerCli command.Cli, backendOptions []compose.Option, opts imageOptions, services []string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions...)
+	if err != nil {
+		return err
+	}
+	
 	images, err := backend.Images(ctx, projectName, api.ImagesOptions{
 		Services: services,
 	})

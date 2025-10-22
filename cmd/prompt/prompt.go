@@ -32,6 +32,10 @@ type UI interface {
 	Confirm(message string, defaultValue bool) (bool, error)
 }
 
+func Yes(_ string, _ bool) (bool, error) {
+	return true, nil
+}
+
 func NewPrompt(stdin *streams.In, stdout *streams.Out) UI {
 	if stdin.IsTerminal() {
 		return User{stdin: streamsFileReader{stdin}, stdout: streamsFileWriter{stdout}}
