@@ -64,7 +64,7 @@ func (p *psOptions) parseFilter() error {
 	return nil
 }
 
-func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := psOptions{
 		ProjectOptions: p,
 	}
@@ -91,7 +91,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *c
 	return psCmd
 }
 
-func runPs(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, opts psOptions) error {
+func runPs(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, opts psOptions) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

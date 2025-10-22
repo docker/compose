@@ -52,7 +52,7 @@ func completeServiceNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 	}
 }
 
-func completeProjectNames(backend api.Service) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func completeProjectNames(backend api.Compose) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		list, err := backend.List(cmd.Context(), api.ListOptions{
 			All: true,

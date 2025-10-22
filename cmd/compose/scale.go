@@ -35,7 +35,7 @@ type scaleOptions struct {
 	noDeps bool
 }
 
-func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := scaleOptions{
 		ProjectOptions: p,
 	}
@@ -58,7 +58,7 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	return scaleCmd
 }
 
-func runScale(ctx context.Context, dockerCli command.Cli, backend api.Service, opts scaleOptions, serviceReplicaTuples map[string]int) error {
+func runScale(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts scaleOptions, serviceReplicaTuples map[string]int) error {
 	services := slices.Sorted(maps.Keys(serviceReplicaTuples))
 	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {

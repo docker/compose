@@ -33,7 +33,7 @@ type exportOptions struct {
 	index   int
 }
 
-func exportCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func exportCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	options := exportOptions{
 		ProjectOptions: p,
 	}
@@ -58,7 +58,7 @@ func exportCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return cmd
 }
 
-func runExport(ctx context.Context, dockerCli command.Cli, backend api.Service, options exportOptions) error {
+func runExport(ctx context.Context, dockerCli command.Cli, backend api.Compose, options exportOptions) error {
 	projectName, err := options.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

@@ -42,7 +42,7 @@ type pullOptions struct {
 	policy             string
 }
 
-func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := pullOptions{
 		ProjectOptions: p,
 	}
@@ -97,7 +97,7 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 	return project, nil
 }
 
-func runPull(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pullOptions, services []string) error {
+func runPull(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts pullOptions, services []string) error {
 	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err

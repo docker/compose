@@ -202,7 +202,7 @@ var topTestCases = []struct {
 }
 
 // TestRunTopCore only tests the core functionality of runTop: formatting
-// and printing of the output of (api.Service).Top().
+// and printing of the output of (api.Compose).Top().
 func TestRunTopCore(t *testing.T) {
 	t.Parallel()
 

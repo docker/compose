@@ -34,7 +34,7 @@ type pushOptions struct {
 	Quiet          bool
 }
 
-func pushCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func pushCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := pushOptions{
 		ProjectOptions: p,
 	}
@@ -53,7 +53,7 @@ func pushCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return pushCmd
 }
 
-func runPush(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pushOptions, services []string) error {
+func runPush(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts pushOptions, services []string) error {
 	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err

@@ -48,7 +48,7 @@ type execOpts struct {
 	interactive bool
 }
 
-func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := execOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -100,7 +100,7 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return runCmd
 }
 
-func runExec(ctx context.Context, dockerCli command.Cli, backend api.Service, opts execOpts) error {
+func runExec(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts execOpts) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

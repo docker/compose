@@ -40,7 +40,7 @@ type downOptions struct {
 	images        string
 }
 
-func downCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func downCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := downOptions{
 		ProjectOptions: p,
 	}
@@ -77,7 +77,7 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return downCmd
 }
 
-func runDown(ctx context.Context, dockerCli command.Cli, backend api.Service, opts downOptions, services []string) error {
+func runDown(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts downOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

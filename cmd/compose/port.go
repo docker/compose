@@ -35,7 +35,7 @@ type portOptions struct {
 	index    int
 }
 
-func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := portOptions{
 		ProjectOptions: p,
 	}
@@ -62,7 +62,7 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return cmd
 }
 
-func runPort(ctx context.Context, dockerCli command.Cli, backend api.Service, opts portOptions, service string) error {
+func runPort(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts portOptions, service string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

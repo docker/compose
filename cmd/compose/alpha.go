@@ -21,7 +21,7 @@ import (
 )
 
 // alphaCommand groups all experimental subcommands
-func alphaCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func alphaCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	cmd := &cobra.Command{
 		Short:  "Experimental commands",
 		Use:    "alpha [COMMAND]",

@@ -90,7 +90,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}, nil
 }
 
-func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -148,7 +148,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	return cmd
 }
 
-func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Service, opts buildOptions, services []string) error {
+func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts buildOptions, services []string) error {
 	opts.All = true // do not drop resources as build may involve some dependencies by additional_contexts
 	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
 	if err != nil {

@@ -37,7 +37,7 @@ type publishOptions struct {
 	app                 bool
 }
 
-func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := publishOptions{
 		ProjectOptions: p,
 	}
@@ -67,7 +67,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	return cmd
 }
 
-func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Service, opts publishOptions, repository string) error {
+func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts publishOptions, repository string) error {
 	project, metrics, err := opts.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return err

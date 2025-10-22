@@ -32,7 +32,7 @@ type stopOptions struct {
 	timeout     int
 }
 
-func stopCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func stopCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := stopOptions{
 		ProjectOptions: p,
 	}
@@ -53,7 +53,7 @@ func stopCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return cmd
 }
 
-func runStop(ctx context.Context, dockerCli command.Cli, backend api.Service, opts stopOptions, services []string) error {
+func runStop(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts stopOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
