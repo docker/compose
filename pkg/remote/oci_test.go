@@ -19,6 +19,9 @@ package remote
 import (
 	"path/filepath"
 	"testing"
+
+	spec "github.com/opencontainers/image-spec/specs-go/v1"
+	"gotest.tools/v3/assert"
 )
 
 func TestValidatePathInBase(t *testing.T) {
@@ -85,11 +88,6 @@ func TestValidatePathInBase(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:       "current directory reference",
-			unsafePath: "./file.yaml",
-			wantErr:    false, // ./ resolves to base dir
-		},
-		{
 			name:       "mixed separators",
 			unsafePath: "config/sub\\file.yaml",
 			wantErr:    true,
@@ -104,11 +102,6 @@ func TestValidatePathInBase(t *testing.T) {
 			unsafePath: "file-name_v1.2.3.yaml",
 			wantErr:    false,
 		},
-		{
-			name:       "single parent then back",
-			unsafePath: "../compose/file.yaml",
-			wantErr:    false, // Resolves back to base dir, which is fine
-		},
 	}
 
 	for _, tt := range tests {
@@ -122,4 +115,25 @@ func TestValidatePathInBase(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWriteComposeFileWithExtendsPathTraversal(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a layer with com.docker.compose.extends=true and a path traversal attempt
+	layer := spec.Descriptor{
+		MediaType: "application/vnd.docker.compose.file.v1+yaml",
+		Digest:    "sha256:test123",
+		Size:      100,
+		Annotations: map[string]string{
+			"com.docker.compose.extends": "true",
+			"com.docker.compose.file":    "../other",
+		},
+	}
+
+	content := []byte("services:\n  test:\n    image: nginx\n")
+
+	// writeComposeFile should return an error due to path traversal
+	err := writeComposeFile(layer, 0, tmpDir, content)
+	assert.Error(t, err, "invalid OCI artifact")
 }

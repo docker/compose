@@ -104,7 +104,6 @@ func ReplaceEnvFile(in []byte, service string, i int, value string) ([]byte, err
 	} else {
 		return replace(in, envFile.Line, envFile.Column, value), nil
 	}
-
 }
 
 func getMapping(root *yaml.Node, key string) (*yaml.Node, error) {

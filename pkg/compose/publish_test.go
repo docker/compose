@@ -77,7 +77,8 @@ services:
 			MediaType: "application/vnd.docker.compose.file+yaml",
 			Annotations: map[string]string{
 				"com.docker.compose.file":    "compose.yaml",
-				"com.docker.compose.version": internal.Version},
+				"com.docker.compose.version": internal.Version,
+			},
 		},
 		{
 			MediaType: "application/vnd.docker.compose.file+yaml",
@@ -98,5 +99,4 @@ services:
 	assert.DeepEqual(t, expectedLayers, layers, cmp.FilterPath(func(path cmp.Path) bool {
 		return !slices.Contains([]string{".Data", ".Digest", ".Size"}, path.String())
 	}, cmp.Ignore()))
-
 }
