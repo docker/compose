@@ -179,7 +179,7 @@ func (g ociRemoteLoader) Dir(path string) string {
 	return g.known[path]
 }
 
-func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest spec.Manifest, ref reference.Named, resolver remotes.Resolver) error { //nolint:gocyclo
+func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest spec.Manifest, ref reference.Named, resolver remotes.Resolver) error {
 	err := os.MkdirAll(local, 0o700)
 	if err != nil {
 		return err
