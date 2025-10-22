@@ -50,18 +50,36 @@ func init() {
 	}
 }
 
-// NewComposeService create a local implementation of the compose.Service API
-func NewComposeService(dockerCli command.Cli) api.Service {
-	return &composeService{
+type Option func(service *composeService)
+
+// NewComposeService create a local implementation of the compose.Compose API
+func NewComposeService(dockerCli command.Cli, options ...Option) api.Compose {
+	s := &composeService{
 		dockerCli:      dockerCli,
 		clock:          clockwork.NewRealClock(),
 		maxConcurrency: -1,
 		dryRun:         false,
 	}
+	for _, option := range options {
+		option(s)
+	}
+	return s
 }
 
+// WithPrompt configure a UI component for Compose service to interact with user and confirm actions
+func WithPrompt(prompt Prompt) Option {
+	return func(s *composeService) {
+		s.prompt = prompt
+	}
+}
+
+type Prompt func(message string, defaultValue bool) (bool, error)
+
 type composeService struct {
-	dockerCli      command.Cli
+	dockerCli command.Cli
+	// prompt is used to interact with user and confirm actions
+	prompt Prompt
+
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool

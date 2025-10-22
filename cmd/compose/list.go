@@ -38,7 +38,7 @@ type lsOptions struct {
 	Filter opts.FilterOpt
 }
 
-func listCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
+func listCommand(dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	lsOpts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls [OPTIONS]",
@@ -61,7 +61,7 @@ var acceptedListFilters = map[string]bool{
 	"name": true,
 }
 
-func runList(ctx context.Context, dockerCli command.Cli, backend api.Service, lsOpts lsOptions) error {
+func runList(ctx context.Context, dockerCli command.Cli, backend api.Compose, lsOpts lsOptions) error {
 	filters := lsOpts.Filter.Value()
 	err := filters.Validate(acceptedListFilters)
 	if err != nil {

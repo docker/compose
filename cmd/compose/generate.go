@@ -30,7 +30,7 @@ type generateOptions struct {
 	Format string
 }
 
-func generateCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
+func generateCommand(p *ProjectOptions, backend api.Compose) *cobra.Command {
 	opts := generateOptions{
 		ProjectOptions: p,
 	}
@@ -52,7 +52,7 @@ func generateCommand(p *ProjectOptions, backend api.Service) *cobra.Command {
 	return cmd
 }
 
-func runGenerate(ctx context.Context, backend api.Service, opts generateOptions, containers []string) error {
+func runGenerate(ctx context.Context, backend api.Compose, opts generateOptions, containers []string) error {
 	_, _ = fmt.Fprintln(os.Stderr, "generate command is EXPERIMENTAL")
 	if len(containers) == 0 {
 		return fmt.Errorf("at least one container must be specified")

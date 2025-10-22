@@ -34,7 +34,7 @@ type volumesOptions struct {
 	Format string
 }
 
-func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	options := volumesOptions{
 		ProjectOptions: p,
 	}
@@ -54,7 +54,7 @@ func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	return cmd
 }
 
-func runVol(ctx context.Context, dockerCli command.Cli, backend api.Service, services []string, options volumesOptions) error {
+func runVol(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, options volumesOptions) error {
 	project, name, err := options.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

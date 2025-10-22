@@ -109,7 +109,7 @@ func (opts upOptions) OnExit() api.Cascade {
 	}
 }
 
-func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	build := buildOptions{ProjectOptions: p}
@@ -228,7 +228,7 @@ func validateFlags(up *upOptions, create *createOptions) error {
 func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
-	backend api.Service,
+	backend api.Compose,
 	createOptions createOptions,
 	upOptions upOptions,
 	buildOptions buildOptions,

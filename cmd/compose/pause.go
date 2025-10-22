@@ -29,7 +29,7 @@ type pauseOptions struct {
 	*ProjectOptions
 }
 
-func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := pauseOptions{
 		ProjectOptions: p,
 	}
@@ -44,7 +44,7 @@ func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	return cmd
 }
 
-func runPause(ctx context.Context, dockerCli command.Cli, backend api.Service, opts pauseOptions, services []string) error {
+func runPause(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts pauseOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ type unpauseOptions struct {
 	*ProjectOptions
 }
 
-func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := unpauseOptions{
 		ProjectOptions: p,
 	}
@@ -75,7 +75,7 @@ func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	return cmd
 }
 
-func runUnPause(ctx context.Context, dockerCli command.Cli, backend api.Service, opts unpauseOptions, services []string) error {
+func runUnPause(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts unpauseOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

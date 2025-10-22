@@ -31,7 +31,7 @@ type removeOptions struct {
 	volumes bool
 }
 
-func removeCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func removeCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := removeOptions{
 		ProjectOptions: p,
 	}
@@ -59,7 +59,7 @@ Any data which is not in a volume will be lost.`,
 	return cmd
 }
 
-func runRemove(ctx context.Context, dockerCli command.Cli, backend api.Service, opts removeOptions, services []string) error {
+func runRemove(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts removeOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

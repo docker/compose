@@ -34,7 +34,7 @@ type topOptions struct {
 	*ProjectOptions
 }
 
-func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := topOptions{
 		ProjectOptions: p,
 	}
@@ -54,7 +54,7 @@ type (
 	topEntries map[string]string
 )
 
-func runTop(ctx context.Context, dockerCli command.Cli, backend api.Service, opts topOptions, services []string) error {
+func runTop(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts topOptions, services []string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

@@ -34,7 +34,7 @@ type eventsOpts struct {
 	until string
 }
 
-func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := eventsOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -55,7 +55,7 @@ func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return cmd
 }
 
-func runEvents(ctx context.Context, dockerCli command.Cli, backend api.Service, opts eventsOpts, services []string) error {
+func runEvents(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts eventsOpts, services []string) error {
 	name, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

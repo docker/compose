@@ -44,7 +44,6 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/prompt"
 )
 
 type createOptions struct {
@@ -1566,7 +1565,7 @@ func (s *composeService) ensureVolume(ctx context.Context, name string, volume t
 		confirm := assumeYes
 		if !assumeYes {
 			msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
-			confirm, err = prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)
+			confirm, err = s.prompt(msg, false)
 			if err != nil {
 				return "", err
 			}

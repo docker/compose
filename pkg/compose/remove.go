@@ -26,7 +26,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/prompt"
 )
 
 func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
@@ -85,7 +84,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	if options.Force {
 		_, _ = fmt.Fprintln(s.stdout(), msg)
 	} else {
-		confirm, err := prompt.NewPrompt(s.stdin(), s.stdout()).Confirm(msg, false)
+		confirm, err := s.prompt(msg, false)
 		if err != nil {
 			return err
 		}

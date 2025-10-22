@@ -30,8 +30,9 @@ import (
 	"github.com/docker/docker/api/types/volume"
 )
 
-// Service manages a compose project
-type Service interface {
+// Compose is the API interface one can use to programmatically use docker/compose in a third-party software
+// Use [compose.NewComposeService] to get an actual instance
+type Compose interface {
 	// Build executes the equivalent to a `compose build`
 	Build(ctx context.Context, project *types.Project, options BuildOptions) error
 	// Push executes the equivalent to a `compose push`

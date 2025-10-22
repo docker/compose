@@ -38,7 +38,7 @@ type copyOptions struct {
 	copyUIDGID  bool
 }
 
-func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := copyOptions{
 		ProjectOptions: p,
 	}
@@ -73,7 +73,7 @@ func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return copyCmd
 }
 
-func runCopy(ctx context.Context, dockerCli command.Cli, backend api.Service, opts copyOptions) error {
+func runCopy(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts copyOptions) error {
 	name, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

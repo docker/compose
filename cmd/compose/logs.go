@@ -40,7 +40,7 @@ type logsOptions struct {
 	timestamps bool
 }
 
-func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := logsOptions{
 		ProjectOptions: p,
 	}
@@ -70,7 +70,7 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return logsCmd
 }
 
-func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Service, opts logsOptions, services []string) error {
+func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts logsOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

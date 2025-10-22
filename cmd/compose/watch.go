@@ -36,7 +36,7 @@ type watchOptions struct {
 	noUp  bool
 }
 
-func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	watchOpts := watchOptions{
 		ProjectOptions: p,
 	}
@@ -64,7 +64,7 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	return cmd
 }
 
-func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Service, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
+func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Compose, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
 	project, _, err := watchOpts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err

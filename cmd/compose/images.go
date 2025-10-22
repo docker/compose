@@ -41,7 +41,7 @@ type imageOptions struct {
 	Format string
 }
 
-func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := imageOptions{
 		ProjectOptions: p,
 	}
@@ -58,7 +58,7 @@ func imagesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return imgCmd
 }
 
-func runImages(ctx context.Context, dockerCli command.Cli, backend api.Service, opts imageOptions, services []string) error {
+func runImages(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts imageOptions, services []string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

@@ -28,7 +28,7 @@ type startOptions struct {
 	*ProjectOptions
 }
 
-func startCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func startCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := startOptions{
 		ProjectOptions: p,
 	}
@@ -43,7 +43,7 @@ func startCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service)
 	return startCmd
 }
 
-func runStart(ctx context.Context, dockerCli command.Cli, backend api.Service, opts startOptions, services []string) error {
+func runStart(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts startOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

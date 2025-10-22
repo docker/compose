@@ -35,7 +35,7 @@ type attachOpts struct {
 	proxy      bool
 }
 
-func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := attachOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -63,7 +63,7 @@ func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return runCmd
 }
 
-func runAttach(ctx context.Context, dockerCli command.Cli, backend api.Service, opts attachOpts) error {
+func runAttach(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts attachOpts) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err

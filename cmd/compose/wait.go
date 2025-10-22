@@ -34,7 +34,7 @@ type waitOptions struct {
 	downProject bool
 }
 
-func waitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func waitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := waitOptions{
 		ProjectOptions: p,
 	}
@@ -60,7 +60,7 @@ func waitCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return cmd
 }
 
-func runWait(ctx context.Context, dockerCli command.Cli, backend api.Service, opts *waitOptions) (int64, error) {
+func runWait(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts *waitOptions) (int64, error) {
 	_, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
 		return 0, err

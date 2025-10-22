@@ -33,7 +33,7 @@ type killOptions struct {
 	signal        string
 }
 
-func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := killOptions{
 		ProjectOptions: p,
 	}
@@ -54,7 +54,7 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) 
 	return cmd
 }
 
-func runKill(ctx context.Context, dockerCli command.Cli, backend api.Service, opts killOptions, services []string) error {
+func runKill(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts killOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err

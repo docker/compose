@@ -25,18 +25,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/DefangLabs/secret-detector/pkg/scanner"
 	"github.com/DefangLabs/secret-detector/pkg/secrets"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
-	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/oci"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose/transform"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/prompt"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -280,16 +279,20 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 	}
 	bindMounts := s.checkForBindMount(project)
 	if len(bindMounts) > 0 {
-		fmt.Println("you are about to publish bind mounts declaration within your OCI artifact.\n" +
+		b := strings.Builder{}
+		b.WriteString("you are about to publish bind mounts declaration within your OCI artifact.\n" +
 			"only the bind mount declarations will be added to the OCI artifact (not content)\n" +
-			"please double check that you are not mounting potential user's sensitive directories or data")
+			"please double check that you are not mounting potential user's sensitive directories or data\n")
 		for key, val := range bindMounts {
-			_, _ = fmt.Fprintln(s.dockerCli.Out(), key)
+			b.WriteString(key)
 			for _, v := range val {
-				_, _ = fmt.Fprintf(s.dockerCli.Out(), "%s\n", v.String())
+				b.WriteString(v.String())
+				b.WriteRune('\n')
 			}
 		}
-		if ok, err := acceptPublishBindMountDeclarations(s.dockerCli); err != nil || !ok {
+		b.WriteString("Are you ok to publish these bind mount declarations?")
+		confirm, err := s.prompt(b.String(), false)
+		if err != nil || !confirm {
 			return false, err
 		}
 	}
@@ -298,13 +301,17 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 		return false, err
 	}
 	if len(detectedSecrets) > 0 {
-		fmt.Println("you are about to publish sensitive data within your OCI artifact.\n" +
-			"please double check that you are not leaking sensitive data")
+		b := strings.Builder{}
+		b.WriteString("you are about to publish sensitive data within your OCI artifact.\n" +
+			"please double check that you are not leaking sensitive data\n")
 		for _, val := range detectedSecrets {
-			_, _ = fmt.Fprintln(s.dockerCli.Out(), val.Type)
-			_, _ = fmt.Fprintf(s.dockerCli.Out(), "%q: %s\n", val.Key, val.Value)
+			b.WriteString(val.Type)
+			b.WriteRune('\n')
+			b.WriteString(fmt.Sprintf("%q: %s\n", val.Key, val.Value))
 		}
-		if ok, err := acceptPublishSensitiveData(s.dockerCli); err != nil || !ok {
+		b.WriteString("Are you ok to publish these sensitive data?")
+		confirm, err := s.prompt(b.String(), false)
+		if err != nil || !confirm {
 			return false, err
 		}
 	}
@@ -313,15 +320,20 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 		return false, err
 	}
 	if len(envVariables) > 0 {
-		fmt.Println("you are about to publish environment variables within your OCI artifact.\n" +
-			"please double check that you are not leaking sensitive data")
+		b := strings.Builder{}
+		b.WriteString("you are about to publish environment variables within your OCI artifact.\n" +
+			"please double check that you are not leaking sensitive data\n")
 		for key, val := range envVariables {
-			_, _ = fmt.Fprintln(s.dockerCli.Out(), "Service/Config ", key)
+			b.WriteString("Service/Config  ")
+			b.WriteString(key)
+			b.WriteRune('\n')
 			for k, v := range val {
-				_, _ = fmt.Fprintf(s.dockerCli.Out(), "%s=%v\n", k, *v)
+				b.WriteString(fmt.Sprintf("%s=%v\n", k, *v))
 			}
 		}
-		if ok, err := acceptPublishEnvVariables(s.dockerCli); err != nil || !ok {
+		b.WriteString("Are you ok to publish these environment variables?")
+		confirm, err := s.prompt(b.String(), false)
+		if err != nil || !confirm {
 			return false, err
 		}
 	}
@@ -362,24 +374,6 @@ func (s *composeService) checkEnvironmentVariables(project *types.Project, optio
 
 	}
 	return envVarList, nil
-}
-
-func acceptPublishEnvVariables(cli command.Cli) (bool, error) {
-	msg := "Are you ok to publish these environment variables? [y/N]: "
-	confirm, err := prompt.NewPrompt(cli.In(), cli.Out()).Confirm(msg, false)
-	return confirm, err
-}
-
-func acceptPublishSensitiveData(cli command.Cli) (bool, error) {
-	msg := "Are you ok to publish these sensitive data? [y/N]: "
-	confirm, err := prompt.NewPrompt(cli.In(), cli.Out()).Confirm(msg, false)
-	return confirm, err
-}
-
-func acceptPublishBindMountDeclarations(cli command.Cli) (bool, error) {
-	msg := "Are you ok to publish these bind mount declarations? [y/N]: "
-	confirm, err := prompt.NewPrompt(cli.In(), cli.Out()).Confirm(msg, false)
-	return confirm, err
 }
 
 func envFileLayers(project *types.Project) []v1.Descriptor {

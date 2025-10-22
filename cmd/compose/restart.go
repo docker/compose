@@ -33,7 +33,7 @@ type restartOptions struct {
 	noDeps      bool
 }
 
-func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := restartOptions{
 		ProjectOptions: p,
 	}
@@ -55,7 +55,7 @@ func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Servic
 	return restartCmd
 }
 
-func runRestart(ctx context.Context, dockerCli command.Cli, backend api.Service, opts restartOptions, services []string) error {
+func runRestart(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts restartOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
 		return err

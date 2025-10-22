@@ -51,7 +51,7 @@ type createOptions struct {
 	AssumeYes     bool
 }
 
-func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
+func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
 	opts := createOptions{}
 	buildOpts := buildOptions{
 		ProjectOptions: p,
@@ -95,7 +95,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service
 	return cmd
 }
 
-func runCreate(ctx context.Context, _ command.Cli, backend api.Service, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
+func runCreate(ctx context.Context, _ command.Cli, backend api.Compose, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}
