@@ -28,7 +28,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
-	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
 	buildtypes "github.com/docker/docker/api/types/build"
@@ -175,7 +174,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 			RegistryToken: authConfig.RegistryToken,
 		}
 	}
-	buildOpts := imageBuildOptions(s.dockerCli, project, service, options)
+	buildOpts := imageBuildOptions(s.getProxyConfig(), project, service, options)
 	imageName := api.GetImageNameOrDefault(service, project.Name)
 	buildOpts.Tags = append(buildOpts.Tags, imageName)
 	buildOpts.Dockerfile = relDockerfile
@@ -215,7 +214,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	return imageID, nil
 }
 
-func imageBuildOptions(dockerCli command.Cli, project *types.Project, service types.ServiceConfig, options api.BuildOptions) buildtypes.ImageBuildOptions {
+func imageBuildOptions(proxyConfigs map[string]string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) buildtypes.ImageBuildOptions {
 	config := service.Build
 	return buildtypes.ImageBuildOptions{
 		Version:     buildtypes.BuilderV1,
@@ -223,7 +222,7 @@ func imageBuildOptions(dockerCli command.Cli, project *types.Project, service ty
 		NoCache:     config.NoCache,
 		Remove:      true,
 		PullParent:  config.Pull,
-		BuildArgs:   resolveAndMergeBuildArgs(dockerCli, project, service, options),
+		BuildArgs:   resolveAndMergeBuildArgs(proxyConfigs, project, service, options),
 		Labels:      config.Labels,
 		NetworkMode: config.Network,
 		ExtraHosts:  config.ExtraHosts.AsList(":"),
