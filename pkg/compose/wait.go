@@ -38,7 +38,7 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			var err error
-			resultC, errC := s.dockerCli.Client().ContainerWait(waitCtx, ctr.ID, "")
+			resultC, errC := s.apiClient().ContainerWait(waitCtx, ctr.ID, "")
 
 			select {
 			case result := <-resultC:
