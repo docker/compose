@@ -45,7 +45,7 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 		return nil, errors.New("use_api_socket can't be used with a Windows Docker Engine")
 	}
 
-	creds, err := s.dockerCli.ConfigFile().GetAllCredentials()
+	creds, err := s.configFile().GetAllCredentials()
 	if err != nil {
 		return nil, fmt.Errorf("resolving credentials failed: %w", err)
 	}

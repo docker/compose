@@ -50,7 +50,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		return fmt.Errorf("failed to export container: %w", err)
 	}
 
-	clnt := s.dockerCli.Client()
+	clnt := s.apiClient()
 
 	w := progress.ContextWriter(ctx)
 

@@ -116,7 +116,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		idx := i
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, s.configFile(), w, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			_, err := s.pullServiceImage(ctx, service, w, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[idx] = err
 				if service.Build != nil {
@@ -177,9 +177,7 @@ func getUnwrappedErrorMessage(err error) string {
 	return err.Error()
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig,
-	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string,
-) (string, error) {
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,
@@ -190,7 +188,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 
-	encodedAuth, err := encodedAuth(ref, configFile)
+	encodedAuth, err := encodedAuth(ref, s.configFile())
 	if err != nil {
 		return "", err
 	}
@@ -330,7 +328,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		var mutex sync.Mutex
 		for name, service := range needPull {
 			eg.Go(func() error {
-				id, err := s.pullServiceImage(ctx, service, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				id, err := s.pullServiceImage(ctx, service, w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				mutex.Lock()
 				defer mutex.Unlock()
 				pulledImages[name] = api.ImageSummary{
