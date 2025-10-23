@@ -223,7 +223,7 @@ func writeComposeFile(layer spec.Descriptor, i int, local string, content []byte
 			return err
 		}
 	}
-	f, err := os.Create(filepath.Join(local, file))
+	f, err := os.OpenFile(filepath.Join(local, file), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
