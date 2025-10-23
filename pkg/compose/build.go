@@ -29,10 +29,8 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/builder"
-	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
-	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
@@ -143,7 +141,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	// Initialize buildkit nodes
-	buildkitEnabled, err := s.dockerCli.BuildKitEnabled()
+	buildkitEnabled, err := s.getContextInfo().BuildKitEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +382,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 //
 // Finally, standard proxy variables based on the Docker client configuration are added, but will not overwrite
 // any values if already present.
-func resolveAndMergeBuildArgs(dockerCli command.Cli, project *types.Project, service types.ServiceConfig, opts api.BuildOptions) types.MappingWithEquals {
+func resolveAndMergeBuildArgs(proxyConfig map[string]string, project *types.Project, service types.ServiceConfig, opts api.BuildOptions) types.MappingWithEquals {
 	result := make(types.MappingWithEquals).
 		OverrideBy(service.Build.Args).
 		OverrideBy(opts.Args).
@@ -392,7 +390,7 @@ func resolveAndMergeBuildArgs(dockerCli command.Cli, project *types.Project, ser
 
 	// proxy arguments do NOT override and should NOT have env resolution applied,
 	// so they're handled last
-	for k, v := range storeutil.GetProxyConfig(dockerCli) {
+	for k, v := range proxyConfig {
 		if _, ok := result[k]; !ok {
 			v := v
 			result[k] = &v
@@ -502,7 +500,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		CacheTo:      build.CreateCaches(cacheTo),
 		NoCache:      service.Build.NoCache,
 		Pull:         service.Build.Pull,
-		BuildArgs:    flatten(resolveAndMergeBuildArgs(s.dockerCli, project, service, options)),
+		BuildArgs:    flatten(resolveAndMergeBuildArgs(s.getProxyConfig(), project, service, options)),
 		Tags:         tags,
 		Target:       service.Build.Target,
 		Exports:      exports,

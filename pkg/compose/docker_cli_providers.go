@@ -14,30 +14,25 @@
    limitations under the License.
 */
 
-package api
+package compose
 
 import (
-	"io"
+	"github.com/docker/cli/cli/command"
 )
 
-// OutputStream is a writable stream with terminal detection capabilities
-type OutputStream interface {
-	io.Writer
-
-	// IsTerminal returns true if the stream is connected to a terminal
-	IsTerminal() bool
-
-	// FD returns the file descriptor for the stream
-	FD() uintptr
+// dockerCliContextInfo implements api.ContextInfo using Docker CLI
+type dockerCliContextInfo struct {
+	cli command.Cli
 }
 
-// InputStream is a readable stream with terminal detection capabilities
-type InputStream interface {
-	io.Reader
+func (c *dockerCliContextInfo) CurrentContext() string {
+	return c.cli.CurrentContext()
+}
 
-	// IsTerminal returns true if the stream is connected to a terminal
-	IsTerminal() bool
+func (c *dockerCliContextInfo) ServerOSType() string {
+	return c.cli.ServerInfo().OSType
+}
 
-	// FD returns the file descriptor for the stream
-	FD() uintptr
+func (c *dockerCliContextInfo) BuildKitEnabled() (bool, error) {
+	return c.cli.BuildKitEnabled()
 }
