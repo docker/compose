@@ -63,7 +63,7 @@ options:
       value_type: bool
       default_value: "true"
       description: |
-        Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.
+        Disable pseudo-TTY allocation. By default 'docker compose exec' allocates a TTY.
       deprecated: false
       hidden: false
       experimental: false
