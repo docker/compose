@@ -20,6 +20,7 @@ import (
 	"context"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -50,6 +51,11 @@ func NewResolver(config *configfile.ConfigFile) remotes.Resolver {
 					return auth.Username, auth.Password, nil
 				}),
 			)),
+			docker.WithPlainHTTP(func(s string) (bool, error) {
+				// Used for testing **only**
+				_, b := os.LookupEnv("__TEST__INSECURE__REGISTRY__")
+				return b, nil
+			}),
 		),
 	})
 }

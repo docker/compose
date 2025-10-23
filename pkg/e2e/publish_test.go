@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -172,4 +173,44 @@ FOO=bar`), out)
 			"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw"), output)
 		assert.Assert(t, strings.Contains(output, "Private Key\n\"\": -----BEGIN DSA PRIVATE KEY-----\nwxyz+ABC=\n-----END DSA PRIVATE KEY-----"), output)
 	})
+}
+
+func TestPublish(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "compose-e2e-publish"
+	const registryName = projectName + "-registry"
+	c.RunDockerCmd(t, "run", "--name", registryName, "-P", "-d", "registry:3")
+	port := c.RunDockerCmd(t, "inspect", "--format", `{{ (index (index .NetworkSettings.Ports "5000/tcp") 0).HostPort }}`, registryName).Stdout()
+	registry := "localhost:" + strings.TrimSpace(port)
+	t.Cleanup(func() {
+		c.RunDockerCmd(t, "rm", "--force", registryName)
+	})
+
+	cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/oci/compose.yaml", "-f", "./fixtures/publish/oci/compose-override.yaml",
+		"-p", projectName, "publish", "--with-env", "--yes", registry+"/test:test")
+	icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		cmd.Env = append(cmd.Env, "__TEST__INSECURE__REGISTRY__=true")
+	}).Assert(t, icmd.Expected{ExitCode: 0})
+
+	// docker exec -it compose-e2e-publish-registry tree /var/lib/registry/docker/registry/v2/
+
+	cmd = c.NewDockerComposeCmd(t, "--verbose", "--project-name=oci", "-f", fmt.Sprintf("oci://%s/test:test", registry), "config")
+	res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		cmd.Env = append(cmd.Env,
+			"XDG_CACHE_HOME="+t.TempDir(),
+			"__TEST__INSECURE__REGISTRY__=true")
+	})
+	res.Assert(t, icmd.Expected{ExitCode: 0})
+	assert.Equal(t, res.Stdout(), `name: oci
+services:
+  app:
+    environment:
+      HELLO: WORLD
+    image: alpine
+    networks:
+      default: null
+networks:
+  default:
+    name: oci_default
+`)
 }
