@@ -1,0 +1,5 @@
+services:
+  app:
+    extends:
+      file: extends.yaml
+      service: test
