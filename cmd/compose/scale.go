@@ -27,6 +27,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ type scaleOptions struct {
 	noDeps bool
 }
 
-func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := scaleOptions{
 		ProjectOptions: p,
 	}
@@ -48,7 +49,7 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose)
 			if err != nil {
 				return err
 			}
-			return runScale(ctx, dockerCli, backend, opts, serviceTuples)
+			return runScale(ctx, dockerCli, backendOptions, opts, serviceTuples)
 		}),
 		ValidArgsFunction: completeScaleArgs(dockerCli, p),
 	}
@@ -58,7 +59,7 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose)
 	return scaleCmd
 }
 
-func runScale(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts scaleOptions, serviceReplicaTuples map[string]int) error {
+func runScale(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts scaleOptions, serviceReplicaTuples map[string]int) error {
 	services := slices.Sorted(maps.Keys(serviceReplicaTuples))
 	project, _, err := opts.ToProject(ctx, dockerCli, services)
 	if err != nil {
@@ -80,6 +81,10 @@ func runScale(ctx context.Context, dockerCli command.Cli, backend api.Compose, o
 		project.Services[key] = service
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Scale(ctx, project, api.ScaleOptions{Services: services})
 }
 

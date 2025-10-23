@@ -25,6 +25,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -34,7 +35,7 @@ type topOptions struct {
 	*ProjectOptions
 }
 
-func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func topCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := topOptions{
 		ProjectOptions: p,
 	}
@@ -42,7 +43,7 @@ func topCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *
 		Use:   "top [SERVICES...]",
 		Short: "Display the running processes",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runTop(ctx, dockerCli, backend, opts, args)
+			return runTop(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -54,8 +55,13 @@ type (
 	topEntries map[string]string
 )
 
-func runTop(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts topOptions, services []string) error {
+func runTop(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts topOptions, services []string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}

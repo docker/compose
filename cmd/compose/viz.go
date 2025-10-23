@@ -24,6 +24,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ type vizOptions struct {
 	indentationStr   string
 }
 
-func vizCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func vizCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := vizOptions{
 		ProjectOptions: p,
 	}
@@ -51,7 +52,7 @@ func vizCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *
 			return err
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runViz(ctx, dockerCli, backend, &opts)
+			return runViz(ctx, dockerCli, backendOptions, &opts)
 		}),
 	}
 
@@ -63,7 +64,7 @@ func vizCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *
 	return cmd
 }
 
-func runViz(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts *vizOptions) error {
+func runViz(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
 	project, _, err := opts.ToProject(ctx, dockerCli, nil)
 	if err != nil {
@@ -71,6 +72,10 @@ func runViz(ctx context.Context, dockerCli command.Cli, backend api.Compose, opt
 	}
 
 	// build graph
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	graphStr, _ := backend.Viz(ctx, project, api.VizOptions{
 		IncludeNetworks:  opts.includeNetworks,
 		IncludePorts:     opts.includePorts,

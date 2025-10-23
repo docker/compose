@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ type downOptions struct {
 	images        string
 }
 
-func downCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := downOptions{
 		ProjectOptions: p,
 	}
@@ -57,7 +58,7 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runDown(ctx, dockerCli, backend, opts, args)
+			return runDown(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: noCompletion(),
 	}
@@ -77,7 +78,7 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 	return downCmd
 }
 
-func runDown(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts downOptions, services []string) error {
+func runDown(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts downOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -87,6 +88,10 @@ func runDown(ctx context.Context, dockerCli command.Cli, backend api.Compose, op
 	if opts.timeChanged {
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
+	}
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
 	}
 	return backend.Down(ctx, name, api.DownOptions{
 		RemoveOrphans: opts.removeOrphans,

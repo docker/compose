@@ -37,10 +37,13 @@ import (
 func pluginMain() {
 	plugin.Run(
 		func(cli command.Cli) *cobra.Command {
-			backend := compose.NewComposeService(cli,
-				compose.WithPrompt(prompt.NewPrompt(cli.In(), cli.Out()).Confirm),
-			)
-			cmd := commands.RootCommand(cli, backend)
+			backendOptions := &commands.BackendOptions{
+				Options: []compose.Option{
+					compose.WithPrompt(prompt.NewPrompt(cli.In(), cli.Out()).Confirm),
+				},
+			}
+
+			cmd := commands.RootCommand(cli, backendOptions)
 			originalPreRunE := cmd.PersistentPreRunE
 			cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 				// initialize the cli instance

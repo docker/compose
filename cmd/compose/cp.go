@@ -22,6 +22,7 @@ import (
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -38,7 +39,7 @@ type copyOptions struct {
 	copyUIDGID  bool
 }
 
-func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func copyCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := copyOptions{
 		ProjectOptions: p,
 	}
@@ -59,7 +60,7 @@ func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.source = args[0]
 			opts.destination = args[1]
-			return runCopy(ctx, dockerCli, backend, opts)
+			return runCopy(ctx, dockerCli, backendOptions, opts)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -73,12 +74,16 @@ func copyCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 	return copyCmd
 }
 
-func runCopy(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts copyOptions) error {
+func runCopy(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts copyOptions) error {
 	name, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Copy(ctx, name, api.CopyOptions{
 		Source:      opts.source,
 		Destination: opts.destination,

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -33,7 +34,7 @@ type exportOptions struct {
 	index   int
 }
 
-func exportCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func exportCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	options := exportOptions{
 		ProjectOptions: p,
 	}
@@ -46,7 +47,7 @@ func exportCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runExport(ctx, dockerCli, backend, options)
+			return runExport(ctx, dockerCli, backendOptions, options)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -58,7 +59,7 @@ func exportCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 	return cmd
 }
 
-func runExport(ctx context.Context, dockerCli command.Cli, backend api.Compose, options exportOptions) error {
+func runExport(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, options exportOptions) error {
 	projectName, err := options.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
@@ -70,5 +71,9 @@ func runExport(ctx context.Context, dockerCli command.Cli, backend api.Compose, 
 		Output:  options.output,
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Export(ctx, projectName, exportOptions)
 }

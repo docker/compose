@@ -26,6 +26,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -109,7 +110,7 @@ func (opts upOptions) OnExit() api.Cascade {
 	}
 }
 
-func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	build := buildOptions{ProjectOptions: p}
@@ -140,7 +141,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *c
 				return fmt.Errorf("no service selected")
 			}
 
-			return runUp(ctx, dockerCli, backend, create, up, build, project, services)
+			return runUp(ctx, dockerCli, backendOptions, create, up, build, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -228,7 +229,7 @@ func validateFlags(up *upOptions, create *createOptions) error {
 func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,
-	backend api.Compose,
+	backendOptions *BackendOptions,
 	createOptions createOptions,
 	upOptions upOptions,
 	buildOptions buildOptions,
@@ -278,6 +279,11 @@ func runUp(
 		Timeout:              createOptions.GetTimeout(),
 		QuietPull:            createOptions.quietPull,
 		AssumeYes:            createOptions.AssumeYes,
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
 	}
 
 	if upOptions.noStart {

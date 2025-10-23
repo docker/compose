@@ -56,8 +56,6 @@ const (
 
 var _ client.APIClient = &DryRunClient{}
 
-type DryRunKey struct{}
-
 // DryRunClient implements APIClient by delegating to implementation functions. This allows lazy init and per-method overrides
 type DryRunClient struct {
 	apiClient  client.APIClient

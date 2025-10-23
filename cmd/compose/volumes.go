@@ -25,6 +25,7 @@ import (
 	"github.com/docker/cli/cli/command/formatter"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +35,7 @@ type volumesOptions struct {
 	Format string
 }
 
-func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	options := volumesOptions{
 		ProjectOptions: p,
 	}
@@ -43,7 +44,7 @@ func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compos
 		Use:   "volumes [OPTIONS] [SERVICE...]",
 		Short: "List volumes",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runVol(ctx, dockerCli, backend, args, options)
+			return runVol(ctx, dockerCli, backendOptions, args, options)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -54,7 +55,7 @@ func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compos
 	return cmd
 }
 
-func runVol(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, options volumesOptions) error {
+func runVol(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, options volumesOptions) error {
 	project, name, err := options.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -69,6 +70,10 @@ func runVol(ctx context.Context, dockerCli command.Cli, backend api.Compose, ser
 		}
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	volumes, err := backend.Volumes(ctx, name, api.VolumesOptions{
 		Services: services,
 	})

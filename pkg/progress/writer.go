@@ -66,11 +66,7 @@ func Run(ctx context.Context, pf progressFunc, out *streams.Out) error {
 }
 
 func RunWithLog(ctx context.Context, pf progressFunc, out *streams.Out, logConsumer api.LogConsumer) error {
-	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
-	if !ok {
-		dryRun = false
-	}
-	w := NewMixedWriter(out, logConsumer, dryRun)
+	w := NewMixedWriter(out, logConsumer, false) // FIXME(ndeloof) re-implement dry-run
 	eg, _ := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return w.Start(context.Background())
@@ -137,10 +133,6 @@ var Mode = ModeAuto
 // NewWriter returns a new multi-progress writer
 func NewWriter(ctx context.Context, out *streams.Out, progressTitle string) (Writer, error) {
 	isTerminal := out.IsTerminal()
-	dryRun, ok := ctx.Value(api.DryRunKey{}).(bool)
-	if !ok {
-		dryRun = false
-	}
 	switch Mode {
 	case ModeQuiet:
 		return quiet{}, nil
@@ -148,20 +140,20 @@ func NewWriter(ctx context.Context, out *streams.Out, progressTitle string) (Wri
 		return &jsonWriter{
 			out:    out,
 			done:   make(chan bool),
-			dryRun: dryRun,
+			dryRun: false, // FIXME(ndeloof) re-implement dry-run
 		}, nil
 	case ModeTTY:
-		return newTTYWriter(out, dryRun, progressTitle)
+		return newTTYWriter(out, false, progressTitle)
 	case ModeAuto, "":
 		if isTerminal {
-			return newTTYWriter(out, dryRun, progressTitle)
+			return newTTYWriter(out, false, progressTitle)
 		}
 		fallthrough
 	case ModePlain:
 		return &plainWriter{
 			out:    out,
 			done:   make(chan bool),
-			dryRun: dryRun,
+			dryRun: false,
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown progress mode: %s", Mode)

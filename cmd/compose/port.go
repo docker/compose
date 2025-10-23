@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -35,7 +36,7 @@ type portOptions struct {
 	index    int
 }
 
-func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func portCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := portOptions{
 		ProjectOptions: p,
 	}
@@ -53,7 +54,7 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPort(ctx, dockerCli, backend, opts, args[0])
+			return runPort(ctx, dockerCli, backendOptions, opts, args[0])
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -62,8 +63,13 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 	return cmd
 }
 
-func runPort(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts portOptions, service string) error {
+func runPort(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts portOptions, service string) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}

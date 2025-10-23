@@ -26,6 +26,7 @@ import (
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 
 	"github.com/docker/cli/cli/command"
 	cliformatter "github.com/docker/cli/cli/command/formatter"
@@ -64,7 +65,7 @@ func (p *psOptions) parseFilter() error {
 	return nil
 }
 
-func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := psOptions{
 		ProjectOptions: p,
 	}
@@ -75,7 +76,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *c
 			return opts.parseFilter()
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPs(ctx, dockerCli, backend, args, opts)
+			return runPs(ctx, dockerCli, backendOptions, args, opts)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -91,7 +92,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *c
 	return psCmd
 }
 
-func runPs(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, opts psOptions) error {
+func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, opts psOptions) error { //nolint:gocyclo
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -111,6 +112,10 @@ func runPs(ctx context.Context, dockerCli command.Cli, backend api.Compose, serv
 		}
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	containers, err := backend.Ps(ctx, name, api.PsOptions{
 		Project:  project,
 		All:      opts.All || len(opts.Status) != 0,

@@ -23,6 +23,7 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -37,7 +38,7 @@ type publishOptions struct {
 	app                 bool
 }
 
-func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := publishOptions{
 		ProjectOptions: p,
 	}
@@ -45,7 +46,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compos
 		Use:   "publish [OPTIONS] REPOSITORY[:TAG]",
 		Short: "Publish compose application",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPublish(ctx, dockerCli, backend, opts, args[0])
+			return runPublish(ctx, dockerCli, backendOptions, opts, args[0])
 		}),
 		Args: cli.ExactArgs(1),
 	}
@@ -67,7 +68,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compos
 	return cmd
 }
 
-func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts publishOptions, repository string) error {
+func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts publishOptions, repository string) error {
 	project, metrics, err := opts.ToProject(ctx, dockerCli, nil)
 	if err != nil {
 		return err
@@ -77,6 +78,10 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backend api.Compose,
 		return errors.New("cannot publish compose file with local includes")
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Publish(ctx, project, repository, api.PublishOptions{
 		ResolveImageDigests: opts.resolveImageDigests || opts.app,
 		Application:         opts.app,

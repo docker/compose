@@ -42,6 +42,7 @@ import (
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/remote"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -415,8 +416,16 @@ func RunningAsStandalone() bool {
 	return len(os.Args) < 2 || os.Args[1] != metadata.MetadataSubcommandName && os.Args[1] != PluginName
 }
 
+type BackendOptions struct {
+	Options []compose.Option
+}
+
+func (o *BackendOptions) Add(option compose.Option) {
+	o.Options = append(o.Options, option)
+}
+
 // RootCommand returns the compose command with its child commands
-func RootCommand(dockerCli command.Cli, backend api.Compose) *cobra.Command { //nolint:gocyclo
+func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command { //nolint:gocyclo
 	// filter out useless commandConn.CloseWrite warning message that can occur
 	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
 	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
@@ -456,9 +465,7 @@ func RootCommand(dockerCli command.Cli, backend api.Compose) *cobra.Command { //
 			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
 			parent := cmd.Root()
-
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
 				if parentPrerun != nil {
@@ -560,64 +567,61 @@ func RootCommand(dockerCli command.Cli, backend api.Compose) *cobra.Command { //
 			}
 			if parallel > 0 {
 				logrus.Debugf("Limiting max concurrency to %d jobs", parallel)
-				backend.MaxConcurrency(parallel)
+				backendOptions.Add(compose.WithMaxConcurrency(parallel))
 			}
 
 			// dry run detection
-			ctx, err = backend.DryRunMode(ctx, dryRun)
-			if err != nil {
-				return err
+			if dryRun {
+				backendOptions.Add(compose.WithDryRun)
 			}
-			cmd.SetContext(ctx)
-
 			return nil
 		},
 	}
 
 	c.AddCommand(
-		upCommand(&opts, dockerCli, backend),
-		downCommand(&opts, dockerCli, backend),
-		startCommand(&opts, dockerCli, backend),
-		restartCommand(&opts, dockerCli, backend),
-		stopCommand(&opts, dockerCli, backend),
-		psCommand(&opts, dockerCli, backend),
-		listCommand(dockerCli, backend),
-		logsCommand(&opts, dockerCli, backend),
+		upCommand(&opts, dockerCli, backendOptions),
+		downCommand(&opts, dockerCli, backendOptions),
+		startCommand(&opts, dockerCli, backendOptions),
+		restartCommand(&opts, dockerCli, backendOptions),
+		stopCommand(&opts, dockerCli, backendOptions),
+		psCommand(&opts, dockerCli, backendOptions),
+		listCommand(dockerCli, backendOptions),
+		logsCommand(&opts, dockerCli, backendOptions),
 		configCommand(&opts, dockerCli),
-		killCommand(&opts, dockerCli, backend),
-		runCommand(&opts, dockerCli, backend),
-		removeCommand(&opts, dockerCli, backend),
-		execCommand(&opts, dockerCli, backend),
-		attachCommand(&opts, dockerCli, backend),
-		exportCommand(&opts, dockerCli, backend),
-		commitCommand(&opts, dockerCli, backend),
-		pauseCommand(&opts, dockerCli, backend),
-		unpauseCommand(&opts, dockerCli, backend),
-		topCommand(&opts, dockerCli, backend),
-		eventsCommand(&opts, dockerCli, backend),
-		portCommand(&opts, dockerCli, backend),
-		imagesCommand(&opts, dockerCli, backend),
+		killCommand(&opts, dockerCli, backendOptions),
+		runCommand(&opts, dockerCli, backendOptions),
+		removeCommand(&opts, dockerCli, backendOptions),
+		execCommand(&opts, dockerCli, backendOptions),
+		attachCommand(&opts, dockerCli, backendOptions),
+		exportCommand(&opts, dockerCli, backendOptions),
+		commitCommand(&opts, dockerCli, backendOptions),
+		pauseCommand(&opts, dockerCli, backendOptions),
+		unpauseCommand(&opts, dockerCli, backendOptions),
+		topCommand(&opts, dockerCli, backendOptions),
+		eventsCommand(&opts, dockerCli, backendOptions),
+		portCommand(&opts, dockerCli, backendOptions),
+		imagesCommand(&opts, dockerCli, backendOptions),
 		versionCommand(dockerCli),
-		buildCommand(&opts, dockerCli, backend),
-		pushCommand(&opts, dockerCli, backend),
-		pullCommand(&opts, dockerCli, backend),
-		createCommand(&opts, dockerCli, backend),
-		copyCommand(&opts, dockerCli, backend),
-		waitCommand(&opts, dockerCli, backend),
-		scaleCommand(&opts, dockerCli, backend),
+		buildCommand(&opts, dockerCli, backendOptions),
+		pushCommand(&opts, dockerCli, backendOptions),
+		pullCommand(&opts, dockerCli, backendOptions),
+		createCommand(&opts, dockerCli, backendOptions),
+		copyCommand(&opts, dockerCli, backendOptions),
+		waitCommand(&opts, dockerCli, backendOptions),
+		scaleCommand(&opts, dockerCli, backendOptions),
 		statsCommand(&opts, dockerCli),
-		watchCommand(&opts, dockerCli, backend),
-		publishCommand(&opts, dockerCli, backend),
-		alphaCommand(&opts, dockerCli, backend),
+		watchCommand(&opts, dockerCli, backendOptions),
+		publishCommand(&opts, dockerCli, backendOptions),
+		alphaCommand(&opts, dockerCli, backendOptions),
 		bridgeCommand(&opts, dockerCli),
-		volumesCommand(&opts, dockerCli, backend),
+		volumesCommand(&opts, dockerCli, backendOptions),
 	)
 
 	c.Flags().SetInterspersed(false)
 	opts.addProjectFlags(c.Flags())
 	c.RegisterFlagCompletionFunc( //nolint:errcheck
 		"project-name",
-		completeProjectNames(backend),
+		completeProjectNames(dockerCli, backendOptions),
 	)
 	c.RegisterFlagCompletionFunc( //nolint:errcheck
 		"project-directory",
