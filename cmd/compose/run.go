@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
+	"github.com/docker/compose/v2/pkg/compose"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 
@@ -142,7 +143,7 @@ func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (t
 	return environment, nil
 }
 
-func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	options := runOptions{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -218,7 +219,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *
 			}
 
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
+			return runRun(ctx, backendOptions, project, options, createOpts, buildOpts, dockerCli)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -266,7 +267,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
+func runRun(ctx context.Context, backendOptions *BackendOptions, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
 	project, err := options.apply(project)
 	if err != nil {
 		return err
@@ -338,6 +339,10 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		}
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
 		errMsg := ""

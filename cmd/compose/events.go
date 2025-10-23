@@ -23,6 +23,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 
 	"github.com/spf13/cobra"
 )
@@ -34,7 +35,7 @@ type eventsOpts struct {
 	until string
 }
 
-func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := eventsOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -44,7 +45,7 @@ func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 		Use:   "events [OPTIONS] [SERVICE...]",
 		Short: "Receive real time events from containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runEvents(ctx, dockerCli, backend, opts, args)
+			return runEvents(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -55,12 +56,16 @@ func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 	return cmd
 }
 
-func runEvents(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts eventsOpts, services []string) error {
+func runEvents(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts eventsOpts, services []string) error {
 	name, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Events(ctx, name, api.EventsOptions{
 		Services: services,
 		Since:    opts.since,

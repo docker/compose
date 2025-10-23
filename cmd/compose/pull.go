@@ -24,6 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
@@ -42,7 +43,7 @@ type pullOptions struct {
 	policy             string
 }
 
-func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func pullCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := pullOptions{
 		ProjectOptions: p,
 	}
@@ -59,7 +60,7 @@ func pullCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 			return nil
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPull(ctx, dockerCli, backend, opts, args)
+			return runPull(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -97,7 +98,7 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 	return project, nil
 }
 
-func runPull(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts pullOptions, services []string) error {
+func runPull(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts pullOptions, services []string) error {
 	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
@@ -108,6 +109,10 @@ func runPull(ctx context.Context, dockerCli command.Cli, backend api.Compose, op
 		return err
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Pull(ctx, project, api.PullOptions{
 		Quiet:           opts.quiet,
 		IgnoreFailures:  opts.ignorePullFailures,

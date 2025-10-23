@@ -22,6 +22,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/pkg/compose"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/locker"
@@ -36,7 +37,7 @@ type watchOptions struct {
 	noUp  bool
 }
 
-func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func watchCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	watchOpts := watchOptions{
 		ProjectOptions: p,
 	}
@@ -53,7 +54,7 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose)
 			if cmd.Parent().Name() == "alpha" {
 				logrus.Warn("watch command is now available as a top level command")
 			}
-			return runWatch(ctx, dockerCli, backend, watchOpts, buildOpts, args)
+			return runWatch(ctx, dockerCli, backendOptions, watchOpts, buildOpts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -64,7 +65,7 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose)
 	return cmd
 }
 
-func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Compose, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
+func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
 	project, _, err := watchOpts.ToProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
@@ -111,12 +112,20 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backend api.Compose, w
 				Services: services,
 			},
 		}
+		backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+		if err != nil {
+			return err
+		}
 		if err := backend.Up(ctx, project, upOpts); err != nil {
 			return err
 		}
 	}
 
 	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), false, false, false)
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Watch(ctx, project, api.WatchOptions{
 		Build:    &build,
 		LogTo:    consumer,

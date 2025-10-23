@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -40,7 +41,7 @@ type logsOptions struct {
 	timestamps bool
 }
 
-func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func logsCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := logsOptions{
 		ProjectOptions: p,
 	}
@@ -48,7 +49,7 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 		Use:   "logs [OPTIONS] [SERVICE...]",
 		Short: "View output from containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runLogs(ctx, dockerCli, backend, opts, args)
+			return runLogs(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if opts.index > 0 && len(args) != 1 {
@@ -70,7 +71,7 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) 
 	return logsCmd
 }
 
-func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts logsOptions, services []string) error {
+func runLogs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts logsOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -86,6 +87,10 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Compose, op
 	}
 
 	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !opts.noColor, !opts.noPrefix, false)
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
 		Services:   services,

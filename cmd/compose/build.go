@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
+	"github.com/docker/compose/v2/pkg/compose"
 	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
 
@@ -90,7 +91,7 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}, nil
 }
 
-func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func buildCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := buildOptions{
 		ProjectOptions: p,
 	}
@@ -115,7 +116,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose)
 			if cmd.Flags().Changed("progress") && opts.ssh == "" {
 				fmt.Fprint(os.Stderr, "--progress is a global compose flag, better use `docker compose --progress xx build ...\n")
 			}
-			return runBuild(ctx, dockerCli, backend, opts, args)
+			return runBuild(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -148,7 +149,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose)
 	return cmd
 }
 
-func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts buildOptions, services []string) error {
+func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts buildOptions, services []string) error {
 	opts.All = true // do not drop resources as build may involve some dependencies by additional_contexts
 	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
 	if err != nil {
@@ -165,5 +166,9 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backend api.Compose, o
 	}
 	apiBuildOptions.Attestations = true
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Build(ctx, project, apiBuildOptions)
 }

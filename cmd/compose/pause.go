@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -29,7 +30,7 @@ type pauseOptions struct {
 	*ProjectOptions
 }
 
-func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := pauseOptions{
 		ProjectOptions: p,
 	}
@@ -37,19 +38,23 @@ func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose)
 		Use:   "pause [SERVICE...]",
 		Short: "Pause services",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPause(ctx, dockerCli, backend, opts, args)
+			return runPause(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	return cmd
 }
 
-func runPause(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts pauseOptions, services []string) error {
+func runPause(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts pauseOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Pause(ctx, name, api.PauseOptions{
 		Services: services,
 		Project:  project,
@@ -60,7 +65,7 @@ type unpauseOptions struct {
 	*ProjectOptions
 }
 
-func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := unpauseOptions{
 		ProjectOptions: p,
 	}
@@ -68,19 +73,23 @@ func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compos
 		Use:   "unpause [SERVICE...]",
 		Short: "Unpause services",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runUnPause(ctx, dockerCli, backend, opts, args)
+			return runUnPause(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	return cmd
 }
 
-func runUnPause(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts unpauseOptions, services []string) error {
+func runUnPause(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts unpauseOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.UnPause(ctx, name, api.PauseOptions{
 		Services: services,
 		Project:  project,

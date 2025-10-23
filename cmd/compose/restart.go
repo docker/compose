@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -33,7 +34,7 @@ type restartOptions struct {
 	noDeps      bool
 }
 
-func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func restartCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := restartOptions{
 		ProjectOptions: p,
 	}
@@ -44,7 +45,7 @@ func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compos
 			opts.timeChanged = cmd.Flags().Changed("timeout")
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runRestart(ctx, dockerCli, backend, opts, args)
+			return runRestart(ctx, dockerCli, backendOptions, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -55,7 +56,7 @@ func restartCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compos
 	return restartCmd
 }
 
-func runRestart(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts restartOptions, services []string) error {
+func runRestart(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts restartOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
 		return err
@@ -74,6 +75,10 @@ func runRestart(ctx context.Context, dockerCli command.Cli, backend api.Compose,
 		timeout = &timeoutValue
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Restart(ctx, name, api.RestartOptions{
 		Timeout:  timeout,
 		Services: services,

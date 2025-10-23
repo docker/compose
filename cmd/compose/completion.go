@@ -22,6 +22,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -52,8 +53,13 @@ func completeServiceNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 	}
 }
 
-func completeProjectNames(backend api.Compose) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func completeProjectNames(dockerCli command.Cli, backendOptions *BackendOptions) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
 		list, err := backend.List(cmd.Context(), api.ListOptions{
 			All: true,
 		})

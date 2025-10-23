@@ -26,6 +26,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -51,7 +52,7 @@ type createOptions struct {
 	AssumeYes     bool
 }
 
-func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := createOptions{}
 	buildOpts := buildOptions{
 		ProjectOptions: p,
@@ -70,7 +71,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 			return nil
 		}),
 		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
-			return runCreate(ctx, dockerCli, backend, opts, buildOpts, project, services)
+			return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -95,7 +96,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 	return cmd
 }
 
-func runCreate(ctx context.Context, _ command.Cli, backend api.Compose, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
+func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}
@@ -109,6 +110,10 @@ func runCreate(ctx context.Context, _ command.Cli, backend api.Compose, createOp
 		build = &bo
 	}
 
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
 	return backend.Create(ctx, project, api.CreateOptions{
 		Build:                build,
 		Services:             services,

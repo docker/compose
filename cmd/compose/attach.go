@@ -21,6 +21,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ type attachOpts struct {
 	proxy      bool
 }
 
-func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose) *cobra.Command {
+func attachCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := attachOpts{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -50,7 +51,7 @@ func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runAttach(ctx, dockerCli, backend, opts)
+			return runAttach(ctx, dockerCli, backendOptions, opts)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -63,7 +64,7 @@ func attachCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Compose
 	return runCmd
 }
 
-func runAttach(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts attachOpts) error {
+func runAttach(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts attachOpts) error {
 	projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
@@ -75,6 +76,10 @@ func runAttach(ctx context.Context, dockerCli command.Cli, backend api.Compose, 
 		DetachKeys: opts.detachKeys,
 		NoStdin:    opts.noStdin,
 		Proxy:      opts.proxy,
+	}
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
 	}
 	return backend.Attach(ctx, projectName, attachOpts)
 }
