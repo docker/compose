@@ -16,28 +16,17 @@
 
 package api
 
-import (
-	"io"
-)
+// ContextInfo provides Docker context information for advanced scenarios
+type ContextInfo interface {
+	// CurrentContext returns the name of the current Docker context
+	// Returns "default" for simple clients without context support
+	CurrentContext() string
 
-// OutputStream is a writable stream with terminal detection capabilities
-type OutputStream interface {
-	io.Writer
+	// ServerOSType returns the Docker daemon's operating system (linux/windows/darwin)
+	// Used for OS-specific compatibility checks
+	ServerOSType() string
 
-	// IsTerminal returns true if the stream is connected to a terminal
-	IsTerminal() bool
-
-	// FD returns the file descriptor for the stream
-	FD() uintptr
-}
-
-// InputStream is a readable stream with terminal detection capabilities
-type InputStream interface {
-	io.Reader
-
-	// IsTerminal returns true if the stream is connected to a terminal
-	IsTerminal() bool
-
-	// FD returns the file descriptor for the stream
-	FD() uintptr
+	// BuildKitEnabled determines whether BuildKit should be used for builds
+	// Checks DOCKER_BUILDKIT env var, config, and daemon capabilities
+	BuildKitEnabled() (bool, error)
 }

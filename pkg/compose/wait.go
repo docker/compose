@@ -42,7 +42,7 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 
 			select {
 			case result := <-resultC:
-				_, _ = fmt.Fprintf(s.dockerCli.Out(), "container %q exited with status code %d\n", ctr.ID, result.StatusCode)
+				_, _ = fmt.Fprintf(s.stdout(), "container %q exited with status code %d\n", ctr.ID, result.StatusCode)
 				statusCode = result.StatusCode
 			case err = <-errC:
 			}

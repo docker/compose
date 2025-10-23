@@ -43,14 +43,12 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 	}
 
 	if options.Output == "" {
-		if s.dockerCli.Out().IsTerminal() {
+		if s.stdout().IsTerminal() {
 			return fmt.Errorf("output option is required when exporting to terminal")
 		}
 	} else if err := command.ValidateOutputPath(options.Output); err != nil {
 		return fmt.Errorf("failed to export container: %w", err)
 	}
-
-	clnt := s.apiClient()
 
 	w := progress.ContextWriter(ctx)
 
@@ -64,7 +62,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		StatusText: "Exporting",
 	})
 
-	responseBody, err := clnt.ContainerExport(ctx, container.ID)
+	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID)
 	if err != nil {
 		return err
 	}
@@ -82,7 +80,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 
 	if !s.dryRun {
 		if options.Output == "" {
-			_, err := io.Copy(s.dockerCli.Out(), responseBody)
+			_, err := io.Copy(s.stdout(), responseBody)
 			return err
 		} else {
 			writer, err := atomicwriter.New(options.Output, 0o600)

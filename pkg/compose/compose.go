@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
@@ -53,7 +55,26 @@ func init() {
 
 type Option func(service *composeService) error
 
-// NewComposeService create a local implementation of the compose.Compose API
+// NewComposeService creates a Compose service using Docker CLI.
+// This is the standard constructor that requires command.Cli for full functionality.
+//
+// Example usage:
+//
+//	dockerCli, _ := command.NewDockerCli()
+//	service := NewComposeService(dockerCli)
+//
+// For advanced configuration with custom overrides, use ServiceOption functions:
+//
+//	service := NewComposeService(dockerCli,
+//	    WithPrompt(prompt.NewPrompt(cli.In(), cli.Out()).Confirm),
+//	    WithOutputStream(customOut),
+//	    WithErrorStream(customErr),
+//	    WithInputStream(customIn))
+//
+// Or set all streams at once:
+//
+//	service := NewComposeService(dockerCli,
+//	    WithStreams(customOut, customErr, customIn))
 func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, error) {
 	s := &composeService{
 		dockerCli:      dockerCli,
@@ -74,6 +95,56 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		}
 	}
 	return s, nil
+}
+
+// WithStreams sets custom I/O streams for output and interaction
+func WithStreams(out, err api.OutputStream, in api.InputStream) Option {
+	return func(s *composeService) error {
+		s.outStream = out
+		s.errStream = err
+		s.inStream = in
+		return nil
+	}
+}
+
+// WithOutputStream sets a custom output stream
+func WithOutputStream(out api.OutputStream) Option {
+	return func(s *composeService) error {
+		s.outStream = out
+		return nil
+	}
+}
+
+// WithErrorStream sets a custom error stream
+func WithErrorStream(err api.OutputStream) Option {
+	return func(s *composeService) error {
+		s.errStream = err
+		return nil
+	}
+}
+
+// WithInputStream sets a custom input stream
+func WithInputStream(in api.InputStream) Option {
+	return func(s *composeService) error {
+		s.inStream = in
+		return nil
+	}
+}
+
+// WithContextInfo sets custom Docker context information
+func WithContextInfo(info api.ContextInfo) Option {
+	return func(s *composeService) error {
+		s.contextInfo = info
+		return nil
+	}
+}
+
+// WithProxyConfig sets custom HTTP proxy configuration for builds
+func WithProxyConfig(config map[string]string) Option {
+	return func(s *composeService) error{
+		s.proxyConfig = config
+		return nil
+	}
 }
 
 // WithPrompt configure a UI component for Compose service to interact with user and confirm actions
@@ -119,6 +190,13 @@ type composeService struct {
 	// prompt is used to interact with user and confirm actions
 	prompt Prompt
 
+	// Optional overrides for specific components (for SDK users)
+	outStream   api.OutputStream
+	errStream   api.OutputStream
+	inStream    api.InputStream
+	contextInfo api.ContextInfo
+	proxyConfig map[string]string
+
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
@@ -144,23 +222,65 @@ func (s *composeService) configFile() *configfile.ConfigFile {
 	return s.dockerCli.ConfigFile()
 }
 
+// getContextInfo returns the context info - either custom override or dockerCli adapter
+func (s *composeService) getContextInfo() api.ContextInfo {
+	if s.contextInfo != nil {
+		return s.contextInfo
+	}
+	return &dockerCliContextInfo{cli: s.dockerCli}
+}
+
+// getProxyConfig returns the proxy config - either custom override or environment-based
+func (s *composeService) getProxyConfig() map[string]string {
+	if s.proxyConfig != nil {
+		return s.proxyConfig
+	}
+	return storeutil.GetProxyConfig(s.dockerCli)
+}
+
+
 func (s *composeService) stdout() *streams.Out {
+	// If stream overrides are provided, use them
+	if s.outStream != nil {
+		return streams.NewOut(s.outStream)
+	}
 	return s.dockerCli.Out()
 }
 
 func (s *composeService) stdin() *streams.In {
+	// If stream overrides are provided, use them
+	if s.inStream != nil {
+		return streams.NewIn(&readCloserAdapter{r: s.inStream})
+	}
 	return s.dockerCli.In()
 }
 
 func (s *composeService) stderr() *streams.Out {
+	// If stream overrides are provided, use them
+	if s.errStream != nil {
+		return streams.NewOut(s.errStream)
+	}
 	return s.dockerCli.Err()
 }
 
 func (s *composeService) stdinfo() *streams.Out {
 	if stdioToStdout {
-		return s.dockerCli.Out()
+		return s.stdout()
 	}
-	return s.dockerCli.Err()
+	return s.stderr()
+}
+
+// readCloserAdapter adapts io.Reader to io.ReadCloser
+type readCloserAdapter struct {
+	r io.Reader
+}
+
+func (r *readCloserAdapter) Read(p []byte) (int, error) {
+	return r.r.Read(p)
+}
+
+func (r *readCloserAdapter) Close() error {
+	return nil
 }
 
 func getCanonicalContainerName(c container.Summary) string {
