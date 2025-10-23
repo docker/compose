@@ -27,7 +27,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
-	"github.com/docker/buildx/driver"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"golang.org/x/sync/errgroup"
@@ -70,7 +69,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 
 		for _, tag := range tags {
 			eg.Go(func() error {
-				err := s.pushServiceImage(ctx, tag, s.configFile(), w, options.Quiet)
+				err := s.pushServiceImage(ctx, tag, w, options.Quiet)
 				if err != nil {
 					if !options.IgnoreFailures {
 						return err
@@ -84,13 +83,13 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 	return eg.Wait()
 }
 
-func (s *composeService) pushServiceImage(ctx context.Context, tag string, configFile driver.Auth, w progress.Writer, quietPush bool) error {
+func (s *composeService) pushServiceImage(ctx context.Context, tag string, w progress.Writer, quietPush bool) error {
 	ref, err := reference.ParseNormalizedNamed(tag)
 	if err != nil {
 		return err
 	}
 
-	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(reference.Domain(ref)))
+	authConfig, err := s.configFile().GetAuthConfig(registry.GetAuthConfigKey(reference.Domain(ref)))
 	if err != nil {
 		return err
 	}

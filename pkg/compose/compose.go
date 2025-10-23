@@ -92,7 +92,7 @@ type composeService struct {
 func (s *composeService) Close() error {
 	var errs []error
 	if s.dockerCli != nil {
-		errs = append(errs, s.dockerCli.Client().Close())
+		errs = append(errs, s.apiClient().Close())
 	}
 	return errors.Join(errs...)
 }
@@ -323,7 +323,7 @@ var runtimeVersion runtimeVersionCache
 
 func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
 	runtimeVersion.once.Do(func() {
-		version, err := s.dockerCli.Client().ServerVersion(ctx)
+		version, err := s.apiClient().ServerVersion(ctx)
 		if err != nil {
 			runtimeVersion.err = err
 		}

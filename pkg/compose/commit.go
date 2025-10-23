@@ -40,7 +40,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return err
 	}
 
-	clnt := s.dockerCli.Client()
+	clnt := s.apiClient()
 
 	w := progress.ContextWriter(ctx)
 

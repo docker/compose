@@ -90,8 +90,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			return err
 		}
 
-		config := s.dockerCli.ConfigFile()
-		resolver := oci.NewResolver(config)
+		resolver := oci.NewResolver(s.configFile())
 
 		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
