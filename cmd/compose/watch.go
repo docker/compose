@@ -121,11 +121,12 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 		}
 	}
 
-	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), false, false, false)
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}
+	outStream, errStream, _ := backend.GetConfiguredStreams()
+	consumer := formatter.NewLogConsumer(ctx, outStream, errStream, false, false, false)
 	return backend.Watch(ctx, project, api.WatchOptions{
 		Build:    &build,
 		LogTo:    consumer,
