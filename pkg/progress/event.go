@@ -16,25 +16,8 @@
 
 package progress
 
-import (
-	"time"
-)
-
 // EventStatus indicates the status of an action
 type EventStatus int
-
-func (s EventStatus) colorFn() colorFunc {
-	switch s {
-	case Done:
-		return SuccessColor
-	case Warning:
-		return WarningColor
-	case Error:
-		return ErrorColor
-	default:
-		return nocolor
-	}
-}
 
 const (
 	// Working means that the current task is working
@@ -56,11 +39,7 @@ type Event struct {
 	StatusText string
 	Current    int64
 	Percent    int
-
-	Total     int64
-	startTime time.Time
-	endTime   time.Time
-	spinner   *Spinner
+	Total      int64
 }
 
 // ErrorMessageEvent creates a new Error Event with message
@@ -178,33 +157,5 @@ func NewEvent(id string, status EventStatus, statusText string) Event {
 		ID:         id,
 		Status:     status,
 		StatusText: statusText,
-	}
-}
-
-func (e *Event) stop() {
-	e.endTime = time.Now()
-	e.spinner.Stop()
-}
-
-func (e *Event) hasMore() {
-	e.spinner.Restart()
-}
-
-var (
-	spinnerDone    = "✔"
-	spinnerWarning = "!"
-	spinnerError   = "✘"
-)
-
-func (e *Event) Spinner() any {
-	switch e.Status {
-	case Done:
-		return SuccessColor(spinnerDone)
-	case Warning:
-		return WarningColor(spinnerWarning)
-	case Error:
-		return ErrorColor(spinnerError)
-	default:
-		return CountColor(e.spinner.String())
 	}
 }
