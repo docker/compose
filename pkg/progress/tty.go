@@ -34,8 +34,8 @@ import (
 
 type ttyWriter struct {
 	out             io.Writer
-	events          map[string]Event
-	eventIDs        []string
+	tasks           map[string]task
+	ids             []string
 	repeated        bool
 	numLines        int
 	done            chan bool
@@ -44,6 +44,29 @@ type ttyWriter struct {
 	dryRun          bool
 	skipChildEvents bool
 	progressTitle   string
+}
+
+type task struct {
+	ID         string
+	parentID   string
+	startTime  time.Time
+	endTime    time.Time
+	text       string
+	status     EventStatus
+	statusText string
+	current    int64
+	percent    int
+	total      int64
+	spinner    *Spinner
+}
+
+func (t *task) stop() {
+	t.endTime = time.Now()
+	t.spinner.Stop()
+}
+
+func (t *task) hasMore() {
+	t.spinner.Restart()
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -77,44 +100,54 @@ func (w *ttyWriter) Event(e Event) {
 }
 
 func (w *ttyWriter) event(e Event) {
-	if !slices.Contains(w.eventIDs, e.ID) {
-		w.eventIDs = append(w.eventIDs, e.ID)
+	if !slices.Contains(w.ids, e.ID) {
+		w.ids = append(w.ids, e.ID)
 	}
-	if _, ok := w.events[e.ID]; ok {
-		last := w.events[e.ID]
+	if _, ok := w.tasks[e.ID]; ok {
+		last := w.tasks[e.ID]
 		switch e.Status {
 		case Done, Error, Warning:
-			if last.Status != e.Status {
+			if last.status != e.Status {
 				last.stop()
 			}
 		case Working:
 			last.hasMore()
 		}
-		last.Status = e.Status
-		last.Text = e.Text
-		last.StatusText = e.StatusText
+		last.status = e.Status
+		last.text = e.Text
+		last.statusText = e.StatusText
 		// progress can only go up
-		if e.Total > last.Total {
-			last.Total = e.Total
+		if e.Total > last.total {
+			last.total = e.Total
 		}
-		if e.Current > last.Current {
-			last.Current = e.Current
+		if e.Current > last.current {
+			last.current = e.Current
 		}
-		if e.Percent > last.Percent {
-			last.Percent = e.Percent
+		if e.Percent > last.percent {
+			last.percent = e.Percent
 		}
 		// allow set/unset of parent, but not swapping otherwise prompt is flickering
-		if last.ParentID == "" || e.ParentID == "" {
-			last.ParentID = e.ParentID
+		if last.parentID == "" || e.ParentID == "" {
+			last.parentID = e.ParentID
 		}
-		w.events[e.ID] = last
+		w.tasks[e.ID] = last
 	} else {
-		e.startTime = time.Now()
-		e.spinner = NewSpinner()
-		if e.Status == Done || e.Status == Error {
-			e.stop()
+		t := task{
+			ID:         e.ID,
+			parentID:   e.ParentID,
+			startTime:  time.Now(),
+			text:       e.Text,
+			status:     e.Status,
+			statusText: e.StatusText,
+			current:    e.Current,
+			percent:    e.Percent,
+			total:      e.Total,
+			spinner:    NewSpinner(),
 		}
-		w.events[e.ID] = e
+		if e.Status == Done || e.Status == Error {
+			t.stop()
+		}
+		w.tasks[e.ID] = t
 	}
 }
 
@@ -147,7 +180,7 @@ func (w *ttyWriter) printTailEvents() {
 func (w *ttyWriter) print() { //nolint:gocyclo
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	if len(w.eventIDs) == 0 {
+	if len(w.ids) == 0 {
 		return
 	}
 	terminalWidth := goterm.Width()
@@ -167,43 +200,43 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 		_, _ = fmt.Fprint(w.out, aec.Show)
 	}()
 
-	firstLine := fmt.Sprintf("[+] %s %d/%d", w.progressTitle, numDone(w.events), len(w.events))
-	if w.numLines != 0 && numDone(w.events) == w.numLines {
+	firstLine := fmt.Sprintf("[+] %s %d/%d", w.progressTitle, numDone(w.tasks), len(w.tasks))
+	if w.numLines != 0 && numDone(w.tasks) == w.numLines {
 		firstLine = DoneColor(firstLine)
 	}
 	_, _ = fmt.Fprintln(w.out, firstLine)
 
 	var statusPadding int
-	for _, v := range w.eventIDs {
-		event := w.events[v]
-		l := len(fmt.Sprintf("%s %s", event.ID, event.Text))
+	for _, v := range w.ids {
+		t := w.tasks[v]
+		l := len(fmt.Sprintf("%s %s", t.ID, t.text))
 		if statusPadding < l {
 			statusPadding = l
 		}
-		if event.ParentID != "" {
+		if t.parentID != "" {
 			statusPadding -= 2
 		}
 	}
 
-	if len(w.eventIDs) > goterm.Height()-2 {
+	if len(w.ids) > goterm.Height()-2 {
 		w.skipChildEvents = true
 	}
 	numLines := 0
-	for _, v := range w.eventIDs {
-		event := w.events[v]
-		if event.ParentID != "" {
+	for _, v := range w.ids {
+		t := w.tasks[v]
+		if t.parentID != "" {
 			continue
 		}
-		line := w.lineText(event, "", terminalWidth, statusPadding, w.dryRun)
+		line := w.lineText(t, "", terminalWidth, statusPadding, w.dryRun)
 		_, _ = fmt.Fprint(w.out, line)
 		numLines++
-		for _, v := range w.eventIDs {
-			ev := w.events[v]
-			if ev.ParentID == event.ID {
+		for _, v := range w.ids {
+			t := w.tasks[v]
+			if t.parentID == t.ID {
 				if w.skipChildEvents {
 					continue
 				}
-				line := w.lineText(ev, "  ", terminalWidth, statusPadding, w.dryRun)
+				line := w.lineText(t, "  ", terminalWidth, statusPadding, w.dryRun)
 				_, _ = fmt.Fprint(w.out, line)
 				numLines++
 			}
@@ -218,12 +251,12 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 	w.numLines = numLines
 }
 
-func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPadding int, dryRun bool) string {
+func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding int, dryRun bool) string {
 	endTime := time.Now()
-	if event.Status != Working {
-		endTime = event.startTime
-		if (event.endTime != time.Time{}) {
-			endTime = event.endTime
+	if t.status != Working {
+		endTime = t.startTime
+		if (t.endTime != time.Time{}) {
+			endTime = t.endTime
 		}
 	}
 	prefix := ""
@@ -231,7 +264,7 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 		prefix = PrefixColor(api.DRYRUN_PREFIX)
 	}
 
-	elapsed := endTime.Sub(event.startTime).Seconds()
+	elapsed := endTime.Sub(t.startTime).Seconds()
 
 	var (
 		hideDetails bool
@@ -241,18 +274,18 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 	)
 
 	// only show the aggregated progress while the root operation is in-progress
-	if parent := event; parent.Status == Working {
-		for _, v := range w.eventIDs {
-			child := w.events[v]
-			if child.ParentID == parent.ID {
-				if child.Status == Working && child.Total == 0 {
+	if parent := t; parent.status == Working {
+		for _, v := range w.ids {
+			child := w.tasks[v]
+			if child.parentID == parent.ID {
+				if child.status == Working && child.total == 0 {
 					// we don't have totals available for all the child events
 					// so don't show the total progress yet
 					hideDetails = true
 				}
-				total += child.Total
-				current += child.Current
-				completion = append(completion, percentChars[(len(percentChars)-1)*child.Percent/100])
+				total += child.total
+				current += child.current
+				completion = append(completion, percentChars[(len(percentChars)-1)*child.percent/100])
 			}
 		}
 	}
@@ -269,13 +302,13 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 			details = fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
 		}
 		txt = fmt.Sprintf("%s [%s]%s %s",
-			event.ID,
+			t.ID,
 			SuccessColor(strings.Join(completion, "")),
 			details,
-			event.Text,
+			t.text,
 		)
 	} else {
-		txt = fmt.Sprintf("%s %s", event.ID, event.Text)
+		txt = fmt.Sprintf("%s %s", t.ID, t.text)
 	}
 	textLen := len(txt)
 	padding := statusPadding - textLen
@@ -285,18 +318,18 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 	// calculate the max length for the status text, on errors it
 	// is 2-3 lines long and breaks the line formatting
 	maxStatusLen := terminalWidth - textLen - statusPadding - 15
-	status := event.StatusText
+	status := t.statusText
 	// in some cases (debugging under VS Code), terminalWidth is set to zero by goterm.Width() ; ensuring we don't tweak strings with negative char index
 	if maxStatusLen > 0 && len(status) > maxStatusLen {
 		status = status[:maxStatusLen] + "..."
 	}
 	text := fmt.Sprintf("%s %s%s %s%s %s",
 		pad,
-		event.Spinner(),
+		spinner(t),
 		prefix,
 		txt,
 		strings.Repeat(" ", padding),
-		event.Status.colorFn()(status),
+		colorFn(t.status)(status),
 	)
 	timer := fmt.Sprintf("%.1fs ", elapsed)
 	o := align(text, TimerColor(timer), terminalWidth)
@@ -304,10 +337,42 @@ func (w *ttyWriter) lineText(event Event, pad string, terminalWidth, statusPaddi
 	return o
 }
 
-func numDone(events map[string]Event) int {
+var (
+	spinnerDone    = "✔"
+	spinnerWarning = "!"
+	spinnerError   = "✘"
+)
+
+func spinner(t task) string {
+	switch t.status {
+	case Done:
+		return SuccessColor(spinnerDone)
+	case Warning:
+		return WarningColor(spinnerWarning)
+	case Error:
+		return ErrorColor(spinnerError)
+	default:
+		return CountColor(t.spinner.String())
+	}
+}
+
+func colorFn(s EventStatus) colorFunc {
+	switch s {
+	case Done:
+		return SuccessColor
+	case Warning:
+		return WarningColor
+	case Error:
+		return ErrorColor
+	default:
+		return nocolor
+	}
+}
+
+func numDone(tasks map[string]task) int {
 	i := 0
-	for _, e := range events {
-		if e.Status != Working {
+	for _, t := range tasks {
+		if t.status != Working {
 			i++
 		}
 	}
