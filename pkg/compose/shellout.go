@@ -52,8 +52,10 @@ func (s *composeService) prepareShellOut(gctx context.Context, env types.Mapping
 func (s *composeService) propagateDockerEndpoint() ([]string, func(), error) {
 	cleanup := func() {}
 	env := types.Mapping{}
+
 	env[command.EnvOverrideContext] = s.dockerCli.CurrentContext()
 	env["USER_AGENT"] = "compose/" + internal.Version
+
 	endpoint := s.dockerCli.DockerEndpoint()
 	env[client.EnvOverrideHost] = endpoint.Host
 	if endpoint.TLSData != nil {

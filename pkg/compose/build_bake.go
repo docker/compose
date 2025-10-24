@@ -139,10 +139,10 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	displayMode := progressui.DisplayMode(options.Progress)
 	out := options.Out
 	if out == nil {
-		if displayMode == progress.ModeAuto && !s.dockerCli.Out().IsTerminal() {
+		if displayMode == progress.ModeAuto && !s.stdout().IsTerminal() {
 			displayMode = progressui.PlainMode
 		}
-		out = os.Stdout // should be s.dockerCli.Out(), but NewDisplay require access to the underlying *File
+		out = os.Stdout // should be s.stdout(), but NewDisplay require access to the underlying *File
 	}
 	display, err := progressui.NewDisplay(out, displayMode)
 	if err != nil {
@@ -185,7 +185,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		build := *service.Build
 		labels := getImageBuildLabels(project, service)
 
-		args := resolveAndMergeBuildArgs(s.dockerCli, project, service, options).ToMapping()
+		args := resolveAndMergeBuildArgs(s.getProxyConfig(), project, service, options).ToMapping()
 		for k, v := range args {
 			args[k] = strings.ReplaceAll(v, "${", "$${")
 		}

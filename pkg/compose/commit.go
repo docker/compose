@@ -40,8 +40,6 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return err
 	}
 
-	clnt := s.apiClient()
-
 	w := progress.ContextWriter(ctx)
 
 	name := getCanonicalContainerName(ctr)
@@ -65,7 +63,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return nil
 	}
 
-	response, err := clnt.ContainerCommit(ctx, ctr.ID, container.CommitOptions{
+	response, err := s.apiClient().ContainerCommit(ctx, ctr.ID, container.CommitOptions{
 		Reference: options.Reference,
 		Comment:   options.Comment,
 		Author:    options.Author,
