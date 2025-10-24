@@ -86,11 +86,12 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		}
 	}
 
-	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !opts.noColor, !opts.noPrefix, false)
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}
+	outStream, errStream, _ := backend.GetConfiguredStreams()
+	consumer := formatter.NewLogConsumer(ctx, outStream, errStream, !opts.noColor, !opts.noPrefix, false)
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
 		Services:   services,

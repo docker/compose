@@ -99,6 +99,9 @@ type Compose interface {
 	Generate(ctx context.Context, options GenerateOptions) (*types.Project, error)
 	// Volumes executes the equivalent to a `docker volume ls`
 	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
+	// GetConfiguredStreams returns the configured I/O streams (stdout, stderr, stdin).
+	// If no custom streams were configured, it returns the dockerCli streams.
+	GetConfiguredStreams() (stdout io.Writer, stderr io.Writer, stdin io.Reader)
 }
 
 type VolumesOptions struct {

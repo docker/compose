@@ -94,6 +94,12 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 			return defaultValue, nil
 		}
 	}
+
+	// If custom streams were provided, wrap the Docker CLI to use them
+	if s.outStream != nil || s.errStream != nil || s.inStream != nil {
+		s.dockerCli = s.wrapDockerCliWithStreams(dockerCli)
+	}
+
 	return s, nil
 }
 
@@ -141,7 +147,7 @@ func WithContextInfo(info api.ContextInfo) Option {
 
 // WithProxyConfig sets custom HTTP proxy configuration for builds
 func WithProxyConfig(config map[string]string) Option {
-	return func(s *composeService) error{
+	return func(s *composeService) error {
 		s.proxyConfig = config
 		return nil
 	}
@@ -238,28 +244,15 @@ func (s *composeService) getProxyConfig() map[string]string {
 	return storeutil.GetProxyConfig(s.dockerCli)
 }
 
-
 func (s *composeService) stdout() *streams.Out {
-	// If stream overrides are provided, use them
-	if s.outStream != nil {
-		return streams.NewOut(s.outStream)
-	}
 	return s.dockerCli.Out()
 }
 
 func (s *composeService) stdin() *streams.In {
-	// If stream overrides are provided, use them
-	if s.inStream != nil {
-		return streams.NewIn(&readCloserAdapter{r: s.inStream})
-	}
 	return s.dockerCli.In()
 }
 
 func (s *composeService) stderr() *streams.Out {
-	// If stream overrides are provided, use them
-	if s.errStream != nil {
-		return streams.NewOut(s.errStream)
-	}
 	return s.dockerCli.Err()
 }
 
@@ -268,6 +261,11 @@ func (s *composeService) stdinfo() *streams.Out {
 		return s.stdout()
 	}
 	return s.stderr()
+}
+
+// GetConfiguredStreams returns the configured I/O streams (implements api.Compose interface)
+func (s *composeService) GetConfiguredStreams() (io.Writer, io.Writer, io.Reader) {
+	return s.stdout(), s.stderr(), s.stdin()
 }
 
 // readCloserAdapter adapts io.Reader to io.ReadCloser
@@ -281,6 +279,55 @@ func (r *readCloserAdapter) Read(p []byte) (int, error) {
 
 func (r *readCloserAdapter) Close() error {
 	return nil
+}
+
+// wrapDockerCliWithStreams wraps the Docker CLI to intercept and override stream methods
+func (s *composeService) wrapDockerCliWithStreams(baseCli command.Cli) command.Cli {
+	wrapper := &streamOverrideWrapper{
+		Cli: baseCli,
+	}
+
+	// Wrap custom streams in Docker CLI's stream types
+	if s.outStream != nil {
+		wrapper.outStream = streams.NewOut(s.outStream)
+	}
+	if s.errStream != nil {
+		wrapper.errStream = streams.NewOut(s.errStream)
+	}
+	if s.inStream != nil {
+		wrapper.inStream = streams.NewIn(&readCloserAdapter{r: s.inStream})
+	}
+
+	return wrapper
+}
+
+// streamOverrideWrapper wraps command.Cli to override streams with custom implementations
+type streamOverrideWrapper struct {
+	command.Cli
+	outStream *streams.Out
+	errStream *streams.Out
+	inStream  *streams.In
+}
+
+func (w *streamOverrideWrapper) Out() *streams.Out {
+	if w.outStream != nil {
+		return w.outStream
+	}
+	return w.Cli.Out()
+}
+
+func (w *streamOverrideWrapper) Err() *streams.Out {
+	if w.errStream != nil {
+		return w.errStream
+	}
+	return w.Cli.Err()
+}
+
+func (w *streamOverrideWrapper) In() *streams.In {
+	if w.inStream != nil {
+		return w.inStream
+	}
+	return w.Cli.In()
 }
 
 func getCanonicalContainerName(c container.Summary) string {
