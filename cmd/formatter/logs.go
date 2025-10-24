@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -119,13 +120,73 @@ func (l *logConsumer) write(w io.Writer, container, message string) {
 	}
 	p := l.getPresenter(container)
 	timestamp := time.Now().Format(jsonmessage.RFC3339NanoFixed)
-	for _, line := range strings.Split(message, "\n") {
+
+	lines := strings.Split(message, "\n")
+
+	for _, line := range lines {
+		formattedLine := line
+		if p.ansiState != "" {
+			formattedLine = p.ansiState + line
+		}
+
 		if l.timestamp {
-			_, _ = fmt.Fprintf(w, "%s%s %s\n", p.prefix, timestamp, line)
+			_, _ = fmt.Fprintf(w, "%s%s %s", p.prefix, timestamp, formattedLine)
 		} else {
-			_, _ = fmt.Fprintf(w, "%s%s\n", p.prefix, line)
+			_, _ = fmt.Fprintf(w, "%s%s", p.prefix, formattedLine)
+		}
+
+		if p.ansiState != "" || hasANSICodes(line) {
+			_, _ = fmt.Fprint(w, "\033[0m")
+		}
+		_, _ = fmt.Fprint(w, "\n")
+
+		p.ansiState = extractANSIState(formattedLine)
+	}
+}
+
+var ansiSGRPattern = regexp.MustCompile(`\033\[([0-9;]*)m`)
+
+func hasANSICodes(s string) bool {
+	return ansiSGRPattern.MatchString(s)
+}
+
+func extractANSIState(line string) string {
+	matches := ansiSGRPattern.FindAllStringSubmatch(line, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+
+	state := make(map[string]bool)
+	var activeFormats []string
+
+	for _, match := range matches {
+		codes := match[1]
+		if codes == "" || codes == "0" {
+			state = make(map[string]bool)
+			activeFormats = nil
+			continue
+		}
+
+		parts := strings.Split(codes, ";")
+		for _, part := range parts {
+			if part == "0" {
+				state = make(map[string]bool)
+				activeFormats = nil
+			} else {
+				state[part] = true
+			}
 		}
 	}
+
+	for code := range state {
+		activeFormats = append(activeFormats, code)
+	}
+
+	if len(activeFormats) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("\033[%sm", strings.Join(activeFormats, ";"))
 }
 
 func (l *logConsumer) Status(container, msg string) {
@@ -147,9 +208,10 @@ func (l *logConsumer) computeWidth() {
 }
 
 type presenter struct {
-	colors colorFunc
-	name   string
-	prefix string
+	colors    colorFunc
+	name      string
+	prefix    string
+	ansiState string
 }
 
 func (p *presenter) setPrefix(width int) {
