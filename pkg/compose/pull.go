@@ -35,6 +35,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/opencontainers/go-digest"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/internal/registry"
@@ -54,7 +55,6 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		return err
 	}
 
-	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(s.maxConcurrency)
 
@@ -67,7 +67,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	i := 0
 	for name, service := range project.Services {
 		if service.Image == "" {
-			w.Event(progress.Event{
+			s.events(ctx, progress.Event{
 				ID:     name,
 				Status: progress.Done,
 				Text:   "Skipped - No image to be pulled",
@@ -77,7 +77,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		switch service.PullPolicy {
 		case types.PullPolicyNever, types.PullPolicyBuild:
-			w.Event(progress.Event{
+			s.events(ctx, progress.Event{
 				ID:     name,
 				Status: progress.Done,
 				Text:   "Skipped",
@@ -85,7 +85,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			continue
 		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
 			if imageAlreadyPresent(service.Image, images) {
-				w.Event(progress.Event{
+				s.events(ctx, progress.Event{
 					ID:     name,
 					Status: progress.Done,
 					Text:   "Skipped - Image is already present locally",
@@ -95,7 +95,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		}
 
 		if service.Build != nil && opts.IgnoreBuildable {
-			w.Event(progress.Event{
+			s.events(ctx, progress.Event{
 				ID:     name,
 				Status: progress.Done,
 				Text:   "Skipped - Image can be built",
@@ -103,11 +103,11 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			continue
 		}
 
-		if s, ok := imagesBeingPulled[service.Image]; ok {
-			w.Event(progress.Event{
+		if img, ok := imagesBeingPulled[service.Image]; ok {
+			s.events(ctx, progress.Event{
 				ID:     name,
 				Status: progress.Done,
-				Text:   fmt.Sprintf("Skipped - Image is already being pulled by %v", s),
+				Text:   fmt.Sprintf("Skipped - Image is already being pulled by %v", img),
 			})
 			continue
 		}
@@ -116,7 +116,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		idx := i
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, w, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			_, err := s.pullServiceImage(ctx, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[idx] = err
 				if service.Build != nil {
@@ -124,7 +124,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				}
 				if !opts.IgnoreFailures && service.Build == nil {
 					if s.dryRun {
-						w.Event(progress.Event{
+						s.events(ctx, progress.Event{
 							ID:     name,
 							Status: progress.Error,
 							Text:   fmt.Sprintf(" - Pull error for image: %s", service.Image),
@@ -142,7 +142,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	err = eg.Wait()
 
 	if len(mustBuild) > 0 {
-		w.TailMsgf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(mustBuild, " "))
+		logrus.Warnf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(mustBuild, " "))
 	}
 
 	if err != nil {
@@ -177,8 +177,8 @@ func getUnwrappedErrorMessage(err error) string {
 	return err.Error()
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
-	w.Event(progress.Event{
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, quietPull bool, defaultPlatform string, ) (string, error) {
+	s.events(ctx, progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,
 		Text:   "Pulling",
@@ -204,7 +204,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	})
 
 	if ctx.Err() != nil {
-		w.Event(progress.Event{
+		s.events(ctx, progress.Event{
 			ID:         service.Name,
 			Status:     progress.Warning,
 			StatusText: "Interrupted",
@@ -215,7 +215,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	// check if has error and the service has a build section
 	// then the status should be warning instead of error
 	if err != nil && service.Build != nil {
-		w.Event(progress.Event{
+		s.events(ctx, progress.Event{
 			ID:         service.Name,
 			Status:     progress.Warning,
 			Text:       "Warning",
@@ -225,7 +225,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	}
 
 	if err != nil {
-		w.Event(progress.Event{
+		s.events(ctx, progress.Event{
 			ID:         service.Name,
 			Status:     progress.Error,
 			Text:       "Error",
@@ -247,10 +247,10 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			return "", errors.New(jm.Error.Message)
 		}
 		if !quietPull {
-			toPullProgressEvent(service.Name, jm, w)
+			toPullProgressEvent(ctx, service.Name, jm, s.events)
 		}
 	}
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:     service.Name,
 		Status: progress.Done,
 		Text:   "Pulled",
@@ -321,14 +321,13 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 	}
 
 	return progress.Run(ctx, func(ctx context.Context) error {
-		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(s.maxConcurrency)
 		pulledImages := map[string]api.ImageSummary{}
 		var mutex sync.Mutex
 		for name, service := range needPull {
 			eg.Go(func() error {
-				id, err := s.pullServiceImage(ctx, service, w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				id, err := s.pullServiceImage(ctx, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				mutex.Lock()
 				defer mutex.Unlock()
 				pulledImages[name] = api.ImageSummary{
@@ -414,7 +413,7 @@ const (
 	PullCompletePhase      = "Pull complete"
 )
 
-func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.Writer) {
+func toPullProgressEvent(ctx context.Context, parent string, jm jsonmessage.JSONMessage, events EventBus) {
 	if jm.ID == "" || jm.Progress == nil {
 		return
 	}
@@ -456,7 +455,7 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.W
 		text = jm.Error.Message
 	}
 
-	w.Event(progress.Event{
+	events(ctx, progress.Event{
 		ID:         jm.ID,
 		ParentID:   parent,
 		Current:    current,

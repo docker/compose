@@ -30,7 +30,6 @@ import (
 	"github.com/docker/buildx/util/confutil"
 	"github.com/docker/buildx/util/dockerutil"
 	buildx "github.com/docker/buildx/util/progress"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/moby/buildkit/client"
 )
 
@@ -67,10 +66,9 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, service string, op
 }
 
 func (s composeService) dryRunBuildResponse(ctx context.Context, name string, options build.Options) map[string]*client.SolveResponse {
-	w := progress.ContextWriter(ctx)
 	buildResponse := map[string]*client.SolveResponse{}
 	dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-	displayDryRunBuildEvent(w, name, dryRunUUID, options.Tags[0])
+	s.displayDryRunBuildEvent(ctx, name, dryRunUUID, options.Tags[0])
 	buildResponse[name] = &client.SolveResponse{ExporterResponse: map[string]string{
 		"containerimage.digest": dryRunUUID,
 	}}

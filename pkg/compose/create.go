@@ -1394,15 +1394,14 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	}
 
 	networkEventName := fmt.Sprintf("Network %s", n.Name)
-	w := progress.ContextWriter(ctx)
-	w.Event(progress.CreatingEvent(networkEventName))
+	s.events(ctx, progress.CreatingEvent(networkEventName))
 
 	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
 	if err != nil {
-		w.Event(progress.ErrorEvent(networkEventName))
+		s.events(ctx, progress.ErrorEvent(networkEventName))
 		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
-	w.Event(progress.CreatedEvent(networkEventName))
+	s.events(ctx, progress.CreatedEvent(networkEventName))
 
 	err = s.connectNetwork(ctx, n.Name, dangledContainers, nil)
 	if err != nil {
@@ -1444,7 +1443,7 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 
 	err = s.apiClient().NetworkRemove(ctx, n.Name)
 	eventName := fmt.Sprintf("Network %s", n.Name)
-	progress.ContextWriter(ctx).Event(progress.RemovedEvent(eventName))
+	s.events(ctx, progress.RemovedEvent(eventName))
 	return containers, err
 }
 
@@ -1623,8 +1622,7 @@ func (s *composeService) removeDivergedVolume(ctx context.Context, name string, 
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
 	eventName := fmt.Sprintf("Volume %s", volume.Name)
-	w := progress.ContextWriter(ctx)
-	w.Event(progress.CreatingEvent(eventName))
+	s.events(ctx, progress.CreatingEvent(eventName))
 	hash, err := VolumeHash(volume)
 	if err != nil {
 		return err
@@ -1637,9 +1635,9 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		DriverOpts: volume.DriverOpts,
 	})
 	if err != nil {
-		w.Event(progress.ErrorEvent(eventName))
+		s.events(ctx, progress.ErrorEvent(eventName))
 		return err
 	}
-	w.Event(progress.CreatedEvent(eventName))
+	s.events(ctx, progress.CreatedEvent(eventName))
 	return nil
 }

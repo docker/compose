@@ -40,12 +40,10 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return err
 	}
 
-	w := progress.ContextWriter(ctx)
-
 	name := getCanonicalContainerName(ctr)
 	msg := fmt.Sprintf("Commit %s", name)
 
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Working,
@@ -53,7 +51,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 	})
 
 	if s.dryRun {
-		w.Event(progress.Event{
+		s.events(ctx, progress.Event{
 			ID:         name,
 			Text:       msg,
 			Status:     progress.Done,
@@ -74,7 +72,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return err
 	}
 
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Done,

@@ -79,7 +79,6 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	w := progress.ContextWriter(ctx)
 	g := errgroup.Group{}
 	for _, cont := range containers {
 		ctr := cont
@@ -91,7 +90,7 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 			} else {
 				msg = fmt.Sprintf("copy %s to %s:%s", srcPath, name, dstPath)
 			}
-			w.Event(progress.Event{
+			s.events(ctx, progress.Event{
 				ID:         name,
 				Text:       msg,
 				Status:     progress.Working,
@@ -100,7 +99,7 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 			if err := copyFunc(ctx, ctr.ID, srcPath, dstPath, options); err != nil {
 				return err
 			}
-			w.Event(progress.Event{
+			s.events(ctx, progress.Event{
 				ID:         name,
 				Text:       msg,
 				Status:     progress.Done,

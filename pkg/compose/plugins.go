@@ -86,14 +86,13 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 }
 
 func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, command string, service types.ServiceConfig) (types.Mapping, error) {
-	pw := progress.ContextWriter(ctx)
 	var action string
 	switch command {
 	case "up":
-		pw.Event(progress.CreatingEvent(service.Name))
+		s.events(ctx, progress.CreatingEvent(service.Name))
 		action = "create"
 	case "down":
-		pw.Event(progress.RemovingEvent(service.Name))
+		s.events(ctx, progress.RemovingEvent(service.Name))
 		action = "remove"
 	default:
 		return nil, fmt.Errorf("unsupported plugin command: %s", command)
@@ -125,10 +124,10 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 		}
 		switch msg.Type {
 		case ErrorType:
-			pw.Event(progress.NewEvent(service.Name, progress.Error, msg.Message))
+			s.events(ctx, progress.NewEvent(service.Name, progress.Error, msg.Message))
 			return nil, errors.New(msg.Message)
 		case InfoType:
-			pw.Event(progress.NewEvent(service.Name, progress.Working, msg.Message))
+			s.events(ctx, progress.NewEvent(service.Name, progress.Working, msg.Message))
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
@@ -144,14 +143,14 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 
 	err = cmd.Wait()
 	if err != nil {
-		pw.Event(progress.ErrorMessageEvent(service.Name, err.Error()))
+		s.events(ctx, progress.ErrorMessageEvent(service.Name, err.Error()))
 		return nil, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
 	}
 	switch command {
 	case "up":
-		pw.Event(progress.CreatedEvent(service.Name))
+		s.events(ctx, progress.CreatedEvent(service.Name))
 	case "down":
-		pw.Event(progress.RemovedEvent(service.Name))
+		s.events(ctx, progress.RemovedEvent(service.Name))
 	}
 	return variables, nil
 }

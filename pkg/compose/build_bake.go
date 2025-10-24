@@ -340,7 +340,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	logrus.Debugf("Executing bake with args: %v", args)
 
 	if s.dryRun {
-		return dryRunBake(ctx, cfg), nil
+		return s.dryRunBake(ctx, cfg), nil
 	}
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 
@@ -417,7 +417,6 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
-	cw := progress.ContextWriter(ctx)
 	results := map[string]string{}
 	for name := range serviceToBeBuild {
 		image := expectedImages[name]
@@ -427,7 +426,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
 		results[image] = built.Digest
-		cw.Event(progress.BuiltEvent(image))
+		s.events(ctx, progress.BuiltEvent(image))
 	}
 	return results, nil
 }
@@ -565,27 +564,26 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	return dockerfile
 }
 
-func dryRunBake(ctx context.Context, cfg bakeConfig) map[string]string {
-	w := progress.ContextWriter(ctx)
+func (s composeService) dryRunBake(ctx context.Context, cfg bakeConfig) map[string]string {
 	bakeResponse := map[string]string{}
 	for name, target := range cfg.Targets {
 		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-		displayDryRunBuildEvent(w, name, dryRunUUID, target.Tags[0])
+		s.displayDryRunBuildEvent(ctx, name, dryRunUUID, target.Tags[0])
 		bakeResponse[name] = dryRunUUID
 	}
 	for name := range bakeResponse {
-		w.Event(progress.BuiltEvent(name))
+		s.events(ctx, progress.BuiltEvent(name))
 	}
 	return bakeResponse
 }
 
-func displayDryRunBuildEvent(w progress.Writer, name string, dryRunUUID, tag string) {
-	w.Event(progress.Event{
+func (s composeService) displayDryRunBuildEvent(ctx context.Context, name, dryRunUUID, tag string) {
+	s.events(ctx, progress.Event{
 		ID:     name + " ==>",
 		Status: progress.Done,
 		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
 	})
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:     name + " ==> ==>",
 		Status: progress.Done,
 		Text:   fmt.Sprintf(`naming to %s`, tag),
