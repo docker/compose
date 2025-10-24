@@ -343,7 +343,7 @@ func TestCreateMobyContainer(t *testing.T) {
 
 		_, err := tested.createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
 			Labels: make(types.Labels),
-		}, progress.ContextWriter(context.TODO()))
+		})
 		assert.NilError(t, err)
 	})
 
@@ -430,7 +430,7 @@ func TestCreateMobyContainer(t *testing.T) {
 
 		_, err := tested.createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
 			Labels: make(types.Labels),
-		}, progress.ContextWriter(context.TODO()))
+		})
 		assert.NilError(t, err)
 	})
 }

@@ -35,8 +35,6 @@ func (s *composeService) Kill(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) kill(ctx context.Context, projectName string, options api.KillOptions) error {
-	w := progress.ContextWriter(ctx)
-
 	services := options.Services
 
 	var containers Containers
@@ -65,13 +63,13 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 	containers.forEach(func(ctr container.Summary) {
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)
-			w.Event(progress.KillingEvent(eventName))
+			s.events(ctx, progress.KillingEvent(eventName))
 			err := s.apiClient().ContainerKill(ctx, ctr.ID, options.Signal)
 			if err != nil {
-				w.Event(progress.ErrorMessageEvent(eventName, "Error while Killing"))
+				s.events(ctx, progress.ErrorMessageEvent(eventName, "Error while Killing"))
 				return err
 			}
-			w.Event(progress.KilledEvent(eventName))
+			s.events(ctx, progress.KilledEvent(eventName))
 			return nil
 		})
 	})

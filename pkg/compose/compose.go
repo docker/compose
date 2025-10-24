@@ -32,6 +32,7 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -81,6 +82,10 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		clock:          clockwork.NewRealClock(),
 		maxConcurrency: -1,
 		dryRun:         false,
+		events: func(ctx context.Context, e ...progress.Event) {
+			// FIXME(ndeloof) temporary during refactoring
+			progress.ContextWriter(ctx).Events(e)
+		},
 	}
 	for _, option := range options {
 		if err := option(s); err != nil {
@@ -191,10 +196,14 @@ func WithDryRun(s *composeService) error {
 
 type Prompt func(message string, defaultValue bool) (bool, error)
 
+type EventBus func(ctx context.Context, e ...progress.Event)
+
 type composeService struct {
 	dockerCli command.Cli
 	// prompt is used to interact with user and confirm actions
 	prompt Prompt
+	// eventBus collects tasks execution events
+	events EventBus
 
 	// Optional overrides for specific components (for SDK users)
 	outStream   io.Writer

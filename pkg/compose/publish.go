@@ -71,8 +71,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 
-	w := progress.ContextWriter(ctx)
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:     repository,
 		Text:   "publishing",
 		Status: progress.Working,
@@ -94,7 +93,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 
 		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
-			w.Event(progress.Event{
+			s.events(ctx, progress.Event{
 				ID:     repository,
 				Text:   "publishing",
 				Status: progress.Error,
@@ -146,7 +145,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			}
 		}
 	}
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:     repository,
 		Text:   "published",
 		Status: progress.Done,

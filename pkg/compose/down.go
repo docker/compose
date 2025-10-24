@@ -44,7 +44,6 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error { //nolint:gocyclo
-	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
 	include := oneOffExclude
@@ -102,10 +101,10 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
-	ops := s.ensureNetworksDown(ctx, project, w)
+	ops := s.ensureNetworksDown(ctx, project)
 
 	if options.Images != "" {
-		imgOps, err := s.ensureImagesDown(ctx, project, options, w)
+		imgOps, err := s.ensureImagesDown(ctx, project, options)
 		if err != nil {
 			return err
 		}
@@ -113,7 +112,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, project, w)...)
+		ops = append(ops, s.ensureVolumesDown(ctx, project)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
@@ -144,7 +143,7 @@ func checkSelectedServices(options api.DownOptions, project *types.Project) ([]s
 	return services, nil
 }
 
-func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project) []downOp {
 	var ops []downOp
 	for _, vol := range project.Volumes {
 		if vol.External {
@@ -152,14 +151,14 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 		}
 		volumeName := vol.Name
 		ops = append(ops, func() error {
-			return s.removeVolume(ctx, volumeName, w)
+			return s.removeVolume(ctx, volumeName)
 		})
 	}
 
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) ([]downOp, error) {
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) ([]downOp, error) {
 	imagePruner := NewImagePruner(s.apiClient(), project)
 	pruneOpts := ImagePruneOptions{
 		Mode:          ImagePruneMode(options.Images),
@@ -174,13 +173,13 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 	for i := range images {
 		img := images[i]
 		ops = append(ops, func() error {
-			return s.removeImage(ctx, img, w)
+			return s.removeImage(ctx, img)
 		})
 	}
 	return ops, nil
 }
 
-func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
+func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project) []downOp {
 	var ops []downOp
 	for key, n := range project.Networks {
 		if n.External {
@@ -190,13 +189,13 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 		networkKey := key
 		idOrName := n.Name
 		ops = append(ops, func() error {
-			return s.removeNetwork(ctx, networkKey, project.Name, idOrName, w)
+			return s.removeNetwork(ctx, networkKey, project.Name, idOrName)
 		})
 	}
 	return ops
 }
 
-func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName string, projectName string, name string, w progress.Writer) error {
+func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName string, projectName string, name string) error {
 	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
@@ -211,7 +210,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 	}
 
 	eventName := fmt.Sprintf("Network %s", name)
-	w.Event(progress.RemovingEvent(eventName))
+	s.events(ctx, progress.RemovingEvent(eventName))
 
 	var found int
 	for _, net := range networks {
@@ -220,14 +219,14 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		}
 		nw, err := s.apiClient().NetworkInspect(ctx, net.ID, network.InspectOptions{})
 		if errdefs.IsNotFound(err) {
-			w.Event(progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
+			s.events(ctx, progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
 			return nil
 		}
 		if err != nil {
 			return err
 		}
 		if len(nw.Containers) > 0 {
-			w.Event(progress.NewEvent(eventName, progress.Warning, "Resource is still in use"))
+			s.events(ctx, progress.NewEvent(eventName, progress.Warning, "Resource is still in use"))
 			found++
 			continue
 		}
@@ -236,10 +235,10 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 			if errdefs.IsNotFound(err) {
 				continue
 			}
-			w.Event(progress.ErrorEvent(eventName))
+			s.events(ctx, progress.ErrorEvent(eventName))
 			return fmt.Errorf("failed to remove network %s: %w", name, err)
 		}
-		w.Event(progress.RemovedEvent(eventName))
+		s.events(ctx, progress.RemovedEvent(eventName))
 		found++
 	}
 
@@ -247,32 +246,32 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		// in practice, it's extremely unlikely for this to ever occur, as it'd
 		// mean the network was present when we queried at the start of this
 		// method but was then deleted by something else in the interim
-		w.Event(progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
+		s.events(ctx, progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
 		return nil
 	}
 	return nil
 }
 
-func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {
+func (s *composeService) removeImage(ctx context.Context, image string) error {
 	id := fmt.Sprintf("Image %s", image)
-	w.Event(progress.NewEvent(id, progress.Working, "Removing"))
+	s.events(ctx, progress.NewEvent(id, progress.Working, "Removing"))
 	_, err := s.apiClient().ImageRemove(ctx, image, imageapi.RemoveOptions{})
 	if err == nil {
-		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
+		s.events(ctx, progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
 	}
 	if errdefs.IsConflict(err) {
-		w.Event(progress.NewEvent(id, progress.Warning, "Resource is still in use"))
+		s.events(ctx, progress.NewEvent(id, progress.Warning, "Resource is still in use"))
 		return nil
 	}
 	if errdefs.IsNotFound(err) {
-		w.Event(progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
+		s.events(ctx, progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
 		return nil
 	}
 	return err
 }
 
-func (s *composeService) removeVolume(ctx context.Context, id string, w progress.Writer) error {
+func (s *composeService) removeVolume(ctx context.Context, id string) error {
 	resource := fmt.Sprintf("Volume %s", id)
 
 	_, err := s.apiClient().VolumeInspect(ctx, id)
@@ -281,30 +280,26 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 		return nil
 	}
 
-	w.Event(progress.NewEvent(resource, progress.Working, "Removing"))
+	s.events(ctx, progress.NewEvent(resource, progress.Working, "Removing"))
 	err = s.apiClient().VolumeRemove(ctx, id, true)
 	if err == nil {
-		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
+		s.events(ctx, progress.NewEvent(resource, progress.Done, "Removed"))
 		return nil
 	}
 	if errdefs.IsConflict(err) {
-		w.Event(progress.NewEvent(resource, progress.Warning, "Resource is still in use"))
+		s.events(ctx, progress.NewEvent(resource, progress.Warning, "Resource is still in use"))
 		return nil
 	}
 	if errdefs.IsNotFound(err) {
-		w.Event(progress.NewEvent(resource, progress.Done, "Warning: No resource found to remove"))
+		s.events(ctx, progress.NewEvent(resource, progress.Done, "Warning: No resource found to remove"))
 		return nil
 	}
 	return err
 }
 
-func (s *composeService) stopContainer(
-	ctx context.Context, w progress.Writer,
-	service *types.ServiceConfig, ctr containerType.Summary,
-	timeout *time.Duration, listener api.ContainerEventListener,
-) error {
+func (s *composeService) stopContainer(ctx context.Context, service *types.ServiceConfig, ctr containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener, ) error {
 	eventName := getContainerProgressName(ctr)
-	w.Event(progress.StoppingEvent(eventName))
+	s.events(ctx, progress.StoppingEvent(eventName))
 
 	if service != nil {
 		for _, hook := range service.PreStop {
@@ -322,22 +317,18 @@ func (s *composeService) stopContainer(
 	timeoutInSecond := utils.DurationSecondToInt(timeout)
 	err := s.apiClient().ContainerStop(ctx, ctr.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 	if err != nil {
-		w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
+		s.events(ctx, progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 		return err
 	}
-	w.Event(progress.StoppedEvent(eventName))
+	s.events(ctx, progress.StoppedEvent(eventName))
 	return nil
 }
 
-func (s *composeService) stopContainers(
-	ctx context.Context, w progress.Writer,
-	serv *types.ServiceConfig, containers []containerType.Summary,
-	timeout *time.Duration, listener api.ContainerEventListener,
-) error {
+func (s *composeService) stopContainers(ctx context.Context, serv *types.ServiceConfig, containers []containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener, ) error {
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, ctr := range containers {
 		eg.Go(func() error {
-			return s.stopContainer(ctx, w, serv, ctr, timeout, listener)
+			return s.stopContainer(ctx, serv, ctr, timeout, listener)
 		})
 	}
 	return eg.Wait()
@@ -354,26 +345,25 @@ func (s *composeService) removeContainers(ctx context.Context, containers []cont
 }
 
 func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
-	w := progress.ContextWriter(ctx)
 	eventName := getContainerProgressName(ctr)
-	err := s.stopContainer(ctx, w, service, ctr, timeout, nil)
+	err := s.stopContainer(ctx, service, ctr, timeout, nil)
 	if errdefs.IsNotFound(err) {
-		w.Event(progress.RemovedEvent(eventName))
+		s.events(ctx, progress.RemovedEvent(eventName))
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	w.Event(progress.RemovingEvent(eventName))
+	s.events(ctx, progress.RemovingEvent(eventName))
 	err = s.apiClient().ContainerRemove(ctx, ctr.ID, containerType.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: volumes,
 	})
 	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
-		w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
+		s.events(ctx, progress.ErrorMessageEvent(eventName, "Error while Removing"))
 		return err
 	}
-	w.Event(progress.RemovedEvent(eventName))
+	s.events(ctx, progress.RemovedEvent(eventName))
 	return nil
 }
 

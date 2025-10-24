@@ -43,14 +43,13 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 	containers.forEach(func(container container.Summary) {
 		eg.Go(func() error {
 			err := s.apiClient().ContainerPause(ctx, container.ID)
 			if err == nil {
 				eventName := getContainerProgressName(container)
-				w.Event(progress.NewEvent(eventName, progress.Done, "Paused"))
+				s.events(ctx, progress.NewEvent(eventName, progress.Done, "Paused"))
 			}
 			return err
 		})
@@ -74,14 +73,13 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 	containers.forEach(func(ctr container.Summary) {
 		eg.Go(func() error {
 			err = s.apiClient().ContainerUnpause(ctx, ctr.ID)
 			if err == nil {
 				eventName := getContainerProgressName(ctr)
-				w.Event(progress.NewEvent(eventName, progress.Done, "Unpaused"))
+				s.events(ctx, progress.NewEvent(eventName, progress.Done, "Unpaused"))
 			}
 			return err
 		})

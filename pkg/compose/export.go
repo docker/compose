@@ -50,12 +50,10 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		return fmt.Errorf("failed to export container: %w", err)
 	}
 
-	w := progress.ContextWriter(ctx)
-
 	name := getCanonicalContainerName(container)
 	msg := fmt.Sprintf("export %s to %s", name, options.Output)
 
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Working,
@@ -69,7 +67,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 
 	defer func() {
 		if err := responseBody.Close(); err != nil {
-			w.Event(progress.Event{
+			s.events(ctx, progress.Event{
 				ID:         name,
 				Text:       msg,
 				Status:     progress.Error,
@@ -94,7 +92,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		}
 	}
 
-	w.Event(progress.Event{
+	s.events(ctx, progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Done,

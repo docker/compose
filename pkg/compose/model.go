@@ -51,19 +51,18 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		return api.SetModelVariables(ctx, project)
 	})
 
-	w := progress.ContextWriter(ctx)
 	for name, config := range project.Models {
 		if config.Name == "" {
 			config.Name = name
 		}
 		eg.Go(func() error {
 			if !slices.Contains(availableModels, config.Model) {
-				err = api.PullModel(ctx, config, quietPull, w)
+				err = api.PullModel(ctx, config, quietPull, s.events)
 				if err != nil {
 					return err
 				}
 			}
-			return api.ConfigureModel(ctx, config, w)
+			return api.ConfigureModel(ctx, config, s.events)
 		})
 	}
 	return eg.Wait()
@@ -102,8 +101,8 @@ func (m *modelAPI) Close() {
 	m.cleanup()
 }
 
-func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, w progress.Writer) error {
-	w.Event(progress.Event{
+func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events EventBus) error {
+	events(ctx, progress.Event{
 		ID:     model.Name,
 		Status: progress.Working,
 		Text:   "Pulling",
@@ -132,7 +131,7 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 		}
 
 		if !quietPull {
-			w.Event(progress.Event{
+			events(ctx, progress.Event{
 				ID:         model.Name,
 				Status:     progress.Working,
 				Text:       "Pulling",
@@ -143,9 +142,9 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 
 	err = cmd.Wait()
 	if err != nil {
-		w.Event(progress.ErrorMessageEvent(model.Name, err.Error()))
+		events(ctx, progress.ErrorMessageEvent(model.Name, err.Error()))
 	}
-	w.Event(progress.Event{
+	events(ctx, progress.Event{
 		ID:     model.Name,
 		Status: progress.Working,
 		Text:   "Pulled",
@@ -153,8 +152,8 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 	return err
 }
 
-func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, w progress.Writer) error {
-	w.Event(progress.Event{
+func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events EventBus) error {
+	events(ctx, progress.Event{
 		ID:     config.Name,
 		Status: progress.Working,
 		Text:   "Configuring",

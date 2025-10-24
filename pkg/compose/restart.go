@@ -75,7 +75,6 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		}
 	}
 
-	w := progress.ContextWriter(ctx)
 	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		config := project.Services[service]
 		err = s.waitDependencies(ctx, project, service, config.DependsOn, containers, 0)
@@ -94,13 +93,13 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 					}
 				}
 				eventName := getContainerProgressName(ctr)
-				w.Event(progress.RestartingEvent(eventName))
+				s.events(ctx, progress.RestartingEvent(eventName))
 				timeout := utils.DurationSecondToInt(options.Timeout)
 				err = s.apiClient().ContainerRestart(ctx, ctr.ID, container.StopOptions{Timeout: timeout})
 				if err != nil {
 					return err
 				}
-				w.Event(progress.StartedEvent(eventName))
+				s.events(ctx, progress.StartedEvent(eventName))
 				for _, hook := range def.PostStart {
 					err = s.runHook(ctx, ctr, def, hook, nil)
 					if err != nil {

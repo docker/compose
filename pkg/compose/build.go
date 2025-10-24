@@ -199,7 +199,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return -1
 	}
 
-	cw := progress.ContextWriter(ctx)
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		service, ok := serviceToBuild[name]
 		if !ok {
@@ -209,12 +208,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 		if !buildkitEnabled {
 			trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "classic"))
-			cw.Event(progress.BuildingEvent(serviceName))
+			s.events(ctx, progress.BuildingEvent(serviceName))
 			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
 				return err
 			}
-			cw.Event(progress.BuiltEvent(serviceName))
+			s.events(ctx, progress.BuiltEvent(serviceName))
 			builtDigests[getServiceIndex(name)] = id
 
 			if options.Push {
@@ -260,7 +259,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			service := project.Services[names[i]]
 			imageRef := api.GetImageNameOrDefault(service, project.Name)
 			imageIDs[imageRef] = imageDigest
-			cw.Event(progress.BuiltEvent(names[i]))
+			s.events(ctx, progress.BuiltEvent(names[i]))
 		}
 	}
 	return imageIDs, err
