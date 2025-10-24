@@ -37,6 +37,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/jonboulle/clockwork"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -62,6 +63,13 @@ func NewComposeService(dockerCli command.Cli, options ...Option) api.Compose {
 	}
 	for _, option := range options {
 		option(s)
+	}
+	if s.prompt == nil {
+		s.prompt = func(message string, defaultValue bool) (bool, error) {
+			fmt.Println(message)
+			logrus.Warning("Compose is running without a 'prompt' component to interact with user")
+			return defaultValue, nil
+		}
 	}
 	return s
 }
