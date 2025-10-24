@@ -162,8 +162,8 @@ func NewWriter(ctx context.Context, out *streams.Out, progressTitle string) (Wri
 func newTTYWriter(out io.Writer, dryRun bool, progressTitle string) (Writer, error) {
 	return &ttyWriter{
 		out:           out,
-		eventIDs:      []string{},
-		events:        map[string]Event{},
+		ids:           []string{},
+		tasks:         map[string]task{},
 		repeated:      false,
 		done:          make(chan bool),
 		mtx:           &sync.Mutex{},
