@@ -177,7 +177,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if options.Progress == progress.ModeAuto {
 			options.Progress = os.Getenv("BUILDKIT_PROGRESS")
 		}
-		w, err = xprogress.NewPrinter(progressCtx, os.Stdout, progressui.DisplayMode(options.Progress),
+		w, err = xprogress.NewPrinter(progressCtx, s.stdout(), progressui.DisplayMode(options.Progress),
 			xprogress.WithDesc(
 				fmt.Sprintf("building with %q instance using %s driver", b.Name, b.Driver),
 				fmt.Sprintf("%s:%s", b.Driver, b.Name),

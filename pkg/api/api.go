@@ -103,6 +103,12 @@ type Compose interface {
 	Generate(ctx context.Context, options GenerateOptions) (*types.Project, error)
 	// Volumes executes the equivalent to a `docker volume ls`
 	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
+	// Stdout returns output stream defined during Compose Service initialization
+	Stdout() io.Writer
+	// Stderr returns the error stream defined at Compose Service initialization
+	Stderr() io.Writer
+	// Stdin returns the input stream defined at Compose Service initialization
+	Stdin() io.Reader
 }
 
 type VolumesOptions struct {

@@ -142,7 +142,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		if displayMode == progress.ModeAuto && !s.stdout().IsTerminal() {
 			displayMode = progressui.PlainMode
 		}
-		out = os.Stdout // should be s.stdout(), but NewDisplay require access to the underlying *File
+		out = s.stdout()
 	}
 	display, err := progressui.NewDisplay(out, displayMode)
 	if err != nil {

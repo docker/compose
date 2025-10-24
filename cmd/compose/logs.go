@@ -85,7 +85,7 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backend api.Compose, op
 		}
 	}
 
-	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !opts.noColor, !opts.noPrefix, false)
+	consumer := formatter.NewLogConsumer(ctx, backend.Stdout(), backend.Stderr(), !opts.noColor, !opts.noPrefix, false)
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
 		Services:   services,
