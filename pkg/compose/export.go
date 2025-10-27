@@ -29,9 +29,9 @@ import (
 )
 
 func (s *composeService) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
-	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.export(ctx, projectName, options)
-	}, s.stdinfo(), "Exporting")
+	}, s.stdinfo(), "export")
 }
 
 func (s *composeService) export(ctx context.Context, projectName string, options api.ExportOptions) error {

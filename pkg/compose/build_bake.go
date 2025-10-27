@@ -426,7 +426,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
 		results[image] = built.Digest
-		s.events(ctx, progress.BuiltEvent(image))
+		s.events(ctx, progress.BuiltEvent("Image "+image))
 	}
 	return results, nil
 }

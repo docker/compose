@@ -31,5 +31,5 @@ func (s *composeService) Scale(ctx context.Context, project *types.Project, opti
 			return err
 		}
 		return s.start(ctx, project.Name, api.StartOptions{Project: project, Services: options.Services}, nil)
-	}), s.stdinfo())
+	}), s.stdinfo(), "scale")
 }

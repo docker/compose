@@ -58,13 +58,13 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	if err != nil {
 		return err
 	}
-	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
 		return tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 			func(ctx context.Context) error {
 				_, err := s.build(ctx, project, options, nil)
 				return err
 			})(ctx)
-	}, s.stdinfo(), "Building")
+	}, s.stdinfo(), "build")
 }
 
 //nolint:gocyclo
@@ -204,16 +204,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if !ok {
 			return nil
 		}
-		serviceName := fmt.Sprintf("Service %s", name)
-
 		if !buildkitEnabled {
 			trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "classic"))
-			s.events(ctx, progress.BuildingEvent(serviceName))
 			id, err := s.doBuildClassic(ctx, project, service, options)
 			if err != nil {
 				return err
 			}
-			s.events(ctx, progress.BuiltEvent(serviceName))
 			builtDigests[getServiceIndex(name)] = id
 
 			if options.Push {
@@ -230,6 +226,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
+		s.events(ctx, progress.BuildingEvent("Image "+buildOptions.Tags[0]))
 
 		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "buildkit"))
 		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
@@ -259,7 +256,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			service := project.Services[names[i]]
 			imageRef := api.GetImageNameOrDefault(service, project.Name)
 			imageIDs[imageRef] = imageDigest
-			s.events(ctx, progress.BuiltEvent(names[i]))
+			s.events(ctx, progress.BuiltEvent("Image "+imageRef))
 		}
 	}
 	return imageIDs, err

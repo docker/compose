@@ -27,9 +27,9 @@ import (
 )
 
 func (s *composeService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
-	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.commit(ctx, projectName, options)
-	}, s.stdinfo(), "Committing")
+	}, s.stdinfo(), "commit")
 }
 
 func (s *composeService) commit(ctx context.Context, projectName string, options api.CommitOptions) error {

@@ -29,9 +29,9 @@ import (
 )
 
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
-	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.restart(ctx, strings.ToLower(projectName), options)
-	}, s.stdinfo(), "Restarting")
+	}, s.stdinfo(), "restart")
 }
 
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error { //nolint:gocyclo
