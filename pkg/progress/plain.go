@@ -24,19 +24,18 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 )
 
+func NewPlainWriter(out io.Writer) EventProcessor {
+	return &plainWriter{
+		out: out,
+	}
+}
+
 type plainWriter struct {
 	out    io.Writer
-	done   chan bool
 	dryRun bool
 }
 
-func (p *plainWriter) Start(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-p.done:
-		return nil
-	}
+func (p *plainWriter) Start(ctx context.Context, operation string) {
 }
 
 func (p *plainWriter) Event(e Event) {
@@ -47,20 +46,11 @@ func (p *plainWriter) Event(e Event) {
 	_, _ = fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.StatusText)
 }
 
-func (p *plainWriter) Events(events []Event) {
+func (p *plainWriter) On(events ...Event) {
 	for _, e := range events {
 		p.Event(e)
 	}
 }
 
-func (p *plainWriter) TailMsgf(msg string, args ...interface{}) {
-	msg = fmt.Sprintf(msg, args...)
-	if p.dryRun {
-		msg = api.DRYRUN_PREFIX + msg
-	}
-	_, _ = fmt.Fprintln(p.out, msg)
-}
-
-func (p *plainWriter) Stop() {
-	p.done <- true
+func (p *plainWriter) Done(_ string, _ bool) {
 }

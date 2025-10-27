@@ -67,7 +67,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
 		return s.startDependencies(ctx, project, opts)
-	}, s.stdinfo(), "run")
+	}, "run", s.events)
 	if err != nil {
 		return "", err
 	}

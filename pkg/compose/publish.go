@@ -45,7 +45,7 @@ import (
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.publish(ctx, project, repository, options)
-	}, s.stdinfo(), "publish")
+	}, "publish", s.events)
 }
 
 //nolint:gocyclo
@@ -71,7 +71,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 
-	s.events(ctx, progress.Event{
+	s.events.On(progress.Event{
 		ID:     repository,
 		Text:   "publishing",
 		Status: progress.Working,
@@ -93,7 +93,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 
 		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
-			s.events(ctx, progress.Event{
+			s.events.On(progress.Event{
 				ID:     repository,
 				Text:   "publishing",
 				Status: progress.Error,
@@ -145,7 +145,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			}
 		}
 	}
-	s.events(ctx, progress.Event{
+	s.events.On(progress.Event{
 		ID:     repository,
 		Text:   "published",
 		Status: progress.Done,

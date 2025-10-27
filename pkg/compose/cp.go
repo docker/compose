@@ -45,7 +45,7 @@ const (
 func (s *composeService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.copy(ctx, projectName, options)
-	}, s.stdinfo(), "copy")
+	}, "copy", s.events)
 }
 
 func (s *composeService) copy(ctx context.Context, projectName string, options api.CopyOptions) error {
@@ -90,7 +90,7 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 			} else {
 				msg = fmt.Sprintf("copy %s to %s:%s", srcPath, name, dstPath)
 			}
-			s.events(ctx, progress.Event{
+			s.events.On(progress.Event{
 				ID:         name,
 				Text:       msg,
 				Status:     progress.Working,
@@ -99,7 +99,7 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 			if err := copyFunc(ctx, ctr.ID, srcPath, dstPath, options); err != nil {
 				return err
 			}
-			s.events(ctx, progress.Event{
+			s.events.On(progress.Event{
 				ID:         name,
 				Text:       msg,
 				Status:     progress.Done,

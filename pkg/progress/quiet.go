@@ -18,20 +18,17 @@ package progress
 
 import "context"
 
+func NewQuiedWriter() EventProcessor {
+	return &quiet{}
+}
+
 type quiet struct{}
 
-func (q quiet) Start(_ context.Context) error {
-	return nil
+func (q *quiet) Start(_ context.Context, _ string) {
 }
 
-func (q quiet) Stop() {
+func (q *quiet) Done(_ string, _ bool) {
 }
 
-func (q quiet) Event(_ Event) {
-}
-
-func (q quiet) Events(_ []Event) {
-}
-
-func (q quiet) TailMsgf(_ string, _ ...interface{}) {
+func (q *quiet) On(_ ...Event) {
 }

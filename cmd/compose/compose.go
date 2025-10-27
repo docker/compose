@@ -508,29 +508,42 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 				ui.Mode = ui.ModeTTY
 			}
 
+			var ep ui.EventProcessor
 			switch opts.Progress {
 			case "", ui.ModeAuto:
-				if ansi == "never" {
+				switch {
+				case ansi == "never":
 					ui.Mode = ui.ModePlain
+					ep = ui.NewPlainWriter(dockerCli.Err())
+				case dockerCli.Out().IsTerminal():
+					ep = ui.NewTTYWriter(dockerCli.Err())
+				default:
+					ep = ui.NewPlainWriter(dockerCli.Err())
 				}
 			case ui.ModeTTY:
 				if ansi == "never" {
 					return fmt.Errorf("can't use --progress tty while ANSI support is disabled")
 				}
 				ui.Mode = ui.ModeTTY
+				ep = ui.NewTTYWriter(dockerCli.Err())
+
 			case ui.ModePlain:
 				if ansi == "always" {
 					return fmt.Errorf("can't use --progress plain while ANSI support is forced")
 				}
 				ui.Mode = ui.ModePlain
+				ep = ui.NewPlainWriter(dockerCli.Err())
 			case ui.ModeQuiet, "none":
 				ui.Mode = ui.ModeQuiet
+				ep = ui.NewQuiedWriter()
 			case ui.ModeJSON:
 				ui.Mode = ui.ModeJSON
 				logrus.SetFormatter(&logrus.JSONFormatter{})
+				ep = ui.NewJSONWriter(dockerCli.Err())
 			default:
 				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
+			backendOptions.Add(compose.WithEventProcessor(ep))
 
 			// (4) options validation / normalization
 			if opts.WorkDir != "" {

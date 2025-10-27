@@ -30,7 +30,7 @@ import (
 func (s *composeService) Pause(ctx context.Context, projectName string, options api.PauseOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.pause(ctx, strings.ToLower(projectName), options)
-	}, s.stdinfo(), "pause")
+	}, "pause", s.events)
 }
 
 func (s *composeService) pause(ctx context.Context, projectName string, options api.PauseOptions) error {
@@ -49,7 +49,7 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 			err := s.apiClient().ContainerPause(ctx, container.ID)
 			if err == nil {
 				eventName := getContainerProgressName(container)
-				s.events(ctx, progress.NewEvent(eventName, progress.Done, "Paused"))
+				s.events.On(progress.NewEvent(eventName, progress.Done, "Paused"))
 			}
 			return err
 		})
@@ -60,7 +60,7 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 func (s *composeService) UnPause(ctx context.Context, projectName string, options api.PauseOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.unPause(ctx, strings.ToLower(projectName), options)
-	}, s.stdinfo(), "unpause")
+	}, "unpause", s.events)
 }
 
 func (s *composeService) unPause(ctx context.Context, projectName string, options api.PauseOptions) error {
@@ -79,7 +79,7 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 			err = s.apiClient().ContainerUnpause(ctx, ctr.ID)
 			if err == nil {
 				eventName := getContainerProgressName(ctr)
-				s.events(ctx, progress.NewEvent(eventName, progress.Done, "Unpaused"))
+				s.events.On(progress.NewEvent(eventName, progress.Done, "Unpaused"))
 			}
 			return err
 		})

@@ -37,9 +37,8 @@ func TestImages(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
 
 	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))

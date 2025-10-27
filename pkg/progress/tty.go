@@ -32,6 +32,18 @@ import (
 	"github.com/morikuni/aec"
 )
 
+// NewTTYWriter creates an EventProcessor that render advanced UI within a terminal.
+// On Start, TUI lists task with a progress timer
+func NewTTYWriter(out io.Writer) EventProcessor {
+	return &ttyWriter{
+		out:   out,
+		tasks: map[string]task{},
+		ids:   []string{},
+		done:  make(chan bool),
+		mtx:   &sync.Mutex{},
+	}
+}
+
 type ttyWriter struct {
 	out             io.Writer
 	tasks           map[string]task
@@ -40,10 +52,10 @@ type ttyWriter struct {
 	numLines        int
 	done            chan bool
 	mtx             *sync.Mutex
-	tailEvents      []string
-	dryRun          bool
+	dryRun          bool // FIXME(ndeloof) (re)implement support for dry-run
 	skipChildEvents bool
-	progressTitle   string
+	title           string
+	ticker          *time.Ticker
 }
 
 type task struct {
@@ -69,34 +81,40 @@ func (t *task) hasMore() {
 	t.spinner.Restart()
 }
 
-func (w *ttyWriter) Start(ctx context.Context) error {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			w.print()
-			w.printTailEvents()
-			return ctx.Err()
-		case <-w.done:
-			w.print()
-			w.printTailEvents()
-			return nil
-		case <-ticker.C:
-			w.print()
+func (w *ttyWriter) Start(ctx context.Context, operation string) {
+	w.ticker = time.NewTicker(100 * time.Millisecond)
+	w.title = operation
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				// interrupted
+				w.ticker.Stop()
+				return
+			case <-w.done:
+				w.print()
+				w.mtx.Lock()
+				w.ticker.Stop()
+				w.title = ""
+				w.mtx.Unlock()
+				return
+			case <-w.ticker.C:
+				w.print()
+			}
 		}
-	}
+	}()
 }
 
-func (w *ttyWriter) Stop() {
+func (w *ttyWriter) Done(operation string, success bool) {
 	w.done <- true
 }
 
-func (w *ttyWriter) Event(e Event) {
+func (w *ttyWriter) On(events ...Event) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	w.event(e)
+	for _, e := range events {
+		w.event(e)
+	}
 }
 
 func (w *ttyWriter) event(e Event) {
@@ -149,32 +167,27 @@ func (w *ttyWriter) event(e Event) {
 		}
 		w.tasks[e.ID] = t
 	}
+	w.printEvent(e)
 }
 
-func (w *ttyWriter) Events(events []Event) {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-	for _, e := range events {
-		w.event(e)
+func (w *ttyWriter) printEvent(e Event) {
+	if w.title != "" {
+		// event will be displayed by progress UI on ticker's ticks
+		return
 	}
-}
 
-func (w *ttyWriter) TailMsgf(msg string, args ...interface{}) {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-	msgWithPrefix := msg
-	if w.dryRun {
-		msgWithPrefix = strings.TrimSpace(api.DRYRUN_PREFIX + msg)
+	var color colorFunc
+	switch e.Status {
+	case Working:
+		color = SuccessColor
+	case Done:
+		color = SuccessColor
+	case Warning:
+		color = WarningColor
+	case Error:
+		color = ErrorColor
 	}
-	w.tailEvents = append(w.tailEvents, fmt.Sprintf(msgWithPrefix, args...))
-}
-
-func (w *ttyWriter) printTailEvents() {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-	for _, msg := range w.tailEvents {
-		_, _ = fmt.Fprintln(w.out, msg)
-	}
+	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, e.Text, color(e.StatusText))
 }
 
 func (w *ttyWriter) print() { //nolint:gocyclo
@@ -200,7 +213,7 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 		_, _ = fmt.Fprint(w.out, aec.Show)
 	}()
 
-	firstLine := fmt.Sprintf("[+] %s %d/%d", w.progressTitle, numDone(w.tasks), len(w.tasks))
+	firstLine := fmt.Sprintf("[+] %s %d/%d", w.title, numDone(w.tasks), len(w.tasks))
 	if w.numLines != 0 && numDone(w.tasks) == w.numLines {
 		firstLine = DoneColor(firstLine)
 	}

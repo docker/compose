@@ -16,6 +16,8 @@
 
 package progress
 
+import "context"
+
 // EventStatus indicates the status of an action
 type EventStatus int
 
@@ -158,4 +160,14 @@ func NewEvent(id string, status EventStatus, statusText string) Event {
 		Status:     status,
 		StatusText: statusText,
 	}
+}
+
+// EventProcessor is notified about Compose operations and tasks
+type EventProcessor interface {
+	// Start is triggered as a Compose operation is starting with context
+	Start(ctx context.Context, operation string)
+	// On notify about (sub)task and progress processing operation
+	On(events ...Event)
+	// Done is triggered as a Compose operation completed
+	Done(operation string, success bool)
 }

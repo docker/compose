@@ -33,7 +33,7 @@ import (
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.start(ctx, strings.ToLower(projectName), options, nil)
-	}, s.stdinfo(), "start")
+	}, "start", s.events)
 }
 
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {

@@ -340,7 +340,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	logrus.Debugf("Executing bake with args: %v", args)
 
 	if s.dryRun {
-		return s.dryRunBake(ctx, cfg), nil
+		return s.dryRunBake(cfg), nil
 	}
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 
@@ -426,7 +426,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
 		results[image] = built.Digest
-		s.events(ctx, progress.BuiltEvent("Image "+image))
+		s.events.On(progress.BuiltEvent("Image " + image))
 	}
 	return results, nil
 }
@@ -564,26 +564,26 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	return dockerfile
 }
 
-func (s composeService) dryRunBake(ctx context.Context, cfg bakeConfig) map[string]string {
+func (s composeService) dryRunBake(cfg bakeConfig) map[string]string {
 	bakeResponse := map[string]string{}
 	for name, target := range cfg.Targets {
 		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-		s.displayDryRunBuildEvent(ctx, name, dryRunUUID, target.Tags[0])
+		s.displayDryRunBuildEvent(name, dryRunUUID, target.Tags[0])
 		bakeResponse[name] = dryRunUUID
 	}
 	for name := range bakeResponse {
-		s.events(ctx, progress.BuiltEvent(name))
+		s.events.On(progress.BuiltEvent(name))
 	}
 	return bakeResponse
 }
 
-func (s composeService) displayDryRunBuildEvent(ctx context.Context, name, dryRunUUID, tag string) {
-	s.events(ctx, progress.Event{
+func (s composeService) displayDryRunBuildEvent(name, dryRunUUID, tag string) {
+	s.events.On(progress.Event{
 		ID:     name + " ==>",
 		Status: progress.Done,
 		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
 	})
-	s.events(ctx, progress.Event{
+	s.events.On(progress.Event{
 		ID:     name + " ==> ==>",
 		Status: progress.Done,
 		Text:   fmt.Sprintf(`naming to %s`, tag),

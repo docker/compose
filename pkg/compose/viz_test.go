@@ -116,9 +116,8 @@ func TestViz(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	cli := mocks.NewMockCli(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 

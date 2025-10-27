@@ -49,7 +49,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil
-	}), s.stdinfo(), "up")
+	}), "up", s.events)
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 						Services: options.Create.Services,
 						Project:  project,
 					}, printer.HandleEvent)
-				}, s.stdinfo(), logConsumer)
+				}, "stop", s.events, logConsumer)
 				appendErr(err)
 				return nil
 			})
@@ -214,7 +214,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 							Services: options.Create.Services,
 							Project:  project,
 						}, printer.HandleEvent)
-					}, s.stdinfo(), logConsumer)
+					}, "stop", s.events, logConsumer)
 					appendErr(err)
 					return nil
 				})

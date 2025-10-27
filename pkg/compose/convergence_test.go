@@ -35,7 +35,6 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 func TestContainerName(t *testing.T) {
@@ -87,9 +86,8 @@ func TestServiceLinks(t *testing.T) {
 
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested := composeService{
-			dockerCli: cli,
-		}
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db"}
@@ -97,7 +95,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
 
-		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -111,9 +109,8 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested := composeService{
-			dockerCli: cli,
-		}
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:db"}
@@ -121,7 +118,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
-		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -135,9 +132,8 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested := composeService{
-			dockerCli: cli,
-		}
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:dbname"}
@@ -145,7 +141,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
 
-		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -159,9 +155,8 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested := composeService{
-			dockerCli: cli,
-		}
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:dbname"}
@@ -170,7 +165,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
 
-		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 4)
@@ -187,9 +182,8 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested := composeService{
-			dockerCli: cli,
-		}
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{}
@@ -208,7 +202,7 @@ func TestServiceLinks(t *testing.T) {
 		}
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptionsOneOff).Return([]container.Summary{c}, nil)
 
-		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -224,9 +218,8 @@ func TestWaitDependencies(t *testing.T) {
 
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 	t.Run("should skip dependencies with scale 0", func(t *testing.T) {
@@ -240,7 +233,7 @@ func TestWaitDependencies(t *testing.T) {
 			"db":    {Condition: ServiceConditionRunningOrHealthy},
 			"redis": {Condition: ServiceConditionRunningOrHealthy},
 		}
-		assert.NilError(t, tested.waitDependencies(context.Background(), &project, "", dependencies, nil, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(context.Background(), &project, "", dependencies, nil, 0))
 	})
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(1)}
@@ -253,7 +246,7 @@ func TestWaitDependencies(t *testing.T) {
 			"db":    {Condition: types.ServiceConditionStarted, Required: true},
 			"redis": {Condition: types.ServiceConditionStarted, Required: true},
 		}
-		assert.NilError(t, tested.waitDependencies(context.Background(), &project, "", dependencies, nil, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(context.Background(), &project, "", dependencies, nil, 0))
 	})
 }
 
@@ -263,9 +256,8 @@ func TestCreateMobyContainer(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested := composeService{
-			dockerCli: cli,
-		}
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 		cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 		apiClient.EXPECT().DaemonHost().Return("").AnyTimes()
@@ -341,7 +333,7 @@ func TestCreateMobyContainer(t *testing.T) {
 				Aliases:    []string{"bork-test-0"},
 			}))
 
-		_, err := tested.createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
+		_, err = tested.(*composeService).createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
 			Labels: make(types.Labels),
 		})
 		assert.NilError(t, err)
@@ -352,9 +344,8 @@ func TestCreateMobyContainer(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested := composeService{
-			dockerCli: cli,
-		}
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 		cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 		apiClient.EXPECT().DaemonHost().Return("").AnyTimes()
@@ -428,7 +419,7 @@ func TestCreateMobyContainer(t *testing.T) {
 				NetworkSettings: &container.NetworkSettings{},
 			}, nil)
 
-		_, err := tested.createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
+		_, err = tested.(*composeService).createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
 			Labels: make(types.Labels),
 		})
 		assert.NilError(t, err)
