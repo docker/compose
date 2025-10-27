@@ -44,9 +44,9 @@ import (
 )
 
 func (s *composeService) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
-	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.pull(ctx, project, options)
-	}, s.stdinfo(), "Pulling")
+	}, s.stdinfo(), "pull")
 }
 
 func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
@@ -320,36 +320,34 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		return nil
 	}
 
-	return progress.Run(ctx, func(ctx context.Context) error {
-		eg, ctx := errgroup.WithContext(ctx)
-		eg.SetLimit(s.maxConcurrency)
-		pulledImages := map[string]api.ImageSummary{}
-		var mutex sync.Mutex
-		for name, service := range needPull {
-			eg.Go(func() error {
-				id, err := s.pullServiceImage(ctx, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
-				mutex.Lock()
-				defer mutex.Unlock()
-				pulledImages[name] = api.ImageSummary{
-					ID:          id,
-					Repository:  service.Image,
-					LastTagTime: time.Now(),
-				}
-				if err != nil && isServiceImageToBuild(service, project.Services) {
-					// image can be built, so we can ignore pull failure
-					return nil
-				}
-				return err
-			})
-		}
-		err := eg.Wait()
-		for i, service := range needPull {
-			if pulledImages[i].ID != "" {
-				images[service.Image] = pulledImages[i]
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(s.maxConcurrency)
+	pulledImages := map[string]api.ImageSummary{}
+	var mutex sync.Mutex
+	for name, service := range needPull {
+		eg.Go(func() error {
+			id, err := s.pullServiceImage(ctx, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			mutex.Lock()
+			defer mutex.Unlock()
+			pulledImages[name] = api.ImageSummary{
+				ID:          id,
+				Repository:  service.Image,
+				LastTagTime: time.Now(),
 			}
+			if err != nil && isServiceImageToBuild(service, project.Services) {
+				// image can be built, so we can ignore pull failure
+				return nil
+			}
+			return err
+		})
+	}
+	err := eg.Wait()
+	for i, service := range needPull {
+		if pulledImages[i].ID != "" {
+			images[service.Image] = pulledImages[i]
 		}
-		return err
-	}, s.stdinfo())
+	}
+	return err
 }
 
 func mustPull(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, error) {

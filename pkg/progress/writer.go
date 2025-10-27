@@ -55,16 +55,6 @@ func ContextWriter(ctx context.Context) Writer {
 
 type progressFunc func(context.Context) error
 
-type progressFuncWithStatus func(context.Context) (string, error)
-
-// Run will run a writer and the progress function in parallel
-func Run(ctx context.Context, pf progressFunc, out *streams.Out) error {
-	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
-		return "", pf(ctx)
-	}, out, "Running")
-	return err
-}
-
 func RunWithLog(ctx context.Context, pf progressFunc, out *streams.Out, logConsumer api.LogConsumer) error {
 	w := NewMixedWriter(out, logConsumer, false) // FIXME(ndeloof) re-implement dry-run
 	eg, _ := errgroup.WithContext(ctx)
@@ -80,20 +70,11 @@ func RunWithLog(ctx context.Context, pf progressFunc, out *streams.Out, logConsu
 	return eg.Wait()
 }
 
-func RunWithTitle(ctx context.Context, pf progressFunc, out *streams.Out, progressTitle string) error {
-	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
-		return "", pf(ctx)
-	}, out, progressTitle)
-	return err
-}
-
-// RunWithStatus will run a writer and the progress function in parallel and return a status
-func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out *streams.Out, progressTitle string) (string, error) {
+func Run(ctx context.Context, pf progressFunc, out *streams.Out, progressTitle string) error {
 	eg, _ := errgroup.WithContext(ctx)
 	w, err := NewWriter(ctx, out, progressTitle)
-	var result string
 	if err != nil {
-		return "", err
+		return err
 	}
 	eg.Go(func() error {
 		return w.Start(context.Background())
@@ -103,15 +84,10 @@ func RunWithStatus(ctx context.Context, pf progressFuncWithStatus, out *streams.
 
 	eg.Go(func() error {
 		defer w.Stop()
-		s, err := pf(ctx)
-		if err == nil {
-			result = s
-		}
+		err := pf(ctx)
 		return err
 	})
-
-	err = eg.Wait()
-	return result, err
+	return eg.Wait()
 }
 
 const (

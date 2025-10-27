@@ -30,6 +30,7 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
+	progress2 "github.com/docker/compose/v2/pkg/progress"
 	buildtypes "github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/registry"
@@ -183,6 +184,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	s.events(ctx, progress2.BuildingEvent("Image "+imageName))
 	response, err := s.apiClient().ImageBuild(ctx, body, buildOpts)
 	if err != nil {
 		return "", err
@@ -211,6 +213,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		}
 		return "", err
 	}
+	s.events(ctx, progress2.BuiltEvent("Image "+imageName))
 	return imageID, nil
 }
 

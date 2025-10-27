@@ -49,7 +49,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil
-	}), s.stdinfo())
+	}), s.stdinfo(), "up")
 	if err != nil {
 		return err
 	}

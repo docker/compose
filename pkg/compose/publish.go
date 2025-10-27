@@ -43,9 +43,9 @@ import (
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
-	return progress.RunWithTitle(ctx, func(ctx context.Context) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.publish(ctx, project, repository, options)
-	}, s.stdinfo(), "Publishing")
+	}, s.stdinfo(), "publish")
 }
 
 //nolint:gocyclo
