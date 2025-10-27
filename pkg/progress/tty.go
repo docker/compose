@@ -54,7 +54,7 @@ type ttyWriter struct {
 	mtx             *sync.Mutex
 	dryRun          bool // FIXME(ndeloof) (re)implement support for dry-run
 	skipChildEvents bool
-	title           string
+	operation       string
 	ticker          *time.Ticker
 }
 
@@ -83,7 +83,7 @@ func (t *task) hasMore() {
 
 func (w *ttyWriter) Start(ctx context.Context, operation string) {
 	w.ticker = time.NewTicker(100 * time.Millisecond)
-	w.title = operation
+	w.operation = operation
 	go func() {
 		for {
 			select {
@@ -95,7 +95,7 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 				w.print()
 				w.mtx.Lock()
 				w.ticker.Stop()
-				w.title = ""
+				w.operation = ""
 				w.mtx.Unlock()
 				return
 			case <-w.ticker.C:
@@ -113,6 +113,10 @@ func (w *ttyWriter) On(events ...Event) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	for _, e := range events {
+		if w.operation != "start" && (e.StatusText == "Started" || e.StatusText == "Starting") {
+			// skip those events to avoid mix with container logs
+			continue
+		}
 		w.event(e)
 	}
 }
@@ -171,7 +175,7 @@ func (w *ttyWriter) event(e Event) {
 }
 
 func (w *ttyWriter) printEvent(e Event) {
-	if w.title != "" {
+	if w.operation != "" {
 		// event will be displayed by progress UI on ticker's ticks
 		return
 	}
@@ -213,7 +217,7 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 		_, _ = fmt.Fprint(w.out, aec.Show)
 	}()
 
-	firstLine := fmt.Sprintf("[+] %s %d/%d", w.title, numDone(w.tasks), len(w.tasks))
+	firstLine := fmt.Sprintf("[+] %s %d/%d", w.operation, numDone(w.tasks), len(w.tasks))
 	if w.numLines != 0 && numDone(w.tasks) == w.numLines {
 		firstLine = DoneColor(firstLine)
 	}
