@@ -25,6 +25,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/docker/compose/v2/pkg/progress"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 
@@ -38,7 +39,6 @@ import (
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 )
 

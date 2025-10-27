@@ -18,7 +18,6 @@ package progress
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -29,7 +28,6 @@ func TestJsonWriter_Event(t *testing.T) {
 	var out bytes.Buffer
 	w := &jsonWriter{
 		out:    &out,
-		done:   make(chan bool),
 		dryRun: true,
 	}
 
@@ -57,33 +55,6 @@ func TestJsonWriter_Event(t *testing.T) {
 		Current:  event.Current,
 		Total:    event.Total,
 		Percent:  event.Percent,
-	}
-	assert.DeepEqual(t, expected, actual)
-}
-
-func TestJsonWriter_TailMsgf(t *testing.T) {
-	var out bytes.Buffer
-	w := &jsonWriter{
-		out:    &out,
-		done:   make(chan bool),
-		dryRun: false,
-	}
-
-	go func() {
-		_ = w.Start(context.Background())
-	}()
-
-	w.TailMsgf("hello %s", "world")
-
-	w.Stop()
-
-	var actual jsonMessage
-	err := json.Unmarshal(out.Bytes(), &actual)
-	assert.NilError(t, err)
-
-	expected := jsonMessage{
-		Tail: true,
-		Text: "hello world",
 	}
 	assert.DeepEqual(t, expected, actual)
 }

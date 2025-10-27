@@ -94,7 +94,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	}
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.remove(ctx, stoppedContainers, options)
-	}, s.stdinfo(), "remove")
+	}, "remove", s.events)
 }
 
 func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {
@@ -102,13 +102,13 @@ func (s *composeService) remove(ctx context.Context, containers Containers, opti
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)
-			s.events(ctx, progress.RemovingEvent(eventName))
+			s.events.On(progress.RemovingEvent(eventName))
 			err := s.apiClient().ContainerRemove(ctx, ctr.ID, container.RemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})
 			if err == nil {
-				s.events(ctx, progress.RemovedEvent(eventName))
+				s.events.On(progress.RemovedEvent(eventName))
 			}
 			return err
 		})

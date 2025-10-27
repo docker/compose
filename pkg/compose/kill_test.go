@@ -40,9 +40,8 @@ func TestKillAll(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
 
 	name := strings.ToLower(testProject)
 
@@ -65,7 +64,7 @@ func TestKillAll(t *testing.T) {
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "789", "").Return(nil)
 
-	err := tested.kill(ctx, name, compose.KillOptions{})
+	err = tested.Kill(ctx, name, compose.KillOptions{})
 	assert.NilError(t, err)
 }
 
@@ -75,9 +74,8 @@ func TestKillSignal(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
 
 	name := strings.ToLower(testProject)
 	listOptions := container.ListOptions{
@@ -98,7 +96,7 @@ func TestKillSignal(t *testing.T) {
 		}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
-	err := tested.kill(ctx, name, compose.KillOptions{Services: []string{serviceName}, Signal: "SIGTERM"})
+	err = tested.Kill(ctx, name, compose.KillOptions{Services: []string{serviceName}, Signal: "SIGTERM"})
 	assert.NilError(t, err)
 }
 

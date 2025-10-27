@@ -66,7 +66,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
-	variables, err := s.executePlugin(ctx, cmd, command, service)
+	variables, err := s.executePlugin(cmd, command, service)
 	if err != nil {
 		return err
 	}
@@ -85,14 +85,14 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	return nil
 }
 
-func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, command string, service types.ServiceConfig) (types.Mapping, error) {
+func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (types.Mapping, error) {
 	var action string
 	switch command {
 	case "up":
-		s.events(ctx, progress.CreatingEvent(service.Name))
+		s.events.On(progress.CreatingEvent(service.Name))
 		action = "create"
 	case "down":
-		s.events(ctx, progress.RemovingEvent(service.Name))
+		s.events.On(progress.RemovingEvent(service.Name))
 		action = "remove"
 	default:
 		return nil, fmt.Errorf("unsupported plugin command: %s", command)
@@ -124,10 +124,10 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 		}
 		switch msg.Type {
 		case ErrorType:
-			s.events(ctx, progress.NewEvent(service.Name, progress.Error, msg.Message))
+			s.events.On(progress.NewEvent(service.Name, progress.Error, msg.Message))
 			return nil, errors.New(msg.Message)
 		case InfoType:
-			s.events(ctx, progress.NewEvent(service.Name, progress.Working, msg.Message))
+			s.events.On(progress.NewEvent(service.Name, progress.Working, msg.Message))
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
@@ -143,14 +143,14 @@ func (s *composeService) executePlugin(ctx context.Context, cmd *exec.Cmd, comma
 
 	err = cmd.Wait()
 	if err != nil {
-		s.events(ctx, progress.ErrorMessageEvent(service.Name, err.Error()))
+		s.events.On(progress.ErrorMessageEvent(service.Name, err.Error()))
 		return nil, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
 	}
 	switch command {
 	case "up":
-		s.events(ctx, progress.CreatedEvent(service.Name))
+		s.events.On(progress.CreatedEvent(service.Name))
 	case "down":
-		s.events(ctx, progress.RemovedEvent(service.Name))
+		s.events.On(progress.RemovedEvent(service.Name))
 	}
 	return variables, nil
 }

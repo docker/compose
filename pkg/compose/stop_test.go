@@ -38,9 +38,8 @@ func TestStopTimeout(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
@@ -64,7 +63,7 @@ func TestStopTimeout(t *testing.T) {
 	api.EXPECT().ContainerStop(gomock.Any(), "456", stopConfig).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopConfig).Return(nil)
 
-	err := tested.Stop(ctx, strings.ToLower(testProject), compose.StopOptions{
+	err = tested.Stop(ctx, strings.ToLower(testProject), compose.StopOptions{
 		Timeout: &timeout,
 	})
 	assert.NilError(t, err)

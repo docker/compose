@@ -23,9 +23,14 @@ import (
 	"io"
 )
 
+func NewJSONWriter(out io.Writer) EventProcessor {
+	return &jsonWriter{
+		out: out,
+	}
+}
+
 type jsonWriter struct {
 	out    io.Writer
-	done   chan bool
 	dryRun bool
 }
 
@@ -41,13 +46,7 @@ type jsonMessage struct {
 	Percent  int    `json:"percent,omitempty"`
 }
 
-func (p *jsonWriter) Start(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-p.done:
-		return nil
-	}
+func (p *jsonWriter) Start(ctx context.Context, operation string) {
 }
 
 func (p *jsonWriter) Event(e Event) {
@@ -68,29 +67,11 @@ func (p *jsonWriter) Event(e Event) {
 	}
 }
 
-func (p *jsonWriter) Events(events []Event) {
+func (p *jsonWriter) On(events ...Event) {
 	for _, e := range events {
 		p.Event(e)
 	}
 }
 
-func (p *jsonWriter) TailMsgf(msg string, args ...interface{}) {
-	message := &jsonMessage{
-		DryRun: p.dryRun,
-		Tail:   true,
-		ID:     "",
-		Text:   fmt.Sprintf(msg, args...),
-		Status: "",
-	}
-	marshal, err := json.Marshal(message)
-	if err == nil {
-		_, _ = fmt.Fprintln(p.out, string(marshal))
-	}
-}
-
-func (p *jsonWriter) Stop() {
-	p.done <- true
-}
-
-func (p *jsonWriter) HasMore(bool) {
+func (p *jsonWriter) Done(_ string, _ bool) {
 }

@@ -39,7 +39,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, service string, op
 		err      error
 	)
 	if s.dryRun {
-		response = s.dryRunBuildResponse(ctx, service, opts)
+		response = s.dryRunBuildResponse(service, opts)
 	} else {
 		response, err = build.Build(ctx, nodes,
 			map[string]build.Options{service: opts},
@@ -65,10 +65,10 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, service string, op
 	return "", fmt.Errorf("buildkit response is missing expected result for %s", service)
 }
 
-func (s composeService) dryRunBuildResponse(ctx context.Context, name string, options build.Options) map[string]*client.SolveResponse {
+func (s composeService) dryRunBuildResponse(name string, options build.Options) map[string]*client.SolveResponse {
 	buildResponse := map[string]*client.SolveResponse{}
 	dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-	s.displayDryRunBuildEvent(ctx, name, dryRunUUID, options.Tags[0])
+	s.displayDryRunBuildEvent(name, dryRunUUID, options.Tags[0])
 	buildResponse[name] = &client.SolveResponse{ExporterResponse: map[string]string{
 		"containerimage.digest": dryRunUUID,
 	}}

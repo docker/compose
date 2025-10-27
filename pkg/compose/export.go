@@ -31,7 +31,7 @@ import (
 func (s *composeService) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.export(ctx, projectName, options)
-	}, s.stdinfo(), "export")
+	}, "export", s.events)
 }
 
 func (s *composeService) export(ctx context.Context, projectName string, options api.ExportOptions) error {
@@ -53,7 +53,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 	name := getCanonicalContainerName(container)
 	msg := fmt.Sprintf("export %s to %s", name, options.Output)
 
-	s.events(ctx, progress.Event{
+	s.events.On(progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Working,
@@ -67,7 +67,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 
 	defer func() {
 		if err := responseBody.Close(); err != nil {
-			s.events(ctx, progress.Event{
+			s.events.On(progress.Event{
 				ID:         name,
 				Text:       msg,
 				Status:     progress.Error,
@@ -92,7 +92,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		}
 	}
 
-	s.events(ctx, progress.Event{
+	s.events.On(progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Done,

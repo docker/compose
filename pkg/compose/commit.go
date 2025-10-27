@@ -29,7 +29,7 @@ import (
 func (s *composeService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.commit(ctx, projectName, options)
-	}, s.stdinfo(), "commit")
+	}, "commit", s.events)
 }
 
 func (s *composeService) commit(ctx context.Context, projectName string, options api.CommitOptions) error {
@@ -43,7 +43,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 	name := getCanonicalContainerName(ctr)
 	msg := fmt.Sprintf("Commit %s", name)
 
-	s.events(ctx, progress.Event{
+	s.events.On(progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Working,
@@ -51,7 +51,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 	})
 
 	if s.dryRun {
-		s.events(ctx, progress.Event{
+		s.events.On(progress.Event{
 			ID:         name,
 			Text:       msg,
 			Status:     progress.Done,
@@ -72,7 +72,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return err
 	}
 
-	s.events(ctx, progress.Event{
+	s.events.On(progress.Event{
 		ID:         name,
 		Text:       msg,
 		Status:     progress.Done,

@@ -63,7 +63,7 @@ type createConfigs struct {
 func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, createOpts)
-	}, s.stdinfo(), "create")
+	}, "create", s.events)
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
@@ -1394,14 +1394,14 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	}
 
 	networkEventName := fmt.Sprintf("Network %s", n.Name)
-	s.events(ctx, progress.CreatingEvent(networkEventName))
+	s.events.On(progress.CreatingEvent(networkEventName))
 
 	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
 	if err != nil {
-		s.events(ctx, progress.ErrorEvent(networkEventName))
+		s.events.On(progress.ErrorEvent(networkEventName))
 		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
-	s.events(ctx, progress.CreatedEvent(networkEventName))
+	s.events.On(progress.CreatedEvent(networkEventName))
 
 	err = s.connectNetwork(ctx, n.Name, dangledContainers, nil)
 	if err != nil {
@@ -1443,7 +1443,7 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 
 	err = s.apiClient().NetworkRemove(ctx, n.Name)
 	eventName := fmt.Sprintf("Network %s", n.Name)
-	s.events(ctx, progress.RemovedEvent(eventName))
+	s.events.On(progress.RemovedEvent(eventName))
 	return containers, err
 }
 
@@ -1622,7 +1622,7 @@ func (s *composeService) removeDivergedVolume(ctx context.Context, name string, 
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
 	eventName := fmt.Sprintf("Volume %s", volume.Name)
-	s.events(ctx, progress.CreatingEvent(eventName))
+	s.events.On(progress.CreatingEvent(eventName))
 	hash, err := VolumeHash(volume)
 	if err != nil {
 		return err
@@ -1635,9 +1635,9 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		DriverOpts: volume.DriverOpts,
 	})
 	if err != nil {
-		s.events(ctx, progress.ErrorEvent(eventName))
+		s.events.On(progress.ErrorEvent(eventName))
 		return err
 	}
-	s.events(ctx, progress.CreatedEvent(eventName))
+	s.events.On(progress.CreatedEvent(eventName))
 	return nil
 }

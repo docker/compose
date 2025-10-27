@@ -42,7 +42,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 	}
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.push(ctx, project, options)
-	}, s.stdinfo(), "push")
+	}, "push", s.events)
 }
 
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
@@ -54,7 +54,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 			if options.ImageMandatory && service.Image == "" && service.Provider == nil {
 				return fmt.Errorf("%q attribute is mandatory to push an image for service %q", "service.image", service.Name)
 			}
-			s.events(ctx, progress.Event{
+			s.events.On(progress.Event{
 				ID:     service.Name,
 				Status: progress.Done,
 				Text:   "Skipped",
@@ -68,16 +68,16 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 
 		for _, tag := range tags {
 			eg.Go(func() error {
-				s.events(ctx, progress.NewEvent(tag, progress.Working, "Pushing"))
+				s.events.On(progress.NewEvent(tag, progress.Working, "Pushing"))
 				err := s.pushServiceImage(ctx, tag, options.Quiet)
 				if err != nil {
 					if !options.IgnoreFailures {
-						s.events(ctx, progress.NewEvent(tag, progress.Error, err.Error()))
+						s.events.On(progress.NewEvent(tag, progress.Error, err.Error()))
 						return err
 					}
-					s.events(ctx, progress.NewEvent(tag, progress.Warning, err.Error()))
+					s.events.On(progress.NewEvent(tag, progress.Warning, err.Error()))
 				} else {
-					s.events(ctx, progress.NewEvent(tag, progress.Done, "Pushed"))
+					s.events.On(progress.NewEvent(tag, progress.Done, "Pushed"))
 				}
 				return nil
 			})
@@ -122,14 +122,14 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 		}
 
 		if !quietPush {
-			toPushProgressEvent(ctx, tag, jm, s.events)
+			toPushProgressEvent(tag, jm, s.events)
 		}
 	}
 
 	return nil
 }
 
-func toPushProgressEvent(ctx context.Context, prefix string, jm jsonmessage.JSONMessage, events EventBus) {
+func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events progress.EventProcessor) {
 	if jm.ID == "" {
 		// skipped
 		return
@@ -160,7 +160,7 @@ func toPushProgressEvent(ctx context.Context, prefix string, jm jsonmessage.JSON
 		}
 	}
 
-	events(ctx, progress.Event{
+	events.On(progress.Event{
 		ParentID:   prefix,
 		ID:         jm.ID,
 		Text:       jm.Status,

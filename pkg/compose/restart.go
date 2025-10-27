@@ -31,7 +31,7 @@ import (
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.restart(ctx, strings.ToLower(projectName), options)
-	}, s.stdinfo(), "restart")
+	}, "restart", s.events)
 }
 
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error { //nolint:gocyclo
@@ -93,13 +93,13 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 					}
 				}
 				eventName := getContainerProgressName(ctr)
-				s.events(ctx, progress.RestartingEvent(eventName))
+				s.events.On(progress.RestartingEvent(eventName))
 				timeout := utils.DurationSecondToInt(options.Timeout)
 				err = s.apiClient().ContainerRestart(ctx, ctr.ID, container.StopOptions{Timeout: timeout})
 				if err != nil {
 					return err
 				}
-				s.events(ctx, progress.StartedEvent(eventName))
+				s.events.On(progress.StartedEvent(eventName))
 				for _, hook := range def.PostStart {
 					err = s.runHook(ctx, ctr, def, hook, nil)
 					if err != nil {

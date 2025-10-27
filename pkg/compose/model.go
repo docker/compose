@@ -101,8 +101,8 @@ func (m *modelAPI) Close() {
 	m.cleanup()
 }
 
-func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events EventBus) error {
-	events(ctx, progress.Event{
+func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events progress.EventProcessor) error {
+	events.On(progress.Event{
 		ID:     model.Name,
 		Status: progress.Working,
 		Text:   "Pulling",
@@ -131,7 +131,7 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 		}
 
 		if !quietPull {
-			events(ctx, progress.Event{
+			events.On(progress.Event{
 				ID:         model.Name,
 				Status:     progress.Working,
 				Text:       "Pulling",
@@ -142,9 +142,9 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 
 	err = cmd.Wait()
 	if err != nil {
-		events(ctx, progress.ErrorMessageEvent(model.Name, err.Error()))
+		events.On(progress.ErrorMessageEvent(model.Name, err.Error()))
 	}
-	events(ctx, progress.Event{
+	events.On(progress.Event{
 		ID:     model.Name,
 		Status: progress.Working,
 		Text:   "Pulled",
@@ -152,8 +152,8 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 	return err
 }
 
-func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events EventBus) error {
-	events(ctx, progress.Event{
+func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events progress.EventProcessor) error {
+	events.On(progress.Event{
 		ID:     config.Name,
 		Status: progress.Working,
 		Text:   "Configuring",

@@ -82,10 +82,6 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		clock:          clockwork.NewRealClock(),
 		maxConcurrency: -1,
 		dryRun:         false,
-		events: func(ctx context.Context, e ...progress.Event) {
-			// FIXME(ndeloof) temporary during refactoring
-			progress.ContextWriter(ctx).Events(e)
-		},
 	}
 	for _, option := range options {
 		if err := option(s); err != nil {
@@ -98,6 +94,9 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 			logrus.Warning("Compose is running without a 'prompt' component to interact with user")
 			return defaultValue, nil
 		}
+	}
+	if s.events == nil {
+		s.events = progress.NewQuiedWriter()
 	}
 
 	// If custom streams were provided, wrap the Docker CLI to use them
@@ -196,14 +195,21 @@ func WithDryRun(s *composeService) error {
 
 type Prompt func(message string, defaultValue bool) (bool, error)
 
-type EventBus func(ctx context.Context, e ...progress.Event)
+// WithEventProcessor configure component to get notified on Compose operation and progress events.
+// Typically used to configure a progress UI
+func WithEventProcessor(bus progress.EventProcessor) Option {
+	return func(s *composeService) error {
+		s.events = bus
+		return nil
+	}
+}
 
 type composeService struct {
 	dockerCli command.Cli
 	// prompt is used to interact with user and confirm actions
 	prompt Prompt
 	// eventBus collects tasks execution events
-	events EventBus
+	events progress.EventProcessor
 
 	// Optional overrides for specific components (for SDK users)
 	outStream   io.Writer

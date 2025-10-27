@@ -39,9 +39,8 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	require.NoError(t, err)
 
 	name := strings.ToLower(testProject)
 
@@ -88,7 +87,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	}
 
 	consumer := &testLogConsumer{}
-	err := tested.Logs(ctx, name, consumer, opts)
+	err = tested.Logs(ctx, name, consumer, opts)
 	require.NoError(t, err)
 
 	require.Equal(
@@ -110,9 +109,8 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
-	tested := composeService{
-		dockerCli: cli,
-	}
+	tested, err := NewComposeService(cli)
+	require.NoError(t, err)
 
 	name := strings.ToLower(testProject)
 
@@ -159,7 +157,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	opts := compose.LogOptions{
 		Project: proj,
 	}
-	err := tested.Logs(ctx, name, consumer, opts)
+	err = tested.Logs(ctx, name, consumer, opts)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"hello c1"}, consumer.LogsForContainer("c1"))
