@@ -104,7 +104,7 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 }
 
 // WithStreams sets custom I/O streams for output and interaction
-func WithStreams(out, err api.OutputStream, in api.InputStream) Option {
+func WithStreams(out, err io.Writer, in io.Reader) Option {
 	return func(s *composeService) error {
 		s.outStream = out
 		s.errStream = err
@@ -114,7 +114,7 @@ func WithStreams(out, err api.OutputStream, in api.InputStream) Option {
 }
 
 // WithOutputStream sets a custom output stream
-func WithOutputStream(out api.OutputStream) Option {
+func WithOutputStream(out io.Writer) Option {
 	return func(s *composeService) error {
 		s.outStream = out
 		return nil
@@ -122,7 +122,7 @@ func WithOutputStream(out api.OutputStream) Option {
 }
 
 // WithErrorStream sets a custom error stream
-func WithErrorStream(err api.OutputStream) Option {
+func WithErrorStream(err io.Writer) Option {
 	return func(s *composeService) error {
 		s.errStream = err
 		return nil
@@ -130,7 +130,7 @@ func WithErrorStream(err api.OutputStream) Option {
 }
 
 // WithInputStream sets a custom input stream
-func WithInputStream(in api.InputStream) Option {
+func WithInputStream(in io.Reader) Option {
 	return func(s *composeService) error {
 		s.inStream = in
 		return nil
@@ -197,9 +197,9 @@ type composeService struct {
 	prompt Prompt
 
 	// Optional overrides for specific components (for SDK users)
-	outStream   api.OutputStream
-	errStream   api.OutputStream
-	inStream    api.InputStream
+	outStream   io.Writer
+	errStream   io.Writer
+	inStream    io.Reader
 	contextInfo api.ContextInfo
 	proxyConfig map[string]string
 
