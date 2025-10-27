@@ -34,7 +34,7 @@ func (s *composeService) Restart(ctx context.Context, projectName string, option
 	}, s.stdinfo(), "Restarting")
 }
 
-func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {
+func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error { //nolint:gocyclo
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
@@ -86,6 +86,13 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		eg, ctx := errgroup.WithContext(ctx)
 		for _, ctr := range containers.filter(isService(service)) {
 			eg.Go(func() error {
+				def := project.Services[service]
+				for _, hook := range def.PreStop {
+					err = s.runHook(ctx, ctr, def, hook, nil)
+					if err != nil {
+						return err
+					}
+				}
 				eventName := getContainerProgressName(ctr)
 				w.Event(progress.RestartingEvent(eventName))
 				timeout := utils.DurationSecondToInt(options.Timeout)
@@ -94,6 +101,12 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 					return err
 				}
 				w.Event(progress.StartedEvent(eventName))
+				for _, hook := range def.PostStart {
+					err = s.runHook(ctx, ctr, def, hook, nil)
+					if err != nil {
+						return err
+					}
+				}
 				return nil
 			})
 		}
