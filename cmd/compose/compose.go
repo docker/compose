@@ -535,7 +535,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 				ep = ui.NewPlainWriter(dockerCli.Err())
 			case ui.ModeQuiet, "none":
 				ui.Mode = ui.ModeQuiet
-				ep = ui.NewQuiedWriter()
+				ep = ui.NewQuietWriter()
 			case ui.ModeJSON:
 				ui.Mode = ui.ModeJSON
 				logrus.SetFormatter(&logrus.JSONFormatter{})

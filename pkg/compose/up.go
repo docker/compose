@@ -128,12 +128,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			first = false
 			fmt.Println("Gracefully Stopping... press Ctrl+C again to force")
 			eg.Go(func() error {
-				err := progress.RunWithLog(context.WithoutCancel(globalCtx), func(c context.Context) error {
-					return s.stop(c, project.Name, api.StopOptions{
-						Services: options.Create.Services,
-						Project:  project,
-					}, printer.HandleEvent)
-				}, "stop", s.events, logConsumer)
+				err = s.stop(context.WithoutCancel(globalCtx), project.Name, api.StopOptions{
+					Services: options.Create.Services,
+					Project:  project,
+				}, printer.HandleEvent)
 				appendErr(err)
 				return nil
 			})
@@ -209,12 +207,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				exitCode = event.ExitCode
 				_, _ = fmt.Fprintln(s.stdinfo(), progress.ErrorColor("Aborting on container exit..."))
 				eg.Go(func() error {
-					err := progress.RunWithLog(context.WithoutCancel(globalCtx), func(c context.Context) error {
-						return s.stop(c, project.Name, api.StopOptions{
-							Services: options.Create.Services,
-							Project:  project,
-						}, printer.HandleEvent)
-					}, "stop", s.events, logConsumer)
+					err = s.stop(context.WithoutCancel(globalCtx), project.Name, api.StopOptions{
+						Services: options.Create.Services,
+						Project:  project,
+					}, printer.HandleEvent)
 					appendErr(err)
 					return nil
 				})

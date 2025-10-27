@@ -18,16 +18,9 @@ package progress
 
 import (
 	"context"
-
-	"github.com/docker/compose/v2/pkg/api"
 )
 
 type progressFunc func(context.Context) error
-
-func RunWithLog(ctx context.Context, pf progressFunc, operation string, bus EventProcessor, logConsumer api.LogConsumer) error {
-	// FIXME(ndeloof) re-implement support for logs during stop sequence
-	return pf(ctx)
-}
 
 func Run(ctx context.Context, pf progressFunc, operation string, bus EventProcessor) error {
 	bus.Start(ctx, operation)

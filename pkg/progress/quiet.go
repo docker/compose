@@ -18,7 +18,7 @@ package progress
 
 import "context"
 
-func NewQuiedWriter() EventProcessor {
+func NewQuietWriter() EventProcessor {
 	return &quiet{}
 }
 

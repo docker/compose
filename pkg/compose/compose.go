@@ -96,7 +96,7 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		}
 	}
 	if s.events == nil {
-		s.events = progress.NewQuiedWriter()
+		s.events = progress.NewQuietWriter()
 	}
 
 	// If custom streams were provided, wrap the Docker CLI to use them
