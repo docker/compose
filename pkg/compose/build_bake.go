@@ -226,6 +226,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 
 		image := api.GetImageNameOrDefault(service, project.Name)
+		s.events.On(progress.BuildingEvent(image))
+
 		expectedImages[serviceName] = image
 
 		pull := service.Build.Pull || options.Pull
@@ -426,7 +428,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
 		results[image] = built.Digest
-		s.events.On(progress.BuiltEvent("Image " + image))
+		s.events.On(progress.BuiltEvent(image))
 	}
 	return results, nil
 }

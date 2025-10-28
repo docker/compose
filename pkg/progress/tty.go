@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +37,6 @@ func NewTTYWriter(out io.Writer) EventProcessor {
 	return &ttyWriter{
 		out:   out,
 		tasks: map[string]task{},
-		ids:   []string{},
 		done:  make(chan bool),
 		mtx:   &sync.Mutex{},
 	}
@@ -47,7 +45,6 @@ func NewTTYWriter(out io.Writer) EventProcessor {
 type ttyWriter struct {
 	out             io.Writer
 	tasks           map[string]task
-	ids             []string
 	repeated        bool
 	numLines        int
 	done            chan bool
@@ -122,11 +119,14 @@ func (w *ttyWriter) On(events ...Event) {
 }
 
 func (w *ttyWriter) event(e Event) {
-	if !slices.Contains(w.ids, e.ID) {
-		w.ids = append(w.ids, e.ID)
+	// Suspend print while a build is in progress, to avoid collision with buildkit Display
+	if e.StatusText == StatusBuilding {
+		w.ticker.Stop()
+	} else {
+		w.ticker.Reset(100 * time.Millisecond)
 	}
-	if _, ok := w.tasks[e.ID]; ok {
-		last := w.tasks[e.ID]
+
+	if last, ok := w.tasks[e.ID]; ok {
 		switch e.Status {
 		case Done, Error, Warning:
 			if last.status != e.Status {
@@ -194,10 +194,10 @@ func (w *ttyWriter) printEvent(e Event) {
 	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, e.Text, color(e.StatusText))
 }
 
-func (w *ttyWriter) print() { //nolint:gocyclo
+func (w *ttyWriter) print() {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	if len(w.ids) == 0 {
+	if len(w.tasks) == 0 {
 		return
 	}
 	terminalWidth := goterm.Width()
@@ -218,14 +218,10 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 	}()
 
 	firstLine := fmt.Sprintf("[+] %s %d/%d", w.operation, numDone(w.tasks), len(w.tasks))
-	if w.numLines != 0 && numDone(w.tasks) == w.numLines {
-		firstLine = DoneColor(firstLine)
-	}
 	_, _ = fmt.Fprintln(w.out, firstLine)
 
 	var statusPadding int
-	for _, v := range w.ids {
-		t := w.tasks[v]
+	for _, t := range w.tasks {
 		l := len(fmt.Sprintf("%s %s", t.ID, t.text))
 		if statusPadding < l {
 			statusPadding = l
@@ -235,20 +231,18 @@ func (w *ttyWriter) print() { //nolint:gocyclo
 		}
 	}
 
-	if len(w.ids) > goterm.Height()-2 {
+	if len(w.tasks) > goterm.Height()-2 {
 		w.skipChildEvents = true
 	}
 	numLines := 0
-	for _, v := range w.ids {
-		t := w.tasks[v]
+	for _, t := range w.tasks {
 		if t.parentID != "" {
 			continue
 		}
 		line := w.lineText(t, "", terminalWidth, statusPadding, w.dryRun)
 		_, _ = fmt.Fprint(w.out, line)
 		numLines++
-		for _, v := range w.ids {
-			t := w.tasks[v]
+		for _, t := range w.tasks {
 			if t.parentID == t.ID {
 				if w.skipChildEvents {
 					continue
@@ -292,8 +286,7 @@ func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding in
 
 	// only show the aggregated progress while the root operation is in-progress
 	if parent := t; parent.status == Working {
-		for _, v := range w.ids {
-			child := w.tasks[v]
+		for _, child := range w.tasks {
 			if child.parentID == parent.ID {
 				if child.status == Working && child.total == 0 {
 					// we don't have totals available for all the child events

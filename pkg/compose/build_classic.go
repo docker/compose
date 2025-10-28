@@ -184,7 +184,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s.events.On(progress2.BuildingEvent("Image " + imageName))
+	s.events.On(progress2.BuildingEvent(imageName))
 	response, err := s.apiClient().ImageBuild(ctx, body, buildOpts)
 	if err != nil {
 		return "", err
@@ -213,7 +213,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		}
 		return "", err
 	}
-	s.events.On(progress2.BuiltEvent("Image " + imageName))
+	s.events.On(progress2.BuiltEvent(imageName))
 	return imageID, nil
 }
 
