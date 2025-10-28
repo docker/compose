@@ -29,7 +29,7 @@ import (
 // This addresses a bug where dependencies were built twice: once in startDependencies
 // and once in ensureImagesExists.
 func TestRunBuildOnce(t *testing.T) {
-	c := NewParallelCLI(t)
+	c := NewCLI(t)
 
 	t.Run("dependency with pull_policy build is built only once", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once.yaml", "down", "--rmi", "local", "--remove-orphans")
