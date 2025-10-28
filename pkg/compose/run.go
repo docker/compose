@@ -97,7 +97,15 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		Add(api.SlugLabel, slug).
 		Add(api.OneoffLabel, "True")
 
-	if err := s.ensureImagesExists(ctx, project, opts.Build, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
+	// Only ensure image exists for the target service, dependencies were already handled by startDependencies
+	var buildOpts *api.BuildOptions
+	if opts.Build != nil {
+		// Create a copy of build options and restrict to only the target service
+		buildOptsCopy := *opts.Build
+		buildOptsCopy.Services = []string{opts.Service}
+		buildOpts = &buildOptsCopy
+	}
+	if err := s.ensureImagesExists(ctx, project, buildOpts, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
 	}
 
