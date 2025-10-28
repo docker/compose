@@ -324,17 +324,16 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 func formatModel(model map[string]any, format string) (content []byte, err error) {
 	switch format {
 	case "json":
-		content, err = json.MarshalIndent(model, "", "  ")
+		return json.MarshalIndent(model, "", "  ")
 	case "yaml":
 		buf := bytes.NewBuffer([]byte{})
 		encoder := yaml.NewEncoder(buf)
 		encoder.SetIndent(2)
 		err = encoder.Encode(model)
-		content = buf.Bytes()
+		return buf.Bytes(), err
 	default:
 		return nil, fmt.Errorf("unsupported format %q", format)
 	}
-	return
 }
 
 func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions) error {

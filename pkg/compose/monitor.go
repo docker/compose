@@ -32,18 +32,18 @@ import (
 )
 
 type monitor struct {
-	api     client.APIClient
-	project string
+	apiClient client.APIClient
+	project   string
 	// services tells us which service to consider and those we can ignore, maybe ran by a concurrent compose command
 	services  map[string]bool
 	listeners []api.ContainerEventListener
 }
 
-func newMonitor(api client.APIClient, project string) *monitor {
+func newMonitor(apiClient client.APIClient, project string) *monitor {
 	return &monitor{
-		api:      api,
-		project:  project,
-		services: map[string]bool{},
+		apiClient: apiClient,
+		project:   project,
+		services:  map[string]bool{},
 	}
 }
 
@@ -58,7 +58,7 @@ func (c *monitor) withServices(services []string) {
 //nolint:gocyclo
 func (c *monitor) Start(ctx context.Context) error {
 	// collect initial application container
-	initialState, err := c.api.ContainerList(ctx, container.ListOptions{
+	initialState, err := c.apiClient.ContainerList(ctx, container.ListOptions{
 		All: true,
 		Filters: filters.NewArgs(
 			projectFilter(c.project),
@@ -79,7 +79,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	}
 	restarting := utils.Set[string]{}
 
-	evtCh, errCh := c.api.Events(ctx, events.ListOptions{
+	evtCh, errCh := c.apiClient.Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("type", "container"),
 			projectFilter(c.project)),
@@ -140,7 +140,7 @@ func (c *monitor) Start(ctx context.Context) error {
 				logrus.Debugf("container %s restarted", ctr.Name)
 			case events.ActionDie:
 				logrus.Debugf("container %s exited with code %d", ctr.Name, ctr.ExitCode)
-				inspect, err := c.api.ContainerInspect(ctx, event.Actor.ID)
+				inspect, err := c.apiClient.ContainerInspect(ctx, event.Actor.ID)
 				if errdefs.IsNotFound(err) {
 					// Source is already removed
 				} else if err != nil {

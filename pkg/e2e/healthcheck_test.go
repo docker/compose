@@ -39,6 +39,7 @@ func TestStartInterval(t *testing.T) {
 	timeout := time.After(30 * time.Second)
 	done := make(chan bool)
 	go func() {
+		//nolint:nolintlint,testifylint // helper asserts inside goroutine; acceptable in this e2e test
 		res := c.RunDockerComposeCmd(t, "-f", "fixtures/start_interval/compose.yaml", "--project-name", projectName, "up", "--wait", "-d", "test")
 		out := res.Combined()
 		assert.Assert(t, strings.Contains(out, "Healthy"), out)

@@ -331,7 +331,7 @@ func splitCpArg(arg string) (ctr, path string) {
 
 func resolveLocalPath(localPath string) (absPath string, err error) {
 	if absPath, err = filepath.Abs(localPath); err != nil {
-		return
+		return absPath, err
 	}
 	return archive.PreserveTrailingDotOrSeparator(absPath, localPath), nil
 }

@@ -184,7 +184,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		if service.Build == nil {
 			continue
 		}
-		build := *service.Build
+		buildConfig := *service.Build
 		labels := getImageBuildLabels(project, service)
 
 		args := resolveAndMergeBuildArgs(s.getProxyConfig(), project, service, options).ToMapping()
@@ -192,11 +192,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			args[k] = strings.ReplaceAll(v, "${", "$${")
 		}
 
-		entitlements := build.Entitlements
-		if slices.Contains(build.Entitlements, "security.insecure") {
+		entitlements := buildConfig.Entitlements
+		if slices.Contains(buildConfig.Entitlements, "security.insecure") {
 			privileged = true
 		}
-		if build.Privileged {
+		if buildConfig.Privileged {
 			entitlements = append(entitlements, "security.insecure")
 			privileged = true
 		}
@@ -217,8 +217,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			}
 		}
 
-		read = append(read, build.Context)
-		for _, path := range build.AdditionalContexts {
+		read = append(read, buildConfig.Context)
+		for _, path := range buildConfig.AdditionalContexts {
 			_, _, err := gitutil.ParseGitRef(path)
 			if !strings.Contains(path, "://") && err != nil {
 				read = append(read, path)
@@ -235,35 +235,35 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		target := targets[serviceName]
 
-		secrets, env := toBakeSecrets(project, build.Secrets)
+		secrets, env := toBakeSecrets(project, buildConfig.Secrets)
 		secretsEnv = append(secretsEnv, env...)
 
 		cfg.Targets[target] = bakeTarget{
-			Context:          build.Context,
-			Contexts:         additionalContexts(build.AdditionalContexts, targets),
-			Dockerfile:       dockerFilePath(build.Context, build.Dockerfile),
-			DockerfileInline: strings.ReplaceAll(build.DockerfileInline, "${", "$${"),
+			Context:          buildConfig.Context,
+			Contexts:         additionalContexts(buildConfig.AdditionalContexts, targets),
+			Dockerfile:       dockerFilePath(buildConfig.Context, buildConfig.Dockerfile),
+			DockerfileInline: strings.ReplaceAll(buildConfig.DockerfileInline, "${", "$${"),
 			Args:             args,
 			Labels:           labels,
-			Tags:             append(build.Tags, image),
+			Tags:             append(buildConfig.Tags, image),
 
-			CacheFrom:    build.CacheFrom,
-			CacheTo:      build.CacheTo,
-			NetworkMode:  build.Network,
-			Platforms:    build.Platforms,
-			Target:       build.Target,
+			CacheFrom:    buildConfig.CacheFrom,
+			CacheTo:      buildConfig.CacheTo,
+			NetworkMode:  buildConfig.Network,
+			Platforms:    buildConfig.Platforms,
+			Target:       buildConfig.Target,
 			Secrets:      secrets,
-			SSH:          toBakeSSH(append(build.SSH, options.SSHs...)),
+			SSH:          toBakeSSH(append(buildConfig.SSH, options.SSHs...)),
 			Pull:         pull,
 			NoCache:      noCache,
-			ShmSize:      build.ShmSize,
-			Ulimits:      toBakeUlimits(build.Ulimits),
+			ShmSize:      buildConfig.ShmSize,
+			Ulimits:      toBakeUlimits(buildConfig.Ulimits),
 			Entitlements: entitlements,
-			ExtraHosts:   toBakeExtraHosts(build.ExtraHosts),
+			ExtraHosts:   toBakeExtraHosts(buildConfig.ExtraHosts),
 
 			Outputs: outputs,
 			Call:    call,
-			Attest:  toBakeAttest(build),
+			Attest:  toBakeAttest(buildConfig),
 		}
 	}
 
@@ -524,24 +524,24 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) 
 	return s, env
 }
 
-func toBakeAttest(build types.BuildConfig) []string {
+func toBakeAttest(buildConfig types.BuildConfig) []string {
 	var attests []string
 
 	// Handle per-service provenance configuration (only from build config, not global options)
-	if build.Provenance != "" {
-		if build.Provenance == "true" {
+	if buildConfig.Provenance != "" {
+		if buildConfig.Provenance == "true" {
 			attests = append(attests, "type=provenance")
-		} else if build.Provenance != "false" {
-			attests = append(attests, fmt.Sprintf("type=provenance,%s", build.Provenance))
+		} else if buildConfig.Provenance != "false" {
+			attests = append(attests, fmt.Sprintf("type=provenance,%s", buildConfig.Provenance))
 		}
 	}
 
 	// Handle per-service SBOM configuration (only from build config, not global options)
-	if build.SBOM != "" {
-		if build.SBOM == "true" {
+	if buildConfig.SBOM != "" {
+		if buildConfig.SBOM == "true" {
 			attests = append(attests, "type=sbom")
-		} else if build.SBOM != "false" {
-			attests = append(attests, fmt.Sprintf("type=sbom,%s", build.SBOM))
+		} else if buildConfig.SBOM != "false" {
+			attests = append(attests, fmt.Sprintf("type=sbom,%s", buildConfig.SBOM))
 		}
 	}
 
