@@ -1449,11 +1449,11 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 
 func (s *composeService) disconnectNetwork(
 	ctx context.Context,
-	network string,
+	nwName string,
 	containers Containers,
 ) error {
 	for _, c := range containers {
-		err := s.apiClient().NetworkDisconnect(ctx, network, c.ID, true)
+		err := s.apiClient().NetworkDisconnect(ctx, nwName, c.ID, true)
 		if err != nil {
 			return err
 		}
@@ -1464,12 +1464,12 @@ func (s *composeService) disconnectNetwork(
 
 func (s *composeService) connectNetwork(
 	ctx context.Context,
-	network string,
+	nwName string,
 	containers Containers,
 	config *network.EndpointSettings,
 ) error {
 	for _, c := range containers {
-		err := s.apiClient().NetworkConnect(ctx, network, c.ID, config)
+		err := s.apiClient().NetworkConnect(ctx, nwName, c.ID, config)
 		if err != nil {
 			return err
 		}
