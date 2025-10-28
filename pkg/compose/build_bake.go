@@ -34,10 +34,12 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/console"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/image/build"
+	"github.com/docker/cli/cli/streams"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/api/types/versions"
@@ -144,7 +146,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 		out = s.stdout()
 	}
-	display, err := progressui.NewDisplay(out, displayMode)
+	display, err := progressui.NewDisplay(makeConsole(out), displayMode)
 	if err != nil {
 		return nil, err
 	}
@@ -428,6 +430,38 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		cw.Event(progress.BuiltEvent(image))
 	}
 	return results, nil
+}
+
+// makeConsole wraps the provided writer to match [containerd.File] interface if it is of type *streams.Out.
+// buildkit's NewDisplay doesn't actually require a [io.Reader], it only uses the [containerd.Console] type to
+// benefits from ANSI capabilities, but only does writes.
+func makeConsole(out io.Writer) io.Writer {
+	if s, ok := out.(*streams.Out); ok {
+		return &_console{s}
+	}
+	return out
+}
+
+var _ console.File = &_console{}
+
+type _console struct {
+	*streams.Out
+}
+
+func (c _console) Read(p []byte) (n int, err error) {
+	return 0, errors.New("not implemented")
+}
+
+func (c _console) Close() error {
+	return nil
+}
+
+func (c _console) Fd() uintptr {
+	return c.FD()
+}
+
+func (c _console) Name() string {
+	return "compose"
 }
 
 func toBakeExtraHosts(hosts types.HostsList) map[string]string {
