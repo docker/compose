@@ -1,0 +1,10 @@
+services:
+  # Simple service with no dependencies
+  simple:
+    pull_policy: build
+    build:
+      dockerfile_inline: |
+        FROM alpine
+        RUN echo "Simple service built at $(date)" > /build.txt
+        CMD echo "Simple service"
+
