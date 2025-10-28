@@ -18,14 +18,15 @@ package compose
 
 import (
 	"context"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
+	"github.com/moby/moby/api/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -42,8 +43,8 @@ func TestImages(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
-	listOpts := container.ListOptions{All: true, Filters: args}
+	args := projectFilter(strings.ToLower(testProject))
+	listOpts := client.ContainerListOptions{All: true, Filters: args}
 	api.EXPECT().ServerVersion(gomock.Any()).Return(types.Version{APIVersion: "1.96"}, nil).AnyTimes()
 	timeStr1 := "2025-06-06T06:06:06.000000000Z"
 	created1, _ := time.Parse(time.RFC3339Nano, timeStr1)
@@ -55,7 +56,7 @@ func TestImages(t *testing.T) {
 	api.EXPECT().ImageInspect(anyCancellableContext(), "bar:2").Return(image2, nil)
 	c1 := containerDetail("service1", "123", "running", "foo:1")
 	c2 := containerDetail("service1", "456", "running", "bar:2")
-	c2.Ports = []container.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
+	c2.Ports = []container.PortSummary{{PublicPort: 80, PrivatePort: 90, IP: netip.MustParseAddr("127.0.0.1")}}
 	c3 := containerDetail("service2", "789", "exited", "foo:1")
 	api.EXPECT().ContainerList(ctx, listOpts).Return([]container.Summary{c1, c2, c3}, nil)
 

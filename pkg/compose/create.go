@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
@@ -31,14 +32,13 @@ import (
 	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
-	"github.com/docker/docker/api/types/blkiodev"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/versions"
-	volumetypes "github.com/docker/docker/api/types/volume"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/blkiodev"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/versions"
+	volumetypes "github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
@@ -202,8 +202,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		mainNw = service.Networks[mainNwName]
 	}
 
-	macAddress, err := s.prepareContainerMACAddress(ctx, service, mainNw, mainNwName)
-	if err != nil {
+	if err := s.prepareContainerMACAddress(service, mainNw, mainNwName); err != nil {
 		return createConfigs{}, err
 	}
 
@@ -211,11 +210,15 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
+	exposedPorts, err := buildContainerPorts(service)
+	if err != nil {
+		return createConfigs{}, err
+	}
 	containerConfig := container.Config{
 		Hostname:        service.Hostname,
 		Domainname:      service.DomainName,
 		User:            service.User,
-		ExposedPorts:    buildContainerPorts(service),
+		ExposedPorts:    exposedPorts,
 		Tty:             tty,
 		OpenStdin:       stdinOpen,
 		StdinOnce:       opts.AttachStdin && stdinOpen,
@@ -227,7 +230,6 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: service.NetworkMode == "disabled",
-		MacAddress:      macAddress, // Field is deprecated since API v1.44, but kept for compatibility with older API versions.
 		Labels:          labels,
 		StopSignal:      service.StopSignal,
 		Env:             ToMobyEnv(env),
@@ -260,7 +262,10 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	portBindings := buildContainerPortBindingOptions(service)
+	portBindings, err := buildContainerPortBindingOptions(service)
+	if err != nil {
+		return createConfigs{}, err
+	}
 
 	// MISC
 	resources := getDeployResources(service)
@@ -274,6 +279,15 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	securityOpts, unconfined, err := parseSecurityOpts(p, service.SecurityOpt)
 	if err != nil {
 		return createConfigs{}, err
+	}
+
+	var dnsIPs []netip.Addr
+	for _, d := range service.DNS {
+		dnsIP, err := netip.ParseAddr(d)
+		if err != nil {
+			return createConfigs{}, fmt.Errorf("invalid DNS address: %w", err)
+		}
+		dnsIPs = append(dnsIPs, dnsIP)
 	}
 
 	hostConfig := container.HostConfig{
@@ -295,7 +309,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		Resources:      resources,
 		VolumeDriver:   service.VolumeDriver,
 		VolumesFrom:    service.VolumesFrom,
-		DNS:            service.DNS,
+		DNS:            dnsIPs,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
 		ExtraHosts:     service.ExtraHosts.AsList(":"),
@@ -334,12 +348,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 // passed mainNw to provide backward-compatibility whenever possible.
 //
 // It returns the container-wide MAC address, but this value will be kept empty for newer API versions.
-func (s *composeService) prepareContainerMACAddress(ctx context.Context, service types.ServiceConfig, mainNw *types.ServiceNetworkConfig, nwName string) (string, error) {
-	version, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return "", err
-	}
-
+func (s *composeService) prepareContainerMACAddress(service types.ServiceConfig, mainNw *types.ServiceNetworkConfig, nwName string) error {
 	// Engine API 1.44 added support for endpoint-specific MAC address and now returns a warning when a MAC address is
 	// set in container.Config. Thus, we have to jump through a number of hoops:
 	//
@@ -353,31 +362,12 @@ func (s *composeService) prepareContainerMACAddress(ctx context.Context, service
 	// there's no need to check for API version in defaultNetworkSettings.
 	macAddress := service.MacAddress
 	if macAddress != "" && mainNw != nil && mainNw.MacAddress != "" && mainNw.MacAddress != macAddress {
-		return "", fmt.Errorf("the service-level mac_address should have the same value as network %s", nwName)
+		return fmt.Errorf("the service-level mac_address should have the same value as network %s", nwName)
 	}
-	if versions.GreaterThanOrEqualTo(version, "1.44") {
-		if mainNw != nil && mainNw.MacAddress == "" {
-			mainNw.MacAddress = macAddress
-		}
-		macAddress = ""
-	} else if len(service.Networks) > 0 {
-		var withMacAddress []string
-		for nwName, nw := range service.Networks {
-			if nw != nil && nw.MacAddress != "" {
-				withMacAddress = append(withMacAddress, nwName)
-			}
-		}
-
-		if len(withMacAddress) > 1 {
-			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine v25 or later", strings.Join(withMacAddress, ", "))
-		}
-
-		if mainNw != nil && mainNw.MacAddress != "" {
-			macAddress = mainNw.MacAddress
-		}
+	if mainNw != nil && mainNw.MacAddress == "" {
+		mainNw.MacAddress = macAddress
 	}
-
-	return macAddress, nil
+	return nil
 }
 
 func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, cfg *types.ServiceNetworkConfig, useNetworkAliases bool) []string {
@@ -391,25 +381,48 @@ func getAliases(project *types.Project, service types.ServiceConfig, serviceInde
 	return aliases
 }
 
-func createEndpointSettings(p *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, links []string, useNetworkAliases bool) *network.EndpointSettings {
+func createEndpointSettings(p *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, links []string, useNetworkAliases bool) (*network.EndpointSettings, error) {
 	const ifname = "com.docker.network.endpoint.ifname"
 
 	config := service.Networks[networkKey]
 	var ipam *network.EndpointIPAMConfig
 	var (
-		ipv4Address string
-		ipv6Address string
+		ipv4Address netip.Addr
+		ipv6Address netip.Addr
 		macAddress  string
 		driverOpts  types.Options
 		gwPriority  int
 	)
 	if config != nil {
-		ipv4Address = config.Ipv4Address
-		ipv6Address = config.Ipv6Address
+		var err error
+		if config.Ipv4Address != "" {
+			ipv4Address, err = netip.ParseAddr(config.Ipv4Address)
+			if err != nil {
+				return nil, fmt.Errorf("invalid IPv4 address: %w", err)
+			}
+		}
+		if config.Ipv6Address != "" {
+			ipv6Address, err = netip.ParseAddr(config.Ipv6Address)
+			if err != nil {
+				return nil, fmt.Errorf("invalid IPv6 address: %w", err)
+			}
+		}
+		var linkLocalIPs []netip.Addr
+		for _, link := range config.LinkLocalIPs {
+			if link == "" {
+				continue
+			}
+			llIP, err := netip.ParseAddr(link)
+			if err != nil {
+				return nil, fmt.Errorf("invalid link-local IP: %w", err)
+			}
+			linkLocalIPs = append(linkLocalIPs, llIP)
+		}
+
 		ipam = &network.EndpointIPAMConfig{
-			IPv4Address:  ipv4Address,
+			IPv4Address:  ipv4Address.Unmap(),
 			IPv6Address:  ipv6Address,
-			LinkLocalIPs: config.LinkLocalIPs,
+			LinkLocalIPs: linkLocalIPs,
 		}
 		macAddress = config.MacAddress
 		driverOpts = config.DriverOpts
@@ -433,7 +446,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		MacAddress:  macAddress,
 		DriverOpts:  driverOpts,
 		GwPriority:  gwPriority,
-	}
+	}, nil
 }
 
 // copy/pasted from https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697 + RelativePath
@@ -515,25 +528,30 @@ func defaultNetworkSettings(project *types.Project,
 		primaryNetworkKey = "default"
 	}
 	primaryNetworkMobyNetworkName := project.Networks[primaryNetworkKey].Name
-	primaryNetworkEndpoint := createEndpointSettings(project, service, serviceIndex, primaryNetworkKey, links, useNetworkAliases)
+	primaryNetworkEndpoint, err := createEndpointSettings(project, service, serviceIndex, primaryNetworkKey, links, useNetworkAliases)
+	if err != nil {
+		return "", nil, err
+	}
+
 	endpointsConfig := map[string]*network.EndpointSettings{}
 
 	// Starting from API version 1.44, the Engine will take several EndpointsConfigs
 	// so we can pass all the extra networks we want the container to be connected to
 	// in the network configuration instead of connecting the container to each extra
 	// network individually after creation.
-	if versions.GreaterThanOrEqualTo(version, "1.44") {
-		if len(service.Networks) > 1 {
-			serviceNetworks := service.NetworksByPriority()
-			for _, networkKey := range serviceNetworks[1:] {
-				mobyNetworkName := project.Networks[networkKey].Name
-				epSettings := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
-				endpointsConfig[mobyNetworkName] = epSettings
+	if len(service.Networks) > 1 {
+		serviceNetworks := service.NetworksByPriority()
+		for _, networkKey := range serviceNetworks[1:] {
+			mobyNetworkName := project.Networks[networkKey].Name
+			epSettings, err := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
+			if err != nil {
+				return "", nil, err
 			}
+			endpointsConfig[mobyNetworkName] = epSettings
 		}
-		if primaryNetworkEndpoint.MacAddress == "" {
-			primaryNetworkEndpoint.MacAddress = service.MacAddress
-		}
+	}
+	if primaryNetworkEndpoint.MacAddress == "" {
+		primaryNetworkEndpoint.MacAddress = service.MacAddress
 	}
 
 	if versions.LessThan(version, "1.49") {
@@ -764,30 +782,46 @@ func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
 	}
 }
 
-func buildContainerPorts(s types.ServiceConfig) nat.PortSet {
-	ports := nat.PortSet{}
+func buildContainerPorts(s types.ServiceConfig) (network.PortSet, error) {
+	ports := network.PortSet{}
 	for _, s := range s.Expose {
-		p := nat.Port(s)
+		p, err := network.ParsePort(s)
+		if err != nil {
+			return nil, err
+		}
 		ports[p] = struct{}{}
 	}
 	for _, p := range s.Ports {
-		p := nat.Port(fmt.Sprintf("%d/%s", p.Target, p.Protocol))
-		ports[p] = struct{}{}
+		np, err := network.ParsePort(fmt.Sprintf("%d/%s", p.Target, p.Protocol))
+		if err != nil {
+			return nil, err
+		}
+		ports[np] = struct{}{}
 	}
-	return ports
+	return ports, nil
 }
 
-func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
-	bindings := nat.PortMap{}
+func buildContainerPortBindingOptions(s types.ServiceConfig) (network.PortMap, error) {
+	bindings := network.PortMap{}
 	for _, port := range s.Ports {
-		p := nat.Port(fmt.Sprintf("%d/%s", port.Target, port.Protocol))
-		binding := nat.PortBinding{
-			HostIP:   port.HostIP,
-			HostPort: port.Published,
+		var err error
+		p, err := network.ParsePort(fmt.Sprintf("%d/%s", port.Target, port.Protocol))
+		if err != nil {
+			return nil, err
 		}
-		bindings[p] = append(bindings[p], binding)
+		var hostIP netip.Addr
+		if port.HostIP != "" {
+			hostIP, err = netip.ParseAddr(port.HostIP)
+			if err != nil {
+				return nil, err
+			}
+		}
+		bindings[p] = append(bindings[p], network.PortBinding{
+			HostIP:   hostIP,
+			HostPort: port.Published,
+		})
 	}
-	return bindings
+	return bindings, nil
 }
 
 func getDependentServiceFromMode(mode string) string {
@@ -1274,7 +1308,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	var dangledContainers Containers
 
 	// First, try to find a unique network matching by name or ID
-	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
+	inspect, err := s.apiClient().NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{})
 	if err == nil {
 		// NetworkInspect will match on ID prefix, so double check we get the expected one
 		// as looking for network named `db` we could erroneously match network ID `db9086999caf`
@@ -1315,8 +1349,8 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	// ignore other errors. Typically, an ambiguous request by name results in some generic `invalidParameter` error
 
 	// Either not found, or name is ambiguous - use NetworkList to list by name
-	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
+	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
+		Filters: make(client.Filters).Add("name", n.Name),
 	})
 	if err != nil {
 		return "", err
@@ -1347,12 +1381,11 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	if n.Ipam.Config != nil {
 		var config []network.IPAMConfig
 		for _, pool := range n.Ipam.Config {
-			config = append(config, network.IPAMConfig{
-				Subnet:     pool.Subnet,
-				IPRange:    pool.IPRange,
-				Gateway:    pool.Gateway,
-				AuxAddress: pool.AuxiliaryAddresses,
-			})
+			c, err := parseIPAMPool(pool)
+			if err != nil {
+				return "", err
+			}
+			config = append(config, c)
 		}
 		ipam = &network.IPAM{
 			Driver: n.Ipam.Driver,
@@ -1364,7 +1397,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 		return "", err
 	}
 	n.CustomLabels = n.CustomLabels.Add(api.ConfigHashLabel, hash)
-	createOpts := network.CreateOptions{
+	createOpts := client.NetworkCreateOptions{
 		Labels:     mergeLabels(n.Labels, n.CustomLabels),
 		Driver:     n.Driver,
 		Options:    n.DriverOpts,
@@ -1384,13 +1417,11 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	}
 
 	for _, ipamConfig := range n.Ipam.Config {
-		config := network.IPAMConfig{
-			Subnet:     ipamConfig.Subnet,
-			IPRange:    ipamConfig.IPRange,
-			Gateway:    ipamConfig.Gateway,
-			AuxAddress: ipamConfig.AuxiliaryAddresses,
+		c, err := parseIPAMPool(ipamConfig)
+		if err != nil {
+			return "", err
 		}
-		createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
+		createOpts.IPAM.Config = append(createOpts.IPAM.Config, c)
 	}
 
 	networkEventName := fmt.Sprintf("Network %s", n.Name)
@@ -1450,11 +1481,11 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 
 func (s *composeService) disconnectNetwork(
 	ctx context.Context,
-	network string,
+	networkID string,
 	containers Containers,
 ) error {
 	for _, c := range containers {
-		err := s.apiClient().NetworkDisconnect(ctx, network, c.ID, true)
+		err := s.apiClient().NetworkDisconnect(ctx, networkID, c.ID, true)
 		if err != nil {
 			return err
 		}
@@ -1465,12 +1496,12 @@ func (s *composeService) disconnectNetwork(
 
 func (s *composeService) connectNetwork(
 	ctx context.Context,
-	network string,
+	networkID string,
 	containers Containers,
 	config *network.EndpointSettings,
 ) error {
 	for _, c := range containers {
-		err := s.apiClient().NetworkConnect(ctx, network, c.ID, config)
+		err := s.apiClient().NetworkConnect(ctx, networkID, c.ID, config)
 		if err != nil {
 			return err
 		}
@@ -1484,8 +1515,8 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	// filter is used to look for an exact match to prevent e.g. a network
 	// named `db` from getting erroneously matched to a network with an ID
 	// like `db9086999caf`
-	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
+	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
+		Filters: make(client.Filters).Add("name", n.Name),
 	})
 	if err != nil {
 		return "", err
@@ -1493,9 +1524,9 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 
 	if len(networks) == 0 {
 		// in this instance, n.Name is really an ID
-		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, network.InspectOptions{})
+		sn, err := s.apiClient().NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{})
 		if err == nil {
-			networks = append(networks, sn)
+			networks = append(networks, network.Summary{Network: sn.Network})
 		} else if !errdefs.IsNotFound(err) {
 			return "", err
 		}
@@ -1503,7 +1534,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 
 	// NetworkList API doesn't return the exact name match, so we can retrieve more than one network with a request
-	networks = slices.DeleteFunc(networks, func(net network.Inspect) bool {
+	networks = slices.DeleteFunc(networks, func(net network.Summary) bool {
 		// this function is called during the rebuild stage of `compose watch`.
 		// we still require just one network back, but we need to run the search on the ID
 		return net.Name != n.Name && net.ID != n.Name
@@ -1642,4 +1673,49 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 	}
 	w.Event(progress.CreatedEvent(eventName))
 	return nil
+}
+
+func parseIPAMPool(pool *types.IPAMPool) (network.IPAMConfig, error) {
+	var (
+		err        error
+		subNet     netip.Prefix
+		ipRange    netip.Prefix
+		gateway    netip.Addr
+		auxAddress map[string]netip.Addr
+	)
+	if pool.Subnet != "" {
+		subNet, err = netip.ParsePrefix(pool.Subnet)
+		if err != nil {
+			return network.IPAMConfig{}, fmt.Errorf("invalid subnet: %w", err)
+		}
+	}
+	if pool.IPRange != "" {
+		ipRange, err = netip.ParsePrefix(pool.IPRange)
+		if err != nil {
+			return network.IPAMConfig{}, fmt.Errorf("invalid ip-range: %w", err)
+		}
+	}
+	if pool.Gateway != "" {
+		gateway, err = netip.ParseAddr(pool.Gateway)
+		if err != nil {
+			return network.IPAMConfig{}, fmt.Errorf("invalid gateway address: %w", err)
+		}
+	}
+	if len(pool.AuxiliaryAddresses) > 0 {
+		auxAddress = make(map[string]netip.Addr, len(pool.AuxiliaryAddresses))
+		for auxName, addr := range pool.AuxiliaryAddresses {
+			auxAddr, err := netip.ParseAddr(addr)
+			if err != nil {
+				return network.IPAMConfig{}, fmt.Errorf("invalid auxiliary address: %w", err)
+			}
+			auxAddress[auxName] = auxAddr
+		}
+
+	}
+	return network.IPAMConfig{
+		Subnet:     subNet,
+		IPRange:    ipRange,
+		Gateway:    gateway,
+		AuxAddress: auxAddress,
+	}, nil
 }

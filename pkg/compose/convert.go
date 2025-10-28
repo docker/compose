@@ -23,8 +23,7 @@ import (
 	"time"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/versions"
+	"github.com/moby/moby/api/types/container"
 )
 
 // ToMobyEnv convert into []string
@@ -69,15 +68,7 @@ func (s *composeService) ToMobyHealthCheck(ctx context.Context, check *compose.H
 	}
 	var startInterval time.Duration
 	if check.StartInterval != nil {
-		version, err := s.RuntimeVersion(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if versions.LessThan(version, "1.44") {
-			return nil, errors.New("can't set healthcheck.start_interval as feature require Docker Engine v25 or later")
-		} else {
-			startInterval = time.Duration(*check.StartInterval)
-		}
+		startInterval = time.Duration(*check.StartInterval)
 		if check.StartPeriod == nil {
 			// see https://github.com/moby/moby/issues/48874
 			return nil, errors.New("healthcheck.start_interval requires healthcheck.start_period to be set")

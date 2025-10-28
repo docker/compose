@@ -30,9 +30,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
-	"github.com/docker/docker/api/types/container"
-	mmount "github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/versions"
+	"github.com/moby/moby/api/types/container"
+	mmount "github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
@@ -605,10 +605,10 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 				StatusText: err.Error(),
 			})
 		}
-		return
+		return ctr, err
 	}
 	w.Event(progress.CreatedEvent(eventName))
-	return
+	return ctr, nil
 }
 
 func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
@@ -655,12 +655,12 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	}
 
 	timeoutInSecond := utils.DurationSecondToInt(timeout)
-	err = s.apiClient().ContainerStop(ctx, replaced.ID, container.StopOptions{Timeout: timeoutInSecond})
+	err = s.apiClient().ContainerStop(ctx, replaced.ID, client.ContainerStopOptions{Timeout: timeoutInSecond})
 	if err != nil {
 		return created, err
 	}
 
-	err = s.apiClient().ContainerRemove(ctx, replaced.ID, container.RemoveOptions{})
+	err = s.apiClient().ContainerRemove(ctx, replaced.ID, client.ContainerRemoveOptions{})
 	if err != nil {
 		return created, err
 	}
@@ -682,7 +682,7 @@ func (s *composeService) startContainer(ctx context.Context, ctr container.Summa
 	w.Event(progress.NewEvent(getContainerProgressName(ctr), progress.Working, "Restart"))
 	startMx.Lock()
 	defer startMx.Unlock()
-	err := s.apiClient().ContainerStart(ctx, ctr.ID, container.StartOptions{})
+	err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
@@ -742,29 +742,6 @@ func (s *composeService) createMobyContainer(ctx context.Context,
 		},
 	}
 
-	apiVersion, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return created, err
-	}
-	// Starting API version 1.44, the ContainerCreate API call takes multiple networks
-	// so we include all the configurations there and can skip the one-by-one calls here
-	if versions.LessThan(apiVersion, "1.44") {
-		// the highest-priority network is the primary and is included in the ContainerCreate API
-		// call via container.NetworkMode & network.NetworkingConfig
-		// any remaining networks are connected one-by-one here after creation (but before start)
-		serviceNetworks := service.NetworksByPriority()
-		for _, networkKey := range serviceNetworks {
-			mobyNetworkName := project.Networks[networkKey].Name
-			if string(cfgs.Host.NetworkMode) == mobyNetworkName {
-				// primary network already configured as part of ContainerCreate
-				continue
-			}
-			epSettings := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
-			if err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, created.ID, epSettings); err != nil {
-				return created, err
-			}
-		}
-	}
 	return created, nil
 }
 
@@ -912,7 +889,7 @@ func (s *composeService) startService(ctx context.Context,
 
 		eventName := getContainerProgressName(ctr)
 		w.Event(progress.StartingEvent(eventName))
-		err = s.apiClient().ContainerStart(ctx, ctr.ID, container.StartOptions{})
+		err = s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
 		if err != nil {
 			return err
 		}

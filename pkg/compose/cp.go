@@ -26,11 +26,11 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/api/types/container"
 	"github.com/moby/go-archive"
 )
 
@@ -234,7 +234,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		}
 	}
 
-	options := container.CopyToContainerOptions{
+	options := client.CopyToContainerOptions{
 		AllowOverwriteDirWithFile: false,
 		CopyUIDGID:                opts.CopyUIDGID,
 	}
@@ -332,7 +332,7 @@ func splitCpArg(arg string) (ctr, path string) {
 
 func resolveLocalPath(localPath string) (absPath string, err error) {
 	if absPath, err = filepath.Abs(localPath); err != nil {
-		return
+		return absPath, err
 	}
 	return archive.PreserveTrailingDotOrSeparator(absPath, localPath), nil
 }
