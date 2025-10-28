@@ -202,7 +202,8 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		mainNw = service.Networks[mainNwName]
 	}
 
-	if err := s.prepareContainerMACAddress(service, mainNw, mainNwName); err != nil {
+	_, err = s.prepareContainerMACAddress(ctx, service, mainNw, mainNwName)
+	if err != nil {
 		return createConfigs{}, err
 	}
 
@@ -348,7 +349,14 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 // passed mainNw to provide backward-compatibility whenever possible.
 //
 // It returns the container-wide MAC address, but this value will be kept empty for newer API versions.
-func (s *composeService) prepareContainerMACAddress(service types.ServiceConfig, mainNw *types.ServiceNetworkConfig, nwName string) error {
+//
+//nolint:gocyclo
+func (s *composeService) prepareContainerMACAddress(ctx context.Context, service types.ServiceConfig, mainNw *types.ServiceNetworkConfig, nwName string) (string, error) {
+	version, err := s.RuntimeVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+
 	// Engine API 1.44 added support for endpoint-specific MAC address and now returns a warning when a MAC address is
 	// set in container.Config. Thus, we have to jump through a number of hoops:
 	//
@@ -362,12 +370,33 @@ func (s *composeService) prepareContainerMACAddress(service types.ServiceConfig,
 	// there's no need to check for API version in defaultNetworkSettings.
 	macAddress := service.MacAddress
 	if macAddress != "" && mainNw != nil && mainNw.MacAddress != "" && mainNw.MacAddress != macAddress {
-		return fmt.Errorf("the service-level mac_address should have the same value as network %s", nwName)
+		return "", fmt.Errorf("the service-level mac_address should have the same value as network %s", nwName)
+	}
+	if versions.GreaterThanOrEqualTo(version, "1.44") {
+		if mainNw != nil && mainNw.MacAddress == "" {
+			mainNw.MacAddress = macAddress
+		}
+		macAddress = ""
+	} else if len(service.Networks) > 0 {
+		var withMacAddress []string
+		for name, nw := range service.Networks {
+			if nw != nil && nw.MacAddress != "" {
+				withMacAddress = append(withMacAddress, name)
+			}
+		}
+
+		if len(withMacAddress) > 1 {
+			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine v25 or later", strings.Join(withMacAddress, ", "))
+		}
+
+		if mainNw != nil && mainNw.MacAddress != "" {
+			macAddress = mainNw.MacAddress
+		}
 	}
 	if mainNw != nil && mainNw.MacAddress == "" {
 		mainNw.MacAddress = macAddress
 	}
-	return nil
+	return "", nil
 }
 
 func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, cfg *types.ServiceNetworkConfig, useNetworkAliases bool) []string {
