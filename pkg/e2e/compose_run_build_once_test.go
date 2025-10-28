@@ -32,10 +32,11 @@ func TestRunBuildOnce(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	t.Run("dependency with pull_policy build is built only once", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once.yaml", "down", "--rmi", "local", "--remove-orphans")
+		projectName := "e2e-run-build-once-single"
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "down", "--rmi", "local", "--remove-orphans")
 		res.Assert(t, icmd.Success)
 
-		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once.yaml", "run", "--rm", "curl")
+		res = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "run", "--rm", "curl")
 		res.Assert(t, icmd.Success)
 
 		// Count how many times nginx was built by looking for its unique RUN command output
@@ -45,14 +46,15 @@ func TestRunBuildOnce(t *testing.T) {
 		assert.Equal(t, nginxBuilds, 1, "nginx dependency should build once, but built %d times", nginxBuilds)
 		assert.Assert(t, strings.Contains(res.Combined(), "curl service"))
 
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once.yaml", "down", "--remove-orphans")
+		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "down", "--remove-orphans")
 	})
 
 	t.Run("nested dependencies build only once each", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--rmi", "local", "--remove-orphans")
+		projectName := "e2e-run-build-once-nested"
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--rmi", "local", "--remove-orphans")
 		res.Assert(t, icmd.Success)
 
-		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once-nested.yaml", "run", "--rm", "app")
+		res = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "run", "--rm", "app")
 		res.Assert(t, icmd.Success)
 
 		output := res.Combined()
@@ -67,14 +69,15 @@ func TestRunBuildOnce(t *testing.T) {
 		assert.Equal(t, appBuilds, 1, "app should build once, built %d times", appBuilds)
 		assert.Assert(t, strings.Contains(output, "App running"))
 
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--remove-orphans")
+		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--remove-orphans")
 	})
 
 	t.Run("service with no dependencies builds once", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--rmi", "local", "--remove-orphans")
+		projectName := "e2e-run-build-once-no-deps"
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--rmi", "local", "--remove-orphans")
 		res.Assert(t, icmd.Success)
 
-		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "run", "--rm", "simple")
+		res = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "run", "--rm", "simple")
 		res.Assert(t, icmd.Success)
 
 		// Should build exactly once
@@ -82,6 +85,6 @@ func TestRunBuildOnce(t *testing.T) {
 		assert.Equal(t, simpleBuilds, 1, "simple should build once, built %d times", simpleBuilds)
 		assert.Assert(t, strings.Contains(res.Combined(), "Simple service"))
 
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--remove-orphans")
+		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--remove-orphans")
 	})
 }
