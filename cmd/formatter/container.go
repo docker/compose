@@ -217,7 +217,9 @@ func (c *ContainerContext) Ports() string {
 	for _, publisher := range c.c.Publishers {
 		var pIP netip.Addr
 		if publisher.URL != "" {
-			pIP, _ = netip.ParseAddr(publisher.URL)
+			if p, err := netip.ParseAddr(publisher.URL); err == nil {
+				pIP = p
+			}
 		}
 		ports = append(ports, container.PortSummary{
 			IP:          pIP,
