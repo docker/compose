@@ -1,0 +1,18 @@
+services:
+  # Service with pull_policy: build to ensure it always rebuilds
+  # This is the key to testing the bug - without the fix, this would build twice
+  nginx:
+    pull_policy: build
+    build:
+      dockerfile_inline: |
+        FROM alpine
+        RUN echo "Building nginx at $(date)" > /build-time.txt
+        CMD sleep 3600
+
+  # Service that depends on nginx
+  curl:
+    image: alpine
+    depends_on:
+      - nginx
+    command: echo "curl service"
+
