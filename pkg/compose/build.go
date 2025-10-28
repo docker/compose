@@ -226,7 +226,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if err != nil {
 			return err
 		}
-		s.events.On(progress.BuildingEvent("Image " + buildOptions.Tags[0]))
+		s.events.On(progress.BuildingEvent(buildOptions.Tags[0]))
 
 		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "buildkit"))
 		digest, err := s.doBuildBuildkit(ctx, name, buildOptions, w, nodes)
@@ -256,7 +256,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			service := project.Services[names[i]]
 			imageRef := api.GetImageNameOrDefault(service, project.Name)
 			imageIDs[imageRef] = imageDigest
-			s.events.On(progress.BuiltEvent("Image " + imageRef))
+			s.events.On(progress.BuiltEvent(imageRef))
 		}
 	}
 	return imageIDs, err
