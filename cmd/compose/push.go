@@ -55,7 +55,12 @@ func pushCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 }
 
 func runPush(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts pushOptions, services []string) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, services)
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
+
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, services)
 	if err != nil {
 		return err
 	}
@@ -67,10 +72,6 @@ func runPush(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		}
 	}
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
 	return backend.Push(ctx, project, api.PushOptions{
 		IgnoreFailures: opts.Ignorefailures,
 		Quiet:          opts.Quiet,

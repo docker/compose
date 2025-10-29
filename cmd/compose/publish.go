@@ -69,7 +69,12 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 }
 
 func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts publishOptions, repository string) error {
-	project, metrics, err := opts.ToProject(ctx, dockerCli, nil)
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
+
+	project, metrics, err := opts.ToProject(ctx, dockerCli, backend, nil)
 	if err != nil {
 		return err
 	}
@@ -78,10 +83,6 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		return errors.New("cannot publish compose file with local includes")
 	}
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
 	return backend.Publish(ctx, project, repository, api.PublishOptions{
 		ResolveImageDigests: opts.resolveImageDigests || opts.app,
 		Application:         opts.app,
