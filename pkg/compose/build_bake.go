@@ -300,7 +300,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			}
 			var pathError *fs.PathError
 			if errors.As(err, &pathError) {
-				return nil, fmt.Errorf("can't acces os.tempDir %s: %w", tmpdir, pathError.Err)
+				return nil, fmt.Errorf("can't access os.tempDir %s: %w", tmpdir, pathError.Err)
 			}
 		}
 	}
