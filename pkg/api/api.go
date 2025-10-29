@@ -24,11 +24,52 @@ import (
 	"strings"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
 	"github.com/docker/cli/opts"
 	"github.com/docker/docker/api/types/volume"
 )
+
+// LoadListener receives events during project loading.
+// Events include:
+//   - "extends": when a service extends another (metadata: service info)
+//   - "include": when including external compose files (metadata: {"path": StringList})
+//
+// Multiple listeners can be registered, and all will be notified of events.
+type LoadListener func(event string, metadata map[string]any)
+
+// ProjectLoadOptions configures how a Compose project should be loaded
+type ProjectLoadOptions struct {
+	// ProjectName to use, or empty to infer from directory
+	ProjectName string
+	// ConfigPaths are paths to compose files
+	ConfigPaths []string
+	// WorkingDir is the project directory
+	WorkingDir string
+	// EnvFiles are paths to .env files
+	EnvFiles []string
+	// Profiles to activate
+	Profiles []string
+	// Services to select (empty = all)
+	Services []string
+	// Offline mode disables remote resource loading
+	Offline bool
+	// All includes all resources (not just those used by services)
+	All bool
+	// Compatibility enables v1 compatibility mode
+	Compatibility bool
+
+	// ProjectOptionsFns are compose-go project options to apply.
+	// Use cli.WithInterpolation(false), cli.WithNormalization(false), etc.
+	// This is optional - pass nil or empty slice to use defaults.
+	ProjectOptionsFns []cli.ProjectOptionsFn
+
+	// LoadListeners receive events during project loading.
+	// All registered listeners will be notified of events.
+	// This is optional - pass nil or empty slice if not needed.
+	LoadListeners []LoadListener
+}
 
 // Compose is the API interface one can use to programmatically use docker/compose in a third-party software
 // Use [compose.NewComposeService] to get an actual instance
@@ -102,6 +143,8 @@ type Compose interface {
 	// GetConfiguredStreams returns the configured I/O streams (stdout, stderr, stdin).
 	// If no custom streams were configured, it returns the dockerCli streams.
 	GetConfiguredStreams() (stdout io.Writer, stderr io.Writer, stdin io.Reader)
+	// LoadProject loads and validates a Compose project from configuration files.
+	LoadProject(ctx context.Context, options ProjectLoadOptions) (*types.Project, error)
 }
 
 type VolumesOptions struct {
