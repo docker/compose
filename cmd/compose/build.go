@@ -150,8 +150,13 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 }
 
 func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts buildOptions, services []string) error {
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
+
 	opts.All = true // do not drop resources as build may involve some dependencies by additional_contexts
-	project, _, err := opts.ToProject(ctx, dockerCli, nil, cli.WithResolvedPaths(true), cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -166,9 +171,5 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	}
 	apiBuildOptions.Attestations = true
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
 	return backend.Build(ctx, project, apiBuildOptions)
 }

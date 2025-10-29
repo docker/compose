@@ -66,16 +66,18 @@ func vizCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 
 func runViz(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
-	project, _, err := opts.ToProject(ctx, dockerCli, nil)
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
+
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil)
 	if err != nil {
 		return err
 	}
 
 	// build graph
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
 	graphStr, _ := backend.Viz(ctx, project, api.VizOptions{
 		IncludeNetworks:  opts.includeNetworks,
 		IncludePorts:     opts.includePorts,

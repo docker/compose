@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/docker/compose/v2/pkg/compose"
@@ -29,7 +30,6 @@ import (
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 
-	cgo "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/opts"
@@ -143,7 +143,7 @@ func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (t
 	return environment, nil
 }
 
-func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command { //nolint:gocyclo
 	options := runOptions{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -204,7 +204,12 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			project, _, err := p.ToProject(ctx, dockerCli, []string{options.Service}, cgo.WithResolvedPaths(true), cgo.WithoutEnvironmentResolution)
+			backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+			if err != nil {
+				return err
+			}
+
+			project, _, err := p.ToProject(ctx, dockerCli, backend, []string{options.Service}, composecli.WithoutEnvironmentResolution)
 			if err != nil {
 				return err
 			}
@@ -219,7 +224,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 			}
 
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-			return runRun(ctx, backendOptions, project, options, createOpts, buildOpts, dockerCli)
+			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -267,7 +272,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backendOptions *BackendOptions, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
+func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
 	project, err := options.apply(project)
 	if err != nil {
 		return err
@@ -339,10 +344,6 @@ func runRun(ctx context.Context, backendOptions *BackendOptions, project *types.
 		}
 	}
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
 		errMsg := ""
