@@ -99,7 +99,12 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts pullOptions, services []string) error {
-	project, _, err := opts.ToProject(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
+
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, services, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -109,10 +114,6 @@ func runPull(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
 	return backend.Pull(ctx, project, api.PullOptions{
 		Quiet:           opts.quiet,
 		IgnoreFailures:  opts.ignorePullFailures,

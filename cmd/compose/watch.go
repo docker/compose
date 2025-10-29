@@ -66,7 +66,12 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 }
 
 func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
-	project, _, err := watchOpts.ToProject(ctx, dockerCli, services)
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
+
+	project, _, err := watchOpts.ToProject(ctx, dockerCli, backend, services)
 	if err != nil {
 		return err
 	}
@@ -112,19 +117,11 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 				Services: services,
 			},
 		}
-		backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-		if err != nil {
-			return err
-		}
 		if err := backend.Up(ctx, project, upOpts); err != nil {
 			return err
 		}
 	}
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
 	outStream, errStream, _ := backend.GetConfiguredStreams()
 	consumer := formatter.NewLogConsumer(ctx, outStream, errStream, false, false, false)
 	return backend.Watch(ctx, project, api.WatchOptions{
