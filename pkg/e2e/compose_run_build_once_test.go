@@ -32,7 +32,7 @@ import (
 // This addresses a bug where dependencies were built twice: once in startDependencies
 // and once in ensureImagesExists.
 func TestRunBuildOnce(t *testing.T) {
-	c := NewParallelCLI(t)
+	c := NewCLI(t)
 
 	t.Run("dependency with pull_policy build is built only once", func(t *testing.T) {
 		projectName := randomProjectName("build-once")
@@ -54,25 +54,27 @@ func TestRunBuildOnce(t *testing.T) {
 
 	t.Run("nested dependencies build only once each", func(t *testing.T) {
 		projectName := randomProjectName("build-nested")
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--rmi", "local", "--remove-orphans")
-		res.Assert(t, icmd.Success)
+		_ = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--rmi", "local", "--remove-orphans", "-v")
 
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "run", "--build", "--rm", "app")
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "--verbose", "run", "--build", "--rm", "app")
 		res.Assert(t, icmd.Success)
 
 		output := res.Combined()
 
-		// Each service should build exactly once
-		dbBuilds := strings.Count(output, "DB built at")
-		apiBuilds := strings.Count(output, "API built at")
-		appBuilds := strings.Count(output, "App built at")
+		dbBuildMarker := fmt.Sprintf("naming to docker.io/library/%s-db", projectName)
+		apiBuildMarker := fmt.Sprintf("naming to docker.io/library/%s-api", projectName)
+		appBuildMarker := fmt.Sprintf("naming to docker.io/library/%s-app", projectName)
 
-		assert.Equal(t, dbBuilds, 1, "db should build once, built %d times", dbBuilds)
-		assert.Equal(t, apiBuilds, 1, "api should build once, built %d times", apiBuilds)
-		assert.Equal(t, appBuilds, 1, "app should build once, built %d times", appBuilds)
+		dbBuilds := strings.Count(output, dbBuildMarker)
+		apiBuilds := strings.Count(output, apiBuildMarker)
+		appBuilds := strings.Count(output, appBuildMarker)
+
+		assert.Equal(t, dbBuilds, 1, "db should build once, built %d times\nOutput:\n%s", dbBuilds, output)
+		assert.Equal(t, apiBuilds, 1, "api should build once, built %d times\nOutput:\n%s", apiBuilds, output)
+		assert.Equal(t, appBuilds, 1, "app should build once, built %d times\nOutput:\n%s", appBuilds, output)
 		assert.Assert(t, strings.Contains(output, "App running"))
 
-		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--remove-orphans")
+		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--rmi", "local", "--remove-orphans", "-v")
 	})
 
 	t.Run("service with no dependencies builds once", func(t *testing.T) {
