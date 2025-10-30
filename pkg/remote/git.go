@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
@@ -113,6 +114,9 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 		g.known[path] = local
 	}
 	if ref.SubDir != "" {
+		if err := validateGitSubDir(local, ref.SubDir); err != nil {
+			return "", err
+		}
 		local = filepath.Join(local, ref.SubDir)
 	}
 	stat, err := os.Stat(local)
@@ -127,6 +131,41 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 
 func (g gitRemoteLoader) Dir(path string) string {
 	return g.known[path]
+}
+
+// validateGitSubDir ensures a subdirectory path is contained within the base directory
+// and doesn't escape via path traversal. Unlike validatePathInBase for OCI artifacts,
+// this allows nested directories but prevents traversal outside the base.
+func validateGitSubDir(base, subDir string) error {
+	cleanSubDir := filepath.Clean(subDir)
+
+	if filepath.IsAbs(cleanSubDir) {
+		return fmt.Errorf("git subdirectory must be relative, got: %s", subDir)
+	}
+
+	if cleanSubDir == ".." || strings.HasPrefix(cleanSubDir, "../") || strings.HasPrefix(cleanSubDir, "..\\") {
+		return fmt.Errorf("git subdirectory path traversal detected: %s", subDir)
+	}
+
+	if len(cleanSubDir) >= 2 && cleanSubDir[1] == ':' {
+		return fmt.Errorf("git subdirectory must be relative, got: %s", subDir)
+	}
+
+	targetPath := filepath.Join(base, cleanSubDir)
+	cleanBase := filepath.Clean(base)
+	cleanTarget := filepath.Clean(targetPath)
+
+	// Ensure the target starts with the base path
+	relPath, err := filepath.Rel(cleanBase, cleanTarget)
+	if err != nil {
+		return fmt.Errorf("invalid git subdirectory path: %w", err)
+	}
+
+	if relPath == ".." || strings.HasPrefix(relPath, "../") || strings.HasPrefix(relPath, "..\\") {
+		return fmt.Errorf("git subdirectory escapes base directory: %s", subDir)
+	}
+
+	return nil
 }
 
 func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gitutil.GitRef) error {
