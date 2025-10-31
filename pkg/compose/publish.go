@@ -297,9 +297,6 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 	if ok, err := s.checkOnlyBuildSection(project); !ok || err != nil {
 		return false, err
 	}
-	if options.AssumeYes {
-		return true, nil
-	}
 	bindMounts := s.checkForBindMount(project)
 	if len(bindMounts) > 0 {
 		b := strings.Builder{}

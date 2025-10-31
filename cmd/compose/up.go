@@ -278,7 +278,10 @@ func runUp(
 		Inherit:              !createOptions.noInherit,
 		Timeout:              createOptions.GetTimeout(),
 		QuietPull:            createOptions.quietPull,
-		AssumeYes:            createOptions.AssumeYes,
+	}
+
+	if createOptions.AssumeYes {
+		backendOptions.Options = append(backendOptions.Options, compose.WithPrompt(compose.AlwaysOkPrompt()))
 	}
 
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)

@@ -78,6 +78,9 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		return errors.New("cannot publish compose file with local includes")
 	}
 
+	if opts.assumeYes {
+		backendOptions.Options = append(backendOptions.Options, compose.WithPrompt(compose.AlwaysOkPrompt()))
+	}
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
@@ -87,6 +90,5 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		Application:         opts.app,
 		OCIVersion:          api.OCIVersion(opts.ociVersion),
 		WithEnvironment:     opts.withEnvironment,
-		AssumeYes:           opts.assumeYes,
 	})
 }

@@ -195,6 +195,13 @@ func WithDryRun(s *composeService) error {
 
 type Prompt func(message string, defaultValue bool) (bool, error)
 
+// AlwaysOkPrompt returns a Prompt implementation that always returns true without user interaction.
+func AlwaysOkPrompt() Prompt {
+	return func(message string, defaultValue bool) (bool, error) {
+		return true, nil
+	}
+}
+
 // WithEventProcessor configure component to get notified on Compose operation and progress events.
 // Typically used to configure a progress UI
 func WithEventProcessor(bus progress.EventProcessor) Option {

@@ -231,8 +231,6 @@ type CreateOptions struct {
 	Timeout *time.Duration
 	// QuietPull makes the pulling process quiet
 	QuietPull bool
-	// AssumeYes assume "yes" as answer to all prompts and run non-interactively
-	AssumeYes bool
 }
 
 // StartOptions group options of the Start API
@@ -447,7 +445,6 @@ type PublishOptions struct {
 	Application         bool
 	WithEnvironment     bool
 
-	AssumeYes  bool
 	OCIVersion OCIVersion
 }
 
