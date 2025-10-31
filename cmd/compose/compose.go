@@ -159,12 +159,12 @@ func (o *ProjectOptions) WithProject(fn ProjectFunc, dockerCli command.Cli) func
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
 	return Adapt(func(ctx context.Context, args []string) error {
-		options := []cli.ProjectOptionsFn{
-			cli.WithResolvedPaths(true),
-			cli.WithoutEnvironmentResolution,
+		backend, err := compose.NewComposeService(dockerCli)
+		if err != nil {
+			return err
 		}
 
-		project, metrics, err := o.ToProject(ctx, dockerCli, args, options...)
+		project, metrics, err := o.ToProject(ctx, dockerCli, backend, args, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			return err
 		}
@@ -236,7 +236,12 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 	name := o.ProjectName
 	var project *types.Project
 	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
-		p, _, err := o.ToProject(ctx, dockerCli, services, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
+		backend, err := compose.NewComposeService(dockerCli)
+		if err != nil {
+			return nil, "", err
+		}
+
+		p, _, err := o.ToProject(ctx, dockerCli, backend, services, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
@@ -260,7 +265,12 @@ func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cl
 		return envProjectName, nil
 	}
 
-	project, _, err := o.ToProject(ctx, dockerCli, nil)
+	backend, err := compose.NewComposeService(dockerCli)
+	if err != nil {
+		return "", err
+	}
+
+	project, _, err := o.ToProject(ctx, dockerCli, backend, nil)
 	if err != nil {
 		return "", err
 	}
@@ -285,19 +295,14 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 	return options.LoadModel(ctx)
 }
 
-func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) { //nolint:gocyclo
+// ToProject loads a Compose project using the LoadProject API.
+// Accepts optional cli.ProjectOptionsFn to control loader behavior.
+func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
 	var metrics tracing.Metrics
 	remotes := o.remoteLoaders(dockerCli)
-	for _, r := range remotes {
-		po = append(po, cli.WithResourceLoader(r))
-	}
 
-	options, err := o.toProjectOptions(po...)
-	if err != nil {
-		return nil, metrics, err
-	}
-
-	options.WithListeners(func(event string, metadata map[string]any) {
+	// Setup metrics listener to collect project data
+	metricsListener := func(event string, metadata map[string]any) {
 		switch event {
 		case "extends":
 			metrics.CountExtends++
@@ -318,50 +323,28 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, s
 				}
 			}
 		}
-	})
-
-	if o.Compatibility || utils.StringToBool(options.Environment[ComposeCompatibility]) {
-		api.Separator = "_"
 	}
 
-	project, err := options.LoadProject(ctx)
+	loadOpts := api.ProjectLoadOptions{
+		ProjectName:       o.ProjectName,
+		ConfigPaths:       o.ConfigPaths,
+		WorkingDir:        o.ProjectDir,
+		EnvFiles:          o.EnvFiles,
+		Profiles:          o.Profiles,
+		Services:          services,
+		Offline:           o.Offline,
+		All:               o.All,
+		Compatibility:     o.Compatibility,
+		ProjectOptionsFns: po,
+		LoadListeners:     []api.LoadListener{metricsListener},
+	}
+
+	project, err := backend.LoadProject(ctx, loadOpts)
 	if err != nil {
 		return nil, metrics, err
 	}
 
-	if project.Name == "" {
-		return nil, metrics, errors.New("project name can't be empty. Use `--project-name` to set a valid name")
-	}
-
-	project, err = project.WithServicesEnabled(services...)
-	if err != nil {
-		return nil, metrics, err
-	}
-
-	for name, s := range project.Services {
-		s.CustomLabels = map[string]string{
-			api.ProjectLabel:     project.Name,
-			api.ServiceLabel:     name,
-			api.VersionLabel:     api.ComposeVersion,
-			api.WorkingDirLabel:  project.WorkingDir,
-			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
-			api.OneoffLabel:      "False", // default, will be overridden by `run` command
-		}
-		if len(o.EnvFiles) != 0 {
-			s.CustomLabels[api.EnvironmentFileLabel] = strings.Join(o.EnvFiles, ",")
-		}
-		project.Services[name] = s
-	}
-
-	project, err = project.WithSelectedServices(services)
-	if err != nil {
-		return nil, tracing.Metrics{}, err
-	}
-
-	if !o.All {
-		project = project.WithoutUnnecessaryResources()
-	}
-	return project, metrics, err
+	return project, metrics, nil
 }
 
 func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceLoader {
