@@ -110,6 +110,10 @@ func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 		build = &bo
 	}
 
+	if createOpts.AssumeYes {
+		backendOptions.Options = append(backendOptions.Options, compose.WithPrompt(compose.AlwaysOkPrompt()))
+	}
+
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
@@ -124,7 +128,6 @@ func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 		Inherit:              !createOpts.noInherit,
 		Timeout:              createOpts.GetTimeout(),
 		QuietPull:            createOpts.quietPull,
-		AssumeYes:            createOpts.AssumeYes,
 	})
 }
 
