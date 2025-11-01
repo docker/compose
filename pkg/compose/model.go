@@ -24,12 +24,12 @@ import (
 	"os/exec"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -200,19 +200,20 @@ func (m *modelAPI) SetModelVariables(ctx context.Context, project *types.Project
 	for _, service := range project.Services {
 		for ref, modelConfig := range service.Models {
 			model := project.Models[ref]
-			varPrefix := strings.ReplaceAll(strings.ToUpper(ref), "-", "_")
+			defaultModelVar, defaultEndpointVar := utils.GetModelVariables(ref)
+
 			var variable string
 			if modelConfig != nil && modelConfig.ModelVariable != "" {
 				variable = modelConfig.ModelVariable
 			} else {
-				variable = varPrefix + "_MODEL"
+				variable = defaultModelVar
 			}
 			service.Environment[variable] = &model.Model
 
 			if modelConfig != nil && modelConfig.EndpointVariable != "" {
 				variable = modelConfig.EndpointVariable
 			} else {
-				variable = varPrefix + "_URL"
+				variable = defaultEndpointVar
 			}
 			service.Environment[variable] = &status.Endpoint
 		}
