@@ -55,6 +55,8 @@ func Convert(ctx context.Context, dockerCli command.Cli, project *types.Project,
 	if err != nil {
 		return err
 	}
+	// Set default model_var and endpoint_var if missing
+	setDefaultModelVariablesIfMissing(project)
 	// for user to rely on compose.yaml attribute names, not go struct ones, we marshall back into YAML
 	raw, err := project.MarshalYAML(types.WithSecretContent)
 	// Marshall to YAML
@@ -221,4 +223,32 @@ func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName strin
 		}
 	}
 	return inspect, err
+}
+
+// setDefaultModelVariablesIfMissing sets default model_var and endpoint_var for services that use models
+// but don't have these variables explicitly defined.
+func setDefaultModelVariablesIfMissing(project *types.Project) {
+	for serviceName, service := range project.Services {
+		if len(service.Models) == 0 {
+			continue
+		}
+		for modelRef, modelConfig := range service.Models {
+			if modelConfig == nil {
+				modelConfig = &types.ServiceModelConfig{}
+				service.Models[modelRef] = modelConfig
+			}
+
+			if modelConfig.ModelVariable == "" || modelConfig.EndpointVariable == "" {
+				defaultModelVar, defaultEndpointVar := utils.GetModelVariables(modelRef)
+
+				if modelConfig.ModelVariable == "" {
+					modelConfig.ModelVariable = defaultModelVar
+				}
+				if modelConfig.EndpointVariable == "" {
+					modelConfig.EndpointVariable = defaultEndpointVar
+				}
+			}
+		}
+		project.Services[serviceName] = service
+	}
 }
