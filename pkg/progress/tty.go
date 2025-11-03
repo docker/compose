@@ -44,6 +44,7 @@ func NewTTYWriter(out io.Writer) EventProcessor {
 
 type ttyWriter struct {
 	out             io.Writer
+	ids             []string // tasks ids ordered as first event appeared
 	tasks           map[string]task
 	repeated        bool
 	numLines        int
@@ -53,6 +54,7 @@ type ttyWriter struct {
 	skipChildEvents bool
 	operation       string
 	ticker          *time.Ticker
+	suspended       bool
 }
 
 type task struct {
@@ -121,9 +123,12 @@ func (w *ttyWriter) On(events ...Event) {
 func (w *ttyWriter) event(e Event) {
 	// Suspend print while a build is in progress, to avoid collision with buildkit Display
 	if e.StatusText == StatusBuilding {
+		fmt.Println("suspend during build")
 		w.ticker.Stop()
-	} else {
+		w.suspended = true
+	} else if w.suspended {
 		w.ticker.Reset(100 * time.Millisecond)
+		w.suspended = false
 	}
 
 	if last, ok := w.tasks[e.ID]; ok {
@@ -170,6 +175,7 @@ func (w *ttyWriter) event(e Event) {
 			t.stop()
 		}
 		w.tasks[e.ID] = t
+		w.ids = append(w.ids, e.ID)
 	}
 	w.printEvent(e)
 }
@@ -235,7 +241,9 @@ func (w *ttyWriter) print() {
 		w.skipChildEvents = true
 	}
 	numLines := 0
-	for _, t := range w.tasks {
+
+	for _, id := range w.ids { // iterate on ids to enforce a consistent order
+		t := w.tasks[id]
 		if t.parentID != "" {
 			continue
 		}
@@ -286,7 +294,8 @@ func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding in
 
 	// only show the aggregated progress while the root operation is in-progress
 	if parent := t; parent.status == Working {
-		for _, child := range w.tasks {
+		for _, id := range w.ids {
+			child := w.tasks[id]
 			if child.parentID == parent.ID {
 				if child.status == Working && child.total == 0 {
 					// we don't have totals available for all the child events
