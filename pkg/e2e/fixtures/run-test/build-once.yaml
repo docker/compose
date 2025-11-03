@@ -6,7 +6,7 @@ services:
     build:
       dockerfile_inline: |
         FROM alpine
-        RUN echo "Building nginx at $(date)" > /build-time.txt
+        RUN echo "Nginx built at $(date)" > /build-time.txt
         CMD sleep 3600
 
   # Service that depends on nginx
