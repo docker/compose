@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -38,11 +39,11 @@ func TestRunBuildOnce(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "down", "--rmi", "local", "--remove-orphans", "-v")
 		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "--verbose", "run", "--build", "--rm", "curl")
 
-		// Count how many times nginx was built by looking for its unique RUN command output
-		nginxBuilds := strings.Count(res.Stdout(), "Building nginx at")
+		output := res.Stdout()
 
-		// nginx should build exactly once, not twice
-		assert.Equal(t, nginxBuilds, 1, "nginx dependency should build once, but built %d times", nginxBuilds)
+		nginxBuilds := countServiceBuilds(output, projectName, "nginx")
+
+		assert.Equal(t, nginxBuilds, 1, "nginx should build once, built %d times\nOutput:\n%s", nginxBuilds, output)
 		assert.Assert(t, strings.Contains(res.Stdout(), "curl service"))
 
 		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "down", "--remove-orphans")
@@ -55,13 +56,9 @@ func TestRunBuildOnce(t *testing.T) {
 
 		output := res.Stdout()
 
-		dbBuildMarker := fmt.Sprintf("naming to docker.io/library/%s-db", projectName)
-		apiBuildMarker := fmt.Sprintf("naming to docker.io/library/%s-api", projectName)
-		appBuildMarker := fmt.Sprintf("naming to docker.io/library/%s-app", projectName)
-
-		dbBuilds := strings.Count(output, dbBuildMarker)
-		apiBuilds := strings.Count(output, apiBuildMarker)
-		appBuilds := strings.Count(output, appBuildMarker)
+		dbBuilds := countServiceBuilds(output, projectName, "db")
+		apiBuilds := countServiceBuilds(output, projectName, "api")
+		appBuilds := countServiceBuilds(output, projectName, "app")
 
 		assert.Equal(t, dbBuilds, 1, "db should build once, built %d times\nOutput:\n%s", dbBuilds, output)
 		assert.Equal(t, apiBuilds, 1, "api should build once, built %d times\nOutput:\n%s", apiBuilds, output)
@@ -76,13 +73,22 @@ func TestRunBuildOnce(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--rmi", "local", "--remove-orphans")
 		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "run", "--build", "--rm", "simple")
 
-		// Should build exactly once
-		simpleBuilds := strings.Count(res.Stdout(), "Simple service built at")
-		assert.Equal(t, simpleBuilds, 1, "simple should build once, built %d times", simpleBuilds)
+		output := res.Stdout()
+
+		simpleBuilds := countServiceBuilds(output, projectName, "simple")
+
+		assert.Equal(t, simpleBuilds, 1, "simple should build once, built %d times\nOutput:\n%s", simpleBuilds, output)
 		assert.Assert(t, strings.Contains(res.Stdout(), "Simple service"))
 
 		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--remove-orphans")
 	})
+}
+
+// countServiceBuilds counts how many times a service was built by matching
+// the "naming to *{projectName}-{serviceName}* done" pattern in the output
+func countServiceBuilds(output, projectName, serviceName string) int {
+	pattern := regexp.MustCompile(`naming to .*` + regexp.QuoteMeta(projectName) + `-` + regexp.QuoteMeta(serviceName) + `.* done`)
+	return len(pattern.FindAllString(output, -1))
 }
 
 // randomProjectName generates a unique project name for parallel test execution

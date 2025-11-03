@@ -5,6 +5,6 @@ services:
     build:
       dockerfile_inline: |
         FROM alpine
-        RUN echo "Simple service built at $(date)" > /build.txt
+        RUN echo "Simple built at $(date)" > /build.txt
         CMD echo "Simple service"
 
