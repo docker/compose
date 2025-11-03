@@ -158,13 +158,13 @@ func (o *ProjectOptions) WithProject(fn ProjectFunc, dockerCli command.Cli) func
 
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
-	return Adapt(func(ctx context.Context, args []string) error {
+	return Adapt(func(ctx context.Context, services []string) error {
 		backend, err := compose.NewComposeService(dockerCli)
 		if err != nil {
 			return err
 		}
 
-		project, metrics, err := o.ToProject(ctx, dockerCli, backend, args, cli.WithoutEnvironmentResolution)
+		project, metrics, err := o.ToProject(ctx, dockerCli, backend, services, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			return err
 		}
@@ -176,7 +176,7 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 			return err
 		}
 
-		return fn(ctx, project, args)
+		return fn(ctx, project, services)
 	})
 }
 
