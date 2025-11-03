@@ -263,7 +263,7 @@ func runUp(
 		if err != nil {
 			return err
 		}
-		bo.Services = services
+		bo.Services = project.ServiceNames()
 		bo.Deps = !upOptions.noDeps
 		build = &bo
 	}
