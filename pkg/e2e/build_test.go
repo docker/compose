@@ -34,7 +34,7 @@ import (
 )
 
 func TestLocalComposeBuild(t *testing.T) {
-	for _, env := range []string{"DOCKER_BUILDKIT=0", "DOCKER_BUILDKIT=1,COMPOSE_BAKE=0", "DOCKER_BUILDKIT=1,COMPOSE_BAKE=1"} {
+	for _, env := range []string{"DOCKER_BUILDKIT=0", "DOCKER_BUILDKIT=1"} {
 		c := NewCLI(t, WithEnv(strings.Split(env, ",")...))
 
 		t.Run(env+" build named and unnamed images", func(t *testing.T) {
@@ -282,25 +282,6 @@ func TestBuildImageDependencies(t *testing.T) {
 		))
 		doTest(t, cli, "build")
 		doTest(t, cli, "build", "--with-dependencies", "service")
-	})
-
-	t.Run("BuildKit by dependency order", func(t *testing.T) {
-		cli := NewCLI(t, WithEnv(
-			"DOCKER_BUILDKIT=1", "COMPOSE_BAKE=0",
-			"COMPOSE_FILE=./fixtures/build-dependencies/classic.yaml",
-		))
-		doTest(t, cli, "build")
-		doTest(t, cli, "build", "--with-dependencies", "service")
-	})
-
-	t.Run("BuildKit by additional contexts", func(t *testing.T) {
-		cli := NewCLI(t, WithEnv(
-			"DOCKER_BUILDKIT=1", "COMPOSE_BAKE=0",
-			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
-		))
-		doTest(t, cli, "build")
-		doTest(t, cli, "build", "service")
-		doTest(t, cli, "up", "--build", "service")
 	})
 
 	t.Run("Bake by additional contexts", func(t *testing.T) {
