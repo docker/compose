@@ -42,7 +42,7 @@ func TestRestart(t *testing.T) {
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose.yaml", "--project-name", projectName, "up", "-d")
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-restart-1  Started"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-restart-1 Started"), res.Combined())
 
 		c.WaitForCmdResult(t, c.NewDockerComposeCmd(t, "--project-name", projectName, "ps", "-a", "--format",
 			"json"),
@@ -80,9 +80,9 @@ func TestRestartWithDependencies(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "restart", baseService)
 	out := res.Combined()
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Restarting", baseService)), out)
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Healthy", baseService)), out)
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Restarting", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Healthy", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Started", depWithRestart)), out)
 	assert.Assert(t, !strings.Contains(out, depNoRestart), out)
 
 	c = NewParallelCLI(t, WithEnv(
@@ -91,11 +91,11 @@ func TestRestartWithDependencies(t *testing.T) {
 	))
 	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose-depends-on.yaml", "up", "-d")
 	out = res.Combined()
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Stopped", depWithRestart)), out)
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Recreated", baseService)), out)
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Healthy", baseService)), out)
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Started", depWithRestart)), out)
-	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1  Running", depNoRestart)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Stopped", depWithRestart)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Recreated", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Healthy", baseService)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Started", depWithRestart)), out)
+	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Running", depNoRestart)), out)
 }
 
 func TestRestartWithProfiles(t *testing.T) {
@@ -111,5 +111,5 @@ func TestRestartWithProfiles(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "restart", "test")
 	fmt.Println(res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-profiles-test-1  Started"), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-profiles-test-1 Started"), res.Combined())
 }

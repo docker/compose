@@ -132,31 +132,30 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 
 		if !quietPull {
 			events.On(progress.Event{
-				ID:         model.Name,
-				Status:     progress.Working,
-				Text:       "Pulling",
-				StatusText: msg,
+				ID:     model.Name,
+				Status: progress.Working,
+				Text:   progress.StatusPulling,
 			})
 		}
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		events.On(progress.ErrorMessageEvent(model.Name, err.Error()))
+		events.On(progress.ErrorEvent(model.Name, err.Error()))
 	}
 	events.On(progress.Event{
-		ID:         model.Name,
-		Status:     progress.Working,
-		StatusText: "Pulled",
+		ID:     model.Name,
+		Status: progress.Working,
+		Text:   progress.StatusPulled,
 	})
 	return err
 }
 
 func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events progress.EventProcessor) error {
 	events.On(progress.Event{
-		ID:         config.Name,
-		Status:     progress.Working,
-		StatusText: "Configuring",
+		ID:     config.Name,
+		Status: progress.Working,
+		Text:   "Configuring",
 	})
 	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]
 	args := []string{"configure"}

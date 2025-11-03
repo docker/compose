@@ -43,7 +43,7 @@ func (p *plainWriter) Event(e Event) {
 	if p.dryRun {
 		prefix = api.DRYRUN_PREFIX
 	}
-	_, _ = fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.StatusText)
+	_, _ = fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.Details)
 }
 
 func (p *plainWriter) On(events ...Event) {

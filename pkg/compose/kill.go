@@ -66,7 +66,7 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 			s.events.On(progress.KillingEvent(eventName))
 			err := s.apiClient().ContainerKill(ctx, ctr.ID, options.Signal)
 			if err != nil {
-				s.events.On(progress.ErrorMessageEvent(eventName, "Error while Killing"))
+				s.events.On(progress.ErrorEvent(eventName, "Error while Killing"))
 				return err
 			}
 			s.events.On(progress.KilledEvent(eventName))

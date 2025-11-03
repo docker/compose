@@ -58,17 +58,17 @@ type ttyWriter struct {
 }
 
 type task struct {
-	ID         string
-	parentID   string
-	startTime  time.Time
-	endTime    time.Time
-	text       string
-	status     EventStatus
-	statusText string
-	current    int64
-	percent    int
-	total      int64
-	spinner    *Spinner
+	ID        string
+	parentID  string
+	startTime time.Time
+	endTime   time.Time
+	text      string
+	details   string
+	status    EventStatus
+	current   int64
+	percent   int
+	total     int64
+	spinner   *Spinner
 }
 
 func (t *task) stop() {
@@ -112,7 +112,7 @@ func (w *ttyWriter) On(events ...Event) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	for _, e := range events {
-		if w.operation != "start" && (e.StatusText == "Started" || e.StatusText == "Starting") {
+		if w.operation != "start" && (e.Text == StatusStarted || e.Text == StatusStarting) {
 			// skip those events to avoid mix with container logs
 			continue
 		}
@@ -122,8 +122,7 @@ func (w *ttyWriter) On(events ...Event) {
 
 func (w *ttyWriter) event(e Event) {
 	// Suspend print while a build is in progress, to avoid collision with buildkit Display
-	if e.StatusText == StatusBuilding {
-		fmt.Println("suspend during build")
+	if e.Text == StatusBuilding {
 		w.ticker.Stop()
 		w.suspended = true
 	} else if w.suspended {
@@ -142,7 +141,7 @@ func (w *ttyWriter) event(e Event) {
 		}
 		last.status = e.Status
 		last.text = e.Text
-		last.statusText = e.StatusText
+		last.details = e.Details
 		// progress can only go up
 		if e.Total > last.total {
 			last.total = e.Total
@@ -160,16 +159,16 @@ func (w *ttyWriter) event(e Event) {
 		w.tasks[e.ID] = last
 	} else {
 		t := task{
-			ID:         e.ID,
-			parentID:   e.ParentID,
-			startTime:  time.Now(),
-			text:       e.Text,
-			status:     e.Status,
-			statusText: e.StatusText,
-			current:    e.Current,
-			percent:    e.Percent,
-			total:      e.Total,
-			spinner:    NewSpinner(),
+			ID:        e.ID,
+			parentID:  e.ParentID,
+			startTime: time.Now(),
+			text:      e.Text,
+			details:   e.Details,
+			status:    e.Status,
+			current:   e.Current,
+			percent:   e.Percent,
+			total:     e.Total,
+			spinner:   NewSpinner(),
 		}
 		if e.Status == Done || e.Status == Error {
 			t.stop()
@@ -197,7 +196,7 @@ func (w *ttyWriter) printEvent(e Event) {
 	case Error:
 		color = ErrorColor
 	}
-	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, e.Text, color(e.StatusText))
+	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, color(e.Text), e.Details)
 }
 
 func (w *ttyWriter) print() {
@@ -228,7 +227,7 @@ func (w *ttyWriter) print() {
 
 	var statusPadding int
 	for _, t := range w.tasks {
-		l := len(fmt.Sprintf("%s %s", t.ID, t.text))
+		l := len(t.ID)
 		if statusPadding < l {
 			statusPadding = l
 		}
@@ -314,20 +313,17 @@ func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding in
 		hideDetails = true
 	}
 
-	var txt string
+	txt := t.ID
 	if len(completion) > 0 {
-		var details string
+		var progress string
 		if !hideDetails {
-			details = fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
+			progress = fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
 		}
-		txt = fmt.Sprintf("%s [%s]%s %s",
+		txt = fmt.Sprintf("%s [%s]%s",
 			t.ID,
 			SuccessColor(strings.Join(completion, "")),
-			details,
-			t.text,
+			progress,
 		)
-	} else {
-		txt = fmt.Sprintf("%s %s", t.ID, t.text)
 	}
 	textLen := len(txt)
 	padding := statusPadding - textLen
@@ -336,19 +332,20 @@ func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding in
 	}
 	// calculate the max length for the status text, on errors it
 	// is 2-3 lines long and breaks the line formatting
-	maxStatusLen := terminalWidth - textLen - statusPadding - 15
-	status := t.statusText
+	maxDetailsLen := terminalWidth - textLen - statusPadding - 15
+	details := t.details
 	// in some cases (debugging under VS Code), terminalWidth is set to zero by goterm.Width() ; ensuring we don't tweak strings with negative char index
-	if maxStatusLen > 0 && len(status) > maxStatusLen {
-		status = status[:maxStatusLen] + "..."
+	if maxDetailsLen > 0 && len(details) > maxDetailsLen {
+		details = details[:maxDetailsLen] + "..."
 	}
-	text := fmt.Sprintf("%s %s%s %s%s %s",
+	text := fmt.Sprintf("%s %s%s %s %s%s %s",
 		pad,
 		spinner(t),
 		prefix,
 		txt,
 		strings.Repeat(" ", padding),
-		colorFn(t.status)(status),
+		colorFn(t.status)(t.text),
+		details,
 	)
 	timer := fmt.Sprintf("%.1fs ", elapsed)
 	o := align(text, TimerColor(timer), terminalWidth)

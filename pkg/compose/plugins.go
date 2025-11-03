@@ -143,7 +143,7 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 
 	err = cmd.Wait()
 	if err != nil {
-		s.events.On(progress.ErrorMessageEvent(service.Name, err.Error()))
+		s.events.On(progress.ErrorEvent(service.Name, err.Error()))
 		return nil, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
 	}
 	switch command {

@@ -161,14 +161,13 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events progr
 	}
 
 	events.On(progress.Event{
-		ParentID:   prefix,
-		ID:         jm.ID,
-		Text:       jm.Status,
-		Status:     status,
-		Current:    current,
-		Total:      total,
-		Percent:    percent,
-		StatusText: text,
+		ParentID: prefix,
+		ID:       jm.ID,
+		Text:     text,
+		Status:   status,
+		Current:  current,
+		Total:    total,
+		Percent:  percent,
 	})
 }
 

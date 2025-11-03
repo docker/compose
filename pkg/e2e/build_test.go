@@ -536,7 +536,7 @@ func TestBuildDependsOn(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-dependencies/compose-depends_on.yaml", "--progress=plain", "up", "test2")
 	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "test1  Built"))
+	assert.Check(t, strings.Contains(out, "test1 Built"))
 }
 
 func TestBuildSubset(t *testing.T) {
@@ -548,7 +548,7 @@ func TestBuildSubset(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/subset/compose.yaml", "build", "main")
 	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "main  Built"))
+	assert.Check(t, strings.Contains(out, "main Built"))
 }
 
 func TestBuildDependentImage(t *testing.T) {
@@ -560,11 +560,11 @@ func TestBuildDependentImage(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "build", "firstbuild")
 	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "firstbuild  Built"))
+	assert.Check(t, strings.Contains(out, "firstbuild Built"))
 
 	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "build", "secondbuild")
 	out = res.Combined()
-	assert.Check(t, strings.Contains(out, "secondbuild  Built"))
+	assert.Check(t, strings.Contains(out, "secondbuild Built"))
 }
 
 func TestBuildSubDependencies(t *testing.T) {
@@ -576,11 +576,11 @@ func TestBuildSubDependencies(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "build", "main")
 	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "main  Built"))
+	assert.Check(t, strings.Contains(out, "main Built"))
 
 	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "up", "--build", "main")
 	out = res.Combined()
-	assert.Check(t, strings.Contains(out, "main  Built"))
+	assert.Check(t, strings.Contains(out, "main Built"))
 }
 
 func TestBuildLongOutputLine(t *testing.T) {
@@ -592,11 +592,11 @@ func TestBuildLongOutputLine(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "build", "long-line")
 	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "long-line  Built"))
+	assert.Check(t, strings.Contains(out, "long-line Built"))
 
 	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "up", "--build", "long-line")
 	out = res.Combined()
-	assert.Check(t, strings.Contains(out, "long-line  Built"))
+	assert.Check(t, strings.Contains(out, "long-line Built"))
 }
 
 func TestBuildDependentImageWithProfile(t *testing.T) {
@@ -608,7 +608,7 @@ func TestBuildDependentImageWithProfile(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/profiles/compose.yaml", "build", "secret-build-test")
 	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "secret-build-test  Built"))
+	assert.Check(t, strings.Contains(out, "secret-build-test Built"))
 }
 
 func TestBuildTLS(t *testing.T) {

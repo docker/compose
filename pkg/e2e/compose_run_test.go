@@ -187,8 +187,8 @@ func TestLocalComposeRun(t *testing.T) {
 		res.Assert(t, icmd.Success)
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/pull.yaml", "run", "--pull", "always", "backend")
-		assert.Assert(t, strings.Contains(res.Combined(), "Image nginx  Pulling"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "Image nginx  Pulled"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Image nginx Pulling"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Image nginx Pulled"), res.Combined())
 	})
 
 	t.Run("compose run --env-from-file", func(t *testing.T) {

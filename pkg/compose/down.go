@@ -235,7 +235,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 			if errdefs.IsNotFound(err) {
 				continue
 			}
-			s.events.On(progress.ErrorEvent(eventName))
+			s.events.On(progress.ErrorEvent(eventName, err.Error()))
 			return fmt.Errorf("failed to remove network %s: %w", name, err)
 		}
 		s.events.On(progress.RemovedEvent(eventName))
@@ -317,7 +317,7 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	timeoutInSecond := utils.DurationSecondToInt(timeout)
 	err := s.apiClient().ContainerStop(ctx, ctr.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 	if err != nil {
-		s.events.On(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
+		s.events.On(progress.ErrorEvent(eventName, "Error while Stopping"))
 		return err
 	}
 	s.events.On(progress.StoppedEvent(eventName))
@@ -360,7 +360,7 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 		RemoveVolumes: volumes,
 	})
 	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
-		s.events.On(progress.ErrorMessageEvent(eventName, "Error while Removing"))
+		s.events.On(progress.ErrorEvent(eventName, "Error while Removing"))
 		return err
 	}
 	s.events.On(progress.RemovedEvent(eventName))

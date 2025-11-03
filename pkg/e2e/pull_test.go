@@ -34,15 +34,15 @@ func TestComposePull(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "pull")
 		output := res.Combined()
 
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.14  Pulled"))
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.15  Pulled"))
+		assert.Assert(t, strings.Contains(output, "Image alpine:3.14 Pulled"))
+		assert.Assert(t, strings.Contains(output, "Image alpine:3.15 Pulled"))
 
 		// verify default policy is 'always' for pull command
 		res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "pull")
 		output = res.Combined()
 
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.14  Pulled"))
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.15  Pulled"))
+		assert.Assert(t, strings.Contains(output, "Image alpine:3.14 Pulled"))
+		assert.Assert(t, strings.Contains(output, "Image alpine:3.15 Pulled"))
 	})
 
 	t.Run("Verify skipped pull if image is already present locally", func(t *testing.T) {
@@ -52,16 +52,16 @@ func TestComposePull(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/image-present-locally", "pull")
 		output := res.Combined()
 
-		assert.Assert(t, strings.Contains(output, "alpine:3.13.12 Skipped - Image is already present locally"))
+		assert.Assert(t, strings.Contains(output, "alpine:3.13.12 Skipped Image is already present locally"))
 		// image with :latest tag gets pulled regardless if pull_policy: missing or if_not_present
-		assert.Assert(t, strings.Contains(output, "alpine:latest  Pulled"))
+		assert.Assert(t, strings.Contains(output, "alpine:latest Pulled"))
 	})
 
 	t.Run("Verify skipped no image to be pulled", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/no-image-name-given", "pull")
 		output := res.Combined()
 
-		assert.Assert(t, strings.Contains(output, "Skipped - No image to be pulled"))
+		assert.Assert(t, strings.Contains(output, "Skipped No image to be pulled"))
 	})
 
 	t.Run("Verify pull failure", func(t *testing.T) {
