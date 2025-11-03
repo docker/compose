@@ -1398,7 +1398,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 
 	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
 	if err != nil {
-		s.events.On(progress.ErrorEvent(networkEventName))
+		s.events.On(progress.ErrorEvent(networkEventName, err.Error()))
 		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
 	s.events.On(progress.CreatedEvent(networkEventName))
@@ -1632,7 +1632,7 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		DriverOpts: volume.DriverOpts,
 	})
 	if err != nil {
-		s.events.On(progress.ErrorEvent(eventName))
+		s.events.On(progress.ErrorEvent(eventName, err.Error()))
 		return err
 	}
 	s.events.On(progress.CreatedEvent(eventName))

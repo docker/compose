@@ -213,10 +213,10 @@ func TestNetworkRecreate(t *testing.T) {
 	err := res.Stderr()
 	fmt.Println(err)
 	res.Assert(t, icmd.Expected{Err: `
- Container network_recreate-web-1  Stopped
- Network network_recreate_test  Removed
- Network network_recreate_test  Creating
- Network network_recreate_test  Created
- Container network_recreate-web-1  Starting
- Container network_recreate-web-1  Started`})
+ Container network_recreate-web-1 Stopped 
+ Network network_recreate_test Removed 
+ Network network_recreate_test Creating 
+ Network network_recreate_test Created 
+ Container network_recreate-web-1 Starting 
+ Container network_recreate-web-1 Started`})
 }

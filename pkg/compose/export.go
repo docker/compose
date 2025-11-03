@@ -51,13 +51,10 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 	}
 
 	name := getCanonicalContainerName(container)
-	msg := fmt.Sprintf("export %s to %s", name, options.Output)
-
 	s.events.On(progress.Event{
-		ID:         name,
-		Text:       msg,
-		Status:     progress.Working,
-		StatusText: "Exporting",
+		ID:     name,
+		Text:   progress.StatusExporting,
+		Status: progress.Working,
 	})
 
 	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID)
@@ -67,12 +64,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 
 	defer func() {
 		if err := responseBody.Close(); err != nil {
-			s.events.On(progress.Event{
-				ID:         name,
-				Text:       msg,
-				Status:     progress.Error,
-				StatusText: fmt.Sprintf("Failed to close response body: %v", err),
-			})
+			s.events.On(progress.ErrorEventf(name, "Failed to close response body: %s", err.Error()))
 		}
 	}()
 
@@ -93,10 +85,9 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 	}
 
 	s.events.On(progress.Event{
-		ID:         name,
-		Text:       msg,
-		Status:     progress.Done,
-		StatusText: "Exported",
+		ID:     name,
+		Text:   progress.StatusExported,
+		Status: progress.Done,
 	})
 
 	return nil

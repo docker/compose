@@ -86,24 +86,24 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 			name := getCanonicalContainerName(ctr)
 			var msg string
 			if direction == fromService {
-				msg = fmt.Sprintf("copy %s:%s to %s", name, srcPath, dstPath)
+				msg = fmt.Sprintf("%s:%s to %s", name, srcPath, dstPath)
 			} else {
-				msg = fmt.Sprintf("copy %s to %s:%s", srcPath, name, dstPath)
+				msg = fmt.Sprintf("%s to %s:%s", srcPath, name, dstPath)
 			}
 			s.events.On(progress.Event{
-				ID:         name,
-				Text:       msg,
-				Status:     progress.Working,
-				StatusText: "Copying",
+				ID:      name,
+				Text:    progress.StatusCopying,
+				Details: msg,
+				Status:  progress.Working,
 			})
 			if err := copyFunc(ctx, ctr.ID, srcPath, dstPath, options); err != nil {
 				return err
 			}
 			s.events.On(progress.Event{
-				ID:         name,
-				Text:       msg,
-				Status:     progress.Done,
-				StatusText: "Copied",
+				ID:      name,
+				Text:    progress.StatusCopied,
+				Details: msg,
+				Status:  progress.Done,
 			})
 			return nil
 		})

@@ -504,7 +504,9 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 							logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
 							return nil
 						}
-						s.events.On(containerEvents(waitingFor, progress.ErrorEvent)...)
+						s.events.On(containerEvents(waitingFor, func(s string) progress.Event {
+							return progress.ErrorEventf(s, "dependency %s failed to start", dep)
+						})...)
 						return fmt.Errorf("dependency failed to start: %w", err)
 					}
 					if healthy {
@@ -532,7 +534,9 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						}
 
 						msg := fmt.Sprintf("service %s", messageSuffix)
-						s.events.On(containerReasonEvents(waitingFor, progress.ErrorMessageEvent, msg)...)
+						s.events.On(containerEvents(waitingFor, func(s string) progress.Event {
+							return progress.ErrorEventf(s, "service %s", messageSuffix)
+						})...)
 						return errors.New(msg)
 					}
 				default:
@@ -600,9 +604,9 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	if err != nil {
 		if ctx.Err() == nil {
 			s.events.On(progress.Event{
-				ID:         eventName,
-				Status:     progress.Error,
-				StatusText: err.Error(),
+				ID:     eventName,
+				Status: progress.Error,
+				Text:   err.Error(),
 			})
 		}
 		return ctr, err
@@ -619,9 +623,9 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	defer func() {
 		if err != nil && ctx.Err() == nil {
 			s.events.On(progress.Event{
-				ID:         eventName,
-				Status:     progress.Error,
-				StatusText: err.Error(),
+				ID:     eventName,
+				Status: progress.Error,
+				Text:   err.Error(),
 			})
 		}
 	}()

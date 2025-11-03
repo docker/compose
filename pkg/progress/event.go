@@ -16,7 +16,10 @@
 
 package progress
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 // EventStatus indicates the status of an action
 type EventStatus int
@@ -54,28 +57,52 @@ const (
 	StatusBuilt      = "Built"
 	StatusPulling    = "Pulling"
 	StatusPulled     = "Pulled"
+	StatusCommitting = "Committing"
+	StatusCommitted  = "Committed"
+	StatusCopying    = "Copying"
+	StatusCopied     = "Copied"
+	StatusExporting  = "Exporting"
+	StatusExported   = "Exported"
 )
 
 // Event represents a progress event.
 type Event struct {
-	ID         string
-	ParentID   string
-	Text       string
-	Status     EventStatus
-	StatusText string
-	Current    int64
-	Percent    int
-	Total      int64
+	ID       string
+	ParentID string
+	Text     string
+	Details  string
+	Status   EventStatus
+	Current  int64
+	Percent  int
+	Total    int64
 }
 
-// ErrorMessageEvent creates a new Error Event with message
-func ErrorMessageEvent(id string, msg string) Event {
-	return NewEvent(id, Error, msg)
+func (e *Event) StatusText() string {
+	switch e.Status {
+	case Working:
+		return "Working"
+	case Warning:
+		return "Warning"
+	case Done:
+		return "Done"
+	default:
+		return "Error"
+	}
 }
 
-// ErrorEvent creates a new Error Event
-func ErrorEvent(id string) Event {
-	return NewEvent(id, Error, StatusError)
+// ErrorEvent creates a new Error Event with message
+func ErrorEvent(id string, msg string) Event {
+	return Event{
+		ID:      id,
+		Status:  Error,
+		Text:    StatusError,
+		Details: msg,
+	}
+}
+
+// ErrorEventf creates a new Error Event with format message
+func ErrorEventf(id string, msg string, args ...any) Event {
+	return ErrorEvent(id, fmt.Sprintf(msg, args...))
 }
 
 // CreatingEvent creates a new Create in progress Event
@@ -181,18 +208,18 @@ func PulledEvent(id string) Event {
 // SkippedEvent creates a new Skipped Event
 func SkippedEvent(id string, reason string) Event {
 	return Event{
-		ID:         id,
-		Status:     Warning,
-		StatusText: "Skipped: " + reason,
+		ID:     id,
+		Status: Warning,
+		Text:   "Skipped: " + reason,
 	}
 }
 
 // NewEvent new event
-func NewEvent(id string, status EventStatus, statusText string) Event {
+func NewEvent(id string, status EventStatus, text string) Event {
 	return Event{
-		ID:         id,
-		Status:     status,
-		StatusText: statusText,
+		ID:     id,
+		Status: status,
+		Text:   text,
 	}
 }
 

@@ -41,21 +41,18 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 	}
 
 	name := getCanonicalContainerName(ctr)
-	msg := fmt.Sprintf("Commit %s", name)
 
 	s.events.On(progress.Event{
-		ID:         name,
-		Text:       msg,
-		Status:     progress.Working,
-		StatusText: "Committing",
+		ID:     name,
+		Status: progress.Working,
+		Text:   progress.StatusCommitting,
 	})
 
 	if s.dryRun {
 		s.events.On(progress.Event{
-			ID:         name,
-			Text:       msg,
-			Status:     progress.Done,
-			StatusText: "Committed",
+			ID:     name,
+			Status: progress.Done,
+			Text:   progress.StatusCommitted,
 		})
 
 		return nil
@@ -73,10 +70,9 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 	}
 
 	s.events.On(progress.Event{
-		ID:         name,
-		Text:       msg,
-		Status:     progress.Done,
-		StatusText: fmt.Sprintf("Committed as %s", response.ID),
+		ID:     name,
+		Text:   fmt.Sprintf("Committed as %s", response.ID),
+		Status: progress.Done,
 	})
 
 	return nil

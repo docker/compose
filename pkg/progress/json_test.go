@@ -32,13 +32,13 @@ func TestJsonWriter_Event(t *testing.T) {
 	}
 
 	event := Event{
-		ID:         "service1",
-		ParentID:   "project",
-		Text:       "Creating",
-		StatusText: "Working",
-		Current:    50,
-		Total:      100,
-		Percent:    50,
+		ID:       "service1",
+		ParentID: "project",
+		Status:   Working,
+		Text:     StatusCreating,
+		Current:  50,
+		Total:    100,
+		Percent:  50,
 	}
 	w.Event(event)
 
@@ -50,8 +50,8 @@ func TestJsonWriter_Event(t *testing.T) {
 		DryRun:   true,
 		ID:       event.ID,
 		ParentID: event.ParentID,
-		Text:     event.Text,
-		Status:   event.StatusText,
+		Text:     StatusCreating,
+		Status:   "Working",
 		Current:  event.Current,
 		Total:    event.Total,
 		Percent:  event.Percent,

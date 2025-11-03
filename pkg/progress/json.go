@@ -39,8 +39,9 @@ type jsonMessage struct {
 	Tail     bool   `json:"tail,omitempty"`
 	ID       string `json:"id,omitempty"`
 	ParentID string `json:"parent_id,omitempty"`
-	Text     string `json:"text,omitempty"`
 	Status   string `json:"status,omitempty"`
+	Text     string `json:"text,omitempty"`
+	Details  string `json:"details,omitempty"`
 	Current  int64  `json:"current,omitempty"`
 	Total    int64  `json:"total,omitempty"`
 	Percent  int    `json:"percent,omitempty"`
@@ -54,8 +55,9 @@ func (p *jsonWriter) Event(e Event) {
 		DryRun:   p.dryRun,
 		Tail:     false,
 		ID:       e.ID,
+		Status:   e.StatusText(),
 		Text:     e.Text,
-		Status:   e.StatusText,
+		Details:  e.Details,
 		ParentID: e.ParentID,
 		Current:  e.Current,
 		Total:    e.Total,
