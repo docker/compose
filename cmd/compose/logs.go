@@ -22,6 +22,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -90,8 +91,7 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	if err != nil {
 		return err
 	}
-	outStream, errStream, _ := backend.GetConfiguredStreams()
-	consumer := formatter.NewLogConsumer(ctx, outStream, errStream, !opts.noColor, !opts.noPrefix, false)
+	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !opts.noColor, !opts.noPrefix, false)
 	return backend.Logs(ctx, name, consumer, api.LogOptions{
 		Project:    project,
 		Services:   services,
@@ -101,5 +101,34 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		Since:      opts.since,
 		Until:      opts.until,
 		Timestamps: opts.timestamps,
+	})
+}
+
+var _ api.LogConsumer = &logConsumer{}
+
+type logConsumer struct {
+	events progress.EventProcessor
+}
+
+func (l logConsumer) Log(containerName, message string) {
+	l.events.On(progress.Event{
+		ID:   containerName,
+		Text: message,
+	})
+}
+
+func (l logConsumer) Err(containerName, message string) {
+	l.events.On(progress.Event{
+		ID:     containerName,
+		Status: progress.Error,
+		Text:   message,
+	})
+}
+
+func (l logConsumer) Status(containerName, message string) {
+	l.events.On(progress.Event{
+		ID:     containerName,
+		Status: progress.Error,
+		Text:   message,
 	})
 }

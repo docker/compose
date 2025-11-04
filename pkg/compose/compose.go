@@ -285,11 +285,6 @@ func (s *composeService) stdinfo() *streams.Out {
 	return s.stderr()
 }
 
-// GetConfiguredStreams returns the configured I/O streams (implements api.Compose interface)
-func (s *composeService) GetConfiguredStreams() (io.Writer, io.Writer, io.Reader) {
-	return s.stdout(), s.stderr(), s.stdin()
-}
-
 // readCloserAdapter adapts io.Reader to io.ReadCloser
 type readCloserAdapter struct {
 	r io.Reader
