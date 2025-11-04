@@ -150,6 +150,9 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 }
 
 func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts buildOptions, services []string) error {
+	if opts.print {
+		backendOptions.Add(compose.WithEventProcessor(ui.NewQuietWriter()))
+	}
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
