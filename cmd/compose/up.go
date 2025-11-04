@@ -296,8 +296,7 @@ func runUp(
 	var consumer api.LogConsumer
 	var attach []string
 	if !upOptions.Detach {
-		outStream, errStream, _ := backend.GetConfiguredStreams()
-		consumer = formatter.NewLogConsumer(ctx, outStream, errStream, !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
+		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 
 		var attachSet utils.Set[string]
 		if len(upOptions.attach) != 0 {

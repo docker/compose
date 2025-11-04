@@ -11,7 +11,6 @@ package mocks
 
 import (
 	context "context"
-	io "io"
 	reflect "reflect"
 
 	types "github.com/compose-spec/compose-go/v2/types"
@@ -182,22 +181,6 @@ func (m *MockCompose) Generate(ctx context.Context, options api.GenerateOptions)
 func (mr *MockComposeMockRecorder) Generate(ctx, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockCompose)(nil).Generate), ctx, options)
-}
-
-// GetConfiguredStreams mocks base method.
-func (m *MockCompose) GetConfiguredStreams() (io.Writer, io.Writer, io.Reader) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConfiguredStreams")
-	ret0, _ := ret[0].(io.Writer)
-	ret1, _ := ret[1].(io.Writer)
-	ret2, _ := ret[2].(io.Reader)
-	return ret0, ret1, ret2
-}
-
-// GetConfiguredStreams indicates an expected call of GetConfiguredStreams.
-func (mr *MockComposeMockRecorder) GetConfiguredStreams() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConfiguredStreams", reflect.TypeOf((*MockCompose)(nil).GetConfiguredStreams))
 }
 
 // Images mocks base method.
