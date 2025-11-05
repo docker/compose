@@ -69,6 +69,12 @@ type ProjectLoadOptions struct {
 	// All registered listeners will be notified of events.
 	// This is optional - pass nil or empty slice if not needed.
 	LoadListeners []LoadListener
+
+	OCI OCIOptions
+}
+
+type OCIOptions struct {
+	InsecureRegistries []string
 }
 
 // Compose is the API interface one can use to programmatically use docker/compose in a third-party software
@@ -484,8 +490,9 @@ type PublishOptions struct {
 	ResolveImageDigests bool
 	Application         bool
 	WithEnvironment     bool
-
-	OCIVersion OCIVersion
+	OCIVersion          OCIVersion
+	// Use plain HTTP to access registry. Should only be used for testing purpose
+	InsecureRegistry bool
 }
 
 func (e Event) String() string {

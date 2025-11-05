@@ -89,7 +89,12 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			return err
 		}
 
-		resolver := oci.NewResolver(s.configFile())
+		var insecureRegistries []string
+		if options.InsecureRegistry {
+			insecureRegistries = append(insecureRegistries, reference.Domain(named))
+		}
+
+		resolver := oci.NewResolver(s.configFile(), insecureRegistries...)
 
 		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {

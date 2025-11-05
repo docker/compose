@@ -131,16 +131,17 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 }
 
 type ProjectOptions struct {
-	ProjectName   string
-	Profiles      []string
-	ConfigPaths   []string
-	WorkDir       string
-	ProjectDir    string
-	EnvFiles      []string
-	Compatibility bool
-	Progress      string
-	Offline       bool
-	All           bool
+	ProjectName        string
+	Profiles           []string
+	ConfigPaths        []string
+	WorkDir            string
+	ProjectDir         string
+	EnvFiles           []string
+	Compatibility      bool
+	Progress           string
+	Offline            bool
+	All                bool
+	insecureRegistries []string
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -216,6 +217,8 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
+	f.StringArrayVar(&o.insecureRegistries, "insecure-registry", []string{}, "Use insecure registry to pull Compose OCI artifacts. Doesn't apply to images")
+	_ = f.MarkHidden("insecure-registry")
 	f.StringArrayVar(&o.EnvFiles, "env-file", defaultStringArrayVar(ComposeEnvFiles), "Specify an alternate environment file")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
@@ -337,6 +340,9 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		Compatibility:     o.Compatibility,
 		ProjectOptionsFns: po,
 		LoadListeners:     []api.LoadListener{metricsListener},
+		OCI: api.OCIOptions{
+			InsecureRegistries: o.insecureRegistries,
+		},
 	}
 
 	project, err := backend.LoadProject(ctx, loadOpts)
@@ -352,7 +358,7 @@ func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceL
 		return nil
 	}
 	git := remote.NewGitRemoteLoader(dockerCli, o.Offline)
-	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline)
+	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline, api.OCIOptions{})
 	return []loader.ResourceLoader{git, oci}
 }
 

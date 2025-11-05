@@ -15,6 +15,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: insecure-registry
+      value_type: bool
+      default_value: "false"
+      description: Use insecure registry
+      deprecated: false
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: oci-version
       value_type: string
       description: |

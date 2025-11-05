@@ -31,6 +31,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/internal/oci"
+	"github.com/docker/compose/v2/pkg/api"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -76,18 +77,20 @@ func ociRemoteLoaderEnabled() (bool, error) {
 	return true, nil
 }
 
-func NewOCIRemoteLoader(dockerCli command.Cli, offline bool) loader.ResourceLoader {
+func NewOCIRemoteLoader(dockerCli command.Cli, offline bool, options api.OCIOptions) loader.ResourceLoader {
 	return ociRemoteLoader{
-		dockerCli: dockerCli,
-		offline:   offline,
-		known:     map[string]string{},
+		dockerCli:          dockerCli,
+		offline:            offline,
+		known:              map[string]string{},
+		insecureRegistries: options.InsecureRegistries,
 	}
 }
 
 type ociRemoteLoader struct {
-	dockerCli command.Cli
-	offline   bool
-	known     map[string]string
+	dockerCli          command.Cli
+	offline            bool
+	known              map[string]string
+	insecureRegistries []string
 }
 
 func (g ociRemoteLoader) Accept(path string) bool {
@@ -115,7 +118,7 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", err
 		}
 
-		resolver := oci.NewResolver(g.dockerCli.ConfigFile())
+		resolver := oci.NewResolver(g.dockerCli.ConfigFile(), g.insecureRegistries...)
 
 		descriptor, content, err := oci.Get(ctx, resolver, ref)
 		if err != nil {

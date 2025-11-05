@@ -186,19 +186,17 @@ func TestPublish(t *testing.T) {
 		c.RunDockerCmd(t, "rm", "--force", registryName)
 	})
 
-	cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/oci/compose.yaml", "-f", "./fixtures/publish/oci/compose-override.yaml",
-		"-p", projectName, "publish", "--with-env", "--yes", registry+"/test:test")
-	icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
-		cmd.Env = append(cmd.Env, "__TEST__INSECURE__REGISTRY__=true")
-	}).Assert(t, icmd.Expected{ExitCode: 0})
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/oci/compose.yaml", "-f", "./fixtures/publish/oci/compose-override.yaml",
+		"-p", projectName, "publish", "--with-env", "--yes", "--insecure-registry", registry+"/test:test")
+	res.Assert(t, icmd.Expected{ExitCode: 0})
 
 	// docker exec -it compose-e2e-publish-registry tree /var/lib/registry/docker/registry/v2/
 
-	cmd = c.NewDockerComposeCmd(t, "--verbose", "--project-name=oci", "-f", fmt.Sprintf("oci://%s/test:test", registry), "config")
-	res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
-		cmd.Env = append(cmd.Env,
-			"XDG_CACHE_HOME="+t.TempDir(),
-			"__TEST__INSECURE__REGISTRY__=true")
+	cmd := c.NewDockerComposeCmd(t, "--verbose", "--project-name=oci",
+		"--insecure-registry", registry,
+		"-f", fmt.Sprintf("oci://%s/test:test", registry), "config")
+	res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		cmd.Env = append(cmd.Env, "XDG_CACHE_HOME="+t.TempDir())
 	})
 	res.Assert(t, icmd.Expected{ExitCode: 0})
 	assert.Equal(t, res.Stdout(), `name: oci
