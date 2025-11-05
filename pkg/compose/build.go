@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
@@ -37,7 +36,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	if err != nil {
 		return err
 	}
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 			func(ctx context.Context) error {
 				_, err := s.build(ctx, project, options, nil)

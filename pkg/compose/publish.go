@@ -35,7 +35,6 @@ import (
 	"github.com/docker/compose/v2/internal/oci"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose/transform"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -43,7 +42,7 @@ import (
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.publish(ctx, project, repository, options)
 	}, "publish", s.events)
 }
@@ -71,10 +70,10 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     repository,
 		Text:   "publishing",
-		Status: progress.Working,
+		Status: api.Working,
 	})
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		logrus.Debug("publishing layers")
@@ -98,10 +97,10 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 
 		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
-			s.events.On(progress.Event{
+			s.events.On(api.Resource{
 				ID:     repository,
 				Text:   "publishing",
-				Status: progress.Error,
+				Status: api.Error,
 			})
 			return err
 		}
@@ -150,10 +149,10 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			}
 		}
 	}
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     repository,
 		Text:   "published",
-		Status: progress.Done,
+		Status: api.Done,
 	})
 	return nil
 }

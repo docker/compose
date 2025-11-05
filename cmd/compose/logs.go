@@ -22,7 +22,6 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/compose"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -107,28 +106,28 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 var _ api.LogConsumer = &logConsumer{}
 
 type logConsumer struct {
-	events progress.EventProcessor
+	events api.EventProcessor
 }
 
 func (l logConsumer) Log(containerName, message string) {
-	l.events.On(progress.Event{
+	l.events.On(api.Resource{
 		ID:   containerName,
 		Text: message,
 	})
 }
 
 func (l logConsumer) Err(containerName, message string) {
-	l.events.On(progress.Event{
+	l.events.On(api.Resource{
 		ID:     containerName,
-		Status: progress.Error,
+		Status: api.Error,
 		Text:   message,
 	})
 }
 
 func (l logConsumer) Status(containerName, message string) {
-	l.events.On(progress.Event{
+	l.events.On(api.Resource{
 		ID:     containerName,
-		Status: progress.Error,
+		Status: api.Error,
 		Text:   message,
 	})
 }

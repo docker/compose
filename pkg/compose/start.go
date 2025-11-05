@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	containerType "github.com/docker/docker/api/types/container"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -31,7 +30,7 @@ import (
 )
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.start(ctx, strings.ToLower(projectName), options, nil)
 	}, "start", s.events)
 }

@@ -18,6 +18,8 @@ package compose
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 
 	"github.com/docker/cli/cli/command"
@@ -65,10 +67,15 @@ func runKill(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	if err != nil {
 		return err
 	}
-	return backend.Kill(ctx, name, api.KillOptions{
+	err = backend.Kill(ctx, name, api.KillOptions{
 		RemoveOrphans: opts.removeOrphans,
 		Project:       project,
 		Services:      services,
 		Signal:        opts.signal,
 	})
+	if errors.Is(err, api.ErrNoResources) {
+		_, _ = fmt.Fprintln(stdinfo(dockerCli), "No container to kill")
+		return nil
+	}
+	return err
 }

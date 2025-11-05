@@ -40,11 +40,10 @@ import (
 
 	"github.com/docker/compose/v2/internal/registry"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 func (s *composeService) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.pull(ctx, project, options)
 	}, "pull", s.events)
 }
@@ -67,9 +66,9 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	i := 0
 	for name, service := range project.Services {
 		if service.Image == "" {
-			s.events.On(progress.Event{
+			s.events.On(api.Resource{
 				ID:      name,
-				Status:  progress.Done,
+				Status:  api.Done,
 				Text:    "Skipped",
 				Details: "No image to be pulled",
 			})
@@ -78,17 +77,17 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		switch service.PullPolicy {
 		case types.PullPolicyNever, types.PullPolicyBuild:
-			s.events.On(progress.Event{
+			s.events.On(api.Resource{
 				ID:     "Image " + service.Image,
-				Status: progress.Done,
+				Status: api.Done,
 				Text:   "Skipped",
 			})
 			continue
 		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
 			if imageAlreadyPresent(service.Image, images) {
-				s.events.On(progress.Event{
+				s.events.On(api.Resource{
 					ID:      "Image " + service.Image,
-					Status:  progress.Done,
+					Status:  api.Done,
 					Text:    "Skipped",
 					Details: "Image is already present locally",
 				})
@@ -97,9 +96,9 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		}
 
 		if service.Build != nil && opts.IgnoreBuildable {
-			s.events.On(progress.Event{
+			s.events.On(api.Resource{
 				ID:      "Image " + service.Image,
-				Status:  progress.Done,
+				Status:  api.Done,
 				Text:    "Skipped",
 				Details: "Image can be built",
 			})
@@ -122,7 +121,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				}
 				if !opts.IgnoreFailures && service.Build == nil {
 					if s.dryRun {
-						s.events.On(progress.ErrorEventf("Image "+service.Image,
+						s.events.On(errorEventf("Image "+service.Image,
 							"error pulling image: %s", service.Image))
 					}
 					// fail fast if image can't be pulled nor built
@@ -174,7 +173,7 @@ func getUnwrappedErrorMessage(err error) string {
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, quietPull bool, defaultPlatform string) (string, error) {
 	resource := "Image " + service.Image
-	s.events.On(progress.PullingEvent(service.Image))
+	s.events.On(pullingEvent(service.Image))
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
 		return "", err
@@ -196,9 +195,9 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	})
 
 	if ctx.Err() != nil {
-		s.events.On(progress.Event{
+		s.events.On(api.Resource{
 			ID:     resource,
-			Status: progress.Warning,
+			Status: api.Warning,
 			Text:   "Interrupted",
 		})
 		return "", nil
@@ -207,16 +206,16 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	// check if has error and the service has a build section
 	// then the status should be warning instead of error
 	if err != nil && service.Build != nil {
-		s.events.On(progress.Event{
+		s.events.On(api.Resource{
 			ID:     resource,
-			Status: progress.Warning,
+			Status: api.Warning,
 			Text:   getUnwrappedErrorMessage(err),
 		})
 		return "", err
 	}
 
 	if err != nil {
-		s.events.On(progress.ErrorEvent(resource, getUnwrappedErrorMessage(err)))
+		s.events.On(errorEvent(resource, getUnwrappedErrorMessage(err)))
 		return "", err
 	}
 
@@ -236,7 +235,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			toPullProgressEvent(resource, jm, s.events)
 		}
 	}
-	s.events.On(progress.PulledEvent(service.Image))
+	s.events.On(pulledEvent(service.Image))
 
 	inspected, err := s.apiClient().ImageInspect(ctx, service.Image)
 	if err != nil {
@@ -383,7 +382,7 @@ func isServiceImageToBuild(service types.ServiceConfig, services types.Services)
 
 const (
 	PreparingPhase         = "Preparing"
-	WaitingPhase           = "Waiting"
+	WaitingPhase           = "waiting"
 	PullingFsPhase         = "Pulling fs layer"
 	DownloadingPhase       = "Downloading"
 	DownloadCompletePhase  = "Download complete"
@@ -393,7 +392,7 @@ const (
 	PullCompletePhase      = "Pull complete"
 )
 
-func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events progress.EventProcessor) {
+func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events api.EventProcessor) {
 	if jm.ID == "" || jm.Progress == nil {
 		return
 	}
@@ -403,7 +402,7 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events progr
 		total   int64
 		percent int
 		current int64
-		status  = progress.Working
+		status  = api.Working
 	)
 
 	text = jm.Progress.String()
@@ -420,22 +419,22 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events progr
 			}
 		}
 	case DownloadCompletePhase, AlreadyExistsPhase, PullCompletePhase:
-		status = progress.Done
+		status = api.Done
 		percent = 100
 	}
 
 	if strings.Contains(jm.Status, "Image is up to date") ||
 		strings.Contains(jm.Status, "Downloaded newer image") {
-		status = progress.Done
+		status = api.Done
 		percent = 100
 	}
 
 	if jm.Error != nil {
-		status = progress.Error
+		status = api.Error
 		text = jm.Error.Message
 	}
 
-	events.On(progress.Event{
+	events.On(api.Resource{
 		ID:       jm.ID,
 		ParentID: parent,
 		Current:  current,

@@ -29,7 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -101,10 +101,10 @@ func (m *modelAPI) Close() {
 	m.cleanup()
 }
 
-func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events progress.EventProcessor) error {
-	events.On(progress.Event{
+func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events api.EventProcessor) error {
+	events.On(api.Resource{
 		ID:     model.Name,
-		Status: progress.Working,
+		Status: api.Working,
 		Text:   "Pulling",
 	})
 
@@ -131,30 +131,30 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 		}
 
 		if !quietPull {
-			events.On(progress.Event{
+			events.On(api.Resource{
 				ID:     model.Name,
-				Status: progress.Working,
-				Text:   progress.StatusPulling,
+				Status: api.Working,
+				Text:   api.StatusPulling,
 			})
 		}
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		events.On(progress.ErrorEvent(model.Name, err.Error()))
+		events.On(errorEvent(model.Name, err.Error()))
 	}
-	events.On(progress.Event{
+	events.On(api.Resource{
 		ID:     model.Name,
-		Status: progress.Working,
-		Text:   progress.StatusPulled,
+		Status: api.Working,
+		Text:   api.StatusPulled,
 	})
 	return err
 }
 
-func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events progress.EventProcessor) error {
-	events.On(progress.Event{
+func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error {
+	events.On(api.Resource{
 		ID:     config.Name,
-		Status: progress.Working,
+		Status: api.Working,
 		Text:   "Configuring",
 	})
 	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]

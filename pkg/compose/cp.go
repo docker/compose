@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/compose/v2/pkg/progress"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/cli/cli/command"
@@ -43,7 +42,7 @@ const (
 )
 
 func (s *composeService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.copy(ctx, projectName, options)
 	}, "copy", s.events)
 }
@@ -90,20 +89,20 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 			} else {
 				msg = fmt.Sprintf("%s to %s:%s", srcPath, name, dstPath)
 			}
-			s.events.On(progress.Event{
+			s.events.On(api.Resource{
 				ID:      name,
-				Text:    progress.StatusCopying,
+				Text:    api.StatusCopying,
 				Details: msg,
-				Status:  progress.Working,
+				Status:  api.Working,
 			})
 			if err := copyFunc(ctx, ctr.ID, srcPath, dstPath, options); err != nil {
 				return err
 			}
-			s.events.On(progress.Event{
+			s.events.On(api.Resource{
 				ID:      name,
-				Text:    progress.StatusCopied,
+				Text:    api.StatusCopied,
 				Details: msg,
-				Status:  progress.Done,
+				Status:  api.Done,
 			})
 			return nil
 		})

@@ -33,9 +33,9 @@ import (
 	"github.com/docker/compose/v2/internal/sync"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	cutils "github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/compose/v2/pkg/watch"
+	"github.com/moby/buildkit/util/progress/progressui"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
@@ -472,7 +472,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		})
 	}
 	eg.Go(func() error {
-		_, err := io.Copy(t.s.stdinfo(), conn.Reader)
+		_, err := io.Copy(t.s.stdout(), conn.Reader)
 		return err
 	})
 
@@ -613,7 +613,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
 	// restrict the build to ONLY this service, not any of its dependencies
 	options.Build.Services = services
-	options.Build.Progress = progress.ModePlain
+	options.Build.Progress = string(progressui.PlainMode)
 	options.Build.Out = cutils.GetWriter(func(line string) {
 		options.LogTo.Log(api.WatchLogger, line)
 	})

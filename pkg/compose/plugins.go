@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/config"
-	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -89,10 +89,10 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	var action string
 	switch command {
 	case "up":
-		s.events.On(progress.CreatingEvent(service.Name))
+		s.events.On(creatingEvent(service.Name))
 		action = "create"
 	case "down":
-		s.events.On(progress.RemovingEvent(service.Name))
+		s.events.On(removingEvent(service.Name))
 		action = "remove"
 	default:
 		return nil, fmt.Errorf("unsupported plugin command: %s", command)
@@ -124,10 +124,10 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		}
 		switch msg.Type {
 		case ErrorType:
-			s.events.On(progress.NewEvent(service.Name, progress.Error, msg.Message))
+			s.events.On(newEvent(service.Name, api.Error, msg.Message))
 			return nil, errors.New(msg.Message)
 		case InfoType:
-			s.events.On(progress.NewEvent(service.Name, progress.Working, msg.Message))
+			s.events.On(newEvent(service.Name, api.Working, msg.Message))
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
@@ -143,14 +143,14 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 
 	err = cmd.Wait()
 	if err != nil {
-		s.events.On(progress.ErrorEvent(service.Name, err.Error()))
+		s.events.On(errorEvent(service.Name, err.Error()))
 		return nil, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
 	}
 	switch command {
 	case "up":
-		s.events.On(progress.CreatedEvent(service.Name))
+		s.events.On(createdEvent(service.Name))
 	case "down":
-		s.events.On(progress.RemovedEvent(service.Name))
+		s.events.On(removedEvent(service.Name))
 	}
 	return variables, nil
 }

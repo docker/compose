@@ -25,8 +25,8 @@ import (
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
+	"github.com/docker/compose/v2/cmd/display"
 	"github.com/docker/compose/v2/pkg/compose"
-	"github.com/docker/compose/v2/pkg/progress"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 
@@ -193,7 +193,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 			}
 
 			if options.quiet {
-				progress.Mode = progress.ModeQuiet
+				display.Mode = display.ModeQuiet
 				devnull, err := os.Open(os.DevNull)
 				if err != nil {
 					return err

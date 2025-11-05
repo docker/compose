@@ -30,9 +30,9 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/display"
 	"github.com/docker/compose/v2/cmd/prompt"
 	"github.com/docker/compose/v2/internal/tracing"
-	ui "github.com/docker/compose/v2/pkg/progress"
 )
 
 func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {
@@ -247,7 +247,7 @@ func displayInterpolationVariables(writer io.Writer, varsInfo []varInfo) {
 
 func displayLocationRemoteStack(dockerCli command.Cli, project *types.Project, options buildOptions) {
 	mainComposeFile := options.ProjectOptions.ConfigPaths[0] //nolint:staticcheck
-	if ui.Mode != ui.ModeQuiet && ui.Mode != ui.ModeJSON {
+	if display.Mode != display.ModeQuiet && display.Mode != display.ModeJSON {
 		_, _ = fmt.Fprintf(dockerCli.Out(), "Your compose stack %q is stored in %q\n", mainComposeFile, project.WorkingDir)
 	}
 }

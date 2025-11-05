@@ -33,14 +33,13 @@ import (
 
 	"github.com/docker/compose/v2/internal/registry"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 func (s *composeService) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	if options.Quiet {
 		return s.push(ctx, project, options)
 	}
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.push(ctx, project, options)
 	}, "push", s.events)
 }
@@ -54,9 +53,9 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 			if options.ImageMandatory && service.Image == "" && service.Provider == nil {
 				return fmt.Errorf("%q attribute is mandatory to push an image for service %q", "service.image", service.Name)
 			}
-			s.events.On(progress.Event{
+			s.events.On(api.Resource{
 				ID:     service.Name,
-				Status: progress.Done,
+				Status: api.Done,
 				Text:   "Skipped",
 			})
 			continue
@@ -68,16 +67,16 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 
 		for _, tag := range tags {
 			eg.Go(func() error {
-				s.events.On(progress.NewEvent(tag, progress.Working, "Pushing"))
+				s.events.On(newEvent(tag, api.Working, "Pushing"))
 				err := s.pushServiceImage(ctx, tag, options.Quiet)
 				if err != nil {
 					if !options.IgnoreFailures {
-						s.events.On(progress.NewEvent(tag, progress.Error, err.Error()))
+						s.events.On(newEvent(tag, api.Error, err.Error()))
 						return err
 					}
-					s.events.On(progress.NewEvent(tag, progress.Warning, err.Error()))
+					s.events.On(newEvent(tag, api.Warning, err.Error()))
 				} else {
-					s.events.On(progress.NewEvent(tag, progress.Done, "Pushed"))
+					s.events.On(newEvent(tag, api.Done, "Pushed"))
 				}
 				return nil
 			})
@@ -129,24 +128,24 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 	return nil
 }
 
-func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events progress.EventProcessor) {
+func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events api.EventProcessor) {
 	if jm.ID == "" {
 		// skipped
 		return
 	}
 	var (
 		text    string
-		status  = progress.Working
+		status  = api.Working
 		total   int64
 		current int64
 		percent int
 	)
 	if isDone(jm) {
-		status = progress.Done
+		status = api.Done
 		percent = 100
 	}
 	if jm.Error != nil {
-		status = progress.Error
+		status = api.Error
 		text = jm.Error.Message
 	}
 	if jm.Progress != nil {
@@ -160,7 +159,7 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events progr
 		}
 	}
 
-	events.On(progress.Event{
+	events.On(api.Resource{
 		ParentID: prefix,
 		ID:       jm.ID,
 		Text:     text,

@@ -18,18 +18,16 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 func (s *composeService) Kill(ctx context.Context, projectName string, options api.KillOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.kill(ctx, strings.ToLower(projectName), options)
 	}, "kill", s.events)
 }
@@ -55,21 +53,20 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		containers = containers.filter(isService(project.ServiceNames()...))
 	}
 	if len(containers) == 0 {
-		_, _ = fmt.Fprintf(s.stdinfo(), "no container to kill")
-		return nil
+		return api.ErrNoResources
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 	containers.forEach(func(ctr container.Summary) {
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)
-			s.events.On(progress.KillingEvent(eventName))
+			s.events.On(killingEvent(eventName))
 			err := s.apiClient().ContainerKill(ctx, ctr.ID, options.Signal)
 			if err != nil {
-				s.events.On(progress.ErrorEvent(eventName, "Error while Killing"))
+				s.events.On(errorEvent(eventName, "Error while Killing"))
 				return err
 			}
-			s.events.On(progress.KilledEvent(eventName))
+			s.events.On(killedEvent(eventName))
 			return nil
 		})
 	})

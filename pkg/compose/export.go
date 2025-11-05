@@ -24,12 +24,11 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/moby/sys/atomicwriter"
 )
 
 func (s *composeService) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.export(ctx, projectName, options)
 	}, "export", s.events)
 }
@@ -51,10 +50,10 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 	}
 
 	name := getCanonicalContainerName(container)
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     name,
-		Text:   progress.StatusExporting,
-		Status: progress.Working,
+		Text:   api.StatusExporting,
+		Status: api.Working,
 	})
 
 	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID)
@@ -64,7 +63,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 
 	defer func() {
 		if err := responseBody.Close(); err != nil {
-			s.events.On(progress.ErrorEventf(name, "Failed to close response body: %s", err.Error()))
+			s.events.On(errorEventf(name, "Failed to close response body: %s", err.Error()))
 		}
 	}()
 
@@ -84,10 +83,10 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		}
 	}
 
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     name,
-		Text:   progress.StatusExported,
-		Status: progress.Done,
+		Text:   api.StatusExported,
+		Status: api.Done,
 	})
 
 	return nil

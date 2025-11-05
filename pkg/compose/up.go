@@ -33,14 +33,13 @@ import (
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/eiannone/keyboard"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
-	err := progress.Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
+	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
 			return err
@@ -126,7 +125,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		first := true
 		gracefulTeardown := func() {
 			first = false
-			fmt.Println("Gracefully Stopping... press Ctrl+C again to force")
+			s.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Gracefully Stopping... press Ctrl+C again to force"))
 			eg.Go(func() error {
 				err = s.stop(context.WithoutCancel(globalCtx), project.Name, api.StopOptions{
 					Services: options.Create.Services,
@@ -162,7 +161,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 						All:      true,
 					})
 					// Ignore errors indicating that some of the containers were already stopped or removed.
-					if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
+					if errdefs.IsNotFound(err) || errdefs.IsConflict(err) || errors.Is(err, api.ErrNoResources) {
 						return nil
 					}
 
@@ -205,7 +204,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				}
 				once = false
 				exitCode = event.ExitCode
-				_, _ = fmt.Fprintln(s.stdinfo(), progress.ErrorColor("Aborting on container exit..."))
+				s.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
 				eg.Go(func() error {
 					err = s.stop(context.WithoutCancel(globalCtx), project.Name, api.StopOptions{
 						Services: options.Create.Services,

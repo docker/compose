@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package progress
+package display
 
 import (
 	"context"
@@ -31,11 +31,12 @@ import (
 	"github.com/morikuni/aec"
 )
 
-// NewTTYWriter creates an EventProcessor that render advanced UI within a terminal.
+// Full creates an EventProcessor that render advanced UI within a terminal.
 // On Start, TUI lists task with a progress timer
-func NewTTYWriter(out io.Writer) EventProcessor {
+func Full(out io.Writer, info io.Writer) api.EventProcessor {
 	return &ttyWriter{
 		out:   out,
+		info:  info,
 		tasks: map[string]task{},
 		done:  make(chan bool),
 		mtx:   &sync.Mutex{},
@@ -55,6 +56,7 @@ type ttyWriter struct {
 	operation       string
 	ticker          *time.Ticker
 	suspended       bool
+	info            io.Writer
 }
 
 type task struct {
@@ -64,7 +66,7 @@ type task struct {
 	endTime   time.Time
 	text      string
 	details   string
-	status    EventStatus
+	status    api.EventStatus
 	current   int64
 	percent   int
 	total     int64
@@ -108,11 +110,16 @@ func (w *ttyWriter) Done(operation string, success bool) {
 	w.done <- true
 }
 
-func (w *ttyWriter) On(events ...Event) {
+func (w *ttyWriter) On(events ...api.Resource) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	for _, e := range events {
-		if w.operation != "start" && (e.Text == StatusStarted || e.Text == StatusStarting) {
+		if e.ID == "Compose" {
+			_, _ = fmt.Fprintln(w.info, ErrorColor(e.Details))
+			continue
+		}
+
+		if w.operation != "start" && (e.Text == api.StatusStarted || e.Text == api.StatusStarting) {
 			// skip those events to avoid mix with container logs
 			continue
 		}
@@ -120,9 +127,9 @@ func (w *ttyWriter) On(events ...Event) {
 	}
 }
 
-func (w *ttyWriter) event(e Event) {
+func (w *ttyWriter) event(e api.Resource) {
 	// Suspend print while a build is in progress, to avoid collision with buildkit Display
-	if e.Text == StatusBuilding {
+	if e.Text == api.StatusBuilding {
 		w.ticker.Stop()
 		w.suspended = true
 	} else if w.suspended {
@@ -132,11 +139,11 @@ func (w *ttyWriter) event(e Event) {
 
 	if last, ok := w.tasks[e.ID]; ok {
 		switch e.Status {
-		case Done, Error, Warning:
+		case api.Done, api.Error, api.Warning:
 			if last.status != e.Status {
 				last.stop()
 			}
-		case Working:
+		case api.Working:
 			last.hasMore()
 		}
 		last.status = e.Status
@@ -170,7 +177,7 @@ func (w *ttyWriter) event(e Event) {
 			total:     e.Total,
 			spinner:   NewSpinner(),
 		}
-		if e.Status == Done || e.Status == Error {
+		if e.Status == api.Done || e.Status == api.Error {
 			t.stop()
 		}
 		w.tasks[e.ID] = t
@@ -179,7 +186,7 @@ func (w *ttyWriter) event(e Event) {
 	w.printEvent(e)
 }
 
-func (w *ttyWriter) printEvent(e Event) {
+func (w *ttyWriter) printEvent(e api.Resource) {
 	if w.operation != "" {
 		// event will be displayed by progress UI on ticker's ticks
 		return
@@ -187,13 +194,13 @@ func (w *ttyWriter) printEvent(e Event) {
 
 	var color colorFunc
 	switch e.Status {
-	case Working:
+	case api.Working:
 		color = SuccessColor
-	case Done:
+	case api.Done:
 		color = SuccessColor
-	case Warning:
+	case api.Warning:
 		color = WarningColor
-	case Error:
+	case api.Error:
 		color = ErrorColor
 	}
 	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, color(e.Text), e.Details)
@@ -271,7 +278,7 @@ func (w *ttyWriter) print() {
 
 func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding int, dryRun bool) string {
 	endTime := time.Now()
-	if t.status != Working {
+	if t.status != api.Working {
 		endTime = t.startTime
 		if (t.endTime != time.Time{}) {
 			endTime = t.endTime
@@ -292,11 +299,11 @@ func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding in
 	)
 
 	// only show the aggregated progress while the root operation is in-progress
-	if parent := t; parent.status == Working {
+	if parent := t; parent.status == api.Working {
 		for _, id := range w.ids {
 			child := w.tasks[id]
 			if child.parentID == parent.ID {
-				if child.status == Working && child.total == 0 {
+				if child.status == api.Working && child.total == 0 {
 					// we don't have totals available for all the child events
 					// so don't show the total progress yet
 					hideDetails = true
@@ -361,24 +368,24 @@ var (
 
 func spinner(t task) string {
 	switch t.status {
-	case Done:
+	case api.Done:
 		return SuccessColor(spinnerDone)
-	case Warning:
+	case api.Warning:
 		return WarningColor(spinnerWarning)
-	case Error:
+	case api.Error:
 		return ErrorColor(spinnerError)
 	default:
 		return CountColor(t.spinner.String())
 	}
 }
 
-func colorFn(s EventStatus) colorFunc {
+func colorFn(s api.EventStatus) colorFunc {
 	switch s {
-	case Done:
+	case api.Done:
 		return SuccessColor
-	case Warning:
+	case api.Warning:
 		return WarningColor
-	case Error:
+	case api.Error:
 		return ErrorColor
 	default:
 		return nocolor
@@ -388,7 +395,7 @@ func colorFn(s EventStatus) colorFunc {
 func numDone(tasks map[string]task) int {
 	i := 0
 	for _, t := range tasks {
-		if t.status != Working {
+		if t.status != api.Working {
 			i++
 		}
 	}

@@ -22,12 +22,11 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/api/types/container"
 )
 
 func (s *composeService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.commit(ctx, projectName, options)
 	}, "commit", s.events)
 }
@@ -42,17 +41,17 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 
 	name := getCanonicalContainerName(ctr)
 
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     name,
-		Status: progress.Working,
-		Text:   progress.StatusCommitting,
+		Status: api.Working,
+		Text:   api.StatusCommitting,
 	})
 
 	if s.dryRun {
-		s.events.On(progress.Event{
+		s.events.On(api.Resource{
 			ID:     name,
-			Status: progress.Done,
-			Text:   progress.StatusCommitted,
+			Status: api.Done,
+			Text:   api.StatusCommitted,
 		})
 
 		return nil
@@ -69,10 +68,10 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return err
 	}
 
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     name,
 		Text:   fmt.Sprintf("Committed as %s", response.ID),
-		Status: progress.Done,
+		Status: api.Done,
 	})
 
 	return nil

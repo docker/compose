@@ -22,14 +22,13 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.restart(ctx, strings.ToLower(projectName), options)
 	}, "restart", s.events)
 }
@@ -93,13 +92,13 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 					}
 				}
 				eventName := getContainerProgressName(ctr)
-				s.events.On(progress.RestartingEvent(eventName))
+				s.events.On(restartingEvent(eventName))
 				timeout := utils.DurationSecondToInt(options.Timeout)
 				err = s.apiClient().ContainerRestart(ctx, ctr.ID, container.StopOptions{Timeout: timeout})
 				if err != nil {
 					return err
 				}
-				s.events.On(progress.StartedEvent(eventName))
+				s.events.On(startedEvent(eventName))
 				for _, hook := range def.PostStart {
 					err = s.runHook(ctx, ctr, def, hook, nil)
 					if err != nil {

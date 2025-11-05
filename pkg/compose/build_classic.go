@@ -30,7 +30,6 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/compose/v2/pkg/api"
-	progress2 "github.com/docker/compose/v2/pkg/progress"
 	buildtypes "github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/registry"
@@ -86,12 +85,12 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		}
 
 		image := api.GetImageNameOrDefault(service, project.Name)
-		s.events.On(progress2.BuildingEvent(image))
+		s.events.On(buildingEvent(image))
 		id, err := s.doBuildImage(ctx, project, service, options)
 		if err != nil {
 			return err
 		}
-		s.events.On(progress2.BuiltEvent(image))
+		s.events.On(builtEvent(image))
 		builtDigests[getServiceIndex(name)] = id
 
 		if options.Push {
@@ -258,7 +257,7 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s.events.On(progress2.BuildingEvent(imageName))
+	s.events.On(buildingEvent(imageName))
 	response, err := s.apiClient().ImageBuild(ctx, body, buildOpts)
 	if err != nil {
 		return "", err
@@ -287,7 +286,7 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 		}
 		return "", err
 	}
-	s.events.On(progress2.BuiltEvent(imageName))
+	s.events.On(builtEvent(imageName))
 	return imageID, nil
 }
 

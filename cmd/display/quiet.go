@@ -14,11 +14,15 @@
    limitations under the License.
 */
 
-package progress
+package display
 
-import "context"
+import (
+	"context"
 
-func NewQuietWriter() EventProcessor {
+	"github.com/docker/compose/v2/pkg/api"
+)
+
+func Quiet() api.EventProcessor {
 	return &quiet{}
 }
 
@@ -30,5 +34,5 @@ func (q *quiet) Start(_ context.Context, _ string) {
 func (q *quiet) Done(_ string, _ bool) {
 }
 
-func (q *quiet) On(_ ...Event) {
+func (q *quiet) On(_ ...api.Resource) {
 }

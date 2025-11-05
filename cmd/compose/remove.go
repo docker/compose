@@ -18,6 +18,8 @@ package compose
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
@@ -70,11 +72,16 @@ func runRemove(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 	if err != nil {
 		return err
 	}
-	return backend.Remove(ctx, name, api.RemoveOptions{
+	err = backend.Remove(ctx, name, api.RemoveOptions{
 		Services: services,
 		Force:    opts.force,
 		Volumes:  opts.volumes,
 		Project:  project,
 		Stop:     opts.stop,
 	})
+	if errors.Is(err, api.ErrNoResources) {
+		_, _ = fmt.Fprintln(stdinfo(dockerCli), "No stopped containers")
+		return nil
+	}
+	return err
 }

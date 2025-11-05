@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package progress
+package display
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-func NewPlainWriter(out io.Writer) EventProcessor {
+func Plain(out io.Writer) api.EventProcessor {
 	return &plainWriter{
 		out: out,
 	}
@@ -38,7 +38,7 @@ type plainWriter struct {
 func (p *plainWriter) Start(ctx context.Context, operation string) {
 }
 
-func (p *plainWriter) Event(e Event) {
+func (p *plainWriter) Event(e api.Resource) {
 	prefix := ""
 	if p.dryRun {
 		prefix = api.DRYRUN_PREFIX
@@ -46,7 +46,7 @@ func (p *plainWriter) Event(e Event) {
 	_, _ = fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.Details)
 }
 
-func (p *plainWriter) On(events ...Event) {
+func (p *plainWriter) On(events ...api.Resource) {
 	for _, e := range events {
 		p.Event(e)
 	}
