@@ -28,7 +28,6 @@ import (
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/pkg/stringid"
 )
 
@@ -65,7 +64,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return "", err
 	}
 
-	err = progress.Run(ctx, func(ctx context.Context) error {
+	err = Run(ctx, func(ctx context.Context) error {
 		return s.startDependencies(ctx, project, opts)
 	}, "run", s.events)
 	if err != nil {

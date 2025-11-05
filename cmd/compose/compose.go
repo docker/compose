@@ -39,11 +39,11 @@ import (
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/pkg/kvfile"
+	"github.com/docker/compose/v2/cmd/display"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/internal/tracing"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
-	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/remote"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/morikuni/aec"
@@ -84,10 +84,16 @@ func rawEnv(r io.Reader, filename string, vars map[string]string, lookup func(ke
 	return nil
 }
 
+var stdioToStdout bool
+
 func init() {
 	// compose evaluates env file values for interpolation
 	// `raw` format allows to load env_file with the same parser used by docker run --env-file
 	dotenv.RegisterFormat("raw", rawEnv)
+
+	if v, ok := os.LookupEnv("COMPOSE_STATUS_STDOUT"); ok {
+		stdioToStdout, _ = strconv.ParseBool(v)
+	}
 }
 
 // Command defines a compose CLI command as a func with args
@@ -116,7 +122,7 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 				StatusCode: 130,
 			}
 		}
-		if ui.Mode == ui.ModeJSON {
+		if display.Mode == display.ModeJSON {
 			err = makeJSONError(err)
 		}
 		return err
@@ -486,49 +492,49 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 			formatter.SetANSIMode(dockerCli, ansi)
 
 			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
-				ui.NoColor()
+				display.NoColor()
 				formatter.SetANSIMode(dockerCli, formatter.Never)
 			}
 
 			switch ansi {
 			case "never":
-				ui.Mode = ui.ModePlain
+				display.Mode = display.ModePlain
 			case "always":
-				ui.Mode = ui.ModeTTY
+				display.Mode = display.ModeTTY
 			}
 
-			var ep ui.EventProcessor
+			var ep api.EventProcessor
 			switch opts.Progress {
-			case "", ui.ModeAuto:
+			case "", display.ModeAuto:
 				switch {
 				case ansi == "never":
-					ui.Mode = ui.ModePlain
-					ep = ui.NewPlainWriter(dockerCli.Err())
+					display.Mode = display.ModePlain
+					ep = display.Plain(dockerCli.Err())
 				case dockerCli.Out().IsTerminal():
-					ep = ui.NewTTYWriter(dockerCli.Err())
+					ep = display.Full(dockerCli.Err(), stdinfo(dockerCli))
 				default:
-					ep = ui.NewPlainWriter(dockerCli.Err())
+					ep = display.Plain(dockerCli.Err())
 				}
-			case ui.ModeTTY:
+			case display.ModeTTY:
 				if ansi == "never" {
 					return fmt.Errorf("can't use --progress tty while ANSI support is disabled")
 				}
-				ui.Mode = ui.ModeTTY
-				ep = ui.NewTTYWriter(dockerCli.Err())
+				display.Mode = display.ModeTTY
+				ep = display.Full(dockerCli.Err(), stdinfo(dockerCli))
 
-			case ui.ModePlain:
+			case display.ModePlain:
 				if ansi == "always" {
 					return fmt.Errorf("can't use --progress plain while ANSI support is forced")
 				}
-				ui.Mode = ui.ModePlain
-				ep = ui.NewPlainWriter(dockerCli.Err())
-			case ui.ModeQuiet, "none":
-				ui.Mode = ui.ModeQuiet
-				ep = ui.NewQuietWriter()
-			case ui.ModeJSON:
-				ui.Mode = ui.ModeJSON
+				display.Mode = display.ModePlain
+				ep = display.Plain(dockerCli.Err())
+			case display.ModeQuiet, "none":
+				display.Mode = display.ModeQuiet
+				ep = display.Quiet()
+			case display.ModeJSON:
+				display.Mode = display.ModeJSON
 				logrus.SetFormatter(&logrus.JSONFormatter{})
-				ep = ui.NewJSONWriter(dockerCli.Err())
+				ep = display.JSON(dockerCli.Err())
 			default:
 				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
 			}
@@ -658,6 +664,13 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 	return c
 }
 
+func stdinfo(dockerCli command.Cli) io.Writer {
+	if stdioToStdout {
+		return dockerCli.Out()
+	}
+	return dockerCli.Err()
+}
+
 func setEnvWithDotEnv(opts ProjectOptions) error {
 	options, err := cli.NewProjectOptions(opts.ConfigPaths,
 		cli.WithWorkingDirectory(opts.ProjectDir),
@@ -683,9 +696,9 @@ func setEnvWithDotEnv(opts ProjectOptions) error {
 }
 
 var printerModes = []string{
-	ui.ModeAuto,
-	ui.ModeTTY,
-	ui.ModePlain,
-	ui.ModeJSON,
-	ui.ModeQuiet,
+	display.ModeAuto,
+	display.ModeTTY,
+	display.ModePlain,
+	display.ModeJSON,
+	display.ModeQuiet,
 }

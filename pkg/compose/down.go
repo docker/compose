@@ -25,7 +25,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -38,7 +37,7 @@ import (
 type downOp func() error
 
 func (s *composeService) Down(ctx context.Context, projectName string, options api.DownOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.down(ctx, strings.ToLower(projectName), options)
 	}, "down", s.events)
 }
@@ -210,7 +209,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 	}
 
 	eventName := fmt.Sprintf("Network %s", name)
-	s.events.On(progress.RemovingEvent(eventName))
+	s.events.On(removingEvent(eventName))
 
 	var found int
 	for _, net := range networks {
@@ -219,14 +218,14 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		}
 		nw, err := s.apiClient().NetworkInspect(ctx, net.ID, network.InspectOptions{})
 		if errdefs.IsNotFound(err) {
-			s.events.On(progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
+			s.events.On(newEvent(eventName, api.Warning, "No resource found to remove"))
 			return nil
 		}
 		if err != nil {
 			return err
 		}
 		if len(nw.Containers) > 0 {
-			s.events.On(progress.NewEvent(eventName, progress.Warning, "Resource is still in use"))
+			s.events.On(newEvent(eventName, api.Warning, "Resource is still in use"))
 			found++
 			continue
 		}
@@ -235,10 +234,10 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 			if errdefs.IsNotFound(err) {
 				continue
 			}
-			s.events.On(progress.ErrorEvent(eventName, err.Error()))
+			s.events.On(errorEvent(eventName, err.Error()))
 			return fmt.Errorf("failed to remove network %s: %w", name, err)
 		}
-		s.events.On(progress.RemovedEvent(eventName))
+		s.events.On(removedEvent(eventName))
 		found++
 	}
 
@@ -246,7 +245,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		// in practice, it's extremely unlikely for this to ever occur, as it'd
 		// mean the network was present when we queried at the start of this
 		// method but was then deleted by something else in the interim
-		s.events.On(progress.NewEvent(eventName, progress.Warning, "No resource found to remove"))
+		s.events.On(newEvent(eventName, api.Warning, "No resource found to remove"))
 		return nil
 	}
 	return nil
@@ -254,18 +253,18 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 
 func (s *composeService) removeImage(ctx context.Context, image string) error {
 	id := fmt.Sprintf("Image %s", image)
-	s.events.On(progress.NewEvent(id, progress.Working, "Removing"))
+	s.events.On(newEvent(id, api.Working, "Removing"))
 	_, err := s.apiClient().ImageRemove(ctx, image, imageapi.RemoveOptions{})
 	if err == nil {
-		s.events.On(progress.NewEvent(id, progress.Done, "Removed"))
+		s.events.On(newEvent(id, api.Done, "Removed"))
 		return nil
 	}
 	if errdefs.IsConflict(err) {
-		s.events.On(progress.NewEvent(id, progress.Warning, "Resource is still in use"))
+		s.events.On(newEvent(id, api.Warning, "Resource is still in use"))
 		return nil
 	}
 	if errdefs.IsNotFound(err) {
-		s.events.On(progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
+		s.events.On(newEvent(id, api.Done, "Warning: No resource found to remove"))
 		return nil
 	}
 	return err
@@ -280,18 +279,18 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 		return nil
 	}
 
-	s.events.On(progress.NewEvent(resource, progress.Working, "Removing"))
+	s.events.On(newEvent(resource, api.Working, "Removing"))
 	err = s.apiClient().VolumeRemove(ctx, id, true)
 	if err == nil {
-		s.events.On(progress.NewEvent(resource, progress.Done, "Removed"))
+		s.events.On(newEvent(resource, api.Done, "Removed"))
 		return nil
 	}
 	if errdefs.IsConflict(err) {
-		s.events.On(progress.NewEvent(resource, progress.Warning, "Resource is still in use"))
+		s.events.On(newEvent(resource, api.Warning, "Resource is still in use"))
 		return nil
 	}
 	if errdefs.IsNotFound(err) {
-		s.events.On(progress.NewEvent(resource, progress.Done, "Warning: No resource found to remove"))
+		s.events.On(newEvent(resource, api.Done, "Warning: No resource found to remove"))
 		return nil
 	}
 	return err
@@ -299,7 +298,7 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 
 func (s *composeService) stopContainer(ctx context.Context, service *types.ServiceConfig, ctr containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
 	eventName := getContainerProgressName(ctr)
-	s.events.On(progress.StoppingEvent(eventName))
+	s.events.On(stoppingEvent(eventName))
 
 	if service != nil {
 		for _, hook := range service.PreStop {
@@ -317,10 +316,10 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	timeoutInSecond := utils.DurationSecondToInt(timeout)
 	err := s.apiClient().ContainerStop(ctx, ctr.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 	if err != nil {
-		s.events.On(progress.ErrorEvent(eventName, "Error while Stopping"))
+		s.events.On(errorEvent(eventName, "Error while Stopping"))
 		return err
 	}
-	s.events.On(progress.StoppedEvent(eventName))
+	s.events.On(stoppedEvent(eventName))
 	return nil
 }
 
@@ -348,22 +347,22 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 	eventName := getContainerProgressName(ctr)
 	err := s.stopContainer(ctx, service, ctr, timeout, nil)
 	if errdefs.IsNotFound(err) {
-		s.events.On(progress.RemovedEvent(eventName))
+		s.events.On(removedEvent(eventName))
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	s.events.On(progress.RemovingEvent(eventName))
+	s.events.On(removingEvent(eventName))
 	err = s.apiClient().ContainerRemove(ctx, ctr.ID, containerType.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: volumes,
 	})
 	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
-		s.events.On(progress.ErrorEvent(eventName, "Error while Removing"))
+		s.events.On(errorEvent(eventName, "Error while Removing"))
 		return err
 	}
-	s.events.On(progress.RemovedEvent(eventName))
+	s.events.On(removedEvent(eventName))
 	return nil
 }
 

@@ -14,16 +14,18 @@
    limitations under the License.
 */
 
-package progress
+package display
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
-func NewJSONWriter(out io.Writer) EventProcessor {
+func JSON(out io.Writer) api.EventProcessor {
 	return &jsonWriter{
 		out: out,
 	}
@@ -50,7 +52,7 @@ type jsonMessage struct {
 func (p *jsonWriter) Start(ctx context.Context, operation string) {
 }
 
-func (p *jsonWriter) Event(e Event) {
+func (p *jsonWriter) Event(e api.Resource) {
 	message := &jsonMessage{
 		DryRun:   p.dryRun,
 		Tail:     false,
@@ -69,7 +71,7 @@ func (p *jsonWriter) Event(e Event) {
 	}
 }
 
-func (p *jsonWriter) On(events ...Event) {
+func (p *jsonWriter) On(events ...api.Resource) {
 	for _, e := range events {
 		p.Event(e)
 	}

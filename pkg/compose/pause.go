@@ -24,11 +24,10 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 func (s *composeService) Pause(ctx context.Context, projectName string, options api.PauseOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.pause(ctx, strings.ToLower(projectName), options)
 	}, "pause", s.events)
 }
@@ -49,7 +48,7 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 			err := s.apiClient().ContainerPause(ctx, container.ID)
 			if err == nil {
 				eventName := getContainerProgressName(container)
-				s.events.On(progress.NewEvent(eventName, progress.Done, "Paused"))
+				s.events.On(newEvent(eventName, api.Done, "Paused"))
 			}
 			return err
 		})
@@ -58,7 +57,7 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 }
 
 func (s *composeService) UnPause(ctx context.Context, projectName string, options api.PauseOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.unPause(ctx, strings.ToLower(projectName), options)
 	}, "unpause", s.events)
 }
@@ -79,7 +78,7 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 			err = s.apiClient().ContainerUnpause(ctx, ctr.ID)
 			if err == nil {
 				eventName := getContainerProgressName(ctr)
-				s.events.On(progress.NewEvent(eventName, progress.Done, "Unpaused"))
+				s.events.On(newEvent(eventName, api.Done, "Unpaused"))
 			}
 			return err
 		})

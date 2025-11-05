@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package progress
+package display
 
 import (
 	"github.com/morikuni/aec"

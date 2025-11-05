@@ -35,12 +35,7 @@ var (
 	ErrForbidden = errors.New("forbidden")
 	// ErrUnknown is returned when the error type is unmapped
 	ErrUnknown = errors.New("unknown")
-	// ErrLoginFailed is returned when login failed
-	ErrLoginFailed = errors.New("login failed")
-	// ErrLoginRequired is returned when login is required for a specific action
-	ErrLoginRequired = errors.New("login required")
-	// ErrNotImplemented is returned when a backend doesn't implement
-	// an action
+	// ErrNotImplemented is returned when a backend doesn't implement an action
 	ErrNotImplemented = errors.New("not implemented")
 	// ErrUnsupportedFlag is returned when a backend doesn't support a flag
 	ErrUnsupportedFlag = errors.New("unsupported flag")
@@ -48,9 +43,8 @@ var (
 	ErrCanceled = errors.New("canceled")
 	// ErrParsingFailed is returned when a string cannot be parsed
 	ErrParsingFailed = errors.New("parsing failed")
-	// ErrWrongContextType is returned when the caller tries to get a context
-	// with the wrong type
-	ErrWrongContextType = errors.New("wrong context type")
+	// ErrNoResources is returned when operation didn't selected any resource
+	ErrNoResources = errors.New("no resources")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound

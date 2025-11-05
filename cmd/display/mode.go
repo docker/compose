@@ -1,5 +1,5 @@
 /*
-   Copyright 2020 Docker Compose CLI authors
+   Copyright 2024 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,20 +14,10 @@
    limitations under the License.
 */
 
-package progress
+package display
 
-import (
-	"context"
-)
-
-type progressFunc func(context.Context) error
-
-func Run(ctx context.Context, pf progressFunc, operation string, bus EventProcessor) error {
-	bus.Start(ctx, operation)
-	err := pf(ctx)
-	bus.Done(operation, err != nil)
-	return err
-}
+// Mode define how progress should be rendered, either as ModePlain or ModeTTY
+var Mode = ModeAuto
 
 const (
 	// ModeAuto detect console capabilities
@@ -41,6 +31,3 @@ const (
 	// ModeJSON outputs a machine-readable JSON stream
 	ModeJSON = "json"
 )
-
-// Mode define how progress should be rendered, either as ModePlain or ModeTTY
-var Mode = ModeAuto

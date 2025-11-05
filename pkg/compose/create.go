@@ -43,7 +43,6 @@ import (
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 type createOptions struct {
@@ -61,7 +60,7 @@ type createConfigs struct {
 }
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, createOpts)
 	}, "create", s.events)
 }
@@ -1394,14 +1393,14 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	}
 
 	networkEventName := fmt.Sprintf("Network %s", n.Name)
-	s.events.On(progress.CreatingEvent(networkEventName))
+	s.events.On(creatingEvent(networkEventName))
 
 	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
 	if err != nil {
-		s.events.On(progress.ErrorEvent(networkEventName, err.Error()))
+		s.events.On(errorEvent(networkEventName, err.Error()))
 		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
-	s.events.On(progress.CreatedEvent(networkEventName))
+	s.events.On(createdEvent(networkEventName))
 
 	err = s.connectNetwork(ctx, n.Name, dangledContainers, nil)
 	if err != nil {
@@ -1443,7 +1442,7 @@ func (s *composeService) removeDivergedNetwork(ctx context.Context, project *typ
 
 	err = s.apiClient().NetworkRemove(ctx, n.Name)
 	eventName := fmt.Sprintf("Network %s", n.Name)
-	s.events.On(progress.RemovedEvent(eventName))
+	s.events.On(removedEvent(eventName))
 	return containers, err
 }
 
@@ -1619,7 +1618,7 @@ func (s *composeService) removeDivergedVolume(ctx context.Context, name string, 
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
 	eventName := fmt.Sprintf("Volume %s", volume.Name)
-	s.events.On(progress.CreatingEvent(eventName))
+	s.events.On(creatingEvent(eventName))
 	hash, err := VolumeHash(volume)
 	if err != nil {
 		return err
@@ -1632,9 +1631,9 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		DriverOpts: volume.DriverOpts,
 	})
 	if err != nil {
-		s.events.On(progress.ErrorEvent(eventName, err.Error()))
+		s.events.On(errorEvent(eventName, err.Error()))
 		return err
 	}
-	s.events.On(progress.CreatedEvent(eventName))
+	s.events.On(createdEvent(eventName))
 	return nil
 }

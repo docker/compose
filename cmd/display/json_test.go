@@ -14,13 +14,14 @@
    limitations under the License.
 */
 
-package progress
+package display
 
 import (
 	"bytes"
 	"encoding/json"
 	"testing"
 
+	"github.com/docker/compose/v2/pkg/api"
 	"gotest.tools/v3/assert"
 )
 
@@ -31,11 +32,11 @@ func TestJsonWriter_Event(t *testing.T) {
 		dryRun: true,
 	}
 
-	event := Event{
+	event := api.Resource{
 		ID:       "service1",
 		ParentID: "project",
-		Status:   Working,
-		Text:     StatusCreating,
+		Status:   api.Working,
+		Text:     api.StatusCreating,
 		Current:  50,
 		Total:    100,
 		Percent:  50,
@@ -50,7 +51,7 @@ func TestJsonWriter_Event(t *testing.T) {
 		DryRun:   true,
 		ID:       event.ID,
 		ParentID: event.ParentID,
-		Text:     StatusCreating,
+		Text:     api.StatusCreating,
 		Status:   "Working",
 		Current:  event.Current,
 		Total:    event.Total,

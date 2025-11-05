@@ -22,11 +22,10 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 )
 
 func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
+	return Run(ctx, func(ctx context.Context) error {
 		return s.stop(ctx, strings.ToLower(projectName), options, nil)
 	}, "stop", s.events)
 }

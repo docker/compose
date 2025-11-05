@@ -26,8 +26,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose/v2/cmd/display"
 	"github.com/docker/compose/v2/pkg/compose"
-	ui "github.com/docker/compose/v2/pkg/progress"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -341,7 +341,7 @@ func runUp(
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
 			Services:       services,
-			NavigationMenu: upOptions.navigationMenu && ui.Mode != "plain" && dockerCli.In().IsTerminal(),
+			NavigationMenu: upOptions.navigationMenu && display.Mode != "plain" && dockerCli.In().IsTerminal(),
 		},
 	})
 }

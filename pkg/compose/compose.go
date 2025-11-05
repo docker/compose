@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,7 +31,6 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -44,15 +42,6 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 )
-
-var stdioToStdout bool
-
-func init() {
-	out, ok := os.LookupEnv("COMPOSE_STATUS_STDOUT")
-	if ok {
-		stdioToStdout, _ = strconv.ParseBool(out)
-	}
-}
 
 type Option func(service *composeService) error
 
@@ -96,7 +85,7 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		}
 	}
 	if s.events == nil {
-		s.events = progress.NewQuietWriter()
+		s.events = &ignore{}
 	}
 
 	// If custom streams were provided, wrap the Docker CLI to use them
@@ -204,7 +193,7 @@ func AlwaysOkPrompt() Prompt {
 
 // WithEventProcessor configure component to get notified on Compose operation and progress events.
 // Typically used to configure a progress UI
-func WithEventProcessor(bus progress.EventProcessor) Option {
+func WithEventProcessor(bus api.EventProcessor) Option {
 	return func(s *composeService) error {
 		s.events = bus
 		return nil
@@ -216,7 +205,7 @@ type composeService struct {
 	// prompt is used to interact with user and confirm actions
 	prompt Prompt
 	// eventBus collects tasks execution events
-	events progress.EventProcessor
+	events api.EventProcessor
 
 	// Optional overrides for specific components (for SDK users)
 	outStream   io.Writer
@@ -276,13 +265,6 @@ func (s *composeService) stdin() *streams.In {
 
 func (s *composeService) stderr() *streams.Out {
 	return s.dockerCli.Err()
-}
-
-func (s *composeService) stdinfo() *streams.Out {
-	if stdioToStdout {
-		return s.stdout()
-	}
-	return s.stderr()
 }
 
 // readCloserAdapter adapts io.Reader to io.ReadCloser

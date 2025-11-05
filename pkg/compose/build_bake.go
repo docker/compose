@@ -40,7 +40,6 @@ import (
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/cli/cli/streams"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/google/uuid"
 	"github.com/moby/buildkit/client"
@@ -118,10 +117,10 @@ type buildStatus struct {
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
-	if options.Progress == progress.ModeAuto {
+	displayMode := progressui.DisplayMode(options.Progress)
+	if displayMode == progressui.AutoMode {
 		options.Progress = os.Getenv("BUILDKIT_PROGRESS")
 	}
-	displayMode := progressui.DisplayMode(options.Progress)
 	out := options.Out
 	if out == nil {
 		out = s.stdout()
@@ -206,7 +205,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 
 		image := api.GetImageNameOrDefault(service, project.Name)
-		s.events.On(progress.BuildingEvent(image))
+		s.events.On(buildingEvent(image))
 
 		expectedImages[serviceName] = image
 
@@ -408,7 +407,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
 		results[image] = built.Digest
-		s.events.On(progress.BuiltEvent(image))
+		s.events.On(builtEvent(image))
 	}
 	return results, nil
 }
@@ -554,20 +553,20 @@ func (s composeService) dryRunBake(cfg bakeConfig) map[string]string {
 		bakeResponse[name] = dryRunUUID
 	}
 	for name := range bakeResponse {
-		s.events.On(progress.BuiltEvent(name))
+		s.events.On(builtEvent(name))
 	}
 	return bakeResponse
 }
 
 func (s composeService) displayDryRunBuildEvent(name, dryRunUUID, tag string) {
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     name + " ==>",
-		Status: progress.Done,
+		Status: api.Done,
 		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
 	})
-	s.events.On(progress.Event{
+	s.events.On(api.Resource{
 		ID:     name + " ==> ==>",
-		Status: progress.Done,
+		Status: api.Done,
 		Text:   fmt.Sprintf(`naming to %s`, tag),
 	})
 }

@@ -26,8 +26,8 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
+	"github.com/docker/compose/v2/cmd/display"
 	"github.com/docker/compose/v2/pkg/compose"
-	ui "github.com/docker/compose/v2/pkg/progress"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -67,8 +67,8 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 		builderName = os.Getenv("BUILDX_BUILDER")
 	}
 
-	uiMode := ui.Mode
-	if uiMode == ui.ModeJSON {
+	uiMode := display.Mode
+	if uiMode == display.ModeJSON {
 		uiMode = "rawjson"
 	}
 
@@ -100,7 +100,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 		Short: "Build or rebuild services",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.quiet {
-				ui.Mode = ui.ModeQuiet
+				display.Mode = display.ModeQuiet
 				devnull, err := os.Open(os.DevNull)
 				if err != nil {
 					return err
@@ -151,7 +151,7 @@ func buildCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 
 func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts buildOptions, services []string) error {
 	if opts.print {
-		backendOptions.Add(compose.WithEventProcessor(ui.NewQuietWriter()))
+		backendOptions.Add(compose.WithEventProcessor(display.Quiet()))
 	}
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
