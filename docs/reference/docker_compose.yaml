@@ -139,6 +139,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: insecure-registry
+      value_type: stringArray
+      default_value: '[]'
+      description: |
+        Use insecure registry to pull Compose OCI artifacts. Doesn't apply to images
+      deprecated: false
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-ansi
       value_type: bool
       default_value: "false"

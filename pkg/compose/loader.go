@@ -33,7 +33,7 @@ import (
 // It loads and validates a Compose project from configuration files.
 func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoadOptions) (*types.Project, error) {
 	// Setup remote loaders (Git, OCI)
-	remoteLoaders := s.createRemoteLoaders(options.Offline)
+	remoteLoaders := s.createRemoteLoaders(options)
 
 	projectOptions, err := s.buildProjectOptions(options, remoteLoaders)
 	if err != nil {
@@ -66,12 +66,12 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 }
 
 // createRemoteLoaders creates Git and OCI remote loaders if not in offline mode
-func (s *composeService) createRemoteLoaders(offline bool) []loader.ResourceLoader {
-	if offline {
+func (s *composeService) createRemoteLoaders(options api.ProjectLoadOptions) []loader.ResourceLoader {
+	if options.Offline {
 		return nil
 	}
-	git := remote.NewGitRemoteLoader(s.dockerCli, offline)
-	oci := remote.NewOCIRemoteLoader(s.dockerCli, offline)
+	git := remote.NewGitRemoteLoader(s.dockerCli, options.Offline)
+	oci := remote.NewOCIRemoteLoader(s.dockerCli, options.Offline, options.OCI)
 	return []loader.ResourceLoader{git, oci}
 }
 

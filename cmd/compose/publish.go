@@ -36,6 +36,7 @@ type publishOptions struct {
 	withEnvironment     bool
 	assumeYes           bool
 	app                 bool
+	insecureRegistry    bool
 }
 
 func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -56,6 +57,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 	flags.BoolVar(&opts.withEnvironment, "with-env", false, "Include environment variables in the published OCI artifact")
 	flags.BoolVarP(&opts.assumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts`)
 	flags.BoolVar(&opts.app, "app", false, "Published compose application (includes referenced images)")
+	flags.BoolVar(&opts.insecureRegistry, "insecure-registry", false, "Use insecure registry")
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		// assumeYes was introduced by mistake as `--y`
 		if name == "y" {
@@ -64,6 +66,8 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 		}
 		return pflag.NormalizedName(name)
 	})
+	// Should **only** be used for testing purpose, we don't want to promote use of insecure registries
+	_ = flags.MarkHidden("insecure-registry")
 
 	return cmd
 }
@@ -92,5 +96,6 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		Application:         opts.app,
 		OCIVersion:          api.OCIVersion(opts.ociVersion),
 		WithEnvironment:     opts.withEnvironment,
+		InsecureRegistry:    opts.insecureRegistry,
 	})
 }
