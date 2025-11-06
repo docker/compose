@@ -31,6 +31,7 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/dryrun"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -173,7 +174,7 @@ func WithDryRun(s *composeService) error {
 	options := flags.NewClientOptions()
 	options.Context = s.dockerCli.CurrentContext()
 	err = cli.Initialize(options, command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
-		return api.NewDryRunClient(s.apiClient(), s.dockerCli)
+		return dryrun.NewDryRunClient(s.apiClient(), s.dockerCli)
 	}))
 	if err != nil {
 		return err
