@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package api
+package dryrun
 
 import (
 	"bytes"
@@ -48,10 +48,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
-)
-
-const (
-	DRYRUN_PREFIX = " DRY-RUN MODE - "
 )
 
 var _ client.APIClient = &DryRunClient{}
@@ -192,28 +188,17 @@ func (d *DryRunClient) ContainerUnpause(ctx context.Context, container string) e
 func (d *DryRunClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, containerType.PathStat, error) {
 	rc := io.NopCloser(strings.NewReader(""))
 	if _, err := d.ContainerStatPath(ctx, container, srcPath); err != nil {
-		return rc, containerType.PathStat{}, fmt.Errorf(" %s Could not find the file %s in container %s", DRYRUN_PREFIX, srcPath, container)
+		return rc, containerType.PathStat{}, fmt.Errorf("could not find the file %s in container %s", srcPath, container)
 	}
 	return rc, containerType.PathStat{}, nil
 }
 
 func (d *DryRunClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, options containerType.CopyToContainerOptions) error {
-	if _, err := d.ContainerStatPath(ctx, container, path); err != nil {
-		return fmt.Errorf(" %s Could not find the file %s in container %s", DRYRUN_PREFIX, path, container)
-	}
 	return nil
 }
 
 func (d *DryRunClient) ImageBuild(ctx context.Context, reader io.Reader, options build.ImageBuildOptions) (build.ImageBuildResponse, error) {
-	jsonMessage, err := json.Marshal(&jsonmessage.JSONMessage{
-		Status:   fmt.Sprintf("%[1]sSuccessfully built: dryRunID\n%[1]sSuccessfully tagged: %[2]s\n", DRYRUN_PREFIX, options.Tags[0]),
-		Progress: &jsonmessage.JSONProgress{},
-		ID:       "",
-	})
-	if err != nil {
-		return build.ImageBuildResponse{}, err
-	}
-	rc := io.NopCloser(bytes.NewReader(jsonMessage))
+	rc := io.NopCloser(bytes.NewReader(nil))
 
 	return build.ImageBuildResponse{
 		Body: rc,
@@ -321,12 +306,10 @@ func (d *DryRunClient) ContainerExecCreate(ctx context.Context, container string
 }
 
 func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, config containerType.ExecStartOptions) error {
-	v, ok := d.execs.LoadAndDelete(execID)
+	_, ok := d.execs.LoadAndDelete(execID)
 	if !ok {
 		return fmt.Errorf("invalid exec ID %q", execID)
 	}
-	details := v.(execDetails)
-	fmt.Printf("%sExecuting command %q in %s (detached mode)\n", DRYRUN_PREFIX, details.command, details.container)
 	return nil
 }
 

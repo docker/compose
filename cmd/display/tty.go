@@ -286,7 +286,7 @@ func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding in
 	}
 	prefix := ""
 	if dryRun {
-		prefix = PrefixColor(api.DRYRUN_PREFIX)
+		prefix = PrefixColor(DRYRUN_PREFIX)
 	}
 
 	elapsed := endTime.Sub(t.startTime).Seconds()

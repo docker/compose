@@ -16,41 +16,6 @@
 
 package display
 
-import (
-	"context"
-	"fmt"
-	"io"
-
-	"github.com/docker/compose/v2/pkg/api"
+const (
+	DRYRUN_PREFIX = " DRY-RUN MODE - "
 )
-
-func Plain(out io.Writer) api.EventProcessor {
-	return &plainWriter{
-		out: out,
-	}
-}
-
-type plainWriter struct {
-	out    io.Writer
-	dryRun bool
-}
-
-func (p *plainWriter) Start(ctx context.Context, operation string) {
-}
-
-func (p *plainWriter) Event(e api.Resource) {
-	prefix := ""
-	if p.dryRun {
-		prefix = DRYRUN_PREFIX
-	}
-	_, _ = fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.Details)
-}
-
-func (p *plainWriter) On(events ...api.Resource) {
-	for _, e := range events {
-		p.Event(e)
-	}
-}
-
-func (p *plainWriter) Done(_ string, _ bool) {
-}
