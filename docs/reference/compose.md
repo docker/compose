@@ -1,3 +1,4 @@
+
 # docker compose
 
 ```text
@@ -124,6 +125,57 @@ get the postgres image for the db service from anywhere by using the `-f` flag a
 
 ```console
 $ docker compose -f ~/sandbox/rails/compose.yaml pull db
+```
+
+#### Using an OCI published artifact
+You can use the `-f` flag with the `oci://` prefix to reference a Compose file that has been published to an OCI registry.
+This allows you to distribute and version your Compose configurations as OCI artifacts.
+
+To use a Compose file from an OCI registry:
+
+```console
+$ docker compose -f oci://registry.example.com/my-compose-project:latest up
+```
+
+You can also combine OCI artifacts with local files:
+
+```console
+$ docker compose -f oci://registry.example.com/my-compose-project:v1.0 -f compose.override.yaml up
+```
+
+The OCI artifact must contain a valid Compose file. You can publish Compose files to an OCI registry using the
+`docker compose publish` command.
+
+#### Using a git repository
+You can use the `-f` flag to reference a Compose file from a git repository. Compose supports various git URL formats:
+
+Using HTTPS:
+```console
+$ docker compose -f https://github.com/user/repo.git up
+```
+
+Using SSH:
+```console
+$ docker compose -f git@github.com:user/repo.git up
+```
+
+You can specify a specific branch, tag, or commit:
+```console
+$ docker compose -f https://github.com/user/repo.git@main up
+$ docker compose -f https://github.com/user/repo.git@v1.0.0 up
+$ docker compose -f https://github.com/user/repo.git@abc123 up
+```
+
+You can also specify a subdirectory within the repository:
+```console
+$ docker compose -f https://github.com/user/repo.git#main:path/to/compose.yaml up
+```
+
+When using git resources, Compose will clone the repository and use the specified Compose file. You can combine
+git resources with local files:
+
+```console
+$ docker compose -f https://github.com/user/repo.git -f compose.override.yaml up
 ```
 
 ### Use `-p` to specify a project name
