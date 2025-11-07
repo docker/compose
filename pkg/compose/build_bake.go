@@ -124,9 +124,6 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	displayMode := progressui.DisplayMode(options.Progress)
 	out := options.Out
 	if out == nil {
-		if displayMode == progress.ModeAuto && !s.stdout().IsTerminal() {
-			displayMode = progressui.PlainMode
-		}
 		out = s.stdout()
 	}
 	display, err := progressui.NewDisplay(makeConsole(out), displayMode)
