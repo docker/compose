@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -90,6 +91,7 @@ const (
 type LogKeyboard struct {
 	kError                KeyboardError
 	Watch                 *KeyboardWatch
+	Detach                func()
 	IsDockerDesktopActive bool
 	logLevel              KEYBOARD_LOG_LEVEL
 	signalChannel         chan<- os.Signal
@@ -161,29 +163,23 @@ func (lk *LogKeyboard) printNavigationMenu() {
 }
 
 func (lk *LogKeyboard) navigationMenu() string {
-	var openDDInfo string
+	var items []string
 	if lk.IsDockerDesktopActive {
-		openDDInfo = shortcutKeyColor("v") + navColor(" View in Docker Desktop")
+		items = append(items, shortcutKeyColor("v")+navColor(" View in Docker Desktop"))
 	}
 
-	var openDDUI string
-	if openDDInfo != "" {
-		openDDUI = navColor("   ")
-	}
 	if lk.IsDockerDesktopActive {
-		openDDUI = openDDUI + shortcutKeyColor("o") + navColor(" View Config")
+		items = append(items, shortcutKeyColor("o")+navColor(" View Config"))
 	}
 
-	var watchInfo string
-	if openDDInfo != "" || openDDUI != "" {
-		watchInfo = navColor("   ")
-	}
 	isEnabled := " Enable"
 	if lk.Watch != nil && lk.Watch.Watching {
 		isEnabled = " Disable"
 	}
-	watchInfo = watchInfo + shortcutKeyColor("w") + navColor(isEnabled+" Watch")
-	return openDDInfo + openDDUI + watchInfo
+	items = append(items, shortcutKeyColor("w")+navColor(isEnabled+" Watch"))
+	items = append(items, shortcutKeyColor("d")+navColor(" Detach"))
+
+	return strings.Join(items, "   ")
 }
 
 func (lk *LogKeyboard) clearNavigationMenu() {
@@ -290,6 +286,9 @@ func (lk *LogKeyboard) ToggleWatch(ctx context.Context, options api.UpOptions) {
 
 func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEvent, project *types.Project, options api.UpOptions) {
 	switch kRune := event.Rune; kRune {
+	case 'd':
+		lk.clearNavigationMenu()
+		lk.Detach()
 	case 'v':
 		lk.openDockerDesktop(ctx, project)
 	case 'w':
@@ -334,6 +333,10 @@ func (lk *LogKeyboard) EnableWatch(enabled bool, watcher Feature) {
 		Watching: enabled,
 		Watcher:  watcher,
 	}
+}
+
+func (lk *LogKeyboard) EnableDetach(detach func()) {
+	lk.Detach = detach
 }
 
 func allocateSpace(lines int) {

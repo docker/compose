@@ -49,6 +49,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		OpenStdin:  !opts.Detach && opts.Interactive,
 		Attach:     !opts.Detach,
 		Containers: []string{containerID},
+		DetachKeys: s.configFile().DetachKeys,
 	})
 	var stErr cli.StatusError
 	if errors.As(err, &stErr) {

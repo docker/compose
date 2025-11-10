@@ -597,6 +597,7 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 			exec.Privileged = x.Privileged
 			exec.Command = x.Command
 			exec.Workdir = x.WorkingDir
+			exec.DetachKeys = s.configFile().DetachKeys
 			for _, v := range x.Environment.ToMapping().Values() {
 				err := exec.Env.Set(v)
 				if err != nil {

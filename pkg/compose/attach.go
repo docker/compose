@@ -152,11 +152,12 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 	var stdout io.ReadCloser
 	var stdin io.WriteCloser
 	cnx, err := s.apiClient().ContainerAttach(ctx, container, containerType.AttachOptions{
-		Stream: true,
-		Stdin:  true,
-		Stdout: true,
-		Stderr: true,
-		Logs:   false,
+		Stream:     true,
+		Stdin:      true,
+		Stdout:     true,
+		Stderr:     true,
+		Logs:       false,
+		DetachKeys: s.configFile().DetachKeys,
 	})
 	if err == nil {
 		stdout = ContainerStdout{HijackedResponse: cnx}

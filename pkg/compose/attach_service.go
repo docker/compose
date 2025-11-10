@@ -31,8 +31,13 @@ func (s *composeService) Attach(ctx context.Context, projectName string, options
 		return err
 	}
 
+	detachKeys := options.DetachKeys
+	if detachKeys == "" {
+		detachKeys = s.configFile().DetachKeys
+	}
+
 	var attach container.AttachOptions
-	attach.DetachKeys = options.DetachKeys
+	attach.DetachKeys = detachKeys
 	attach.NoStdin = options.NoStdin
 	attach.Proxy = options.Proxy
 	return container.RunAttach(ctx, s.dockerCli, target.ID, &attach)
