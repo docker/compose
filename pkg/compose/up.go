@@ -107,6 +107,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	globalCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	if navigationMenu != nil {
+		navigationMenu.EnableDetach(cancel)
+	}
+
 	var (
 		eg   errgroup.Group
 		mu   sync.Mutex
