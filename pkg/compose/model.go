@@ -39,16 +39,16 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		return nil
 	}
 
-	api, err := s.newModelAPI(project)
+	mdlAPI, err := s.newModelAPI(project)
 	if err != nil {
 		return err
 	}
-	defer api.Close()
-	availableModels, err := api.ListModels(ctx)
+	defer mdlAPI.Close()
+	availableModels, err := mdlAPI.ListModels(ctx)
 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return api.SetModelVariables(ctx, project)
+		return mdlAPI.SetModelVariables(ctx, project)
 	})
 
 	for name, config := range project.Models {
@@ -57,12 +57,12 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		}
 		eg.Go(func() error {
 			if !slices.Contains(availableModels, config.Model) {
-				err = api.PullModel(ctx, config, quietPull, s.events)
+				err = mdlAPI.PullModel(ctx, config, quietPull, s.events)
 				if err != nil {
 					return err
 				}
 			}
-			return api.ConfigureModel(ctx, config, s.events)
+			return mdlAPI.ConfigureModel(ctx, config, s.events)
 		})
 	}
 	return eg.Wait()
