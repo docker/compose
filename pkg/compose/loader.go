@@ -95,12 +95,18 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 	}
 
 	opts = append(opts,
+		// Load PWD/.env if present and no explicit --env-file has been set
 		cli.WithEnvFiles(options.EnvFiles...),
+		// read dot env file to populate project environment
 		cli.WithDotEnv,
+		// get compose file path set by COMPOSE_FILE
 		cli.WithConfigFileEnv,
+		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
+		// .. and then, a project directory != PWD maybe has been set so let's load .env file
 		cli.WithEnvFiles(options.EnvFiles...),
 		cli.WithDotEnv,
+		// eventually COMPOSE_PROFILES should have been set
 		cli.WithDefaultProfiles(options.Profiles...),
 		cli.WithName(options.ProjectName),
 	)

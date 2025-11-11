@@ -22,6 +22,7 @@ const (
 	// TemplateLegacyJSON the legacy json formatting value using go template
 	TemplateLegacyJSON = "{{json.}}"
 	// PRETTY is the constant for default formats on list commands
+	//
 	// Deprecated: use TABLE
 	PRETTY = "pretty"
 	// TABLE Print output in table format with column headers (default)
