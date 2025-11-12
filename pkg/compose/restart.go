@@ -24,7 +24,7 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -94,8 +94,9 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 				}
 				eventName := getContainerProgressName(ctr)
 				s.events.On(progress.RestartingEvent(eventName))
-				timeout := utils.DurationSecondToInt(options.Timeout)
-				err = s.apiClient().ContainerRestart(ctx, ctr.ID, container.StopOptions{Timeout: timeout})
+				_, err = s.apiClient().ContainerRestart(ctx, ctr.ID, client.ContainerRestartOptions{
+					Timeout: utils.DurationSecondToInt(options.Timeout),
+				})
 				if err != nil {
 					return err
 				}

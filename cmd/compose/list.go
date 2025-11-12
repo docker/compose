@@ -18,13 +18,16 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/cli/opts"
 	"github.com/spf13/cobra"
@@ -62,11 +65,32 @@ var acceptedListFilters = map[string]bool{
 	"name": true,
 }
 
+// match returns true if any of the values at key match the source string
+func match(filters client.Filters, field, source string) bool {
+	if f, ok := filters[field]; ok && f[source] {
+		return true
+	}
+
+	fieldValues := filters[field]
+	for name2match := range fieldValues {
+		isMatch, err := regexp.MatchString(name2match, source)
+		if err != nil {
+			continue
+		}
+		if isMatch {
+			return true
+		}
+	}
+	return false
+}
+
 func runList(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, lsOpts lsOptions) error {
 	filters := lsOpts.Filter.Value()
-	err := filters.Validate(acceptedListFilters)
-	if err != nil {
-		return err
+
+	for filter := range filters {
+		if _, ok := acceptedListFilters[filter]; !ok {
+			return errors.New("invalid filter '" + filter + "'")
+		}
 	}
 
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
@@ -78,13 +102,12 @@ func runList(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
-	if filters.Len() > 0 {
+	if len(filters) > 0 {
 		var filtered []api.Stack
 		for _, s := range stackList {
-			if filters.Contains("name") && !filters.Match("name", s.Name) {
-				continue
+			if match(filters, "name", s.Name) {
+				filtered = append(filtered, s)
 			}
-			filtered = append(filtered, s)
 		}
 		stackList = filtered
 	}

@@ -45,7 +45,7 @@ func TestPrint(t *testing.T) {
 	}
 
 	b := &bytes.Buffer{}
-	assert.NilError(t, Print(testList, PRETTY, b, func(w io.Writer) {
+	assert.NilError(t, Print(testList, TABLE, b, func(w io.Writer) {
 		for _, t := range testList {
 			_, _ = fmt.Fprintf(w, "%s\t%s\n", t.Name, t.Status)
 		}

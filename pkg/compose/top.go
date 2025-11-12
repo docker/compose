@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -38,7 +39,9 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 	eg, ctx := errgroup.WithContext(ctx)
 	for i, ctr := range containers {
 		eg.Go(func() error {
-			topContent, err := s.apiClient().ContainerTop(ctx, ctr.ID, []string{})
+			topContent, err := s.apiClient().ContainerTop(ctx, ctr.ID, client.ContainerTopOptions{
+				Arguments: []string{},
+			})
 			if err != nil {
 				return err
 			}

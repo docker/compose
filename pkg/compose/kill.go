@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -64,7 +65,9 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)
 			s.events.On(progress.KillingEvent(eventName))
-			err := s.apiClient().ContainerKill(ctx, ctr.ID, options.Signal)
+			_, err := s.apiClient().ContainerKill(ctx, ctr.ID, client.ContainerKillOptions{
+				Signal: options.Signal,
+			})
 			if err != nil {
 				s.events.On(progress.ErrorEvent(eventName, "Error while Killing"))
 				return err

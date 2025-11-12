@@ -34,7 +34,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	composegoutils "github.com/compose-spec/compose-go/v2/utils"
-	"github.com/docker/buildx/util/logutil"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/command"
@@ -387,8 +386,8 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(o.EnvFiles...),
-		cli.WithDotEnv,
+		cli.WithEnvFiles(o.EnvFiles...), //nolint:gocritic // intentionally applying cli.WithEnvFiles twice.
+		cli.WithDotEnv,                  //nolint:gocritic // intentionally applying cli.WithDotEnv twice.
 		// eventually COMPOSE_PROFILES should have been set
 		cli.WithDefaultProfiles(o.Profiles...),
 		cli.WithName(o.ProjectName),
@@ -415,16 +414,6 @@ func (o *BackendOptions) Add(option compose.Option) {
 
 // RootCommand returns the compose command with its child commands
 func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command { //nolint:gocyclo
-	// filter out useless commandConn.CloseWrite warning message that can occur
-	// when using a remote context that is unreachable: "commandConn.CloseWrite: commandconn: failed to wait: signal: killed"
-	// https://github.com/docker/cli/blob/e1f24d3c93df6752d3c27c8d61d18260f141310c/cli/connhelper/commandconn/commandconn.go#L203-L215
-	logrus.AddHook(logutil.NewFilter([]logrus.Level{
-		logrus.WarnLevel,
-	},
-		"commandConn.CloseWrite:",
-		"commandConn.CloseRead:",
-	))
-
 	opts := ProjectOptions{}
 	var (
 		ansi     string

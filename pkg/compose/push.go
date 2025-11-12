@@ -27,8 +27,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/internal/registry"
@@ -102,7 +102,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 		return err
 	}
 
-	stream, err := s.apiClient().ImagePush(ctx, tag, image.PushOptions{
+	stream, err := s.apiClient().ImagePush(ctx, tag, client.ImagePushOptions{
 		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
 	})
 	if err != nil {
@@ -110,7 +110,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 	}
 	dec := json.NewDecoder(stream)
 	for {
-		var jm jsonmessage.JSONMessage
+		var jm jsonstream.Message
 		if err := dec.Decode(&jm); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
@@ -129,7 +129,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 	return nil
 }
 
-func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events progress.EventProcessor) {
+func toPushProgressEvent(prefix string, jm jsonstream.Message, events progress.EventProcessor) {
 	if jm.ID == "" {
 		// skipped
 		return
@@ -150,7 +150,8 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events progr
 		text = jm.Error.Message
 	}
 	if jm.Progress != nil {
-		text = jm.Progress.String()
+		// FIXME(thaJeztah): what's the replacement for Progress.String()?
+		// text = jm.Progress.String()
 		if jm.Progress.Total != 0 {
 			current = jm.Progress.Current
 			total = jm.Progress.Total
@@ -171,7 +172,7 @@ func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, events progr
 	})
 }
 
-func isDone(msg jsonmessage.JSONMessage) bool {
+func isDone(msg jsonstream.Message) bool {
 	// TODO there should be a better way to detect push is done than such a status message check
 	switch strings.ToLower(msg.Status) {
 	case "pushed", "layer already exists":
