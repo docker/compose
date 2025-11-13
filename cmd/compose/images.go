@@ -95,21 +95,19 @@ func runImages(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 	if opts.Format == "json" {
 
 		type img struct {
-			ID            string    `json:"ID"`
-			ContainerName string    `json:"ContainerName"`
-			Repository    string    `json:"Repository"`
-			Tag           string    `json:"Tag"`
-			Platform      string    `json:"Platform"`
-			Size          int64     `json:"Size"`
-			LastTagTime   time.Time `json:"LastTagTime"`
+			ID            string     `json:"ID"`
+			ContainerName string     `json:"ContainerName"`
+			Repository    string     `json:"Repository"`
+			Tag           string     `json:"Tag"`
+			Platform      string     `json:"Platform"`
+			Size          int64      `json:"Size"`
+			Created       *time.Time `json:"Created,omitempty"`
+			LastTagTime   time.Time  `json:"LastTagTime,omitzero"`
 		}
 		// Convert map to slice
 		var imageList []img
 		for ctr, i := range images {
 			lastTagTime := i.LastTagTime
-			if lastTagTime.IsZero() {
-				lastTagTime = i.Created
-			}
 			imageList = append(imageList, img{
 				ContainerName: ctr,
 				ID:            i.ID,
@@ -117,6 +115,7 @@ func runImages(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 				Tag:           i.Tag,
 				Platform:      platforms.Format(i.Platform),
 				Size:          i.Size,
+				Created:       i.Created,
 				LastTagTime:   lastTagTime,
 			})
 		}
@@ -142,7 +141,10 @@ func runImages(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 				if tag == "" {
 					tag = "<none>"
 				}
-				created := units.HumanDuration(time.Now().UTC().Sub(img.LastTagTime)) + " ago"
+				created := "N/A"
+				if img.Created != nil {
+					created = units.HumanDuration(time.Now().UTC().Sub(*img.Created)) + " ago"
+				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					container, repo, tag, platforms.Format(img.Platform), id, size, created)
 			}
