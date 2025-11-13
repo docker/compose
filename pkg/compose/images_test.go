@@ -66,21 +66,21 @@ func TestImages(t *testing.T) {
 			Repository: "foo",
 			Tag:        "1",
 			Size:       12345,
-			Created:    created1,
+			Created:    &created1,
 		},
 		"456": {
 			ID:         "image2",
 			Repository: "bar",
 			Tag:        "2",
 			Size:       67890,
-			Created:    created2,
+			Created:    &created2,
 		},
 		"789": {
 			ID:         "image1",
 			Repository: "foo",
 			Tag:        "1",
 			Size:       12345,
-			Created:    created1,
+			Created:    &created1,
 		},
 	}
 	assert.NilError(t, err)

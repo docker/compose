@@ -91,9 +91,13 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 				}
 			}
 
-			created, err := time.Parse(time.RFC3339Nano, image.Created)
-			if err != nil {
-				return err
+			var created *time.Time
+			if image.Created != "" {
+				t, err := time.Parse(time.RFC3339Nano, image.Created)
+				if err != nil {
+					return err
+				}
+				created = &t
 			}
 
 			mux.Lock()
