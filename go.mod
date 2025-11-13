@@ -8,7 +8,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.9.1
+	github.com/compose-spec/compose-go/v2 v2.9.2-0.20251125103817-dbfe61974b3f
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd/v2 v2.2.1-0.20251115011841-efd86f2b0bc2
 	github.com/containerd/errdefs v1.0.0
@@ -143,7 +143,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/net v0.46.1-0.20251013234738-63d1a5100f82 // indirect
 	golang.org/x/term v0.36.0 // indirect
