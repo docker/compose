@@ -393,8 +393,8 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(o.EnvFiles...),
-		cli.WithDotEnv,
+		cli.WithEnvFiles(o.EnvFiles...), //nolint:gocritic // intentionally applying cli.WithEnvFiles twice.
+		cli.WithDotEnv,                  //nolint:gocritic // intentionally applying cli.WithDotEnv twice.
 		// eventually COMPOSE_PROFILES should have been set
 		cli.WithDefaultProfiles(o.Profiles...),
 		cli.WithName(o.ProjectName),
