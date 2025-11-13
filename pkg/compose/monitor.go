@@ -27,8 +27,8 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type monitor struct {

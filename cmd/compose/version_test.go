@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v2/internal"
-	"github.com/docker/compose/v2/pkg/mocks"
+	"github.com/docker/compose/v5/internal"
+	"github.com/docker/compose/v5/pkg/mocks"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )

@@ -32,7 +32,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
 	"github.com/sirupsen/logrus"
 )

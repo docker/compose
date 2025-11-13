@@ -24,7 +24,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {

@@ -30,7 +30,7 @@ import (
 	"github.com/docker/docker/client"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // ImagePruneMode controls how aggressively images associated with the project

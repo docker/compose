@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/mocks"
+	compose "github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 func TestViz(t *testing.T) {

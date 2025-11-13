@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/buger/goterm"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/pkg/jsonmessage"
 )
 

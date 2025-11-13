@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func JSON(out io.Writer) api.EventProcessor {

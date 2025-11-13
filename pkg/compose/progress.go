@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 type progressFunc func(context.Context) error

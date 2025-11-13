@@ -25,7 +25,7 @@ import (
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {

@@ -42,7 +42,7 @@ import (
 	"github.com/sirupsen/logrus"
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 type createOptions struct {

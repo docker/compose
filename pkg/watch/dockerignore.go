@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/internal/paths"
+	"github.com/docker/compose/v5/internal/paths"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 )

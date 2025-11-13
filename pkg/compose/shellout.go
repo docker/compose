@@ -26,7 +26,7 @@ import (
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/flags"
-	"github.com/docker/compose/v2/internal"
+	"github.com/docker/compose/v5/internal"
 	"github.com/docker/docker/client"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"

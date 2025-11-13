@@ -1,4 +1,4 @@
-module github.com/docker/compose/v2
+module github.com/docker/compose/v5
 
 go 1.24.9
 

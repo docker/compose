@@ -22,10 +22,10 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v2/pkg/utils"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
-//go:generate mockgen -destination=./prompt_mock.go -self_package "github.com/docker/compose/v2/pkg/prompt" -package=prompt . UI
+//go:generate mockgen -destination=./prompt_mock.go -self_package "github.com/docker/compose/v5/pkg/prompt" -package=prompt . UI
 
 // UI - prompt user input
 type UI interface {

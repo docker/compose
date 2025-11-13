@@ -23,7 +23,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/compose/v2/internal"
+	"github.com/docker/compose/v5/internal"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/docker/cli/cli/command"

@@ -29,7 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )

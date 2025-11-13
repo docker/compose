@@ -23,13 +23,13 @@ import (
 	"time"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/pkg/compose"
-	"github.com/docker/compose/v2/pkg/utils"
+	"github.com/docker/compose/v5/pkg/compose"
+	"github.com/docker/compose/v5/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 type downOptions struct {

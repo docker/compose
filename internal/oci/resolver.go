@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
-	"github.com/docker/compose/v2/internal/registry"
+	"github.com/docker/compose/v5/internal/registry"
 	"github.com/moby/buildkit/util/contentutil"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )

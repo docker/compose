@@ -23,7 +23,7 @@ import (
 
 	clidocstool "github.com/docker/cli-docs-tool"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/cmd/compose"
+	"github.com/docker/compose/v5/cmd/compose"
 	"github.com/spf13/cobra"
 )
 

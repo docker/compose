@@ -22,7 +22,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/store"
-	"github.com/docker/compose/v2/internal/memnet"
+	"github.com/docker/compose/v5/internal/memnet"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"google.golang.org/grpc"

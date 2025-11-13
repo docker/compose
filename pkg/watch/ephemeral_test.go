@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/compose/v2/pkg/watch"
+	"github.com/docker/compose/v5/pkg/watch"
 )
 
 func TestEphemeralPathMatcher(t *testing.T) {

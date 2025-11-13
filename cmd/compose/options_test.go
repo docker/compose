@@ -28,7 +28,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v2/pkg/mocks"
+	"github.com/docker/compose/v5/pkg/mocks"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )

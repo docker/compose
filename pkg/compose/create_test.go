@@ -29,7 +29,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert/cmp"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/network"
 
 	composetypes "github.com/compose-spec/compose-go/v2/types"
