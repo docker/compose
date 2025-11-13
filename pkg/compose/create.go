@@ -899,7 +899,7 @@ func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
 	switch {
 	case bind == nil:
 		return false
-	case !bind.CreateHostPath:
+	case !bool(bind.CreateHostPath):
 		return true
 	case bind.Propagation != "":
 		return true
@@ -1210,7 +1210,7 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 	}
 	opts := &mount.BindOptions{
 		Propagation:      mount.Propagation(bind.Propagation),
-		CreateMountpoint: bind.CreateHostPath,
+		CreateMountpoint: bool(bind.CreateHostPath),
 	}
 	switch bind.Recursive {
 	case "disabled":
