@@ -30,8 +30,8 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/internal/oci"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/internal/oci"
+	"github.com/docker/compose/v5/pkg/api"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

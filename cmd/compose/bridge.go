@@ -28,9 +28,9 @@ import (
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/pkg/bridge"
-	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/pkg/bridge"
+	"github.com/docker/compose/v5/pkg/compose"
 )
 
 func bridgeCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {

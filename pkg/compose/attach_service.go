@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/command/container"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Attach(ctx context.Context, projectName string, options api.AttachOptions) error {

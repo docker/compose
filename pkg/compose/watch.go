@@ -29,12 +29,12 @@ import (
 	gsync "sync"
 	"time"
 
-	pathutil "github.com/docker/compose/v2/internal/paths"
-	"github.com/docker/compose/v2/internal/sync"
-	"github.com/docker/compose/v2/internal/tracing"
-	"github.com/docker/compose/v2/pkg/api"
-	cutils "github.com/docker/compose/v2/pkg/utils"
-	"github.com/docker/compose/v2/pkg/watch"
+	pathutil "github.com/docker/compose/v5/internal/paths"
+	"github.com/docker/compose/v5/internal/sync"
+	"github.com/docker/compose/v5/internal/tracing"
+	"github.com/docker/compose/v5/pkg/api"
+	cutils "github.com/docker/compose/v5/pkg/utils"
+	"github.com/docker/compose/v5/pkg/watch"
 	"github.com/moby/buildkit/util/progress/progressui"
 
 	"github.com/compose-spec/compose-go/v2/types"

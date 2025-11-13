@@ -25,8 +25,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/docker/compose/v2/internal"
-	"github.com/docker/compose/v2/internal/memnet"
+	"github.com/docker/compose/v5/internal"
+	"github.com/docker/compose/v5/internal/memnet"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 

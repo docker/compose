@@ -26,8 +26,8 @@ import (
 
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
-	commands "github.com/docker/compose/v2/cmd/compose"
-	"github.com/docker/compose/v2/internal/tracing"
+	commands "github.com/docker/compose/v5/cmd/compose"
+	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"

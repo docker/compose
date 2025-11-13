@@ -23,15 +23,15 @@ import (
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/cmd/cmdtrace"
-	"github.com/docker/compose/v2/cmd/prompt"
+	"github.com/docker/compose/v5/cmd/cmdtrace"
+	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose/v2/cmd/compatibility"
-	commands "github.com/docker/compose/v2/cmd/compose"
-	"github.com/docker/compose/v2/internal"
-	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/docker/compose/v5/cmd/compatibility"
+	commands "github.com/docker/compose/v5/cmd/compose"
+	"github.com/docker/compose/v5/internal"
+	"github.com/docker/compose/v5/pkg/compose"
 )
 
 func pluginMain() {

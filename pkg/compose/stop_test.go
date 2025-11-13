@@ -29,8 +29,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
-	compose "github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
+	compose "github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 func TestStopTimeout(t *testing.T) {

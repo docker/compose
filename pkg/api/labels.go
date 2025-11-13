@@ -19,7 +19,7 @@ package api
 import (
 	"github.com/hashicorp/go-version"
 
-	"github.com/docker/compose/v2/internal"
+	"github.com/docker/compose/v5/internal"
 )
 
 const (

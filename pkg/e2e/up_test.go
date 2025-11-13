@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/compose/v2/pkg/utils"
+	"github.com/docker/compose/v5/pkg/utils"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"

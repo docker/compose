@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 
 	"github.com/buger/goterm"
 	"github.com/docker/go-units"

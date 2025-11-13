@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"time"
 
-	pathutil "github.com/docker/compose/v2/internal/paths"
+	pathutil "github.com/docker/compose/v5/internal/paths"
 	"github.com/fsnotify/fsevents"
 )
 

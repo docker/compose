@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 	containerType "github.com/docker/docker/api/types/container"
 
 	"github.com/compose-spec/compose-go/v2/types"

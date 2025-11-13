@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	pusherrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/distribution/reference"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"

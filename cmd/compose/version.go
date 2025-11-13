@@ -21,11 +21,11 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v5/cmd/formatter"
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose/v2/internal"
+	"github.com/docker/compose/v5/internal"
 )
 
 type versionOptions struct {

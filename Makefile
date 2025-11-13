@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-PKG := github.com/docker/compose/v2
+PKG := github.com/docker/compose/v5
 VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
 
 GO_LDFLAGS ?= -w -X ${PKG}/internal.Version=${VERSION}

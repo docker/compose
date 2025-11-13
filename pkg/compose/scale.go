@@ -19,8 +19,8 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/internal/tracing"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/internal/tracing"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Scale(ctx context.Context, project *types.Project, options api.ScaleOptions) error {

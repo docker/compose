@@ -23,7 +23,7 @@ import (
 	"github.com/docker/cli/cli/context/store"
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/compose/v2/internal/tracing"
+	"github.com/docker/compose/v5/internal/tracing"
 )
 
 var testStoreCfg = store.NewConfig(

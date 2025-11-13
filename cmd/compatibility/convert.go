@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/compose/v2/cmd/compose"
+	"github.com/docker/compose/v5/cmd/compose"
 )
 
 func getCompletionCommands() []string {

@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	types "github.com/compose-spec/compose-go/v2/types"
-	api "github.com/docker/compose/v2/pkg/api"
+	api "github.com/docker/compose/v5/pkg/api"
 	gomock "go.uber.org/mock/gomock"
 )
 

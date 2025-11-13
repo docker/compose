@@ -29,7 +29,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
-	compose "github.com/docker/compose/v2/pkg/api"
+	compose "github.com/docker/compose/v5/pkg/api"
 )
 
 func TestImages(t *testing.T) {
