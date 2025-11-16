@@ -210,11 +210,17 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
+
+	exposed, err := buildContainerPorts(service)
+	if err != nil {
+		return createConfigs{}, err
+	}
+
 	containerConfig := container.Config{
 		Hostname:        service.Hostname,
 		Domainname:      service.DomainName,
 		User:            service.User,
-		ExposedPorts:    buildContainerPorts(service),
+		ExposedPorts:    exposed,
 		Tty:             tty,
 		OpenStdin:       stdinOpen,
 		StdinOnce:       opts.AttachStdin && stdinOpen,
@@ -763,17 +769,24 @@ func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
 	}
 }
 
-func buildContainerPorts(s types.ServiceConfig) nat.PortSet {
+func buildContainerPorts(s types.ServiceConfig) (nat.PortSet, error) {
 	ports := nat.PortSet{}
 	for _, s := range s.Expose {
-		p := nat.Port(s)
-		ports[p] = struct{}{}
+		proto, port := nat.SplitProtoPort(s)
+		start, end, err := nat.ParsePortRange(port)
+		if err != nil {
+			return nil, err
+		}
+		for i := start; i <= end; i++ {
+			p := nat.Port(fmt.Sprintf("%d/%s", i, proto))
+			ports[p] = struct{}{}
+		}
 	}
 	for _, p := range s.Ports {
 		p := nat.Port(fmt.Sprintf("%d/%s", p.Target, p.Protocol))
 		ports[p] = struct{}{}
 	}
-	return ports
+	return ports, nil
 }
 
 func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
