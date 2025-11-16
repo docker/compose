@@ -26,7 +26,6 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
@@ -250,7 +249,29 @@ func (s *composeService) getProxyConfig() map[string]string {
 	if s.proxyConfig != nil {
 		return s.proxyConfig
 	}
-	return storeutil.GetProxyConfig(s.dockerCli)
+	cfg := s.dockerCli.ConfigFile()
+	host := s.dockerCli.Client().DaemonHost()
+
+	proxy, ok := cfg.Proxies[host]
+	if !ok {
+		proxy = cfg.Proxies["default"]
+	}
+
+	m := map[string]string{}
+
+	if v := proxy.HTTPProxy; v != "" {
+		m["HTTP_PROXY"] = v
+	}
+	if v := proxy.HTTPSProxy; v != "" {
+		m["HTTPS_PROXY"] = v
+	}
+	if v := proxy.NoProxy; v != "" {
+		m["NO_PROXY"] = v
+	}
+	if v := proxy.FTPProxy; v != "" {
+		m["FTP_PROXY"] = v
+	}
+	return m
 }
 
 func (s *composeService) stdout() *streams.Out {
