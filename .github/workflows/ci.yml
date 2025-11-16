@@ -149,15 +149,26 @@ jobs:
         if: always()
   e2e:
     runs-on: ubuntu-latest
+    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }})
     strategy:
       fail-fast: false
       matrix:
-        mode:
-          - plugin
-          - standalone
-        engine:
-          - 28 # old stable (latest major - 1)
-          - 29 # current stable
+        include:
+          # current stable
+          - mode: plugin
+            engine: 29
+            channel: stable
+          - mode: standalone
+            engine: 29
+            channel: stable
+
+          # old stable (latest major - 1)
+          - mode: plugin
+            engine: 28
+            channel: oldstable
+          - mode: standalone
+            engine: 28
+            channel: oldstable
     steps:
       - name: Prepare
         run: |
