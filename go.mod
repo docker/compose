@@ -10,11 +10,11 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.9.1
 	github.com/containerd/console v1.0.5
-	github.com/containerd/containerd/v2 v2.2.0
+	github.com/containerd/containerd/v2 v2.2.1-0.20251115011841-efd86f2b0bc2
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.2
 	github.com/distribution/reference v0.6.0
-	github.com/docker/buildx v0.30.0
+	github.com/docker/buildx v0.30.1
 	github.com/docker/cli v28.5.2+incompatible
 	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.5.2+incompatible
@@ -29,7 +29,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/moby/buildkit v0.26.0
+	github.com/moby/buildkit v0.26.1
 	github.com/moby/go-archive v0.1.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
