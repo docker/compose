@@ -73,7 +73,7 @@ func combinedConfigFiles(containers []container.Summary) (string, error) {
 			return "", fmt.Errorf("no label %q set on container %q of compose project", api.ConfigFilesLabel, c.ID)
 		}
 
-		for _, f := range strings.Split(files, ",") {
+		for f := range strings.SplitSeq(files, ",") {
 			if !slices.Contains(configFiles, f) {
 				configFiles = append(configFiles, f)
 			}

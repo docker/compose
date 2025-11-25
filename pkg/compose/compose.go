@@ -386,7 +386,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		dependencies := service.Labels[api.DependenciesLabel]
 		if dependencies != "" {
 			service.DependsOn = types.DependsOnConfig{}
-			for _, dc := range strings.Split(dependencies, ",") {
+			for dc := range strings.SplitSeq(dependencies, ",") {
 				dcArr := strings.Split(dc, ":")
 				condition := ServiceConditionRunningOrHealthy
 				// Let's restart the dependency by default if we don't have the info stored in the label

@@ -169,8 +169,8 @@ func TestScaleDownRemovesObsolete(t *testing.T) {
 
 func checkServiceContainer(t *testing.T, stdout, containerName, containerState string, count int) {
 	found := 0
-	lines := strings.Split(stdout, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(stdout, "\n")
+	for line := range lines {
 		if strings.Contains(line, containerName) && strings.Contains(line, containerState) {
 			found++
 		}

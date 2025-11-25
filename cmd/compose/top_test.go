@@ -321,7 +321,7 @@ func TestRunTopCore(t *testing.T) {
 
 func trim(s string) string {
 	var out bytes.Buffer
-	for _, line := range strings.Split(strings.TrimSpace(s), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(s), "\n") {
 		out.WriteString(strings.TrimSpace(line))
 		out.WriteRune('\n')
 	}
