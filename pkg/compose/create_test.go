@@ -434,6 +434,21 @@ volumes:
 				},
 			},
 		},
+		{
+			name: "mount bind with selinux",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: /data
+        target: /data
+        bind:
+          selinux: Z
+`,
+			binds:  []string{"/data:/data:rw,Z"},
+			mounts: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

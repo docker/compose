@@ -912,6 +912,8 @@ func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
 	switch {
 	case bind == nil:
 		return false
+	case bind.SELinux != "":
+		return false
 	case !bind.CreateHostPath:
 		return true
 	case bind.Propagation != "":
