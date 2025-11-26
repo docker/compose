@@ -388,13 +388,13 @@ func (s *composeService) checkEnvironmentVariables(project *types.Project, optio
 	if !options.WithEnvironment && len(errorList) > 0 {
 		errorMsgSuffix := "To avoid leaking sensitive data, you must either explicitly allow the sending of environment variables by using the --with-env flag,\n" +
 			"or remove sensitive data from your Compose configuration"
-		errorMsg := ""
+		var errorMsg strings.Builder
 		for _, errors := range errorList {
 			for _, err := range errors {
-				errorMsg += fmt.Sprintf("%s\n", err)
+				errorMsg.WriteString(fmt.Sprintf("%s\n", err))
 			}
 		}
-		return nil, fmt.Errorf("%s%s", errorMsg, errorMsgSuffix)
+		return nil, fmt.Errorf("%s%s", errorMsg.String(), errorMsgSuffix)
 
 	}
 	return envVarList, nil
@@ -422,11 +422,12 @@ func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, er
 		}
 	}
 	if len(errorList) > 0 {
-		errMsg := "your Compose stack cannot be published as it only contains a build section for service(s):\n"
+		var errMsg strings.Builder
+		errMsg.WriteString("your Compose stack cannot be published as it only contains a build section for service(s):\n")
 		for _, serviceInError := range errorList {
-			errMsg += fmt.Sprintf("- %q\n", serviceInError)
+			errMsg.WriteString(fmt.Sprintf("- %q\n", serviceInError))
 		}
-		return false, errors.New(errMsg)
+		return false, errors.New(errMsg.String())
 	}
 	return true, nil
 }
