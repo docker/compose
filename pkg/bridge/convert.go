@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/command"
 	cli "github.com/docker/cli/cli/command/container"
-	"github.com/docker/go-connections/nat"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/network"
@@ -175,7 +174,11 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 		exposed := utils.Set[string]{}
 		exposed.AddAll(service.Expose...)
 		for port := range inspect.Config.ExposedPorts {
-			exposed.Add(nat.Port(port).Port())
+			p, err := network.ParsePort(port)
+			if err != nil {
+				return nil, err
+			}
+			exposed.Add(strconv.Itoa(int(p.Num())))
 		}
 		for _, port := range service.Ports {
 			exposed.Add(strconv.Itoa(int(port.Target)))
