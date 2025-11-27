@@ -242,6 +242,7 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 		options.SkipExtends = true
 		options.SkipConsistencyCheck = true
 		options.ResolvePaths = true
+		options.SkipInclude = true
 		options.Profiles = project.Profiles
 	})
 	if err != nil {
