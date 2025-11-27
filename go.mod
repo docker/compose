@@ -20,7 +20,6 @@ require (
 	github.com/docker/cli v29.1.2+incompatible
 	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.5.2+incompatible
-	github.com/docker/go-connections v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
 	github.com/fsnotify/fsevents v0.2.0
@@ -77,6 +76,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/docker-credential-helpers v0.9.4 // indirect
+	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fvbommel/sortorder v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
