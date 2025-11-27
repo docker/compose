@@ -297,7 +297,6 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	return override.MarshalYAML()
 }
 
-//nolint:gocyclo
 func (s *composeService) preChecks(project *types.Project, options api.PublishOptions) (bool, error) {
 	if ok, err := s.checkOnlyBuildSection(project); !ok || err != nil {
 		return false, err
@@ -340,49 +339,19 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 			return false, err
 		}
 	}
-	envVariables, err := s.checkEnvironmentVariables(project, options)
+	err = s.checkEnvironmentVariables(project, options)
 	if err != nil {
 		return false, err
-	}
-	if len(envVariables) > 0 {
-		b := strings.Builder{}
-		b.WriteString("you are about to publish environment variables within your OCI artifact.\n" +
-			"please double check that you are not leaking sensitive data\n")
-		for key, val := range envVariables {
-			b.WriteString("Service/Config  ")
-			b.WriteString(key)
-			b.WriteRune('\n')
-			for k, v := range val {
-				b.WriteString(fmt.Sprintf("%s=%v\n", k, *v))
-			}
-		}
-		b.WriteString("Are you ok to publish these environment variables?")
-		confirm, err := s.prompt(b.String(), false)
-		if err != nil || !confirm {
-			return false, err
-		}
 	}
 	return true, nil
 }
 
-func (s *composeService) checkEnvironmentVariables(project *types.Project, options api.PublishOptions) (map[string]types.MappingWithEquals, error) {
-	envVarList := map[string]types.MappingWithEquals{}
+func (s *composeService) checkEnvironmentVariables(project *types.Project, options api.PublishOptions) error {
 	errorList := map[string][]string{}
 
 	for _, service := range project.Services {
 		if len(service.EnvFiles) > 0 {
 			errorList[service.Name] = append(errorList[service.Name], fmt.Sprintf("service %q has env_file declared.", service.Name))
-		}
-		if len(service.Environment) > 0 {
-			errorList[service.Name] = append(errorList[service.Name], fmt.Sprintf("service %q has environment variable(s) declared.", service.Name))
-			envVarList[service.Name] = service.Environment
-		}
-	}
-
-	for _, config := range project.Configs {
-		if config.Environment != "" {
-			errorList[config.Name] = append(errorList[config.Name], fmt.Sprintf("config %q is declare as an environment variable.", config.Name))
-			envVarList[config.Name] = types.NewMappingWithEquals([]string{fmt.Sprintf("%s=%s", config.Name, config.Environment)})
 		}
 	}
 
@@ -395,10 +364,10 @@ func (s *composeService) checkEnvironmentVariables(project *types.Project, optio
 				errorMsg.WriteString(fmt.Sprintf("%s\n", err))
 			}
 		}
-		return nil, fmt.Errorf("%s%s", errorMsg.String(), errorMsgSuffix)
+		return fmt.Errorf("%s%s", errorMsg.String(), errorMsgSuffix)
 
 	}
-	return envVarList, nil
+	return nil
 }
 
 func envFileLayers(files map[string]string) []v1.Descriptor {
