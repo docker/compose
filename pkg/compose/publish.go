@@ -17,13 +17,11 @@
 package compose
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -452,12 +450,7 @@ func (s *composeService) checkForSensitiveData(project *types.Project) ([]secret
 	scan := scanner.NewDefaultScanner()
 	// Check all compose files
 	for _, file := range project.ComposeFiles {
-		in, err := composeFileAsByteReader(file, project)
-		if err != nil {
-			return nil, err
-		}
-
-		findings, err := scan.ScanReader(in)
+		findings, err := scan.ScanFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan compose file %s: %w", file, err)
 		}
@@ -497,37 +490,4 @@ func (s *composeService) checkForSensitiveData(project *types.Project) ([]secret
 	}
 
 	return allFindings, nil
-}
-
-func composeFileAsByteReader(filePath string, project *types.Project) (io.Reader, error) {
-	composeFile, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
-	}
-	base, err := loader.LoadWithContext(context.TODO(), types.ConfigDetails{
-		WorkingDir:  project.WorkingDir,
-		Environment: project.Environment,
-		ConfigFiles: []types.ConfigFile{
-			{
-				Filename: filePath,
-				Content:  composeFile,
-			},
-		},
-	}, func(options *loader.Options) {
-		options.SkipValidation = true
-		options.SkipExtends = true
-		options.SkipConsistencyCheck = true
-		options.ResolvePaths = true
-		options.SkipInterpolation = true
-		options.SkipResolveEnvironment = true
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	in, err := base.MarshalYAML()
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewBuffer(in), nil
 }
