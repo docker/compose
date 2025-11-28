@@ -21,9 +21,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 var topTestCases = []struct {

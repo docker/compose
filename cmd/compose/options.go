@@ -30,6 +30,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/docker/compose/v5/internal/tracing"

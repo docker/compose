@@ -18,9 +18,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/compose/v5/pkg/utils"
 	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
+
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 const QuietPeriod = 500 * time.Millisecond

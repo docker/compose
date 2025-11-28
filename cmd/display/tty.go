@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/compose/v5/pkg/api"
-
 	"github.com/buger/goterm"
 	"github.com/docker/go-units"
 	"github.com/morikuni/aec"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // Full creates an EventProcessor that render advanced UI within a terminal.

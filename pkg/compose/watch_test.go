@@ -23,10 +23,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v5/internal/sync"
-	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/mocks"
-	"github.com/docker/compose/v5/pkg/watch"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -34,6 +30,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/internal/sync"
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
+	"github.com/docker/compose/v5/pkg/watch"
 )
 
 type testWatcher struct {

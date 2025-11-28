@@ -21,8 +21,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestJsonWriter_Event(t *testing.T) {
