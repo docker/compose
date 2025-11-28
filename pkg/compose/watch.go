@@ -29,23 +29,22 @@ import (
 	gsync "sync"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v2/utils"
+	ccli "github.com/docker/cli/cli/command/container"
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/moby/buildkit/util/progress/progressui"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
 	pathutil "github.com/docker/compose/v5/internal/paths"
 	"github.com/docker/compose/v5/internal/sync"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 	cutils "github.com/docker/compose/v5/pkg/utils"
 	"github.com/docker/compose/v5/pkg/watch"
-	"github.com/moby/buildkit/util/progress/progressui"
-
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/compose-spec/compose-go/v2/utils"
-	ccli "github.com/docker/cli/cli/command/container"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 )
 
 type WatchFunc func(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error)
@@ -442,20 +441,20 @@ func (t tarDockerClient) ContainersForService(ctx context.Context, projectName s
 }
 
 func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
-	execCfg := container.ExecOptions{
+	execCreateResp, err := t.s.apiClient().ExecCreate(ctx, containerID, client.ExecCreateOptions{
 		Cmd:          cmd,
 		AttachStdout: false,
 		AttachStderr: true,
 		AttachStdin:  in != nil,
-		Tty:          false,
-	}
-	execCreateResp, err := t.s.apiClient().ContainerExecCreate(ctx, containerID, execCfg)
+		TTY:          false,
+	})
 	if err != nil {
 		return err
 	}
 
-	startCheck := container.ExecStartOptions{Tty: false, Detach: false}
-	conn, err := t.s.apiClient().ContainerExecAttach(ctx, execCreateResp.ID, startCheck)
+	conn, err := t.s.apiClient().ExecAttach(ctx, execCreateResp.ID, client.ExecAttachOptions{
+		TTY: false,
+	})
 	if err != nil {
 		return err
 	}
@@ -476,7 +475,10 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	})
 
-	err = t.s.apiClient().ContainerExecStart(ctx, execCreateResp.ID, startCheck)
+	_, err = t.s.apiClient().ExecStart(ctx, execCreateResp.ID, client.ExecStartOptions{
+		TTY:    false,
+		Detach: false,
+	})
 	if err != nil {
 		return err
 	}
@@ -488,7 +490,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	execResult, err := t.s.apiClient().ContainerExecInspect(ctx, execCreateResp.ID)
+	execResult, err := t.s.apiClient().ExecInspect(ctx, execCreateResp.ID, client.ExecInspectOptions{})
 	if err != nil {
 		return err
 	}
@@ -502,9 +504,12 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 }
 
 func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCloser) error {
-	return t.s.apiClient().CopyToContainer(ctx, id, "/", archive, container.CopyToContainerOptions{
-		CopyUIDGID: true,
+	_, err := t.s.apiClient().CopyToContainer(ctx, id, client.CopyToContainerOptions{
+		DestinationPath: "/",
+		Content:         archive,
+		CopyUIDGID:      true,
 	})
+	return err
 }
 
 //nolint:gocyclo
@@ -688,20 +693,17 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 }
 
 func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
-	images, err := s.apiClient().ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("dangling", "true"),
-			filters.Arg("label", api.ProjectLabel+"="+projectName),
-		),
+	images, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
+		Filters: projectFilter(projectName).Add("dangling", "true"),
 	})
 	if err != nil {
 		logrus.Debugf("Failed to list images: %v", err)
 		return
 	}
 
-	for _, img := range images {
+	for _, img := range images.Items {
 		if _, ok := imageNameToIdMap[img.ID]; !ok {
-			_, err := s.apiClient().ImageRemove(ctx, img.ID, image.RemoveOptions{})
+			_, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{})
 			if err != nil {
 				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
 			}
@@ -815,20 +817,18 @@ func shouldIgnore(name string, ignore watch.PathMatcher) bool {
 
 // gets the image creation time for a service
 func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Project, serviceName string) (time.Time, error) {
-	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		All: true,
-		Filters: filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", api.ProjectLabel, project.Name)),
-			filters.Arg("label", fmt.Sprintf("%s=%s", api.ServiceLabel, serviceName))),
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: projectFilter(project.Name).Add("label", serviceFilter(serviceName)),
 	})
 	if err != nil {
 		return time.Now(), err
 	}
-	if len(containers) == 0 {
+	if len(res.Items) == 0 {
 		return time.Now(), fmt.Errorf("could not get created time for service's image")
 	}
 
-	img, err := s.apiClient().ImageInspect(ctx, containers[0].ImageID)
+	img, err := s.apiClient().ImageInspect(ctx, res.Items[0].ImageID)
 	if err != nil {
 		return time.Now(), err
 	}

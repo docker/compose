@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/moby/moby/api/types/container"
+
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/docker/api/types/container"
 )
 
 func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
@@ -33,7 +34,7 @@ func (s *composeService) Port(ctx context.Context, projectName string, service s
 	}
 	for _, p := range ctr.Ports {
 		if p.PrivatePort == port && p.Type == options.Protocol {
-			return p.IP, int(p.PublicPort), nil
+			return p.IP.String(), int(p.PublicPort), nil
 		}
 	}
 	return "", 0, portNotFoundError(options.Protocol, port, ctr)

@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/moby/moby/client"
+
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/docker/api/types/container"
 )
 
 func (s *composeService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
@@ -57,12 +58,12 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return nil
 	}
 
-	response, err := s.apiClient().ContainerCommit(ctx, ctr.ID, container.CommitOptions{
+	response, err := s.apiClient().ContainerCommit(ctx, ctr.ID, client.ContainerCommitOptions{
 		Reference: options.Reference,
 		Comment:   options.Comment,
 		Author:    options.Author,
 		Changes:   options.Changes.GetSlice(),
-		Pause:     options.Pause,
+		NoPause:   !options.Pause,
 	})
 	if err != nil {
 		return err

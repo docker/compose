@@ -27,8 +27,10 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/stringid"
+
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/docker/pkg/stringid"
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
@@ -135,17 +137,17 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return "", err
 	}
 
-	ctr, err := s.apiClient().ContainerInspect(ctx, created.ID)
+	inspect, err := s.apiClient().ContainerInspect(ctx, created.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	err = s.injectSecrets(ctx, project, service, ctr.ID)
+	err = s.injectSecrets(ctx, project, service, inspect.Container.ID)
 	if err != nil {
 		return created.ID, err
 	}
 
-	err = s.injectConfigs(ctx, project, service, ctr.ID)
+	err = s.injectConfigs(ctx, project, service, inspect.Container.ID)
 	return created.ID, err
 }
 

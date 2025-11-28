@@ -29,9 +29,10 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
-	"github.com/docker/compose/v5/internal/registry"
 	"github.com/moby/buildkit/util/contentutil"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/docker/compose/v5/internal/registry"
 )
 
 // NewResolver setup an OCI Resolver based on docker/cli config to provide registry credentials
