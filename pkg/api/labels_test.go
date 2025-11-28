@@ -19,9 +19,10 @@ package api
 import (
 	"testing"
 
-	"github.com/docker/compose/v5/internal"
 	"github.com/hashicorp/go-version"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/internal"
 )
 
 func TestComposeVersionInitialization(t *testing.T) {

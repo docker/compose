@@ -26,14 +26,15 @@ import (
 
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
-	commands "github.com/docker/compose/v5/cmd/compose"
-	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	commands "github.com/docker/compose/v5/cmd/compose"
+	"github.com/docker/compose/v5/internal/tracing"
 )
 
 // Setup should be called as part of the command's PersistentPreRunE

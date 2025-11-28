@@ -25,9 +25,10 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v5/internal/paths"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
+
+	"github.com/docker/compose/v5/internal/paths"
 )
 
 type dockerPathMatcher struct {

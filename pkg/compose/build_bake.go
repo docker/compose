@@ -39,7 +39,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/google/uuid"
 	"github.com/moby/buildkit/client"
@@ -48,6 +47,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func buildWithBake(dockerCli command.Cli) (bool, error) {

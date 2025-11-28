@@ -25,20 +25,19 @@ import (
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
-	"github.com/docker/compose/v5/cmd/display"
-	"github.com/docker/compose/v5/pkg/compose"
-	xprogress "github.com/moby/buildkit/util/progress/progressui"
-	"github.com/sirupsen/logrus"
-
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/opts"
 	"github.com/mattn/go-shellwords"
+	xprogress "github.com/moby/buildkit/util/progress/progressui"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/cli/cli"
+	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/compose"
 	"github.com/docker/compose/v5/pkg/utils"
 )
 

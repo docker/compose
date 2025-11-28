@@ -24,10 +24,11 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v5/pkg/utils"
 	testify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 func createTestProject() *types.Project {

@@ -29,7 +29,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/image/build"
-	"github.com/docker/compose/v5/pkg/api"
 	buildtypes "github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/registry"
@@ -40,6 +39,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, serviceToBuild types.Services, options api.BuildOptions) (map[string]string, error) {

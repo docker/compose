@@ -24,9 +24,10 @@ import (
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // Containers is a set of moby Container

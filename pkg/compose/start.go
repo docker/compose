@@ -22,11 +22,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/compose/v5/pkg/api"
-	containerType "github.com/docker/docker/api/types/container"
-
 	"github.com/compose-spec/compose-go/v2/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
