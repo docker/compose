@@ -28,10 +28,11 @@ import (
 
 	"github.com/buger/goterm"
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v5/internal/tracing"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/eiannone/keyboard"
 	"github.com/skratchdot/open-golang/open"
+
+	"github.com/docker/compose/v5/internal/tracing"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 const DISPLAY_ERROR_TIME = 10

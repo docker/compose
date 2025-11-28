@@ -22,6 +22,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/docker/cli/cli/streams"
+
 	"github.com/docker/compose/v5/pkg/utils"
 )
 

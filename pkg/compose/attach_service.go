@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/command/container"
+
 	"github.com/docker/compose/v5/pkg/api"
 )
 

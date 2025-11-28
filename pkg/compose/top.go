@@ -20,8 +20,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {

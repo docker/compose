@@ -29,14 +29,6 @@ import (
 	gsync "sync"
 	"time"
 
-	pathutil "github.com/docker/compose/v5/internal/paths"
-	"github.com/docker/compose/v5/internal/sync"
-	"github.com/docker/compose/v5/internal/tracing"
-	"github.com/docker/compose/v5/pkg/api"
-	cutils "github.com/docker/compose/v5/pkg/utils"
-	"github.com/docker/compose/v5/pkg/watch"
-	"github.com/moby/buildkit/util/progress/progressui"
-
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
 	ccli "github.com/docker/cli/cli/command/container"
@@ -44,8 +36,16 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+
+	pathutil "github.com/docker/compose/v5/internal/paths"
+	"github.com/docker/compose/v5/internal/sync"
+	"github.com/docker/compose/v5/internal/tracing"
+	"github.com/docker/compose/v5/pkg/api"
+	cutils "github.com/docker/compose/v5/pkg/utils"
+	"github.com/docker/compose/v5/pkg/watch"
 )
 
 type WatchFunc func(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error)

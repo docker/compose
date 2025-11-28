@@ -29,10 +29,11 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) ensureModels(ctx context.Context, project *types.Project, quietPull bool) error {

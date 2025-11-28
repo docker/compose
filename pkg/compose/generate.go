@@ -24,11 +24,12 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {

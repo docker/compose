@@ -23,8 +23,9 @@ import (
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/container"
-	"github.com/docker/compose/v5/pkg/api"
 	containerType "github.com/docker/docker/api/types/container"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {

@@ -24,18 +24,16 @@ import (
 	"testing"
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
+	composetypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	mountTypes "github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"go.uber.org/mock/gomock"
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/docker/api/types/network"
-
-	composetypes "github.com/compose-spec/compose-go/v2/types"
-	mountTypes "github.com/docker/docker/api/types/mount"
-
-	"gotest.tools/v3/assert"
 )
 
 func TestBuildBindMount(t *testing.T) {

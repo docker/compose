@@ -21,9 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"gotest.tools/v3/icmd"
-
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 )
 
 func TestWaitOnFaster(t *testing.T) {

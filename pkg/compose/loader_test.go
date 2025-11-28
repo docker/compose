@@ -23,9 +23,10 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestLoadProject_Basic(t *testing.T) {

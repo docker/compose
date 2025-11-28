@@ -27,8 +27,9 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/pkg/stringid"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {

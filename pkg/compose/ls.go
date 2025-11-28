@@ -23,10 +23,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/sirupsen/logrus"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {

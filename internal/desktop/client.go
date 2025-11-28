@@ -25,9 +25,10 @@ import (
 	"net/http"
 	"strings"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/docker/compose/v5/internal"
 	"github.com/docker/compose/v5/internal/memnet"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // identify this client in the logs
