@@ -152,6 +152,9 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 }
 
 func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error {
+	if len(config.RuntimeFlags) != 0 {
+		return fmt.Errorf("runtime flags are not supported for model configuration")
+	}
 	events.On(api.Resource{
 		ID:     config.Name,
 		Status: api.Working,
