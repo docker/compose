@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -153,23 +154,20 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 
 func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error {
 	if len(config.RuntimeFlags) != 0 {
-		return fmt.Errorf("runtime flags are not supported for model configuration")
+		logrus.Warnf("Runtime flags are not supported and will be ignored for model %s", config.Model)
+		config.RuntimeFlags = nil
 	}
 	events.On(api.Resource{
 		ID:     config.Name,
 		Status: api.Working,
 		Text:   "Configuring",
 	})
-	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]
+	// configure [--context-size=<n>] MODEL
 	args := []string{"configure"}
 	if config.ContextSize > 0 {
 		args = append(args, "--context-size", strconv.Itoa(config.ContextSize))
 	}
 	args = append(args, config.Model)
-	if len(config.RuntimeFlags) != 0 {
-		args = append(args, "--")
-		args = append(args, config.RuntimeFlags...)
-	}
 	cmd := exec.CommandContext(ctx, m.path, args...)
 	err := m.prepare(ctx, cmd)
 	if err != nil {
