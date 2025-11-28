@@ -19,8 +19,9 @@ package compose
 import (
 	"fmt"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/filters"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func projectFilter(projectName string) filters.KeyValuePair {

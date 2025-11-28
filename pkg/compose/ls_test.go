@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/container"
-
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestContainersToStacks(t *testing.T) {

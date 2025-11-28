@@ -20,10 +20,11 @@ import (
 	"context"
 	"slices"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {

@@ -39,6 +39,11 @@ import (
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/pkg/kvfile"
+	"github.com/morikuni/aec"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/internal/tracing"
@@ -46,10 +51,6 @@ import (
 	"github.com/docker/compose/v5/pkg/compose"
 	"github.com/docker/compose/v5/pkg/remote"
 	"github.com/docker/compose/v5/pkg/utils"
-	"github.com/morikuni/aec"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (

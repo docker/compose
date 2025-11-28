@@ -20,12 +20,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestVolumes(t *testing.T) {

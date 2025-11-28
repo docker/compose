@@ -25,12 +25,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/api/types/container"
 	"github.com/moby/go-archive"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 type copyDirection int

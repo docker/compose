@@ -26,9 +26,8 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
-	"gotest.tools/v3/poll"
-
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 )
 
 func TestLocalComposeLogs(t *testing.T) {

@@ -24,8 +24,9 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v5/pkg/api"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // ServiceStatus indicates the status of a service

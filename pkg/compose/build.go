@@ -24,11 +24,12 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
+
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {

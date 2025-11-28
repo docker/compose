@@ -20,9 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	commands "github.com/docker/compose/v5/cmd/compose"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+
+	commands "github.com/docker/compose/v5/cmd/compose"
 )
 
 func TestGetFlags(t *testing.T) {

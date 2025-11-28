@@ -21,10 +21,11 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
