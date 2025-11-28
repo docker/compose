@@ -26,8 +26,9 @@ import (
 	"time"
 
 	"github.com/buger/goterm"
-	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/docker/pkg/jsonmessage"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // LogConsumer consume logs from services and format them

@@ -23,19 +23,19 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/compose/v5/internal"
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/buildkit/util/tracing/detect"
 	_ "github.com/moby/buildkit/util/tracing/env" //nolint:blank-imports
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+
+	"github.com/docker/compose/v5/internal"
 )
 
 func init() {

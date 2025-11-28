@@ -24,11 +24,11 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v5/pkg/compose"
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/compose"
 )
 
 type pullOptions struct {

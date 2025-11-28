@@ -25,10 +25,10 @@ import (
 	"text/tabwriter"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose/v5/pkg/compose"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/compose"
 )
 
 type topOptions struct {

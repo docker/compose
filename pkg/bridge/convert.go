@@ -30,14 +30,15 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/command"
 	cli "github.com/docker/cli/cli/command/container"
-	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"gopkg.in/yaml.v3"
+
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type ConvertOptions struct {

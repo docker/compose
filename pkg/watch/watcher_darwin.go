@@ -24,8 +24,9 @@ import (
 	"path/filepath"
 	"time"
 
-	pathutil "github.com/docker/compose/v5/internal/paths"
 	"github.com/fsnotify/fsevents"
+
+	pathutil "github.com/docker/compose/v5/internal/paths"
 )
 
 // A file watcher optimized for Darwin.

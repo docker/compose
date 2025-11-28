@@ -27,9 +27,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/compose/v5/pkg/utils"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
+
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 func TestComposeCancel(t *testing.T) {

@@ -30,9 +30,10 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
+	spec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/docker/compose/v5/internal/oci"
 	"github.com/docker/compose/v5/pkg/api"
-	spec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
