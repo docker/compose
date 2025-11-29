@@ -24,7 +24,7 @@ Once you have a Compose file, you can create and start your application with a
 single command: `docker compose up`.
 
 > **Note**: About Docker Swarm
-> Docker Swarm used to rely on the legacy compose file format but did not adopted the compose specification
+> Docker Swarm used to rely on the legacy compose file format but did not adopt the compose specification
 > so is missing some of the recent enhancements in the compose syntax. After 
 > [acquisition by Mirantis](https://www.mirantis.com/software/swarm/) swarm isn't maintained by Docker Inc, and
 > as such some Docker Compose features aren't accessible to swarm users.
