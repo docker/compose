@@ -4,6 +4,28 @@ long: Starts existing containers for a service
 usage: docker compose start [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
+options:
+    - option: wait
+      value_type: bool
+      default_value: "false"
+      description: Wait for services to be running|healthy. Implies detached mode.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: wait-timeout
+      value_type: int
+      default_value: "0"
+      description: |
+        Maximum duration in seconds to wait for the project to be running|healthy
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 inherited_options:
     - option: dry-run
       value_type: bool

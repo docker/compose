@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"time"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v5/pkg/api"
@@ -27,6 +28,8 @@ import (
 
 type startOptions struct {
 	*ProjectOptions
+	wait        bool
+	waitTimeout int
 }
 
 func startCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -41,6 +44,10 @@ func startCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
+	flags := startCmd.Flags()
+	flags.BoolVar(&opts.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
+	flags.IntVar(&opts.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
+
 	return startCmd
 }
 
@@ -54,9 +61,13 @@ func runStart(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	if err != nil {
 		return err
 	}
+
+	timeout := time.Duration(opts.waitTimeout) * time.Second
 	return backend.Start(ctx, name, api.StartOptions{
-		AttachTo: services,
-		Project:  project,
-		Services: services,
+		AttachTo:    services,
+		Project:     project,
+		Services:    services,
+		Wait:        opts.wait,
+		WaitTimeout: timeout,
 	})
 }
