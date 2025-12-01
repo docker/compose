@@ -19,7 +19,7 @@ package transform
 import (
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ReplaceExtendsFile changes value for service.extends.file in input yaml stream, preserving formatting
