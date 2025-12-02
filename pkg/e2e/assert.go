@@ -29,7 +29,7 @@ import (
 func RequireServiceState(t testing.TB, cli *CLI, service string, state string) {
 	t.Helper()
 	psRes := cli.RunDockerComposeCmd(t, "ps", "--all", "--format=json", service)
-	var svc map[string]interface{}
+	var svc map[string]any
 	require.NoError(t, json.Unmarshal([]byte(psRes.Stdout()), &svc),
 		"Invalid `compose ps` JSON: command output: %s",
 		psRes.Combined())

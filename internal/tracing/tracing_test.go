@@ -27,8 +27,8 @@ import (
 )
 
 var testStoreCfg = store.NewConfig(
-	func() interface{} {
-		return &map[string]interface{}{}
+	func() any {
+		return &map[string]any{}
 	},
 )
 
@@ -44,13 +44,13 @@ func TestExtractOtelFromContext(t *testing.T) {
 		Name: "test",
 		Metadata: command.DockerContext{
 			Description: t.Name(),
-			AdditionalFields: map[string]interface{}{
-				"otel": map[string]interface{}{
+			AdditionalFields: map[string]any{
+				"otel": map[string]any{
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:1234",
 				},
 			},
 		},
-		Endpoints: make(map[string]interface{}),
+		Endpoints: make(map[string]any),
 	})
 	require.NoError(t, err)
 

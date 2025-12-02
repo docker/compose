@@ -84,18 +84,18 @@ func ConfigFromDockerContext(st store.Store, name string) (OTLPConfig, error) {
 		return OTLPConfig{}, err
 	}
 
-	var otelCfg interface{}
+	var otelCfg any
 	switch m := meta.Metadata.(type) {
 	case command.DockerContext:
 		otelCfg = m.AdditionalFields[otelConfigFieldName]
-	case map[string]interface{}:
+	case map[string]any:
 		otelCfg = m[otelConfigFieldName]
 	}
 	if otelCfg == nil {
 		return OTLPConfig{}, nil
 	}
 
-	otelMap, ok := otelCfg.(map[string]interface{})
+	otelMap, ok := otelCfg.(map[string]any)
 	if !ok {
 		return OTLPConfig{}, fmt.Errorf(
 			"unexpected type for field %q: %T (expected: %T)",
@@ -115,7 +115,7 @@ func ConfigFromDockerContext(st store.Store, name string) (OTLPConfig, error) {
 // valueOrDefault returns the type-cast value at the specified key in the map
 // if present and the correct type; otherwise, it returns the default value for
 // T.
-func valueOrDefault[T any](m map[string]interface{}, key string) T {
+func valueOrDefault[T any](m map[string]any, key string) T {
 	if v, ok := m[key].(T); ok {
 		return v
 	}
