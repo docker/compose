@@ -41,7 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create docker CLI: %v", err)
 	}
-	err = dockerCLI.Initialize(flags.ClientOptions{})
+	err = dockerCLI.Initialize(&flags.ClientOptions{})
 	if err != nil {
 		log.Fatalf("Failed to initialize docker CLI: %v", err)
 	}
