@@ -289,13 +289,9 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		_ = os.Remove(metadataFile)
 	}()
 
-	buildx, err := manager.GetPlugin("buildx", s.dockerCli, &cobra.Command{})
+	buildx, err := s.getBuildxPlugin()
 	if err != nil {
 		return nil, err
-	}
-
-	if versions.LessThan(buildx.Version[1:], "0.17.0") {
-		return nil, fmt.Errorf("compose build requires buildx 0.17 or later")
 	}
 
 	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadataFile}
@@ -412,6 +408,27 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		s.events.On(builtEvent(image))
 	}
 	return results, nil
+}
+
+func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
+	buildx, err := manager.GetPlugin("buildx", s.dockerCli, &cobra.Command{})
+	if err != nil {
+		return nil, err
+	}
+
+	if buildx.Err != nil {
+		return nil, buildx.Err
+	}
+
+	if buildx.Version == "" {
+		return nil, fmt.Errorf("failed to get version of buildx")
+	}
+
+	if versions.LessThan(buildx.Version[1:], "0.17.0") {
+		return nil, fmt.Errorf("compose build requires buildx 0.17 or later")
+	}
+
+	return buildx, nil
 }
 
 // makeConsole wraps the provided writer to match [containerd.File] interface if it is of type *streams.Out.
