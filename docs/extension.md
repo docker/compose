@@ -1,7 +1,7 @@
 # About
 
 The Compose application model defines `service` as an abstraction for a computing unit managing (a subset of)
-application needs, which can interact with other service by relying on network(s). Docker Compose is designed 
+application needs, which can interact with other services by relying on network(s). Docker Compose is designed 
 to use the Docker Engine ("Moby") API to manage services as containers, but the abstraction _could_ also cover 
 many other runtimes, typically cloud services or services natively provided by host.
 
@@ -55,8 +55,8 @@ JSON messages MUST include a `type` and a `message` attribute.
 
 `type` can be either:
 - `info`: Reports status updates to the user. Compose will render message as the service state in the progress UI
-- `error`: Let's the user know something went wrong with details about the error. Compose will render the message as the reason for the service failure.
-- `setenv`: Let's the plugin tell Compose how dependent services can access the created resource. See next section for further details.
+- `error`: Lets the user know something went wrong with details about the error. Compose will render the message as the reason for the service failure.
+- `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. See next section for further details.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
 
 ```mermaid
