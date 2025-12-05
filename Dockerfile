@@ -16,7 +16,7 @@
 #   limitations under the License.
 
 ARG GO_VERSION=1.24.11
-ARG XX_VERSION=1.6.1
+ARG XX_VERSION=1.9.0
 ARG GOLANGCI_LINT_VERSION=v2.6.2
 ARG ADDLICENSE_VERSION=v1.0.0
 
@@ -28,12 +28,12 @@ ARG LICENSE_FILES=".*\(Dockerfile\|Makefile\|\.go\|\.hcl\|\.sh\)"
 FROM --platform=${BUILDPLATFORM} tonistiigi/xx:${XX_VERSION} AS xx
 
 # osxcross contains the MacOSX cross toolchain for xx
-FROM crazymax/osxcross:11.3-alpine AS osxcross
+FROM crazymax/osxcross:15.5-alpine AS osxcross
 
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
 FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
 
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS base
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine3.22 AS base
 COPY --from=xx / /
 RUN apk add --no-cache \
       clang \
