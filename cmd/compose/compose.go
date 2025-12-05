@@ -59,7 +59,7 @@ const (
 	// ComposeProjectName define the project name to be used, instead of guessing from parent directory
 	ComposeProjectName = "COMPOSE_PROJECT_NAME"
 	// ComposeCompatibility try to mimic compose v1 as much as possible
-	ComposeCompatibility = "COMPOSE_COMPATIBILITY"
+	ComposeCompatibility = api.ComposeCompatibility
 	// ComposeRemoveOrphans remove "orphaned" containers, i.e. containers tagged for current project but not declared as service
 	ComposeRemoveOrphans = "COMPOSE_REMOVE_ORPHANS"
 	// ComposeIgnoreOrphans ignore "orphaned" containers
