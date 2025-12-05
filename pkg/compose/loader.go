@@ -28,6 +28,7 @@ import (
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/remote"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 // LoadProject implements api.Compose.LoadProject
@@ -48,7 +49,7 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 		}
 	}
 
-	if options.Compatibility {
+	if options.Compatibility || utils.StringToBool(projectOptions.Environment[api.ComposeCompatibility]) {
 		api.Separator = "_"
 	}
 
