@@ -20,9 +20,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -39,9 +39,9 @@ func TestVolumes(t *testing.T) {
 	}
 
 	// Create test volumes
-	vol1 := &volume.Volume{Name: testProject + "_vol1"}
-	vol2 := &volume.Volume{Name: testProject + "_vol2"}
-	vol3 := &volume.Volume{Name: testProject + "_vol3"}
+	vol1 := volume.Volume{Name: testProject + "_vol1"}
+	vol2 := volume.Volume{Name: testProject + "_vol2"}
+	vol3 := volume.Volume{Name: testProject + "_vol3"}
 
 	// Create test containers with volume mounts
 	c1 := container.Summary{
@@ -59,29 +59,27 @@ func TestVolumes(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	args := filters.NewArgs(projectFilter(testProject))
-	listOpts := container.ListOptions{Filters: args}
-	volumeListArgs := filters.NewArgs(projectFilter(testProject))
-	volumeListOpts := volume.ListOptions{Filters: volumeListArgs}
-	volumeReturn := volume.ListResponse{
-		Volumes: []*volume.Volume{vol1, vol2, vol3},
+	listOpts := client.ContainerListOptions{Filters: projectFilter(testProject)}
+	volumeListOpts := client.VolumeListOptions{Filters: projectFilter(testProject)}
+	volumeReturn := client.VolumeListResult{
+		Items: []volume.Volume{vol1, vol2, vol3},
 	}
-	containerReturn := []container.Summary{c1, c2}
+	containerReturn := client.ContainerListResult{
+		Items: []container.Summary{c1, c2},
+	}
 
 	// Mock API calls
 	mockApi.EXPECT().ContainerList(ctx, listOpts).Times(2).Return(containerReturn, nil)
 	mockApi.EXPECT().VolumeList(ctx, volumeListOpts).Times(2).Return(volumeReturn, nil)
 
 	// Test without service filter - should return all project volumes
-	volumeOptions := api.VolumesOptions{}
-	volumes, err := tested.Volumes(ctx, testProject, volumeOptions)
+	volumes, err := tested.Volumes(ctx, testProject, api.VolumesOptions{})
 	expected := []api.VolumesSummary{vol1, vol2, vol3}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, volumes, expected)
 
 	// Test with service filter - should only return volumes used by service1
-	volumeOptions = api.VolumesOptions{Services: []string{"service1"}}
-	volumes, err = tested.Volumes(ctx, testProject, volumeOptions)
+	volumes, err = tested.Volumes(ctx, testProject, api.VolumesOptions{Services: []string{"service1"}})
 	expected = []api.VolumesSummary{vol1, vol2}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, volumes, expected)
