@@ -142,7 +142,7 @@ func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (t
 	return environment, nil
 }
 
-func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command { //nolint:gocyclo
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	options := runOptions{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -193,11 +193,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 
 			if options.quiet {
 				display.Mode = display.ModeQuiet
-				devnull, err := os.Open(os.DevNull)
-				if err != nil {
-					return err
-				}
-				os.Stdout = devnull
+				backendOptions.Add(compose.WithEventProcessor(display.Quiet()))
 			}
 			createOpts.pullChanged = cmd.Flags().Changed("pull")
 			return nil
