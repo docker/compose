@@ -201,7 +201,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version-file: '.go-version'
           check-latest: true
           cache: true
 
@@ -266,7 +266,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version-file: '.go-version'
           check-latest: true
       - name: Download unit test coverage
         uses: actions/download-artifact@v4
