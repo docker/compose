@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: '.go-version'
           cache: true
           check-latest: true
 
