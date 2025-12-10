@@ -44,19 +44,18 @@ func Full(out io.Writer, info io.Writer) api.EventProcessor {
 }
 
 type ttyWriter struct {
-	out             io.Writer
-	ids             []string // tasks ids ordered as first event appeared
-	tasks           map[string]task
-	repeated        bool
-	numLines        int
-	done            chan bool
-	mtx             *sync.Mutex
-	dryRun          bool // FIXME(ndeloof) (re)implement support for dry-run
-	skipChildEvents bool
-	operation       string
-	ticker          *time.Ticker
-	suspended       bool
-	info            io.Writer
+	out       io.Writer
+	ids       []string // tasks ids ordered as first event appeared
+	tasks     map[string]task
+	repeated  bool
+	numLines  int
+	done      chan bool
+	mtx       *sync.Mutex
+	dryRun    bool // FIXME(ndeloof) (re)implement support for dry-run
+	operation string
+	ticker    *time.Ticker
+	suspended bool
+	info      io.Writer
 }
 
 type task struct {
@@ -234,19 +233,12 @@ func (w *ttyWriter) print() {
 	var statusPadding int
 	for _, t := range w.tasks {
 		l := len(t.ID)
-		if statusPadding < l {
+		if t.parentID == "" && statusPadding < l {
 			statusPadding = l
 		}
-		if t.parentID != "" {
-			statusPadding -= 2
-		}
 	}
 
-	if len(w.tasks) > goterm.Height()-2 {
-		w.skipChildEvents = true
-	}
 	numLines := 0
-
 	for _, id := range w.ids { // iterate on ids to enforce a consistent order
 		t := w.tasks[id]
 		if t.parentID != "" {
@@ -255,16 +247,6 @@ func (w *ttyWriter) print() {
 		line := w.lineText(t, "", terminalWidth, statusPadding, w.dryRun)
 		_, _ = fmt.Fprint(w.out, line)
 		numLines++
-		for _, t := range w.tasks {
-			if t.parentID == t.ID {
-				if w.skipChildEvents {
-					continue
-				}
-				line := w.lineText(t, "  ", terminalWidth, statusPadding, w.dryRun)
-				_, _ = fmt.Fprint(w.out, line)
-				numLines++
-			}
-		}
 	}
 	for i := numLines; i < w.numLines; i++ {
 		if numLines < goterm.Height()-2 {
