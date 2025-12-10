@@ -93,11 +93,6 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 				w.ticker.Stop()
 				return
 			case <-w.done:
-				w.print()
-				w.mtx.Lock()
-				w.ticker.Stop()
-				w.operation = ""
-				w.mtx.Unlock()
 				return
 			case <-w.ticker.C:
 				w.print()
@@ -107,6 +102,11 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 }
 
 func (w *ttyWriter) Done(operation string, success bool) {
+	w.print()
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+	w.ticker.Stop()
+	w.operation = ""
 	w.done <- true
 }
 
@@ -213,18 +213,17 @@ func (w *ttyWriter) print() {
 		return
 	}
 	terminalWidth := goterm.Width()
-	b := aec.EmptyBuilder
-	for i := 0; i <= w.numLines; i++ {
-		b = b.Up(1)
-	}
+	up := w.numLines + 1
 	if !w.repeated {
-		b = b.Down(1)
+		up--
+		w.repeated = true
 	}
-	w.repeated = true
-	_, _ = fmt.Fprint(w.out, b.Column(0).ANSI)
-
-	// Hide the cursor while we are printing
-	_, _ = fmt.Fprint(w.out, aec.Hide)
+	b := aec.NewBuilder(
+		aec.Hide, // Hide the cursor while we are printing
+		aec.Up(uint(up)),
+		aec.Column(0),
+	)
+	_, _ = fmt.Fprint(w.out, b.ANSI)
 	defer func() {
 		_, _ = fmt.Fprint(w.out, aec.Show)
 	}()
