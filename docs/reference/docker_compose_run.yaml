@@ -169,6 +169,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: no-build
+      value_type: bool
+      default_value: "false"
+      description: Don't build an image, even if it's policy
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-deps
       value_type: bool
       default_value: "false"
