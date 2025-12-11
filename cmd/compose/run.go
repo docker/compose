@@ -190,6 +190,9 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				// we don't have an actual terminal to attach to for interactive mode
 				options.noTty = true
 			}
+			if createOpts.Build && createOpts.noBuild {
+				return fmt.Errorf("--build and --no-build are incompatible")
+			}
 
 			if options.quiet {
 				display.Mode = display.ModeQuiet
@@ -246,6 +249,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 	flags.BoolVar(&buildOpts.quiet, "quiet-build", false, "Suppress progress output from the build process")
 	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container")
+	flags.BoolVar(&createOpts.noBuild, "no-build", false, "Don't build an image, even if it's policy")
 	flags.BoolVar(&options.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 
 	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
