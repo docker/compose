@@ -26,11 +26,11 @@ import (
 	"time"
 
 	"github.com/buger/goterm"
-	"github.com/docker/compose/v5/pkg/utils"
 	"github.com/docker/go-units"
 	"github.com/morikuni/aec"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 // Full creates an EventProcessor that render advanced UI within a terminal.
@@ -39,7 +39,7 @@ func Full(out io.Writer, info io.Writer) api.EventProcessor {
 	return &ttyWriter{
 		out:   out,
 		info:  info,
-		tasks: map[string]task{},
+		tasks: map[string]*task{},
 		done:  make(chan bool),
 		mtx:   &sync.Mutex{},
 	}
@@ -48,7 +48,7 @@ func Full(out io.Writer, info io.Writer) api.EventProcessor {
 type ttyWriter struct {
 	out       io.Writer
 	ids       []string // tasks ids ordered as first event appeared
-	tasks     map[string]task
+	tasks     map[string]*task
 	repeated  bool
 	numLines  int
 	done      chan bool
@@ -208,10 +208,9 @@ func (w *ttyWriter) event(e api.Resource) {
 
 	if last, ok := w.tasks[e.ID]; ok {
 		last.update(e)
-		w.tasks[e.ID] = last
 	} else {
 		t := newTask(e)
-		w.tasks[e.ID] = t
+		w.tasks[e.ID] = &t
 		w.ids = append(w.ids, e.ID)
 	}
 	w.printEvent(e)
@@ -237,8 +236,8 @@ func (w *ttyWriter) printEvent(e api.Resource) {
 	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, color(e.Text), e.Details)
 }
 
-func (w *ttyWriter) parentTasks() iter.Seq[task] {
-	return func(yield func(task) bool) {
+func (w *ttyWriter) parentTasks() iter.Seq[*task] {
+	return func(yield func(*task) bool) {
 		for _, id := range w.ids { // iterate on ids to enforce a consistent order
 			t := w.tasks[id]
 			if len(t.parents) == 0 {
@@ -248,8 +247,8 @@ func (w *ttyWriter) parentTasks() iter.Seq[task] {
 	}
 }
 
-func (w *ttyWriter) childrenTasks(parent string) iter.Seq[task] {
-	return func(yield func(task) bool) {
+func (w *ttyWriter) childrenTasks(parent string) iter.Seq[*task] {
+	return func(yield func(*task) bool) {
 		for _, id := range w.ids { // iterate on ids to enforce a consistent order
 			t := w.tasks[id]
 			if t.parents.Has(parent) {
@@ -316,7 +315,7 @@ func (w *ttyWriter) print() {
 	w.numLines = numLines
 }
 
-func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding int, dryRun bool) string {
+func (w *ttyWriter) lineText(t *task, pad string, terminalWidth, statusPadding int, dryRun bool) string {
 	endTime := time.Now()
 	if t.status != api.Working {
 		endTime = t.startTime
@@ -403,7 +402,7 @@ var (
 	spinnerError   = "✘"
 )
 
-func spinner(t task) string {
+func spinner(t *task) string {
 	switch t.status {
 	case api.Done:
 		return SuccessColor(spinnerDone)
@@ -429,7 +428,7 @@ func colorFn(s api.EventStatus) colorFunc {
 	}
 }
 
-func numDone(tasks map[string]task) int {
+func numDone(tasks map[string]*task) int {
 	i := 0
 	for _, t := range tasks {
 		if t.status != api.Working {
