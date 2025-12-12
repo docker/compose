@@ -107,7 +107,7 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 	events.On(api.Resource{
 		ID:     model.Name,
 		Status: api.Working,
-		Text:   "Pulling",
+		Text:   api.StatusPulling,
 	})
 
 	cmd := exec.CommandContext(ctx, m.path, "pull", model.Model)
@@ -161,7 +161,7 @@ func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig,
 	events.On(api.Resource{
 		ID:     config.Name,
 		Status: api.Working,
-		Text:   "Configuring",
+		Text:   api.StatusConfiguring,
 	})
 	// configure [--context-size=<n>] MODEL
 	args := []string{"configure"}
@@ -174,7 +174,17 @@ func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig,
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	err = cmd.Run()
+	if err != nil {
+		events.On(errorEvent(config.Name, err.Error()))
+		return err
+	}
+	events.On(api.Resource{
+		ID:     config.Name,
+		Status: api.Done,
+		Text:   api.StatusConfigured,
+	})
+	return nil
 }
 
 func (m *modelAPI) SetModelVariables(ctx context.Context, project *types.Project) error {

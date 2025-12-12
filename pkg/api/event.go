@@ -67,6 +67,8 @@ const (
 	StatusExported         = "Exported"
 	StatusDownloading      = "Downloading"
 	StatusDownloadComplete = "Download complete"
+	StatusConfiguring      = "Configuring"
+	StatusConfigured       = "Configured"
 )
 
 // Resource represents status change and progress for a compose resource.
