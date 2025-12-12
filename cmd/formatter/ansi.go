@@ -20,47 +20,46 @@ import (
 	"fmt"
 
 	"github.com/acarl005/stripansi"
+	"github.com/morikuni/aec"
 )
 
 var disableAnsi bool
-
-func ansi(code string) string {
-	return fmt.Sprintf("\033%s", code)
-}
 
 func saveCursor() {
 	if disableAnsi {
 		return
 	}
-	fmt.Print(ansi("7"))
+	// see https://github.com/morikuni/aec/pull/5
+	fmt.Print(aec.Save)
 }
 
 func restoreCursor() {
 	if disableAnsi {
 		return
 	}
-	fmt.Print(ansi("8"))
+	// see https://github.com/morikuni/aec/pull/5
+	fmt.Print(aec.Restore)
 }
 
 func showCursor() {
 	if disableAnsi {
 		return
 	}
-	fmt.Print(ansi("[?25h"))
+	fmt.Print(aec.Show)
 }
 
 func moveCursor(y, x int) {
 	if disableAnsi {
 		return
 	}
-	fmt.Print(ansi(fmt.Sprintf("[%d;%dH", y, x)))
+	fmt.Print(aec.Position(uint(y), uint(x)))
 }
 
 func carriageReturn() {
 	if disableAnsi {
 		return
 	}
-	fmt.Print(ansi(fmt.Sprintf("[%dG", 0)))
+	fmt.Print(aec.Column(0))
 }
 
 func clearLine() {
@@ -68,7 +67,7 @@ func clearLine() {
 		return
 	}
 	// Does not move cursor from its current position
-	fmt.Print(ansi("[2K"))
+	fmt.Print(aec.EraseLine(aec.EraseModes.Tail))
 }
 
 func moveCursorUp(lines int) {
@@ -76,7 +75,7 @@ func moveCursorUp(lines int) {
 		return
 	}
 	// Does not add new lines
-	fmt.Print(ansi(fmt.Sprintf("[%dA", lines)))
+	fmt.Print(aec.Up(uint(lines)))
 }
 
 func moveCursorDown(lines int) {
@@ -84,7 +83,7 @@ func moveCursorDown(lines int) {
 		return
 	}
 	// Does not add new lines
-	fmt.Print(ansi(fmt.Sprintf("[%dB", lines)))
+	fmt.Print(aec.Down(uint(lines)))
 }
 
 func newLine() {
