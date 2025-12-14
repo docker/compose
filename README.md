@@ -1,12 +1,13 @@
 # Table of Contents
-- [Docker Compose v2](#docker-compose-v2)
+- [Docker Compose](#docker-compose)
 - [Where to get Docker Compose](#where-to-get-docker-compose)
     + [Windows and macOS](#windows-and-macos)
     + [Linux](#linux)
 - [Quick Start](#quick-start)
 - [Contributing](#contributing)
 - [Legacy](#legacy)
-# Docker Compose v2
+
+# Docker Compose
 
 [![GitHub release](https://img.shields.io/github/v/release/docker/compose.svg?style=flat-square)](https://github.com/docker/compose/releases/latest)
 [![PkgGoDev](https://img.shields.io/badge/go.dev-docs-007d9c?style=flat-square&logo=go&logoColor=white)](https://pkg.go.dev/github.com/docker/compose/v5)
