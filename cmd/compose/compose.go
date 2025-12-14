@@ -680,20 +680,20 @@ func setEnvWithDotEnv(opts ProjectOptions) error {
 		cli.WithDotEnv,
 	)
 	if err != nil {
-		return nil
+		return err
 	}
 	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), options.EnvFiles)
 	if err != nil {
-		return nil
+		return err
 	}
 	for k, v := range envFromFile {
 		if _, ok := os.LookupEnv(k); !ok && strings.HasPrefix(k, "COMPOSE_") {
 			if err = os.Setenv(k, v); err != nil {
-				return nil
+				return err
 			}
 		}
 	}
-	return err
+	return nil
 }
 
 var printerModes = []string{
