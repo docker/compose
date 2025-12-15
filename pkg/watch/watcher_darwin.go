@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build fsnotify
 
 /*
    Copyright 2020 Docker Compose CLI authors

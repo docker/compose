@@ -29,6 +29,10 @@ ifeq ($(DETECTED_OS),Windows)
 	BINARY_EXT=.exe
 endif
 
+ifeq ($(DETECTED_OS),Darwin)
+	GO_BUILDTAGS += fsnotify
+endif
+
 BUILD_FLAGS?=
 TEST_FLAGS?=
 E2E_TEST?=
@@ -62,11 +66,11 @@ build:
 
 .PHONY: binary
 binary:
-	$(BUILDX_CMD) bake binary
+	BUILD_TAGS="$(GO_BUILDTAGS)" $(BUILDX_CMD) bake binary
 
 .PHONY: binary-with-coverage
 binary-with-coverage:
-	$(BUILDX_CMD) bake binary-with-coverage
+	BUILD_TAGS="$(GO_BUILDTAGS)" $(BUILDX_CMD) bake binary-with-coverage
 
 .PHONY: install
 install: binary
