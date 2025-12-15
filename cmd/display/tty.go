@@ -347,7 +347,12 @@ func (w *ttyWriter) lineText(t *task, pad string, terminalWidth, statusPadding i
 			}
 			total += child.total
 			current += child.current
-			completion = append(completion, percentChars[(len(percentChars)-1)*child.percent/100])
+			r := len(percentChars) - 1
+			p := child.percent
+			if p > 100 {
+				p = 100
+			}
+			completion = append(completion, percentChars[r*p/100])
 		}
 	}
 

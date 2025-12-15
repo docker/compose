@@ -416,6 +416,9 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events api.E
 			total = jm.Progress.Total
 			if jm.Progress.Total > 0 {
 				percent = int(jm.Progress.Current * 100 / jm.Progress.Total)
+				if percent > 100 {
+					percent = 100
+				}
 			}
 		}
 	case DownloadCompletePhase, AlreadyExistsPhase, PullCompletePhase:
