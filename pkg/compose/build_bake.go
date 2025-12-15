@@ -119,8 +119,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
 	displayMode := progressui.DisplayMode(options.Progress)
-	if displayMode == progressui.AutoMode {
-		options.Progress = os.Getenv("BUILDKIT_PROGRESS")
+	if p, ok := os.LookupEnv("BUILDKIT_PROGRESS"); ok && displayMode == progressui.AutoMode {
+		displayMode = progressui.DisplayMode(p)
 	}
 	out := options.Out
 	if out == nil {
