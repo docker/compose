@@ -398,14 +398,14 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events api.E
 	}
 
 	var (
-		text    string
-		total   int64
-		percent int
-		current int64
-		status  = api.Working
+		progress string
+		total    int64
+		percent  int
+		current  int64
+		status   = api.Working
 	)
 
-	text = jm.Progress.String()
+	progress = jm.Progress.String()
 
 	switch jm.Status {
 	case PreparingPhase, WaitingPhase, PullingFsPhase:
@@ -416,6 +416,9 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events api.E
 			total = jm.Progress.Total
 			if jm.Progress.Total > 0 {
 				percent = int(jm.Progress.Current * 100 / jm.Progress.Total)
+				if percent > 100 {
+					percent = 100
+				}
 			}
 		}
 	case DownloadCompletePhase, AlreadyExistsPhase, PullCompletePhase:
@@ -431,7 +434,7 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events api.E
 
 	if jm.Error != nil {
 		status = api.Error
-		text = jm.Error.Message
+		progress = jm.Error.Message
 	}
 
 	events.On(api.Resource{
@@ -441,6 +444,7 @@ func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, events api.E
 		Total:    total,
 		Percent:  percent,
 		Status:   status,
-		Text:     text,
+		Text:     jm.Status,
+		Details:  progress,
 	})
 }

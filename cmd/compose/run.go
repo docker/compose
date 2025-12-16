@@ -142,7 +142,7 @@ func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (t
 	return environment, nil
 }
 
-func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command { //nolint:gocyclo
+func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	options := runOptions{
 		composeOptions: &composeOptions{
 			ProjectOptions: p,
@@ -185,7 +185,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				}
 			} else if !cmd.Flags().Changed("no-TTY") && !cmd.Flags().Changed("interactive") && !dockerCli.In().IsTerminal() {
 				// while `docker run` requires explicit `-it` flags, Compose enables interactive mode and TTY by default
-				// but when compose is used from a scripr has stdin piped from another command, we just can't
+				// but when compose is used from a script that has stdin piped from another command, we just can't
 				// Here, we detect we run "by default" (user didn't passed explicit flags) and disable TTY allocation if
 				// we don't have an actual terminal to attach to for interactive mode
 				options.noTty = true
@@ -193,11 +193,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 
 			if options.quiet {
 				display.Mode = display.ModeQuiet
-				devnull, err := os.Open(os.DevNull)
-				if err != nil {
-					return err
-				}
-				os.Stdout = devnull
+				backendOptions.Add(compose.WithEventProcessor(display.Quiet()))
 			}
 			createOpts.pullChanged = cmd.Flags().Changed("pull")
 			return nil

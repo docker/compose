@@ -313,7 +313,7 @@ func (d *DryRunClient) ContainerExecStart(ctx context.Context, execID string, co
 	return nil
 }
 
-// Functions delegated to original APIClient (not used by Compose or not modifying the Compose stack
+// Functions delegated to original APIClient (not used by Compose or not modifying the Compose stack)
 
 func (d *DryRunClient) ConfigList(ctx context.Context, options swarm.ConfigListOptions) ([]swarm.Config, error) {
 	return d.apiClient.ConfigList(ctx, options)

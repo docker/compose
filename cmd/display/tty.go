@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/morikuni/aec"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 // Full creates an EventProcessor that render advanced UI within a terminal.
@@ -37,31 +39,31 @@ func Full(out io.Writer, info io.Writer) api.EventProcessor {
 	return &ttyWriter{
 		out:   out,
 		info:  info,
-		tasks: map[string]task{},
+		tasks: map[string]*task{},
 		done:  make(chan bool),
 		mtx:   &sync.Mutex{},
 	}
 }
 
 type ttyWriter struct {
-	out             io.Writer
-	ids             []string // tasks ids ordered as first event appeared
-	tasks           map[string]task
-	repeated        bool
-	numLines        int
-	done            chan bool
-	mtx             *sync.Mutex
-	dryRun          bool // FIXME(ndeloof) (re)implement support for dry-run
-	skipChildEvents bool
-	operation       string
-	ticker          *time.Ticker
-	suspended       bool
-	info            io.Writer
+	out       io.Writer
+	ids       []string // tasks ids ordered as first event appeared
+	tasks     map[string]*task
+	repeated  bool
+	numLines  int
+	done      chan bool
+	mtx       *sync.Mutex
+	dryRun    bool // FIXME(ndeloof) (re)implement support for dry-run
+	operation string
+	ticker    *time.Ticker
+	suspended bool
+	info      io.Writer
 }
 
 type task struct {
 	ID        string
-	parentID  string
+	parent    string            // the resource this task receives updates from - other parents will be ignored
+	parents   utils.Set[string] // all resources to depend on this task
 	startTime time.Time
 	endTime   time.Time
 	text      string
@@ -73,6 +75,64 @@ type task struct {
 	spinner   *Spinner
 }
 
+func newTask(e api.Resource) task {
+	t := task{
+		ID:        e.ID,
+		parents:   utils.NewSet[string](),
+		startTime: time.Now(),
+		text:      e.Text,
+		details:   e.Details,
+		status:    e.Status,
+		current:   e.Current,
+		percent:   e.Percent,
+		total:     e.Total,
+		spinner:   NewSpinner(),
+	}
+	if e.ParentID != "" {
+		t.parent = e.ParentID
+		t.parents.Add(e.ParentID)
+	}
+	if e.Status == api.Done || e.Status == api.Error {
+		t.stop()
+	}
+	return t
+}
+
+// update adjusts task state based on last received event
+func (t *task) update(e api.Resource) {
+	if e.ParentID != "" {
+		t.parents.Add(e.ParentID)
+		// we may receive same event from distinct parents (typically: images sharing layers)
+		// to avoid status to flicker, only accept updates from our first declared parent
+		if t.parent != e.ParentID {
+			return
+		}
+	}
+
+	// update task based on received event
+	switch e.Status {
+	case api.Done, api.Error, api.Warning:
+		if t.status != e.Status {
+			t.stop()
+		}
+	case api.Working:
+		t.hasMore()
+	}
+	t.status = e.Status
+	t.text = e.Text
+	t.details = e.Details
+	// progress can only go up
+	if e.Total > t.total {
+		t.total = e.Total
+	}
+	if e.Current > t.current {
+		t.current = e.Current
+	}
+	if e.Percent > t.percent {
+		t.percent = e.Percent
+	}
+}
+
 func (t *task) stop() {
 	t.endTime = time.Now()
 	t.spinner.Stop()
@@ -80,6 +140,15 @@ func (t *task) stop() {
 
 func (t *task) hasMore() {
 	t.spinner.Restart()
+}
+
+func (t *task) Completed() bool {
+	switch t.status {
+	case api.Done, api.Error, api.Warning:
+		return true
+	default:
+		return false
+	}
 }
 
 func (w *ttyWriter) Start(ctx context.Context, operation string) {
@@ -93,11 +162,6 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 				w.ticker.Stop()
 				return
 			case <-w.done:
-				w.print()
-				w.mtx.Lock()
-				w.ticker.Stop()
-				w.operation = ""
-				w.mtx.Unlock()
 				return
 			case <-w.ticker.C:
 				w.print()
@@ -107,6 +171,11 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 }
 
 func (w *ttyWriter) Done(operation string, success bool) {
+	w.print()
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+	w.ticker.Stop()
+	w.operation = ""
 	w.done <- true
 }
 
@@ -138,49 +207,10 @@ func (w *ttyWriter) event(e api.Resource) {
 	}
 
 	if last, ok := w.tasks[e.ID]; ok {
-		switch e.Status {
-		case api.Done, api.Error, api.Warning:
-			if last.status != e.Status {
-				last.stop()
-			}
-		case api.Working:
-			last.hasMore()
-		}
-		last.status = e.Status
-		last.text = e.Text
-		last.details = e.Details
-		// progress can only go up
-		if e.Total > last.total {
-			last.total = e.Total
-		}
-		if e.Current > last.current {
-			last.current = e.Current
-		}
-		if e.Percent > last.percent {
-			last.percent = e.Percent
-		}
-		// allow set/unset of parent, but not swapping otherwise prompt is flickering
-		if last.parentID == "" || e.ParentID == "" {
-			last.parentID = e.ParentID
-		}
-		w.tasks[e.ID] = last
+		last.update(e)
 	} else {
-		t := task{
-			ID:        e.ID,
-			parentID:  e.ParentID,
-			startTime: time.Now(),
-			text:      e.Text,
-			details:   e.Details,
-			status:    e.Status,
-			current:   e.Current,
-			percent:   e.Percent,
-			total:     e.Total,
-			spinner:   NewSpinner(),
-		}
-		if e.Status == api.Done || e.Status == api.Error {
-			t.stop()
-		}
-		w.tasks[e.ID] = t
+		t := newTask(e)
+		w.tasks[e.ID] = &t
 		w.ids = append(w.ids, e.ID)
 	}
 	w.printEvent(e)
@@ -206,6 +236,28 @@ func (w *ttyWriter) printEvent(e api.Resource) {
 	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, color(e.Text), e.Details)
 }
 
+func (w *ttyWriter) parentTasks() iter.Seq[*task] {
+	return func(yield func(*task) bool) {
+		for _, id := range w.ids { // iterate on ids to enforce a consistent order
+			t := w.tasks[id]
+			if len(t.parents) == 0 {
+				yield(t)
+			}
+		}
+	}
+}
+
+func (w *ttyWriter) childrenTasks(parent string) iter.Seq[*task] {
+	return func(yield func(*task) bool) {
+		for _, id := range w.ids { // iterate on ids to enforce a consistent order
+			t := w.tasks[id]
+			if t.parents.Has(parent) {
+				yield(t)
+			}
+		}
+	}
+}
+
 func (w *ttyWriter) print() {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
@@ -213,18 +265,17 @@ func (w *ttyWriter) print() {
 		return
 	}
 	terminalWidth := goterm.Width()
-	b := aec.EmptyBuilder
-	for i := 0; i <= w.numLines; i++ {
-		b = b.Up(1)
-	}
+	up := w.numLines + 1
 	if !w.repeated {
-		b = b.Down(1)
+		up--
+		w.repeated = true
 	}
-	w.repeated = true
-	_, _ = fmt.Fprint(w.out, b.Column(0).ANSI)
-
-	// Hide the cursor while we are printing
-	_, _ = fmt.Fprint(w.out, aec.Hide)
+	b := aec.NewBuilder(
+		aec.Hide, // Hide the cursor while we are printing
+		aec.Up(uint(up)),
+		aec.Column(0),
+	)
+	_, _ = fmt.Fprint(w.out, b.ANSI)
 	defer func() {
 		_, _ = fmt.Fprint(w.out, aec.Show)
 	}()
@@ -235,36 +286,24 @@ func (w *ttyWriter) print() {
 	var statusPadding int
 	for _, t := range w.tasks {
 		l := len(t.ID)
-		if statusPadding < l {
+		if len(t.parents) == 0 && statusPadding < l {
 			statusPadding = l
 		}
-		if t.parentID != "" {
-			statusPadding -= 2
-		}
 	}
 
-	if len(w.tasks) > goterm.Height()-2 {
-		w.skipChildEvents = true
-	}
+	skipChildEvents := len(w.tasks) > goterm.Height()-2
 	numLines := 0
-
-	for _, id := range w.ids { // iterate on ids to enforce a consistent order
-		t := w.tasks[id]
-		if t.parentID != "" {
-			continue
-		}
+	for t := range w.parentTasks() {
 		line := w.lineText(t, "", terminalWidth, statusPadding, w.dryRun)
 		_, _ = fmt.Fprint(w.out, line)
 		numLines++
-		for _, t := range w.tasks {
-			if t.parentID == t.ID {
-				if w.skipChildEvents {
-					continue
-				}
-				line := w.lineText(t, "  ", terminalWidth, statusPadding, w.dryRun)
-				_, _ = fmt.Fprint(w.out, line)
-				numLines++
-			}
+		if skipChildEvents {
+			continue
+		}
+		for child := range w.childrenTasks(t.ID) {
+			line := w.lineText(child, "  ", terminalWidth, statusPadding-2, w.dryRun)
+			_, _ = fmt.Fprint(w.out, line)
+			numLines++
 		}
 	}
 	for i := numLines; i < w.numLines; i++ {
@@ -276,7 +315,7 @@ func (w *ttyWriter) print() {
 	w.numLines = numLines
 }
 
-func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding int, dryRun bool) string {
+func (w *ttyWriter) lineText(t *task, pad string, terminalWidth, statusPadding int, dryRun bool) string {
 	endTime := time.Now()
 	if t.status != api.Working {
 		endTime = t.startTime
@@ -300,18 +339,20 @@ func (w *ttyWriter) lineText(t task, pad string, terminalWidth, statusPadding in
 
 	// only show the aggregated progress while the root operation is in-progress
 	if parent := t; parent.status == api.Working {
-		for _, id := range w.ids {
-			child := w.tasks[id]
-			if child.parentID == parent.ID {
-				if child.status == api.Working && child.total == 0 {
-					// we don't have totals available for all the child events
-					// so don't show the total progress yet
-					hideDetails = true
-				}
-				total += child.total
-				current += child.current
-				completion = append(completion, percentChars[(len(percentChars)-1)*child.percent/100])
+		for child := range w.childrenTasks(parent.ID) {
+			if child.status == api.Working && child.total == 0 {
+				// we don't have totals available for all the child events
+				// so don't show the total progress yet
+				hideDetails = true
 			}
+			total += child.total
+			current += child.current
+			r := len(percentChars) - 1
+			p := child.percent
+			if p > 100 {
+				p = 100
+			}
+			completion = append(completion, percentChars[r*p/100])
 		}
 	}
 
@@ -366,7 +407,7 @@ var (
 	spinnerError   = "✘"
 )
 
-func spinner(t task) string {
+func spinner(t *task) string {
 	switch t.status {
 	case api.Done:
 		return SuccessColor(spinnerDone)
@@ -392,7 +433,7 @@ func colorFn(s api.EventStatus) colorFunc {
 	}
 }
 
-func numDone(tasks map[string]task) int {
+func numDone(tasks map[string]*task) int {
 	i := 0
 	for _, t := range tasks {
 		if t.status != api.Working {

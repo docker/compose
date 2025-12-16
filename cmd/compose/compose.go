@@ -59,7 +59,7 @@ const (
 	// ComposeProjectName define the project name to be used, instead of guessing from parent directory
 	ComposeProjectName = "COMPOSE_PROJECT_NAME"
 	// ComposeCompatibility try to mimic compose v1 as much as possible
-	ComposeCompatibility = "COMPOSE_COMPATIBILITY"
+	ComposeCompatibility = api.ComposeCompatibility
 	// ComposeRemoveOrphans remove "orphaned" containers, i.e. containers tagged for current project but not declared as service
 	ComposeRemoveOrphans = "COMPOSE_REMOVE_ORPHANS"
 	// ComposeIgnoreOrphans ignore "orphaned" containers
@@ -680,20 +680,20 @@ func setEnvWithDotEnv(opts ProjectOptions) error {
 		cli.WithDotEnv,
 	)
 	if err != nil {
-		return nil
+		return err
 	}
 	envFromFile, err := dotenv.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), options.EnvFiles)
 	if err != nil {
-		return nil
+		return err
 	}
 	for k, v := range envFromFile {
 		if _, ok := os.LookupEnv(k); !ok && strings.HasPrefix(k, "COMPOSE_") {
-			if err = os.Setenv(k, v); err != nil {
-				return nil
+			if err := os.Setenv(k, v); err != nil {
+				return err
 			}
 		}
 	}
-	return err
+	return nil
 }
 
 var printerModes = []string{
