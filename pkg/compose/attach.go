@@ -25,8 +25,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/moby/term"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -67,7 +68,7 @@ func (s *composeService) attachContainer(ctx context.Context, container containe
 }
 
 func (s *composeService) doAttachContainer(ctx context.Context, service, id, name string, listener api.ContainerEventListener) error {
-	inspect, err := s.apiClient().ContainerInspect(ctx, id)
+	inspect, err := s.apiClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		return err
 	}
@@ -91,7 +92,7 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 		})
 	})
 
-	_, _, err = s.attachContainerStreams(ctx, id, inspect.Config.Tty, nil, wOut, wErr)
+	_, _, err = s.attachContainerStreams(ctx, id, inspect.Container.Config.Tty, nil, wOut, wErr)
 	return err
 }
 
@@ -151,7 +152,7 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.WriteCloser, io.ReadCloser, error) {
 	var stdout io.ReadCloser
 	var stdin io.WriteCloser
-	cnx, err := s.apiClient().ContainerAttach(ctx, container, containerType.AttachOptions{
+	cnx, err := s.apiClient().ContainerAttach(ctx, container, client.ContainerAttachOptions{
 		Stream:     true,
 		Stdin:      true,
 		Stdout:     true,
@@ -160,13 +161,13 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 		DetachKeys: s.configFile().DetachKeys,
 	})
 	if err == nil {
-		stdout = ContainerStdout{HijackedResponse: cnx}
-		stdin = ContainerStdin{HijackedResponse: cnx}
+		stdout = ContainerStdout{HijackedResponse: cnx.HijackedResponse}
+		stdin = ContainerStdin{HijackedResponse: cnx.HijackedResponse}
 		return stdin, stdout, nil
 	}
 
 	// Fallback to logs API
-	logs, err := s.apiClient().ContainerLogs(ctx, container, containerType.LogsOptions{
+	logs, err := s.apiClient().ContainerLogs(ctx, container, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,

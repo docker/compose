@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 type mountType string
@@ -128,9 +128,12 @@ func (s *composeService) copyFileToContainer(ctx context.Context, id, content st
 		return err
 	}
 
-	return s.apiClient().CopyToContainer(ctx, id, "/", &b, container.CopyToContainerOptions{
-		CopyUIDGID: file.UID != "" || file.GID != "",
+	_, err = s.apiClient().CopyToContainer(ctx, id, client.CopyToContainerOptions{
+		DestinationPath: "/",
+		Content:         &b,
+		CopyUIDGID:      file.UID != "" || file.GID != "",
 	})
+	return err
 }
 
 func createTar(env string, config types.FileReferenceConfig) (bytes.Buffer, error) {

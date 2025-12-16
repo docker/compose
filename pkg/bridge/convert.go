@@ -30,11 +30,11 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/command"
 	cli "github.com/docker/cli/cli/command/container"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
 	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -127,10 +127,14 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 			}
 			containerConfig.User = usr.Uid
 		}
-		created, err := dockerCli.Client().ContainerCreate(ctx, containerConfig, &container.HostConfig{
-			AutoRemove: true,
-			Binds:      binds,
-		}, &network.NetworkingConfig{}, nil, "")
+		created, err := dockerCli.Client().ContainerCreate(ctx, client.ContainerCreateOptions{
+			Config: containerConfig,
+			HostConfig: &container.HostConfig{
+				Binds:      binds,
+				AutoRemove: true,
+			},
+			NetworkingConfig: &network.NetworkingConfig{},
+		})
 		if err != nil {
 			return err
 		}
@@ -159,7 +163,11 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 		exposed := utils.Set[string]{}
 		exposed.AddAll(service.Expose...)
 		for port := range inspect.Config.ExposedPorts {
-			exposed.Add(nat.Port(port).Port())
+			p, err := network.ParsePort(port)
+			if err != nil {
+				return nil, err
+			}
+			exposed.Add(strconv.Itoa(int(p.Num())))
 		}
 		for _, port := range service.Ports {
 			exposed.Add(strconv.Itoa(int(port.Target)))
@@ -207,13 +215,14 @@ func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName strin
 	inspect, err := dockerCli.Client().ImageInspect(ctx, imageName)
 	if errdefs.IsNotFound(err) {
 		var stream io.ReadCloser
-		stream, err = dockerCli.Client().ImagePull(ctx, imageName, image.PullOptions{})
+		stream, err = dockerCli.Client().ImagePull(ctx, imageName, client.ImagePullOptions{})
 		if err != nil {
 			return image.InspectResponse{}, err
 		}
 		defer func() { _ = stream.Close() }()
 
-		err = jsonmessage.DisplayJSONMessagesToStream(stream, dockerCli.Out(), nil)
+		out := dockerCli.Out()
+		err = jsonmessage.DisplayJSONMessagesStream(stream, out, out.FD(), out.IsTerminal(), nil)
 		if err != nil {
 			return image.InspectResponse{}, err
 		}
@@ -221,5 +230,5 @@ func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName strin
 			return image.InspectResponse{}, err
 		}
 	}
-	return inspect, err
+	return inspect.InspectResponse, err
 }
