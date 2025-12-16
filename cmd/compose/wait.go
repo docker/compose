@@ -24,6 +24,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -34,6 +35,7 @@ type waitOptions struct {
 	services []string
 
 	downProject bool
+	log         bool
 }
 
 func waitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -58,22 +60,27 @@ func waitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	}
 
 	cmd.Flags().BoolVar(&opts.downProject, "down-project", false, "Drops project when the first container stops")
+	cmd.Flags().BoolVar(&opts.log, "log", false, "Shows the logs of the service")
 
 	return cmd
 }
 
 func runWait(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts *waitOptions) (int64, error) {
-	_, name, err := opts.projectOrName(ctx, dockerCli)
+	project, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
 		return 0, err
 	}
 
+	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), false, false, false)
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return 0, err
 	}
-	return backend.Wait(ctx, name, api.WaitOptions{
+
+	return backend.Wait(ctx, name, consumer, api.WaitOptions{
 		Services:                   opts.services,
 		DownProjectOnContainerExit: opts.downProject,
+		Log:                        opts.log,
+		Project:                    project,
 	})
 }

@@ -3,3 +3,6 @@ services:
     image:  nginx:alpine
   another:
     image:  nginx:alpine
+  hello:
+    image: alpine
+    command: echo please-see-me
