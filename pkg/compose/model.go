@@ -29,7 +29,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
@@ -154,21 +153,21 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 }
 
 func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error {
-	if len(config.RuntimeFlags) != 0 {
-		logrus.Warnf("Runtime flags are not supported and will be ignored for model %s", config.Model)
-		config.RuntimeFlags = nil
-	}
 	events.On(api.Resource{
 		ID:     config.Name,
 		Status: api.Working,
 		Text:   api.StatusConfiguring,
 	})
-	// configure [--context-size=<n>] MODEL
+	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]
 	args := []string{"configure"}
 	if config.ContextSize > 0 {
 		args = append(args, "--context-size", strconv.Itoa(config.ContextSize))
 	}
 	args = append(args, config.Model)
+	if len(config.RuntimeFlags) != 0 {
+		args = append(args, "--")
+		args = append(args, config.RuntimeFlags...)
+	}
 	cmd := exec.CommandContext(ctx, m.path, args...)
 	err := m.prepare(ctx, cmd)
 	if err != nil {
