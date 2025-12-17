@@ -135,7 +135,7 @@ type Compose interface {
 	// Viz generates a graphviz graph of the project services
 	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	// Wait blocks until at least one of the services' container exits
-	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
+	Wait(ctx context.Context, projectName string, consumer LogConsumer, options WaitOptions) (int64, error)
 	// Scale manages numbers of container instances running per service
 	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
 	// Export a service container's filesystem as a tar archive
@@ -165,6 +165,8 @@ type WaitOptions struct {
 	Services []string
 	// Executes a down when a container exits
 	DownProjectOnContainerExit bool
+	Log                        bool
+	Project                    *types.Project
 }
 
 type VizOptions struct {
@@ -293,6 +295,7 @@ type StartOptions struct {
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
 	Wait        bool
+	Log         bool
 	WaitTimeout time.Duration
 	// Services passed in the command line to be started
 	Services       []string

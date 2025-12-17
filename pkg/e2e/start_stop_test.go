@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 )
 
 func TestStartStop(t *testing.T) {
@@ -241,6 +243,22 @@ func TestStartStopMultipleServices(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Stderr(), startMsg),
 			fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
 	}
+}
+
+func TestStartLogService(t *testing.T) {
+	c := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-start-log-svc",
+		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
+
+	t.Run("run wait log", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "up", "hello", "--wait", "--log")
+		res := icmd.StartCmd(cmd)
+		t.Cleanup(func() {
+			_ = res.Cmd.Process.Kill()
+		})
+
+		poll.WaitOn(t, expectOutput(res, "please-see-me"), poll.WithDelay(1000*time.Millisecond), poll.WithTimeout(2*time.Second))
+	})
 }
 
 func TestStartSingleServiceAndDependency(t *testing.T) {
