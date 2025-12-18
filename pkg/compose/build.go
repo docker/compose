@@ -61,6 +61,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 	// also include services used as additional_contexts with service: prefix
 	options.Services = addBuildDependencies(options.Services, project)
+
 	// Some build dependencies we just introduced may not be enabled
 	var err error
 	project, err = project.WithServicesEnabled(options.Services...)
@@ -85,8 +86,13 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		serviceToBuild[serviceName] = *service
 		return nil
 	}, policy)
-	if err != nil || len(serviceToBuild) == 0 {
+	if err != nil {
 		return imageIDs, err
+	}
+
+	if len(serviceToBuild) == 0 {
+		logrus.Warn("No services to build")
+		return imageIDs, nil
 	}
 
 	bake, err := buildWithBake(s.dockerCli)
