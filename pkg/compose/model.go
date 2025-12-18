@@ -291,13 +291,5 @@ func (m *modelAPI) supportsRuntimeFlags() bool {
 
 	// Strip 'v' prefix if present (e.g., "v1.0.6" -> "1.0.6")
 	versionStr := strings.TrimPrefix(m.version, "v")
-
-	// Strip build metadata or prerelease suffix after "-" or "+"
-	// This is necessary because versions.LessThan treats "1.0.6-dirty" < "1.0.6" per semver rules
-	// but we want to compare the base version numbers only
-	if idx := strings.IndexAny(versionStr, "-+"); idx != -1 {
-		versionStr = versionStr[:idx]
-	}
-
 	return !versions.LessThan(versionStr, "1.0.6")
 }
