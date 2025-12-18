@@ -76,6 +76,7 @@ type modelAPI struct {
 	env     []string
 	prepare func(ctx context.Context, cmd *exec.Cmd) error
 	cleanup func()
+	version string
 }
 
 func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) {
@@ -85,6 +86,9 @@ func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) 
 			return nil, fmt.Errorf("'models' support requires Docker Model plugin")
 		}
 		return nil, err
+	}
+	if dockerModel.Err != nil {
+		return nil, fmt.Errorf("failed to load Docker Model plugin: %w", dockerModel.Err)
 	}
 	endpoint, cleanup, err := s.propagateDockerEndpoint()
 	if err != nil {
