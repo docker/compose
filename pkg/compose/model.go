@@ -72,7 +72,6 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 
 type modelAPI struct {
 	path    string
-	version string // cached plugin version
 	env     []string
 	prepare func(ctx context.Context, cmd *exec.Cmd) error
 	cleanup func()
