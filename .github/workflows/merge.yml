@@ -31,9 +31,9 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # tag=v4.2.2
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # tag=v6.1.0
         with:
           go-version-file: '.go-version'
           cache: true
@@ -81,7 +81,7 @@ jobs:
     steps:
       -
         name: Free disk space
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # tag=v1.3.1
         with:
           android: true
           dotnet: true
@@ -90,7 +90,7 @@ jobs:
           swap-storage: true
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # tag=v4.2.2
       -
         name: Login to DockerHub
         if: github.event_name != 'pull_request'
@@ -100,14 +100,14 @@ jobs:
           password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # tag=v3.6.0
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # tag=v3.11.1
       -
         name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # tag=v5.8.0
         with:
           images: |
             ${{ env.REPO_SLUG }}
@@ -117,7 +117,7 @@ jobs:
           bake-target: meta-helper
       -
         name: Build and push image
-        uses: docker/bake-action@v6
+        uses: docker/bake-action@37816e747588cb137173af99ab33873600c46ea8 # tag=v6.8.0
         id: bake
         with:
           source: .
@@ -139,7 +139,7 @@ jobs:
       -
         name: Generate Token
         id: generate_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # tag=v1.12.0
         with:
           app-id: ${{ vars.DOCKERDESKTOP_APP_ID }}
           private-key: ${{ secrets.DOCKERDESKTOP_APP_PRIVATEKEY }}
@@ -148,7 +148,7 @@ jobs:
             ${{ secrets.DOCKERDESKTOP_REPO }}
       -
         name: Trigger Docker Desktop e2e with edge version
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # tag=v7.0.1
         with:
           github-token: ${{ steps.generate_token.outputs.token }}
           script: |
