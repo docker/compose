@@ -60,7 +60,7 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runDown(ctx, dockerCli, backendOptions, opts, args)
 		}),
-		ValidArgsFunction: noCompletion(),
+		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := downCmd.Flags()
 	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
