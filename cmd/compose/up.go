@@ -188,6 +188,9 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 
 //nolint:gocyclo
 func validateFlags(up *upOptions, create *createOptions) error {
+	if up.waitTimeout < 0 {
+		return fmt.Errorf("--wait-timeout must be a non-negative integer")
+	}
 	if up.exitCodeFrom != "" && !up.cascadeFail {
 		up.cascadeStop = true
 	}
@@ -328,7 +331,10 @@ func runUp(
 		attach = attachSet.Elements()
 	}
 
-	timeout := time.Duration(upOptions.waitTimeout) * time.Second
+	var timeout time.Duration
+	if upOptions.waitTimeout > 0 {
+		timeout = time.Duration(upOptions.waitTimeout) * time.Second
+	}
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
