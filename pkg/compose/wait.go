@@ -42,13 +42,11 @@ func (s *composeService) Wait(
 	eg, waitCtx := errgroup.WithContext(ctx)
 	var statusCode int64
 
-	if options.Log {
-		s.Logs(ctx, projectName, options.Consumer, api.LogOptions{
-			Project:  options.Project,
-			Services: options.Services,
-			Follow:   false,
-		})
-	}
+	s.Logs(ctx, projectName, options.Consumer, api.LogOptions{
+		Project:  options.Project,
+		Services: options.Services,
+		Follow:   false,
+	})
 
 	for _, ctr := range containers {
 		eg.Go(func() error {

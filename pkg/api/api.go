@@ -165,7 +165,6 @@ type WaitOptions struct {
 	Services []string
 	// Executes a down when a container exits
 	DownProjectOnContainerExit bool
-	Log                        bool
 	Project                    *types.Project
 	Consumer                   LogConsumer
 }
@@ -296,7 +295,6 @@ type StartOptions struct {
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
 	Wait        bool
-	Log         bool
 	WaitTimeout time.Duration
 	// Services passed in the command line to be started
 	Services       []string

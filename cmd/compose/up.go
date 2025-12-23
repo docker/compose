@@ -58,7 +58,6 @@ type upOptions struct {
 	noAttach              []string
 	timestamp             bool
 	wait                  bool
-	log                   bool
 	waitTimeout           int
 	watch                 bool
 	navigationMenu        bool
@@ -172,7 +171,6 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services")
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
 	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies attached mode by default.")
-	flags.BoolVar(&up.log, "log", false, "Stream service logs")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
@@ -195,12 +193,6 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	}
 	if up.cascadeStop && up.cascadeFail {
 		return fmt.Errorf("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
-	}
-
-	if up.log {
-		if !up.wait {
-			return fmt.Errorf("--log should be combined with --wait")
-		}
 	}
 
 	if up.wait {
@@ -348,7 +340,6 @@ func runUp(
 			OnExit:         upOptions.OnExit(),
 			Wait:           upOptions.wait,
 			WaitTimeout:    timeout,
-			Log:            upOptions.log,
 			Watch:          upOptions.watch,
 			Services:       services,
 			NavigationMenu: upOptions.navigationMenu && display.Mode != "plain" && dockerCli.In().IsTerminal(),

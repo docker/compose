@@ -198,10 +198,11 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	}
 	monitor.withListener(printer.HandleEvent)
 
-	monitor.withListener(onHealthy(func(e api.ContainerEvent) {
-		fmt.Println("Healthy:", e.Service, e.Container.Name)
-		cancel()
-	}))
+	if options.Start.Wait {
+		monitor.withListener(onHealthy(func(e api.ContainerEvent) {
+			cancel()
+		}))
+	}
 
 	var exitCode int
 	if options.Start.OnExit != api.CascadeIgnore {

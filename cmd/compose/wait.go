@@ -60,7 +60,6 @@ func waitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	}
 
 	cmd.Flags().BoolVar(&opts.downProject, "down-project", false, "Drops project when the first container stops")
-	cmd.Flags().BoolVar(&opts.log, "log", false, "Shows the logs of the service")
 
 	return cmd
 }
@@ -81,7 +80,6 @@ func runWait(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		Services:                   opts.services,
 		DownProjectOnContainerExit: opts.downProject,
 		Consumer:                   consumer,
-		Log:                        opts.log,
 		Project:                    project,
 	})
 }
