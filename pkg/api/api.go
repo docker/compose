@@ -746,6 +746,8 @@ const (
 	ContainerEventRecreated
 	// ContainerEventExited is a ContainerEvent of type exit. ExitCode is set
 	ContainerEventExited
+	// ContainerEventHealthy let consumer know container is healthy
+	ContainerEventHealthy
 	// UserCancel user canceled compose up, we are stopping containers
 	HookEventLog
 )

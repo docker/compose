@@ -95,16 +95,6 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 			}
 			return err
 		}
-
-		if options.Log {
-			s.Logs(ctx, projectName, options.Attach, api.LogOptions{
-				Project:    options.Project,
-				Services:   options.Services,
-				Follow:     false,
-				Tail:       "all",
-				Timestamps: false,
-			})
-		}
 	}
 
 	return nil
