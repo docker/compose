@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -91,7 +92,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	if len(serviceToBuild) == 0 {
-		logrus.Warn("No services to build")
+		// Add COMPOSE_BUILDKIT_WARN_NOBUILD=true environment variable to enable warning when no services are built
+		if utils.StringToBool(os.Getenv("COMPOSE_BUILDKIT_WARN_NOBUILD")) {
+			logrus.Warn("No services to build")
+		}
 		return imageIDs, nil
 	}
 
