@@ -478,7 +478,7 @@ var swarmEnabled = struct {
 	err  error
 }{}
 
-func (s *composeService) isSWarmEnabled(ctx context.Context) (bool, error) {
+func (s *composeService) isSwarmEnabled(ctx context.Context) (bool, error) {
 	swarmEnabled.once.Do(func() {
 		info, err := s.apiClient().Info(ctx)
 		if err != nil {
