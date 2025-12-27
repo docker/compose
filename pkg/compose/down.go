@@ -119,7 +119,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		logrus.Warnf("Warning: No resource found to remove for project %q.", projectName)
 	}
 
-	eg, _ := errgroup.WithContext(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, op := range ops {
 		eg.Go(op)
 	}
@@ -335,7 +335,7 @@ func (s *composeService) stopContainers(ctx context.Context, serv *types.Service
 }
 
 func (s *composeService) removeContainers(ctx context.Context, containers []containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
-	eg, _ := errgroup.WithContext(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
