@@ -1524,7 +1524,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	case 1:
 		return networks[0].ID, nil
 	case 0:
-		enabled, err := s.isSWarmEnabled(ctx)
+		enabled, err := s.isSwarmEnabled(ctx)
 		if err != nil {
 			return "", err
 		}
