@@ -35,6 +35,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
+	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -85,7 +86,17 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 		return err
 	}
 
-	dir := os.TempDir()
+	dir, err := os.MkdirTemp("", "compose-convert-*")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err := os.RemoveAll(dir)
+		if err != nil {
+			logrus.Warnf("failed to remove temp dir %s: %v", dir, err)
+		}
+	}()
+
 	composeYaml := filepath.Join(dir, "compose.yaml")
 	err = os.WriteFile(composeYaml, raw, 0o600)
 	if err != nil {
