@@ -91,7 +91,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	if len(serviceToBuild) == 0 {
-		logrus.Warn("No services to build")
+		logrus.Debug("No services to build")
 		return imageIDs, nil
 	}
 
