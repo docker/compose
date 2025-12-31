@@ -28,6 +28,7 @@ import (
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/moby/term"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -49,7 +50,11 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 		names = append(names, getContainerNameWithoutProject(c))
 	}
 
-	_, _ = fmt.Fprintf(s.stdout(), "Attaching to %s\n", strings.Join(names, ", "))
+	_, err = fmt.Fprintf(s.stdout(), "Attaching to %s\n", strings.Join(names, ", "))
+	if err != nil {
+		logrus.Debugf("failed to write attach message: %v", err)
+		return nil, err
+	}
 
 	for _, ctr := range containers {
 		err := s.attachContainer(ctx, ctr, listener)
@@ -57,7 +62,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 			return nil, err
 		}
 	}
-	return containers, err
+	return containers, nil
 }
 
 func (s *composeService) attachContainer(ctx context.Context, container containerType.Summary, listener api.ContainerEventListener) error {
@@ -91,10 +96,21 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 		})
 	})
 
-	_, _, err = s.attachContainerStreams(ctx, id, inspect.Config.Tty, nil, wOut, wErr)
-	return err
+	restore, detached, err := s.attachContainerStreams(ctx, id, inspect.Config.Tty, nil, wOut, wErr)
+	if err != nil {
+		return err
+	}
+	defer restore()
+
+	go func() {
+		<-detached
+		logrus.Debugf("detached from container %s", name)
+	}()
+
+	return nil
 }
 
+//nolint:gocyclo
 func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (func(), chan bool, error) {
 	detached := make(chan bool)
 	restore := func() { /* noop */ }
@@ -106,7 +122,10 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 				return restore, detached, err
 			}
 			restore = func() {
-				term.RestoreTerminal(in.FD(), state) //nolint:errcheck
+				err := term.RestoreTerminal(in.FD(), state)
+				if err != nil {
+					logrus.Warnf("failed to restore terminal: %v", err)
+				}
 			}
 		}
 	}
@@ -119,7 +138,10 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 	go func() {
 		<-ctx.Done()
 		if stdin != nil {
-			stdin.Close() //nolint:errcheck
+			err := stdin.Close()
+			if err != nil {
+				logrus.Debugf("failed to close stdin: %v", err)
+			}
 		}
 	}()
 
@@ -129,19 +151,34 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 			var escapeErr term.EscapeError
 			if errors.As(err, &escapeErr) {
 				close(detached)
+			} else if err != nil && !errors.Is(err, io.EOF) {
+				logrus.Debugf("stdin copy error for container %s: %v", container, err)
 			}
 		}()
 	}
 
 	if stdout != nil {
 		go func() {
-			defer stdout.Close()    //nolint:errcheck
-			defer stderr.Close()    //nolint:errcheck
-			defer streamOut.Close() //nolint:errcheck
+			defer func() {
+				if err := stdout.Close(); err != nil {
+					logrus.Debugf("failed to close stdout: %v", err)
+				}
+				if err := stderr.Close(); err != nil {
+					logrus.Debugf("failed to close stderr: %v", err)
+				}
+				if err := streamOut.Close(); err != nil {
+					logrus.Debugf("failed to close stream output: %v", err)
+				}
+			}()
+
+			var err error
 			if tty {
-				io.Copy(stdout, streamOut) //nolint:errcheck
+				_, err = io.Copy(stdout, streamOut)
 			} else {
-				stdcopy.StdCopy(stdout, stderr, streamOut) //nolint:errcheck
+				_, err = stdcopy.StdCopy(stdout, stderr, streamOut)
+			}
+			if err != nil && !errors.Is(err, io.EOF) {
+				logrus.Debugf("stream copy error for container %s: %v", container, err)
 			}
 		}()
 	}
@@ -149,8 +186,6 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 }
 
 func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.WriteCloser, io.ReadCloser, error) {
-	var stdout io.ReadCloser
-	var stdin io.WriteCloser
 	cnx, err := s.apiClient().ContainerAttach(ctx, container, containerType.AttachOptions{
 		Stream:     true,
 		Stdin:      true,
@@ -160,8 +195,8 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 		DetachKeys: s.configFile().DetachKeys,
 	})
 	if err == nil {
-		stdout = ContainerStdout{HijackedResponse: cnx}
-		stdin = ContainerStdin{HijackedResponse: cnx}
+		stdout := ContainerStdout{HijackedResponse: cnx}
+		stdin := ContainerStdin{HijackedResponse: cnx}
 		return stdin, stdout, nil
 	}
 
@@ -174,5 +209,5 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 	if err != nil {
 		return nil, nil, err
 	}
-	return stdin, logs, nil
+	return nil, logs, nil
 }
