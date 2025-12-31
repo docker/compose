@@ -53,7 +53,6 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 	_, err = fmt.Fprintf(s.stdout(), "Attaching to %s\n", strings.Join(names, ", "))
 	if err != nil {
 		logrus.Debugf("failed to write attach message: %v", err)
-		return nil, err
 	}
 
 	for _, ctr := range containers {
@@ -96,16 +95,11 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 		})
 	})
 
-	restore, detached, err := s.attachContainerStreams(ctx, id, inspect.Config.Tty, nil, wOut, wErr)
+	restore, _, err := s.attachContainerStreams(ctx, id, inspect.Config.Tty, nil, wOut, wErr)
 	if err != nil {
 		return err
 	}
 	defer restore()
-
-	go func() {
-		<-detached
-		logrus.Debugf("detached from container %s", name)
-	}()
 
 	return nil
 }
