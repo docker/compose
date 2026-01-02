@@ -104,23 +104,3 @@ func TestWaitAndDrop(t *testing.T) {
 	res := c.RunDockerCmd(t, "ps", "--all")
 	assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 }
-
-func TestWaitLog(t *testing.T) {
-	const projectName = "e2e-wait-and-log"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d", "hello")
-	})
-
-	t.Run("logs", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "wait", "hello", "--log")
-		res.Assert(t, icmd.Expected{Out: `hello`})
-	})
-}

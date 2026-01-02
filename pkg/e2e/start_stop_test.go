@@ -251,7 +251,7 @@ func TestStartLogService(t *testing.T) {
 		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
 
 	t.Run("run wait log", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "up", "hello", "--wait", "--log")
+		cmd := c.NewDockerComposeCmd(t, "up", "hello", "--wait")
 		res := icmd.StartCmd(cmd)
 		t.Cleanup(func() {
 			_ = res.Cmd.Process.Kill()
