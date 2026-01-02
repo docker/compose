@@ -25,13 +25,8 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Wait(
-	ctx context.Context,
-	projectName string,
-	options api.WaitOptions,
-) (int64, error) {
+func (s *composeService) Wait(ctx context.Context, projectName string, options api.WaitOptions) (int64, error) {
 	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false, options.Services...)
-
 	if err != nil {
 		return 0, err
 	}
@@ -41,13 +36,6 @@ func (s *composeService) Wait(
 
 	eg, waitCtx := errgroup.WithContext(ctx)
 	var statusCode int64
-
-	s.Logs(ctx, projectName, options.Consumer, api.LogOptions{
-		Project:  options.Project,
-		Services: options.Services,
-		Follow:   false,
-	})
-
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			var err error
