@@ -8,4 +8,6 @@ services:
   infinity:
     image: alpine
     command: sleep infinity
-
+  hello:
+    image: alpine
+    command: sh -c "echo hello"
