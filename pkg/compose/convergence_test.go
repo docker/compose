@@ -250,6 +250,148 @@ func TestWaitDependencies(t *testing.T) {
 	})
 }
 
+func TestIsServiceHealthy(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+
+	ctx := context.Background()
+
+	t.Run("disabled healthcheck with fallback to running", func(t *testing.T) {
+		containerID := "test-container-id"
+		containers := Containers{
+			{ID: containerID},
+		}
+
+		// Container with disabled healthcheck (Test: ["NONE"])
+		apiClient.EXPECT().ContainerInspect(ctx, containerID).Return(container.InspectResponse{
+			ContainerJSONBase: &container.ContainerJSONBase{
+				ID:    containerID,
+				Name:  "test-container",
+				State: &container.State{Status: "running"},
+			},
+			Config: &container.Config{
+				Healthcheck: &container.HealthConfig{
+					Test: []string{"NONE"},
+				},
+			},
+		}, nil)
+
+		isHealthy, err := tested.(*composeService).isServiceHealthy(ctx, containers, true)
+		assert.NilError(t, err)
+		assert.Equal(t, true, isHealthy, "Container with disabled healthcheck should be considered healthy when running with fallbackRunning=true")
+	})
+
+	t.Run("disabled healthcheck without fallback", func(t *testing.T) {
+		containerID := "test-container-id"
+		containers := Containers{
+			{ID: containerID},
+		}
+
+		// Container with disabled healthcheck (Test: ["NONE"]) but fallbackRunning=false
+		apiClient.EXPECT().ContainerInspect(ctx, containerID).Return(container.InspectResponse{
+			ContainerJSONBase: &container.ContainerJSONBase{
+				ID:    containerID,
+				Name:  "test-container",
+				State: &container.State{Status: "running"},
+			},
+			Config: &container.Config{
+				Healthcheck: &container.HealthConfig{
+					Test: []string{"NONE"},
+				},
+			},
+		}, nil)
+
+		_, err := tested.(*composeService).isServiceHealthy(ctx, containers, false)
+		assert.ErrorContains(t, err, "has no healthcheck configured")
+	})
+
+	t.Run("no healthcheck with fallback to running", func(t *testing.T) {
+		containerID := "test-container-id"
+		containers := Containers{
+			{ID: containerID},
+		}
+
+		// Container with no healthcheck at all
+		apiClient.EXPECT().ContainerInspect(ctx, containerID).Return(container.InspectResponse{
+			ContainerJSONBase: &container.ContainerJSONBase{
+				ID:    containerID,
+				Name:  "test-container",
+				State: &container.State{Status: "running"},
+			},
+			Config: &container.Config{
+				Healthcheck: nil,
+			},
+		}, nil)
+
+		isHealthy, err := tested.(*composeService).isServiceHealthy(ctx, containers, true)
+		assert.NilError(t, err)
+		assert.Equal(t, true, isHealthy, "Container with no healthcheck should be considered healthy when running with fallbackRunning=true")
+	})
+
+	t.Run("exited container with disabled healthcheck", func(t *testing.T) {
+		containerID := "test-container-id"
+		containers := Containers{
+			{ID: containerID},
+		}
+
+		// Container with disabled healthcheck but exited
+		apiClient.EXPECT().ContainerInspect(ctx, containerID).Return(container.InspectResponse{
+			ContainerJSONBase: &container.ContainerJSONBase{
+				ID:   containerID,
+				Name: "test-container",
+				State: &container.State{
+					Status:   "exited",
+					ExitCode: 1,
+				},
+			},
+			Config: &container.Config{
+				Healthcheck: &container.HealthConfig{
+					Test: []string{"NONE"},
+				},
+			},
+		}, nil)
+
+		_, err := tested.(*composeService).isServiceHealthy(ctx, containers, true)
+		assert.ErrorContains(t, err, "exited")
+	})
+
+	t.Run("healthy container with healthcheck", func(t *testing.T) {
+		containerID := "test-container-id"
+		containers := Containers{
+			{ID: containerID},
+		}
+
+		// Container with actual healthcheck that is healthy
+		apiClient.EXPECT().ContainerInspect(ctx, containerID).Return(container.InspectResponse{
+			ContainerJSONBase: &container.ContainerJSONBase{
+				ID:   containerID,
+				Name: "test-container",
+				State: &container.State{
+					Status: "running",
+					Health: &container.Health{
+						Status: container.Healthy,
+					},
+				},
+			},
+			Config: &container.Config{
+				Healthcheck: &container.HealthConfig{
+					Test: []string{"CMD", "curl", "-f", "http://localhost"},
+				},
+			},
+		}, nil)
+
+		isHealthy, err := tested.(*composeService).isServiceHealthy(ctx, containers, false)
+		assert.NilError(t, err)
+		assert.Equal(t, true, isHealthy, "Container with healthy status should be healthy")
+	})
+}
+
 func TestCreateMobyContainer(t *testing.T) {
 	t.Run("connects container networks one by one if API <1.44", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
