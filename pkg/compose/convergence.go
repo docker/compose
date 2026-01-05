@@ -833,7 +833,8 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 			return false, fmt.Errorf("container %s exited (%d)", name, ctr.State.ExitCode)
 		}
 
-		if ctr.Config.Healthcheck == nil && fallbackRunning {
+		noHealthcheck := ctr.Config.Healthcheck == nil || (len(ctr.Config.Healthcheck.Test) > 0 && ctr.Config.Healthcheck.Test[0] == "NONE")
+		if noHealthcheck && fallbackRunning {
 			// Container does not define a health check, but we can fall back to "running" state
 			return ctr.State != nil && ctr.State.Status == container.StateRunning, nil
 		}
