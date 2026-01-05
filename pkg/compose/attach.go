@@ -24,10 +24,8 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli/streams"
 	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/moby/term"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -95,60 +93,18 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 		})
 	})
 
-	restore, _, err := s.attachContainerStreams(ctx, id, inspect.Config.Tty, nil, wOut, wErr)
+	err = s.attachContainerStreams(ctx, id, inspect.Config.Tty, wOut, wErr)
 	if err != nil {
 		return err
 	}
-	defer restore()
 
 	return nil
 }
 
-//nolint:gocyclo
-func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdin io.ReadCloser, stdout, stderr io.WriteCloser) (func(), chan bool, error) {
-	detached := make(chan bool)
-	restore := func() { /* noop */ }
-	if stdin != nil {
-		in := streams.NewIn(stdin)
-		if in.IsTerminal() {
-			state, err := term.SetRawTerminal(in.FD())
-			if err != nil {
-				return restore, detached, err
-			}
-			restore = func() {
-				err := term.RestoreTerminal(in.FD(), state)
-				if err != nil {
-					logrus.Warnf("failed to restore terminal: %v", err)
-				}
-			}
-		}
-	}
-
-	streamIn, streamOut, err := s.getContainerStreams(ctx, container)
+func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdout, stderr io.WriteCloser) error {
+	_, streamOut, err := s.getContainerStreams(ctx, container)
 	if err != nil {
-		return restore, detached, err
-	}
-
-	go func() {
-		<-ctx.Done()
-		if stdin != nil {
-			err := stdin.Close()
-			if err != nil {
-				logrus.Debugf("failed to close stdin: %v", err)
-			}
-		}
-	}()
-
-	if streamIn != nil && stdin != nil {
-		go func() {
-			_, err := io.Copy(streamIn, stdin)
-			var escapeErr term.EscapeError
-			if errors.As(err, &escapeErr) {
-				close(detached)
-			} else if err != nil && !errors.Is(err, io.EOF) {
-				logrus.Debugf("stdin copy error for container %s: %v", container, err)
-			}
-		}()
+		return err
 	}
 
 	if stdout != nil {
@@ -176,7 +132,7 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 			}
 		}()
 	}
-	return restore, detached, nil
+	return nil
 }
 
 func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.WriteCloser, io.ReadCloser, error) {
