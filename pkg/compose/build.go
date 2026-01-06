@@ -40,7 +40,10 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	return Run(ctx, func(ctx context.Context) error {
 		return tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 			func(ctx context.Context) error {
-				_, err := s.build(ctx, project, options, nil)
+				builtImages, err := s.build(ctx, project, options, nil)
+				if err == nil && len(builtImages) == 0 {
+					logrus.Warn("No services to build")
+				}
 				return err
 			})(ctx)
 	}, "build", s.events)
@@ -91,7 +94,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	if len(serviceToBuild) == 0 {
-		logrus.Warn("No services to build")
 		return imageIDs, nil
 	}
 

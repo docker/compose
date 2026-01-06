@@ -121,7 +121,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	actual := len(containers)
 	updated := make(Containers, expected)
 
-	eg, _ := errgroup.WithContext(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 
 	err = c.resolveServiceReferences(&service)
 	if err != nil {
@@ -451,7 +451,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		defer cancelFunc()
 		ctx = withTimeout
 	}
-	eg, _ := errgroup.WithContext(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 	for dep, config := range dependencies {
 		if shouldWait, err := shouldWaitForDependency(dep, config, project); err != nil {
 			return err

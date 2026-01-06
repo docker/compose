@@ -21,6 +21,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestApplyScaleOpt(t *testing.T) {
@@ -47,4 +49,43 @@ func TestApplyScaleOpt(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, *bar.Scale, 3)
 	assert.Equal(t, *bar.Deploy.Replicas, 3)
+}
+
+func TestUpOptions_OnExit(t *testing.T) {
+	tests := []struct {
+		name string
+		args upOptions
+		want api.Cascade
+	}{
+		{
+			name: "no cascade",
+			args: upOptions{},
+			want: api.CascadeIgnore,
+		},
+		{
+			name: "cascade stop",
+			args: upOptions{cascadeStop: true},
+			want: api.CascadeStop,
+		},
+		{
+			name: "cascade fail",
+			args: upOptions{cascadeFail: true},
+			want: api.CascadeFail,
+		},
+		{
+			name: "both set - stop takes precedence",
+			args: upOptions{
+				cascadeStop: true,
+				cascadeFail: true,
+			},
+			want: api.CascadeStop,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.args.OnExit()
+			assert.Equal(t, got, tt.want)
+		})
+	}
 }
