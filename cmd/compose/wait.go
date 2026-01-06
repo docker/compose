@@ -24,7 +24,6 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -35,7 +34,6 @@ type waitOptions struct {
 	services []string
 
 	downProject bool
-	log         bool
 }
 
 func waitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -65,21 +63,17 @@ func waitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 }
 
 func runWait(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts *waitOptions) (int64, error) {
-	project, name, err := opts.projectOrName(ctx, dockerCli)
+	_, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
 		return 0, err
 	}
 
-	consumer := formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), false, false, false)
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return 0, err
 	}
-
 	return backend.Wait(ctx, name, api.WaitOptions{
 		Services:                   opts.services,
 		DownProjectOnContainerExit: opts.downProject,
-		Consumer:                   consumer,
-		Project:                    project,
 	})
 }

@@ -165,8 +165,6 @@ type WaitOptions struct {
 	Services []string
 	// Executes a down when a container exits
 	DownProjectOnContainerExit bool
-	Project                    *types.Project
-	Consumer                   LogConsumer
 }
 
 type VizOptions struct {
