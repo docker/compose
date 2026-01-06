@@ -102,7 +102,7 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 }
 
 func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdout, stderr io.WriteCloser) error {
-	_, streamOut, err := s.getContainerStreams(ctx, container)
+	streamOut, err := s.getContainerStreams(ctx, container)
 	if err != nil {
 		return err
 	}
@@ -135,19 +135,17 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 	return nil
 }
 
-func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.WriteCloser, io.ReadCloser, error) {
+func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.ReadCloser, error) {
 	cnx, err := s.apiClient().ContainerAttach(ctx, container, containerType.AttachOptions{
-		Stream:     true,
-		Stdin:      true,
-		Stdout:     true,
-		Stderr:     true,
-		Logs:       false,
-		DetachKeys: s.configFile().DetachKeys,
+		Stream: true,
+		Stdin:  false,
+		Stdout: true,
+		Stderr: true,
+		Logs:   false,
 	})
 	if err == nil {
 		stdout := ContainerStdout{HijackedResponse: cnx}
-		stdin := ContainerStdin{HijackedResponse: cnx}
-		return stdin, stdout, nil
+		return stdout, nil
 	}
 
 	// Fallback to logs API
@@ -157,7 +155,7 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 		Follow:     true,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return nil, logs, nil
+	return logs, nil
 }
