@@ -155,12 +155,3 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-exclude (
-	// FIXME(thaJeztah): remove this once kubernetes updated their dependencies to no longer need this.
-	//
-	// For additional details, see this PR and links mentioned in that PR:
-	// https://github.com/kubernetes-sigs/kustomize/pull/5830#issuecomment-2569960859
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
-)
