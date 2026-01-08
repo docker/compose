@@ -24,38 +24,33 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
-	filtersListNames := filters.NewArgs()
-	filtersListIDs := filters.NewArgs()
-	for _, containerName := range options.Containers {
-		filtersListNames.Add("name", containerName)
-		filtersListIDs.Add("id", containerName)
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: make(client.Filters).Add("name", options.Containers...),
+		All:     true,
+	})
+	if err != nil {
+		return nil, err
 	}
-	containers, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		Filters: filtersListNames,
+	containers := res.Items
+
+	containersByIds, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: make(client.Filters).Add("id", options.Containers...),
 		All:     true,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	containersByIds, err := s.apiClient().ContainerList(ctx, container.ListOptions{
-		Filters: filtersListIDs,
-		All:     true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, ctr := range containersByIds {
+	for _, ctr := range containersByIds.Items {
 		if !slices.ContainsFunc(containers, func(summary container.Summary) bool {
 			return summary.ID == ctr.ID
 		}) {
@@ -97,12 +92,12 @@ func (s *composeService) createProjectFromContainers(containers []container.Summ
 		}
 		service.Scale = increment(service.Scale)
 
-		inspect, err := s.apiClient().ContainerInspect(context.Background(), c.ID)
+		inspect, err := s.apiClient().ContainerInspect(context.Background(), c.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			services[serviceLabel] = service
 			continue
 		}
-		s.extractComposeConfiguration(&service, inspect, volumes, secrets, networks)
+		s.extractComposeConfiguration(&service, inspect.Container, volumes, secrets, networks)
 		service.Labels = cleanDockerPreviousLabels(service.Labels)
 		services[serviceLabel] = service
 	}
@@ -136,10 +131,10 @@ func (s *composeService) extractComposeConfiguration(service *types.ServiceConfi
 		for key, portBindings := range inspect.HostConfig.PortBindings {
 			for _, portBinding := range portBindings {
 				service.Ports = append(service.Ports, types.ServicePortConfig{
-					Target:    uint32(key.Int()),
+					Target:    uint32(key.Num()),
 					Published: portBinding.HostPort,
-					Protocol:  key.Proto(),
-					HostIP:    portBinding.HostIP,
+					Protocol:  string(key.Proto()),
+					HostIP:    portBinding.HostIP.String(),
 				})
 			}
 		}
@@ -222,12 +217,12 @@ func (s *composeService) toComposeNetwork(networks map[string]*network.EndpointS
 	serviceNetworkConfigs := make(map[string]*types.ServiceNetworkConfig)
 
 	for name, net := range networks {
-		inspect, err := s.apiClient().NetworkInspect(context.Background(), name, network.InspectOptions{})
+		inspect, err := s.apiClient().NetworkInspect(context.Background(), name, client.NetworkInspectOptions{})
 		if err != nil {
 			networkConfigs[name] = types.NetworkConfig{}
 		} else {
 			networkConfigs[name] = types.NetworkConfig{
-				Internal: inspect.Internal,
+				Internal: inspect.Network.Internal,
 			}
 		}
 		serviceNetworkConfigs[name] = &types.ServiceNetworkConfig{
