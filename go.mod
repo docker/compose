@@ -10,7 +10,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.10.0
 	github.com/containerd/console v1.0.5
-	github.com/containerd/containerd/v2 v2.2.1-0.20251115011841-efd86f2b0bc2
+	github.com/containerd/containerd/v2 v2.2.1
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.2
 	github.com/distribution/reference v0.6.0
@@ -95,7 +95,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.18.1 // indirect
+	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -154,13 +154,4 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-exclude (
-	// FIXME(thaJeztah): remove this once kubernetes updated their dependencies to no longer need this.
-	//
-	// For additional details, see this PR and links mentioned in that PR:
-	// https://github.com/kubernetes-sigs/kustomize/pull/5830#issuecomment-2569960859
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
