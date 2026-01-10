@@ -424,8 +424,8 @@ func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
 		return nil, fmt.Errorf("failed to get version of buildx")
 	}
 
-	if versions.LessThan(buildx.Version[1:], "0.17.0") {
-		return nil, fmt.Errorf("compose build requires buildx 0.17 or later")
+	if versions.LessThan(buildx.Version[1:], BuildxMinVersion) {
+		return nil, fmt.Errorf("compose build requires buildx %s or later", BuildxMinVersion)
 	}
 
 	return buildx, nil
