@@ -52,6 +52,15 @@ Or copy it into one of these folders to install it system-wide:
 
 (might require making the downloaded file executable with `chmod +x`)
 
+## When to use docker-compose
+
+docker-compose is well suited for defining and running multi-container applications in the following scenarios:
+
+- Local development environments
+- Testing and staging setups
+- Small to medium-sized deployments on a single host
+
+For larger, distributed or highly available production environments, other solutions such as Kubernetes may be more appropriate.
 
 Quick Start
 -----------
