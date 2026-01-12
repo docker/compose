@@ -73,8 +73,8 @@ func (s *composeService) ToMobyHealthCheck(ctx context.Context, check *compose.H
 		if err != nil {
 			return nil, err
 		}
-		if versions.LessThan(version, "1.44") {
-			return nil, errors.New("can't set healthcheck.start_interval as feature require Docker Engine v25 or later")
+		if versions.LessThan(version, APIVersion144) {
+			return nil, fmt.Errorf("can't set healthcheck.start_interval as feature require Docker Engine %s or later", DockerEngineV25)
 		} else {
 			startInterval = time.Duration(*check.StartInterval)
 		}

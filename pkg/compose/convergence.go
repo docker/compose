@@ -743,7 +743,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	}
 	// Starting API version 1.44, the ContainerCreate API call takes multiple networks
 	// so we include all the configurations there and can skip the one-by-one calls here
-	if versions.LessThan(apiVersion, "1.44") {
+	if versions.LessThan(apiVersion, APIVersion144) {
 		// the highest-priority network is the primary and is included in the ContainerCreate API
 		// call via container.NetworkMode & network.NetworkingConfig
 		// any remaining networks are connected one-by-one here after creation (but before start)

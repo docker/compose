@@ -353,7 +353,7 @@ func TestCreateMobyContainer(t *testing.T) {
 		// force `RuntimeVersion` to fetch fresh version
 		runtimeVersion = runtimeVersionCache{}
 		apiClient.EXPECT().ServerVersion(gomock.Any()).Return(moby.Version{
-			APIVersion: "1.44",
+			APIVersion: APIVersion144,
 		}, nil).AnyTimes()
 
 		service := types.ServiceConfig{

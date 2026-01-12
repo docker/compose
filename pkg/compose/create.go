@@ -360,7 +360,7 @@ func (s *composeService) prepareContainerMACAddress(ctx context.Context, service
 	if macAddress != "" && mainNw != nil && mainNw.MacAddress != "" && mainNw.MacAddress != macAddress {
 		return "", fmt.Errorf("the service-level mac_address should have the same value as network %s", nwName)
 	}
-	if versions.GreaterThanOrEqualTo(version, "1.44") {
+	if versions.GreaterThanOrEqualTo(version, APIVersion144) {
 		if mainNw != nil && mainNw.MacAddress == "" {
 			mainNw.MacAddress = macAddress
 		}
@@ -374,7 +374,7 @@ func (s *composeService) prepareContainerMACAddress(ctx context.Context, service
 		}
 
 		if len(withMacAddress) > 1 {
-			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine v25 or later", strings.Join(withMacAddress, ", "))
+			return "", fmt.Errorf("a MAC address is specified for multiple networks (%s), but this feature requires Docker Engine %s or later", strings.Join(withMacAddress, ", "), DockerEngineV25)
 		}
 
 		if mainNw != nil && mainNw.MacAddress != "" {
@@ -527,7 +527,7 @@ func defaultNetworkSettings(project *types.Project,
 	// so we can pass all the extra networks we want the container to be connected to
 	// in the network configuration instead of connecting the container to each extra
 	// network individually after creation.
-	if versions.GreaterThanOrEqualTo(version, "1.44") {
+	if versions.GreaterThanOrEqualTo(version, APIVersion144) {
 		if len(service.Networks) > 1 {
 			serviceNetworks := service.NetworksByPriority()
 			for _, networkKey := range serviceNetworks[1:] {
@@ -541,10 +541,10 @@ func defaultNetworkSettings(project *types.Project,
 		}
 	}
 
-	if versions.LessThan(version, "1.49") {
+	if versions.LessThan(version, APIVersion149) {
 		for _, config := range service.Networks {
 			if config != nil && config.InterfaceName != "" {
-				return "", nil, fmt.Errorf("interface_name requires Docker Engine v28.1 or later")
+				return "", nil, fmt.Errorf("interface_name requires Docker Engine %s or later", DockerEngineV28_1)
 			}
 		}
 	}
@@ -861,8 +861,8 @@ func (s *composeService) buildContainerVolumes(
 			if err != nil {
 				return nil, nil, err
 			}
-			if versions.LessThan(version, "1.48") {
-				return nil, nil, fmt.Errorf("volume with type=image require Docker Engine v28 or later")
+			if versions.LessThan(version, APIVersion148) {
+				return nil, nil, fmt.Errorf("volume with type=image require Docker Engine %s or later", DockerEngineV28)
 			}
 		}
 		mounts = append(mounts, m)
