@@ -46,6 +46,7 @@ import (
 
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/internal/paths"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
@@ -550,11 +551,14 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
 			}
 			for i, file := range opts.EnvFiles {
+				file = paths.ExpandUser(file)
 				if !filepath.IsAbs(file) {
 					file, err := filepath.Abs(file)
 					if err != nil {
 						return err
 					}
+					opts.EnvFiles[i] = file
+				} else {
 					opts.EnvFiles[i] = file
 				}
 			}
