@@ -30,6 +30,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -424,4 +425,50 @@ func TestCreateMobyContainer(t *testing.T) {
 		})
 		assert.NilError(t, err)
 	})
+}
+
+func TestDefaultNetworkSettingsOrdersEndpointsByGwPriority(t *testing.T) {
+	project := &types.Project{
+		Name: "test",
+		Networks: map[string]types.NetworkConfig{
+			"net1": {Name: "net1"},
+			"net2": {Name: "net2"},
+		},
+	}
+
+	service := types.ServiceConfig{
+		Name: "svc",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"net1": {GatewayPriority: 0},
+			"net2": {GatewayPriority: 100},
+		},
+	}
+
+	mode, netConfig, err := defaultNetworkSettings(
+		project,
+		service,
+		0,
+		nil,
+		false,
+		APIVersion144,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, netConfig)
+
+	endpoints := netConfig.EndpointsConfig
+	require.Len(t, endpoints, 2)
+
+	keys := make([]string, 0, len(endpoints))
+	for k := range endpoints {
+		keys = append(keys, k)
+	}
+
+	// Highest gw_priority must come first in EndpointsConfig
+	assert.Equal(t, keys[0], "net2")
+	assert.Equal(t, keys[1], "net1")
+
+	// NetworkMode must remain the primary network
+	assert.Equal(t, mode, container.NetworkMode("net1"))
+
 }
