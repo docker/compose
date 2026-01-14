@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -519,8 +520,17 @@ func defaultNetworkSettings(project *types.Project,
 	} else {
 		primaryNetworkKey = "default"
 	}
+
 	primaryNetworkMobyNetworkName := project.Networks[primaryNetworkKey].Name
-	primaryNetworkEndpoint := createEndpointSettings(project, service, serviceIndex, primaryNetworkKey, links, useNetworkAliases)
+	primaryNetworkEndpoint := createEndpointSettings(
+		project,
+		service,
+		serviceIndex,
+		primaryNetworkKey,
+		links,
+		useNetworkAliases,
+	)
+
 	endpointsConfig := map[string]*network.EndpointSettings{}
 
 	// Starting from API version 1.44, the Engine will take several EndpointsConfigs
@@ -532,7 +542,14 @@ func defaultNetworkSettings(project *types.Project,
 			serviceNetworks := service.NetworksByPriority()
 			for _, networkKey := range serviceNetworks[1:] {
 				mobyNetworkName := project.Networks[networkKey].Name
-				epSettings := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
+				epSettings := createEndpointSettings(
+					project,
+					service,
+					serviceIndex,
+					networkKey,
+					links,
+					useNetworkAliases,
+				)
 				endpointsConfig[mobyNetworkName] = epSettings
 			}
 		}
@@ -544,20 +561,52 @@ func defaultNetworkSettings(project *types.Project,
 	if versions.LessThan(version, APIVersion149) {
 		for _, config := range service.Networks {
 			if config != nil && config.InterfaceName != "" {
-				return "", nil, fmt.Errorf("interface_name requires Docker Engine %s or later", DockerEngineV28_1)
+				return "", nil, fmt.Errorf(
+					"interface_name requires Docker Engine %s or later",
+					DockerEngineV28_1,
+				)
 			}
 		}
 	}
 
+	// Include the primary network before ordering.
 	endpointsConfig[primaryNetworkMobyNetworkName] = primaryNetworkEndpoint
+
 	networkConfig := &network.NetworkingConfig{
-		EndpointsConfig: endpointsConfig,
+		EndpointsConfig: orderEndpointsByGwPriority(endpointsConfig),
 	}
 
 	// From the Engine API docs:
 	// > Supported standard values are: bridge, host, none, and container:<name|id>.
 	// > Any other value is taken as a custom network's name to which this container should connect to.
 	return container.NetworkMode(primaryNetworkMobyNetworkName), networkConfig, nil
+}
+
+type endpointWithName struct {
+	name     string
+	settings *network.EndpointSettings
+}
+
+func orderEndpointsByGwPriority(endpoints map[string]*network.EndpointSettings) map[string]*network.EndpointSettings {
+	if len(endpoints) <= 1 {
+		return endpoints
+	}
+
+	ordered := make([]endpointWithName, 0, len(endpoints))
+	for name, ep := range endpoints {
+		ordered = append(ordered, endpointWithName{name, ep})
+	}
+
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return ordered[i].settings.GwPriority > ordered[j].settings.GwPriority
+	})
+
+	orderedEndpoints := make(map[string]*network.EndpointSettings, len(ordered))
+	for _, ep := range ordered {
+		orderedEndpoints[ep.name] = ep.settings
+	}
+
+	return orderedEndpoints
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
