@@ -22,6 +22,30 @@ import (
 	"strings"
 )
 
+// ExpandUser expands a leading tilde (~) in a path to the user's home directory.
+// If the path doesn't start with ~, it is returned unchanged.
+// If the home directory cannot be determined, the original path is returned.
+func ExpandUser(path string) string {
+	if path == "" {
+		return path
+	}
+	if path[0] != '~' {
+		return path
+	}
+	if len(path) > 1 && path[1] != '/' && path[1] != filepath.Separator {
+		// ~otheruser/... syntax is not supported
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if len(path) == 1 {
+		return home
+	}
+	return filepath.Join(home, path[2:])
+}
+
 func IsChild(dir string, file string) bool {
 	if dir == "" {
 		return false
