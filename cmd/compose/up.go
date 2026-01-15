@@ -152,6 +152,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	flags.StringVar(&create.Pull, "pull", "policy", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.StringArrayVar(&create.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
+	flags.StringArrayVar(&create.labels, "label", []string{}, "Add or override labels on services, networks and volumes")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output")
 	flags.BoolVar(&up.noPrefix, "no-log-prefix", false, "Don't print prefix in logs")
 	flags.BoolVar(&create.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed")

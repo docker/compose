@@ -49,6 +49,7 @@ type createOptions struct {
 	timeout       int
 	quietPull     bool
 	scale         []string
+	labels        []string // 👈 ADICIONADO
 	AssumeYes     bool
 }
 
@@ -84,6 +85,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
+	flags.StringArrayVar(&opts.labels, "label", []string{}, "Add or override labels on services") // 👈 ADICIONADO
 	flags.BoolVarP(&opts.AssumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		// assumeYes was introduced by mistake as `--y`
@@ -172,9 +174,7 @@ func (opts createOptions) Apply(project *types.Project) error {
 			project.Services[i] = service
 		}
 	}
-	// N.B. opts.Build means "force build all", but images can still be built
-	// when this is false
-	// e.g. if a service has pull_policy: build or its local image is policy
+
 	if opts.Build {
 		for i, service := range project.Services {
 			if service.Build == nil {
@@ -185,15 +185,33 @@ func (opts createOptions) Apply(project *types.Project) error {
 		}
 	}
 
+	// 👇 APLICA LABELS
+	if len(opts.labels) > 0 {
+		parsed := types.Labels{}
+		for _, l := range opts.labels {
+			parts := strings.SplitN(l, "=", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid label %q, expected key=value", l)
+			}
+			parsed[parts[0]] = parts[1]
+		}
+
+		for name, svc := range project.Services {
+			if svc.Labels == nil {
+				svc.Labels = types.Labels{}
+			}
+			for k, v := range parsed {
+				svc.Labels[k] = v
+			}
+			project.Services[name] = svc
+		}
+	}
+
 	if err := applyPlatforms(project, true); err != nil {
 		return err
 	}
 
-	err := applyScaleOpts(project, opts.scale)
-	if err != nil {
-		return err
-	}
-	return nil
+	return applyScaleOpts(project, opts.scale)
 }
 
 func applyScaleOpts(project *types.Project, opts []string) error {
@@ -217,8 +235,11 @@ func applyScaleOpts(project *types.Project, opts []string) error {
 
 func (opts createOptions) isPullPolicyValid() bool {
 	pullPolicies := []string{
-		types.PullPolicyAlways, types.PullPolicyNever, types.PullPolicyBuild,
-		types.PullPolicyMissing, types.PullPolicyIfNotPresent,
+		types.PullPolicyAlways,
+		types.PullPolicyNever,
+		types.PullPolicyBuild,
+		types.PullPolicyMissing,
+		types.PullPolicyIfNotPresent,
 	}
 	return slices.Contains(pullPolicies, opts.Pull)
 }
