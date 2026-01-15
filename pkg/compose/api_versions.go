@@ -19,19 +19,6 @@ package compose
 // Docker Engine API version constants.
 // These versions correspond to specific Docker Engine releases and their features.
 const (
-	// APIVersion144 represents Docker Engine API version 1.44 (Engine v25.0).
-	//
-	// New features in this version:
-	//  - Endpoint-specific MAC address configuration
-	//  - Multiple networks can be connected during container creation
-	//  - healthcheck.start_interval parameter support
-	//
-	// Before this version:
-	//  - MAC address was container-wide only
-	//  - Extra networks required post-creation NetworkConnect calls
-	//  - healthcheck.start_interval was not available
-	APIVersion144 = "1.44"
-
 	// APIVersion148 represents Docker Engine API version 1.48 (Engine v28.0).
 	//
 	// New features in this version:
@@ -56,9 +43,6 @@ const (
 // Docker Engine version strings for user-facing error messages.
 // These should be used in error messages to provide clear version requirements.
 const (
-	// DockerEngineV25 is the major version string for Docker Engine 25.x
-	DockerEngineV25 = "v25"
-
 	// DockerEngineV28 is the major version string for Docker Engine 28.x
 	DockerEngineV28 = "v28"
 
