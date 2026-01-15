@@ -34,6 +34,9 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// ImagePruneMode controls how aggressively images associated with the project
+// are removed from the engine
+
 type ImagePruneMode string
 
 const (
