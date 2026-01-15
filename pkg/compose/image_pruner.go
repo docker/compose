@@ -36,7 +36,6 @@ import (
 
 // ImagePruneMode controls how aggressively images associated with the project
 // are removed from the engine
-
 type ImagePruneMode string
 
 const (
@@ -70,10 +69,7 @@ func (p *ImagePruner) ImagesToPrune(ctx context.Context, opts ImagePruneOptions)
 		return nil, fmt.Errorf("unsupported image prune mode: %s", opts.Mode)
 	}
 
-	var (
-		imagesToCheck []string // subject to container usage check
-		imagesFinal   []string // always removed
-	)
+	var imagesFinal []string
 
 	// --rmi=all
 	if opts.Mode == ImagePruneAll {
@@ -81,7 +77,7 @@ func (p *ImagePruner) ImagesToPrune(ctx context.Context, opts ImagePruneOptions)
 		if err != nil {
 			return nil, err
 		}
-		imagesToCheck = append(imagesToCheck, named...)
+		imagesFinal = append(imagesFinal, named...)
 	}
 
 	projectImages, err := p.labeledLocalImages(ctx)
@@ -104,32 +100,23 @@ func (p *ImagePruner) ImagesToPrune(ctx context.Context, opts ImagePruneOptions)
 		}
 
 		if shouldPrune {
-			imagesToCheck = append(imagesToCheck, img.RepoTags[0])
+			imagesFinal = append(imagesFinal, img.RepoTags[0])
 		}
 	}
 
-	// legacy / no-label images — ALWAYS removed, no container check
+	// legacy / no-label images — ALWAYS removed
 	fallbackImages, err := p.unlabeledLocalImages(ctx)
 	if err != nil {
 		return nil, err
 	}
 	imagesFinal = append(imagesFinal, fallbackImages...)
 
-	// only check containers if needed
-	if len(imagesToCheck) > 0 {
-		inUse, err := p.imagesInUse(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, img := range imagesToCheck {
-			if _, used := inUse[img]; used {
-				continue
-			}
-			imagesFinal = append(imagesFinal, img)
-		}
-	}
-
+	// NOTE: We intentionally do NOT check whether images are currently in use by containers.
+	// The engine already performs this validation during image removal, avoiding race
+	// conditions and keeping behavior consistent with the daemon.
+	//
+	// Errors such as "image is being used by a container" are expected to be returned by
+	// the engine and handled at removal time.
 	return normalizeAndDedupeImages(imagesFinal), nil
 }
 
