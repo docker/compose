@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
@@ -427,7 +428,7 @@ func TestCreateMobyContainer(t *testing.T) {
 	})
 }
 
-func TestDefaultNetworkSettingsOrdersEndpointsByGwPriority(t *testing.T) {
+func TestDefaultNetworkSettingsGwPrioritySelectsPrimaryNetwork(t *testing.T) {
 	project := &types.Project{
 		Name: "test",
 		Networks: map[string]types.NetworkConfig{
@@ -459,16 +460,9 @@ func TestDefaultNetworkSettingsOrdersEndpointsByGwPriority(t *testing.T) {
 	endpoints := netConfig.EndpointsConfig
 	require.Len(t, endpoints, 2)
 
-	keys := make([]string, 0, len(endpoints))
-	for k := range endpoints {
-		keys = append(keys, k)
-	}
+	assert.Assert(t, cmp.Contains(endpoints, "net1"))
+	assert.Assert(t, cmp.Contains(endpoints, "net2"))
 
-	// Highest gw_priority must come first in EndpointsConfig
-	assert.Equal(t, keys[0], "net2")
-	assert.Equal(t, keys[1], "net1")
-
-	// NetworkMode must remain the primary network
-	assert.Equal(t, mode, container.NetworkMode("net1"))
-
+	// gw_priority must only affect primary network selection
+	assert.Assert(t, cmp.Equal(container.NetworkMode("net1"), mode))
 }

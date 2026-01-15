@@ -25,7 +25,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -569,44 +568,17 @@ func defaultNetworkSettings(project *types.Project,
 		}
 	}
 
-	// Include the primary network before ordering.
+	// Include the primary network
 	endpointsConfig[primaryNetworkMobyNetworkName] = primaryNetworkEndpoint
 
 	networkConfig := &network.NetworkingConfig{
-		EndpointsConfig: orderEndpointsByGwPriority(endpointsConfig),
+		EndpointsConfig: endpointsConfig,
 	}
 
 	// From the Engine API docs:
 	// > Supported standard values are: bridge, host, none, and container:<name|id>.
 	// > Any other value is taken as a custom network's name to which this container should connect to.
 	return container.NetworkMode(primaryNetworkMobyNetworkName), networkConfig, nil
-}
-
-type endpointWithName struct {
-	name     string
-	settings *network.EndpointSettings
-}
-
-func orderEndpointsByGwPriority(endpoints map[string]*network.EndpointSettings) map[string]*network.EndpointSettings {
-	if len(endpoints) <= 1 {
-		return endpoints
-	}
-
-	ordered := make([]endpointWithName, 0, len(endpoints))
-	for name, ep := range endpoints {
-		ordered = append(ordered, endpointWithName{name, ep})
-	}
-
-	sort.SliceStable(ordered, func(i, j int) bool {
-		return ordered[i].settings.GwPriority > ordered[j].settings.GwPriority
-	})
-
-	orderedEndpoints := make(map[string]*network.EndpointSettings, len(ordered))
-	for _, ep := range ordered {
-		orderedEndpoints[ep.name] = ep.settings
-	}
-
-	return orderedEndpoints
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
