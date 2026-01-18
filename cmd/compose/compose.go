@@ -32,6 +32,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/loader"
+	composepaths "github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	composegoutils "github.com/compose-spec/compose-go/v2/utils"
 	"github.com/docker/buildx/util/logutil"
@@ -550,11 +551,14 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
 			}
 			for i, file := range opts.EnvFiles {
+				file = composepaths.ExpandUser(file)
 				if !filepath.IsAbs(file) {
 					file, err := filepath.Abs(file)
 					if err != nil {
 						return err
 					}
+					opts.EnvFiles[i] = file
+				} else {
 					opts.EnvFiles[i] = file
 				}
 			}
