@@ -30,7 +30,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.26.3
-	github.com/moby/go-archive v0.1.0
+	github.com/moby/go-archive v0.2.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/morikuni/aec v1.1.0
