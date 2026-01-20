@@ -355,6 +355,8 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 		select {
 		case <-ctx.Done():
 			options.LogTo.Log(api.WatchLogger, "Watch disabled")
+			// Ensure watcher is closed to release resources
+			_ = watcher.Close()
 			return nil
 		case err, open := <-watcher.Errors():
 			if err != nil {
@@ -363,13 +365,28 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 			if open {
 				continue
 			}
+			_ = watcher.Close()
 			return err
-		case batch := <-batchEvents:
+		case batch, ok := <-batchEvents:
+			if !ok {
+				options.LogTo.Log(api.WatchLogger, "Watch disabled")
+				_ = watcher.Close()
+				return nil
+			}
+			if len(batch) > 1000 {
+				logrus.Warnf("Very large batch of file changes detected: %d files. This may impact performance.", len(batch))
+				options.LogTo.Log(api.WatchLogger, "Large batch of file changes detected. If you just switched branches, this is expected.")
+			}
 			start := time.Now()
 			logrus.Debugf("batch start: count[%d]", len(batch))
 			err := s.handleWatchBatch(ctx, project, options, batch, rules, syncer)
 			if err != nil {
 				logrus.Warnf("Error handling changed files: %v", err)
+				// If context was canceled, exit immediately
+				if ctx.Err() != nil {
+					_ = watcher.Close()
+					return ctx.Err()
+				}
 			}
 			logrus.Debugf("batch complete: duration[%s] count[%d]", time.Since(start), len(batch))
 		}
