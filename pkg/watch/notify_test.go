@@ -35,20 +35,20 @@ import (
 // behavior.
 
 func TestWindowsBufferSize(t *testing.T) {
-	orig := os.Getenv(WindowsBufferSizeEnvVar)
-	defer os.Setenv(WindowsBufferSizeEnvVar, orig) //nolint:errcheck
+	t.Run("empty value", func(t *testing.T) {
+		t.Setenv(WindowsBufferSizeEnvVar, "")
+		assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
+	})
 
-	err := os.Setenv(WindowsBufferSizeEnvVar, "")
-	require.NoError(t, err)
-	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
+	t.Run("invalid value", func(t *testing.T) {
+		t.Setenv(WindowsBufferSizeEnvVar, "a")
+		assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
+	})
 
-	err = os.Setenv(WindowsBufferSizeEnvVar, "a")
-	require.NoError(t, err)
-	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
-
-	err = os.Setenv(WindowsBufferSizeEnvVar, "10")
-	require.NoError(t, err)
-	assert.Equal(t, 10, DesiredWindowsBufferSize())
+	t.Run("valid value", func(t *testing.T) {
+		t.Setenv(WindowsBufferSizeEnvVar, "10")
+		assert.Equal(t, 10, DesiredWindowsBufferSize())
+	})
 }
 
 func TestNoEvents(t *testing.T) {
@@ -114,7 +114,7 @@ func TestGitBranchSwitch(t *testing.T) {
 	f.events = nil
 
 	// consume all the events in the background
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	done := f.consumeEventsInBackground(ctx)
 
 	for i, dir := range dirs {
