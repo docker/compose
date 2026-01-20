@@ -8,6 +8,7 @@ linters:
     - depguard
     - errcheck
     - errorlint
+    - forbidigo
     - gocritic
     - gocyclo
     - gomodguard
@@ -38,6 +39,15 @@ linters:
               desc: use stdlib slices package
             - pkg: gopkg.in/yaml.v2
               desc: compose-go uses yaml.v3
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: 'context\.Background'
+          pkg: '^context$'
+          msg: "in tests, use t.Context() instead of context.Background()"
+        - pattern: 'context\.TODO'
+          pkg: '^context$'
+          msg: "in tests, use t.Context() instead of context.TODO()"
     gocritic:
       disabled-checks:
         - paramTypeCombine
@@ -74,6 +84,10 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - path-except: '_test\.go'
+        linters:
+          - forbidigo
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
