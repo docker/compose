@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -41,7 +40,6 @@ func TestStopTimeout(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
-	ctx := context.Background()
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]container.Summary{
 			testContainer("service1", "123", false),
@@ -63,7 +61,7 @@ func TestStopTimeout(t *testing.T) {
 	api.EXPECT().ContainerStop(gomock.Any(), "456", stopConfig).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopConfig).Return(nil)
 
-	err = tested.Stop(ctx, strings.ToLower(testProject), compose.StopOptions{
+	err = tested.Stop(t.Context(), strings.ToLower(testProject), compose.StopOptions{
 		Timeout: &timeout,
 	})
 	assert.NilError(t, err)

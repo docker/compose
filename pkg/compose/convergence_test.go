@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -95,7 +94,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
 
-		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -118,7 +117,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
-		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -141,7 +140,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
 
-		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -165,7 +164,7 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]container.Summary{c}, nil)
 
-		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 4)
@@ -202,7 +201,7 @@ func TestServiceLinks(t *testing.T) {
 		}
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptionsOneOff).Return([]container.Summary{c}, nil)
 
-		links, err := tested.(*composeService).getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -233,7 +232,7 @@ func TestWaitDependencies(t *testing.T) {
 			"db":    {Condition: ServiceConditionRunningOrHealthy},
 			"redis": {Condition: ServiceConditionRunningOrHealthy},
 		}
-		assert.NilError(t, tested.(*composeService).waitDependencies(context.Background(), &project, "", dependencies, nil, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil, 0))
 	})
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(1)}
@@ -246,7 +245,7 @@ func TestWaitDependencies(t *testing.T) {
 			"db":    {Condition: types.ServiceConditionStarted, Required: true},
 			"redis": {Condition: types.ServiceConditionStarted, Required: true},
 		}
-		assert.NilError(t, tested.(*composeService).waitDependencies(context.Background(), &project, "", dependencies, nil, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil, 0))
 	})
 }
 
@@ -260,7 +259,7 @@ func TestIsServiceHealthy(t *testing.T) {
 	assert.NilError(t, err)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("disabled healthcheck with fallback to running", func(t *testing.T) {
 		containerID := "test-container-id"
@@ -475,7 +474,7 @@ func TestCreateMobyContainer(t *testing.T) {
 				Aliases:    []string{"bork-test-0"},
 			}))
 
-		_, err = tested.(*composeService).createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
+		_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service, "test", 0, nil, createOptions{
 			Labels: make(types.Labels),
 		})
 		assert.NilError(t, err)
@@ -561,7 +560,7 @@ func TestCreateMobyContainer(t *testing.T) {
 				NetworkSettings: &container.NetworkSettings{},
 			}, nil)
 
-		_, err = tested.(*composeService).createMobyContainer(context.Background(), &project, service, "test", 0, nil, createOptions{
+		_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service, "test", 0, nil, createOptions{
 			Labels: make(types.Labels),
 		})
 		assert.NilError(t, err)

@@ -501,7 +501,7 @@ type notifyFixture struct {
 
 func newNotifyFixture(t *testing.T) *notifyFixture {
 	out := bytes.NewBuffer(nil)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	nf := &notifyFixture{
 		ctx:            ctx,
 		cancel:         cancel,

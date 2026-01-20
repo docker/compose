@@ -95,7 +95,7 @@ func TestWatch_Sync(t *testing.T) {
 	//
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(t.Context())
 	t.Cleanup(cancelFunc)
 
 	proj := types.Project{

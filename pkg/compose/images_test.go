@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +39,6 @@ func TestImages(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
-	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
 	listOpts := container.ListOptions{All: true, Filters: args}
 	api.EXPECT().ServerVersion(gomock.Any()).Return(types.Version{APIVersion: "1.96"}, nil).AnyTimes()
@@ -56,9 +54,9 @@ func TestImages(t *testing.T) {
 	c2 := containerDetail("service1", "456", "running", "bar:2")
 	c2.Ports = []container.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
 	c3 := containerDetail("service2", "789", "exited", "foo:1")
-	api.EXPECT().ContainerList(ctx, listOpts).Return([]container.Summary{c1, c2, c3}, nil)
+	api.EXPECT().ContainerList(t.Context(), listOpts).Return([]container.Summary{c1, c2, c3}, nil)
 
-	images, err := tested.Images(ctx, strings.ToLower(testProject), compose.ImagesOptions{})
+	images, err := tested.Images(t.Context(), strings.ToLower(testProject), compose.ImagesOptions{})
 
 	expected := map[string]compose.ImageSummary{
 		"123": {

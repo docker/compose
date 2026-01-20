@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"io"
 	"strings"
 	"sync"
@@ -44,8 +43,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 
-	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, containerType.ListOptions{
+	api.EXPECT().ContainerList(t.Context(), containerType.ListOptions{
 		All:     true,
 		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
@@ -87,7 +85,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	}
 
 	consumer := &testLogConsumer{}
-	err = tested.Logs(ctx, name, consumer, opts)
+	err = tested.Logs(t.Context(), name, consumer, opts)
 	require.NoError(t, err)
 
 	require.Equal(
@@ -114,8 +112,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 
-	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, containerType.ListOptions{
+	api.EXPECT().ContainerList(t.Context(), containerType.ListOptions{
 		All:     true,
 		Filters: filters.NewArgs(oneOffFilter(false), projectFilter(name), hasConfigHashLabel()),
 	}).Return(
@@ -157,7 +154,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	opts := compose.LogOptions{
 		Project: proj,
 	}
-	err = tested.Logs(ctx, name, consumer, opts)
+	err = tested.Logs(t.Context(), name, consumer, opts)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"hello c1"}, consumer.LogsForContainer("c1"))

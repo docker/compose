@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -32,7 +31,7 @@ import (
 )
 
 func Test_createLayers(t *testing.T) {
-	project, err := loader.LoadWithContext(context.TODO(), types.ConfigDetails{
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
 		WorkingDir:  "testdata/publish/",
 		Environment: types.Mapping{},
 		ConfigFiles: []types.ConfigFile{
@@ -45,7 +44,7 @@ func Test_createLayers(t *testing.T) {
 	project.ComposeFiles = []string{"testdata/publish/compose.yaml"}
 
 	service := &composeService{}
-	layers, err := service.createLayers(context.TODO(), project, api.PublishOptions{
+	layers, err := service.createLayers(t.Context(), project, api.PublishOptions{
 		WithEnvironment: true,
 	})
 	assert.NilError(t, err)

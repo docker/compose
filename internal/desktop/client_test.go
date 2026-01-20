@@ -17,7 +17,6 @@
 package desktop
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -34,9 +33,6 @@ func TestClientPing(t *testing.T) {
 		t.Skip("Skipping - COMPOSE_TEST_DESKTOP_ENDPOINT not defined")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
 	client := NewClient(desktopEndpoint)
 	t.Cleanup(func() {
 		_ = client.Close()
@@ -44,7 +40,7 @@ func TestClientPing(t *testing.T) {
 
 	now := time.Now()
 
-	ret, err := client.Ping(ctx)
+	ret, err := client.Ping(t.Context())
 	require.NoError(t, err)
 
 	serverTime := time.Unix(0, ret.ServerTime)

@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -164,7 +163,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	}
 	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(image.InspectResponse{}, nil)
 
-	mounts, err := s.buildContainerMountOptions(context.TODO(), project, project.Services["myService"], inherit)
+	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -176,7 +175,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
-	mounts, err = s.buildContainerMountOptions(context.TODO(), project, project.Services["myService"], inherit)
+	mounts, err = s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -435,7 +434,7 @@ volumes:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := composeloader.LoadWithContext(context.TODO(), composetypes.ConfigDetails{
+			p, err := composeloader.LoadWithContext(t.Context(), composetypes.ConfigDetails{
 				ConfigFiles: []composetypes.ConfigFile{
 					{
 						Filename: "test",
@@ -448,7 +447,7 @@ volumes:
 			})
 			assert.NilError(t, err)
 			s := &composeService{}
-			binds, mounts, err := s.buildContainerVolumes(context.TODO(), *p, p.Services["test"], nil)
+			binds, mounts, err := s.buildContainerVolumes(t.Context(), *p, p.Services["test"], nil)
 			assert.NilError(t, err)
 			assert.DeepEqual(t, tt.binds, binds)
 			assert.DeepEqual(t, tt.mounts, mounts)

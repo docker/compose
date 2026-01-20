@@ -18,7 +18,6 @@ package compose
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -244,16 +243,11 @@ services:
 	}
 
 	// Set up the context with necessary environment variables
-	ctx := context.Background()
-	_ = os.Setenv("TEST_VAR", "test-value")
-	_ = os.Setenv("API_KEY", "123456")
-	defer func() {
-		_ = os.Unsetenv("TEST_VAR")
-		_ = os.Unsetenv("API_KEY")
-	}()
+	t.Setenv("TEST_VAR", "test-value")
+	t.Setenv("API_KEY", "123456")
 
 	// Extract variables from the model
-	info, noVariables, err := extractInterpolationVariablesFromModel(ctx, cli, projectOptions, []string{})
+	info, noVariables, err := extractInterpolationVariablesFromModel(t.Context(), cli, projectOptions, []string{})
 	require.NoError(t, err)
 	require.False(t, noVariables)
 

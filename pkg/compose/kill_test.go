@@ -45,8 +45,7 @@ func TestKillAll(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 
-	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, container.ListOptions{
+	api.EXPECT().ContainerList(t.Context(), container.ListOptions{
 		Filters: filters.NewArgs(projectFilter(name), hasConfigHashLabel()),
 	}).Return(
 		[]container.Summary{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
@@ -64,7 +63,7 @@ func TestKillAll(t *testing.T) {
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "789", "").Return(nil)
 
-	err = tested.Kill(ctx, name, compose.KillOptions{})
+	err = tested.Kill(t.Context(), name, compose.KillOptions{})
 	assert.NilError(t, err)
 }
 
@@ -82,8 +81,7 @@ func TestKillSignal(t *testing.T) {
 		Filters: filters.NewArgs(projectFilter(name), serviceFilter(serviceName), hasConfigHashLabel()),
 	}
 
-	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, listOptions).Return([]container.Summary{testContainer(serviceName, "123", false)}, nil)
+	api.EXPECT().ContainerList(t.Context(), listOptions).Return([]container.Summary{testContainer(serviceName, "123", false)}, nil)
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		volume.ListOptions{
@@ -96,7 +94,7 @@ func TestKillSignal(t *testing.T) {
 		}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
-	err = tested.Kill(ctx, name, compose.KillOptions{Services: []string{serviceName}, Signal: "SIGTERM"})
+	err = tested.Kill(t.Context(), name, compose.KillOptions{Services: []string{serviceName}, Signal: "SIGTERM"})
 	assert.NilError(t, err)
 }
 

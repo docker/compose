@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -90,7 +89,7 @@ func TestDown(t *testing.T) {
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "def456").Return(nil)
 
-	err = tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{})
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{})
 	assert.NilError(t, err)
 }
 
@@ -139,7 +138,7 @@ func TestDownWithGivenServices(t *testing.T) {
 	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{ID: "abc123"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 
-	err = tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{
 		Services: []string{"service1", "not-running-service"},
 	})
 	assert.NilError(t, err)
@@ -175,7 +174,7 @@ func TestDownWithSpecifiedServiceButTheServicesAreNotRunning(t *testing.T) {
 			{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}},
 		}, nil)
 
-	err = tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{
 		Services: []string{"not-running-service1", "not-running-service2"},
 	})
 	assert.NilError(t, err)
@@ -227,7 +226,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(network.Inspect{ID: "abc123"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123").Return(nil)
 
-	err = tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})
 	assert.NilError(t, err)
 }
 
@@ -259,7 +258,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 
 	api.EXPECT().VolumeRemove(gomock.Any(), "myProject_volume", true).Return(nil)
 
-	err = tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Volumes: true})
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{Volumes: true})
 	assert.NilError(t, err)
 }
 
@@ -346,7 +345,7 @@ func TestDownRemoveImages(t *testing.T) {
 
 	t.Log("-> docker compose down --rmi=local")
 	opts.Images = "local"
-	err = tested.Down(context.Background(), strings.ToLower(testProject), opts)
+	err = tested.Down(t.Context(), strings.ToLower(testProject), opts)
 	assert.NilError(t, err)
 
 	otherImagesToBeRemoved := []string{
@@ -361,7 +360,7 @@ func TestDownRemoveImages(t *testing.T) {
 
 	t.Log("-> docker compose down --rmi=all")
 	opts.Images = "all"
-	err = tested.Down(context.Background(), strings.ToLower(testProject), opts)
+	err = tested.Down(t.Context(), strings.ToLower(testProject), opts)
 	assert.NilError(t, err)
 }
 
@@ -406,7 +405,7 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 
 	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1:latest", image.RemoveOptions{}).Return(nil, nil)
 
-	err = tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Images: "local"})
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{Images: "local"})
 	assert.NilError(t, err)
 }
 

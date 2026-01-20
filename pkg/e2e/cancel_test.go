@@ -39,7 +39,7 @@ func TestComposeCancel(t *testing.T) {
 	t.Run("metrics on cancel Compose build", func(t *testing.T) {
 		const buildProjectPath = "fixtures/build-infinite/compose.yaml"
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
