@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -48,13 +47,11 @@ services:
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	require.NoError(t, err)
 
-	// Create compose service
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
 	// Load the project
-	ctx := context.Background()
-	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 		ConfigPaths: []string{composeFile},
 	})
 
@@ -87,19 +84,14 @@ services:
 	require.NoError(t, err)
 
 	// Set environment variable
-	require.NoError(t, os.Setenv("TEST_VAR", "resolved_value"))
-	t.Cleanup(func() {
-		require.NoError(t, os.Unsetenv("TEST_VAR"))
-	})
+	t.Setenv("TEST_VAR", "resolved_value")
 
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Test with environment resolution (default)
 	t.Run("WithResolution", func(t *testing.T) {
-		project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 			ConfigPaths: []string{composeFile},
 		})
 		require.NoError(t, err)
@@ -114,7 +106,7 @@ services:
 
 	// Test without environment resolution
 	t.Run("WithoutResolution", func(t *testing.T) {
-		project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 			ConfigPaths:       []string{composeFile},
 			ProjectOptionsFns: []cli.ProjectOptionsFn{cli.WithoutEnvironmentResolution},
 		})
@@ -145,10 +137,8 @@ services:
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Load only specific services
-	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 		ConfigPaths: []string{composeFile},
 		Services:    []string{"web", "db"},
 	})
@@ -177,11 +167,9 @@ services:
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Without debug profile
 	t.Run("WithoutProfile", func(t *testing.T) {
-		project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 			ConfigPaths: []string{composeFile},
 		})
 		require.NoError(t, err)
@@ -191,7 +179,7 @@ services:
 
 	// With debug profile
 	t.Run("WithProfile", func(t *testing.T) {
-		project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 			ConfigPaths: []string{composeFile},
 			Profiles:    []string{"debug"},
 		})
@@ -216,15 +204,13 @@ services:
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Track events received
 	var events []string
 	listener := func(event string, metadata map[string]any) {
 		events = append(events, event)
 	}
 
-	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 		ConfigPaths:   []string{composeFile},
 		LoadListeners: []api.LoadListener{listener},
 	})
@@ -251,11 +237,9 @@ services:
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Without explicit project name
 	t.Run("InferredName", func(t *testing.T) {
-		project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 			ConfigPaths: []string{composeFile},
 		})
 		require.NoError(t, err)
@@ -265,7 +249,7 @@ services:
 
 	// With explicit project name
 	t.Run("ExplicitName", func(t *testing.T) {
-		project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 			ConfigPaths: []string{composeFile},
 			ProjectName: "my-custom-project",
 		})
@@ -288,10 +272,8 @@ services:
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// With compatibility mode
-	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 		ConfigPaths:   []string{composeFile},
 		Compatibility: true,
 	})
@@ -317,10 +299,8 @@ this is not valid yaml: [[[
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Should return an error for invalid YAML
-	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 		ConfigPaths: []string{composeFile},
 	})
 
@@ -332,10 +312,8 @@ func TestLoadProject_MissingComposeFile(t *testing.T) {
 	service, err := NewComposeService(nil)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Should return an error for missing file
-	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 		ConfigPaths: []string{"/nonexistent/compose.yaml"},
 	})
 
