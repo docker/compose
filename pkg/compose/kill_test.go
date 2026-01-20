@@ -127,6 +127,7 @@ func containerLabels(service string, oneOff bool) map[string]string {
 }
 
 func anyCancellableContext() gomock.Matcher {
+	//nolint:forbidigo // This creates a context type for gomock matching, not for actual test usage
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
 	cancel()
 	return gomock.AssignableToTypeOf(ctxWithCancel)
