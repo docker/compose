@@ -83,7 +83,7 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=bind,from=osxcross,src=/osxsdk,target=/xx-sdk \
     xx-go --wrap && \
-    if [ "$(xx-info os)" == "darwin" ]; then export CGO_ENABLED=1; fi && \
+    if [ "$(xx-info os)" == "darwin" ]; then export CGO_ENABLED=1; export BUILD_TAGS=fsnotify,$BUILD_TAGS; fi && \
     make build GO_BUILDTAGS="$BUILD_TAGS" DESTDIR=/out && \
     xx-verify --static /out/docker-compose
 
