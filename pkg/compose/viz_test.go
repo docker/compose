@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"strconv"
 	"testing"
 
@@ -119,10 +118,8 @@ func TestViz(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	t.Run("viz (no ports, networks or image)", func(t *testing.T) {
-		graphStr, err := tested.Viz(ctx, &project, compose.VizOptions{
+		graphStr, err := tested.Viz(t.Context(), &project, compose.VizOptions{
 			Indentation:      "  ",
 			IncludePorts:     false,
 			IncludeImageName: false,
@@ -181,7 +178,7 @@ func TestViz(t *testing.T) {
 	})
 
 	t.Run("viz (with ports, networks and image)", func(t *testing.T) {
-		graphStr, err := tested.Viz(ctx, &project, compose.VizOptions{
+		graphStr, err := tested.Viz(t.Context(), &project, compose.VizOptions{
 			Indentation:      "\t",
 			IncludePorts:     true,
 			IncludeImageName: true,

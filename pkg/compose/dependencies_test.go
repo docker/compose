@@ -71,9 +71,6 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 		project.Services[name] = svc
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
 	svc := make(chan string, 10)
 	seen := make(map[string]int)
 	done := make(chan struct{})
@@ -84,7 +81,7 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 		done <- struct{}{}
 	}()
 
-	err := InDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+	err := InDependencyOrder(t.Context(), &project, func(ctx context.Context, service string) error {
 		svc <- service
 		return nil
 	})
@@ -99,11 +96,8 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 }
 
 func TestInDependencyUpCommandOrder(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
 	var order []string
-	err := InDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
+	err := InDependencyOrder(t.Context(), createTestProject(), func(ctx context.Context, service string) error {
 		order = append(order, service)
 		return nil
 	})
@@ -112,11 +106,8 @@ func TestInDependencyUpCommandOrder(t *testing.T) {
 }
 
 func TestInDependencyReverseDownCommandOrder(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
 	var order []string
-	err := InReverseDependencyOrder(ctx, createTestProject(), func(ctx context.Context, service string) error {
+	err := InReverseDependencyOrder(t.Context(), createTestProject(), func(ctx context.Context, service string) error {
 		order = append(order, service)
 		return nil
 	})
@@ -429,7 +420,7 @@ func TestWith_RootNodesAndUp(t *testing.T) {
 				return nil
 			})
 			WithRootNodesAndDown(tt.nodes)(gt)
-			err := gt.visit(context.TODO(), graph)
+			err := gt.visit(t.Context(), graph)
 			assert.NilError(t, err)
 			sort.Strings(visited)
 			assert.DeepEqual(t, tt.want, visited)

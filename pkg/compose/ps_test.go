@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -37,7 +36,6 @@ func TestPs(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
-	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)), hasConfigHashLabel())
 	args.Add("label", "com.docker.compose.oneoff=False")
 	listOpts := containerType.ListOptions{Filters: args, All: false}
@@ -45,12 +43,12 @@ func TestPs(t *testing.T) {
 	c2, inspect2 := containerDetails("service1", "456", containerType.StateRunning, "", 0)
 	c2.Ports = []containerType.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
 	c3, inspect3 := containerDetails("service2", "789", containerType.StateExited, "", 130)
-	api.EXPECT().ContainerList(ctx, listOpts).Return([]containerType.Summary{c1, c2, c3}, nil)
+	api.EXPECT().ContainerList(t.Context(), listOpts).Return([]containerType.Summary{c1, c2, c3}, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "123").Return(inspect1, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "456").Return(inspect2, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "789").Return(inspect3, nil)
 
-	containers, err := tested.Ps(ctx, strings.ToLower(testProject), compose.PsOptions{})
+	containers, err := tested.Ps(t.Context(), strings.ToLower(testProject), compose.PsOptions{})
 
 	expected := []compose.ContainerSummary{
 		{

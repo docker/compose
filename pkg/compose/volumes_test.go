@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -58,7 +57,6 @@ func TestVolumes(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
 	args := filters.NewArgs(projectFilter(testProject))
 	listOpts := container.ListOptions{Filters: args}
 	volumeListArgs := filters.NewArgs(projectFilter(testProject))
@@ -68,20 +66,19 @@ func TestVolumes(t *testing.T) {
 	}
 	containerReturn := []container.Summary{c1, c2}
 
-	// Mock API calls
-	mockApi.EXPECT().ContainerList(ctx, listOpts).Times(2).Return(containerReturn, nil)
-	mockApi.EXPECT().VolumeList(ctx, volumeListOpts).Times(2).Return(volumeReturn, nil)
+	mockApi.EXPECT().ContainerList(t.Context(), listOpts).Times(2).Return(containerReturn, nil)
+	mockApi.EXPECT().VolumeList(t.Context(), volumeListOpts).Times(2).Return(volumeReturn, nil)
 
 	// Test without service filter - should return all project volumes
 	volumeOptions := api.VolumesOptions{}
-	volumes, err := tested.Volumes(ctx, testProject, volumeOptions)
+	volumes, err := tested.Volumes(t.Context(), testProject, volumeOptions)
 	expected := []api.VolumesSummary{vol1, vol2, vol3}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, volumes, expected)
 
 	// Test with service filter - should only return volumes used by service1
 	volumeOptions = api.VolumesOptions{Services: []string{"service1"}}
-	volumes, err = tested.Volumes(ctx, testProject, volumeOptions)
+	volumes, err = tested.Volumes(t.Context(), testProject, volumeOptions)
 	expected = []api.VolumesSummary{vol1, vol2}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, volumes, expected)

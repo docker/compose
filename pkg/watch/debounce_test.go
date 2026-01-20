@@ -27,7 +27,7 @@ import (
 func Test_BatchDebounceEvents(t *testing.T) {
 	ch := make(chan FileEvent)
 	clock := clockwork.NewFakeClock()
-	ctx, stop := context.WithCancel(context.Background())
+	ctx, stop := context.WithCancel(t.Context())
 	t.Cleanup(stop)
 
 	eventBatchCh := BatchDebounceEvents(ctx, clock, ch)
