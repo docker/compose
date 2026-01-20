@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -104,9 +103,7 @@ func TestProjectVolumeBind(t *testing.T) {
 		if runtime.GOOS == "windows" {
 			t.Skip("Running on Windows. Skipping...")
 		}
-		tmpDir, err := os.MkdirTemp("", projectName)
-		assert.NilError(t, err)
-		defer os.RemoveAll(tmpDir) //nolint
+		tmpDir := t.TempDir()
 
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 

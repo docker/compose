@@ -213,10 +213,7 @@ func TestDisplayInterpolationVariables(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	// Create a temporary directory for the test
-	tmpDir, err := os.MkdirTemp("", "compose-test")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	tmpDir := t.TempDir()
 
 	// Create a temporary compose file
 	composeContent := `
@@ -230,8 +227,7 @@ services:
       - UNSET_VAR                       # optional without default
 `
 	composePath := filepath.Join(tmpDir, "docker-compose.yml")
-	err = os.WriteFile(composePath, []byte(composeContent), 0o644)
-	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(composePath, []byte(composeContent), 0o644))
 
 	buf := new(bytes.Buffer)
 	cli := mocks.NewMockCli(ctrl)
