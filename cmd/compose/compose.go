@@ -505,6 +505,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 				display.Mode = display.ModeTTY
 			}
 
+			detached, _ := cmd.Flags().GetBool("detach")
 			var ep api.EventProcessor
 			switch opts.Progress {
 			case "", display.ModeAuto:
@@ -513,7 +514,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 					display.Mode = display.ModePlain
 					ep = display.Plain(dockerCli.Err())
 				case dockerCli.Out().IsTerminal():
-					ep = display.Full(dockerCli.Err(), stdinfo(dockerCli))
+					ep = display.Full(dockerCli.Err(), stdinfo(dockerCli), detached)
 				default:
 					ep = display.Plain(dockerCli.Err())
 				}
@@ -522,7 +523,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 					return fmt.Errorf("can't use --progress tty while ANSI support is disabled")
 				}
 				display.Mode = display.ModeTTY
-				ep = display.Full(dockerCli.Err(), stdinfo(dockerCli))
+				ep = display.Full(dockerCli.Err(), stdinfo(dockerCli), detached)
 
 			case display.ModePlain:
 				if ansi == "always" {
