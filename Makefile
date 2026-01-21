@@ -29,10 +29,6 @@ ifeq ($(DETECTED_OS),Windows)
 	BINARY_EXT=.exe
 endif
 
-ifeq ($(DETECTED_OS),Darwin)
-	GO_BUILDTAGS += fsnotify
-endif
-
 BUILD_FLAGS?=
 TEST_FLAGS?=
 E2E_TEST?=
