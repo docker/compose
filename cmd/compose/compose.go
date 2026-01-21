@@ -308,7 +308,13 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 
 // ToProject loads a Compose project using the LoadProject API.
 // Accepts optional cli.ProjectOptionsFn to control loader behavior.
-func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
+func (o *ProjectOptions) ToProject(
+	ctx context.Context,
+	dockerCli command.Cli,
+	backend api.Compose,
+	services []string,
+	po ...cli.ProjectOptionsFn,
+) (*types.Project, tracing.Metrics, error) {
 	var metrics tracing.Metrics
 	remotes := o.remoteLoaders(dockerCli)
 
@@ -357,6 +363,9 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 	if err != nil {
 		return nil, metrics, err
 	}
+
+	// Warn about unsupported attributes (e.g. deploy)
+	warnIgnoredDeployAttributes(project)
 
 	return project, metrics, nil
 }
