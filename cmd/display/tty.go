@@ -37,13 +37,14 @@ import (
 
 // Full creates an EventProcessor that render advanced UI within a terminal.
 // On Start, TUI lists task with a progress timer
-func Full(out io.Writer, info io.Writer) api.EventProcessor {
+func Full(out io.Writer, info io.Writer, detached bool) api.EventProcessor {
 	return &ttyWriter{
-		out:   out,
-		info:  info,
-		tasks: map[string]*task{},
-		done:  make(chan bool),
-		mtx:   &sync.Mutex{},
+		out:      out,
+		info:     info,
+		tasks:    map[string]*task{},
+		done:     make(chan bool),
+		mtx:      &sync.Mutex{},
+		detached: detached,
 	}
 }
 
@@ -60,6 +61,7 @@ type ttyWriter struct {
 	ticker    *time.Ticker
 	suspended bool
 	info      io.Writer
+	detached  bool
 }
 
 type task struct {
@@ -190,7 +192,7 @@ func (w *ttyWriter) On(events ...api.Resource) {
 			continue
 		}
 
-		if w.operation != "start" && (e.Text == api.StatusStarted || e.Text == api.StatusStarting) {
+		if w.operation != "start" && (e.Text == api.StatusStarted || e.Text == api.StatusStarting) && !w.detached {
 			// skip those events to avoid mix with container logs
 			continue
 		}
