@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"runtime"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/paths"
@@ -1171,6 +1172,17 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
+	// Heuristic: detect Git Bash (MSYS/MinGW) path mangling on Windows where ":" is converted to ";" and container
+	// paths are transformed into a path under "Program Files/Git". If detected, warn the user with actionable advice.
+	if volume.Type == types.VolumeTypeBind {
+		if runtime.GOOS == "windows" && strings.Contains(source, ";") {
+			t := strings.ToLower(volume.Target)
+			if strings.Contains(t, "program files") && strings.Contains(t, "git") {
+				logrus.Warn("Warning: It looks like Git Bash mangled your volume path. Please use '//' at the start of the container path (e.g., //etc/...) or set MSYS_NO_PATHCONV=1 to avoid this.")
+			}
+		}
+	}
+
 	bind, vol, tmpfs, img := buildMountOptions(volume)
 
 	if bind != nil {
@@ -1418,6 +1430,25 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	err = s.connectNetwork(ctx, n.Name, dangledContainers, nil)
 	if err != nil {
 		return "", err
+	}
+
+	// Emit container status events for containers that may have been restarted by the engine
+	for _, c := range dangledContainers {
+		inspected, err := s.apiClient().ContainerInspect(ctx, c.ID)
+		if err != nil {
+			// ignore inspect errors
+			continue
+		}
+		// Build a temporary summary so we can compute the canonical container name
+		tmp := container.Summary{ID: inspected.ID, Names: []string{inspected.Name}}
+		name := getContainerProgressName(tmp)
+		if inspected.State != nil && inspected.State.Status == container.StateRunning {
+			s.events.On(runningEvent(name))
+		} else if inspected.State != nil && inspected.State.Status == container.StateCreated {
+			s.events.On(createdEvent(name))
+		} else if inspected.State != nil && inspected.State.Status == container.StateExited {
+			s.events.On(stoppedEvent(name))
+		}
 	}
 
 	return resp.ID, nil
