@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.24.12
+ARG GO_VERSION=1.25.6
 ARG XX_VERSION=1.9.0
 ARG GOLANGCI_LINT_VERSION=v2.8.0
 ARG ADDLICENSE_VERSION=v1.0.0
