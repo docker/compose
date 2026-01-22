@@ -223,6 +223,46 @@ services:
 	_ = events // events may or may not have entries depending on compose-go behavior
 }
 
+func TestLoadProject_IncludeEnvFileInterpolation(t *testing.T) {
+	// Setup a top-level compose including a subcompose and an env_file
+	tmpDir := t.TempDir()
+	composeFile := filepath.Join(tmpDir, "compose.yaml")
+	subdir := filepath.Join(tmpDir, "subproj")
+	require.NoError(t, os.Mkdir(subdir, 0o755))
+
+	mainCompose := `include:
+  - path: subproj/subcompose.yml
+    env_file:
+      - values.env
+`
+	subCompose := `services:
+  app:
+    env_file: subvalues.env
+    image: alpine
+`
+	subValues := "MYVAR=${VAR?}\n"
+	values := "VAR=1\n"
+
+	require.NoError(t, os.WriteFile(composeFile, []byte(mainCompose), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(subdir, "subcompose.yml"), []byte(subCompose), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(subdir, "subvalues.env"), []byte(subValues), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "values.env"), []byte(values), 0o644))
+
+	service, err := NewComposeService(nil)
+	require.NoError(t, err)
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+	})
+
+	require.NoError(t, err)
+	app := project.Services["app"]
+	require.NotNil(t, app)
+	v, ok := app.Environment["MYVAR"]
+	require.True(t, ok)
+	require.Equal(t, "1", *v)
+}
+
 func TestLoadProject_ProjectNameInference(t *testing.T) {
 	tmpDir := t.TempDir()
 	composeFile := filepath.Join(tmpDir, "compose.yaml")

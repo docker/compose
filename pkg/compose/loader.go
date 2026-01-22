@@ -20,7 +20,10 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"go.yaml.in/yaml/v4"
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
@@ -67,6 +70,67 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 	return project, nil
 }
 
+// collectIncludeEnvFiles scans top-level compose files for `include` entries
+// and returns a list of resolved env_file paths declared on those includes.
+// This implementation is intentionally small and defensive: it unmarshals the
+// document to a generic map and extracts `include` -> `env_file` entries.
+func collectIncludeEnvFiles(configPaths []string) ([]string, error) {
+	var files []string
+	for _, cp := range configPaths {
+		content, err := os.ReadFile(cp)
+		if err != nil {
+			continue
+		}
+		var data map[string]interface{}
+		if err := yaml.Unmarshal(content, &data); err != nil {
+			continue
+		}
+		incRaw, ok := data["include"]
+		if !ok {
+			continue
+		}
+		incs, ok := incRaw.([]interface{})
+		if !ok {
+			continue
+		}
+		for _, inc := range incs {
+			im, ok := inc.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			envRaw, ok := im["env_file"]
+			if !ok {
+				continue
+			}
+			switch v := envRaw.(type) {
+			case string:
+				resolved := filepath.Join(filepath.Dir(cp), v)
+				if _, err := os.Stat(resolved); err == nil {
+					files = append(files, resolved)
+				}
+			case []interface{}:
+				for _, e := range v {
+					switch ee := e.(type) {
+					case string:
+						resolved := filepath.Join(filepath.Dir(cp), ee)
+						if _, err := os.Stat(resolved); err == nil {
+							files = append(files, resolved)
+						}
+					case map[string]interface{}:
+						if p, ok := ee["path"].(string); ok {
+							resolved := filepath.Join(filepath.Dir(cp), p)
+							if _, err := os.Stat(resolved); err == nil {
+								files = append(files, resolved)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return files, nil
+}
+
 // createRemoteLoaders creates Git and OCI remote loaders if not in offline mode
 func (s *composeService) createRemoteLoaders(options api.ProjectLoadOptions) []loader.ResourceLoader {
 	if options.Offline {
@@ -96,9 +160,25 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 		opts = append(opts, cli.WithResourceLoader(r))
 	}
 
+	// Collect env_files declared on include: entries such as
+	// include:
+	//   - path: subproj/subcompose.yml
+	//     env_file:
+	//       - values.env
+	// should apply values.env when evaluating the included compose file.
+	includeEnvFiles, err := collectIncludeEnvFiles(options.ConfigPaths)
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge CLI-provided env_files and include-provided env_files so they are
+	// considered during project loading/interpolation.
+	allEnvFiles := append([]string{}, options.EnvFiles...)
+	allEnvFiles = append(allEnvFiles, includeEnvFiles...)
+
 	opts = append(opts,
 		// Load PWD/.env if present and no explicit --env-file has been set
-		cli.WithEnvFiles(options.EnvFiles...),
+		cli.WithEnvFiles(allEnvFiles...),
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
@@ -106,8 +186,8 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(options.EnvFiles...), //nolint:gocritic // intentionally applying cli.WithEnvFiles twice.
-		cli.WithDotEnv,                        //nolint:gocritic // intentionally applying cli.WithDotEnv twice.
+		cli.WithEnvFiles(allEnvFiles...), //nolint:gocritic // intentionally applying cli.WithEnvFiles twice.
+		cli.WithDotEnv,                   //nolint:gocritic // intentionally applying cli.WithDotEnv twice.
 		// eventually COMPOSE_PROFILES should have been set
 		cli.WithDefaultProfiles(options.Profiles...),
 		cli.WithName(options.ProjectName),

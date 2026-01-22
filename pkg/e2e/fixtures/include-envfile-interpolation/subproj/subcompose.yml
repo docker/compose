@@ -1,0 +1,5 @@
+services:
+  app:
+    env_file: subvalues.env
+    image: alpine
+    command: env

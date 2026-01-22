@@ -1,0 +1,4 @@
+include:
+  - path: subproj/subcompose.yml
+    env_file:
+      - values.env
