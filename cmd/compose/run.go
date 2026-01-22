@@ -284,11 +284,11 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 
 	labels := types.Labels{}
 	for _, s := range options.labels {
-		parts := strings.SplitN(s, "=", 2)
-		if len(parts) != 2 {
+		key, val, ok := strings.Cut(s, "=")
+		if !ok {
 			return fmt.Errorf("label must be set as KEY=VALUE")
 		}
-		labels[parts[0]] = parts[1]
+		labels[key] = val
 	}
 
 	var buildForRun *api.BuildOptions

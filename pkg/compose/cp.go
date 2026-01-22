@@ -317,15 +317,15 @@ func splitCpArg(arg string) (ctr, path string) {
 		return "", arg
 	}
 
-	parts := strings.SplitN(arg, ":", 2)
+	ctr, path, ok := strings.Cut(arg, ":")
 
-	if len(parts) == 1 || strings.HasPrefix(parts[0], ".") {
+	if !ok || strings.HasPrefix(ctr, ".") {
 		// Either there's no `:` in the arg
 		// OR it's an explicit local relative path like `./file:name.txt`.
 		return "", arg
 	}
 
-	return parts[0], parts[1]
+	return ctr, path
 }
 
 func resolveLocalPath(localPath string) (absPath string, err error) {

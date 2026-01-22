@@ -213,9 +213,9 @@ func extractEnvCLIDefined(cmdEnvs []string) map[string]string {
 	// Parse command-line environment variables
 	cmdEnvMap := make(map[string]string)
 	for _, env := range cmdEnvs {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			cmdEnvMap[parts[0]] = parts[1]
+		key, val, ok := strings.Cut(env, "=")
+		if ok {
+			cmdEnvMap[key] = val
 		}
 	}
 	return cmdEnvMap

@@ -241,11 +241,8 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	} // VOLUMES/MOUNTS/FILESYSTEMS
 	tmpfs := map[string]string{}
 	for _, t := range service.Tmpfs {
-		if arr := strings.SplitN(t, ":", 2); len(arr) > 1 {
-			tmpfs[arr[0]] = arr[1]
-		} else {
-			tmpfs[arr[0]] = ""
-		}
+		k, v, _ := strings.Cut(t, ":")
+		tmpfs[k] = v
 	}
 	binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
 	if err != nil {
@@ -563,13 +560,13 @@ func defaultNetworkSettings(project *types.Project,
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
 	var restart container.RestartPolicy
 	if service.Restart != "" {
-		split := strings.Split(service.Restart, ":")
+		name, num, ok := strings.Cut(service.Restart, ":")
 		var attempts int
-		if len(split) > 1 {
-			attempts, _ = strconv.Atoi(split[1])
+		if ok {
+			attempts, _ = strconv.Atoi(num)
 		}
 		restart = container.RestartPolicy{
-			Name:              mapRestartPolicyCondition(split[0]),
+			Name:              mapRestartPolicyCondition(name),
 			MaximumRetryCount: attempts,
 		}
 	}

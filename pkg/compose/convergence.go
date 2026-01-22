@@ -774,11 +774,10 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 	}
 
 	for _, rawLink := range service.Links {
-		linkSplit := strings.Split(rawLink, ":")
-		linkServiceName := linkSplit[0]
-		linkName := linkServiceName
-		if len(linkSplit) == 2 {
-			linkName = linkSplit[1] // linkName if informed like in: "serviceName:linkName"
+		// linkName if informed like in: "serviceName[:linkName]"
+		linkServiceName, linkName, ok := strings.Cut(rawLink, ":")
+		if !ok {
+			linkName = linkServiceName
 		}
 		cnts, err := getServiceContainers(linkServiceName)
 		if err != nil {
@@ -810,11 +809,9 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 	}
 
 	for _, rawExtLink := range service.ExternalLinks {
-		extLinkSplit := strings.Split(rawExtLink, ":")
-		externalLink := extLinkSplit[0]
-		linkName := externalLink
-		if len(extLinkSplit) == 2 {
-			linkName = extLinkSplit[1]
+		externalLink, linkName, ok := strings.Cut(rawExtLink, ":")
+		if !ok {
+			linkName = externalLink
 		}
 		links = append(links, format(externalLink, linkName))
 	}
