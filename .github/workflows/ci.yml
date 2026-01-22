@@ -290,7 +290,7 @@ jobs:
           path: ./coverage.txt
           if-no-files-found: error
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.txt
 
