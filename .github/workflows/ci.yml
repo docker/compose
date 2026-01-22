@@ -29,7 +29,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       -
         name: Create matrix
         id: platforms
@@ -53,7 +53,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -73,7 +73,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       -
         name: Prepare
         run: |
@@ -114,7 +114,7 @@ jobs:
           tree -nh ./bin/release
       -
         name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: compose-${{ env.PLATFORM_PAIR }}
           path: ./bin/release
@@ -136,7 +136,7 @@ jobs:
             *.cache-to=type=gha,scope=test
       -
         name: Gather coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-data-unit
           path: bin/coverage/unit/
@@ -177,7 +177,7 @@ jobs:
           echo "MODE_ENGINE_PAIR=${mode}-${engine}" >> $GITHUB_ENV
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Docker ${{ matrix.engine }}
         run: |
@@ -236,7 +236,7 @@ jobs:
 
       - name: Gather coverage data
         if: ${{ matrix.mode == 'plugin' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-data-e2e-${{ env.MODE_ENGINE_PAIR }}
           path: bin/coverage/e2e/
@@ -262,20 +262,20 @@ jobs:
     steps:
       # codecov won't process the report without the source code available
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: '.go-version'
           check-latest: true
       - name: Download unit test coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: coverage-data-unit
           path: coverage/unit
           merge-multiple: true
       - name: Download E2E test coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: coverage-data-e2e-*
           path: coverage/e2e
@@ -284,7 +284,7 @@ jobs:
         run: |
           go tool covdata textfmt -i=./coverage/unit,./coverage/e2e -o ./coverage.txt
       - name: Store coverage report in GitHub Actions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: go-covdata-txt
           path: ./coverage.txt
@@ -304,10 +304,10 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       -
         name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: compose-*
           path: ./bin/release
