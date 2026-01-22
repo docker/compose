@@ -198,12 +198,11 @@ func (opts createOptions) Apply(project *types.Project) error {
 
 func applyScaleOpts(project *types.Project, opts []string) error {
 	for _, scale := range opts {
-		split := strings.Split(scale, "=")
-		if len(split) != 2 {
+		name, val, ok := strings.Cut(scale, "=")
+		if !ok || val == "" {
 			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
 		}
-		name := split[0]
-		replicas, err := strconv.Atoi(split[1])
+		replicas, err := strconv.Atoi(val)
 		if err != nil {
 			return err
 		}

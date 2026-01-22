@@ -50,19 +50,19 @@ func (p *psOptions) parseFilter() error {
 	if p.Filter == "" {
 		return nil
 	}
-	parts := strings.SplitN(p.Filter, "=", 2)
-	if len(parts) != 2 {
+	key, val, ok := strings.Cut(p.Filter, "=")
+	if !ok {
 		return errors.New("arguments to --filter should be in form KEY=VAL")
 	}
-	switch parts[0] {
+	switch key {
 	case "status":
-		p.Status = append(p.Status, parts[1])
+		p.Status = append(p.Status, val)
+		return nil
 	case "source":
 		return api.ErrNotImplemented
 	default:
-		return fmt.Errorf("unknown filter %s", parts[0])
+		return fmt.Errorf("unknown filter %s", key)
 	}
-	return nil
 }
 
 func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
