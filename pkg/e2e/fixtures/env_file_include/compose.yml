@@ -1,0 +1,9 @@
+include:
+  - path: subproj/subcompose.yml
+    env_file:
+      - values.env
+
+services:
+  main:
+    image: alpine
+    command: echo "main"

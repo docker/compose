@@ -20,11 +20,13 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"gopkg.in/yaml.v3"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/remote"
@@ -34,6 +36,31 @@ import (
 // LoadProject implements api.Compose.LoadProject
 // It loads and validates a Compose project from configuration files.
 func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoadOptions) (*types.Project, error) {
+	// Extract env vars from include env_files to make them available for interpolation
+	includeEnvVars, err := extractIncludeEnvVars(options.ConfigPaths, options.WorkingDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Temporarily set include env vars in OS environment for env_file interpolation
+	envBackup := make(map[string]string)
+	for k, v := range includeEnvVars {
+		if oldVal, exists := os.LookupEnv(k); exists {
+			envBackup[k] = oldVal
+		}
+		os.Setenv(k, v)
+	}
+	defer func() {
+		// Restore original environment
+		for k := range includeEnvVars {
+			if oldVal, exists := envBackup[k]; exists {
+				os.Setenv(k, oldVal)
+			} else {
+				os.Unsetenv(k)
+			}
+		}
+	}()
+
 	// Setup remote loaders (Git, OCI)
 	remoteLoaders := s.createRemoteLoaders(options)
 
@@ -114,6 +141,110 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 	)
 
 	return cli.NewProjectOptions(options.ConfigPaths, append(options.ProjectOptionsFns, opts...)...)
+}
+
+// extractIncludeEnvVars extracts environment variables from env_file directives in include directives
+func extractIncludeEnvVars(configPaths []string, workingDir string) (map[string]string, error) {
+	envFiles, err := extractIncludeEnvFilesFromFilePaths(configPaths, workingDir)
+	if err != nil {
+		return nil, err
+	}
+	vars := make(map[string]string)
+	for _, envFile := range envFiles {
+		fileVars, err := loadEnvFile(envFile)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range fileVars {
+			vars[k] = v
+		}
+	}
+	return vars, nil
+}
+
+// extractIncludeEnvFilesFromFilePaths extracts env_file paths from include directives in compose files
+func extractIncludeEnvFilesFromFilePaths(configPaths []string, workingDir string) ([]string, error) {
+	var envFiles []string
+	for _, configPath := range configPaths {
+		absPath := configPath
+		if !filepath.IsAbs(configPath) {
+			absPath = filepath.Join(workingDir, configPath)
+		}
+		files, err := extractIncludeEnvFilesFromFile(absPath)
+		if err != nil {
+			return nil, err
+		}
+		envFiles = append(envFiles, files...)
+	}
+	return envFiles, nil
+}
+
+// loadEnvFile loads environment variables from a .env file
+func loadEnvFile(filePath string) (map[string]string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	vars := make(map[string]string)
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if key, value, ok := strings.Cut(line, "="); ok {
+			vars[strings.TrimSpace(key)] = strings.TrimSpace(value)
+		}
+	}
+	return vars, nil
+}
+
+// extractIncludeEnvFilesFromFile parses a compose file and extracts env_file paths from include directives
+func extractIncludeEnvFilesFromFile(filePath string) ([]string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var compose map[string]interface{}
+	if err := yaml.Unmarshal(data, &compose); err != nil {
+		return nil, err
+	}
+	includes, ok := compose["include"]
+	if !ok {
+		return nil, nil
+	}
+	includeList, ok := includes.([]interface{})
+	if !ok {
+		return nil, nil
+	}
+	var envFiles []string
+	dir := filepath.Dir(filePath)
+	for _, item := range includeList {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		envFileList, ok := itemMap["env_file"]
+		if !ok {
+			continue
+		}
+		files, ok := envFileList.([]interface{})
+		if !ok {
+			// Could be a single string
+			if file, ok := envFileList.(string); ok {
+				absFile := filepath.Join(dir, file)
+				envFiles = append(envFiles, absFile)
+			}
+			continue
+		}
+		for _, f := range files {
+			if file, ok := f.(string); ok {
+				absFile := filepath.Join(dir, file)
+				envFiles = append(envFiles, absFile)
+			}
+		}
+	}
+	return envFiles, nil
 }
 
 // postProcessProject applies post-loading transformations to the project

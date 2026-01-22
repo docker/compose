@@ -51,3 +51,12 @@ func TestRunEnvFile(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/env_file", "run", "serviceC", "env")
 	res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
 }
+
+func TestEnvFileFromInclude(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	// Test that config works without errors (variables are interpolated)
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file_include/compose.yml", "config")
+	// Should contain the interpolated value
+	assert.Assert(t, strings.Contains(res.Stdout(), "MYVAR: test_value"))
+}
