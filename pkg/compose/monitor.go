@@ -147,7 +147,7 @@ func (c *monitor) Start(ctx context.Context) error {
 					return err
 				}
 
-				if inspect.State != nil && inspect.State.Restarting || inspect.State.Running {
+				if inspect.State != nil && (inspect.State.Restarting || inspect.State.Running) {
 					// State.Restarting is set by engine when container is configured to restart on exit
 					// on ContainerRestart it doesn't (see https://github.com/moby/moby/issues/45538)
 					// container state still is reported as "running"
