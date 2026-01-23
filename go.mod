@@ -56,6 +56,7 @@ require (
 	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.40.0
 	google.golang.org/grpc v1.78.0
+	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
 	tags.cncf.io/container-device-interface v1.1.0
 )
@@ -153,5 +154,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
