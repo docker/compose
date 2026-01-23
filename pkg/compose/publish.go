@@ -61,7 +61,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 	if !accept {
 		return nil
 	}
-	err = s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
+	err = s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: !options.SkipValidation})
 	if err != nil {
 		return err
 	}

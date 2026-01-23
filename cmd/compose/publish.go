@@ -20,7 +20,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/docker/cli/cli"
+	"github.com/compose-spec/compose-go/v2/cli"
+	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,6 +39,7 @@ type publishOptions struct {
 	assumeYes           bool
 	app                 bool
 	insecureRegistry    bool
+	skipValidation      bool
 }
 
 func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -50,7 +52,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPublish(ctx, dockerCli, backendOptions, opts, args[0])
 		}),
-		Args: cli.ExactArgs(1),
+		Args: dockercli.ExactArgs(1),
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests")
@@ -59,6 +61,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 	flags.BoolVarP(&opts.assumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts`)
 	flags.BoolVar(&opts.app, "app", false, "Published compose application (includes referenced images)")
 	flags.BoolVar(&opts.insecureRegistry, "insecure-registry", false, "Use insecure registry")
+	flags.BoolVar(&opts.skipValidation, "skip-validation", false, "Skip validation of compose project")
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		// assumeYes was introduced by mistake as `--y`
 		if name == "y" {
@@ -83,7 +86,7 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		return err
 	}
 
-	project, metrics, err := opts.ToProject(ctx, dockerCli, backend, nil)
+	project, metrics, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithSkipValidation(opts.skipValidation))
 	if err != nil {
 		return err
 	}
@@ -98,5 +101,6 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		OCIVersion:          api.OCIVersion(opts.ociVersion),
 		WithEnvironment:     opts.withEnvironment,
 		InsecureRegistry:    opts.insecureRegistry,
+		SkipValidation:      opts.skipValidation,
 	})
 }

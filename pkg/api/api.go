@@ -59,6 +59,8 @@ type ProjectLoadOptions struct {
 	All bool
 	// Compatibility enables v1 compatibility mode
 	Compatibility bool
+	// SkipValidation skips validation of the compose project
+	SkipValidation bool
 
 	// ProjectOptionsFns are compose-go project options to apply.
 	// Use cli.WithInterpolation(false), cli.WithNormalization(false), etc.
@@ -493,6 +495,8 @@ type PublishOptions struct {
 	OCIVersion          OCIVersion
 	// Use plain HTTP to access registry. Should only be used for testing purpose
 	InsecureRegistry bool
+	// Skip validation of the compose project
+	SkipValidation bool
 }
 
 func (e Event) String() string {
