@@ -1,0 +1,18 @@
+services:
+  source:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: image-volume-source
+
+  consumer:
+    image: alpine
+    depends_on:
+      - source
+    command: ["cat", "/data/content.txt"]
+    volumes:
+      - type: image
+        source: image-volume-source
+        target: /data
+        image:
+          subpath: app
