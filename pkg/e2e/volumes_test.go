@@ -190,3 +190,47 @@ func TestImageVolume(t *testing.T) {
 	out := res.Combined()
 	assert.Check(t, strings.Contains(out, "index.html"))
 }
+
+func TestImageVolumeRecreateOnRebuild(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-image-volume-recreate"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+		c.RunDockerOrExitError(t, "rmi", "-f", "image-volume-source")
+	})
+
+	version := c.RunDockerCmd(t, "version", "-f", "{{.Server.Version}}")
+	major, _, found := strings.Cut(version.Combined(), ".")
+	assert.Assert(t, found)
+	if major == "26" || major == "27" {
+		t.Skip("Skipping test due to docker version < 28")
+	}
+
+	// First build and run with initial content
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/image-volume-recreate/compose.yaml",
+		"--project-name", projectName, "build", "--build-arg", "CONTENT=foo")
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/image-volume-recreate/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+	assert.Check(t, !strings.Contains(res.Combined(), "error"))
+
+	// Check initial content
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/image-volume-recreate/compose.yaml",
+		"--project-name", projectName, "logs", "consumer")
+	assert.Check(t, strings.Contains(res.Combined(), "foo"), "Expected 'foo' in output, got: %s", res.Combined())
+
+	// Rebuild source image with different content
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/image-volume-recreate/compose.yaml",
+		"--project-name", projectName, "build", "--build-arg", "CONTENT=bar")
+
+	// Run up again - consumer should be recreated because source image changed
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/image-volume-recreate/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+	// The consumer container should be recreated
+	assert.Check(t, strings.Contains(res.Combined(), "Recreate") || strings.Contains(res.Combined(), "Created"),
+		"Expected container to be recreated, got: %s", res.Combined())
+
+	// Check updated content
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/image-volume-recreate/compose.yaml",
+		"--project-name", projectName, "logs", "consumer")
+	assert.Check(t, strings.Contains(res.Combined(), "bar"), "Expected 'bar' in output after rebuild, got: %s", res.Combined())
+}

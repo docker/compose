@@ -158,9 +158,35 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		if ok {
 			service.CustomLabels.Add(api.ImageDigestLabel, img.ID)
 		}
+
+		resolveImageVolumes(&service, images, project.Name)
+
 		project.Services[name] = service
 	}
 	return nil
+}
+
+func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.ImageSummary, projectName string) {
+	for i, vol := range service.Volumes {
+		if vol.Type == types.VolumeTypeImage {
+			imgName := vol.Source
+			if _, ok := images[vol.Source]; !ok {
+				// check if source is another service in the project
+				imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: vol.Source}, projectName)
+				// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
+				if _, ok := images[imgName]; !ok {
+					continue
+				}
+			}
+			if img, ok := images[imgName]; ok {
+				// Use Image ID directly as source.
+				// Using name@digest format (via reference.WithDigest) fails for local-only images
+				// that don't have RepoDigests (e.g. built locally in CI).
+				// Image ID (sha256:...) is always valid and ensures ServiceHash changes on rebuild.
+				service.Volumes[i].Source = img.ID
+			}
+		}
+	}
 }
 
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]api.ImageSummary, error) {
