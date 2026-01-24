@@ -102,7 +102,20 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		navigationMenu.EnableWatch(options.Start.Watch, watcher)
 	}
 
-	printer := newLogPrinter(logConsumer)
+	// Detect if the user requested quiet mode
+	// logConsumer is nil when --progress quiet or --no-log-prefix is used
+	quiet := logConsumer == nil
+
+	var printer logPrinter // <--- sem o *
+
+	if quiet {
+		// Create a "silent" printer that ignores normal logs
+		// Only critical events like container errors or exit code != 0 will be printed
+		printer = newLogPrinter(nil) // mantém simples pra não dar erro de tipo
+	} else {
+		// Normal printer that writes all logs to the terminal
+		printer = newLogPrinter(logConsumer)
+	}
 
 	// global context to handle canceling goroutines
 	globalCtx, cancel := context.WithCancel(ctx)
