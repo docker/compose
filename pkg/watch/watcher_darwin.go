@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsevents"
@@ -38,6 +39,7 @@ type fseventNotify struct {
 	stop   chan struct{}
 
 	pathsWereWatching map[string]any
+	closeOnce         sync.Once
 }
 
 func (d *fseventNotify) loop() {
@@ -81,6 +83,8 @@ func (d *fseventNotify) Start() error {
 		return nil
 	}
 
+	d.closeOnce = sync.Once{}
+
 	numberOfWatches.Add(int64(len(d.stream.Paths)))
 
 	err := d.stream.Start()
@@ -92,11 +96,13 @@ func (d *fseventNotify) Start() error {
 }
 
 func (d *fseventNotify) Close() error {
-	numberOfWatches.Add(int64(-len(d.stream.Paths)))
+	d.closeOnce.Do(func() {
+		numberOfWatches.Add(int64(-len(d.stream.Paths)))
 
-	d.stream.Stop()
-	close(d.errors)
-	close(d.stop)
+		d.stream.Stop()
+		close(d.errors)
+		close(d.stop)
+	})
 
 	return nil
 }
