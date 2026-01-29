@@ -39,6 +39,36 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// quietLogConsumer implements api.LogConsumer for --progress quiet or --no-log-prefix
+// It suppresses normal logs and only outputs critical events (container errors or non-zero exit codes)
+type quietLogConsumer struct{}
+
+// HandleEvent processes container events. Only prints containers that exited with a non-zero exit code
+func (q *quietLogConsumer) HandleEvent(event api.ContainerEvent) {
+	if event.Type == api.ContainerEventExited && event.ExitCode != 0 {
+		// Print to stderr to separate from normal output streams
+		fmt.Fprintf(os.Stderr, "%s exited with code %d\n", event.Service, event.ExitCode)
+	}
+}
+
+// Log is called for standard container log messages
+// This implementation discards all logs to keep quiet mode truly silent
+func (q *quietLogConsumer) Log(service, msg string) {
+	// No-op: suppress normal logs
+}
+
+// Err is called for critical error messages related to a service
+// In quiet mode, we still want to print these to stderr
+func (q *quietLogConsumer) Err(service, msg string) {
+	fmt.Fprintf(os.Stderr, "%s: %s\n", service, msg)
+}
+
+// Status is called for status updates (like container starting/stopping)
+// These updates are ignored in quiet mode to minimize output noise
+func (q *quietLogConsumer) Status(service, msg string) {
+	// No-op: suppress status messages
+}
+
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
@@ -101,13 +131,27 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	if navigationMenu != nil && watcher != nil {
 		navigationMenu.EnableWatch(options.Start.Watch, watcher)
 	}
+	// Determine if quiet mode is requested
+	// In quiet mode, logConsumer is nil because --progress=quiet or --no-log-prefix was used
+	quiet := logConsumer == nil
 
-	printer := newLogPrinter(logConsumer)
+	// Create the appropriate log printer based on quiet mode
+	var printer logPrinter
+	if quiet {
+		// In quiet mode, use quietLogConsumer that suppresses normal logs
+		// Only critical events like container errors or non-zero exit codes are printed
+		printer = newLogPrinter(&quietLogConsumer{})
+	} else {
+		// Normal mode: print all container logs to the terminal
+		printer = newLogPrinter(logConsumer)
+	}
 
-	// global context to handle canceling goroutines
+	// Create a global context for controlling goroutines and graceful shutdown
 	globalCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer cancel() // Ensure all goroutines are canceled when Up() exits
 
+	// If the interactive navigation menu is enabled, attach it to the cancel function
+	// This allows detaching from logs gracefully when user presses the detach key
 	if navigationMenu != nil {
 		navigationMenu.EnableDetach(cancel)
 	}
