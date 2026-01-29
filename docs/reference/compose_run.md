@@ -71,6 +71,7 @@ specified in the service configuration.
 | `-l`, `--label`         | `stringArray` |          | Add or override a label                                                          |
 | `--name`                | `string`      |          | Assign a name to the container                                                   |
 | `-T`, `--no-TTY`        | `bool`        | `true`   | Disable pseudo-TTY allocation (default: auto-detected)                           |
+| `--no-build`            | `bool`        |          | Don't build an image, even if it's policy                                        |
 | `--no-deps`             | `bool`        |          | Don't start linked services                                                      |
 | `-p`, `--publish`       | `stringArray` |          | Publish a container's port(s) to the host                                        |
 | `--pull`                | `string`      | `policy` | Pull image before running ("always"\|"missing"\|"never")                         |
