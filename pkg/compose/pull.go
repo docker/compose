@@ -29,8 +29,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
-	"github.com/docker/buildx/driver"
 	"github.com/docker/cli/cli/config/configfile"
+	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -260,7 +260,11 @@ func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiCl
 	}
 }
 
-func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
+type authProvider interface {
+	GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error)
+}
+
+func encodedAuth(ref reference.Named, configFile authProvider) (string, error) {
 	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(reference.Domain(ref)))
 	if err != nil {
 		return "", err
