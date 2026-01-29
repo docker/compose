@@ -95,7 +95,7 @@ example-provider: ## build example provider for e2e tests
 mocks:
 	mockgen --version >/dev/null 2>&1 || go install go.uber.org/mock/mockgen@v0.4.0
 	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
-	mockgen -destination pkg/mocks/mock_docker_api.go -package mocks github.com/docker/docker/client APIClient
+	mockgen -destination pkg/mocks/mock_docker_api.go -package mocks github.com/moby/moby/client APIClient
 	mockgen -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go Service
 
 .PHONY: e2e

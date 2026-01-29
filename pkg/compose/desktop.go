@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 	"strings"
+
+	"github.com/moby/moby/client"
 )
 
 // engineLabelDesktopAddress is used to detect that Compose is running with a
@@ -27,11 +29,11 @@ import (
 const engineLabelDesktopAddress = "com.docker.desktop.address"
 
 func (s *composeService) isDesktopIntegrationActive(ctx context.Context) (bool, error) {
-	info, err := s.apiClient().Info(ctx)
+	res, err := s.apiClient().Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return false, err
 	}
-	for _, l := range info.Labels {
+	for _, l := range res.Info.Labels {
 		k, _, ok := strings.Cut(l, "=")
 		if ok && k == engineLabelDesktopAddress {
 			return true, nil

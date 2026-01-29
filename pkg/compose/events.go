@@ -22,29 +22,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
 	projectName = strings.ToLower(projectName)
-	evts, errors := s.apiClient().Events(ctx, events.ListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+	res := s.apiClient().Events(ctx, client.EventsListOptions{
+		Filters: projectFilter(projectName),
 		Since:   options.Since,
 		Until:   options.Until,
 	})
 	for {
 		select {
-		case event := <-evts:
+		case event := <-res.Messages:
 			// TODO: support other event types
 			if event.Type != "container" {
 				continue
 			}
 
-			oneOff := event.Actor.Attributes[api.OneoffLabel]
-			if oneOff == "True" {
+			if event.Actor.Attributes[api.OneoffLabel] == "True" {
 				// ignore
 				continue
 			}
@@ -76,7 +74,7 @@ func (s *composeService) Events(ctx context.Context, projectName string, options
 				return err
 			}
 
-		case err := <-errors:
+		case err := <-res.Err:
 			return err
 		}
 	}

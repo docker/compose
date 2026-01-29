@@ -24,10 +24,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
-	containerType "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	imageapi "github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -196,14 +194,13 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 }
 
 func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName string, projectName string, name string) error {
-	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-			networkFilter(composeNetworkName)),
+	res, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
+		Filters: projectFilter(projectName).Add("label", networkFilter(composeNetworkName)),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list networks: %w", err)
 	}
+	networks := res.Items
 
 	if len(networks) == 0 {
 		return nil
@@ -217,7 +214,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		if net.Name != name {
 			continue
 		}
-		nw, err := s.apiClient().NetworkInspect(ctx, net.ID, network.InspectOptions{})
+		nwInspect, err := s.apiClient().NetworkInspect(ctx, net.ID, client.NetworkInspectOptions{})
 		if errdefs.IsNotFound(err) {
 			s.events.On(newEvent(eventName, api.Warning, "No resource found to remove"))
 			return nil
@@ -225,13 +222,14 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		if err != nil {
 			return err
 		}
+		nw := nwInspect.Network
 		if len(nw.Containers) > 0 {
 			s.events.On(newEvent(eventName, api.Warning, "Resource is still in use"))
 			found++
 			continue
 		}
 
-		if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
+		if _, err := s.apiClient().NetworkRemove(ctx, net.ID, client.NetworkRemoveOptions{}); err != nil {
 			if errdefs.IsNotFound(err) {
 				continue
 			}
@@ -255,7 +253,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 func (s *composeService) removeImage(ctx context.Context, image string) error {
 	id := fmt.Sprintf("Image %s", image)
 	s.events.On(newEvent(id, api.Working, "Removing"))
-	_, err := s.apiClient().ImageRemove(ctx, image, imageapi.RemoveOptions{})
+	_, err := s.apiClient().ImageRemove(ctx, image, client.ImageRemoveOptions{})
 	if err == nil {
 		s.events.On(newEvent(id, api.Done, "Removed"))
 		return nil
@@ -274,14 +272,16 @@ func (s *composeService) removeImage(ctx context.Context, image string) error {
 func (s *composeService) removeVolume(ctx context.Context, id string) error {
 	resource := fmt.Sprintf("Volume %s", id)
 
-	_, err := s.apiClient().VolumeInspect(ctx, id)
+	_, err := s.apiClient().VolumeInspect(ctx, id, client.VolumeInspectOptions{})
 	if errdefs.IsNotFound(err) {
 		// Already gone
 		return nil
 	}
 
 	s.events.On(newEvent(resource, api.Working, "Removing"))
-	err = s.apiClient().VolumeRemove(ctx, id, true)
+	_, err = s.apiClient().VolumeRemove(ctx, id, client.VolumeRemoveOptions{
+		Force: true,
+	})
 	if err == nil {
 		s.events.On(newEvent(resource, api.Done, "Removed"))
 		return nil
@@ -314,8 +314,9 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 		}
 	}
 
-	timeoutInSecond := utils.DurationSecondToInt(timeout)
-	err := s.apiClient().ContainerStop(ctx, ctr.ID, containerType.StopOptions{Timeout: timeoutInSecond})
+	_, err := s.apiClient().ContainerStop(ctx, ctr.ID, client.ContainerStopOptions{
+		Timeout: utils.DurationSecondToInt(timeout),
+	})
 	if err != nil {
 		s.events.On(errorEvent(eventName, "Error while Stopping"))
 		return err
@@ -355,7 +356,7 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 		return err
 	}
 	s.events.On(removingEvent(eventName))
-	err = s.apiClient().ContainerRemove(ctx, ctr.ID, containerType.RemoveOptions{
+	_, err = s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
 		Force:         true,
 		RemoveVolumes: volumes,
 	})

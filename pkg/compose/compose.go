@@ -26,18 +26,14 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
 	"github.com/jonboulle/clockwork"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -253,7 +249,29 @@ func (s *composeService) getProxyConfig() map[string]string {
 	if s.proxyConfig != nil {
 		return s.proxyConfig
 	}
-	return storeutil.GetProxyConfig(s.dockerCli)
+	cfg := s.dockerCli.ConfigFile()
+	host := s.dockerCli.Client().DaemonHost()
+
+	proxy, ok := cfg.Proxies[host]
+	if !ok {
+		proxy = cfg.Proxies["default"]
+	}
+
+	m := map[string]string{}
+
+	if v := proxy.HTTPProxy; v != "" {
+		m["HTTP_PROXY"] = v
+	}
+	if v := proxy.HTTPSProxy; v != "" {
+		m["HTTPS_PROXY"] = v
+	}
+	if v := proxy.NoProxy; v != "" {
+		m["NO_PROXY"] = v
+	}
+	if v := proxy.FTPProxy; v != "" {
+		m["FTP_PROXY"] = v
+	}
+	return m
 }
 
 func (s *composeService) stdout() *streams.Out {
@@ -434,8 +452,8 @@ func increment(scale *int) *int {
 }
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
-	opts := volume.ListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+	opts := client.VolumeListOptions{
+		Filters: projectFilter(projectName),
 	}
 	volumes, err := s.apiClient().VolumeList(ctx, opts)
 	if err != nil {
@@ -443,7 +461,7 @@ func (s *composeService) actualVolumes(ctx context.Context, projectName string) 
 	}
 
 	actual := types.Volumes{}
-	for _, vol := range volumes.Volumes {
+	for _, vol := range volumes.Items {
 		actual[vol.Labels[api.VolumeLabel]] = types.VolumeConfig{
 			Name:   vol.Name,
 			Driver: vol.Driver,
@@ -454,15 +472,15 @@ func (s *composeService) actualVolumes(ctx context.Context, projectName string) 
 }
 
 func (s *composeService) actualNetworks(ctx context.Context, projectName string) (types.Networks, error) {
-	networks, err := s.apiClient().NetworkList(ctx, network.ListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
+	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
+		Filters: projectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	actual := types.Networks{}
-	for _, net := range networks {
+	for _, net := range networks.Items {
 		actual[net.Labels[api.NetworkLabel]] = types.NetworkConfig{
 			Name:   net.Name,
 			Driver: net.Driver,
@@ -480,11 +498,11 @@ var swarmEnabled = struct {
 
 func (s *composeService) isSwarmEnabled(ctx context.Context) (bool, error) {
 	swarmEnabled.once.Do(func() {
-		info, err := s.apiClient().Info(ctx)
+		res, err := s.apiClient().Info(ctx, client.InfoOptions{})
 		if err != nil {
 			swarmEnabled.err = err
 		}
-		switch info.Swarm.LocalNodeState {
+		switch res.Info.Swarm.LocalNodeState {
 		case swarm.LocalNodeStateInactive, swarm.LocalNodeStateLocked:
 			swarmEnabled.val = false
 		default:
@@ -503,8 +521,9 @@ type runtimeVersionCache struct {
 var runtimeVersion runtimeVersionCache
 
 func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
+	// TODO(thaJeztah): this should use Client.ClientVersion), which has the negotiated version.
 	runtimeVersion.once.Do(func() {
-		version, err := s.apiClient().ServerVersion(ctx)
+		version, err := s.apiClient().ServerVersion(ctx, client.ServerVersionOptions{})
 		if err != nil {
 			runtimeVersion.err = err
 		}

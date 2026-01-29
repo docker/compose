@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/command"
+	"github.com/moby/moby/client"
 	"github.com/moby/sys/atomicwriter"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -57,7 +58,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		Status: api.Working,
 	})
 
-	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID)
+	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID, client.ContainerExportOptions{})
 	if err != nil {
 		return err
 	}

@@ -21,8 +21,9 @@ import (
 	"io"
 
 	"github.com/containerd/errdefs"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -83,14 +84,14 @@ func (s *composeService) Logs(
 		monitor.withListener(func(event api.ContainerEvent) {
 			if event.Type == api.ContainerEventStarted {
 				eg.Go(func() error {
-					ctr, err := s.apiClient().ContainerInspect(ctx, event.ID)
+					res, err := s.apiClient().ContainerInspect(ctx, event.ID, client.ContainerInspectOptions{})
 					if err != nil {
 						return err
 					}
 
-					err = s.doLogContainer(ctx, consumer, event.Source, ctr, api.LogOptions{
+					err = s.doLogContainer(ctx, consumer, event.Source, res.Container, api.LogOptions{
 						Follow:     options.Follow,
-						Since:      ctr.State.StartedAt,
+						Since:      res.Container.State.StartedAt,
 						Until:      options.Until,
 						Tail:       options.Tail,
 						Timestamps: options.Timestamps,
@@ -113,16 +114,16 @@ func (s *composeService) Logs(
 }
 
 func (s *composeService) logContainer(ctx context.Context, consumer api.LogConsumer, c container.Summary, options api.LogOptions) error {
-	ctr, err := s.apiClient().ContainerInspect(ctx, c.ID)
+	res, err := s.apiClient().ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return err
 	}
 	name := getContainerNameWithoutProject(c)
-	return s.doLogContainer(ctx, consumer, name, ctr, options)
+	return s.doLogContainer(ctx, consumer, name, res.Container, options)
 }
 
 func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {
-	r, err := s.apiClient().ContainerLogs(ctx, ctr.ID, container.LogsOptions{
+	r, err := s.apiClient().ContainerLogs(ctx, ctr.ID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     options.Follow,
