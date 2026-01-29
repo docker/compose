@@ -64,7 +64,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 		if err != nil {
 			return err
 		}
-		if !inspected.State.Running || (options.Stop && s.dryRun) {
+		if inspected.State == nil || !inspected.State.Running || (options.Stop && s.dryRun) {
 			stoppedContainers = append(stoppedContainers, ctr)
 		}
 	}
