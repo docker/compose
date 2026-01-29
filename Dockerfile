@@ -188,9 +188,6 @@ ARG TARGETARCH
 ARG TARGETVARIANT
 RUN --mount=from=binary \
     mkdir -p /out && \
-    # TODO: should just use standard arch
-    TARGETARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH"); \
-    TARGETARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "$TARGETARCH"); \
     cp docker-compose* "/out/docker-compose-${TARGETOS}-${TARGETARCH}${TARGETVARIANT}$(ls docker-compose* | sed -e 's/^docker-compose//')"
 
 FROM scratch AS release
