@@ -16,6 +16,7 @@ start participating.
   - [Reporting security issues](#reporting-security-issues)
   - [Reporting other issues](#reporting-other-issues)
   - [Quick contribution tips and guidelines](#quick-contribution-tips-and-guidelines)
+    - [AI-assisted contributions](#ai-assisted-contributions)
     - [Pull requests are always welcome](#pull-requests-are-always-welcome)
     - [Talking to other Docker users and contributors](#talking-to-other-docker-users-and-contributors)
     - [Conventions](#conventions)
@@ -66,7 +67,7 @@ When sending lengthy log files, consider posting them as a gist
 Don't forget to remove sensitive data from your log files before posting (you
 can replace those parts with "REDACTED").
 
-_Note:_ 
+_Note:_
 Maintainers might request additional information to diagnose an issue,
 if initial reporter doesn't answer within a reasonable delay (a few weeks),
 issue will be closed.
@@ -75,13 +76,31 @@ issue will be closed.
 
 This section gives the experienced contributor some tips and guidelines.
 
+### AI-assisted contributions
+
+Docker Compose has clear rules for AI-assisted contributions. **Read the full policy**: [AI_POLICY.md](AI_POLICY.md)
+
+**Required for all AI-assisted PRs**:
+- **Disclose** the AI tool used (GitHub Copilot, Claude Code, ChatGPT, Cursor, etc.)
+- **Link to an approved issue** - only submit PRs for issues labeled `status/approved`
+- **Test thoroughly** - run `make test`, `make lint`, and relevant E2E tests
+- **Follow existing patterns** - read [AGENTS.md](AGENTS.md) and match nearby code
+- **Understand your code** - you must be able to explain every line
+
+**PRs that don't follow these rules will be closed.** Contributors who repeatedly
+ignore this policy may be banned from the repository.
+
+This is not an anti-AI stance - we use AI ourselves. This policy exists to maintain
+code quality and protect maintainer time. See [AI_POLICY.md](AI_POLICY.md) for details.
+
 ### Pull requests are always welcome
 
 Not sure if that typo is worth a pull request? Found a bug and know how to fix
 it? Do it! We will appreciate it. Any significant change, like adding a backend,
-should be documented as
+**must** be documented as
 [a GitHub issue](https://github.com/docker/compose/issues)
-before anybody starts working on it.
+before anybody starts working on it. All pull requests must reference
+an existing issue (see [AI_POLICY.md](AI_POLICY.md) for exceptions).
 
 We are always thrilled to receive pull requests. We do our best to process them
 quickly. If your pull request is not accepted on the first try,
@@ -146,7 +165,9 @@ and maintenance. Always run `gofmt -s -w file.go` on each changed file before
 committing your changes. Most editors have plug-ins that do this automatically.
 
 Pull request descriptions should be as clear as possible and include a reference
-to all the issues that they address.
+to all the issues that they address. Explain both **what** changed and **why**
+the change was necessary. If you used AI assistance, include a disclosure
+(see [AI_POLICY.md](AI_POLICY.md)).
 
 Commit messages must start with a capitalized and short summary (max. 50 chars)
 written in the imperative, followed by an optional, more detailed explanatory
