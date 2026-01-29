@@ -170,7 +170,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	flags.StringArrayVar(&up.attach, "attach", []string{}, "Restrict attaching to the specified services. Incompatible with --attach-dependencies.")
 	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services")
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
-	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
+	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies attached mode by default.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
@@ -197,12 +197,14 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	if up.cascadeStop && up.cascadeFail {
 		return fmt.Errorf("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
 	}
+
 	if up.wait {
+		up.Detach = false
 		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
 			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
 		}
-		up.Detach = true
 	}
+
 	if create.Build && create.noBuild {
 		return fmt.Errorf("--build and --no-build are incompatible")
 	}
@@ -300,7 +302,6 @@ func runUp(
 	var attach []string
 	if !upOptions.Detach {
 		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
-
 		var attachSet utils.Set[string]
 		if len(upOptions.attach) != 0 {
 			// services are passed explicitly with --attach, verify they're valid and then use them as-is
