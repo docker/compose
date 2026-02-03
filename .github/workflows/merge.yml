@@ -136,6 +136,6 @@ jobs:
               workflow_id: 'compose-edge-integration.yml',
               ref: 'main',
               inputs: {
-                "image-tag": "${{ needs.bin-image.outputs.digest }}"
+                "image-tag": "${{ env.REPO_SLUG }}:edge"
               }
             })
