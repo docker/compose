@@ -109,6 +109,24 @@ jobs:
           path: ./bin/release/*
           if-no-files-found: error
 
+  bin-image-test:
+    if: github.event_name == 'pull_request'
+    uses: docker/github-builder/.github/workflows/bake.yml@v1
+    with:
+      runner: amd64
+      target: image-cross
+      cache: true
+      cache-scope: bin-image-test
+      output: image
+      push: false
+      sbom: true
+      set-meta-labels: true
+      meta-images: |
+        compose-bin
+      meta-tags: |
+        type=ref,event=pr
+      meta-bake-target: meta-helper
+
   test:
     runs-on: ubuntu-latest
     steps:

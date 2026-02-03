@@ -74,63 +74,39 @@ jobs:
         run: |
           make e2e-compose-standalone
 
-  bin-image:
-    runs-on: ubuntu-22.04
+  bin-image-prepare:
+    runs-on: ubuntu-24.04
     outputs:
-      digest: ${{ fromJSON(steps.bake.outputs.metadata).image-cross['containerimage.digest'] }}
+      repo-slug: ${{ env.REPO_SLUG }}
     steps:
-      -
-        name: Free disk space
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-        with:
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          swap-storage: true
-      -
-        name: Checkout
-        uses: actions/checkout@v4
-      -
-        name: Login to DockerHub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
+      # FIXME: can't use env object in reusable workflow inputs: https://github.com/orgs/community/discussions/26671
+      - run: echo "Exposing env vars for reusable workflow"
+
+  bin-image:
+    uses: docker/github-builder/.github/workflows/bake.yml@v1
+    permissions:
+      contents: read # same as global permission
+      id-token: write # for signing attestation(s) with GitHub OIDC Token
+    with:
+      runner: amd64
+      target: image-cross
+      cache: true
+      cache-scope: bin-image
+      output: image
+      push: ${{ github.event_name != 'pull_request' }}
+      sbom: true
+      set-meta-labels: true
+      meta-images: |
+        ${{ needs.bin-image-prepare.outputs.repo-slug }}
+      meta-tags: |
+        type=ref,event=tag
+        type=edge
+      meta-bake-target: meta-helper
+    secrets:
+      registry-auths: |
+        - registry: docker.io
           username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
           password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      -
-        name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.REPO_SLUG }}
-          tags: |
-            type=ref,event=tag
-            type=edge
-          bake-target: meta-helper
-      -
-        name: Build and push image
-        uses: docker/bake-action@v6
-        id: bake
-        with:
-          source: .
-          files: |
-            ./docker-bake.hcl
-            ${{ steps.meta.outputs.bake-file }}
-          targets: image-cross
-          push: ${{ github.event_name != 'pull_request' }}
-          sbom: true
-          provenance: mode=max
-          set: |
-            *.cache-from=type=gha,scope=bin-image
-            *.cache-to=type=gha,scope=bin-image,mode=max
 
   desktop-edge-test:
     runs-on: ubuntu-latest
