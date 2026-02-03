@@ -84,6 +84,8 @@ jobs:
 
   bin-image:
     uses: docker/github-builder/.github/workflows/bake.yml@v1
+    needs:
+      - bin-image-prepare
     permissions:
       contents: read # same as global permission
       id-token: write # for signing attestation(s) with GitHub OIDC Token
