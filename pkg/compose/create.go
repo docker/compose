@@ -528,6 +528,14 @@ func defaultNetworkSettings(project *types.Project,
 		return "none", nil, nil
 	}
 
+	if versions.LessThan(version, APIVersion149) {
+		for _, config := range service.Networks {
+			if config != nil && config.InterfaceName != "" {
+				return "", nil, fmt.Errorf("interface_name requires Docker Engine %s or later", DockerEngineV28_1)
+			}
+		}
+	}
+
 	var primaryNetworkKey string
 	if len(service.Networks) > 0 {
 		primaryNetworkKey = service.NetworksByPriority()[0]
@@ -561,14 +569,6 @@ func defaultNetworkSettings(project *types.Project,
 		primaryNetworkEndpoint.MacAddress, err = parseMACAddr(service.MacAddress)
 		if err != nil {
 			return "", nil, err
-		}
-	}
-
-	if versions.LessThan(version, APIVersion149) {
-		for _, config := range service.Networks {
-			if config != nil && config.InterfaceName != "" {
-				return "", nil, fmt.Errorf("interface_name requires Docker Engine %s or later", DockerEngineV28_1)
-			}
 		}
 	}
 
