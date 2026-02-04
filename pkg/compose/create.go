@@ -525,7 +525,7 @@ func defaultNetworkSettings(project *types.Project,
 	}
 
 	if len(project.Networks) == 0 {
-		return "none", nil, nil
+		return network.NetworkNone, nil, nil
 	}
 
 	if versions.LessThan(version, APIVersion149) {
@@ -536,34 +536,16 @@ func defaultNetworkSettings(project *types.Project,
 		}
 	}
 
-	var primaryNetworkKey string
-	if len(service.Networks) > 0 {
-		primaryNetworkKey = service.NetworksByPriority()[0]
-	} else {
-		primaryNetworkKey = "default"
+	serviceNetworks := service.NetworksByPriority()
+	primaryNetworkKey := "default"
+	if len(serviceNetworks) > 0 {
+		primaryNetworkKey = serviceNetworks[0]
+		serviceNetworks = serviceNetworks[1:]
 	}
-	primaryNetworkMobyNetworkName := project.Networks[primaryNetworkKey].Name
+
 	primaryNetworkEndpoint, err := createEndpointSettings(project, service, serviceIndex, primaryNetworkKey, links, useNetworkAliases)
 	if err != nil {
 		return "", nil, err
-	}
-
-	endpointsConfig := map[string]*network.EndpointSettings{}
-
-	// Starting from API version 1.44, the Engine will take several EndpointsConfigs
-	// so we can pass all the extra networks we want the container to be connected to
-	// in the network configuration instead of connecting the container to each extra
-	// network individually after creation.
-	if len(service.Networks) > 1 {
-		serviceNetworks := service.NetworksByPriority()
-		for _, networkKey := range serviceNetworks[1:] {
-			mobyNetworkName := project.Networks[networkKey].Name
-			epSettings, err := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
-			if err != nil {
-				return "", nil, err
-			}
-			endpointsConfig[mobyNetworkName] = epSettings
-		}
 	}
 	if primaryNetworkEndpoint.MacAddress.String() == "" {
 		primaryNetworkEndpoint.MacAddress, err = parseMACAddr(service.MacAddress)
@@ -572,7 +554,24 @@ func defaultNetworkSettings(project *types.Project,
 		}
 	}
 
-	endpointsConfig[primaryNetworkMobyNetworkName] = primaryNetworkEndpoint
+	primaryNetworkMobyNetworkName := project.Networks[primaryNetworkKey].Name
+	endpointsConfig := map[string]*network.EndpointSettings{
+		primaryNetworkMobyNetworkName: primaryNetworkEndpoint,
+	}
+
+	// Starting from API version 1.44, the Engine will take several EndpointsConfigs
+	// so we can pass all the extra networks we want the container to be connected to
+	// in the network configuration instead of connecting the container to each extra
+	// network individually after creation.
+	for _, networkKey := range serviceNetworks {
+		epSettings, err := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
+		if err != nil {
+			return "", nil, err
+		}
+		mobyNetworkName := project.Networks[networkKey].Name
+		endpointsConfig[mobyNetworkName] = epSettings
+	}
+
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: endpointsConfig,
 	}
