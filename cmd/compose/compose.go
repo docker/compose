@@ -477,7 +477,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 
-			err := setEnvWithDotEnv(opts)
+			err := setEnvWithDotEnv(opts, dockerCli)
 			if err != nil {
 				return err
 			}
@@ -677,7 +677,21 @@ func stdinfo(dockerCli command.Cli) io.Writer {
 	return dockerCli.Err()
 }
 
-func setEnvWithDotEnv(opts ProjectOptions) error {
+func setEnvWithDotEnv(opts ProjectOptions, dockerCli command.Cli) error {
+	// Check if we're using a remote config (OCI or Git)
+	// If so, skip env loading as remote loaders haven't been initialized yet
+	// and trying to process the path would fail
+	remoteLoaders := opts.remoteLoaders(dockerCli)
+	for _, path := range opts.ConfigPaths {
+		for _, loader := range remoteLoaders {
+			if loader.Accept(path) {
+				// Remote config - skip env loading for now
+				// It will be loaded later when the project is fully initialized
+				return nil
+			}
+		}
+	}
+
 	options, err := cli.NewProjectOptions(opts.ConfigPaths,
 		cli.WithWorkingDirectory(opts.ProjectDir),
 		cli.WithOsEnv,
