@@ -32,6 +32,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
 	clitypes "github.com/docker/cli/cli/config/types"
+	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
 	"github.com/opencontainers/go-digest"
@@ -414,15 +415,12 @@ func toPullProgressEvent(parent string, jm jsonstream.Message, events api.EventP
 	}
 
 	var (
-		progress string
-		total    int64
-		percent  int
-		current  int64
-		status   = api.Working
+		details string
+		total   int64
+		percent int
+		current int64
+		status  = api.Working
 	)
-
-	// FIXME(thaJeztah): what's the replacement for Progress.String()?
-	// progress = jm.Progress.String()
 
 	switch jm.Status {
 	case PreparingPhase, WaitingPhase, PullingFsPhase:
@@ -451,7 +449,9 @@ func toPullProgressEvent(parent string, jm jsonstream.Message, events api.EventP
 
 	if jm.Error != nil {
 		status = api.Error
-		progress = jm.Error.Message
+		details = jm.Error.Message
+	} else {
+		details = units.HumanSize(float64(jm.Progress.Current))
 	}
 
 	events.On(api.Resource{
@@ -462,6 +462,6 @@ func toPullProgressEvent(parent string, jm jsonstream.Message, events api.EventP
 		Percent:  percent,
 		Status:   status,
 		Text:     jm.Status,
-		Details:  progress,
+		Details:  details,
 	})
 }
