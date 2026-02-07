@@ -435,9 +435,6 @@ func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
 // buildkit's NewDisplay doesn't actually require a [io.Reader], it only uses the [containerd.Console] type to
 // benefits from ANSI capabilities, but only does writes.
 func makeConsole(out io.Writer) io.Writer {
-	if s, ok := out.(*streams.Out); ok {
-		return &_console{s}
-	}
 	return out
 }
 
