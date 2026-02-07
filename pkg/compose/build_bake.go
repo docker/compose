@@ -435,6 +435,9 @@ func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
 // buildkit's NewDisplay doesn't actually require a [io.Reader], it only uses the [containerd.Console] type to
 // benefits from ANSI capabilities, but only does writes.
 func makeConsole(out io.Writer) io.Writer {
+	if s, ok := out.(*streams.Out); ok {
+		return &_console{s}
+	}
 	return out
 }
 
@@ -444,20 +447,24 @@ type _console struct {
 	*streams.Out
 }
 
-func (c _console) Read(p []byte) (n int, err error) {
+func (c *_console) Read(p []byte) (n int, err error) {
 	return 0, errors.New("not implemented")
 }
 
-func (c _console) Close() error {
+func (c *_console) Close() error {
 	return nil
 }
 
-func (c _console) Fd() uintptr {
+func (c *_console) Fd() uintptr {
 	return c.FD()
 }
 
-func (c _console) Name() string {
+func (c *_console) Name() string {
 	return "compose"
+}
+func (c *_console) File() *os.File {
+	// streams.Out wraps the actual file. We attempt to unwrap it.
+	return os.NewFile(c.Out.FD(), "compose")
 }
 
 func toBakeExtraHosts(hosts types.HostsList) map[string]string {
