@@ -28,7 +28,7 @@ Define and run multi-container applications with Docker
 | [`logs`](compose_logs.md)       | View output from containers                                                             |
 | [`ls`](compose_ls.md)           | List running compose projects                                                           |
 | [`pause`](compose_pause.md)     | Pause services                                                                          |
-| [`port`](compose_port.md)       | Print the public port for a port binding                                                |
+| [`port`](compose_port.md)       | List port mappings or print the public port of a specific mapping for the service       |
 | [`ps`](compose_ps.md)           | List containers                                                                         |
 | [`publish`](compose_publish.md) | Publish compose application                                                             |
 | [`pull`](compose_pull.md)       | Pull service images                                                                     |
