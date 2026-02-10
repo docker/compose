@@ -27,6 +27,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
+	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
@@ -149,8 +150,7 @@ func toPushProgressEvent(prefix string, jm jsonstream.Message, events api.EventP
 		text = jm.Error.Message
 	}
 	if jm.Progress != nil {
-		// FIXME(thaJeztah): what's the replacement for Progress.String()?
-		// text = jm.Progress.String()
+		text = progressText(jm.Progress)
 		if jm.Progress.Total != 0 {
 			current = jm.Progress.Current
 			total = jm.Progress.Total
@@ -181,5 +181,29 @@ func isDone(msg jsonstream.Message) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// progressText is a minimal variant of [jsonmessage.JSONProgress.String()]
+//
+// [jsonmessage.JSONProgress.String()]: https://github.com/moby/moby/blob/v28.5.2/pkg/jsonmessage/jsonmessage.go#L54-L117
+func progressText(p *jsonstream.Progress) string {
+	switch {
+	case p.Current <= 0 && p.Total <= 0:
+		return ""
+	case p.Units == "": // no units, use bytes
+		current := units.HumanSize(float64(p.Current))
+		if p.Total <= 0 || p.Total > p.Current {
+			// remove total display if the reported current is wonky.
+			return fmt.Sprintf("%8v", current)
+		}
+		total := units.HumanSize(float64(p.Total))
+		return fmt.Sprintf("%8v/%v", current, total)
+	default:
+		if p.Total <= 0 || p.Total > p.Current {
+			// remove total display if the reported current is wonky.
+			return fmt.Sprintf("%d %s", p.Current, p.Units)
+		}
+		return fmt.Sprintf("%d/%d %s", p.Current, p.Total, p.Units)
 	}
 }
