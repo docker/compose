@@ -60,7 +60,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	if err != nil {
 		return nil, err
 	}
-	withPlatform := versions.GreaterThanOrEqualTo(version, APIVersion149)
+	withPlatform := versions.GreaterThanOrEqualTo(version, apiVersion149)
 
 	summary := map[string]api.ImageSummary{}
 	var mux sync.Mutex

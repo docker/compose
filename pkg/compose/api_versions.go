@@ -19,16 +19,16 @@ package compose
 // Docker Engine API version constants.
 // These versions correspond to specific Docker Engine releases and their features.
 const (
-	// APIVersion148 represents Docker Engine API version 1.48 (Engine v28.0).
+	// apiVersion148 represents Docker Engine API version 1.48 (Engine v28.0).
 	//
 	// New features in this version:
 	//  - Volume mounts with type=image support
 	//
 	// Before this version:
 	//  - Only bind, volume, and tmpfs mount types were supported
-	APIVersion148 = "1.48"
+	apiVersion148 = "1.48"
 
-	// APIVersion149 represents Docker Engine API version 1.49 (Engine v28.1).
+	// apiVersion149 represents Docker Engine API version 1.49 (Engine v28.1).
 	//
 	// New features in this version:
 	//  - Network interface_name configuration
@@ -37,14 +37,14 @@ const (
 	// Before this version:
 	//  - interface_name was not configurable
 	//  - ImageList didn't support platform filtering
-	APIVersion149 = "1.49"
+	apiVersion149 = "1.49"
 )
 
 // Docker Engine version strings for user-facing error messages.
 // These should be used in error messages to provide clear version requirements.
 const (
-	// DockerEngineV28 is the major version string for Docker Engine 28.x
-	DockerEngineV28 = "v28"
+	// dockerEngineV28 is the major version string for Docker Engine 28.x
+	dockerEngineV28 = "v28"
 
 	// DockerEngineV28_1 is the specific version string for Docker Engine 28.1
 	DockerEngineV28_1 = "v28.1"
@@ -52,6 +52,6 @@ const (
 
 // Build tool version constants
 const (
-	// BuildxMinVersion is the minimum required version of buildx for compose build
-	BuildxMinVersion = "0.17.0"
+	// buildxMinVersion is the minimum required version of buildx for compose build
+	buildxMinVersion = "0.17.0"
 )

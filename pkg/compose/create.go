@@ -528,7 +528,7 @@ func defaultNetworkSettings(project *types.Project,
 		return network.NetworkNone, nil, nil
 	}
 
-	if versions.LessThan(version, APIVersion149) {
+	if versions.LessThan(version, apiVersion149) {
 		for _, config := range service.Networks {
 			if config != nil && config.InterfaceName != "" {
 				return "", nil, fmt.Errorf("interface_name requires Docker Engine %s or later", DockerEngineV28_1)
@@ -901,8 +901,8 @@ func (s *composeService) buildContainerVolumes(
 			if err != nil {
 				return nil, nil, err
 			}
-			if versions.LessThan(version, APIVersion148) {
-				return nil, nil, fmt.Errorf("volume with type=image require Docker Engine %s or later", DockerEngineV28)
+			if versions.LessThan(version, apiVersion148) {
+				return nil, nil, fmt.Errorf("volume with type=image require Docker Engine %s or later", dockerEngineV28)
 			}
 		}
 		mounts = append(mounts, m)
