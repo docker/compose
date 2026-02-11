@@ -36,15 +36,13 @@ func (m MuxExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 	)
 
 	for _, exporter := range m.exporters {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := exporter.ExportSpans(ctx, spans); err != nil {
 				errMu.Lock()
 				errs = append(errs, err)
 				errMu.Unlock()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	return errors.Join(errs...)
@@ -58,15 +56,13 @@ func (m MuxExporter) Shutdown(ctx context.Context) error {
 	)
 
 	for _, exporter := range m.exporters {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := exporter.Shutdown(ctx); err != nil {
 				errMu.Lock()
 				errs = append(errs, err)
 				errMu.Unlock()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	return errors.Join(errs...)

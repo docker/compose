@@ -186,7 +186,7 @@ func TestPrintWithDimensions_TaskWithProgress(t *testing.T) {
 	w.ids = append(w.ids, "Image nginx")
 
 	// Create child tasks to trigger progress display
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		child := &task{
 			ID:        "layer" + string(rune('a'+i)),
 			parents:   map[string]struct{}{"Image nginx": {}},

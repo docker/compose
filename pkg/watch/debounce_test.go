@@ -31,7 +31,7 @@ func Test_BatchDebounceEvents(t *testing.T) {
 	t.Cleanup(stop)
 
 	eventBatchCh := BatchDebounceEvents(ctx, clock, ch)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		path := "/a"
 		if i%2 == 0 {
 			path = "/b"

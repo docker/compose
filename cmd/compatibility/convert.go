@@ -19,6 +19,7 @@ package compatibility
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/docker/compose/v5/cmd/compose"
@@ -59,7 +60,7 @@ func Convert(args []string) []string {
 ARGS:
 	for i := 0; i < l; i++ {
 		arg := args[i]
-		if contains(getCompletionCommands(), arg) {
+		if slices.Contains(getCompletionCommands(), arg) {
 			command = append([]string{arg}, command...)
 			continue
 		}
@@ -79,7 +80,7 @@ ARGS:
 			arg = "version"
 		}
 
-		if contains(getBoolFlags(), arg) {
+		if slices.Contains(getBoolFlags(), arg) {
 			rootFlags = append(rootFlags, arg)
 			continue
 		}
@@ -104,13 +105,4 @@ ARGS:
 		command = append(command, arg)
 	}
 	return append(rootFlags, command...)
-}
-
-func contains(array []string, needle string) bool {
-	for _, val := range array {
-		if val == needle {
-			return true
-		}
-	}
-	return false
 }

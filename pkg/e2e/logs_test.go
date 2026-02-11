@@ -109,7 +109,7 @@ func TestLocalComposeLargeLogs(t *testing.T) {
 
 	f, err := os.Create(file)
 	assert.NilError(t, err)
-	for i := 0; i < 300_000; i++ {
+	for i := range 300_000 {
 		_, err := io.WriteString(f, fmt.Sprintf("This is line %d in a laaaarge text file\n", i))
 		assert.NilError(t, err)
 	}

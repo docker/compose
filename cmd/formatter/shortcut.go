@@ -189,7 +189,7 @@ func (lk *LogKeyboard) clearNavigationMenu() {
 	saveCursor()
 
 	// clearLine()
-	for i := 0; i < height; i++ {
+	for range height {
 		moveCursorDown(1)
 		clearLine()
 	}
@@ -341,7 +341,7 @@ func (lk *LogKeyboard) EnableDetach(detach func()) {
 }
 
 func allocateSpace(lines int) {
-	for i := 0; i < lines; i++ {
+	for range lines {
 		clearLine()
 		newLine()
 		carriageReturn()

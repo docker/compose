@@ -317,10 +317,7 @@ func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
 	allTasks := slices.Collect(w.parentTasks())
 
 	// Available lines: terminal height - 2 (header line + potential "more" line)
-	maxLines := terminalHeight - 2
-	if maxLines < 1 {
-		maxLines = 1
-	}
+	maxLines := max(terminalHeight-2, 1)
 
 	showMore := len(allTasks) > maxLines
 	tasksToShow := allTasks
@@ -354,10 +351,7 @@ func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
 	if showMore {
 		moreCount := len(allTasks) - len(tasksToShow)
 		moreText := fmt.Sprintf(" ... %d more", moreCount)
-		pad := terminalWidth - len(moreText)
-		if pad < 0 {
-			pad = 0
-		}
+		pad := max(terminalWidth-len(moreText), 0)
 		_, _ = fmt.Fprintf(w.out, "%s%s\n", moreText, strings.Repeat(" ", pad))
 		numLines++
 	}
@@ -392,10 +386,7 @@ func (w *ttyWriter) applyPadding(lines []lineData, terminalWidth int, timerLen i
 		if l.details != "" {
 			lineLen += 1 + utf8.RuneCountInString(l.details)
 		}
-		l.timerPad = terminalWidth - lineLen - timerLen
-		if l.timerPad < 1 {
-			l.timerPad = 1
-		}
+		l.timerPad = max(terminalWidth-lineLen-timerLen, 1)
 		lines[i] = l
 
 	}
@@ -472,10 +463,7 @@ func truncateDetails(lines []lineData, overflow int) bool {
 	for i := range lines {
 		l := &lines[i]
 		if len(l.details) > 3 {
-			reduction := overflow
-			if reduction > len(l.details)-3 {
-				reduction = len(l.details) - 3
-			}
+			reduction := min(overflow, len(l.details)-3)
 			l.details = l.details[:len(l.details)-reduction-3] + "..."
 			return true
 		} else if l.details != "" {
@@ -504,10 +492,7 @@ func truncateLongestTaskID(lines []lineData, overflow, minIDLen int) bool {
 
 	l := &lines[longestIdx]
 	reduction := overflow + 3 // account for "..."
-	newLen := len(l.taskID) - reduction
-	if newLen < minIDLen-3 {
-		newLen = minIDLen - 3
-	}
+	newLen := max(len(l.taskID)-reduction, minIDLen-3)
 	if newLen > 0 {
 		l.taskID = l.taskID[:newLen] + "..."
 	}
@@ -546,10 +531,7 @@ func (w *ttyWriter) prepareLineData(t *task) lineData {
 			total += child.total
 			current += child.current
 			r := len(percentChars) - 1
-			p := child.percent
-			if p > 100 {
-				p = 100
-			}
+			p := min(child.percent, 100)
 			completion = append(completion, percentChars[r*p/100])
 		}
 	}

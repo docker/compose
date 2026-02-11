@@ -167,18 +167,9 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 func filterByStatus(containers []api.ContainerSummary, statuses []string) []api.ContainerSummary {
 	var filtered []api.ContainerSummary
 	for _, c := range containers {
-		if hasStatus(c, statuses) {
+		if slices.Contains(statuses, string(c.State)) {
 			filtered = append(filtered, c)
 		}
 	}
 	return filtered
-}
-
-func hasStatus(c api.ContainerSummary, statuses []string) bool {
-	for _, status := range statuses {
-		if string(c.State) == status {
-			return true
-		}
-	}
-	return false
 }

@@ -155,10 +155,7 @@ func toPushProgressEvent(prefix string, jm jsonstream.Message, events api.EventP
 			current = jm.Progress.Current
 			total = jm.Progress.Total
 			if jm.Progress.Total > 0 {
-				percent = int(jm.Progress.Current * 100 / jm.Progress.Total)
-				if percent > 100 {
-					percent = 100
-				}
+				percent = min(int(jm.Progress.Current*100/jm.Progress.Total), 100)
 			}
 		}
 	}

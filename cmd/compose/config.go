@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -454,9 +455,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 	}
 
 	sorted := services
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i] < sorted[j]
-	})
+	slices.Sort(sorted)
 
 	for _, name := range sorted {
 		s, err := project.GetService(name)

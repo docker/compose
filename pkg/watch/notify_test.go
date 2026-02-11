@@ -118,7 +118,7 @@ func TestGitBranchSwitch(t *testing.T) {
 	done := f.consumeEventsInBackground(ctx)
 
 	for i, dir := range dirs {
-		for j := 0; j < count; j++ {
+		for j := range count {
 			base := fmt.Sprintf("x/y/dir-%d/x.txt", j)
 			p := filepath.Join(dir, base)
 			f.WriteFile(p, "contents")
