@@ -42,6 +42,7 @@ func TestUnusedMissingEnvFile(t *testing.T) {
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "ps")
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "logs")
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "down")
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "exec", "serviceA", "echo", "hello")
 }
 
 func TestRunEnvFile(t *testing.T) {
