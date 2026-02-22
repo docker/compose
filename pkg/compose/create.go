@@ -866,6 +866,13 @@ func (s *composeService) buildContainerVolumes(
 		return nil, nil, err
 	}
 
+	// Check Docker Engine API version for CreateMountpoint support
+	version, err := s.RuntimeVersion(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	supportsCreateMountpoint := versions.GreaterThanOrEqualTo(version, apiVersion142)
+
 	for _, m := range mountOptions {
 		switch m.Type {
 		case mount.TypeBind:
@@ -885,6 +892,10 @@ func (s *composeService) buildContainerVolumes(
 					binds = append(binds, toBindString(source, v))
 					continue
 				}
+				// Check if create_host_path: false is used on an engine that doesn't support it
+				if v.Bind != nil && !bool(v.Bind.CreateHostPath) && !supportsCreateMountpoint {
+					return nil, nil, fmt.Errorf("bind mount create_host_path: false requires Docker Engine %s or later", dockerEngineV23)
+				}
 			}
 		case mount.TypeVolume:
 			v := findVolumeByTarget(service.Volumes, m.Target)
@@ -897,10 +908,6 @@ func (s *composeService) buildContainerVolumes(
 				}
 			}
 		case mount.TypeImage:
-			version, err := s.RuntimeVersion(ctx)
-			if err != nil {
-				return nil, nil, err
-			}
 			if versions.LessThan(version, apiVersion148) {
 				return nil, nil, fmt.Errorf("volume with type=image require Docker Engine %s or later", dockerEngineV28)
 			}

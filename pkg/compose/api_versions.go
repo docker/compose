@@ -19,6 +19,15 @@ package compose
 // Docker Engine API version constants.
 // These versions correspond to specific Docker Engine releases and their features.
 const (
+	// apiVersion142 represents Docker Engine API version 1.42 (Engine v23.0).
+	//
+	// New features in this version:
+	//  - CreateMountpoint option for bind mounts (allows create_host_path: false)
+	//
+	// Before this version:
+	//  - Bind mounts always created host path if missing, regardless of CreateMountpoint setting
+	apiVersion142 = "1.42"
+
 	// apiVersion148 represents Docker Engine API version 1.48 (Engine v28.0).
 	//
 	// New features in this version:
@@ -43,6 +52,9 @@ const (
 // Docker Engine version strings for user-facing error messages.
 // These should be used in error messages to provide clear version requirements.
 const (
+	// dockerEngineV23 is the major version string for Docker Engine 23.x
+	dockerEngineV23 = "v23"
+
 	// dockerEngineV28 is the major version string for Docker Engine 28.x
 	dockerEngineV28 = "v28"
 
