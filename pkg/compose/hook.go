@@ -61,15 +61,17 @@ func (s composeService) runHook(ctx context.Context, ctr container.Summary, serv
 		return s.runWaitExec(ctx, exec.ID, service, listener)
 	}
 
-	height, width := s.stdout().GetTtySize()
-	consoleSize := client.ConsoleSize{
-		Width:  width,
-		Height: height,
+	attachOptions := client.ExecAttachOptions{
+		TTY: service.Tty,
 	}
-	attach, err := s.apiClient().ExecAttach(ctx, exec.ID, client.ExecAttachOptions{
-		TTY:         service.Tty,
-		ConsoleSize: consoleSize,
-	})
+	if service.Tty {
+		height, width := s.stdout().GetTtySize()
+		attachOptions.ConsoleSize = client.ConsoleSize{
+			Width:  width,
+			Height: height,
+		}
+	}
+	attach, err := s.apiClient().ExecAttach(ctx, exec.ID, attachOptions)
 	if err != nil {
 		return err
 	}
