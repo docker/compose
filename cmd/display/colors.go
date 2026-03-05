@@ -27,15 +27,23 @@ var (
 		return s
 	}
 
+	// DoneColor is the color function used to render the completion indicator.
 	DoneColor    colorFunc = aec.BlueF.Apply
+	// TimerColor is the color function used to render elapsed time.
 	TimerColor   colorFunc = aec.BlueF.Apply
+	// CountColor is the color function used to render counts.
 	CountColor   colorFunc = aec.YellowF.Apply
+	// WarningColor is the color function used to render warning messages.
 	WarningColor colorFunc = aec.YellowF.With(aec.Bold).Apply
+	// SuccessColor is the color function used to render success messages.
 	SuccessColor colorFunc = aec.GreenF.Apply
+	// ErrorColor is the color function used to render error messages.
 	ErrorColor   colorFunc = aec.RedF.With(aec.Bold).Apply
+	// PrefixColor is the color function used to render service name prefixes.
 	PrefixColor  colorFunc = aec.CyanF.Apply
 )
 
+// NoColor disables all terminal color output by replacing color functions with pass-through variants.
 func NoColor() {
 	DoneColor = nocolor
 	TimerColor = nocolor

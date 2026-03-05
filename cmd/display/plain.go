@@ -24,6 +24,7 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// Plain returns an EventProcessor that writes events as plain text lines to the given writer.
 func Plain(out io.Writer) api.EventProcessor {
 	return &plainWriter{
 		out: out,

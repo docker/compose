@@ -21,6 +21,7 @@ import (
 	"time"
 )
 
+// Spinner renders an animated terminal spinner to indicate ongoing progress.
 type Spinner struct {
 	time  time.Time
 	index int
@@ -29,6 +30,7 @@ type Spinner struct {
 	done  string
 }
 
+// NewSpinner creates and returns a new Spinner instance with platform-appropriate characters.
 func NewSpinner() *Spinner {
 	chars := []string{
 		"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
@@ -61,10 +63,12 @@ func (s *Spinner) String() string {
 	return s.chars[s.index]
 }
 
+// Stop marks the spinner as done, causing it to display the completion character.
 func (s *Spinner) Stop() {
 	s.stop = true
 }
 
+// Restart resumes the spinner animation after it has been stopped.
 func (s *Spinner) Restart() {
 	s.stop = false
 }
