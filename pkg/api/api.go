@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -125,8 +127,8 @@ type Compose interface {
 	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
 	// Events executes the equivalent to a `compose events`
 	Events(ctx context.Context, projectName string, options EventsOptions) error
-	// Port executes the equivalent to a `compose port`
-	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
+	// Ports executes the equivalent to a `compose port`
+	Ports(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (PortPublishers, error)
 	// Publish executes the equivalent to a `compose publish`
 	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`
@@ -533,6 +535,10 @@ type PortPublisher struct {
 	TargetPort    int
 	PublishedPort int
 	Protocol      string
+}
+
+func (p PortPublisher) String() string {
+	return fmt.Sprintf("%d/%s -> %s", p.TargetPort, p.Protocol, net.JoinHostPort(p.URL, strconv.Itoa(p.PublishedPort)))
 }
 
 // ContainerSummary hold high-level description of a container

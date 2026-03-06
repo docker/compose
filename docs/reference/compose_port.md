@@ -1,7 +1,7 @@
 # docker compose port
 
 <!---MARKER_GEN_START-->
-Prints the public port for a port binding
+List port mappings or print the public port of a specific mapping for the service
 
 ### Options
 
@@ -16,4 +16,4 @@ Prints the public port for a port binding
 
 ## Description
 
-Prints the public port for a port binding
+List port mappings or print the public port of a specific mapping for the service
