@@ -66,7 +66,15 @@ func TestComposePull(t *testing.T) {
 
 	t.Run("Verify pull failure", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/compose-pull/unknown-image", "pull")
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "pull access denied for does_not_exists"})
+		output := res.Combined()
+
+		errMsg := "pull access denied for does_not_exists"
+		if !strings.Contains(output, errMsg) {
+			// containerd returns:
+			// failed to resolve reference "docker.io/library/does_not_exists:latest": docker.io/library/does_not_exists:latest: not found
+			errMsg = "does_not_exists:latest: not found"
+		}
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: errMsg})
 	})
 
 	t.Run("Verify ignore pull failure", func(t *testing.T) {
