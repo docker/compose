@@ -159,6 +159,11 @@ func (c *monitor) Start(ctx context.Context) error {
 					}
 					containers.Remove(ctr.ID)
 				}
+			case events.ActionHealthStatusHealthy:
+				logrus.Debugf("container %s healthy", ctr.Name)
+				for _, listener := range c.listeners {
+					listener(newContainerEvent(event.TimeNano, ctr, api.ContainerEventHealthy))
+				}
 			}
 		}
 	}

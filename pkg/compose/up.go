@@ -199,6 +199,12 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	}
 	monitor.withListener(printer.HandleEvent)
 
+	if options.Start.Wait {
+		monitor.withListener(onHealthy(func(e api.ContainerEvent) {
+			cancel()
+		}))
+	}
+
 	var exitCode int
 	if options.Start.OnExit != api.CascadeIgnore {
 		once := true
@@ -301,4 +307,12 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
+}
+
+func onHealthy(fn func(api.ContainerEvent)) api.ContainerEventListener {
+	return func(e api.ContainerEvent) {
+		if e.Type == api.ContainerEventHealthy {
+			fn(e)
+		}
+	}
 }
