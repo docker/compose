@@ -211,7 +211,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Status: api.Warning,
 			Text:   "Interrupted",
 		})
-		return "", nil
+		return "", ctx.Err()
 	}
 
 	// check if has error and the service has a build section

@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -108,10 +109,12 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithCancel(cmd.Context())
 
+		var caughtSignal atomic.Value
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
 		go func() {
-			<-s
+			sig := <-s
+			caughtSignal.Store(sig)
 			cancel()
 			signal.Stop(s)
 			close(s)
@@ -119,6 +122,11 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 
 		err := fn(ctx, cmd, args)
 		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+			if sig, ok := caughtSignal.Load().(os.Signal); ok {
+				reraiseSignal(sig)
+				// On Unix, process dies here from signal.
+				// On Windows (or fallback), continues below.
+			}
 			err = dockercli.StatusError{
 				StatusCode: 130,
 			}

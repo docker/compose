@@ -94,11 +94,13 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	err = cmd.Wait()
 	if err != nil {
 		var exitErr *exec.ExitError
-		errors.As(err, &exitErr)
-		if exitErr.ExitCode() == -1 {
-			t.Fatalf("`compose up` was killed: %v", err)
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("`compose up` failed with non-exit error: %v", err)
 		}
-		require.Equal(t, 130, exitErr.ExitCode())
+		// Process is expected to die from re-raised SIGINT signal (exit code -1).
+		// If signal re-raise doesn't terminate the process, the fallback path exits with code 130.
+		assert.Assert(t, exitErr.ExitCode() == -1 || exitErr.ExitCode() == 130,
+			"`compose up` exited with unexpected code: %d (%v)", exitErr.ExitCode(), err)
 	}
 
 	RequireServiceState(t, c, "app", "exited")
