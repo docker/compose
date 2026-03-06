@@ -271,6 +271,20 @@ func runConfigNoInterpolate(ctx context.Context, dockerCli command.Cli, opts con
 		return nil, err
 	}
 
+	if len(services) > 0 {
+		if svcs, ok := model["services"].(map[string]any); ok {
+			filtered := make(map[string]any, len(services))
+			for _, name := range services {
+				if svc, exists := svcs[name]; exists {
+					filtered[name] = svc
+				} else {
+					return nil, fmt.Errorf("no such service: %s", name)
+				}
+			}
+			model["services"] = filtered
+		}
+	}
+
 	if opts.resolveImageDigests {
 		err = resolveImageDigests(ctx, dockerCli, model)
 		if err != nil {

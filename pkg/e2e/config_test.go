@@ -17,8 +17,10 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
 
@@ -45,6 +47,13 @@ func TestLocalComposeConfig(t *testing.T) {
 	t.Run("--no-interpolate", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--no-interpolate")
 		res.Assert(t, icmd.Expected{Out: `- ${PORT:-8080}:80`})
+	})
+
+	t.Run("--no-interpolate with service filter", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName, "config", "--no-interpolate", "example1")
+		res.Assert(t, icmd.Expected{Out: `example1`})
+		// example2 should NOT appear in the output when only example1 is requested
+		assert.Assert(t, !strings.Contains(res.Stdout(), "example2"), "expected example2 to be filtered out")
 	})
 
 	t.Run("--variables --format json", func(t *testing.T) {
