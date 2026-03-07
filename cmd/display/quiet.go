@@ -22,6 +22,7 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// Quiet returns an EventProcessor that silently discards all events.
 func Quiet() api.EventProcessor {
 	return &quiet{}
 }

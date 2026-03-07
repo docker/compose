@@ -25,6 +25,7 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// JSON returns an EventProcessor that serializes events as JSON lines to the given writer.
 func JSON(out io.Writer) api.EventProcessor {
 	return &jsonWriter{
 		out: out,
