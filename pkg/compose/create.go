@@ -53,10 +53,11 @@ type createOptions struct {
 }
 
 type createConfigs struct {
-	Container *container.Config
-	Host      *container.HostConfig
-	Network   *network.NetworkingConfig
-	Links     []string
+	Container  *container.Config
+	Host       *container.HostConfig
+	Network    *network.NetworkingConfig
+	Links      []string
+	APIVersion string
 }
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
@@ -332,10 +333,11 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	}
 
 	cfgs := createConfigs{
-		Container: &containerConfig,
-		Host:      &hostConfig,
-		Network:   networkingConfig,
-		Links:     links,
+		Container:  &containerConfig,
+		Host:       &hostConfig,
+		Network:    networkingConfig,
+		Links:      links,
+		APIVersion: apiVersion,
 	}
 	return cfgs, nil
 }

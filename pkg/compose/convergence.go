@@ -733,28 +733,12 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			Text:   warning,
 		})
 	}
-	res, err := s.apiClient().ContainerInspect(ctx, response.ID, client.ContainerInspectOptions{})
-	if err != nil {
-		return created, err
-	}
-	created = container.Summary{
-		ID:     res.Container.ID,
-		Labels: res.Container.Config.Labels,
-		Names:  []string{res.Container.Name},
-		NetworkSettings: &container.NetworkSettingsSummary{
-			Networks: res.Container.NetworkSettings.Networks,
-		},
-	}
 
 	// Starting API version 1.44, the ContainerCreate API call takes multiple networks
 	// so we include all configurations there and can skip the one-by-one calls here.
 	// For older API versions (e.g. Docker 20.10/API 1.41, Synology DSM 7.1/7.2),
 	// extra networks must be connected individually after creation via NetworkConnect.
-	apiVersion, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return created, err
-	}
-	if versions.LessThan(apiVersion, apiVersion144) {
+	if versions.LessThan(cfgs.APIVersion, apiVersion144) {
 		// The highest-priority network is the primary and is already included in the
 		// ContainerCreate API call via NetworkMode & NetworkingConfig.
 		// Any remaining networks are connected one-by-one here after creation (but before start).
@@ -770,12 +754,25 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 				return created, err
 			}
 			if _, err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, client.NetworkConnectOptions{
-				Container:      created.ID,
+				Container:      response.ID,
 				EndpointConfig: epSettings,
 			}); err != nil {
 				return created, err
 			}
 		}
+	}
+
+	res, err := s.apiClient().ContainerInspect(ctx, response.ID, client.ContainerInspectOptions{})
+	if err != nil {
+		return created, err
+	}
+	created = container.Summary{
+		ID:     res.Container.ID,
+		Labels: res.Container.Config.Labels,
+		Names:  []string{res.Container.Name},
+		NetworkSettings: &container.NetworkSettingsSummary{
+			Networks: res.Container.NetworkSettings.Networks,
+		},
 	}
 
 	return created, nil

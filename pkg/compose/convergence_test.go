@@ -498,3 +498,98 @@ func TestCreateMobyContainer(t *testing.T) {
 	assert.DeepEqual(t, want, got, cmpopts.EquateComparable(netip.Addr{}), cmpopts.EquateEmpty())
 	assert.NilError(t, err)
 }
+
+func TestCreateMobyContainerLegacyAPI(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("").AnyTimes()
+	apiClient.EXPECT().ImageInspect(anyCancellableContext(), gomock.Any()).Return(client.ImageInspectResult{}, nil).AnyTimes()
+
+	// force `RuntimeVersion` to return a pre-1.44 API version
+	runtimeVersion = runtimeVersionCache{}
+	apiClient.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).Return(client.ServerVersionResult{
+		APIVersion: "1.43",
+	}, nil).AnyTimes()
+
+	service := types.ServiceConfig{
+		Name: "test",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"a": {
+				Priority: 10,
+			},
+			"b": {
+				Priority: 100,
+			},
+		},
+	}
+	project := types.Project{
+		Name: "bork",
+		Services: types.Services{
+			"test": service,
+		},
+		Networks: types.Networks{
+			"a": types.NetworkConfig{
+				Name: "a-moby-name",
+			},
+			"b": types.NetworkConfig{
+				Name: "b-moby-name",
+			},
+		},
+	}
+
+	var gotCreate client.ContainerCreateOptions
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+		gotCreate = opts
+		return client.ContainerCreateResult{ID: "an-id"}, nil
+	})
+
+	// For API < 1.44, the secondary network "a" should be connected via NetworkConnect.
+	// Using gomock.InOrder to verify NetworkConnect is called before ContainerInspect.
+	var gotConnect client.NetworkConnectOptions
+	connectCall := apiClient.EXPECT().NetworkConnect(gomock.Any(), gomock.Eq("a-moby-name"), gomock.Any()).DoAndReturn(func(_ context.Context, _ string, opts client.NetworkConnectOptions) (client.NetworkConnectResult, error) {
+		gotConnect = opts
+		return client.NetworkConnectResult{}, nil
+	})
+
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), gomock.Eq("an-id"), gomock.Any()).Times(1).After(connectCall).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:     "an-id",
+			Name:   "a-name",
+			Config: &container.Config{},
+			NetworkSettings: &container.NetworkSettings{
+				Networks: map[string]*network.EndpointSettings{
+					"b-moby-name": {
+						IPAMConfig: &network.EndpointIPAMConfig{},
+						Aliases:    []string{"bork-test-0"},
+					},
+					"a-moby-name": {
+						IPAMConfig: &network.EndpointIPAMConfig{},
+						Aliases:    []string{"bork-test-0"},
+					},
+				},
+			},
+		},
+	}, nil)
+
+	_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service, "test", 0, nil, createOptions{
+		Labels:            make(types.Labels),
+		UseNetworkAliases: true,
+	})
+	assert.NilError(t, err)
+
+	// ContainerCreate should only have the primary network (b, highest priority) in EndpointsConfig
+	assert.Check(t, gotCreate.NetworkingConfig != nil)
+	assert.Equal(t, len(gotCreate.NetworkingConfig.EndpointsConfig), 1)
+	_, hasPrimary := gotCreate.NetworkingConfig.EndpointsConfig["b-moby-name"]
+	assert.Check(t, hasPrimary, "primary network b-moby-name should be in ContainerCreate EndpointsConfig")
+
+	// NetworkConnect should have been called for the secondary network "a"
+	assert.Equal(t, gotConnect.Container, "an-id")
+	assert.Check(t, gotConnect.EndpointConfig != nil)
+}
