@@ -604,7 +604,7 @@ func TestBuildTLS(t *testing.T) {
 		c.RunDockerCmd(t, "context", "rm", dindBuilder)
 	})
 
-	c.RunDockerCmd(t, "run", "--name", dindBuilder, "--privileged", "-p", "2376:2376", "-d", "docker:dind")
+	c.RunDockerCmd(t, "run", "--name", dindBuilder, "--privileged", "-p", "127.0.0.1::2376", "-d", "docker:dind")
 
 	poll.WaitOn(t, func(_ poll.LogT) poll.Result {
 		res := c.RunDockerCmd(t, "logs", dindBuilder)
@@ -617,13 +617,19 @@ func TestBuildTLS(t *testing.T) {
 	time.Sleep(1 * time.Second) // wait for dind setup
 	c.RunDockerCmd(t, "cp", dindBuilder+":/certs/client", tmp)
 
+	res := c.RunDockerCmd(t, "inspect", "-f", "{{(index (index .NetworkSettings.Ports \"2376/tcp\") 0).HostPort}}", dindBuilder)
+	hostPort := strings.TrimSpace(res.Stdout())
+	if hostPort == "" {
+		t.Fatal("failed to resolve mapped host port for 2376/tcp")
+	}
+
 	c.RunDockerCmd(t, "context", "create", dindBuilder, "--docker",
-		fmt.Sprintf("host=tcp://localhost:2376,ca=%s/client/ca.pem,cert=%s/client/cert.pem,key=%s/client/key.pem,skip-tls-verify=1", tmp, tmp, tmp))
+		fmt.Sprintf("host=tcp://127.0.0.1:%s,ca=%s/client/ca.pem,cert=%s/client/cert.pem,key=%s/client/key.pem,skip-tls-verify=1", hostPort, tmp, tmp, tmp))
 
 	cmd := c.NewDockerComposeCmd(t, "-f", "fixtures/build-test/minimal/compose.yaml", "build")
 	cmd.Env = append(cmd.Env, "DOCKER_CONTEXT="+dindBuilder)
 	cmd.Stdout = os.Stdout
-	res := icmd.RunCmd(cmd)
+	res = icmd.RunCmd(cmd)
 	res.Assert(t, icmd.Expected{Err: "Built"})
 }
 
