@@ -10,7 +10,7 @@ require (
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.10.1
 	github.com/containerd/console v1.0.5
-	github.com/containerd/containerd/v2 v2.2.1
+	github.com/containerd/containerd/v2 v2.2.2
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.2
 	github.com/distribution/reference v0.6.0
