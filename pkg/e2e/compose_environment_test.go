@@ -205,6 +205,24 @@ func TestEnvInterpolation(t *testing.T) {
 	})
 }
 
+func TestEnvSelfReference(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Run("self-referencing variables expand within env file", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-self-reference/compose.yaml", "config")
+		res.Assert(t, icmd.Expected{Out: `FULL_IMAGE: gcr.io/myproject/myapp:latest`})
+		res.Assert(t, icmd.Expected{Out: `BASE_URL: gcr.io/myproject/subpath`})
+	})
+
+	t.Run("OS env overrides base variable and cascades through references", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-self-reference/compose.yaml", "config")
+		cmd.Env = append(cmd.Env, "REGISTRY_URL=override.io")
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{Out: `FULL_IMAGE: override.io/myapp:latest`})
+		res.Assert(t, icmd.Expected{Out: `BASE_URL: override.io/subpath`})
+	})
+}
+
 func TestCommentsInEnvFile(t *testing.T) {
 	c := NewParallelCLI(t)
 
