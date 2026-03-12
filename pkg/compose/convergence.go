@@ -33,6 +33,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	mmount "github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/versions"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
@@ -732,6 +733,35 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			Text:   warning,
 		})
 	}
+
+	// Starting API version 1.44, the ContainerCreate API call takes multiple networks
+	// so we include all configurations there and can skip the one-by-one calls here.
+	// For older API versions (e.g. Docker 20.10/API 1.41, Synology DSM 7.1/7.2),
+	// extra networks must be connected individually after creation via NetworkConnect.
+	if versions.LessThan(cfgs.APIVersion, apiVersion144) {
+		// The highest-priority network is the primary and is already included in the
+		// ContainerCreate API call via NetworkMode & NetworkingConfig.
+		// Any remaining networks are connected one-by-one here after creation (but before start).
+		serviceNetworks := service.NetworksByPriority()
+		for _, networkKey := range serviceNetworks {
+			mobyNetworkName := project.Networks[networkKey].Name
+			if string(cfgs.Host.NetworkMode) == mobyNetworkName {
+				// primary network already configured as part of ContainerCreate
+				continue
+			}
+			epSettings, err := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
+			if err != nil {
+				return created, err
+			}
+			if _, err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, client.NetworkConnectOptions{
+				Container:      response.ID,
+				EndpointConfig: epSettings,
+			}); err != nil {
+				return created, err
+			}
+		}
+	}
+
 	res, err := s.apiClient().ContainerInspect(ctx, response.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return created, err
