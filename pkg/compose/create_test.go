@@ -26,6 +26,7 @@ import (
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/moby/moby/api/types/container"
 	mountTypes "github.com/moby/moby/api/types/mount"
@@ -36,6 +37,7 @@ import (
 	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 func TestBuildBindMount(t *testing.T) {
@@ -346,13 +348,16 @@ func Test_buildContainerVolumes(t *testing.T) {
 	assert.NilError(t, err)
 
 	tests := []struct {
-		name   string
-		yaml   string
-		binds  []string
-		mounts []mountTypes.Mount
+		name        string
+		yaml        string
+		binds       []string
+		mounts      []mountTypes.Mount
+		apiVersion  string
+		expectError string
 	}{
 		{
-			name: "bind mount local path",
+			name:       "bind mount local path",
+			apiVersion: "1.44",
 			yaml: `
 services:
   test:
@@ -363,7 +368,8 @@ services:
 			mounts: nil,
 		},
 		{
-			name: "bind mount, not create host path",
+			name:       "bind mount, not create host path",
+			apiVersion: "1.44",
 			yaml: `
 services:
   test:
@@ -385,7 +391,23 @@ services:
 			},
 		},
 		{
-			name: "mount volume",
+			name:        "bind mount, not create host path with old engine",
+			apiVersion:  "1.41",
+			expectError: "bind mount create_host_path: false requires Docker Engine v23 or later",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          create_host_path: false
+`,
+		},
+		{
+			name:       "mount volume",
+			apiVersion: "1.44",
 			yaml: `
 services:
   test:
@@ -399,7 +421,8 @@ volumes:
 			mounts: nil,
 		},
 		{
-			name: "mount volume, readonly",
+			name:       "mount volume, readonly",
+			apiVersion: "1.44",
 			yaml: `
 services:
   test:
@@ -413,7 +436,8 @@ volumes:
 			mounts: nil,
 		},
 		{
-			name: "mount volume subpath",
+			name:       "mount volume subpath",
+			apiVersion: "1.44",
 			yaml: `
 services:
   test:
@@ -440,6 +464,21 @@ volumes:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			apiClient := mocks.NewMockAPIClient(mockCtrl)
+			cli := mocks.NewMockCli(mockCtrl)
+			tested, err := NewComposeService(cli)
+			assert.NilError(t, err)
+			cli.EXPECT().Client().Return(apiClient).AnyTimes()
+			cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+
+			// force `RuntimeVersion` to fetch fresh version
+			runtimeVersion = runtimeVersionCache{}
+			apiClient.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).Return(client.ServerVersionResult{
+				APIVersion: tt.apiVersion,
+			}, nil).AnyTimes()
+
 			p, err := composeloader.LoadWithContext(t.Context(), composetypes.ConfigDetails{
 				ConfigFiles: []composetypes.ConfigFile{
 					{
@@ -452,8 +491,11 @@ volumes:
 				options.SkipConsistencyCheck = true
 			})
 			assert.NilError(t, err)
-			s := &composeService{}
-			binds, mounts, err := s.buildContainerVolumes(t.Context(), *p, p.Services["test"], nil)
+			binds, mounts, err := tested.(*composeService).buildContainerVolumes(t.Context(), *p, p.Services["test"], nil)
+			if tt.expectError != "" {
+				assert.ErrorContains(t, err, tt.expectError)
+				return
+			}
 			assert.NilError(t, err)
 			assert.DeepEqual(t, tt.binds, binds)
 			assert.DeepEqual(t, tt.mounts, mounts)
