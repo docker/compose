@@ -339,6 +339,18 @@ func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
 		}
 	}
 
+	// pad timers so they all have the same visible width
+	for i := range lines {
+		l := &lines[i]
+		if l.timer == "" {
+			continue
+		}
+		timerWidth := utf8.RuneCountInString(l.timer)
+		if timerWidth < timerLen {
+			l.timer = l.timer + strings.Repeat(" ", timerLen-timerWidth)
+		}
+	}
+
 	// shorten details/taskID to fit terminal width
 	w.adjustLineWidth(lines, timerLen, terminalWidth)
 
