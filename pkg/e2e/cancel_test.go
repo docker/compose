@@ -74,9 +74,8 @@ func TestComposeCancel(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("test context canceled")
 		case err := <-processDone:
-			// TODO(milas): Compose should really not return exit code 130 here,
-			// 	this is an old hack for the compose-cli wrapper
-			assert.Error(t, err, "exit status 130",
+			// Process should be killed by re-raised SIGINT signal
+			assert.ErrorContains(t, err, "signal: interrupt",
 				"STDOUT:\n%s\nSTDERR:\n%s\n", stdout.String(), stderr.String())
 		case <-time.After(10 * time.Second):
 			t.Fatal("timeout waiting for Compose exit")
