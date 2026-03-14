@@ -178,7 +178,9 @@ func (w *ttyWriter) Done(operation string, success bool) {
 	w.print()
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	w.ticker.Stop()
+	if w.ticker != nil {
+		w.ticker.Stop()
+	}
 	w.operation = ""
 	w.done <- true
 }
@@ -202,12 +204,14 @@ func (w *ttyWriter) On(events ...api.Resource) {
 
 func (w *ttyWriter) event(e api.Resource) {
 	// Suspend print while a build is in progress, to avoid collision with buildkit Display
-	if e.Text == api.StatusBuilding {
-		w.ticker.Stop()
-		w.suspended = true
-	} else if w.suspended {
-		w.ticker.Reset(100 * time.Millisecond)
-		w.suspended = false
+	if w.ticker != nil {
+		if e.Text == api.StatusBuilding {
+			w.ticker.Stop()
+			w.suspended = true
+		} else if w.suspended {
+			w.ticker.Reset(100 * time.Millisecond)
+			w.suspended = false
+		}
 	}
 
 	if last, ok := w.tasks[e.ID]; ok {
