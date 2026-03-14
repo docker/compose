@@ -97,9 +97,8 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 		if !errors.As(err, &exitErr) {
 			t.Fatalf("`compose up` failed with non-exit error: %v", err)
 		}
-		// Process is expected to die from re-raised SIGINT signal (exit code -1).
-		// If signal re-raise doesn't terminate the process, the fallback path exits with code 130.
-		assert.Assert(t, exitErr.ExitCode() == -1 || exitErr.ExitCode() == 130,
+		// On Unix, process is expected to die from re-raised SIGINT signal (exit code -1).
+		assert.Equal(t, -1, exitErr.ExitCode(),
 			"`compose up` exited with unexpected code: %d (%v)", exitErr.ExitCode(), err)
 	}
 
