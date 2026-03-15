@@ -22,6 +22,8 @@ import (
 	"gotest.tools/v3/icmd"
 )
 
+// TODO: force-recreate with no-deps decision logic is also covered by pure Reconcile unit test:
+// TestReconcileForceRecreateNoDeps in pkg/compose/reconcile_test.go
 func TestRecreateWithNoDeps(t *testing.T) {
 	c := NewParallelCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=recreate-no-deps",
