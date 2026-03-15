@@ -1,0 +1,18 @@
+services:
+  example1:
+    container_name: example1
+    image: example/example
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+
+  example2:
+    container_name: example2
+    image: example/example
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      TZ: ${TZ:-Etc/UTC}
