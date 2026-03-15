@@ -332,7 +332,7 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 		for _, val := range detectedSecrets {
 			b.WriteString(val.Type)
 			b.WriteRune('\n')
-			b.WriteString(fmt.Sprintf("%q: %s\n", val.Key, val.Value))
+			fmt.Fprintf(&b, "%q: %s\n", val.Key, val.Value)
 		}
 		b.WriteString("Are you ok to publish these sensitive data?")
 		confirm, err := s.prompt(b.String(), false)
@@ -362,7 +362,7 @@ func (s *composeService) checkEnvironmentVariables(project *types.Project, optio
 		var errorMsg strings.Builder
 		for _, errors := range errorList {
 			for _, err := range errors {
-				errorMsg.WriteString(fmt.Sprintf("%s\n", err))
+				fmt.Fprintf(&errorMsg, "%s\n", err)
 			}
 		}
 		return fmt.Errorf("%s%s", errorMsg.String(), errorMsgSuffix)
@@ -396,7 +396,7 @@ func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, er
 		var errMsg strings.Builder
 		errMsg.WriteString("your Compose stack cannot be published as it only contains a build section for service(s):\n")
 		for _, serviceInError := range errorList {
-			errMsg.WriteString(fmt.Sprintf("- %q\n", serviceInError))
+			fmt.Fprintf(&errMsg, "- %q\n", serviceInError)
 		}
 		return false, errors.New(errMsg.String())
 	}

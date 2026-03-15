@@ -145,6 +145,8 @@ func TestNetworkModes(t *testing.T) {
 	})
 }
 
+// TODO: network config change detection logic is also covered by pure Reconcile unit test:
+// TestReconcileNetworkConfigChanged in pkg/compose/reconcile_test.go
 func TestNetworkConfigChanged(t *testing.T) {
 	t.Skip("unstable")
 	// fixture is shared with TestNetworks and is not safe to run concurrently
@@ -200,6 +202,8 @@ func TestInterfaceName(t *testing.T) {
 	res.Assert(t, icmd.Expected{Out: "foobar@"})
 }
 
+// TODO: network recreation detection logic is also covered by pure Reconcile unit test:
+// TestReconcileNetworkConfigChanged in pkg/compose/reconcile_test.go
 func TestNetworkRecreate(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "network_recreate"

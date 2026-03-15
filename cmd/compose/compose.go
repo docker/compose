@@ -30,6 +30,7 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/consts"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/loader"
 	composepaths "github.com/compose-spec/compose-go/v2/paths"
@@ -221,7 +222,7 @@ func makeJSONError(err error) error {
 }
 
 func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
-	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
+	f.StringArrayVar(&o.Profiles, "profile", defaultStringArrayVar(consts.ComposeProfiles), "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringArrayVar(&o.insecureRegistries, "insecure-registry", []string{}, "Use insecure registry to pull Compose OCI artifacts. Doesn't apply to images")

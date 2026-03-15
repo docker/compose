@@ -142,6 +142,8 @@ func TestUpSwitchVolumes(t *testing.T) {
 	res.Assert(t, icmd.Expected{Out: "test_external_volume_2"})
 }
 
+// TODO: volume recreation decision logic is also covered by pure Reconcile unit test:
+// TestReconcileVolumeConfigChanged in pkg/compose/reconcile_test.go
 func TestUpRecreateVolumes(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "compose-e2e-recreate-volumes"

@@ -27,6 +27,9 @@ import (
 
 const NO_STATE_TO_CHECK = ""
 
+// TODO: decision logic (which ops to generate for scale up/down) is also covered by
+// pure Reconcile unit tests: TestReconcileScaleUpMultipleServices, TestReconcileScaleDownMultipleServices,
+// TestReconcileScaleToZero in pkg/compose/reconcile_test.go
 func TestScaleBasicCases(t *testing.T) {
 	c := NewCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=scale-basic-tests"))
@@ -95,6 +98,8 @@ func TestScaleWithDepsCases(t *testing.T) {
 	checkServiceContainer(t, res.Combined(), "scale-deps-tests-db", NO_STATE_TO_CHECK, 1)
 }
 
+// TODO: scale up/down decision logic is also covered by pure Reconcile unit tests:
+// TestReconcileScaleUp, TestReconcileScaleDown in pkg/compose/reconcile_test.go
 func TestScaleUpAndDownPreserveContainerNumber(t *testing.T) {
 	const projectName = "scale-up-down-test"
 
@@ -129,6 +134,8 @@ func TestScaleUpAndDownPreserveContainerNumber(t *testing.T) {
 	assert.Equal(t, strings.TrimSpace(res.Stdout()), projectName+"-db-1\n"+projectName+"-db-2")
 }
 
+// TODO: obsolete-first removal logic is also covered by pure Reconcile unit test:
+// TestReconcileScaleDownRemovesObsoleteFirst in pkg/compose/reconcile_test.go
 func TestScaleDownRemovesObsolete(t *testing.T) {
 	const projectName = "scale-down-obsolete-test"
 	c := NewCLI(t, WithEnv(
@@ -185,6 +192,8 @@ func checkServiceContainer(t *testing.T, stdout, containerName, containerState s
 	testify.Fail(t, errMessage, stdout)
 }
 
+// TODO: no-recreate scale logic is also covered by pure Reconcile unit test:
+// TestReconcileScaleUpNoRecreate in pkg/compose/reconcile_test.go
 func TestScaleDownNoRecreate(t *testing.T) {
 	const projectName = "scale-down-recreated-test"
 	c := NewCLI(t, WithEnv(
