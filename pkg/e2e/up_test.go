@@ -141,6 +141,8 @@ func TestUpWithDependencyExit(t *testing.T) {
 	})
 }
 
+// TODO: scale-without-recreate decision logic is also covered by pure Reconcile unit test:
+// TestReconcileScaleUpNoRecreate in pkg/compose/reconcile_test.go
 func TestScaleDoesntRecreate(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "compose-e2e-scale"
