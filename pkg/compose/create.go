@@ -87,43 +87,106 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	prepareNetworks(project)
 
-	networks, err := s.ensureNetworks(ctx, project)
-	if err != nil {
-		return err
-	}
-
-	volumes, err := s.ensureProjectVolumes(ctx, project)
-	if err != nil {
-		return err
-	}
-
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-	orphans := observedState.filter(isOrphaned(project))
-	if len(orphans) > 0 && !options.IgnoreOrphans {
-		if options.RemoveOrphans {
-			err := s.removeContainers(ctx, orphans, nil, nil, false)
-			if err != nil {
-				return err
-			}
-		} else {
-			logrus.Warnf("Found orphan containers (%s) for this project. If "+
-				"you removed or renamed this service in your compose "+
-				"file, you can run this command with the "+
-				"--remove-orphans flag to clean it up.", orphans.names())
-		}
-	}
-
 	// Temporary implementation of use_api_socket until we get actual support inside docker engine
 	project, err = s.useAPISocket(project)
 	if err != nil {
 		return err
 	}
 
-	return newConvergence(options.Services, observedState, networks, volumes, s).apply(ctx, project, options)
+	// Phase 1: Inspect current state
+	observed, err := s.InspectState(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	// Handle orphan containers
+	if len(observed.Orphans) > 0 && !options.IgnoreOrphans {
+		if !options.RemoveOrphans {
+			logrus.Warnf("Found orphan containers (%s) for this project. If "+
+				"you removed or renamed this service in your compose "+
+				"file, you can run this command with the "+
+				"--remove-orphans flag to clean it up.", observed.Orphans.names())
+		}
+	}
+
+	// Validate external networks exist before reconciling
+	if err := s.validateExternalNetworks(ctx, project, options.Services); err != nil {
+		return err
+	}
+
+	// Phase 2: Reconcile desired vs observed state (pure function)
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             options.Recreate,
+		RecreateDependencies: options.RecreateDependencies,
+		Services:             options.Services,
+		Inherit:              options.Inherit,
+		Timeout:              options.Timeout,
+		RemoveOrphans:        options.RemoveOrphans,
+	})
+	if err != nil {
+		return err
+	}
+
+	if plan.IsEmpty() {
+		return nil
+	}
+
+	s.emitUntouchedContainerEvents(project, observed, plan)
+
+	// Phase 3: Execute the plan
+	return s.ExecutePlan(ctx, project, plan)
+}
+
+// emitUntouchedContainerEvents emits progress events for containers that are
+// already up-to-date and running, so that callers (e.g. scale) can see them.
+func (s *composeService) emitUntouchedContainerEvents(project *types.Project, observed *ObservedState, plan *ReconciliationPlan) {
+	for _, service := range project.Services {
+		for _, ctr := range observed.Containers[service.Name] {
+			ctrName := getCanonicalContainerName(ctr)
+			if _, touched := plan.Operations["stop-container:"+ctrName]; touched {
+				continue
+			}
+			if _, touched := plan.Operations["start-container:"+ctrName]; touched {
+				continue
+			}
+			if _, touched := plan.Operations["create-container:"+ctrName]; touched {
+				continue
+			}
+			if ctr.State == container.StateRunning {
+				s.events.On(runningEvent(getContainerProgressName(ctr)))
+			}
+		}
+	}
+}
+
+// validateExternalNetworks checks that external networks exist for services
+// that are part of the current operation. Returns an error if a required
+// external network is not found.
+func (s *composeService) validateExternalNetworks(ctx context.Context, project *types.Project, services []string) error {
+	for key, net := range project.Networks {
+		if !net.External {
+			continue
+		}
+		// Check if any targeted service uses this network
+		usedByTargetedService := false
+		for _, service := range project.Services {
+			if len(services) > 0 && !slices.Contains(services, service.Name) {
+				continue
+			}
+			if _, ok := service.Networks[key]; ok {
+				usedByTargetedService = true
+				break
+			}
+		}
+		if !usedByTargetedService {
+			continue
+		}
+		_, err := s.resolveExternalNetwork(ctx, &net)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -134,35 +197,6 @@ func prepareNetworks(project *types.Project) {
 			Add(api.VersionLabel, api.ComposeVersion)
 		project.Networks[k] = nw
 	}
-}
-
-func (s *composeService) ensureNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
-	networks := map[string]string{}
-	for name, nw := range project.Networks {
-		id, err := s.ensureNetwork(ctx, project, name, &nw)
-		if err != nil {
-			return nil, err
-		}
-		networks[name] = id
-		project.Networks[name] = nw
-	}
-	return networks, nil
-}
-
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
-	ids := map[string]string{}
-	for k, volume := range project.Volumes {
-		volume.CustomLabels = volume.CustomLabels.Add(api.VolumeLabel, k)
-		volume.CustomLabels = volume.CustomLabels.Add(api.ProjectLabel, project.Name)
-		volume.CustomLabels = volume.CustomLabels.Add(api.VersionLabel, api.ComposeVersion)
-		id, err := s.ensureVolume(ctx, k, volume, project)
-		if err != nil {
-			return nil, err
-		}
-		ids[k] = id
-	}
-
-	return ids, nil
 }
 
 //nolint:gocyclo

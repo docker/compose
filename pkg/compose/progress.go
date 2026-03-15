@@ -82,7 +82,7 @@ func restartingEvent(id string) api.Resource {
 	return newEvent(id, api.Working, api.StatusRestarting)
 }
 
-// runningEvent creates a new Running in progress Resource
+// runningEvent creates a new Running (done) Resource
 func runningEvent(id string) api.Resource {
 	return newEvent(id, api.Done, api.StatusRunning)
 }

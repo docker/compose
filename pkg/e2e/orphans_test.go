@@ -23,6 +23,8 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+// TODO: orphan removal decision logic is also covered by pure Reconcile unit tests:
+// TestReconcileOrphans, TestReconcileOrphansNotRemovedByDefault in pkg/compose/reconcile_test.go
 func TestRemoveOrphans(t *testing.T) {
 	c := NewCLI(t)
 
