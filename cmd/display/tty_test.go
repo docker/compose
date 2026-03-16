@@ -18,6 +18,7 @@ package display
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"sync"
 	"testing"
@@ -420,5 +421,25 @@ func TestLenAnsi(t *testing.T) {
 			result := lenAnsi(tc.input)
 			assert.Equal(t, tc.expected, result)
 		})
+	}
+}
+
+func TestDoneDeadlockFix(t *testing.T) {
+	w, _ := newTestWriter()
+	addTask(w, "test-task", "Working", "details", api.Working)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
+	w.Start(ctx, "test")
+	done := make(chan bool)
+	go func() {
+		w.Done("test", true)
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Deadlock detected: Done() did not complete within 5 seconds")
 	}
 }

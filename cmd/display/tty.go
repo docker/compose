@@ -176,13 +176,13 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 
 func (w *ttyWriter) Done(operation string, success bool) {
 	w.print()
+	w.done <- true
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	if w.ticker != nil {
 		w.ticker.Stop()
 	}
 	w.operation = ""
-	w.done <- true
 }
 
 func (w *ttyWriter) On(events ...api.Resource) {
