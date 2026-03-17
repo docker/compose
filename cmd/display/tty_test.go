@@ -427,7 +427,7 @@ func TestLenAnsi(t *testing.T) {
 func TestDoneDeadlockFix(t *testing.T) {
 	w, _ := newTestWriter()
 	addTask(w, "test-task", "Working", "details", api.Working)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	w.Start(ctx, "test")
