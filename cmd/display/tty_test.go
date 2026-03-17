@@ -429,7 +429,7 @@ func TestDoneDeadlockFix(t *testing.T) {
 	addTask(w, "test-task", "Working", "details", api.Working)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	w.Start(ctx, "test")
 	done := make(chan bool)
 	go func() {
