@@ -83,7 +83,7 @@ jobs:
       - run: echo "Exposing env vars for reusable workflow"
 
   bin-image:
-    uses: docker/github-builder/.github/workflows/bake.yml@v1
+    uses: docker/github-builder/.github/workflows/bake.yml@v1.4.0
     needs:
       - bin-image-prepare
     permissions:
