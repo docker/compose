@@ -615,6 +615,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 		statsCommand(&opts, dockerCli),
 		watchCommand(&opts, dockerCli, backendOptions),
 		publishCommand(&opts, dockerCli, backendOptions),
+		deployCommand(&opts, dockerCli, backendOptions),
 		alphaCommand(&opts, dockerCli, backendOptions),
 		bridgeCommand(&opts, dockerCli),
 		volumesCommand(&opts, dockerCli, backendOptions),

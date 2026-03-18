@@ -19,6 +19,7 @@ Define and run multi-container applications with Docker
 | [`config`](compose_config.md)   | Parse, resolve and render compose file in canonical format                              |
 | [`cp`](compose_cp.md)           | Copy files/folders between a service container and the local filesystem                 |
 | [`create`](compose_create.md)   | Creates containers for a service                                                        |
+| [`deploy`](compose_deploy.md)   | Deploy a Compose application to a Docker server                                         |
 | [`down`](compose_down.md)       | Stop and remove containers, networks                                                    |
 | [`events`](compose_events.md)   | Receive real time events from containers                                                |
 | [`exec`](compose_exec.md)       | Execute a command in a running container                                                |

@@ -149,6 +149,26 @@ type Compose interface {
 	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
 	// LoadProject loads and validates a Compose project from configuration files.
 	LoadProject(ctx context.Context, options ProjectLoadOptions) (*types.Project, error)
+	// Deploy executes the equivalent to a `compose deploy`
+	Deploy(ctx context.Context, project *types.Project, options DeployOptions) error
+}
+
+// DeployOptions group options of the Deploy API
+type DeployOptions struct {
+	// Build rebuilds service images before deploying
+	Build *BuildOptions
+	// Push pushes images to the registry before deploying
+	Push bool
+	// Quiet suppresses pull/push progress output
+	Quiet bool
+	// RemoveOrphans removes containers for services not defined in the project
+	RemoveOrphans bool
+	// Services is the list of services to deploy (defaults to all)
+	Services []string
+	// Wait waits for services to be healthy after deploy
+	Wait bool
+	// WaitTimeout is the maximum time to wait for services to become healthy
+	WaitTimeout time.Duration
 }
 
 type VolumesOptions struct {
