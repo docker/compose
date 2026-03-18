@@ -81,7 +81,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := psCmd.Flags()
-	flags.StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
+	flags.StringVar(&opts.Format, "format", "", cliflags.FormatHelp)
 	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property (supported filters: status)")
 	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
@@ -152,8 +152,13 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 		return nil
 	}
 
-	if opts.Format == "" {
+	if len(opts.Format) == 0 {
 		opts.Format = dockerCli.ConfigFile().PsFormat
+	}
+	if len(opts.Format) == 0 {
+		opts.Format = "table"
+	} else if opts.Quiet {
+		_, _ = dockerCli.Err().Write([]byte("WARNING: Ignoring custom format, because both --format and --quiet are set.\n"))
 	}
 
 	containerCtx := cliformatter.Context{
