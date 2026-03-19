@@ -1159,6 +1159,1033 @@ func TestReconcileImageDigestChanged(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// 1. Stopped container gets started
+// ---------------------------------------------------------------------------
+
+func TestReconcileDeadContainerGetsStarted(t *testing.T) {
+	service := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(service)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": service,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123",
+					Names: []string{"/testproject-web-1"},
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "testproject",
+					},
+					State: container.StateDead,
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. start container testproject-web-1  reason: container not running (state: dead)
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 2. Exited container is left alone
+// ---------------------------------------------------------------------------
+
+func TestReconcileExitedContainerNoOps(t *testing.T) {
+	service := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(service)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": service,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123",
+					Names: []string{"/testproject-web-1"},
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "testproject",
+					},
+					State: container.StateExited,
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// ---------------------------------------------------------------------------
+// 3. Force recreate on up-to-date container produces full chain
+// ---------------------------------------------------------------------------
+
+func TestReconcileForceRecreateUpToDate(t *testing.T) {
+	service := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(service)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": service,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123def456",
+					Names: []string{"/testproject-web-1"},
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "testproject",
+					},
+					State: container.StateRunning,
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateForce,
+		RecreateDependencies: api.RecreateForce,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container abc123def456_testproject-web-1  reason: force recreate
+[1] -> 2. stop container testproject-web-1  reason: force recreate
+[2] -> 3. remove container testproject-web-1  reason: force recreate
+[3] -> 4. rename container testproject-web-1  reason: force recreate
+[4] -> 5. start container testproject-web-1  reason: force recreate
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 4. RecreateNever with stale containers — no ops
+// ---------------------------------------------------------------------------
+
+func TestReconcileNeverRecreateStaleContainers(t *testing.T) {
+	service := types.ServiceConfig{Name: "web", Image: "nginx"}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": service,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("testproject", "web", 1, "stale-hash"),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateNever,
+		RecreateDependencies: api.RecreateNever,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// ---------------------------------------------------------------------------
+// 5. Network recreate with multiple connected containers
+// ---------------------------------------------------------------------------
+
+func TestReconcileNetworkRecreateMultipleContainers(t *testing.T) {
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+	workerSvc := types.ServiceConfig{
+		Name:  "worker",
+		Image: "worker:latest",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+	workerHash, err := ServiceHash(workerSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web":    webSvc,
+			"worker": workerSvc,
+		},
+		Networks: types.Networks{
+			"default": types.NetworkConfig{Name: "testproject_default"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "ctr-web",
+					Names: []string{"/testproject-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "testproject",
+						api.ConfigHashLabel:      webHash,
+					},
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"testproject_default": {NetworkID: "net123"},
+						},
+					},
+				},
+			},
+			"worker": {
+				{
+					ID:    "ctr-worker",
+					Names: []string{"/testproject-worker-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "worker",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "testproject",
+						api.ConfigHashLabel:      workerHash,
+					},
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"testproject_default": {NetworkID: "net123"},
+						},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"default": {
+				ID:         "net123",
+				Name:       "testproject_default",
+				ConfigHash: "outdated-hash",
+			},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container testproject-web-1  reason: network "testproject_default" is being recreated
+2. stop container testproject-worker-1  reason: network "testproject_default" is being recreated
+[1] -> 3. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
+[2] -> 4. disconnect network testproject-worker-1 from testproject_default  reason: network "testproject_default" is being recreated
+[3,4] -> 5. remove network testproject_default  reason: config hash changed
+[5] -> 6. create network testproject_default  reason: config hash changed
+[6] -> 7. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
+[6] -> 8. connect network testproject-worker-1 to testproject_default  reason: network "testproject_default" has been recreated
+[7] -> 9. start container testproject-web-1  reason: network "testproject_default" has been recreated
+[8] -> 10. start container testproject-worker-1  reason: network "testproject_default" has been recreated
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 6. Container matched by network name (not ID)
+// ---------------------------------------------------------------------------
+
+func TestReconcileNetworkMatchByName(t *testing.T) {
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": webSvc,
+		},
+		Networks: types.Networks{
+			"default": types.NetworkConfig{Name: "testproject_default"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "ctr-web",
+					Names: []string{"/testproject-web-1"},
+					// StateCreated avoids checkExpectedNetworks (only runs for running containers),
+					// isolating the name-based matching in findContainersOnNetwork.
+					State: container.StateCreated,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "testproject",
+						api.ConfigHashLabel:      webHash,
+					},
+					// NetworkID is empty — findContainersOnNetwork can only find this by name match
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"testproject_default": {NetworkID: ""},
+						},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"default": {
+				ID:         "net123",
+				Name:       "testproject_default",
+				ConfigHash: "outdated-hash",
+			},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container testproject-web-1  reason: network "testproject_default" is being recreated
+[1] -> 2. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
+[2] -> 3. remove network testproject_default  reason: config hash changed
+[3] -> 4. create network testproject_default  reason: config hash changed
+[4] -> 5. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
+[5] -> 6. start container testproject-web-1  reason: network "testproject_default" has been recreated
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 7. Service references network not in project.Networks
+// ---------------------------------------------------------------------------
+
+func TestReconcileServiceWithUnknownNetwork(t *testing.T) {
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": types.ServiceConfig{
+				Name:  "web",
+				Image: "nginx",
+				Networks: map[string]*types.ServiceNetworkConfig{
+					"nonexistent": nil,
+				},
+			},
+		},
+		Networks: types.Networks{}, // no networks defined
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// Should still produce a create container op without panicking
+	assert.Equal(t, plan.String(), `
+1. create container testproject-web-1  reason: scale up
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 8. Volume recreate with connected containers
+// ---------------------------------------------------------------------------
+
+func TestReconcileVolumeRecreateWithContainers(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "app",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "data", Target: "/data"},
+		},
+	}
+	svcHash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	originalVol := types.VolumeConfig{Name: "testproject_data"}
+	originalHash, err := VolumeHash(originalVol)
+	assert.NilError(t, err)
+
+	updatedVol := types.VolumeConfig{
+		Name:   "testproject_data",
+		Labels: types.Labels{"version": "2"},
+	}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"app": svc,
+		},
+		Volumes: types.Volumes{
+			"data": updatedVol,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"app": {
+				{
+					ID:    "ctr-app",
+					Names: []string{"/testproject-app-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "app",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "testproject",
+						api.ConfigHashLabel:      svcHash,
+					},
+					Mounts: []container.MountPoint{
+						{Type: "volume", Name: "testproject_data"},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data": {
+				Name:       "testproject_data",
+				Driver:     "local",
+				ConfigHash: originalHash,
+			},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container testproject-app-1  reason: volume "testproject_data" is being recreated
+[1] -> 2. remove container testproject-app-1  reason: volume "testproject_data" is being recreated
+[2] -> 3. remove volume testproject_data  reason: config hash changed
+[3] -> 4. create volume testproject_data  reason: config hash changed
+[4] -> 5. create container testproject-app-1  reason: volume "data" is being recreated
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 9. Bind mount does not trigger volume reconciliation
+// ---------------------------------------------------------------------------
+
+func TestReconcileBindMountNotAffectedByVolumeReconcile(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "app",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "bind", Source: "/host/path", Target: "/data"},
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"app": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"app": {
+				makeContainerWithHash("testproject", "app", 1, hash),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// ---------------------------------------------------------------------------
+// 10. Diamond dependency: D ← B,C ← A
+// ---------------------------------------------------------------------------
+
+func TestReconcileDiamondDependency(t *testing.T) {
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"a": types.ServiceConfig{
+				Name:  "a",
+				Image: "nginx",
+				DependsOn: types.DependsOnConfig{
+					"b": types.ServiceDependency{Condition: "service_started"},
+					"c": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+			"b": types.ServiceConfig{
+				Name:  "b",
+				Image: "nginx",
+				DependsOn: types.DependsOnConfig{
+					"d": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+			"c": types.ServiceConfig{
+				Name:  "c",
+				Image: "nginx",
+				DependsOn: types.DependsOnConfig{
+					"d": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+			"d": types.ServiceConfig{
+				Name:  "d",
+				Image: "nginx",
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container testproject-d-1  reason: scale up
+[1] -> 2. create container testproject-b-1  reason: scale up
+[1] -> 3. create container testproject-c-1  reason: scale up
+[2,3] -> 4. create container testproject-a-1  reason: scale up
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 11. Cascading restart when dependency is recreated (restart: true)
+// ---------------------------------------------------------------------------
+
+func TestReconcileCascadingRestart(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{
+				Condition: "service_started",
+				Restart:   true,
+			},
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"db":  dbSvc,
+			"web": webSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"db": {
+				makeContainer("testproject", "db", 1, "stale-hash"),
+			},
+			"web": {
+				makeContainer("testproject", "web", 1, webHash),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container testproject-_testproject-db-1  reason: config hash changed
+2. stop container testproject-web-1  reason: dependency "db" is being recreated (restart: true)
+[1] -> 3. stop container testproject-db-1  reason: config hash changed
+[3] -> 4. remove container testproject-db-1  reason: config hash changed
+[4] -> 5. rename container testproject-db-1  reason: config hash changed
+[5] -> 6. start container testproject-db-1  reason: config hash changed
+[6,2] -> 7. start container testproject-web-1  reason: restart after dependency "db" recreated
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 12. No cascading restart when restart: false
+// ---------------------------------------------------------------------------
+
+func TestReconcileNoCascadingRestartWhenFalse(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{
+				Condition: "service_started",
+				Restart:   false,
+			},
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"db":  dbSvc,
+			"web": webSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"db": {
+				makeContainer("testproject", "db", 1, "stale-hash"),
+			},
+			"web": {
+				makeContainer("testproject", "web", 1, webHash),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container testproject-_testproject-db-1  reason: config hash changed
+[1] -> 2. stop container testproject-db-1  reason: config hash changed
+[2] -> 3. remove container testproject-db-1  reason: config hash changed
+[3] -> 4. rename container testproject-db-1  reason: config hash changed
+[4] -> 5. start container testproject-db-1  reason: config hash changed
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 13. Scale up + config change simultaneously
+// ---------------------------------------------------------------------------
+
+func TestReconcileScaleUpWithConfigChange(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx", Scale: intPtr(3)}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("testproject", "web", 1, "stale-hash"),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container testproject-_testproject-web-1  reason: config hash changed
+2. create container testproject-web-2  reason: scale up
+3. create container testproject-web-3  reason: scale up
+[1] -> 4. stop container testproject-web-1  reason: config hash changed
+[4] -> 5. remove container testproject-web-1  reason: config hash changed
+[5] -> 6. rename container testproject-web-1  reason: config hash changed
+[6] -> 7. start container testproject-web-1  reason: config hash changed
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 14. Scale down + config change
+// ---------------------------------------------------------------------------
+
+func TestReconcileScaleDownWithConfigChange(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("testproject", "web", 1, "stale-hash-1"),
+				makeContainer("testproject", "web", 2, "stale-hash-2"),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container testproject-_testproject-web-1  reason: config hash changed
+2. stop container testproject-web-2  reason: scale down
+[1] -> 3. stop container testproject-web-1  reason: config hash changed
+[2] -> 4. remove container testproject-web-2  reason: scale down
+[3] -> 5. remove container testproject-web-1  reason: config hash changed
+[5] -> 6. rename container testproject-web-1  reason: config hash changed
+[6] -> 7. start container testproject-web-1  reason: config hash changed
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 15. Custom container_name with scale > 1 returns error
+// ---------------------------------------------------------------------------
+
+func TestReconcileCustomContainerNameScaleError(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:          "web",
+		Image:         "nginx",
+		Scale:         intPtr(2),
+		ContainerName: "my-custom-name",
+	}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	_, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.Assert(t, err != nil, "expected error for custom container_name with scale > 1")
+}
+
+// ---------------------------------------------------------------------------
+// 16. Targeted service with dependency — dep uses RecreateDependencies policy
+// ---------------------------------------------------------------------------
+
+func TestReconcileTargetedServiceDependencyPolicy(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{Condition: "service_started"},
+		},
+	}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"db":  dbSvc,
+			"web": webSvc,
+		},
+	}
+
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"db": {
+				makeContainer("testproject", "db", 1, "stale-hash"),
+			},
+			"web": {
+				makeContainer("testproject", "web", 1, "stale-hash"),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	// Target only "web" with force-recreate; deps get "never" — db is NOT recreated
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateForce,
+		RecreateDependencies: api.RecreateNever,
+		Services:             []string{"web"},
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container testproject-_testproject-web-1  reason: force recreate
+[1] -> 2. stop container testproject-web-1  reason: force recreate
+[2] -> 3. remove container testproject-web-1  reason: force recreate
+[3] -> 4. rename container testproject-web-1  reason: force recreate
+[4] -> 5. start container testproject-web-1  reason: force recreate
+`)
+
+	// Same setup but deps get "diverged" — db IS stale so it gets recreated too
+	plan2, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateForce,
+		RecreateDependencies: api.RecreateDiverged,
+		Services:             []string{"web"},
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan2.String(), `
+1. create container testproject-_testproject-db-1  reason: config hash changed
+[1] -> 2. stop container testproject-db-1  reason: config hash changed
+[2] -> 3. remove container testproject-db-1  reason: config hash changed
+[3] -> 4. rename container testproject-db-1  reason: config hash changed
+[4] -> 5. start container testproject-db-1  reason: config hash changed
+[5] -> 6. create container testproject-_testproject-web-1  reason: force recreate
+[6] -> 7. stop container testproject-web-1  reason: force recreate
+[7] -> 8. remove container testproject-web-1  reason: force recreate
+[8] -> 9. rename container testproject-web-1  reason: force recreate
+[9,5] -> 10. start container testproject-web-1  reason: force recreate
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 17. Non-targeted service is skipped entirely
+// ---------------------------------------------------------------------------
+
+func TestReconcileNonTargetedServiceSkipped(t *testing.T) {
+	webSvc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	workerSvc := types.ServiceConfig{Name: "worker", Image: "worker:latest"}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web":    webSvc,
+			"worker": workerSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("testproject", "web", 1, "stale-hash"),
+			},
+			"worker": {
+				makeContainer("testproject", "worker", 1, "stale-hash"),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+		Services:             []string{"web"},
+	})
+	assert.NilError(t, err)
+	// Only web is recreated — worker is completely skipped
+	assert.Equal(t, plan.String(), `
+1. create container testproject-_testproject-web-1  reason: config hash changed
+[1] -> 2. stop container testproject-web-1  reason: config hash changed
+[2] -> 3. remove container testproject-web-1  reason: config hash changed
+[3] -> 4. rename container testproject-web-1  reason: config hash changed
+[4] -> 5. start container testproject-web-1  reason: config hash changed
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 18. Empty project produces empty plan
+// ---------------------------------------------------------------------------
+
+func TestReconcileEmptyProject(t *testing.T) {
+	project := &types.Project{
+		Name:     "testproject",
+		Services: types.Services{},
+		Networks: types.Networks{},
+		Volumes:  types.Volumes{},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// ---------------------------------------------------------------------------
+// 19. Multiple orphans with RemoveOrphans: true
+// ---------------------------------------------------------------------------
+
+func TestReconcileMultipleOrphans(t *testing.T) {
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": types.ServiceConfig{Name: "web", Image: "nginx"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans: Containers{
+			makeContainer("testproject", "old-a", 1, "hash-a"),
+			makeContainer("testproject", "old-b", 1, "hash-b"),
+			makeContainer("testproject", "old-c", 1, "hash-c"),
+		},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+		RemoveOrphans:        true,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container testproject-web-1  reason: scale up
+2. stop container testproject-old-a-1  reason: orphan container
+3. stop container testproject-old-b-1  reason: orphan container
+4. stop container testproject-old-c-1  reason: orphan container
+[2] -> 5. remove container testproject-old-a-1  reason: orphan container
+[3] -> 6. remove container testproject-old-b-1  reason: orphan container
+[4] -> 7. remove container testproject-old-c-1  reason: orphan container
+`)
+}
+
+// ---------------------------------------------------------------------------
+// 20. Plugin service unaffected by recreate policies
+// ---------------------------------------------------------------------------
+
+func TestReconcilePluginServiceIgnoresRecreatePolicy(t *testing.T) {
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"plugin-svc": types.ServiceConfig{
+				Name: "plugin-svc",
+				Provider: &types.ServiceProviderConfig{
+					Type: "aws",
+				},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	// Test with RecreateNever — plugin should still get an op
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateNever,
+		RecreateDependencies: api.RecreateNever,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. plugin plugin plugin-svc  reason: plugin service
+`)
+
+	// Test with RecreateForce — same result
+	plan2, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateForce,
+		RecreateDependencies: api.RecreateForce,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan2.String(), `
+1. plugin plugin plugin-svc  reason: plugin service
+`)
+}
+
+// ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
@@ -1175,4 +2202,10 @@ func makeContainer(projectName, serviceName string, number int, configHash strin
 		},
 		State: container.StateRunning,
 	}
+}
+
+// makeContainerWithHash is like makeContainer but returns a container
+// with the given hash precomputed (alias for readability).
+func makeContainerWithHash(projectName, serviceName string, number int, configHash string) container.Summary {
+	return makeContainer(projectName, serviceName, number, configHash)
 }
