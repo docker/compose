@@ -19,9 +19,11 @@ package compose
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	mmount "github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"gotest.tools/v3/assert"
 
@@ -1442,6 +1444,89 @@ func TestReconcileNetworkRecreateMultipleContainers(t *testing.T) {
 // 6. Container matched by network name (not ID)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// 5b. Container connected to TWO recreated networks — start must depend on both connects
+// ---------------------------------------------------------------------------
+
+func TestReconcileMultiNetworkContainerReconnectDeps(t *testing.T) {
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"frontend": nil,
+			"backend":  nil,
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": webSvc,
+		},
+		Networks: types.Networks{
+			"backend":  types.NetworkConfig{Name: "testproject_backend"},
+			"frontend": types.NetworkConfig{Name: "testproject_frontend"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "ctr-web",
+					Names: []string{"/testproject-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "testproject",
+						api.ConfigHashLabel:      webHash,
+					},
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"testproject_frontend": {NetworkID: "net-fe"},
+							"testproject_backend":  {NetworkID: "net-be"},
+						},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"frontend": {ID: "net-fe", Name: "testproject_frontend", ConfigHash: "old-hash-fe"},
+			"backend":  {ID: "net-be", Name: "testproject_backend", ConfigHash: "old-hash-be"},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	// The start-container op must depend on BOTH connect ops.
+	startOp, exists := plan.Operations["start-container:testproject-web-1"]
+	assert.Assert(t, exists, "start-container op must exist")
+	assert.Assert(t, len(startOp.DependsOn) == 2, "start must depend on both connect ops, got %v", startOp.DependsOn)
+
+	// Both connect ops must be listed
+	connectFe := "connect-network:testproject_frontend/testproject-web-1"
+	connectBe := "connect-network:testproject_backend/testproject-web-1"
+	for _, dep := range []string{connectFe, connectBe} {
+		found := false
+		for _, d := range startOp.DependsOn {
+			if d == dep {
+				found = true
+				break
+			}
+		}
+		assert.Assert(t, found, "start-container should depend on %s", dep)
+	}
+}
+
 func TestReconcileNetworkMatchByName(t *testing.T) {
 	webSvc := types.ServiceConfig{
 		Name:  "web",
@@ -2183,6 +2268,2005 @@ func TestReconcilePluginServiceIgnoresRecreatePolicy(t *testing.T) {
 	assert.Equal(t, plan2.String(), `
 1. plugin plugin plugin-svc  reason: plugin service
 `)
+}
+
+// ---------------------------------------------------------------------------
+// Corner-case tests
+// ---------------------------------------------------------------------------
+
+// TestReconcileNonContiguousScaleDown verifies that when scaling down with
+// non-sequential container numbers (gaps), the highest numbers are removed first.
+func TestReconcileNonContiguousScaleDown(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("tp", "web", 1, hash),
+				makeContainer("tp", "web", 3, hash),
+				makeContainer("tp", "web", 5, hash),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container tp-web-3  reason: scale down
+2. stop container tp-web-5  reason: scale down
+[1] -> 3. remove container tp-web-3  reason: scale down
+[2] -> 4. remove container tp-web-5  reason: scale down
+`)
+}
+
+// TestReconcileScaleUpFillsAfterMax verifies that new containers are numbered
+// after the current maximum, not filling gaps.
+func TestReconcileScaleUpFillsAfterMax(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx", Scale: intPtr(3)}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("tp", "web", 1, hash),
+				makeContainer("tp", "web", 3, hash),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// New container numbered 4 (max+1), not 2 (the gap)
+	assert.Equal(t, plan.String(), `
+1. create container tp-web-4  reason: scale up
+`)
+}
+
+// TestReconcileInvalidContainerNumberFallback verifies that containers with
+// invalid ContainerNumberLabel fall back to Created-timestamp-based sorting.
+func TestReconcileInvalidContainerNumberFallback(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "c1",
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "abc", // invalid
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+					Created: 100,
+				},
+				{
+					ID:    "c2",
+					Names: []string{"/tp-web-2"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "2",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+					Created: 200,
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// Container with invalid number (older Created) is removed via scale down
+	assert.Equal(t, plan.String(), `
+1. stop container tp-web-1  reason: scale down
+[1] -> 2. remove container tp-web-1  reason: scale down
+`)
+}
+
+// TestReconcilePausedContainerGetsStarted verifies that paused containers
+// trigger a start operation (paused is NOT in the "no action" list).
+func TestReconcilePausedContainerGetsStarted(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	ctr := makeContainer("tp", "web", 1, hash)
+	ctr.State = container.StatePaused
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{"web": {ctr}},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. start container tp-web-1  reason: container not running (state: paused)
+`)
+}
+
+// TestReconcileRestartingContainerNoOps verifies that a restarting container
+// with matching config produces no operations.
+func TestReconcileRestartingContainerNoOps(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	ctr := makeContainer("tp", "web", 1, hash)
+	ctr.State = container.StateRestarting
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{"web": {ctr}},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// TestReconcileNetworkCheckSkippedNonRunning verifies that checkExpectedNetworks
+// is NOT called for non-running containers (only gated on StateRunning).
+func TestReconcileNetworkCheckSkippedNonRunning(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"mynet": nil,
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	netCfg := types.NetworkConfig{Name: "tp_mynet"}
+	netHash, err := NetworkHash(&netCfg)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Networks: types.Networks{
+			"mynet": netCfg,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "c1",
+					Names: []string{"/tp-web-1"},
+					// StateCreated → checkExpectedNetworks skipped
+					State: container.StateCreated,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+					// Connected to a different network ID — would trigger recreate if running
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"tp_mynet": {NetworkID: "wrong-id"},
+						},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"mynet": {
+				ID:         "correct-id",
+				Name:       "tp_mynet",
+				ConfigHash: netHash,
+			},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// No recreate despite network mismatch — container is not running
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// TestReconcileSwarmNetworkSkipped verifies that the "swarm" overlay network
+// special case is handled correctly — containers using it should not trigger
+// a false "network configuration changed" recreate.
+func TestReconcileSwarmNetworkSkipped(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"overlay": nil,
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	netCfg := types.NetworkConfig{Name: "tp_overlay"}
+	netHash, err := NetworkHash(&netCfg)
+	assert.NilError(t, err)
+
+	ctr := makeContainer("tp", "web", 1, hash)
+	ctr.NetworkSettings = &container.NetworkSettingsSummary{
+		Networks: map[string]*network.EndpointSettings{
+			"tp_overlay": {NetworkID: "net1"},
+		},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Networks: types.Networks{
+			"overlay": netCfg,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{"web": {ctr}},
+		Networks: map[string]ObservedNetwork{
+			// Network ID is "swarm" — the special case
+			"overlay": {ID: "swarm", Name: "tp_overlay", ConfigHash: netHash},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// TestReconcileNilNetworkSettingsNoPanic verifies that a container with nil
+// NetworkSettings does not cause a panic during network recreate.
+func TestReconcileNilNetworkSettingsNoPanic(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Networks: types.Networks{
+			"default": types.NetworkConfig{Name: "tp_default"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "c1",
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+					NetworkSettings: nil, // nil — must not panic
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"default": {ID: "net1", Name: "tp_default", ConfigHash: "outdated"},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// Container is skipped by findContainersOnNetwork (nil settings),
+	// network is still recreated
+	assert.Equal(t, plan.String(), `
+1. remove network tp_default  reason: config hash changed
+[1] -> 2. create network tp_default  reason: config hash changed
+`)
+}
+
+// TestReconcileExternalNetworkResolvedFromContainer verifies that external
+// network IDs are resolved from running containers' network endpoints,
+// preventing a false "network configuration changed" recreate.
+func TestReconcileExternalNetworkResolvedFromContainer(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"ext": nil,
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	ctr := makeContainer("tp", "web", 1, hash)
+	ctr.NetworkSettings = &container.NetworkSettingsSummary{
+		Networks: map[string]*network.EndpointSettings{
+			"shared_net": {NetworkID: "extnet123"},
+		},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Networks: types.Networks{
+			"ext": types.NetworkConfig{Name: "shared_net", External: true},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{"web": {ctr}},
+		Networks:    map[string]ObservedNetwork{}, // external net not in observed
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// No recreate — external network ID resolved from container
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// TestReconcileAnonymousVolumeNoOps verifies that anonymous volumes
+// (empty Source) do not interfere with volume reconciliation.
+func TestReconcileAnonymousVolumeNoOps(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "", Target: "/data"},
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {makeContainer("tp", "web", 1, hash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// TestReconcileVolumeRecreateUnrelatedServiceUnaffected verifies that when a
+// volume is recreated, only services that mount it are affected.
+func TestReconcileVolumeRecreateUnrelatedServiceUnaffected(t *testing.T) {
+	appSvc := types.ServiceConfig{
+		Name:  "app",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "data", Target: "/data"},
+		},
+	}
+	workerSvc := types.ServiceConfig{Name: "worker", Image: "worker:latest"}
+	appHash, err := ServiceHash(appSvc)
+	assert.NilError(t, err)
+	workerHash, err := ServiceHash(workerSvc)
+	assert.NilError(t, err)
+
+	origVol := types.VolumeConfig{Name: "tp_data"}
+	origHash, err := VolumeHash(origVol)
+	assert.NilError(t, err)
+
+	updatedVol := types.VolumeConfig{
+		Name:   "tp_data",
+		Labels: types.Labels{"v": "2"},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"app":    appSvc,
+			"worker": workerSvc,
+		},
+		Volumes: types.Volumes{
+			"data": updatedVol,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"app": {
+				{
+					ID:    "ctr-app",
+					Names: []string{"/tp-app-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "app",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "tp",
+						api.ConfigHashLabel:      appHash,
+					},
+					Mounts: []container.MountPoint{
+						{Type: mmount.TypeVolume, Name: "tp_data"},
+					},
+				},
+			},
+			"worker": {makeContainer("tp", "worker", 1, workerHash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data": {Name: "tp_data", Driver: "local", ConfigHash: origHash},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// Only app is affected — worker has no volume ops
+	assert.Equal(t, plan.String(), `
+1. stop container tp-app-1  reason: volume "tp_data" is being recreated
+[1] -> 2. remove container tp-app-1  reason: volume "tp_data" is being recreated
+[2] -> 3. remove volume tp_data  reason: config hash changed
+[3] -> 4. create volume tp_data  reason: config hash changed
+[4] -> 5. create container tp-app-1  reason: volume "data" is being recreated
+`)
+}
+
+// TestReconcileCircularDependencyNoPanic verifies that circular service
+// dependencies do not cause infinite recursion in expandServiceDependencies.
+func TestReconcileCircularDependencyNoPanic(t *testing.T) {
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"a": types.ServiceConfig{
+				Name:  "a",
+				Image: "nginx",
+				DependsOn: types.DependsOnConfig{
+					"b": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+			"b": types.ServiceConfig{
+				Name:  "b",
+				Image: "nginx",
+				DependsOn: types.DependsOnConfig{
+					"a": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	// Should not panic — expandServiceDependencies uses a seen map
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, !plan.IsEmpty(), "expected create ops for both services")
+}
+
+// TestReconcileCascadingRestartMultipleDepsOneRecreated verifies cascading
+// restart fires when only one of multiple dependencies is recreated.
+func TestReconcileCascadingRestartMultipleDepsOneRecreated(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	cacheSvc := types.ServiceConfig{Name: "cache", Image: "redis"}
+	cacheHash, err := ServiceHash(cacheSvc)
+	assert.NilError(t, err)
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db":    types.ServiceDependency{Condition: "service_started", Restart: true},
+			"cache": types.ServiceDependency{Condition: "service_started", Restart: true},
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"db":    dbSvc,
+			"cache": cacheSvc,
+			"web":   webSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"db":    {makeContainer("tp", "db", 1, "stale")},      // stale → recreated
+			"cache": {makeContainer("tp", "cache", 1, cacheHash)}, // up-to-date
+			"web":   {makeContainer("tp", "web", 1, webHash)},     // up-to-date
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container tp-db-1_tp-db-1  reason: config hash changed
+2. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
+[1] -> 3. stop container tp-db-1  reason: config hash changed
+[3] -> 4. remove container tp-db-1  reason: config hash changed
+[4] -> 5. rename container tp-db-1  reason: config hash changed
+[5] -> 6. start container tp-db-1  reason: config hash changed
+[6,2] -> 7. start container tp-web-1  reason: restart after dependency "db" recreated
+`)
+}
+
+// TestReconcileCascadingRestartSkippedForExitedDependent verifies that
+// cascading restart is skipped when the dependent container is not running.
+func TestReconcileCascadingRestartSkippedForExitedDependent(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{
+				Condition: "service_started",
+				Restart:   true,
+			},
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+
+	webCtr := makeContainer("tp", "web", 1, webHash)
+	webCtr.State = container.StateExited
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"db":  dbSvc,
+			"web": webSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"db":  {makeContainer("tp", "db", 1, "stale")},
+			"web": {webCtr},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// Only db is recreated — web is exited, no cascading restart
+	assert.Equal(t, plan.String(), `
+1. create container tp-db-1_tp-db-1  reason: config hash changed
+[1] -> 2. stop container tp-db-1  reason: config hash changed
+[2] -> 3. remove container tp-db-1  reason: config hash changed
+[3] -> 4. rename container tp-db-1  reason: config hash changed
+[4] -> 5. start container tp-db-1  reason: config hash changed
+`)
+}
+
+// TestReconcileCustomContainerNameScale1Allowed verifies that container_name
+// with the default scale (1) works without error.
+func TestReconcileCustomContainerNameScale1Allowed(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:          "web",
+		Image:         "nginx",
+		ContainerName: "my-app",
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container my-app  reason: scale up
+`)
+}
+
+// TestReconcileCustomContainerNameScale0Allowed verifies that container_name
+// with scale=0 works without error and scales down existing containers.
+func TestReconcileCustomContainerNameScale0Allowed(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:          "web",
+		Image:         "nginx",
+		ContainerName: "my-app",
+		Scale:         intPtr(0),
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "c1",
+					Names: []string{"/my-app"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container my-app  reason: scale down
+[1] -> 2. remove container my-app  reason: scale down
+`)
+}
+
+// TestReconcileShortContainerIDInRecreate verifies that container IDs shorter
+// than 12 characters don't cause a slice bounds panic in temp name generation.
+func TestReconcileShortContainerIDInRecreate(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123", // 6 chars — shorter than 12
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      "stale",
+						api.ProjectLabel:         "tp",
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container abc123_tp-web-1  reason: config hash changed
+[1] -> 2. stop container tp-web-1  reason: config hash changed
+[2] -> 3. remove container tp-web-1  reason: config hash changed
+[3] -> 4. rename container tp-web-1  reason: config hash changed
+[4] -> 5. start container tp-web-1  reason: config hash changed
+`)
+}
+
+// TestReconcileTwoServicesShareRecreatedVolume verifies that when two services
+// mount the same volume and it's recreated, both get stop+remove+create ops.
+func TestReconcileTwoServicesShareRecreatedVolume(t *testing.T) {
+	appSvc := types.ServiceConfig{
+		Name:  "app",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "shared", Target: "/data"},
+		},
+	}
+	workerSvc := types.ServiceConfig{
+		Name:  "worker",
+		Image: "worker:latest",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "shared", Target: "/data"},
+		},
+	}
+	appHash, err := ServiceHash(appSvc)
+	assert.NilError(t, err)
+	workerHash, err := ServiceHash(workerSvc)
+	assert.NilError(t, err)
+
+	origVol := types.VolumeConfig{Name: "tp_shared"}
+	origHash, err := VolumeHash(origVol)
+	assert.NilError(t, err)
+
+	updatedVol := types.VolumeConfig{
+		Name:   "tp_shared",
+		Labels: types.Labels{"v": "2"},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"app":    appSvc,
+			"worker": workerSvc,
+		},
+		Volumes: types.Volumes{
+			"shared": updatedVol,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"app": {
+				{
+					ID:    "ctr-app",
+					Names: []string{"/tp-app-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "app",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "tp",
+						api.ConfigHashLabel:      appHash,
+					},
+					Mounts: []container.MountPoint{
+						{Type: mmount.TypeVolume, Name: "tp_shared"},
+					},
+				},
+			},
+			"worker": {
+				{
+					ID:    "ctr-worker",
+					Names: []string{"/tp-worker-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "worker",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "tp",
+						api.ConfigHashLabel:      workerHash,
+					},
+					Mounts: []container.MountPoint{
+						{Type: mmount.TypeVolume, Name: "tp_shared"},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"shared": {Name: "tp_shared", Driver: "local", ConfigHash: origHash},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container tp-app-1  reason: volume "tp_shared" is being recreated
+2. stop container tp-worker-1  reason: volume "tp_shared" is being recreated
+[1] -> 3. remove container tp-app-1  reason: volume "tp_shared" is being recreated
+[2] -> 4. remove container tp-worker-1  reason: volume "tp_shared" is being recreated
+[3,4] -> 5. remove volume tp_shared  reason: config hash changed
+[5] -> 6. create volume tp_shared  reason: config hash changed
+[6] -> 7. create container tp-app-1  reason: volume "shared" is being recreated
+[6] -> 8. create container tp-worker-1  reason: volume "shared" is being recreated
+`)
+}
+
+// TestReconcileDependsOnMissingServiceNoPanic verifies that a depends_on
+// reference to a non-existent service doesn't panic — it's silently ignored.
+func TestReconcileDependsOnMissingServiceNoPanic(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"ghost": types.ServiceDependency{Condition: "service_started"},
+		},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// "ghost" is silently ignored — web is created without dependency edge
+	assert.Equal(t, plan.String(), `
+1. create container tp-web-1  reason: scale up
+`)
+}
+
+// TestReconcileStaleConfigAndNetworkRecreate verifies that when a container
+// has both a stale config hash AND is connected to a network being recreated,
+// the plan contains valid operations for both paths without panicking.
+func TestReconcileStaleConfigAndNetworkRecreate(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Networks: types.Networks{
+			"default": types.NetworkConfig{Name: "tp_default"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123def456",
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      "stale",
+						api.ProjectLabel:         "tp",
+					},
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"tp_default": {NetworkID: "net1"},
+						},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"default": {ID: "net1", Name: "tp_default", ConfigHash: "outdated"},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// Both network recreate ops and container recreate ops coexist — plan is non-empty
+	assert.Assert(t, !plan.IsEmpty(), "expected non-empty plan")
+	// The plan has ops from both paths (network: stop/disconnect/remove/create/connect/start
+	// and container: create-temp/stop/remove/rename/start). Some ops share IDs, so the
+	// network stop overwrites the container stop. Verify key ops exist.
+	var hasNetworkRemove, hasContainerCreate bool
+	for _, op := range plan.Operations {
+		if op.Type == OpRemoveNetwork {
+			hasNetworkRemove = true
+		}
+		if op.Type == OpCreateContainer {
+			hasContainerCreate = true
+		}
+	}
+	assert.Assert(t, hasNetworkRemove, "expected network remove op")
+	assert.Assert(t, hasContainerCreate, "expected container create op")
+}
+
+// ---------------------------------------------------------------------------
+// Volume mount mismatch tests
+// ---------------------------------------------------------------------------
+
+// TestReconcileVolumeMountMissingTriggersRecreate verifies that when a container's
+// config hash matches but it's missing a volume mount, checkExpectedVolumes triggers
+// a "volume configuration changed" recreate.
+func TestReconcileVolumeMountMissingTriggersRecreate(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "data", Target: "/data"},
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	volCfg := types.VolumeConfig{Name: "tp_data"}
+	volHash, err := VolumeHash(volCfg)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Volumes: types.Volumes{
+			"data": volCfg,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123def456",
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+					Mounts: []container.MountPoint{}, // no mounts
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data": {Name: "tp_data", Driver: "local", ConfigHash: volHash},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container abc123def456_tp-web-1  reason: volume configuration changed
+[1] -> 2. stop container tp-web-1  reason: volume configuration changed
+[2] -> 3. remove container tp-web-1  reason: volume configuration changed
+[3] -> 4. rename container tp-web-1  reason: volume configuration changed
+[4] -> 5. start container tp-web-1  reason: volume configuration changed
+`)
+}
+
+// TestReconcileMultipleVolumesOneMissing verifies that when a container has
+// two declared volumes but only one is mounted, it triggers recreate.
+func TestReconcileMultipleVolumesOneMissing(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "data", Target: "/data"},
+			{Type: "volume", Source: "logs", Target: "/logs"},
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	volData := types.VolumeConfig{Name: "tp_data"}
+	volLogs := types.VolumeConfig{Name: "tp_logs"}
+	volDataHash, err := VolumeHash(volData)
+	assert.NilError(t, err)
+	volLogsHash, err := VolumeHash(volLogs)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Volumes: types.Volumes{
+			"data": volData,
+			"logs": volLogs,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123def456",
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+					// only data mounted, logs missing
+					Mounts: []container.MountPoint{
+						{Type: mmount.TypeVolume, Name: "tp_data"},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data": {Name: "tp_data", Driver: "local", ConfigHash: volDataHash},
+			"logs": {Name: "tp_logs", Driver: "local", ConfigHash: volLogsHash},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container abc123def456_tp-web-1  reason: volume configuration changed
+[1] -> 2. stop container tp-web-1  reason: volume configuration changed
+[2] -> 3. remove container tp-web-1  reason: volume configuration changed
+[3] -> 4. rename container tp-web-1  reason: volume configuration changed
+[4] -> 5. start container tp-web-1  reason: volume configuration changed
+`)
+}
+
+// ---------------------------------------------------------------------------
+// Timeout propagation
+// ---------------------------------------------------------------------------
+
+// TestReconcileTimeoutPropagated verifies that the Timeout option is carried
+// through to stop operations in scale-down.
+func TestReconcileTimeoutPropagated(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	timeout := 30 * time.Second
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("tp", "web", 1, hash),
+				makeContainer("tp", "web", 2, hash),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+		Timeout:              &timeout,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container tp-web-2  reason: scale down
+[1] -> 2. remove container tp-web-2  reason: scale down
+`)
+	// Verify timeout is set on the stop op
+	stopOp := plan.Operations["stop-container:tp-web-2"]
+	assert.Assert(t, stopOp.ContainerOp.Timeout != nil)
+	assert.Equal(t, *stopOp.ContainerOp.Timeout, timeout)
+}
+
+// ---------------------------------------------------------------------------
+// Scale edge cases
+// ---------------------------------------------------------------------------
+
+// TestReconcileScaleUpFromZeroContainers verifies that scaling up when
+// there are zero existing containers (first deploy) works correctly.
+func TestReconcileScaleUpFromZeroContainers(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx", Scale: intPtr(2)}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{}, // nil entry for "web"
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container tp-web-1  reason: scale up
+2. create container tp-web-2  reason: scale up
+`)
+}
+
+// TestReconcileAllContainersObsolete verifies that when all containers have
+// stale hashes and scale is unchanged, each gets a full recreate chain.
+func TestReconcileAllContainersObsolete(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx", Scale: intPtr(3)}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("tp", "web", 1, "stale1"),
+				makeContainer("tp", "web", 2, "stale2"),
+				makeContainer("tp", "web", 3, "stale3"),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container tp-web-1_tp-web-1  reason: config hash changed
+2. create container tp-web-2_tp-web-2  reason: config hash changed
+3. create container tp-web-3_tp-web-3  reason: config hash changed
+[1] -> 4. stop container tp-web-1  reason: config hash changed
+[2] -> 5. stop container tp-web-2  reason: config hash changed
+[3] -> 6. stop container tp-web-3  reason: config hash changed
+[4] -> 7. remove container tp-web-1  reason: config hash changed
+[5] -> 8. remove container tp-web-2  reason: config hash changed
+[6] -> 9. remove container tp-web-3  reason: config hash changed
+[7] -> 10. rename container tp-web-1  reason: config hash changed
+[8] -> 11. rename container tp-web-2  reason: config hash changed
+[9] -> 12. rename container tp-web-3  reason: config hash changed
+[10] -> 13. start container tp-web-1  reason: config hash changed
+[11] -> 14. start container tp-web-2  reason: config hash changed
+[12] -> 15. start container tp-web-3  reason: config hash changed
+`)
+}
+
+// TestReconcileScaleDownStaleRemovedCurrentKept verifies that when scaling
+// down with a mix of stale and current containers, the stale ones are removed
+// and the current one is kept.
+func TestReconcileScaleDownStaleRemovedCurrentKept(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				makeContainer("tp", "web", 1, "stale1"),
+				makeContainer("tp", "web", 2, hash), // current
+				makeContainer("tp", "web", 3, "stale3"),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// Both stale containers removed, current container #2 survives
+	assert.Equal(t, plan.String(), `
+1. stop container tp-web-1  reason: scale down
+2. stop container tp-web-3  reason: scale down
+[1] -> 3. remove container tp-web-1  reason: scale down
+[2] -> 4. remove container tp-web-3  reason: scale down
+`)
+}
+
+// ---------------------------------------------------------------------------
+// Dependency edge wiring
+// ---------------------------------------------------------------------------
+
+// TestReconcileRecreateNoEdgeToRunningDependency verifies that when a service
+// is recreated but its dependency is already running and up-to-date, no
+// dependency edge is added to the recreate chain.
+func TestReconcileRecreateNoEdgeToRunningDependency(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	dbHash, err := ServiceHash(dbSvc)
+	assert.NilError(t, err)
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{Condition: "service_started"},
+		},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"db":  dbSvc,
+			"web": webSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"db":  {makeContainer("tp", "db", 1, dbHash)}, // up-to-date
+			"web": {makeContainer("tp", "web", 1, "stale")},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// No dependency edge on db — it has no "ready" op in the plan
+	assert.Equal(t, plan.String(), `
+1. create container tp-web-1_tp-web-1  reason: config hash changed
+[1] -> 2. stop container tp-web-1  reason: config hash changed
+[2] -> 3. remove container tp-web-1  reason: config hash changed
+[3] -> 4. rename container tp-web-1  reason: config hash changed
+[4] -> 5. start container tp-web-1  reason: config hash changed
+`)
+}
+
+// TestReconcileTwoServicesDependOnSameService verifies that when two services
+// depend on the same missing service, both get dependency edges to it.
+func TestReconcileTwoServicesDependOnSameService(t *testing.T) {
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"db": types.ServiceConfig{Name: "db", Image: "postgres"},
+			"web": types.ServiceConfig{
+				Name:  "web",
+				Image: "nginx",
+				DependsOn: types.DependsOnConfig{
+					"db": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+			"worker": types.ServiceConfig{
+				Name:  "worker",
+				Image: "worker",
+				DependsOn: types.DependsOnConfig{
+					"db": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container tp-db-1  reason: scale up
+[1] -> 2. create container tp-web-1  reason: scale up
+[1] -> 3. create container tp-worker-1  reason: scale up
+`)
+}
+
+// TestReconcileContainerCreateDependsOnRecreatedNetwork verifies that when a
+// network is being recreated (not just created), a new container using that
+// network depends on the network create op.
+func TestReconcileContainerCreateDependsOnRecreatedNetwork(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Networks: types.Networks{
+			"default": types.NetworkConfig{Name: "tp_default"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{}, // no containers yet
+		Networks: map[string]ObservedNetwork{
+			"default": {ID: "net1", Name: "tp_default", ConfigHash: "outdated"},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. remove network tp_default  reason: config hash changed
+[1] -> 2. create network tp_default  reason: config hash changed
+[2] -> 3. create container tp-web-1  reason: scale up
+`)
+}
+
+// ---------------------------------------------------------------------------
+// Cascading restart edge case
+// ---------------------------------------------------------------------------
+
+// TestReconcileCascadingRestartSkippedWhenAlreadyRecreating verifies that
+// when a service is already being recreated (stale hash), cascading restart
+// does not add duplicate stop/start ops.
+func TestReconcileCascadingRestartSkippedWhenAlreadyRecreating(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{
+				Condition: "service_started",
+				Restart:   true,
+			},
+		},
+	}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"db":  dbSvc,
+			"web": webSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"db":  {makeContainer("tp", "db", 1, "stale-db")},
+			"web": {makeContainer("tp", "web", 1, "stale-web")}, // also stale
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// web is already being recreated — cascading restart does NOT add a duplicate stop
+	assert.Equal(t, plan.String(), `
+1. create container tp-db-1_tp-db-1  reason: config hash changed
+[1] -> 2. stop container tp-db-1  reason: config hash changed
+[2] -> 3. remove container tp-db-1  reason: config hash changed
+[3] -> 4. rename container tp-db-1  reason: config hash changed
+[4] -> 5. start container tp-db-1  reason: config hash changed
+[5] -> 6. create container tp-web-1_tp-web-1  reason: config hash changed
+[6] -> 7. stop container tp-web-1  reason: config hash changed
+[7] -> 8. remove container tp-web-1  reason: config hash changed
+[8] -> 9. rename container tp-web-1  reason: config hash changed
+[9,5] -> 10. start container tp-web-1  reason: config hash changed
+`)
+	// Verify exactly one stop op for web
+	var stopCount int
+	for _, op := range plan.Operations {
+		if op.Type == OpStopContainer && op.Resource == "tp-web-1" {
+			stopCount++
+		}
+	}
+	assert.Equal(t, stopCount, 1)
+}
+
+// ---------------------------------------------------------------------------
+// Multiple plugin services
+// ---------------------------------------------------------------------------
+
+// TestReconcileMultiplePluginServices verifies that multiple plugin services
+// each produce their own independent OpRunPlugin op.
+func TestReconcileMultiplePluginServices(t *testing.T) {
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"p1": types.ServiceConfig{
+				Name:     "p1",
+				Provider: &types.ServiceProviderConfig{Type: "aws"},
+			},
+			"p2": types.ServiceConfig{
+				Name:     "p2",
+				Provider: &types.ServiceProviderConfig{Type: "gcp"},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. plugin plugin p1  reason: plugin service
+2. plugin plugin p2  reason: plugin service
+`)
+}
+
+// ---------------------------------------------------------------------------
+// Orphan edge case
+// ---------------------------------------------------------------------------
+
+// TestReconcileOrphanAlreadyStopped verifies that orphan containers in exited
+// state still get stop+remove ops (stop is a no-op at execution time).
+func TestReconcileOrphanAlreadyStopped(t *testing.T) {
+	project := &types.Project{
+		Name:     "tp",
+		Services: types.Services{},
+	}
+	orphan := makeContainer("tp", "old", 1, "hash")
+	orphan.State = container.StateExited
+
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{orphan},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+		RemoveOrphans:        true,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. stop container tp-old-1  reason: orphan container
+[1] -> 2. remove container tp-old-1  reason: orphan container
+`)
+}
+
+// ---------------------------------------------------------------------------
+// External volume resolution
+// ---------------------------------------------------------------------------
+
+// TestReconcileExternalVolumeResolvedFromContainer verifies that external
+// volume names are resolved from running containers' mounts, preventing a
+// false "volume configuration changed" recreate.
+func TestReconcileExternalVolumeResolvedFromContainer(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "ext", Target: "/data"},
+		},
+	}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+		Volumes: types.Volumes{
+			"ext": types.VolumeConfig{Name: "shared_vol", External: true},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "c1",
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      hash,
+						api.ProjectLabel:         "tp",
+					},
+					Mounts: []container.MountPoint{
+						{Type: mmount.TypeVolume, Name: "shared_vol"},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{}, // external vol not in observed
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// No recreate — external volume name resolved from container mount
+	assert.Assert(t, plan.IsEmpty(), "expected empty plan but got:\n%s", plan.String())
+}
+
+// ---------------------------------------------------------------------------
+// Mixed operations ordering
+// ---------------------------------------------------------------------------
+
+// TestReconcileServiceDependsOnMissingNetworkVolumeAndService verifies that
+// when a service needs a network, volume, and dependency service all created
+// from scratch, the container create depends on all three.
+func TestReconcileServiceDependsOnMissingNetworkVolumeAndService(t *testing.T) {
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"db": types.ServiceConfig{Name: "db", Image: "postgres"},
+			"web": types.ServiceConfig{
+				Name:  "web",
+				Image: "nginx",
+				Networks: map[string]*types.ServiceNetworkConfig{
+					"mynet": nil,
+				},
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: "volume", Source: "data", Target: "/data"},
+				},
+				DependsOn: types.DependsOnConfig{
+					"db": types.ServiceDependency{Condition: "service_started"},
+				},
+			},
+		},
+		Networks: types.Networks{
+			"mynet": types.NetworkConfig{Name: "tp_mynet"},
+		},
+		Volumes: types.Volumes{
+			"data": types.VolumeConfig{Name: "tp_data"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container tp-db-1  reason: scale up
+2. create network tp_mynet  reason: network does not exist
+3. create volume tp_data  reason: volume does not exist
+[1,2,3] -> 4. create container tp-web-1  reason: scale up
+`)
+}
+
+// ---------------------------------------------------------------------------
+// Inherit flag propagation
+// ---------------------------------------------------------------------------
+
+// TestReconcileInheritFlagPropagated verifies that the Inherit option is
+// carried through to ContainerOperation on both recreate and scale-up creates.
+func TestReconcileInheritFlagPropagated(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx", Scale: intPtr(2)}
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {makeContainer("tp", "web", 1, "stale")},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+		Inherit:              true,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. create container tp-web-1_tp-web-1  reason: config hash changed
+2. create container tp-web-2  reason: scale up
+[1] -> 3. stop container tp-web-1  reason: config hash changed
+[3] -> 4. remove container tp-web-1  reason: config hash changed
+[4] -> 5. rename container tp-web-1  reason: config hash changed
+[5] -> 6. start container tp-web-1  reason: config hash changed
+`)
+	// Verify Inherit is set on both create ops
+	for _, op := range plan.Operations {
+		if op.Type == OpCreateContainer && op.ContainerOp != nil {
+			assert.Assert(t, op.ContainerOp.Inherit,
+				"expected Inherit=true on create op %s", op.Resource)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Multi-network + simultaneous container recreate
+// ---------------------------------------------------------------------------
+
+// TestReconcileMultiNetworkAndContainerRecreate verifies that when a container
+// is connected to a recreated network AND also needs recreating due to a config
+// hash change, the network-path stop and the recreate-path stop do not collide.
+func TestReconcileMultiNetworkAndContainerRecreate(t *testing.T) {
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx:new", // changed image -> config hash diverges
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+	oldWebSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx:old",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+	oldHash, err := ServiceHash(oldWebSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"web": webSvc,
+		},
+		Networks: types.Networks{
+			"default": types.NetworkConfig{Name: "tp_default"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "ctr-web-1",
+					Names: []string{"/tp-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "tp",
+						api.ConfigHashLabel:      oldHash,
+					},
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"tp_default": {NetworkID: "net-1"},
+						},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"default": {ID: "net-1", Name: "tp_default", ConfigHash: "outdated"},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, !plan.IsEmpty())
+
+	// Count stop ops for web-1 — must be exactly one despite both network recreate
+	// and container recreate wanting to stop it.
+	var stopCount int
+	for _, op := range plan.Operations {
+		if op.Type == OpStopContainer && op.ContainerOp != nil && op.ContainerOp.ContainerName == "tp-web-1" {
+			stopCount++
+		}
+	}
+	assert.Equal(t, stopCount, 1, "expected exactly one stop op for tp-web-1")
+}
+
+// ---------------------------------------------------------------------------
+// Cascading restart with volume-recreated service
+// ---------------------------------------------------------------------------
+
+// TestReconcileCascadingRestartWithVolumeRecreatedDep verifies that when a
+// service's volume is being recreated (producing a bare create-container op
+// without a stop-container), a dependent service with restart: true still gets
+// cascading restart ops. The volume-recreated service doesn't go through the
+// rename chain, so addCascadingRestarts (which looks for OpRenameContainer)
+// should NOT add a cascading restart for it.
+func TestReconcileCascadingRestartWithVolumeRecreatedDep(t *testing.T) {
+	dbSvc := types.ServiceConfig{
+		Name:  "db",
+		Image: "postgres",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "dbdata", Target: "/var/lib/data"},
+		},
+	}
+	dbHash, err := ServiceHash(dbSvc)
+	assert.NilError(t, err)
+
+	appSvc := types.ServiceConfig{
+		Name:  "app",
+		Image: "myapp",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{
+				Condition: "service_started",
+				Restart:   true,
+			},
+		},
+	}
+	appHash, err := ServiceHash(appSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "tp",
+		Services: types.Services{
+			"db":  dbSvc,
+			"app": appSvc,
+		},
+		Volumes: types.Volumes{
+			"dbdata": types.VolumeConfig{Name: "tp_dbdata"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"db":  {makeContainer("tp", "db", 1, dbHash)},
+			"app": {makeContainer("tp", "app", 1, appHash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"dbdata": {Name: "tp_dbdata", ConfigHash: "outdated-vol-hash"},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	// db container gets a create-container op (volume recreated path) — no rename,
+	// so addCascadingRestarts won't detect db as "recreated."
+	dbCreate, hasCreate := plan.Operations["create-container:tp-db-1"]
+	assert.Assert(t, hasCreate, "db should have create-container op from volume recreate")
+	assert.Assert(t, dbCreate.ContainerOp != nil)
+
+	// No rename op for db — it goes through the volume-recreated path, not the
+	// standard recreate chain.
+	_, hasRename := plan.Operations["rename-container:tp-db-1"]
+	assert.Assert(t, !hasRename, "volume-recreated container should not have rename op")
+
+	// app should NOT get cascading restart ops because db doesn't have a rename op
+	// (cascading restart detection relies on OpRenameContainer).
+	_, hasAppStop := plan.Operations["stop-container:tp-app-1"]
+	assert.Assert(t, !hasAppStop, "app should not get cascading restart when db is volume-recreated (no rename)")
+}
+
+// ---------------------------------------------------------------------------
+// Orphan containers with removal ops are "touched"
+// ---------------------------------------------------------------------------
+
+// TestReconcileOrphanContainersTouched verifies that orphan containers get
+// stop+remove ops, so ContainerTouched returns true for them. This ensures
+// emitUntouchedContainerEvents won't emit a "running" event for a container
+// that's about to be removed.
+func TestReconcileOrphanContainersTouched(t *testing.T) {
+	project := &types.Project{
+		Name:     "tp",
+		Services: types.Services{},
+	}
+	orphan := makeContainer("tp", "removed-svc", 1, "hash")
+
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{orphan},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:      api.RecreateDiverged,
+		RemoveOrphans: true,
+	})
+	assert.NilError(t, err)
+
+	ctrName := getCanonicalContainerName(orphan)
+
+	// The plan should have stop+remove for the orphan
+	_, hasStop := plan.Operations["stop-container:"+ctrName]
+	assert.Assert(t, hasStop, "orphan should have stop op")
+	_, hasRemove := plan.Operations["remove-container:"+ctrName]
+	assert.Assert(t, hasRemove, "orphan should have remove op")
+
+	// ContainerTouched should return true for this container
+	assert.Assert(t, plan.ContainerTouched(ctrName),
+		"orphan with stop+remove ops should be touched")
 }
 
 // ---------------------------------------------------------------------------

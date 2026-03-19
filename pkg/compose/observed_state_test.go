@@ -155,3 +155,62 @@ func TestReconciliationPlanString(t *testing.T) {
 `
 	assert.Equal(t, plan.String(), expected)
 }
+
+func TestContainerTouchedMatchesContainerOps(t *testing.T) {
+	plan := &ReconciliationPlan{
+		Operations: map[string]*Operation{
+			"stop-container:web-1": {
+				ID:   "stop-container:web-1",
+				Type: OpStopContainer,
+				ContainerOp: &ContainerOperation{
+					ContainerName: "web-1",
+				},
+			},
+			"create-container:tmpname_web-2": {
+				ID:   "create-container:tmpname_web-2",
+				Type: OpCreateContainer,
+				ContainerOp: &ContainerOperation{
+					ContainerName: "tmpname_web-2",
+				},
+			},
+			"rename-container:web-2": {
+				ID:   "rename-container:web-2",
+				Type: OpRenameContainer,
+				RenameOp: &RenameOperation{
+					CurrentName: "tmpname_web-2",
+					NewName:     "web-2",
+				},
+				// No ContainerOp — rename ops use RenameOp
+			},
+			"remove-container:db-1": {
+				ID:   "remove-container:db-1",
+				Type: OpRemoveContainer,
+				ContainerOp: &ContainerOperation{
+					ContainerName: "db-1",
+				},
+			},
+			"create-network:mynet": {
+				ID:   "create-network:mynet",
+				Type: OpCreateNetwork,
+				NetworkOp: &NetworkOperation{
+					NetworkKey: "default",
+				},
+			},
+		},
+		Dependents: map[string][]string{},
+	}
+
+	// Containers with ContainerOp are touched
+	assert.Assert(t, plan.ContainerTouched("web-1"), "stop op should mark web-1 as touched")
+	assert.Assert(t, plan.ContainerTouched("tmpname_web-2"), "create op should mark tmpname_web-2 as touched")
+	assert.Assert(t, plan.ContainerTouched("db-1"), "remove op should mark db-1 as touched")
+
+	// Rename ops have RenameOp, not ContainerOp — rename target is NOT touched via ContainerOp
+	assert.Assert(t, !plan.ContainerTouched("web-2"), "rename op (RenameOp only) should not mark web-2 as touched")
+
+	// Network ops are not container ops
+	assert.Assert(t, !plan.ContainerTouched("mynet"), "network op should not match container name")
+
+	// Non-existent container
+	assert.Assert(t, !plan.ContainerTouched("nonexistent"), "unknown container should not be touched")
+}

@@ -29,8 +29,12 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -148,7 +152,7 @@ func (es *executionState) resolveSharedNamespaces(service *types.ServiceConfig) 
 // ExecutePlan executes a reconciliation plan using DAG traversal similar to
 // graphTraversal.visit() in dependencies.go. Operations are executed
 // concurrently, respecting dependency ordering.
-func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project, plan *ReconciliationPlan) error {
+func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project, plan *ReconciliationPlan, observed *ObservedState) error {
 	if plan.IsEmpty() {
 		return nil
 	}
@@ -156,11 +160,7 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 	// Pre-populate execution state with existing containers so that
 	// resolveServiceReferences can find containers for services not
 	// included in the plan (e.g. --no-deps scenarios).
-	allContainers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
-	if err != nil {
-		return err
-	}
-	state := newExecutionStateFrom(allContainers)
+	state := newExecutionStateFrom(observed.allContainers())
 
 	// Build dependency count map: number of unsatisfied deps per operation.
 	// The consumer goroutine is single-threaded, so no mutex is needed for depCount.
@@ -219,6 +219,30 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 }
 
 func (s *composeService) executeOperation(ctx context.Context, project *types.Project, op *Operation, state *executionState) error {
+	spanName := op.Type.String()
+	opts := tracing.SpanOptions{}
+	if op.ContainerOp != nil {
+		opts = tracing.ServiceOptions(op.ContainerOp.Service)
+	}
+	ctx, span := otel.Tracer("").Start(ctx, spanName, opts.SpanStartOptions()...)
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("operation.id", op.ID),
+		attribute.String("operation.resource", op.Resource),
+		attribute.String("operation.reason", op.Reason),
+	)
+
+	err := s.dispatchOperation(ctx, project, op, state)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		span.RecordError(err)
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
+	return err
+}
+
+func (s *composeService) dispatchOperation(ctx context.Context, project *types.Project, op *Operation, state *executionState) error {
 	switch op.Type {
 	case OpCreateNetwork:
 		return s.executePlanCreateNetwork(ctx, project, op, state)
@@ -397,7 +421,10 @@ func (s *composeService) executePlanRunPlugin(ctx context.Context, project *type
 // DisplayPlan performs a topological sort of operations and displays them
 // grouped by resource type.
 func DisplayPlan(plan *ReconciliationPlan, w io.Writer) error {
-	ops := topologicalSort(plan)
+	ops, err := topologicalSort(plan)
+	if err != nil {
+		return err
+	}
 
 	// Group operations by category
 	var networkOps, volumeOps []*Operation
@@ -497,7 +524,8 @@ func opVerb(t OperationType) string {
 }
 
 // topologicalSort returns operations in dependency order using Kahn's algorithm.
-func topologicalSort(plan *ReconciliationPlan) []*Operation {
+// Returns an error if the dependency graph contains a cycle.
+func topologicalSort(plan *ReconciliationPlan) ([]*Operation, error) {
 	inDegree := make(map[string]int, len(plan.Operations))
 	for _, op := range plan.Operations {
 		inDegree[op.ID] = len(op.DependsOn)
@@ -529,5 +557,16 @@ func topologicalSort(plan *ReconciliationPlan) []*Operation {
 		queue = append(queue, next...)
 	}
 
-	return sorted
+	if len(sorted) != len(plan.Operations) {
+		var cycled []string
+		for id, degree := range inDegree {
+			if degree > 0 {
+				cycled = append(cycled, id)
+			}
+		}
+		sort.Strings(cycled)
+		return nil, fmt.Errorf("dependency cycle detected involving operations: %v", cycled)
+	}
+
+	return sorted, nil
 }

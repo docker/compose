@@ -109,8 +109,11 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		}
 	}
 
-	// Validate external networks exist before reconciling
+	// Validate external resources exist before reconciling
 	if err := s.validateExternalNetworks(ctx, project, options.Services); err != nil {
+		return err
+	}
+	if err := s.validateExternalVolumes(ctx, project, options.Services); err != nil {
 		return err
 	}
 
@@ -127,14 +130,14 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
+	s.emitUntouchedContainerEvents(project, observed, plan)
+
 	if plan.IsEmpty() {
 		return nil
 	}
 
-	s.emitUntouchedContainerEvents(project, observed, plan)
-
 	// Phase 3: Execute the plan
-	return s.ExecutePlan(ctx, project, plan)
+	return s.ExecutePlan(ctx, project, plan, observed)
 }
 
 // emitUntouchedContainerEvents emits progress events for containers that are
@@ -143,13 +146,7 @@ func (s *composeService) emitUntouchedContainerEvents(project *types.Project, ob
 	for _, service := range project.Services {
 		for _, ctr := range observed.Containers[service.Name] {
 			ctrName := getCanonicalContainerName(ctr)
-			if _, touched := plan.Operations["stop-container:"+ctrName]; touched {
-				continue
-			}
-			if _, touched := plan.Operations["start-container:"+ctrName]; touched {
-				continue
-			}
-			if _, touched := plan.Operations["create-container:"+ctrName]; touched {
+			if plan.ContainerTouched(ctrName) {
 				continue
 			}
 			if ctr.State == container.StateRunning {
@@ -183,6 +180,44 @@ func (s *composeService) validateExternalNetworks(ctx context.Context, project *
 		}
 		_, err := s.resolveExternalNetwork(ctx, &net)
 		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateExternalVolumes checks that external volumes exist for services
+// that are part of the current operation. Returns an error if a required
+// external volume is not found.
+func (s *composeService) validateExternalVolumes(ctx context.Context, project *types.Project, services []string) error {
+	for key, vol := range project.Volumes {
+		if !vol.External {
+			continue
+		}
+		// Check if any targeted service uses this volume
+		usedByTargetedService := false
+		for _, service := range project.Services {
+			if len(services) > 0 && !slices.Contains(services, service.Name) {
+				continue
+			}
+			for _, v := range service.Volumes {
+				if v.Type == string(mount.TypeVolume) && v.Source == key {
+					usedByTargetedService = true
+					break
+				}
+			}
+			if usedByTargetedService {
+				break
+			}
+		}
+		if !usedByTargetedService {
+			continue
+		}
+		_, err := s.apiClient().VolumeInspect(ctx, vol.Name, client.VolumeInspectOptions{})
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return fmt.Errorf("external volume %q not found", vol.Name)
+			}
 			return err
 		}
 	}

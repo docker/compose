@@ -165,6 +165,17 @@ func (p *ReconciliationPlan) IsEmpty() bool {
 	return len(p.Operations) == 0
 }
 
+// ContainerTouched reports whether the plan contains any operation that
+// directly affects the named container (stop, start, create, or remove).
+func (p *ReconciliationPlan) ContainerTouched(containerName string) bool {
+	for _, op := range p.Operations {
+		if op.ContainerOp != nil && op.ContainerOp.ContainerName == containerName {
+			return true
+		}
+	}
+	return false
+}
+
 // String returns a deterministic, test-friendly dump of the plan.
 //
 // Operations are listed in topological order, each prefixed by a sequential
@@ -182,7 +193,10 @@ func (p *ReconciliationPlan) String() string {
 		return "(empty plan)"
 	}
 
-	ops := topologicalSort(p)
+	ops, err := topologicalSort(p)
+	if err != nil {
+		return fmt.Sprintf("(invalid plan: %s)", err)
+	}
 
 	// Assign a 1-based index to each operation ID
 	index := make(map[string]int, len(ops))
@@ -256,7 +270,7 @@ func Reconcile(project *types.Project, observed *ObservedState, opts ReconcileOp
 	}
 
 	// Step 2 - Volumes
-	if err := reconcileVolumes(project, observed, plan); err != nil {
+	if err := reconcileVolumes(project, observed, plan, opts); err != nil {
 		return nil, err
 	}
 
@@ -502,9 +516,15 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 				Reason:    fmt.Sprintf("network %q has been recreated", n.Name),
 			}
 
-			// Start the container (depends on connect)
+			// Start the container (depends on all connect ops for this container)
 			startID := fmt.Sprintf("start-container:%s", ctrName)
-			if _, exists := plan.Operations[startID]; !exists {
+			if existing, exists := plan.Operations[startID]; exists {
+				// Container is connected to multiple recreated networks;
+				// add the new connect op as a dependency.
+				if !slices.Contains(existing.DependsOn, connectID) {
+					existing.DependsOn = append(existing.DependsOn, connectID)
+				}
+			} else {
 				plan.Operations[startID] = &Operation{
 					ID:          startID,
 					Type:        OpStartContainer,
@@ -546,7 +566,7 @@ func findContainersOnNetwork(observed *ObservedState, networkName string, networ
 // When a volume must be recreated (config hash diverged), it decomposes the
 // recreation into discrete operations: stop containers → remove containers → remove volume → create volume,
 // each with proper dependency edges.
-func reconcileVolumes(project *types.Project, observed *ObservedState, plan *ReconciliationPlan) error {
+func reconcileVolumes(project *types.Project, observed *ObservedState, plan *ReconciliationPlan, opts ReconcileOptions) error {
 	for key, vol := range project.Volumes {
 		if vol.External {
 			continue
@@ -598,6 +618,7 @@ func reconcileVolumes(project *types.Project, observed *ObservedState, plan *Rec
 					ContainerOp: &ContainerOperation{
 						ContainerName: ctrName,
 						Existing:      &ctr,
+						Timeout:       opts.Timeout,
 					},
 					Reason: fmt.Sprintf("volume %q is being recreated", v.Name),
 				}
@@ -614,6 +635,7 @@ func reconcileVolumes(project *types.Project, observed *ObservedState, plan *Rec
 					ContainerOp: &ContainerOperation{
 						ContainerName: ctrName,
 						Existing:      &ctr,
+						Timeout:       opts.Timeout,
 					},
 					DependsOn: []string{stopID},
 					Reason:    fmt.Sprintf("volume %q is being recreated", v.Name),
@@ -744,6 +766,9 @@ func reconcileServiceContainers(
 	}
 
 	// Precompute which containers are obsolete to avoid repeated hashing in the sort comparator.
+	// The error from needsRecreate is intentionally discarded here: this is only used for sorting
+	// priority (obsolete containers first). The actual recreate decision — with proper error
+	// handling — happens below when building the plan operations.
 	obsolete := make(map[string]bool, len(containers))
 	for _, ctr := range containers {
 		recreate, _, _ := needsRecreate(service, ctr, networkIDs, volumeNames, policy)
@@ -975,6 +1000,13 @@ func reconcileServiceContainers(
 
 // buildDependencyEdges wires up DependsOn and Dependents for container operations
 // based on service dependencies, network dependencies, and volume dependencies.
+//
+// Note: dependency edges are added to ALL OpCreateContainer/OpStartContainer ops,
+// including recreate temp creates (Existing != nil). This is intentional — the
+// recreate chain's internal ordering (create → stop → remove → rename → start)
+// is already wired, and network/volume deps on the temp create ensure it waits
+// for resource recreation. Excluding temp creates would break recreate+network-recreate
+// ordering.
 func buildDependencyEdges(project *types.Project, plan *ReconciliationPlan) {
 	readyOpsByService := indexReadyOps(plan)
 
@@ -992,6 +1024,12 @@ func buildDependencyEdges(project *types.Project, plan *ReconciliationPlan) {
 //   - Recreate chain: the start after rename (create → stop → remove → rename → start)
 //   - Fresh create: the OpCreateContainer itself
 //   - Plugin: the OpRunPlugin
+//
+// For recreate chains, a start op is recognized as the "ready" milestone only when its
+// sole dependency is a rename op. This is correct because the recreate chain is built
+// deterministically (create → stop → remove → rename → start), and additional deps
+// (e.g. network reconnects) are added to the start op only by buildDependencyEdges,
+// which runs AFTER indexReadyOps.
 func indexReadyOps(plan *ReconciliationPlan) map[string][]string {
 	readyOpsByService := map[string][]string{}
 	for id, op := range plan.Operations {
@@ -1098,7 +1136,7 @@ func needsRecreate(expected types.ServiceConfig, actual container.Summary, netwo
 		return true, "image digest changed", nil
 	}
 
-	if networks != nil && actual.State == container.StateRunning {
+	if networks != nil && actual.State == container.StateRunning && actual.NetworkSettings != nil {
 		if checkExpectedNetworks(expected, actual, networks) {
 			return true, "network configuration changed", nil
 		}
@@ -1164,13 +1202,9 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 				continue
 			}
 			// This service's dependency is being recreated and has restart: true.
-			// Add stop+start ops for its running containers (if not already being recreated/stopped).
+			// Add stop+start ops for its running containers (if not already being stopped).
 			for _, ctr := range observed.Containers[service.Name] {
 				ctrName := getCanonicalContainerName(ctr)
-				// Skip if we already have operations for this container
-				if _, exists := plan.Operations["recreate-container:"+ctrName]; exists {
-					continue
-				}
 				if _, exists := plan.Operations["stop-container:"+ctrName]; exists {
 					continue
 				}
