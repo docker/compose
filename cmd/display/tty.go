@@ -347,7 +347,10 @@ func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
 		}
 		timerWidth := utf8.RuneCountInString(l.timer)
 		if timerWidth < timerLen {
-			l.timer = l.timer + strings.Repeat(" ", timerLen-timerWidth)
+			// Left-pad so the timer's right edge stays aligned on the terminal.
+			// This also prevents stale suffix characters from visually “sticking”
+			// when a previously-rendered timer was wider (e.g. "10.6s" -> "0.0s").
+			l.timer = strings.Repeat(" ", timerLen-timerWidth) + l.timer
 		}
 	}
 
