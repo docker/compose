@@ -54,7 +54,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 	if err != nil {
 		return err
 	}
-	accept, err := s.preChecks(project, options)
+	accept, err := s.preChecks(ctx, project, options)
 	if err != nil {
 		return err
 	}
@@ -298,7 +298,7 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	return override.MarshalYAML()
 }
 
-func (s *composeService) preChecks(project *types.Project, options api.PublishOptions) (bool, error) {
+func (s *composeService) preChecks(ctx context.Context, project *types.Project, options api.PublishOptions) (bool, error) {
 	if ok, err := s.checkOnlyBuildSection(project); !ok || err != nil {
 		return false, err
 	}
@@ -321,7 +321,7 @@ func (s *composeService) preChecks(project *types.Project, options api.PublishOp
 			return false, err
 		}
 	}
-	detectedSecrets, err := s.checkForSensitiveData(project)
+	detectedSecrets, err := s.checkForSensitiveData(ctx, project)
 	if err != nil {
 		return false, err
 	}
@@ -419,12 +419,12 @@ func (s *composeService) checkForBindMount(project *types.Project) map[string][]
 	return allFindings
 }
 
-func (s *composeService) checkForSensitiveData(project *types.Project) ([]secrets.DetectedSecret, error) {
+func (s *composeService) checkForSensitiveData(ctx context.Context, project *types.Project) ([]secrets.DetectedSecret, error) {
 	var allFindings []secrets.DetectedSecret
 	scan := scanner.NewDefaultScanner()
 	// Check all compose files
 	for _, file := range project.ComposeFiles {
-		in, err := composeFileAsByteReader(file, project)
+		in, err := composeFileAsByteReader(ctx, file, project)
 		if err != nil {
 			return nil, err
 		}
@@ -471,12 +471,12 @@ func (s *composeService) checkForSensitiveData(project *types.Project) ([]secret
 	return allFindings, nil
 }
 
-func composeFileAsByteReader(filePath string, project *types.Project) (io.Reader, error) {
+func composeFileAsByteReader(ctx context.Context, filePath string, project *types.Project) (io.Reader, error) {
 	composeFile, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
 	}
-	base, err := loader.LoadWithContext(context.TODO(), types.ConfigDetails{
+	base, err := loader.LoadWithContext(ctx, types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
 		Environment: project.Environment,
 		ConfigFiles: []types.ConfigFile{
