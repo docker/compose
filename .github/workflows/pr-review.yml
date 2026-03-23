@@ -1,0 +1,44 @@
+name: PR Review
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+# Serialize reviews per PR; do not cancel in-progress runs
+# so no review is silently dropped mid-execution.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    # Only run on the upstream repo (not forks) to prevent credential leaks.
+    # Skip draft PRs (ready_for_review will fire when promoted).
+    # Skip bot actors to avoid reviewing Dependabot and automation PRs.
+    # Require collaborator-level access for comment-triggered events.
+    # Only trigger on PR comments, not plain issue comments.
+    if: >-
+      github.repository == 'docker/compose' &&
+      (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) &&
+      (github.event_name == 'pull_request_target' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+       (github.event_name == 'pull_request_review_comment' &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))) &&
+      !endsWith(github.actor, '[bot]')
+    uses: docker/cagent-action/.github/workflows/review-pr.yml@3a12dbd0c6cd7dda3d4e05f24f0143c9701456de # v1.2.13
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CAGENT_ORG_MEMBERSHIP_TOKEN: ${{ secrets.CAGENT_ORG_MEMBERSHIP_TOKEN }}
+      CAGENT_REVIEWER_APP_ID: ${{ secrets.CAGENT_REVIEWER_APP_ID }}
+      CAGENT_REVIEWER_APP_PRIVATE_KEY: ${{ secrets.CAGENT_REVIEWER_APP_PRIVATE_KEY }}
+    permissions:
+      contents: read       # to fetch code
+      pull-requests: write # to post review comments
+      issues: write        # to reply to issue/PR comments
+      checks: write        # to update check statuses
