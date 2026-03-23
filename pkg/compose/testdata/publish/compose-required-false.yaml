@@ -5,5 +5,7 @@ services:
     env_file:
       - path: missing.env
         required: false
+      - path: optional.env
+        required: false
       - path: existing.env
         required: true

@@ -121,15 +121,21 @@ func Test_createLayers_withRequiredFalse(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	assert.Equal(t, len(layers), 2)
+	assert.Equal(t, len(layers), 3)
 
 	assert.Equal(t, layers[0].Annotations["com.docker.compose.file"], "compose-required-false.yaml")
 
 	assert.Equal(t, layers[1].MediaType, "application/vnd.docker.compose.envfile")
+	assert.Equal(t, layers[2].MediaType, "application/vnd.docker.compose.envfile")
 
-	envFileHash := layers[1].Annotations["com.docker.compose.envfile"]
-	assert.Assert(t, len(envFileHash) > 0)
-	assert.Assert(t, envFileHash != "missing.env")
+	envFileHashes := []string{
+		layers[1].Annotations["com.docker.compose.envfile"],
+		layers[2].Annotations["com.docker.compose.envfile"],
+	}
+	assert.Assert(t, envFileHashes[0] != "")
+	assert.Assert(t, envFileHashes[1] != "")
+	assert.Assert(t, envFileHashes[0] != "missing.env")
+	assert.Assert(t, envFileHashes[1] != "missing.env")
 }
 
 func Test_checkEnvironmentVariables_withRequiredFalse(t *testing.T) {
@@ -143,7 +149,7 @@ func Test_checkEnvironmentVariables_withRequiredFalse(t *testing.T) {
 						Required: false,
 					},
 					{
-						Path:     "existing.env", 
+						Path:     "existing.env",
 						Required: true,
 					},
 				},
@@ -164,6 +170,6 @@ func Test_checkEnvironmentVariables_withRequiredFalse(t *testing.T) {
 
 	err := service.checkEnvironmentVariables(project, api.PublishOptions{})
 	assert.Assert(t, err != nil)
-	assert.Assert(t, strings.Contains(err.Error(), `service "test" has env_file declared.`))
+	assert.Assert(t, strings.Contains(err.Error(), `service "test" has required env_file declared.`))
 	assert.Assert(t, !strings.Contains(err.Error(), `service "test2"`))
 }
