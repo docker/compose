@@ -404,6 +404,67 @@ func TestPrintWithDimensions_PulledAndPullingWithLongIDs(t *testing.T) {
 	}
 }
 
+func TestPrintWithDimensions_TimerIsRightAligned(t *testing.T) {
+	w, buf := newTestWriter()
+
+	base := time.Unix(0, 0)
+
+	// Long timer: "10.6s" (length 5)
+	longTask := &task{
+		ID:        "task-long",
+		parents:   make(map[string]struct{}),
+		startTime: base,
+		endTime:   base.Add(10*time.Second + 600*time.Millisecond),
+		text:      "Pulled",
+		status:    api.Done,
+		spinner:   NewSpinner(),
+	}
+	longTask.spinner.Stop()
+	w.tasks[longTask.ID] = longTask
+	w.ids = append(w.ids, longTask.ID)
+
+	// Short timer: "0.0s" (length 4)
+	shortTask := &task{
+		ID:        "task-short",
+		parents:   make(map[string]struct{}),
+		startTime: base,
+		endTime:   base,
+		text:      "Pulled",
+		status:    api.Done,
+		spinner:   NewSpinner(),
+	}
+	shortTask.spinner.Stop()
+	w.tasks[shortTask.ID] = shortTask
+	w.ids = append(w.ids, shortTask.ID)
+
+	terminalWidth := 80
+	w.printWithDimensions(terminalWidth, 24)
+
+	// Strip ANSI codes from output and split by newline
+	stripped := stripAnsi(buf.String())
+	lines := strings.Split(stripped, "\n")
+
+	var nonEmptyLines []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmptyLines = append(nonEmptyLines, line)
+		}
+	}
+
+	// Find the line containing the shorter timer.
+	var shortLine string
+	for _, line := range nonEmptyLines {
+		if strings.Contains(line, "0.0s") {
+			shortLine = line
+			break
+		}
+	}
+	assert.Assert(t, shortLine != "", "expected to find a rendered line containing \"0.0s\"")
+	assert.Assert(t, strings.HasSuffix(shortLine, "0.0s"),
+		"short timer should be left-padded (no trailing spaces after the timer); got: %q",
+		shortLine)
+}
+
 func TestLenAnsi(t *testing.T) {
 	testCases := []struct {
 		input    string

@@ -95,6 +95,6 @@ func countServiceBuilds(output, projectName, serviceName string) int {
 // Format: prefix-<8 random hex chars> (e.g., "build-once-3f4a9b2c")
 func randomProjectName(prefix string) string {
 	b := make([]byte, 4) // 4 bytes = 8 hex chars
-	rand.Read(b)         //nolint:errcheck
+	rand.Read(b)
 	return fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(b))
 }
