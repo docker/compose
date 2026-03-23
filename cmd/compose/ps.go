@@ -69,14 +69,15 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	opts := psOptions{
 		ProjectOptions: p,
 	}
-	psCmd := &cobra.Command{
+	var psCmd *cobra.Command
+	psCmd = &cobra.Command{
 		Use:   "ps [OPTIONS] [SERVICE...]",
 		Short: "List containers",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return opts.parseFilter()
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPs(ctx, dockerCli, backendOptions, args, opts)
+			return runPs(ctx, dockerCli, backendOptions, args, opts, psCmd)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -92,7 +93,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	return psCmd
 }
 
-func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, opts psOptions) error { //nolint:gocyclo
+func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, opts psOptions, cmd *cobra.Command) error { //nolint:gocyclo
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -157,8 +158,8 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 	}
 	if len(opts.Format) == 0 {
 		opts.Format = "table"
-	} else if opts.Quiet {
-		_, _ = dockerCli.Err().Write([]byte("WARNING: Ignoring custom format, because both --format and --quiet are set.\n"))
+	} else if opts.Quiet && cmd.Flags().Changed("format") {
+		fmt.Fprintln(dockerCli.Err(), "WARNING: Ignoring custom format, because both --format and --quiet are set.")
 	}
 
 	containerCtx := cliformatter.Context{
