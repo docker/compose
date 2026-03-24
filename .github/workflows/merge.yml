@@ -31,7 +31,7 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
@@ -117,7 +117,7 @@ jobs:
       -
         name: Generate Token
         id: generate_token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3
         with:
           app-id: ${{ vars.DOCKERDESKTOP_APP_ID }}
           private-key: ${{ secrets.DOCKERDESKTOP_APP_PRIVATEKEY }}
@@ -126,7 +126,7 @@ jobs:
             ${{ secrets.DOCKERDESKTOP_REPO }}
       -
         name: Trigger Docker Desktop e2e with edge version
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           github-token: ${{ steps.generate_token.outputs.token }}
           script: |
