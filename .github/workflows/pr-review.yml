@@ -8,7 +8,7 @@ on:
     types: [ready_for_review, opened]
 
 permissions:
-  contents: read # Required at top-level to give `issue_comment` events access to the secrets below.
+  contents: read # Required at top level so `GITHUB_TOKEN` for `issue_comment` events can read repository contents.
 
 jobs:
   review:
