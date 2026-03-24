@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   review:
-    uses: docker/cagent-action/.github/workflows/review-pr.yml@dba0ca51938c78afb363625363c50582243218d6 #v1.3.1
+    uses: docker/cagent-action/.github/workflows/review-pr.yml@dba0ca51938c78afb363625363c50582243218d6 # v1.3.1
     # Scoped to the job so other jobs in this workflow aren't over-permissioned
     permissions:
       contents: read       # Read repository files and PR diffs
