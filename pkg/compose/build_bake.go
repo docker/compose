@@ -550,7 +550,11 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
-	if contextType, _ := build.DetectContextType(ctxName); contextType == build.ContextTypeGit {
+	contextType, _ := build.DetectContextType(ctxName)
+	if contextType == build.ContextTypeGit || contextType == build.ContextTypeRemote {
+		return dockerfile
+	}
+	if strings.Contains(ctxName, "://") {
 		return dockerfile
 	}
 	if !filepath.IsAbs(dockerfile) {

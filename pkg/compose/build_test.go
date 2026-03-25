@@ -24,6 +24,58 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func Test_dockerFilePath(t *testing.T) {
+	tests := []struct {
+		name       string
+		ctxName    string
+		dockerfile string
+		expected   string
+	}{
+		{
+			name:       "empty dockerfile",
+			ctxName:    "/some/local/dir",
+			dockerfile: "",
+			expected:   "",
+		},
+		{
+			name:       "local dir with relative dockerfile",
+			ctxName:    "/some/local/dir",
+			dockerfile: "Dockerfile",
+			expected:   "/some/local/dir/Dockerfile",
+		},
+		{
+			name:       "local dir with absolute dockerfile",
+			ctxName:    "/some/local/dir",
+			dockerfile: "/absolute/path/Dockerfile",
+			expected:   "/absolute/path/Dockerfile",
+		},
+		{
+			name:       "ssh URL preserves double slash",
+			ctxName:    "ssh://git@github.com:22/docker/welcome-to-docker.git",
+			dockerfile: "Dockerfile",
+			expected:   "Dockerfile",
+		},
+		{
+			name:       "git:// URL returns dockerfile as-is",
+			ctxName:    "git://github.com/docker/compose.git",
+			dockerfile: "Dockerfile",
+			expected:   "Dockerfile",
+		},
+		{
+			name:       "https git URL returns dockerfile as-is",
+			ctxName:    "https://github.com/docker/compose.git",
+			dockerfile: "Dockerfile",
+			expected:   "Dockerfile",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := dockerFilePath(tt.ctxName, tt.dockerfile)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func Test_addBuildDependencies(t *testing.T) {
 	project := &types.Project{Services: types.Services{
 		"test": types.ServiceConfig{
