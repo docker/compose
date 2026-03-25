@@ -28,7 +28,7 @@ ARG LICENSE_FILES=".*\(Dockerfile\|Makefile\|\.go\|\.hcl\|\.sh\)"
 FROM --platform=${BUILDPLATFORM} tonistiigi/xx:${XX_VERSION} AS xx
 
 # osxcross contains the MacOSX cross toolchain for xx
-FROM crazymax/osxcross:15.5-alpine AS osxcross
+FROM crazymax/osxcross:15.5-alpine@sha256:ab016ff172118c7c98f49413bbdbf496b7c96c2677d1fb1736543301b8359341 AS osxcross
 
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
 FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
@@ -108,7 +108,7 @@ RUN --mount=type=bind,target=. \
     mkdir -p /tmp/coverage && \
     rm -rf /tmp/report && \
     mkdir -p /tmp/report && \
-    go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -tags "$BUILD_TAGS" -v -cover -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') -args -test.gocoverdir="/tmp/coverage" && \
+    go run gotest.tools/gotestsum@v1.13.0 --format testname --junitfile "/tmp/report/report.xml" -- -tags "$BUILD_TAGS" -v -cover -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') -args -test.gocoverdir="/tmp/coverage" && \
     go tool covdata percent -i=/tmp/coverage
 
 FROM scratch AS test-coverage
@@ -124,7 +124,7 @@ RUN --mount=type=bind,target=.,rw \
     find . -regex "${LICENSE_FILES}" | cpio -pdm /out
 
 FROM scratch AS license-update
-COPY --from=set /out /
+COPY --from=license-set /out /
 
 FROM base AS license-validate
 ARG LICENSE_FILES

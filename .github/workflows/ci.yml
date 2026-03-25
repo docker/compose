@@ -143,7 +143,7 @@ jobs:
             *.cache-to=type=gha,scope=test
       -
         name: Gather coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-data-unit
           path: bin/coverage/unit/
@@ -191,9 +191,10 @@ jobs:
         run: |
           sudo systemctl stop docker.service
           sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-ce-rootless-extras docker-buildx-plugin
-          sudo apt-get install curl
-          curl -fsSL https://test.docker.com -o get-docker.sh
-          sudo sh ./get-docker.sh --version ${{ matrix.engine }}
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) test" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-ce=5:${{ matrix.engine }}.* docker-ce-cli=5:${{ matrix.engine }}.* containerd.io
 
       - name: Check Docker Version
         run: docker --version
@@ -244,7 +245,7 @@ jobs:
 
       - name: Gather coverage data
         if: ${{ matrix.mode == 'plugin' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-data-e2e-${{ env.MODE_ENGINE_PAIR }}
           path: bin/coverage/e2e/
@@ -278,13 +279,13 @@ jobs:
           go-version-file: '.go-version'
           check-latest: true
       - name: Download unit test coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: coverage-data-unit
           path: coverage/unit
           merge-multiple: true
       - name: Download E2E test coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: coverage-data-e2e-*
           path: coverage/e2e
@@ -293,7 +294,7 @@ jobs:
         run: |
           go tool covdata textfmt -i=./coverage/unit,./coverage/e2e -o ./coverage.txt
       - name: Store coverage report in GitHub Actions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: go-covdata-txt
           path: ./coverage.txt
