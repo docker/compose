@@ -1,1 +1,8 @@
 bin/
+.github/
+README.md
+BUILDING.md
+CONTRIBUTING.md
+logo.png
+pkg/e2e/fixtures/
+codecov.yml
