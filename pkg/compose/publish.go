@@ -42,6 +42,9 @@ import (
 	"github.com/docker/compose/v5/pkg/compose/transform"
 )
 
+
+var ErrPublishAborted = errors.New("publish aborted by user")
+
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	return Run(ctx, func(ctx context.Context) error {
 		return s.publish(ctx, project, repository, options)
@@ -59,7 +62,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 	if !accept {
-		return nil
+		return ErrPublishAborted
 	}
 	err = s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
 	if err != nil {
