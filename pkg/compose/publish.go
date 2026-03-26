@@ -197,8 +197,9 @@ func (s *composeService) createLayers(ctx context.Context, project *types.Projec
 func processExtends(ctx context.Context, project *types.Project, extFiles map[string]string) ([]v1.Descriptor, error) {
 	var layers []v1.Descriptor
 	moreExtFiles := map[string]string{}
+	envFiles := map[string]string{}
 	for xf, hash := range extFiles {
-		data, err := processFile(ctx, xf, project, moreExtFiles, nil)
+		data, err := processFile(ctx, xf, project, moreExtFiles, envFiles)
 		if err != nil {
 			return nil, err
 		}
