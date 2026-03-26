@@ -59,7 +59,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		return err
 	}
 	if !accept {
-		return nil
+		return api.ErrCanceled
 	}
 	err = s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
 	if err != nil {
