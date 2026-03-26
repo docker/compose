@@ -246,10 +246,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	}
 
 	monitor.withListener(func(event api.ContainerEvent) {
-		if event.Type != api.ContainerEventStarted {
-			return
-		}
-		if slices.Contains(attached, event.ID) && !event.Restarting {
+		if !shouldFollowStartEvent(event, attached, options.Start.AttachTo) {
 			return
 		}
 		eg.Go(func() error {
@@ -301,4 +298,17 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
+}
+
+func shouldFollowStartEvent(event api.ContainerEvent, attached []string, attachTo []string) bool {
+	if event.Type != api.ContainerEventStarted {
+		return false
+	}
+	if len(attachTo) > 0 && !slices.Contains(attachTo, event.Service) {
+		return false
+	}
+	if slices.Contains(attached, event.ID) && !event.Restarting {
+		return false
+	}
+	return true
 }
