@@ -102,7 +102,7 @@ func (s composeService) runWaitExec(ctx context.Context, execID string, service 
 		TTY:    service.Tty,
 	})
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// We miss a ContainerExecWait API
