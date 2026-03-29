@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/containerd/console"
+	"github.com/creack/pty"
 	"github.com/docker/cli/cli/streams"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -67,16 +67,14 @@ func TestRunHook_ConsoleSize(t *testing.T) {
 
 			// Create a PTY so GetTtySize() returns real non-zero dimensions,
 			// simulating an interactive terminal session.
-			pty, slavePath, err := console.NewPty()
+			ptmx, tty, err := pty.Open()
 			assert.NilError(t, err)
-			defer pty.Close() //nolint:errcheck
-			assert.NilError(t, pty.Resize(console.WinSize{Height: 24, Width: 80}))
-
-			slaveFile, err := os.OpenFile(slavePath, os.O_RDWR, 0)
-			assert.NilError(t, err)
-			defer slaveFile.Close() //nolint:errcheck
-
-			mockCli.EXPECT().Out().Return(streams.NewOut(slaveFile)).AnyTimes()
+			t.Cleanup(func() {
+				_ = ptmx.Close()
+				_ = tty.Close()
+			})
+			assert.NilError(t, pty.Setsize(ptmx, &pty.Winsize{Rows: 24, Cols: 80}))
+			mockCli.EXPECT().Out().Return(streams.NewOut(tty)).AnyTimes()
 
 			service := types.ServiceConfig{
 				Name: "test",

@@ -13,6 +13,7 @@ require (
 	github.com/containerd/containerd/v2 v2.2.2
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.3
+	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.31.1
 	github.com/docker/cli v29.2.1+incompatible
