@@ -15,9 +15,11 @@
 package compose
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -27,7 +29,6 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -153,10 +154,14 @@ func TestWatch_Sync(t *testing.T) {
 	clock.Advance(watch.QuietPeriod)
 	select {
 	case actual := <-syncer.synced:
-		require.ElementsMatch(t, []*sync.PathMapping{
+		expected := []*sync.PathMapping{
 			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 			{HostPath: "/sync/changed/sub", ContainerPath: "/work/changed/sub"},
-		}, actual)
+		}
+		slices.SortFunc(actual, func(a, b *sync.PathMapping) int {
+			return cmp.Compare(a.HostPath, b.HostPath)
+		})
+		assert.DeepEqual(t, expected, actual)
 	case <-time.After(100 * time.Millisecond):
 		t.Error("timeout")
 	}

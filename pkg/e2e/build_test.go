@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
 )
@@ -244,7 +244,7 @@ func TestBuildImageDependencies(t *testing.T) {
 			cli.RunDockerComposeCmd(t, "down", "--rmi=all", "-t=0")
 			res := cli.RunDockerOrExitError(t, "image", "rm", "build-dependencies-service")
 			if res.Error != nil {
-				require.Contains(t, res.Stderr(), `No such image: build-dependencies-service`)
+				assert.Assert(t, is.Contains(res.Stderr(), `No such image: build-dependencies-service`))
 			}
 		}
 		resetState()

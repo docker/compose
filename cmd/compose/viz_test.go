@@ -19,8 +19,7 @@ package compose
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 func TestPreferredIndentationStr(t *testing.T) {
@@ -84,10 +83,10 @@ func TestPreferredIndentationStr(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := preferredIndentationStr(tt.args.size, tt.args.useSpace)
 			if tt.wantErr {
-				require.Errorf(t, err, "preferredIndentationStr(%v, %v)", tt.args.size, tt.args.useSpace)
+				assert.ErrorContains(t, err, "invalid indentation size", "preferredIndentationStr(%v,%v)", tt.args.size, tt.args.useSpace)
 			} else {
-				require.NoError(t, err)
-				assert.Equalf(t, tt.want, got, "preferredIndentationStr(%v, %v)", tt.args.size, tt.args.useSpace)
+				assert.NilError(t, err)
+				assert.Equal(t, tt.want, got)
 			}
 		})
 	}

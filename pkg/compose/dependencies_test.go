@@ -24,9 +24,8 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	testify "github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -85,11 +84,11 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 		svc <- service
 		return nil
 	})
-	require.NoError(t, err, "Error during iteration")
+	assert.NilError(t, err, "Error during iteration")
 	close(svc)
 	<-done
 
-	testify.Len(t, seen, 101)
+	assert.Check(t, is.Len(seen, 101))
 	for svc, count := range seen {
 		assert.Equal(t, 1, count, "Service: %s", svc)
 	}
@@ -101,8 +100,8 @@ func TestInDependencyUpCommandOrder(t *testing.T) {
 		order = append(order, service)
 		return nil
 	})
-	require.NoError(t, err, "Error during iteration")
-	require.Equal(t, []string{"test3", "test2", "test1"}, order)
+	assert.NilError(t, err, "Error during iteration")
+	assert.DeepEqual(t, []string{"test3", "test2", "test1"}, order)
 }
 
 func TestInDependencyReverseDownCommandOrder(t *testing.T) {
@@ -111,8 +110,8 @@ func TestInDependencyReverseDownCommandOrder(t *testing.T) {
 		order = append(order, service)
 		return nil
 	})
-	require.NoError(t, err, "Error during iteration")
-	require.Equal(t, []string{"test1", "test2", "test3"}, order)
+	assert.NilError(t, err, "Error during iteration")
+	assert.DeepEqual(t, []string{"test1", "test2", "test3"}, order)
 }
 
 func TestBuildGraph(t *testing.T) {

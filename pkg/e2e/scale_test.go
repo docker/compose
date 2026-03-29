@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
@@ -182,7 +181,7 @@ func checkServiceContainer(t *testing.T, stdout, containerName, containerState s
 	if containerState != "" {
 		errMessage += fmt.Sprintf(" with expected state %s", containerState)
 	}
-	testify.Fail(t, errMessage, stdout)
+	t.Fatalf("%s\n%s", errMessage, stdout)
 }
 
 func TestScaleDownNoRecreate(t *testing.T) {

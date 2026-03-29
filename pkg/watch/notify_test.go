@@ -27,8 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 // Each implementation of the notify interface should have the same basic
@@ -126,7 +125,7 @@ func TestGitBranchSwitch(t *testing.T) {
 
 		if i != 0 {
 			err := os.RemoveAll(dir)
-			require.NoError(t, err)
+			assert.NilError(t, err)
 		}
 	}
 
@@ -149,7 +148,7 @@ func TestGitBranchSwitch(t *testing.T) {
 	f.assertEvents(path)
 
 	// Make sure there are no errors in the out stream
-	assert.Empty(t, f.out.String())
+	assert.Assert(t, f.out.String() == "")
 }
 
 func TestWatchesAreRecursive(t *testing.T) {
@@ -357,7 +356,7 @@ func TestWatchBrokenLink(t *testing.T) {
 
 	f.watch(newRoot.Path())
 	err = os.Remove(link)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	f.assertEvents(link)
 }
 

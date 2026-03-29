@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 func TestProjectHash(t *testing.T) {
@@ -53,15 +53,15 @@ func TestProjectHash(t *testing.T) {
 	}
 
 	hashA, ok := projectHash(projA)
-	require.True(t, ok)
-	require.NotEmpty(t, hashA)
+	assert.Assert(t, ok)
+	assert.Assert(t, hashA != "")
 	hashB, ok := projectHash(projB)
-	require.True(t, ok)
-	require.NotEmpty(t, hashB)
-	require.Equal(t, hashA, hashB)
+	assert.Assert(t, ok)
+	assert.Assert(t, hashB != "")
+	assert.Equal(t, hashA, hashB)
 
 	hashC, ok := projectHash(projC)
-	require.True(t, ok)
-	require.NotEmpty(t, hashC)
-	require.NotEqual(t, hashC, hashA)
+	assert.Assert(t, ok)
+	assert.Assert(t, hashC != "")
+	assert.Assert(t, hashC != hashA)
 }

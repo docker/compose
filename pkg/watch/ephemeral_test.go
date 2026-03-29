@@ -18,8 +18,7 @@ package watch_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/watch"
 )
@@ -37,12 +36,12 @@ func TestEphemeralPathMatcher(t *testing.T) {
 	matcher := watch.EphemeralPathMatcher()
 	for _, p := range ignored {
 		ok, err := matcher.Matches(p)
-		require.NoErrorf(t, err, "Matching %s", p)
-		assert.Truef(t, ok, "Path %s should have matched", p)
+		assert.NilError(t, err, "Matching %s", p)
+		assert.Assert(t, ok, "Path %s should have matched", p)
 	}
 
 	const includedPath = "normal.txt"
 	ok, err := matcher.Matches(includedPath)
-	require.NoErrorf(t, err, "Matching %s", includedPath)
-	assert.Falsef(t, ok, "Path %s should NOT have matched", includedPath)
+	assert.NilError(t, err, "Matching %s", includedPath)
+	assert.Assert(t, !ok, "Path %s should NOT have matched", includedPath)
 }
