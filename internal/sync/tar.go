@@ -73,10 +73,12 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 	var pathsToCopy []PathMapping
 	var pathsToDelete []string
 	for _, p := range paths {
-		if _, err := os.Stat(p.HostPath); err != nil && errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Stat(p.HostPath); err == nil {
+			pathsToCopy = append(pathsToCopy, *p)
+		} else if errors.Is(err, fs.ErrNotExist) {
 			pathsToDelete = append(pathsToDelete, p.ContainerPath)
 		} else {
-			pathsToCopy = append(pathsToCopy, *p)
+			return fmt.Errorf("stat %q: %w", p.HostPath, err)
 		}
 	}
 
