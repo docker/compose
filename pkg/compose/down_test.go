@@ -270,6 +270,82 @@ func TestDownRemoveVolumes(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+func TestDownAllRemovesInactiveProfileServicesAndOrphans(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	projectName := strings.ToLower(testProject)
+	project := &types.Project{
+		Name: projectName,
+		Services: types.Services{
+			"service1": {
+				Name: "service1",
+			},
+		},
+		DisabledServices: types.Services{
+			"service2": {
+				Name:     "service2",
+				Profiles: []string{"manual"},
+			},
+		},
+		Networks: types.Networks{
+			"default": {
+				Name: fmt.Sprintf("%s_default", projectName),
+			},
+		},
+		Volumes: types.Volumes{
+			"data": {
+				Name: fmt.Sprintf("%s_data", projectName),
+			},
+		},
+	}
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(true)).Return(
+		client.ContainerListResult{
+			Items: []container.Summary{
+				testContainer("service1", "123", false),
+				testContainer("service2", "456", false),
+				testContainer("service_orphan", "321", true),
+			},
+		}, nil)
+
+	stopOptions := client.ContainerStopOptions{}
+	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(client.ContainerStopResult{}, nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "456", stopOptions).Return(client.ContainerStopResult{}, nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "321", stopOptions).Return(client.ContainerStopResult{}, nil)
+
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(client.ContainerRemoveResult{}, nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "456", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(client.ContainerRemoveResult{}, nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "321", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
+
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(projectName).Add("label", networkFilter("default")),
+	}).Return(client.NetworkListResult{
+		Items: []network.Summary{{Network: network.Network{ID: "abc123", Name: fmt.Sprintf("%s_default", projectName)}}},
+	}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkInspectResult{
+		Network: network.Inspect{Network: network.Network{ID: "abc123"}},
+	}, nil)
+	api.EXPECT().NetworkRemove(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
+
+	api.EXPECT().VolumeInspect(gomock.Any(), fmt.Sprintf("%s_data", projectName), gomock.Any()).
+		Return(client.VolumeInspectResult{}, nil)
+	api.EXPECT().VolumeRemove(gomock.Any(), fmt.Sprintf("%s_data", projectName), client.VolumeRemoveOptions{Force: true}).
+		Return(client.VolumeRemoveResult{}, nil)
+
+	err = tested.Down(t.Context(), projectName, compose.DownOptions{
+		All:      true,
+		Project:  project,
+		Volumes:  true,
+		Services: []string{"service1"},
+	})
+	assert.NilError(t, err)
+}
+
 func TestDownRemoveImages(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

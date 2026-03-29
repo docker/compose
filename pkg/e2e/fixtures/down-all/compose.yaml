@@ -1,0 +1,28 @@
+services:
+  foo:
+    image: alpine
+    command: tail -f /dev/null
+    stop_grace_period: 1s
+    networks:
+      - wipe
+    volumes:
+      - shared:/data
+
+  bar:
+    profiles:
+      - manual
+    depends_on:
+      - foo
+    image: alpine
+    command: tail -f /dev/null
+    stop_grace_period: 1s
+    networks:
+      - wipe
+    volumes:
+      - shared:/data
+
+volumes:
+  shared:
+
+networks:
+  wipe:

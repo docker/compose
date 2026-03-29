@@ -205,3 +205,39 @@ func TestDotEnvProfileUsage(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: profiledService})
 	})
 }
+
+func TestDownAllRemovesInactiveProfileResources(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "compose-e2e-down-all"
+	const composeFile = "./fixtures/down-all/compose.yaml"
+
+	t.Cleanup(func() {
+		_ = c.RunDockerComposeCmdNoCheck(t, "-f", composeFile, "-p", projectName, "down", "--all", "-v", "-t", "0")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", composeFile, "-p", projectName, "up", "-d", "bar")
+
+	c.RunDockerComposeCmd(t, "-f", composeFile, "-p", projectName, "down", "--remove-orphans", "-v", "-t", "0")
+
+	res := c.RunDockerCmd(t, "ps", "--all", "--format", "{{.Names}}")
+	assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-foo-1"), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), projectName+"-bar-1"), res.Combined())
+
+	res = c.RunDockerCmd(t, "network", "ls")
+	assert.Assert(t, strings.Contains(res.Combined(), projectName+"_wipe"), res.Combined())
+
+	res = c.RunDockerCmd(t, "volume", "ls")
+	assert.Assert(t, strings.Contains(res.Combined(), projectName+"_shared"), res.Combined())
+
+	c.RunDockerComposeCmd(t, "-f", composeFile, "-p", projectName, "down", "--all", "-v", "-t", "0")
+
+	res = c.RunDockerCmd(t, "ps", "--all", "--format", "{{.Names}}")
+	assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-foo-1"), res.Combined())
+	assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-bar-1"), res.Combined())
+
+	res = c.RunDockerCmd(t, "network", "ls")
+	assert.Assert(t, !strings.Contains(res.Combined(), projectName+"_wipe"), res.Combined())
+
+	res = c.RunDockerCmd(t, "volume", "ls")
+	assert.Assert(t, !strings.Contains(res.Combined(), projectName+"_shared"), res.Combined())
+}

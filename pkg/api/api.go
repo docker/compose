@@ -339,6 +339,8 @@ type UpOptions struct {
 
 // DownOptions group options of the Down API
 type DownOptions struct {
+	// All performs a complete project cleanup, including inactive profile services and orphan containers
+	All bool
 	// RemoveOrphans will cleanup containers that are not declared on the compose model but own the same labels
 	RemoveOrphans bool
 	// Project is the compose project used to define this app. Might be nil if user ran `down` just with project name

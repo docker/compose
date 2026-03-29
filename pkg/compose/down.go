@@ -44,6 +44,11 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error { //nolint:gocyclo
 	resourceToRemove := false
 
+	if options.All {
+		options.RemoveOrphans = true
+		options.Services = nil
+	}
+
 	include := oneOffExclude
 	if options.RemoveOrphans {
 		include = oneOffInclude
@@ -56,6 +61,12 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	project := options.Project
 	if project == nil {
 		project, err = s.getProjectWithResources(ctx, containers, projectName)
+		if err != nil {
+			return err
+		}
+	}
+	if options.All {
+		project, err = project.WithProfiles([]string{"*"})
 		if err != nil {
 			return err
 		}

@@ -14,10 +14,26 @@ long: |-
     Anonymous volumes are not removed by default. However, as they don’t have a stable name, they are not automatically
     mounted by a subsequent `up`. For data that needs to persist between updates, use explicit paths as bind mounts or
     named volumes.
+
+    Use `--all` to remove every resource for the project, including services from inactive profiles and orphan containers.
 usage: docker compose down [OPTIONS] [SERVICES]
 pname: docker compose
 plink: docker_compose.yaml
+examples: |-
+    docker compose down
+    docker compose down -v --remove-orphans
+    docker compose down --all -v
 options:
+    - option: all
+      value_type: bool
+      default_value: "false"
+      description: Remove all resources for the project, including inactive profile services and orphan containers
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: remove-orphans
       value_type: bool
       default_value: "false"
@@ -78,4 +94,3 @@ experimental: false
 experimentalcli: false
 kubernetes: false
 swarm: false
-
