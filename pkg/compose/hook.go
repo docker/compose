@@ -31,7 +31,7 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
-func (s composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
+func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
 	wOut := utils.GetWriter(func(line string) {
 		listener(api.ContainerEvent{
 			Type:    api.HookEventLog,
@@ -96,7 +96,7 @@ func (s composeService) runHook(ctx context.Context, ctr container.Summary, serv
 	return nil
 }
 
-func (s composeService) runWaitExec(ctx context.Context, execID string, service types.ServiceConfig, listener api.ContainerEventListener) error {
+func (s *composeService) runWaitExec(ctx context.Context, execID string, service types.ServiceConfig, listener api.ContainerEventListener) error {
 	_, err := s.apiClient().ExecStart(ctx, execID, client.ExecStartOptions{
 		Detach: listener == nil,
 		TTY:    service.Tty,
