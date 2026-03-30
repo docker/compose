@@ -215,6 +215,9 @@ type composeService struct {
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
+
+	runtimeVersion    runtimeVersionCache
+	currentAPIVersion runtimeVersionCache
 }
 
 // Close releases any connections/resources held by the underlying clients.
@@ -497,16 +500,43 @@ type runtimeVersionCache struct {
 	err  error
 }
 
-var runtimeVersion runtimeVersionCache
-
+// RuntimeVersion returns the raw API version reported by the daemon.
+// Callers that need the negotiated/effective client API version should use
+// CurrentAPIVersion instead.
 func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
-	// TODO(thaJeztah): this should use Client.ClientVersion), which has the negotiated version.
-	runtimeVersion.once.Do(func() {
+	s.runtimeVersion.once.Do(func() {
 		version, err := s.apiClient().ServerVersion(ctx, client.ServerVersionOptions{})
 		if err != nil {
-			runtimeVersion.err = err
+			s.runtimeVersion.err = err
+			return
 		}
-		runtimeVersion.val = version.APIVersion
+		s.runtimeVersion.val = version.APIVersion
 	})
-	return runtimeVersion.val, runtimeVersion.err
+	return s.runtimeVersion.val, s.runtimeVersion.err
+}
+
+// CurrentAPIVersion returns the API version currently used by the Docker client.
+// Trigger negotiation first so version-gated request shaping matches the version
+// that subsequent API calls will actually use.
+func (s *composeService) CurrentAPIVersion(ctx context.Context) (string, error) {
+	s.currentAPIVersion.once.Do(func() {
+		cli := s.apiClient()
+		_, err := cli.Ping(ctx, client.PingOptions{NegotiateAPIVersion: true})
+		if err != nil {
+			s.currentAPIVersion.err = err
+			return
+		}
+
+		version := cli.ClientVersion()
+		if version != "" {
+			s.currentAPIVersion.val = version
+			return
+		}
+
+		// Defensive fallback for unexpected client implementations or mocks that
+		// do not populate ClientVersion after a successful negotiated ping.
+		s.currentAPIVersion.val, s.currentAPIVersion.err = s.RuntimeVersion(ctx)
+	})
+
+	return s.currentAPIVersion.val, s.currentAPIVersion.err
 }

@@ -411,11 +411,10 @@ func TestCreateMobyContainer(t *testing.T) {
 	apiClient.EXPECT().DaemonHost().Return("").AnyTimes()
 	apiClient.EXPECT().ImageInspect(anyCancellableContext(), gomock.Any()).Return(client.ImageInspectResult{}, nil).AnyTimes()
 
-	// force `RuntimeVersion` to fetch fresh version
-	runtimeVersion = runtimeVersionCache{}
-	apiClient.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).Return(client.ServerVersionResult{
+	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{
 		APIVersion: "1.44",
 	}, nil).AnyTimes()
+	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
 
 	service := types.ServiceConfig{
 		Name: "test",
@@ -497,4 +496,28 @@ func TestCreateMobyContainer(t *testing.T) {
 	}
 	assert.DeepEqual(t, want, got, cmpopts.EquateComparable(netip.Addr{}), cmpopts.EquateEmpty())
 	assert.NilError(t, err)
+}
+
+func TestCurrentAPIVersionCachesNegotiation(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested := &composeService{dockerCli: cli}
+
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+
+	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{
+		APIVersion: "1.44",
+	}, nil).Times(1)
+	apiClient.EXPECT().ClientVersion().Return("1.43").Times(1)
+
+	version, err := tested.CurrentAPIVersion(t.Context())
+	assert.NilError(t, err)
+	assert.Equal(t, version, "1.43")
+
+	version, err = tested.CurrentAPIVersion(t.Context())
+	assert.NilError(t, err)
+	assert.Equal(t, version, "1.43")
 }
