@@ -494,49 +494,62 @@ func (s *composeService) isSwarmEnabled(ctx context.Context) (bool, error) {
 	return swarmEnabled.val, swarmEnabled.err
 }
 
+// runtimeVersionCache caches a version string after a successful lookup.
+// Errors (including context cancellation) are not cached so that
+// subsequent calls can retry with a fresh context.
 type runtimeVersionCache struct {
-	once sync.Once
-	val  string
-	err  error
+	mu  sync.Mutex
+	val string
 }
 
 // RuntimeVersion returns the raw API version reported by the daemon.
 // Callers that need the negotiated/effective client API version should use
 // CurrentAPIVersion instead.
 func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
-	s.runtimeVersion.once.Do(func() {
-		version, err := s.apiClient().ServerVersion(ctx, client.ServerVersionOptions{})
-		if err != nil {
-			s.runtimeVersion.err = err
-			return
-		}
-		s.runtimeVersion.val = version.APIVersion
-	})
-	return s.runtimeVersion.val, s.runtimeVersion.err
+	s.runtimeVersion.mu.Lock()
+	defer s.runtimeVersion.mu.Unlock()
+	if s.runtimeVersion.val != "" {
+		return s.runtimeVersion.val, nil
+	}
+	version, err := s.apiClient().ServerVersion(ctx, client.ServerVersionOptions{})
+	if err != nil {
+		return "", err
+	}
+	s.runtimeVersion.val = version.APIVersion
+	return s.runtimeVersion.val, nil
 }
 
 // CurrentAPIVersion returns the API version currently used by the Docker client.
 // Trigger negotiation first so version-gated request shaping matches the version
 // that subsequent API calls will actually use.
+//
+// Lock ordering: currentAPIVersion.mu must be acquired before runtimeVersion.mu
+// (via the RuntimeVersion fallback). No code path should reverse this order.
 func (s *composeService) CurrentAPIVersion(ctx context.Context) (string, error) {
-	s.currentAPIVersion.once.Do(func() {
-		cli := s.apiClient()
-		_, err := cli.Ping(ctx, client.PingOptions{NegotiateAPIVersion: true})
-		if err != nil {
-			s.currentAPIVersion.err = err
-			return
-		}
+	s.currentAPIVersion.mu.Lock()
+	defer s.currentAPIVersion.mu.Unlock()
+	if s.currentAPIVersion.val != "" {
+		return s.currentAPIVersion.val, nil
+	}
 
-		version := cli.ClientVersion()
-		if version != "" {
-			s.currentAPIVersion.val = version
-			return
-		}
+	cli := s.apiClient()
+	_, err := cli.Ping(ctx, client.PingOptions{NegotiateAPIVersion: true})
+	if err != nil {
+		return "", err
+	}
 
-		// Defensive fallback for unexpected client implementations or mocks that
-		// do not populate ClientVersion after a successful negotiated ping.
-		s.currentAPIVersion.val, s.currentAPIVersion.err = s.RuntimeVersion(ctx)
-	})
+	version := cli.ClientVersion()
+	if version != "" {
+		s.currentAPIVersion.val = version
+		return s.currentAPIVersion.val, nil
+	}
 
-	return s.currentAPIVersion.val, s.currentAPIVersion.err
+	// Defensive fallback for unexpected client implementations or mocks that
+	// do not populate ClientVersion after a successful negotiated ping.
+	val, err := s.RuntimeVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+	s.currentAPIVersion.val = val
+	return s.currentAPIVersion.val, nil
 }

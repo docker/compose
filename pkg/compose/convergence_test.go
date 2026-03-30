@@ -521,3 +521,68 @@ func TestCurrentAPIVersionCachesNegotiation(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, version, "1.43")
 }
+
+func TestRuntimeVersionRetriesOnTransientError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested := &composeService{dockerCli: cli}
+
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+
+	// First call: ServerVersion fails with a transient error
+	firstCall := apiClient.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).
+		Return(client.ServerVersionResult{}, context.DeadlineExceeded).Times(1)
+
+	// Second call: succeeds
+	apiClient.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).
+		Return(client.ServerVersionResult{APIVersion: "1.48"}, nil).Times(1).After(firstCall)
+
+	_, err := tested.RuntimeVersion(t.Context())
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+
+	version, err := tested.RuntimeVersion(t.Context())
+	assert.NilError(t, err)
+	assert.Equal(t, version, "1.48")
+
+	// Third call returns cached value
+	version, err = tested.RuntimeVersion(t.Context())
+	assert.NilError(t, err)
+	assert.Equal(t, version, "1.48")
+}
+
+func TestCurrentAPIVersionRetriesOnTransientError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested := &composeService{dockerCli: cli}
+
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+
+	// First call: Ping fails with a transient error
+	firstCall := apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{}, context.DeadlineExceeded).Times(1)
+
+	// Second call: Ping succeeds after the transient failure
+	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: "1.44"}, nil).Times(1).After(firstCall)
+	apiClient.EXPECT().ClientVersion().Return("1.44").Times(1)
+
+	// First call should return the transient error
+	_, err := tested.CurrentAPIVersion(t.Context())
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+
+	// Second call should succeed — error was not cached
+	version, err := tested.CurrentAPIVersion(t.Context())
+	assert.NilError(t, err)
+	assert.Equal(t, version, "1.44")
+
+	// Third call should return the cached value without calling Ping again
+	version, err = tested.CurrentAPIVersion(t.Context())
+	assert.NilError(t, err)
+	assert.Equal(t, version, "1.44")
+}
