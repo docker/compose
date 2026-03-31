@@ -17,6 +17,8 @@
 package compose
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -99,4 +101,32 @@ services:
 	assert.DeepEqual(t, expectedLayers, layers, cmp.FilterPath(func(path cmp.Path) bool {
 		return !slices.Contains([]string{".Data", ".Digest", ".Size"}, path.String())
 	}, cmp.Ignore()))
+}
+
+func TestComposeFileAsByteReaderWithShortFormPortsAndInterpolation(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	err := os.WriteFile(composePath, []byte(`name: publish-test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+`), 0o600)
+	assert.NilError(t, err)
+
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir: dir,
+		Environment: types.Mapping{
+			"DASHBOARD_PORT": "",
+		},
+		ConfigFiles: []types.ConfigFile{
+			{Filename: composePath},
+		},
+	})
+	assert.NilError(t, err)
+
+	reader, err := composeFileAsByteReader(t.Context(), composePath, project)
+	assert.NilError(t, err)
+	assert.Assert(t, reader != nil)
 }

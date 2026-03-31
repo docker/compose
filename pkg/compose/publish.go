@@ -36,6 +36,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/internal/oci"
 	"github.com/docker/compose/v5/pkg/api"
@@ -183,12 +184,12 @@ func (s *composeService) createLayers(ctx context.Context, project *types.Projec
 	}
 
 	if options.ResolveImageDigests {
-		yaml, err := s.generateImageDigestsOverride(ctx, project)
+		overrideYAML, err := s.generateImageDigestsOverride(ctx, project)
 		if err != nil {
 			return nil, err
 		}
 
-		layerDescriptor := oci.DescriptorForComposeFile("image-digests.yaml", yaml)
+		layerDescriptor := oci.DescriptorForComposeFile("image-digests.yaml", overrideYAML)
 		layers = append(layers, layerDescriptor)
 	}
 	return layers, nil
@@ -437,6 +438,39 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 		allFindings = append(allFindings, findings...)
 	}
 	for _, service := range project.Services {
+		if len(service.Environment) == 0 {
+			continue
+		}
+
+		environment := map[string]string{}
+		for key, value := range service.Environment {
+			if value == nil {
+				continue
+			}
+			environment[key] = *value
+		}
+		if len(environment) == 0 {
+			continue
+		}
+
+		in, err := yaml.Marshal(map[string]any{
+			"services": map[string]any{
+				service.Name: map[string]any{
+					"environment": environment,
+				},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		findings, err := scan.ScanReader(bytes.NewReader(in))
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan environment for service %s: %w", service.Name, err)
+		}
+		allFindings = append(allFindings, findings...)
+	}
+	for _, service := range project.Services {
 		// Check env files
 		for _, envFile := range service.EnvFiles {
 			findings, err := scan.ScanFile(envFile.Path)
@@ -477,7 +511,7 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 	if err != nil {
 		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
 	}
-	base, err := loader.LoadWithContext(ctx, types.ConfigDetails{
+	model, err := loader.LoadModelWithContext(ctx, types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
 		Environment: project.Environment,
 		ConfigFiles: []types.ConfigFile{
@@ -497,8 +531,7 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 	if err != nil {
 		return nil, err
 	}
-
-	in, err := base.MarshalYAML()
+	in, err := yaml.Marshal(model)
 	if err != nil {
 		return nil, err
 	}

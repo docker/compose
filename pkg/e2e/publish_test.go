@@ -18,6 +18,8 @@ package e2e
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -55,6 +57,23 @@ or remove sensitive data from your Compose configuration
 
 	t.Run("publish success env_file", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/compose-env-file.yml",
+			"-p", projectName, "publish", "test/test", "--with-env", "-y", "--dry-run")
+		assert.Assert(t, strings.Contains(res.Combined(), "test/test publishing"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
+	})
+
+	t.Run("publish success short-form port mapping", func(t *testing.T) {
+		dir := t.TempDir()
+		composePath := filepath.Join(dir, "compose-short-port.yml")
+		err := os.WriteFile(composePath, []byte(`services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+`), 0o600)
+		assert.NilError(t, err)
+
+		res := c.RunDockerComposeCmd(t, "-f", composePath,
 			"-p", projectName, "publish", "test/test", "--with-env", "-y", "--dry-run")
 		assert.Assert(t, strings.Contains(res.Combined(), "test/test publishing"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
