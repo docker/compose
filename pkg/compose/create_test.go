@@ -273,6 +273,30 @@ func TestDefaultNetworkSettings(t *testing.T) {
 		assert.Check(t, cmp.Nil(networkConfig))
 	})
 
+	t.Run("returns only primary network in EndpointsConfig for API < 1.44", func(t *testing.T) {
+		service := composetypes.ServiceConfig{
+			Name: "myService",
+			Networks: map[string]*composetypes.ServiceNetworkConfig{
+				"myNetwork1": {Priority: 10},
+				"myNetwork2": {Priority: 1000},
+			},
+		}
+		project := composetypes.Project{
+			Name:     "myProject",
+			Services: composetypes.Services{"myService": service},
+			Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{
+				"myNetwork1": {Name: "myProject_myNetwork1"},
+				"myNetwork2": {Name: "myProject_myNetwork2"},
+			}),
+		}
+
+		networkMode, networkConfig, err := defaultNetworkSettings(&project, service, 1, nil, true, "1.43")
+		assert.NilError(t, err)
+		assert.Equal(t, string(networkMode), "myProject_myNetwork2")
+		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 1))
+		assert.Check(t, cmp.Contains(networkConfig.EndpointsConfig, "myProject_myNetwork2"))
+	})
+
 	t.Run("returns defined network mode if explicitly set", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
 			Name:        "myService",
