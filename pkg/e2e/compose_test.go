@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 )
 
@@ -166,7 +166,7 @@ func TestInitContainer(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/init-container", "up", "--menu=false")
 	defer c.RunDockerComposeCmd(t, "-p", "init-container", "down")
-	testify.Regexp(t, "foo-1  | hello(?m:.*)bar-1  | world", res.Stdout())
+	assert.Assert(t, is.Regexp("foo-1  | hello(?m:.*)bar-1  | world", res.Stdout()))
 }
 
 func TestRm(t *testing.T) {

@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 )
 
@@ -42,7 +42,7 @@ func TestStartStop(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-no-dependencies-simple-1 Started"), res.Combined())
 
 		res = c.RunDockerComposeCmd(t, "ls", "--all")
-		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
+		assert.Assert(t, is.Regexp(getProjectRegx("running"), res.Stdout()))
 
 		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps")
 		assertServiceStatus(t, projectName, "simple", "Up", res.Stdout())
@@ -56,7 +56,7 @@ func TestStartStop(t *testing.T) {
 		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-no-dependencies"), res.Combined())
 
 		res = c.RunDockerComposeCmd(t, "ls", "--all")
-		testify.Regexp(t, getProjectRegx("exited"), res.Stdout())
+		assert.Assert(t, is.Regexp(getProjectRegx("exited"), res.Stdout()))
 
 		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps")
 		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-no-dependencies-words-1"), res.Combined())
@@ -70,7 +70,7 @@ func TestStartStop(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "start")
 
 		res := c.RunDockerComposeCmd(t, "ls")
-		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
+		assert.Assert(t, is.Regexp(getProjectRegx("running"), res.Stdout()))
 	})
 
 	t.Run("down", func(t *testing.T) {

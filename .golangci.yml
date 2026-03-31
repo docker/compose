@@ -39,6 +39,12 @@ linters:
               desc: use stdlib slices package
             - pkg: gopkg.in/yaml.v2
               desc: compose-go uses yaml.v3
+            - pkg: github.com/stretchr/testify/assert
+              desc: Use "gotest.tools/v3/assert" instead
+            - pkg: github.com/stretchr/testify/require
+              desc: Use "gotest.tools/v3/assert" instead
+            - pkg: github.com/stretchr/testify/suite
+              desc: Do not use
     forbidigo:
       analyze-types: true
       forbid:

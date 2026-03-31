@@ -34,17 +34,17 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       -
         name: Upload reference YAML docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: docs-yaml
           path: docs/reference
           retention-days: 1
 
   validate:
-    uses: docker/docs/.github/workflows/validate-upstream.yml@main
+    uses: docker/docs/.github/workflows/validate-upstream.yml@464a44a6e72b37cf1755968477e242a5e5f6ef7d # main 2026-03-24
     needs:
       - docs-yaml
     with:

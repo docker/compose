@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 func TestClientPing(t *testing.T) {
@@ -41,8 +41,8 @@ func TestClientPing(t *testing.T) {
 	now := time.Now()
 
 	ret, err := client.Ping(t.Context())
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	serverTime := time.Unix(0, ret.ServerTime)
-	require.True(t, now.Before(serverTime))
+	assert.Assert(t, now.Before(serverTime))
 }

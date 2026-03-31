@@ -27,8 +27,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -56,15 +56,14 @@ func TestApplyPlatforms_InferFromRuntime(t *testing.T) {
 
 	t.Run("SinglePlatform", func(t *testing.T) {
 		project := makeProject()
-		require.NoError(t, applyPlatforms(project, true))
-		require.EqualValues(t, []string{"alice/32"}, project.Services["test"].Build.Platforms)
+		assert.NilError(t, applyPlatforms(project, true))
+		assert.DeepEqual(t, types.StringList{"alice/32"}, project.Services["test"].Build.Platforms)
 	})
 
 	t.Run("MultiPlatform", func(t *testing.T) {
 		project := makeProject()
-		require.NoError(t, applyPlatforms(project, false))
-		require.EqualValues(t, []string{"linux/amd64", "linux/arm64", "alice/32"},
-			project.Services["test"].Build.Platforms)
+		assert.NilError(t, applyPlatforms(project, false))
+		assert.DeepEqual(t, types.StringList{"linux/amd64", "linux/arm64", "alice/32"}, project.Services["test"].Build.Platforms)
 	})
 }
 
@@ -92,15 +91,14 @@ func TestApplyPlatforms_DockerDefaultPlatform(t *testing.T) {
 
 	t.Run("SinglePlatform", func(t *testing.T) {
 		project := makeProject()
-		require.NoError(t, applyPlatforms(project, true))
-		require.EqualValues(t, []string{"linux/amd64"}, project.Services["test"].Build.Platforms)
+		assert.NilError(t, applyPlatforms(project, true))
+		assert.DeepEqual(t, types.StringList{"linux/amd64"}, project.Services["test"].Build.Platforms)
 	})
 
 	t.Run("MultiPlatform", func(t *testing.T) {
 		project := makeProject()
-		require.NoError(t, applyPlatforms(project, false))
-		require.EqualValues(t, []string{"linux/amd64", "linux/arm64"},
-			project.Services["test"].Build.Platforms)
+		assert.NilError(t, applyPlatforms(project, false))
+		assert.DeepEqual(t, types.StringList{"linux/amd64", "linux/arm64"}, project.Services["test"].Build.Platforms)
 	})
 }
 
@@ -128,13 +126,13 @@ func TestApplyPlatforms_UnsupportedPlatform(t *testing.T) {
 
 	t.Run("SinglePlatform", func(t *testing.T) {
 		project := makeProject()
-		require.EqualError(t, applyPlatforms(project, true),
+		assert.Error(t, applyPlatforms(project, true),
 			`service "test" build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: commodore/64`)
 	})
 
 	t.Run("MultiPlatform", func(t *testing.T) {
 		project := makeProject()
-		require.EqualError(t, applyPlatforms(project, false),
+		assert.Error(t, applyPlatforms(project, false),
 			`service "test" build.platforms does not support value set by DOCKER_DEFAULT_PLATFORM: commodore/64`)
 	})
 }
@@ -179,7 +177,7 @@ func TestIsRemoteConfig(t *testing.T) {
 				},
 			}
 			got := isRemoteConfig(cli, opts)
-			require.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -206,7 +204,7 @@ func TestDisplayLocationRemoteStack(t *testing.T) {
 	displayLocationRemoteStack(cli, project, options)
 
 	output := buf.String()
-	require.Equal(t, output, fmt.Sprintf("Your compose stack %q is stored in %q\n", "oci://registry.example.com/stack:latest", "/tmp/test"))
+	assert.Equal(t, output, fmt.Sprintf("Your compose stack %q is stored in %q\n", "oci://registry.example.com/stack:latest", "/tmp/test"))
 }
 
 func TestDisplayInterpolationVariables(t *testing.T) {
@@ -227,7 +225,7 @@ services:
       - UNSET_VAR                       # optional without default
 `
 	composePath := filepath.Join(tmpDir, "docker-compose.yml")
-	require.NoError(t, os.WriteFile(composePath, []byte(composeContent), 0o644))
+	assert.NilError(t, os.WriteFile(composePath, []byte(composeContent), 0o644))
 
 	buf := new(bytes.Buffer)
 	cli := mocks.NewMockCli(ctrl)
@@ -244,8 +242,8 @@ services:
 
 	// Extract variables from the model
 	info, noVariables, err := extractInterpolationVariablesFromModel(t.Context(), cli, projectOptions, []string{})
-	require.NoError(t, err)
-	require.False(t, noVariables)
+	assert.NilError(t, err)
+	assert.Assert(t, noVariables == false)
 
 	// Display the variables
 	displayInterpolationVariables(cli.Out(), info)
@@ -267,7 +265,7 @@ services:
 	actualOutput := buf.String()
 
 	// Compare normalized strings
-	require.Equal(t,
+	assert.Equal(t,
 		normalizeSpaces(expected),
 		normalizeSpaces(actualOutput),
 		"\nExpected:\n%s\nGot:\n%s", expected, actualOutput)
@@ -370,14 +368,13 @@ func TestConfirmRemoteIncludes(t *testing.T) {
 			err := confirmRemoteIncludes(cli, tt.opts, tt.assumeYes)
 
 			if tt.wantErr {
-				require.Error(t, err)
-				require.Equal(t, tt.errMessage, err.Error())
+				assert.Error(t, err, tt.errMessage)
 			} else {
-				require.NoError(t, err)
+				assert.NilError(t, err)
 			}
 
 			if tt.wantOutput != "" {
-				require.Equal(t, tt.wantOutput, buf.String())
+				assert.Equal(t, tt.wantOutput, buf.String())
 			}
 			buf.Reset()
 		})

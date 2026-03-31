@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
 
@@ -61,10 +61,11 @@ func TestPause(t *testing.T) {
 	if resp != nil {
 		_ = resp.Body.Close()
 	}
-	require.Error(t, err, "a should no longer respond")
+	assert.Assert(t, err != nil, "a should no longer respond")
 	var netErr net.Error
+	assert.ErrorType(t, err, &netErr, "expected a network error")
 	errors.As(err, &netErr)
-	require.True(t, netErr.Timeout(), "Error should have indicated a timeout")
+	assert.Assert(t, netErr.Timeout(), "Error should have indicated a timeout")
 	HTTPGetWithRetry(t, urls["b"], http.StatusOK, 50*time.Millisecond, 5*time.Second)
 
 	// unpause a and verify that both containers work again
@@ -147,14 +148,16 @@ func publishedPortForService(t testing.TB, cli *CLI, service string, targetPort 
 			PublishedPort int
 		}
 	}
-	require.NoError(t, json.Unmarshal([]byte(res.Stdout()), &svc),
+	assert.NilError(t, json.Unmarshal([]byte(res.Stdout()), &svc),
 		"Failed to parse `%s` output", res.Cmd.String())
+	var found bool
+	var port int
 	for _, pp := range svc.Publishers {
 		if pp.TargetPort == targetPort {
-			return pp.PublishedPort
+			found = true
+			port = pp.PublishedPort
 		}
 	}
-	require.Failf(t, "No published port for target port",
-		"Target port: %d\nService: %s", targetPort, res.Combined())
-	return -1
+	assert.Assert(t, found, "No published port for target port %d\nService: %s", targetPort, res.Combined())
+	return port
 }

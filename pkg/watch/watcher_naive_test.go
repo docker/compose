@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 func TestDontWatchEachFile(t *testing.T) {
@@ -113,7 +113,7 @@ func TestDontWatchEachFile(t *testing.T) {
 	f.events = nil
 
 	n, err := inotifyNodes()
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	if n > 10 {
 		t.Fatalf("watching more than 10 files: %d", n)
 	}
@@ -152,7 +152,7 @@ func TestDontRecurseWhenWatchingParentsOfNonExistentFiles(t *testing.T) {
 	f.fsync()
 
 	n, err := inotifyNodes()
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	if n > 5 {
 		t.Fatalf("watching more than 5 files: %d", n)
 	}

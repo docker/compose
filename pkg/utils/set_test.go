@@ -15,27 +15,34 @@
 package utils
 
 import (
+	"slices"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 func TestSet_Has(t *testing.T) {
 	x := NewSet[string]("value")
-	require.True(t, x.Has("value"))
-	require.False(t, x.Has("VALUE"))
+	assert.Check(t, x.Has("value"))
+	assert.Check(t, !x.Has("VALUE"))
 }
 
 func TestSet_Diff(t *testing.T) {
 	a := NewSet[int](1, 2)
 	b := NewSet[int](2, 3)
-	require.ElementsMatch(t, []int{1}, a.Diff(b).Elements())
-	require.ElementsMatch(t, []int{3}, b.Diff(a).Elements())
+	assert.DeepEqual(t, []int{1}, a.Diff(b).Elements())
+	assert.DeepEqual(t, []int{3}, b.Diff(a).Elements())
 }
 
 func TestSet_Union(t *testing.T) {
 	a := NewSet[int](1, 2)
 	b := NewSet[int](2, 3)
-	require.ElementsMatch(t, []int{1, 2, 3}, a.Union(b).Elements())
-	require.ElementsMatch(t, []int{1, 2, 3}, b.Union(a).Elements())
+
+	actual := a.Union(b).Elements()
+	slices.Sort(actual)
+	assert.DeepEqual(t, []int{1, 2, 3}, actual)
+
+	actual = b.Union(a).Elements()
+	slices.Sort(actual)
+	assert.DeepEqual(t, []int{1, 2, 3}, actual)
 }

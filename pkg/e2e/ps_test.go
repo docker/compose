@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -33,25 +33,25 @@ func TestPs(t *testing.T) {
 	const projectName = "e2e-ps"
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "up", "-d")
-	require.NoError(t, res.Error)
+	assert.NilError(t, res.Error)
 	t.Cleanup(func() {
 		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
 
-	assert.Contains(t, res.Combined(), "Container e2e-ps-busybox-1 Started", res.Combined())
+	assert.Assert(t, is.Contains(res.Combined(), "Container e2e-ps-busybox-1 Started"))
 
 	t.Run("table", func(t *testing.T) {
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
 		lines := strings.Split(res.Stdout(), "\n")
-		assert.Len(t, lines, 4)
+		assert.Assert(t, is.Len(lines, 4))
 		count := 0
 		for _, line := range lines[1:3] {
 			if strings.Contains(line, "e2e-ps-busybox-1") {
-				assert.Contains(t, line, "127.0.0.1:8001->8000/tcp")
+				assert.Assert(t, is.Contains(line, "127.0.0.1:8001->8000/tcp"))
 				count++
 			}
 			if strings.Contains(line, "e2e-ps-nginx-1") {
-				assert.Contains(t, line, "80/tcp, 443/tcp, 8080/tcp")
+				assert.Assert(t, is.Contains(line, "80/tcp, 443/tcp, 8080/tcp"))
 				count++
 			}
 		}
@@ -71,18 +71,18 @@ func TestPs(t *testing.T) {
 		dec := json.NewDecoder(strings.NewReader(out))
 		for dec.More() {
 			var s element
-			require.NoError(t, dec.Decode(&s), "Failed to unmarshal ps JSON output")
+			assert.NilError(t, dec.Decode(&s), "Failed to unmarshal ps JSON output")
 			output = append(output, s)
 		}
 
 		count := 0
-		assert.Len(t, output, 2)
+		assert.Assert(t, is.Len(output, 2))
 		for _, service := range output {
 			assert.Equal(t, projectName, service.Project)
 			publishers := service.Publishers
 			if service.Name == "e2e-ps-busybox-1" {
-				assert.Len(t, publishers, 1)
-				assert.Equal(t, api.PortPublishers{
+				assert.Assert(t, is.Len(publishers, 1))
+				assert.DeepEqual(t, api.PortPublishers{
 					{
 						URL:           "127.0.0.1",
 						TargetPort:    8000,
@@ -93,8 +93,8 @@ func TestPs(t *testing.T) {
 				count++
 			}
 			if service.Name == "e2e-ps-nginx-1" {
-				assert.Len(t, publishers, 3)
-				assert.Equal(t, api.PortPublishers{
+				assert.Assert(t, is.Len(publishers, 3))
+				assert.DeepEqual(t, api.PortPublishers{
 					{TargetPort: 80, Protocol: "tcp"},
 					{TargetPort: 443, Protocol: "tcp"},
 					{TargetPort: 8080, Protocol: "tcp"},
@@ -108,20 +108,20 @@ func TestPs(t *testing.T) {
 
 	t.Run("ps --all", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "stop")
-		require.NoError(t, res.Error)
+		assert.NilError(t, res.Error)
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
 		lines := strings.Split(res.Stdout(), "\n")
-		assert.Len(t, lines, 2)
+		assert.Assert(t, is.Len(lines, 2))
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "--all")
 		lines = strings.Split(res.Stdout(), "\n")
-		assert.Len(t, lines, 4)
+		assert.Assert(t, is.Len(lines, 4))
 	})
 
 	t.Run("ps unknown", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "stop")
-		require.NoError(t, res.Error)
+		assert.NilError(t, res.Error)
 
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "nginx")
 		res.Assert(t, icmd.Success)

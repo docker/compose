@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
@@ -81,7 +80,7 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	r := icmd.StartCmd(cmd)
-	require.NoError(t, r.Error)
+	assert.NilError(t, r.Error)
 	var testComplete atomic.Bool
 	go func() {
 		// if the process exits abnormally before the test is done, fail the test
@@ -141,9 +140,9 @@ func doTest(t *testing.T, svcName string) {
 	writeTestFile := func(name, contents, sourceDir string) {
 		t.Helper()
 		dest := filepath.Join(sourceDir, name)
-		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o700))
+		assert.NilError(t, os.MkdirAll(filepath.Dir(dest), 0o700))
 		t.Logf("writing %q to %q", contents, dest)
-		require.NoError(t, os.WriteFile(dest, []byte(contents+"\n"), 0o600))
+		assert.NilError(t, os.WriteFile(dest, []byte(contents+"\n"), 0o600))
 	}
 	writeDataFile := func(name, contents string) {
 		writeTestFile(name, contents, dataDir)
@@ -168,7 +167,7 @@ func doTest(t *testing.T, svcName string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	r := icmd.StartCmd(cmd)
-	require.NoError(t, r.Error)
+	assert.NilError(t, r.Error)
 	t.Cleanup(func() {
 		// IMPORTANT: watch doesn't exit on its own, don't leak processes!
 		if r.Cmd.Process != nil {
@@ -184,7 +183,7 @@ func doTest(t *testing.T, svcName string) {
 		}
 	}()
 
-	require.NoError(t, os.Mkdir(dataDir, 0o700))
+	assert.NilError(t, os.Mkdir(dataDir, 0o700))
 
 	checkFileContents := func(path string, contents string) poll.Check {
 		return func(pollLog poll.LogT) poll.Result {
@@ -218,7 +217,7 @@ func doTest(t *testing.T, svcName string) {
 	poll.WaitOn(t, checkFileContents("/app/data/hello.txt", "hello watch"))
 
 	t.Logf("Deleting file")
-	require.NoError(t, os.Remove(filepath.Join(dataDir, "hello.txt")))
+	assert.NilError(t, os.Remove(filepath.Join(dataDir, "hello.txt")))
 	waitForFlush()
 	cli.RunDockerComposeCmdNoCheck(t, "exec", svcName, "stat", "/app/data/hello.txt").
 		Assert(t, icmd.Expected{
@@ -242,7 +241,7 @@ func doTest(t *testing.T, svcName string) {
 		})
 
 	t.Logf("Creating subdirectory")
-	require.NoError(t, os.Mkdir(filepath.Join(dataDir, "subdir"), 0o700))
+	assert.NilError(t, os.Mkdir(filepath.Join(dataDir, "subdir"), 0o700))
 	waitForFlush()
 	cli.RunDockerComposeCmd(t, "exec", svcName, "stat", "/app/data/subdir")
 
@@ -261,7 +260,7 @@ func doTest(t *testing.T, svcName string) {
 	poll.WaitOn(t, checkFileContents("/app/data/subdir/file.txt", "x"))
 
 	t.Logf("Deleting directory")
-	require.NoError(t, os.RemoveAll(filepath.Join(dataDir, "subdir")))
+	assert.NilError(t, os.RemoveAll(filepath.Join(dataDir, "subdir")))
 	waitForFlush()
 	cli.RunDockerComposeCmdNoCheck(t, "exec", svcName, "stat", "/app/data/subdir").
 		Assert(t, icmd.Expected{
@@ -270,7 +269,7 @@ func doTest(t *testing.T, svcName string) {
 		})
 
 	t.Logf("Sync and restart use case")
-	require.NoError(t, os.Mkdir(configDir, 0o700))
+	assert.NilError(t, os.Mkdir(configDir, 0o700))
 	writeTestFile("file.config", "This is an updated config file", configDir)
 	checkRestart := func(state string) poll.Check {
 		return func(pollLog poll.LogT) poll.Result {
@@ -311,7 +310,7 @@ func TestWatchExec(t *testing.T) {
 	t.Logf("Create new file")
 
 	testFile := filepath.Join(tmpdir, "test")
-	require.NoError(t, os.WriteFile(testFile, []byte("test\n"), 0o600))
+	assert.NilError(t, os.WriteFile(testFile, []byte("test\n"), 0o600))
 
 	poll.WaitOn(t, func(l poll.LogT) poll.Result {
 		out := buffer.String()
@@ -334,7 +333,7 @@ func TestWatchMultiServices(t *testing.T) {
 	CopyFile(t, filepath.Join("fixtures", "watch", "rebuild.yaml"), composeFilePath)
 
 	testFile := filepath.Join(tmpdir, "test")
-	require.NoError(t, os.WriteFile(testFile, []byte("test"), 0o600))
+	assert.NilError(t, os.WriteFile(testFile, []byte("test"), 0o600))
 
 	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--watch")
 	buffer := bytes.NewBuffer(nil)
@@ -361,7 +360,7 @@ func TestWatchMultiServices(t *testing.T) {
 	waitRebuild("b", "test")
 	waitRebuild("c", "test")
 
-	require.NoError(t, os.WriteFile(testFile, []byte("updated"), 0o600))
+	assert.NilError(t, os.WriteFile(testFile, []byte("updated"), 0o600))
 	waitRebuild("a", "updated")
 	waitRebuild("b", "updated")
 	waitRebuild("c", "updated")
@@ -391,8 +390,8 @@ func TestWatchIncludes(t *testing.T) {
 		return poll.Continue("%v", watch.Stdout())
 	})
 
-	require.NoError(t, os.WriteFile(filepath.Join(tmpdir, "B.test"), []byte("test"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpdir, "A.test"), []byte("test"), 0o600))
+	assert.NilError(t, os.WriteFile(filepath.Join(tmpdir, "B.test"), []byte("test"), 0o600))
+	assert.NilError(t, os.WriteFile(filepath.Join(tmpdir, "A.test"), []byte("test"), 0o600))
 
 	poll.WaitOn(t, func(l poll.LogT) poll.Result {
 		cat := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", "a", "ls", "/data/")

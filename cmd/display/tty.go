@@ -176,13 +176,13 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 
 func (w *ttyWriter) Done(operation string, success bool) {
 	w.print()
+	w.done <- true
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 	if w.ticker != nil {
 		w.ticker.Stop()
 	}
 	w.operation = ""
-	w.done <- true
 }
 
 func (w *ttyWriter) On(events ...api.Resource) {
@@ -336,6 +336,21 @@ func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
 		lines[i] = w.prepareLineData(t)
 		if len(lines[i].timer) > timerLen {
 			timerLen = len(lines[i].timer)
+		}
+	}
+
+	// pad timers so they all have the same visible width
+	for i := range lines {
+		l := &lines[i]
+		if l.timer == "" {
+			continue
+		}
+		timerWidth := utf8.RuneCountInString(l.timer)
+		if timerWidth < timerLen {
+			// Left-pad so the timer's right edge stays aligned on the terminal.
+			// This also prevents stale suffix characters from visually “sticking”
+			// when a previously-rendered timer was wider (e.g. "10.6s" -> "0.0s").
+			l.timer = strings.Repeat(" ", timerLen-timerWidth) + l.timer
 		}
 	}
 

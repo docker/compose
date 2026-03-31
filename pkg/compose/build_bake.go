@@ -550,7 +550,11 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
-	if contextType, _ := build.DetectContextType(ctxName); contextType == build.ContextTypeGit {
+	contextType, _ := build.DetectContextType(ctxName)
+	if contextType == build.ContextTypeGit || contextType == build.ContextTypeRemote {
+		return dockerfile
+	}
+	if strings.Contains(ctxName, "://") {
 		return dockerfile
 	}
 	if !filepath.IsAbs(dockerfile) {
@@ -564,7 +568,7 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	return dockerfile
 }
 
-func (s composeService) dryRunBake(cfg bakeConfig) map[string]string {
+func (s *composeService) dryRunBake(cfg bakeConfig) map[string]string {
 	bakeResponse := map[string]string{}
 	for name, target := range cfg.Targets {
 		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
@@ -577,7 +581,7 @@ func (s composeService) dryRunBake(cfg bakeConfig) map[string]string {
 	return bakeResponse
 }
 
-func (s composeService) displayDryRunBuildEvent(name, dryRunUUID, tag string) {
+func (s *composeService) displayDryRunBuildEvent(name, dryRunUUID, tag string) {
 	s.events.On(api.Resource{
 		ID:     name + " ==>",
 		Status: api.Done,

@@ -18,12 +18,13 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/poll"
 )
 
 // SafeBuffer is a thread safe version of bytes.Buffer
@@ -64,15 +65,21 @@ func (b *SafeBuffer) Bytes() []byte {
 func (b *SafeBuffer) RequireEventuallyContains(t testing.TB, v string) {
 	t.Helper()
 	var bufContents strings.Builder
-	require.Eventuallyf(t, func() bool {
+	poll.WaitOn(t, func(logt poll.LogT) poll.Result {
+		bufContents.Reset()
 		b.m.Lock()
 		defer b.m.Unlock()
 		if _, err := b.b.WriteTo(&bufContents); err != nil {
-			require.FailNowf(t, "Failed to copy from buffer",
-				"Error: %v", err)
+			return poll.Error(fmt.Errorf("failed to copy from buffer. Error: %w", err))
 		}
-		return strings.Contains(bufContents.String(), v)
-	}, 2*time.Second, 20*time.Millisecond,
-		"Buffer did not contain %q\n============\n%s\n============",
-		v, &bufContents)
+		if !strings.Contains(bufContents.String(), v) {
+			return poll.Continue(
+				"buffer does not contain %q\n============\n%s\n============",
+				v, &bufContents)
+		}
+		return poll.Success()
+	},
+		poll.WithTimeout(2*time.Second),
+		poll.WithDelay(20*time.Millisecond),
+	)
 }
