@@ -216,8 +216,7 @@ type composeService struct {
 	maxConcurrency int
 	dryRun         bool
 
-	runtimeVersion    runtimeVersionCache
-	currentAPIVersion runtimeVersionCache
+	runtimeAPIVersion runtimeVersionCache
 }
 
 // Close releases any connections/resources held by the underlying clients.
@@ -502,34 +501,18 @@ type runtimeVersionCache struct {
 	val string
 }
 
-// RuntimeVersion returns the raw API version reported by the daemon.
-// Callers that need the negotiated/effective client API version should use
-// CurrentAPIVersion instead.
-func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
-	s.runtimeVersion.mu.Lock()
-	defer s.runtimeVersion.mu.Unlock()
-	if s.runtimeVersion.val != "" {
-		return s.runtimeVersion.val, nil
-	}
-	version, err := s.apiClient().ServerVersion(ctx, client.ServerVersionOptions{})
-	if err != nil {
-		return "", err
-	}
-	s.runtimeVersion.val = version.APIVersion
-	return s.runtimeVersion.val, nil
-}
-
-// CurrentAPIVersion returns the API version currently used by the Docker client.
-// Trigger negotiation first so version-gated request shaping matches the version
-// that subsequent API calls will actually use.
+// RuntimeAPIVersion returns the negotiated API version that will be used for
+// requests to the Docker daemon. It triggers version negotiation via Ping so
+// that version-gated request shaping matches the version subsequent API calls
+// will actually use.
 //
-// Lock ordering: currentAPIVersion.mu must be acquired before runtimeVersion.mu
-// (via the RuntimeVersion fallback). No code path should reverse this order.
-func (s *composeService) CurrentAPIVersion(ctx context.Context) (string, error) {
-	s.currentAPIVersion.mu.Lock()
-	defer s.currentAPIVersion.mu.Unlock()
-	if s.currentAPIVersion.val != "" {
-		return s.currentAPIVersion.val, nil
+// After negotiation, Compose should never rely on features or request attributes
+// not defined by this API version, even if the daemon's raw version is higher.
+func (s *composeService) RuntimeAPIVersion(ctx context.Context) (string, error) {
+	s.runtimeAPIVersion.mu.Lock()
+	defer s.runtimeAPIVersion.mu.Unlock()
+	if s.runtimeAPIVersion.val != "" {
+		return s.runtimeAPIVersion.val, nil
 	}
 
 	cli := s.apiClient()
@@ -539,17 +522,10 @@ func (s *composeService) CurrentAPIVersion(ctx context.Context) (string, error) 
 	}
 
 	version := cli.ClientVersion()
-	if version != "" {
-		s.currentAPIVersion.val = version
-		return s.currentAPIVersion.val, nil
+	if version == "" {
+		return "", fmt.Errorf("docker client returned empty version after successful API negotiation")
 	}
 
-	// Defensive fallback for unexpected client implementations or mocks that
-	// do not populate ClientVersion after a successful negotiated ping.
-	val, err := s.RuntimeVersion(ctx)
-	if err != nil {
-		return "", err
-	}
-	s.currentAPIVersion.val = val
-	return s.currentAPIVersion.val, nil
+	s.runtimeAPIVersion.val = version
+	return s.runtimeAPIVersion.val, nil
 }

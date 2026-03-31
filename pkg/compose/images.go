@@ -58,7 +58,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 
 	// The daemon validates the platform field in ImageInspect against the
 	// negotiated API version from the request path, not the server's own max version.
-	version, err := s.CurrentAPIVersion(ctx)
+	version, err := s.RuntimeAPIVersion(ctx)
 	if err != nil {
 		return nil, err
 	}

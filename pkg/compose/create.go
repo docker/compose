@@ -252,7 +252,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	apiVersion, err := s.CurrentAPIVersion(ctx)
+	apiVersion, err := s.RuntimeAPIVersion(ctx)
 	if err != nil {
 		return createConfigs{}, err
 	}
@@ -899,7 +899,7 @@ func (s *composeService) buildContainerVolumes(
 		case mount.TypeImage:
 			// The daemon validates image mounts against the negotiated API version
 			// from the request path, not the server's own max version.
-			version, err := s.CurrentAPIVersion(ctx)
+			version, err := s.RuntimeAPIVersion(ctx)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -498,7 +498,7 @@ func TestCreateMobyContainer(t *testing.T) {
 	assert.NilError(t, err)
 }
 
-func TestCurrentAPIVersionCachesNegotiation(t *testing.T) {
+func TestRuntimeAPIVersionCachesNegotiation(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -508,52 +508,25 @@ func TestCurrentAPIVersionCachesNegotiation(t *testing.T) {
 
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
+	// Ping reports the server's max API version (1.44), but after negotiation
+	// the client may settle on a lower version (1.43) — e.g. when the client
+	// SDK caps at an older version. RuntimeAPIVersion must return the negotiated
+	// ClientVersion, not the server's raw APIVersion.
 	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{
 		APIVersion: "1.44",
 	}, nil).Times(1)
 	apiClient.EXPECT().ClientVersion().Return("1.43").Times(1)
 
-	version, err := tested.CurrentAPIVersion(t.Context())
+	version, err := tested.RuntimeAPIVersion(t.Context())
 	assert.NilError(t, err)
 	assert.Equal(t, version, "1.43")
 
-	version, err = tested.CurrentAPIVersion(t.Context())
+	version, err = tested.RuntimeAPIVersion(t.Context())
 	assert.NilError(t, err)
 	assert.Equal(t, version, "1.43")
 }
 
-func TestRuntimeVersionRetriesOnTransientError(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	apiClient := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
-	tested := &composeService{dockerCli: cli}
-
-	cli.EXPECT().Client().Return(apiClient).AnyTimes()
-
-	// First call: ServerVersion fails with a transient error
-	firstCall := apiClient.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).
-		Return(client.ServerVersionResult{}, context.DeadlineExceeded).Times(1)
-
-	// Second call: succeeds
-	apiClient.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).
-		Return(client.ServerVersionResult{APIVersion: "1.48"}, nil).Times(1).After(firstCall)
-
-	_, err := tested.RuntimeVersion(t.Context())
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
-
-	version, err := tested.RuntimeVersion(t.Context())
-	assert.NilError(t, err)
-	assert.Equal(t, version, "1.48")
-
-	// Third call returns cached value
-	version, err = tested.RuntimeVersion(t.Context())
-	assert.NilError(t, err)
-	assert.Equal(t, version, "1.48")
-}
-
-func TestCurrentAPIVersionRetriesOnTransientError(t *testing.T) {
+func TestRuntimeAPIVersionRetriesOnTransientError(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -573,16 +546,16 @@ func TestCurrentAPIVersionRetriesOnTransientError(t *testing.T) {
 	apiClient.EXPECT().ClientVersion().Return("1.44").Times(1)
 
 	// First call should return the transient error
-	_, err := tested.CurrentAPIVersion(t.Context())
+	_, err := tested.RuntimeAPIVersion(t.Context())
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 
 	// Second call should succeed — error was not cached
-	version, err := tested.CurrentAPIVersion(t.Context())
+	version, err := tested.RuntimeAPIVersion(t.Context())
 	assert.NilError(t, err)
 	assert.Equal(t, version, "1.44")
 
 	// Third call should return the cached value without calling Ping again
-	version, err = tested.CurrentAPIVersion(t.Context())
+	version, err = tested.RuntimeAPIVersion(t.Context())
 	assert.NilError(t, err)
 	assert.Equal(t, version, "1.44")
 }
