@@ -252,6 +252,11 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 	}
 	for name, service := range base.Services {
 		for i, envFile := range service.EnvFiles {
+			if !envFile.Required {
+				if _, err := os.Stat(envFile.Path); os.IsNotExist(err) {
+					continue
+				}
+			}
 			hash := fmt.Sprintf("%x.env", sha256.Sum256([]byte(envFile.Path)))
 			envFiles[envFile.Path] = hash
 			f, err = transform.ReplaceEnvFile(f, name, i, hash)
@@ -352,8 +357,11 @@ func (s *composeService) checkEnvironmentVariables(project *types.Project, optio
 	errorList := map[string][]string{}
 
 	for _, service := range project.Services {
-		if len(service.EnvFiles) > 0 {
-			errorList[service.Name] = append(errorList[service.Name], fmt.Sprintf("service %q has env_file declared.", service.Name))
+		for _, envFile := range service.EnvFiles {
+			if envFile.Required {
+				errorList[service.Name] = append(errorList[service.Name], fmt.Sprintf("service %q has required env_file declared.", service.Name))
+				break
+			}
 		}
 	}
 
@@ -439,6 +447,12 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 	for _, service := range project.Services {
 		// Check env files
 		for _, envFile := range service.EnvFiles {
+			// Skip optional env files that don't exist
+			if !envFile.Required {
+				if _, err := os.Stat(envFile.Path); os.IsNotExist(err) {
+					continue
+				}
+			}
 			findings, err := scan.ScanFile(envFile.Path)
 			if err != nil {
 				return nil, fmt.Errorf("failed to scan env file %s: %w", envFile.Path, err)

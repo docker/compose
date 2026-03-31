@@ -18,6 +18,7 @@ package compose
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/loader"
@@ -99,4 +100,76 @@ services:
 	assert.DeepEqual(t, expectedLayers, layers, cmp.FilterPath(func(path cmp.Path) bool {
 		return !slices.Contains([]string{".Data", ".Digest", ".Size"}, path.String())
 	}, cmp.Ignore()))
+}
+
+func Test_createLayers_withRequiredFalse(t *testing.T) {
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir:  "testdata/publish/",
+		Environment: types.Mapping{},
+		ConfigFiles: []types.ConfigFile{
+			{
+				Filename: "testdata/publish/compose-required-false.yaml",
+			},
+		},
+	})
+	assert.NilError(t, err)
+	project.ComposeFiles = []string{"testdata/publish/compose-required-false.yaml"}
+
+	service := &composeService{}
+	layers, err := service.createLayers(t.Context(), project, api.PublishOptions{
+		WithEnvironment: true,
+	})
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(layers), 3)
+
+	assert.Equal(t, layers[0].Annotations["com.docker.compose.file"], "compose-required-false.yaml")
+
+	assert.Equal(t, layers[1].MediaType, "application/vnd.docker.compose.envfile")
+	assert.Equal(t, layers[2].MediaType, "application/vnd.docker.compose.envfile")
+
+	envFileHashes := []string{
+		layers[1].Annotations["com.docker.compose.envfile"],
+		layers[2].Annotations["com.docker.compose.envfile"],
+	}
+	assert.Assert(t, envFileHashes[0] != "")
+	assert.Assert(t, envFileHashes[1] != "")
+	assert.Assert(t, envFileHashes[0] != "missing.env")
+	assert.Assert(t, envFileHashes[1] != "missing.env")
+}
+
+func Test_checkEnvironmentVariables_withRequiredFalse(t *testing.T) {
+	project := &types.Project{
+		Services: types.Services{
+			"test": {
+				Name: "test",
+				EnvFiles: []types.EnvFile{
+					{
+						Path:     "missing.env",
+						Required: false,
+					},
+					{
+						Path:     "existing.env",
+						Required: true,
+					},
+				},
+			},
+			"test2": {
+				Name: "test2",
+				EnvFiles: []types.EnvFile{
+					{
+						Path:     "optional.env",
+						Required: false,
+					},
+				},
+			},
+		},
+	}
+
+	service := &composeService{}
+
+	err := service.checkEnvironmentVariables(project, api.PublishOptions{})
+	assert.Assert(t, err != nil)
+	assert.Assert(t, strings.Contains(err.Error(), `service "test" has required env_file declared.`))
+	assert.Assert(t, !strings.Contains(err.Error(), `service "test2"`))
 }
