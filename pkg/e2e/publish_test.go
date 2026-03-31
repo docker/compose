@@ -71,7 +71,7 @@ or remove sensitive data from your Compose configuration
 			"-p", projectName, "publish", "test/test", "--dry-run")
 		cmd.Stdin = strings.NewReader("n\n")
 		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 0})
+		res.Assert(t, icmd.Expected{ExitCode: 130})
 		out := res.Combined()
 		assert.Assert(t, strings.Contains(out, "you are about to publish bind mounts declaration within your OCI artifact."), out)
 		assert.Assert(t, strings.Contains(out, "e2e/fixtures/publish:/user-data"), out)
@@ -111,7 +111,7 @@ or remove sensitive data from your Compose configuration
 			"-p", projectName, "publish", "test/test", "--with-env", "--dry-run")
 		cmd.Stdin = strings.NewReader("n\n")
 		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 0})
+		res.Assert(t, icmd.Expected{ExitCode: 130})
 
 		output := res.Combined()
 		assert.Assert(t, strings.Contains(output, "you are about to publish sensitive data within your OCI artifact.\n"), output)

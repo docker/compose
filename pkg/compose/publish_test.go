@@ -104,7 +104,6 @@ services:
 }
 
 func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
-	
 	dir := t.TempDir()
 	envPath := dir + "/secrets.env"
 	secretData := `AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"`
@@ -112,7 +111,6 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	assert.NilError(t, err)
 
 	project := &types.Project{
-
 		Services: types.Services{
 			"web": {
 				Name:  "web",
