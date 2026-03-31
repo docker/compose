@@ -18,6 +18,7 @@ package compose
 
 import (
 	"errors"
+	"os"
 	"slices"
 	"testing"
 
@@ -102,18 +103,22 @@ services:
 	}, cmp.Ignore()))
 }
 
-func Test_preChecks_decline_returns_ErrPublishAborted(t *testing.T) {
+func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
+	
+	dir := t.TempDir()
+	envPath := dir + "/secrets.env"
+	secretData := `AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"`
+	err := os.WriteFile(envPath, []byte(secretData), 0o600)
+	assert.NilError(t, err)
+
 	project := &types.Project{
+
 		Services: types.Services{
 			"web": {
 				Name:  "web",
 				Image: "nginx",
-				Volumes: []types.ServiceVolumeConfig{
-					{
-						Type:   types.VolumeTypeBind,
-						Source: "/host/path",
-						Target: "/container/path",
-					},
+				EnvFiles: []types.EnvFile{
+					{Path: envPath, Required: true},
 				},
 			},
 		},
