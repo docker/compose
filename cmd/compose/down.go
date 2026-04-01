@@ -84,6 +84,11 @@ func runDown(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
 	var timeout *time.Duration
 	if opts.timeChanged {
 		timeoutValue := time.Duration(opts.timeout) * time.Second

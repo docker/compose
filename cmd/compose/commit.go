@@ -76,7 +76,7 @@ func commitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 }
 
 func runCommit(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, options commitOptions) error {
-	projectName, err := options.toProjectName(ctx, dockerCli)
+	dockerCli, projectName, err := options.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

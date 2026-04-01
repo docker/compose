@@ -66,12 +66,23 @@ func watchCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 }
 
 func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, watchOpts watchOptions, buildOpts buildOptions, services []string) error {
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	// Load project first to detect x-context extension
+	tempBackend, err := compose.NewComposeService(dockerCli)
 	if err != nil {
 		return err
 	}
 
-	project, _, err := watchOpts.ToProject(ctx, dockerCli, backend, services)
+	project, _, err := watchOpts.ToProject(ctx, dockerCli, tempBackend, services)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}

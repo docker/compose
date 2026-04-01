@@ -71,7 +71,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 			return nil
 		}),
 		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
-			return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
+			return runCreate(ctx, getDockerCli(ctx, dockerCli), backendOptions, opts, buildOpts, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}

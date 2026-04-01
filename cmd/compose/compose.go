@@ -38,6 +38,7 @@ import (
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/pkg/kvfile"
 	"github.com/morikuni/aec"
 	"github.com/sirupsen/logrus"
@@ -164,6 +165,49 @@ func (o *ProjectOptions) WithProject(fn ProjectFunc, dockerCli command.Cli) func
 	})
 }
 
+// dockerCliKey is a context key used to propagate a context-switched Docker CLI through the call chain.
+type dockerCliKey struct{}
+
+// switchDockerContextFromProject checks for an "x-context" extension in the compose project and returns
+// a new DockerCli initialized for that context if it differs from the current one.
+// If no switch is needed, it returns the original dockerCli unchanged.
+func switchDockerContextFromProject(dockerCli command.Cli, project *types.Project) (command.Cli, error) {
+	if project == nil {
+		return dockerCli, nil
+	}
+	xctxVal, ok := project.Extensions["x-context"]
+	if !ok {
+		return dockerCli, nil
+	}
+	contextName, ok := xctxVal.(string)
+	if !ok || contextName == "" || contextName == dockerCli.CurrentContext() {
+		return dockerCli, nil
+	}
+	newCli, err := command.NewDockerCli(
+		command.WithInputStream(dockerCli.In()),
+		command.WithOutputStream(dockerCli.Out()),
+		command.WithErrorStream(dockerCli.Err()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker client for context %q: %w", contextName, err)
+	}
+	clientOpts := flags.NewClientOptions()
+	clientOpts.Context = contextName
+	if err := newCli.Initialize(clientOpts); err != nil {
+		return nil, fmt.Errorf("failed to initialize docker client for context %q: %w", contextName, err)
+	}
+	return newCli, nil
+}
+
+// getDockerCli returns the Docker CLI stored in the context (set by WithServices when x-context is
+// specified), falling back to defaultCli when none is stored.
+func getDockerCli(ctx context.Context, defaultCli command.Cli) command.Cli {
+	if cli, ok := ctx.Value(dockerCliKey{}).(command.Cli); ok {
+		return cli
+	}
+	return defaultCli
+}
+
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
 	return Adapt(func(ctx context.Context, services []string) error {
@@ -177,7 +221,14 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 			return err
 		}
 
+		// Apply x-context if specified in the compose file
+		dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+		if err != nil {
+			return err
+		}
+
 		ctx = context.WithValue(ctx, tracing.MetricsKey{}, metrics)
+		ctx = context.WithValue(ctx, dockerCliKey{}, dockerCli)
 
 		project, err = project.WithServicesEnvironmentResolved(true)
 		if err != nil {
@@ -265,26 +316,32 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 	return project, name, nil
 }
 
-func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cli) (string, error) {
+func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cli) (command.Cli, string, error) {
 	if o.ProjectName != "" {
-		return o.ProjectName, nil
+		return dockerCli, o.ProjectName, nil
 	}
 
 	envProjectName := os.Getenv(ComposeProjectName)
 	if envProjectName != "" {
-		return envProjectName, nil
+		return dockerCli, envProjectName, nil
 	}
 
 	backend, err := compose.NewComposeService(dockerCli)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
 	project, _, err := o.ToProject(ctx, dockerCli, backend, nil)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
-	return project.Name, nil
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return dockerCli, project.Name, nil
 }
 
 func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (map[string]any, error) {

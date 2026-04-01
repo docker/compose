@@ -58,6 +58,16 @@ func runStart(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 		return err
 	}
 
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err

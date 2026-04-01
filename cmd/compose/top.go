@@ -56,7 +56,7 @@ type (
 )
 
 func runTop(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts topOptions, services []string) error {
-	projectName, err := opts.toProjectName(ctx, dockerCli)
+	dockerCli, projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

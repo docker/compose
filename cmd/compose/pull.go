@@ -99,12 +99,23 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts pullOptions, services []string) error {
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	// Load project first to detect x-context extension
+	tempBackend, err := compose.NewComposeService(dockerCli)
 	if err != nil {
 		return err
 	}
 
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, services, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, tempBackend, services, cli.WithoutEnvironmentResolution)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}

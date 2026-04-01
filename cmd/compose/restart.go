@@ -62,6 +62,11 @@ func runRestart(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		return err
 	}
 
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
 	if project != nil && len(services) > 0 {
 		project, err = project.WithServicesEnabled(services...)
 		if err != nil {

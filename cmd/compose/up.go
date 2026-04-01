@@ -135,13 +135,14 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
 
-			up.validateNavigationMenu(dockerCli)
+			effectiveCli := getDockerCli(ctx, dockerCli)
+			up.validateNavigationMenu(effectiveCli)
 
 			if !p.All && len(project.Services) == 0 {
 				return fmt.Errorf("no service selected")
 			}
 
-			return runUp(ctx, dockerCli, backendOptions, create, up, build, project, services)
+			return runUp(ctx, effectiveCli, backendOptions, create, up, build, project, services)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}

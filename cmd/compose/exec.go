@@ -102,7 +102,7 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 }
 
 func runExec(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts execOpts) error {
-	projectName, err := opts.toProjectName(ctx, dockerCli)
+	dockerCli, projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

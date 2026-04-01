@@ -51,6 +51,11 @@ func runPause(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 		return err
 	}
 
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
@@ -82,6 +87,11 @@ func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 
 func runUnPause(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts unpauseOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
 	if err != nil {
 		return err
 	}

@@ -63,7 +63,7 @@ Refer to https://docs.docker.com/engine/cli/formatting/ for more information abo
 }
 
 func runStats(ctx context.Context, dockerCli command.Cli, opts statsOptions, service []string) error {
-	name, err := opts.ProjectOptions.toProjectName(ctx, dockerCli)
+	dockerCli, name, err := opts.ProjectOptions.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

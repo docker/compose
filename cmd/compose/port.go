@@ -64,7 +64,7 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 }
 
 func runPort(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts portOptions, service string) error {
-	projectName, err := opts.toProjectName(ctx, dockerCli)
+	dockerCli, projectName, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

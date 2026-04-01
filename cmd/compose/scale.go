@@ -61,13 +61,25 @@ func scaleCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 }
 
 func runScale(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts scaleOptions, serviceReplicaTuples map[string]int) error {
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	services := slices.Sorted(maps.Keys(serviceReplicaTuples))
+
+	// Load project first to detect x-context extension
+	tempBackend, err := compose.NewComposeService(dockerCli)
 	if err != nil {
 		return err
 	}
 
-	services := slices.Sorted(maps.Keys(serviceReplicaTuples))
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, tempBackend, services)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}

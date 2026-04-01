@@ -98,6 +98,21 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 		return err
 	}
 
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
 	if project != nil {
 		names := project.ServiceNames()
 		if len(services) > 0 {

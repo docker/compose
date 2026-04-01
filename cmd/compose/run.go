@@ -199,12 +199,23 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+			// Load project first to detect x-context extension
+			tempBackend, err := compose.NewComposeService(dockerCli)
 			if err != nil {
 				return err
 			}
 
-			project, _, err := p.ToProject(ctx, dockerCli, backend, []string{options.Service}, composecli.WithoutEnvironmentResolution)
+			project, _, err := p.ToProject(ctx, dockerCli, tempBackend, []string{options.Service}, composecli.WithoutEnvironmentResolution)
+			if err != nil {
+				return err
+			}
+
+			dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+			if err != nil {
+				return err
+			}
+
+			backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 			if err != nil {
 				return err
 			}

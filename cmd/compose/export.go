@@ -60,7 +60,7 @@ func exportCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 }
 
 func runExport(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, options exportOptions) error {
-	projectName, err := options.toProjectName(ctx, dockerCli)
+	dockerCli, projectName, err := options.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

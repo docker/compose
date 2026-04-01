@@ -75,7 +75,7 @@ func copyCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 }
 
 func runCopy(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts copyOptions) error {
-	name, err := opts.toProjectName(ctx, dockerCli)
+	dockerCli, name, err := opts.toProjectName(ctx, dockerCli)
 	if err != nil {
 		return err
 	}

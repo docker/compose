@@ -77,6 +77,11 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
 	// exclude services configured to ignore output (attach: false), until explicitly selected
 	if project != nil && len(services) == 0 {
 		for n, service := range project.Services {

@@ -68,12 +68,23 @@ func vizCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 func runViz(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts *vizOptions) error {
 	_, _ = fmt.Fprintln(os.Stderr, "viz command is EXPERIMENTAL")
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	// Load project first to detect x-context extension
+	tempBackend, err := compose.NewComposeService(dockerCli)
 	if err != nil {
 		return err
 	}
 
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil)
+	project, _, err := opts.ToProject(ctx, dockerCli, tempBackend, nil)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}

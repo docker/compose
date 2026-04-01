@@ -153,13 +153,24 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	if opts.print {
 		backendOptions.Add(compose.WithEventProcessor(display.Quiet()))
 	}
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	// Load project first to detect x-context extension
+	tempBackend, err := compose.NewComposeService(dockerCli)
 	if err != nil {
 		return err
 	}
 
 	opts.All = true // do not drop resources as build may involve some dependencies by additional_contexts
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, tempBackend, nil, cli.WithoutEnvironmentResolution)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
 	if err != nil {
 		return err
 	}

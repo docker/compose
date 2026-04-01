@@ -62,6 +62,21 @@ func runVol(ctx context.Context, dockerCli command.Cli, backendOptions *BackendO
 		return err
 	}
 
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
+	dockerCli, err = switchDockerContextFromProject(dockerCli, project)
+	if err != nil {
+		return err
+	}
+
 	if project != nil {
 		names := project.ServiceNames()
 		for _, service := range services {
