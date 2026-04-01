@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	"github.com/moby/moby/api/types/container"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 )
 
 // fakeLowLevelClient records calls made to it for test assertions.
@@ -51,7 +51,7 @@ func (f *fakeLowLevelClient) Untar(_ context.Context, _ string, _ io.ReadCloser)
 func TestSync_ExistingPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	existingFile := filepath.Join(tmpDir, "exists.txt")
-	require.NoError(t, os.WriteFile(existingFile, []byte("data"), 0o644))
+	assert.NilError(t, os.WriteFile(existingFile, []byte("data"), 0o644))
 
 	client := &fakeLowLevelClient{
 		containers: []container.Summary{{ID: "ctr1"}},
@@ -62,9 +62,9 @@ func TestSync_ExistingPath(t *testing.T) {
 		{HostPath: existingFile, ContainerPath: "/app/exists.txt"},
 	})
 
-	require.NoError(t, err)
-	assert.Equal(t, 1, client.untarCount, "existing path should be copied via Untar")
-	assert.Empty(t, client.execCmds, "no delete command expected for existing path")
+	assert.NilError(t, err)
+	assert.Equal(t, client.untarCount, 1, "existing path should be copied via Untar")
+	assert.Equal(t, len(client.execCmds), 0, "no delete command expected for existing path")
 }
 
 func TestSync_NonExistentPath(t *testing.T) {
@@ -77,9 +77,9 @@ func TestSync_NonExistentPath(t *testing.T) {
 		{HostPath: "/no/such/file", ContainerPath: "/app/gone.txt"},
 	})
 
-	require.NoError(t, err)
-	require.Len(t, client.execCmds, 1, "should issue a delete command")
-	assert.Equal(t, []string{"rm", "-rf", "/app/gone.txt"}, client.execCmds[0])
+	assert.NilError(t, err)
+	assert.Equal(t, len(client.execCmds), 1, "should issue a delete command")
+	assert.DeepEqual(t, client.execCmds[0], []string{"rm", "-rf", "/app/gone.txt"})
 }
 
 func TestSync_StatPermissionError(t *testing.T) {
@@ -92,11 +92,11 @@ func TestSync_StatPermissionError(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	restrictedDir := filepath.Join(tmpDir, "noaccess")
-	require.NoError(t, os.Mkdir(restrictedDir, 0o700))
+	assert.NilError(t, os.Mkdir(restrictedDir, 0o700))
 	targetFile := filepath.Join(restrictedDir, "secret.txt")
-	require.NoError(t, os.WriteFile(targetFile, []byte("data"), 0o644))
+	assert.NilError(t, os.WriteFile(targetFile, []byte("data"), 0o644))
 	// Remove all permissions on the parent directory so stat on the child fails with EACCES.
-	require.NoError(t, os.Chmod(restrictedDir, 0o000))
+	assert.NilError(t, os.Chmod(restrictedDir, 0o000))
 	t.Cleanup(func() {
 		// Restore permissions so t.TempDir() cleanup can remove it.
 		_ = os.Chmod(restrictedDir, 0o700)
@@ -111,17 +111,16 @@ func TestSync_StatPermissionError(t *testing.T) {
 		{HostPath: targetFile, ContainerPath: "/app/secret.txt"},
 	})
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "permission denied")
-	assert.Contains(t, err.Error(), "secret.txt")
-	assert.Equal(t, 0, client.untarCount, "should not attempt copy on stat error")
-	assert.Empty(t, client.execCmds, "should not attempt delete on stat error")
+	assert.ErrorContains(t, err, "permission denied")
+	assert.ErrorContains(t, err, "secret.txt")
+	assert.Equal(t, client.untarCount, 0, "should not attempt copy on stat error")
+	assert.Equal(t, len(client.execCmds), 0, "should not attempt delete on stat error")
 }
 
 func TestSync_MixedPaths(t *testing.T) {
 	tmpDir := t.TempDir()
 	existingFile := filepath.Join(tmpDir, "keep.txt")
-	require.NoError(t, os.WriteFile(existingFile, []byte("data"), 0o644))
+	assert.NilError(t, os.WriteFile(existingFile, []byte("data"), 0o644))
 
 	client := &fakeLowLevelClient{
 		containers: []container.Summary{{ID: "ctr1"}},
@@ -133,8 +132,8 @@ func TestSync_MixedPaths(t *testing.T) {
 		{HostPath: "/no/such/path", ContainerPath: "/app/removed.txt"},
 	})
 
-	require.NoError(t, err)
-	assert.Equal(t, 1, client.untarCount, "existing path should be copied")
-	require.Len(t, client.execCmds, 1)
-	assert.Contains(t, client.execCmds[0][len(client.execCmds[0])-1], "removed.txt")
+	assert.NilError(t, err)
+	assert.Equal(t, client.untarCount, 1, "existing path should be copied")
+	assert.Equal(t, len(client.execCmds), 1)
+	assert.Check(t, cmp.Contains(client.execCmds[0][len(client.execCmds[0])-1], "removed.txt"))
 }
