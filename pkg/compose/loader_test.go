@@ -286,6 +286,70 @@ services:
 	api.Separator = "-"
 }
 
+func TestLoadProject_ImageLongSyntax(t *testing.T) {
+	tmpDir := t.TempDir()
+	composeFile := filepath.Join(tmpDir, "compose.yaml")
+	composeContent := `
+name: test-project
+services:
+  web:
+    image:
+      name: nginx
+      tag: "1.25"
+    build:
+      context: .
+      tags:
+        - name: nginx
+          tag: "1.25"
+        - name: nginx
+          tag: latest
+        - nginx:stable
+`
+	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
+	assert.NilError(t, err)
+
+	service, err := NewComposeService(nil)
+	assert.NilError(t, err)
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+	})
+	assert.NilError(t, err)
+
+	webService := project.Services["web"]
+	assert.Equal(t, "nginx:1.25", webService.Image)
+	assert.Check(t, is.Len(webService.Build.Tags, 3))
+	assert.Equal(t, "nginx:1.25", webService.Build.Tags[0])
+	assert.Equal(t, "nginx:latest", webService.Build.Tags[1])
+	assert.Equal(t, "nginx:stable", webService.Build.Tags[2])
+}
+
+func TestLoadProject_ImageLongSyntaxDigest(t *testing.T) {
+	tmpDir := t.TempDir()
+	composeFile := filepath.Join(tmpDir, "compose.yaml")
+	composeContent := `
+name: test-project
+services:
+  web:
+    image:
+      name: nginx
+      digest: sha256:abc123
+`
+	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
+	assert.NilError(t, err)
+
+	service, err := NewComposeService(nil)
+	assert.NilError(t, err)
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+	})
+	assert.NilError(t, err)
+
+	webService := project.Services["web"]
+	assert.Equal(t, "nginx@sha256:abc123", webService.Image)
+}
+
 func TestLoadProject_InvalidComposeFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	composeFile := filepath.Join(tmpDir, "compose.yaml")
