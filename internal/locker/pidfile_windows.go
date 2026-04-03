@@ -21,7 +21,7 @@ package locker
 import (
 	"os"
 
-	"github.com/docker/docker/pkg/pidfile"
+	"github.com/docker/compose/v5/internal/pidfile"
 	"github.com/mitchellh/go-ps"
 )
 

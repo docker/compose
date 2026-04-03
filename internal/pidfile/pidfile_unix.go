@@ -1,7 +1,7 @@
 //go:build !windows
 
 /*
-   Copyright 2023 Docker Compose CLI authors
+   Copyright 2025 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -16,14 +16,27 @@
    limitations under the License.
 */
 
-package locker
+package pidfile
 
 import (
+	"errors"
 	"os"
+	"runtime"
+	"strconv"
 
-	"github.com/docker/compose/v5/internal/pidfile"
+	"golang.org/x/sys/unix"
 )
 
-func (f *Pidfile) Lock() error {
-	return pidfile.Write(f.path, os.Getpid())
+func alive(pid int) bool {
+	if pid < 1 {
+		return false
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		err := unix.Kill(pid, 0)
+		return err == nil || errors.Is(err, unix.EPERM)
+	default:
+		_, err := os.Stat("/proc/" + strconv.Itoa(pid))
+		return err == nil
+	}
 }
