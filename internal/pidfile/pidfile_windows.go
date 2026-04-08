@@ -1,7 +1,7 @@
-//go:build !windows
+//go:build windows
 
 /*
-   Copyright 2023 Docker Compose CLI authors
+   Copyright 2025 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -16,14 +16,23 @@
    limitations under the License.
 */
 
-package locker
+package pidfile
 
-import (
-	"os"
+import "golang.org/x/sys/windows"
 
-	"github.com/docker/compose/v5/internal/pidfile"
-)
-
-func (f *Pidfile) Lock() error {
-	return pidfile.Write(f.path, os.Getpid())
+func alive(pid int) bool {
+	if pid < 1 {
+		return false
+	}
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+	if err != nil {
+		return false
+	}
+	var c uint32
+	err = windows.GetExitCodeProcess(h, &c)
+	_ = windows.CloseHandle(h)
+	if err != nil {
+		return c == uint32(windows.STATUS_PENDING)
+	}
+	return true
 }
