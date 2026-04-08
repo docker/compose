@@ -409,7 +409,7 @@ const PluginName = "compose"
 
 // RunningAsStandalone detects when running as a standalone program
 func RunningAsStandalone() bool {
-	return len(os.Args) < 2 || os.Args[1] != metadata.MetadataSubcommandName && os.Args[1] != PluginName
+	return len(os.Args) < 2 || os.Args[1] != metadata.MetadataSubcommandName && os.Args[1] != metadata.HookSubcommandName && os.Args[1] != PluginName
 }
 
 type BackendOptions struct {

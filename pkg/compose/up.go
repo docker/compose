@@ -36,6 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -88,8 +89,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			if err != nil {
 				return err
 			}
-			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive)
-			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, signalChan)
+			isLogsViewEnabled := s.isDesktopFeatureActive(ctx, desktop.FeatureLogsTab)
+			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isLogsViewEnabled)
+			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled, signalChan)
 			logConsumer = navigationMenu.Decorate(logConsumer)
 		}
 	}
