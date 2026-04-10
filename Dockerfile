@@ -195,3 +195,16 @@ RUN --mount=from=binary \
 
 FROM scratch AS release
 COPY --from=releaser /out/ /
+
+FROM --platform=$BUILDPLATFORM alpine AS module-releaser
+WORKDIR /work
+ARG TARGETOS
+RUN --mount=from=binary \
+    mkdir -p /cli-plugins/compose/$TARGETOS && \
+    cp docker-compose* "/cli-plugins/compose/$TARGETOS/docker-compose$(ls docker-compose* | sed -e 's/^docker-compose//')"
+
+FROM scratch AS module
+ARG TARGETOS
+COPY --from=module-releaser /cli-plugins/compose/$TARGETOS /cli-plugins/compose/$TARGETOS
+COPY ./desktop-module/module-metadata.json /
+COPY LICENSE /
