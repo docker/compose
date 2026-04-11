@@ -1,9 +1,5 @@
 module github.com/docker/compose/v5
 
-// TODO: Remove replace once compose-go#860 is merged. See: https://github.com/compose-spec/compose-go/pull/860
-
-replace github.com/compose-spec/compose-go/v2 => github.com/yunus25jmi1/compose-go/v2 v2.0.0-20260404194456-e694d656b965
-
 go 1.25.5
 
 require (
