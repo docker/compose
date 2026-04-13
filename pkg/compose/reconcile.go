@@ -125,11 +125,11 @@ type ContainerOperation struct {
 	Existing        *container.Summary
 	Inherit         bool
 	Timeout         *time.Duration
+	NetworkRecreate bool // true when this op was created for a network recreation
 }
 
 // RenameOperation holds details for renaming a container.
 type RenameOperation struct {
-	ContainerID string
 	CurrentName string
 	NewName     string
 }
@@ -303,6 +303,14 @@ func Reconcile(project *types.Project, observed *ObservedState, opts ReconcileOp
 		return nil, err
 	}
 
+	// Step 3b - Clean up stale network disconnect/connect operations.
+	// When a container is being recreated (has a rename op in the plan),
+	// any disconnect/connect ops created by reconcileNetworks use the old
+	// container ID which will be stale after recreation. The new container
+	// will be connected to the recreated network automatically via
+	// buildDependencyEdges (create-container depends on create-network).
+	pruneStaleNetworkOpsForRecreatedContainers(plan)
+
 	// Step 4 - Orphans
 	if opts.RemoveOrphans {
 		reconcileOrphans(observed.Orphans, plan, opts)
@@ -446,9 +454,10 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 					ServiceName: ctr.Labels[api.ServiceLabel],
 					Resource:    ctrName,
 					ContainerOp: &ContainerOperation{
-						ContainerName: ctrName,
-						Existing:      &ctr,
-						Timeout:       opts.Timeout,
+						ContainerName:   ctrName,
+						Existing:        &ctr,
+						Timeout:         opts.Timeout,
+						NetworkRecreate: true,
 					},
 					Reason: fmt.Sprintf("network %q is being recreated", n.Name),
 				}
@@ -1228,22 +1237,129 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 				}
 
 				startID := fmt.Sprintf("start-container:%s", ctrName)
-				plan.Operations[startID] = &Operation{
-					ID:          startID,
-					Type:        OpStartContainer,
-					ServiceName: service.Name,
-					Resource:    ctrName,
-					ContainerOp: &ContainerOperation{
-						Service:       service,
-						ContainerName: ctrName,
-						Existing:      &ctr,
-					},
-					DependsOn: []string{stopID},
-					Reason:    fmt.Sprintf("restart after dependency %q recreated", depName),
+				if existingStart, exists := plan.Operations[startID]; exists {
+					// A start operation already exists (e.g. from network recreation).
+					// Add our stop as a dependency instead of overwriting.
+					if !slices.Contains(existingStart.DependsOn, stopID) {
+						existingStart.DependsOn = append(existingStart.DependsOn, stopID)
+					}
+				} else {
+					plan.Operations[startID] = &Operation{
+						ID:          startID,
+						Type:        OpStartContainer,
+						ServiceName: service.Name,
+						Resource:    ctrName,
+						ContainerOp: &ContainerOperation{
+							Service:       service,
+							ContainerName: ctrName,
+							Existing:      &ctr,
+						},
+						DependsOn: []string{stopID},
+						Reason:    fmt.Sprintf("restart after dependency %q recreated", depName),
+					}
 				}
 			}
 			break // Only need to process once per service
 		}
+	}
+}
+
+// pruneStaleNetworkOpsForRecreatedContainers removes disconnect/connect/start
+// operations that were created by reconcileNetworks for containers that are
+// also being recreated. When a container is recreated, the old container ID
+// used in connect/disconnect ops becomes stale. The new container will
+// automatically connect to the new network because buildDependencyEdges
+// ensures create-container depends on create-network.
+func pruneStaleNetworkOpsForRecreatedContainers(plan *ReconciliationPlan) {
+	recreatedContainers := collectRecreatedContainerNames(plan)
+	if len(recreatedContainers) == 0 {
+		return
+	}
+
+	toDelete := findStaleNetworkOps(plan, recreatedContainers)
+	deletePlanOps(plan, toDelete)
+}
+
+// collectRecreatedContainerNames returns the final names of containers that
+// have a recreate chain (identified by rename operations).
+func collectRecreatedContainerNames(plan *ReconciliationPlan) map[string]bool {
+	result := map[string]bool{}
+	for _, op := range plan.Operations {
+		if op.Type == OpRenameContainer && op.RenameOp != nil {
+			result[op.RenameOp.NewName] = true
+		}
+	}
+	return result
+}
+
+// findStaleNetworkOps identifies disconnect/connect/start/stop operations that
+// reference containers being recreated. These ops use stale container IDs.
+func findStaleNetworkOps(plan *ReconciliationPlan, recreated map[string]bool) []string {
+	var toDelete []string
+	for id, op := range plan.Operations {
+		switch op.Type {
+		case OpDisconnectNetwork, OpConnectNetwork:
+			if isNetworkOpForRecreatedContainer(op, recreated) {
+				toDelete = append(toDelete, id)
+			}
+		case OpStartContainer:
+			if isNetworkStartForRecreatedContainer(plan, op, recreated) {
+				toDelete = append(toDelete, id)
+			}
+		case OpStopContainer:
+			if isNetworkStopForRecreatedContainer(op, recreated) {
+				toDelete = append(toDelete, id)
+			}
+		}
+	}
+	return toDelete
+}
+
+func isNetworkOpForRecreatedContainer(op *Operation, recreated map[string]bool) bool {
+	if op.ContainerNetworkOp == nil {
+		return false
+	}
+	parts := strings.Fields(op.Resource)
+	return len(parts) > 0 && recreated[parts[0]]
+}
+
+func isNetworkStartForRecreatedContainer(plan *ReconciliationPlan, op *Operation, recreated map[string]bool) bool {
+	if op.ContainerOp == nil || !recreated[op.ContainerOp.ContainerName] {
+		return false
+	}
+	// Only remove start ops created by network recreation (depend on a connect op),
+	// not the start from the recreate chain itself (depends on a rename op).
+	for _, depID := range op.DependsOn {
+		if dep, ok := plan.Operations[depID]; ok && dep.Type == OpConnectNetwork {
+			return true
+		}
+	}
+	return false
+}
+
+func isNetworkStopForRecreatedContainer(op *Operation, recreated map[string]bool) bool {
+	if op.ContainerOp == nil || !recreated[op.ContainerOp.ContainerName] {
+		return false
+	}
+	// Only remove stop ops from network recreation, not from the recreate chain.
+	return op.ContainerOp.NetworkRecreate
+}
+
+// deletePlanOps removes operations by ID and cleans up DependsOn references.
+func deletePlanOps(plan *ReconciliationPlan, ids []string) {
+	deleted := map[string]bool{}
+	for _, id := range ids {
+		deleted[id] = true
+		delete(plan.Operations, id)
+	}
+	for _, op := range plan.Operations {
+		var cleaned []string
+		for _, depID := range op.DependsOn {
+			if !deleted[depID] {
+				cleaned = append(cleaned, depID)
+			}
+		}
+		op.DependsOn = cleaned
 	}
 }
 

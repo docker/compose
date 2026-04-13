@@ -27,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.opentelemetry.io/otel"
@@ -43,15 +44,11 @@ import (
 type executionState struct {
 	mu         sync.Mutex
 	containers map[string]Containers // service name -> containers created/updated
-	networks   map[string]string     // network key -> ID
-	volumes    map[string]string     // volume key -> ID
 }
 
 func newExecutionState() *executionState {
 	return &executionState{
 		containers: make(map[string]Containers),
-		networks:   make(map[string]string),
-		volumes:    make(map[string]string),
 	}
 }
 
@@ -77,18 +74,6 @@ func (es *executionState) getContainers(serviceName string) Containers {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 	return slices.Clone(es.containers[serviceName])
-}
-
-func (es *executionState) setNetworkID(key, id string) {
-	es.mu.Lock()
-	defer es.mu.Unlock()
-	es.networks[key] = id
-}
-
-func (es *executionState) setVolumeID(key, id string) {
-	es.mu.Lock()
-	defer es.mu.Unlock()
-	es.volumes[key] = id
 }
 
 // resolveServiceReferences replaces service references in a ServiceConfig with
@@ -157,6 +142,13 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 		return nil
 	}
 
+	// Validate the plan has no dependency cycles before executing.
+	// Without this check, a cycle would cause the executor to hang
+	// indefinitely waiting for operations that can never be scheduled.
+	if _, err := topologicalSort(plan); err != nil {
+		return err
+	}
+
 	// Pre-populate execution state with existing containers so that
 	// resolveServiceReferences can find containers for services not
 	// included in the plan (e.g. --no-deps scenarios).
@@ -172,7 +164,15 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 	expect := len(plan.Operations)
 	eg, ctx := errgroup.WithContext(ctx)
 	opCh := make(chan *Operation, expect)
-	defer close(opCh)
+
+	// sendDone sends a completed operation to the consumer goroutine,
+	// respecting context cancellation to avoid blocking or panicking.
+	sendDone := func(op *Operation) {
+		select {
+		case opCh <- op:
+		case <-ctx.Done():
+		}
+	}
 
 	// Consumer goroutine: waits for completed ops and enqueues newly-ready dependents
 	eg.Go(func() error {
@@ -195,7 +195,7 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 							if err := s.executeOperation(ctx, project, depOp, state); err != nil {
 								return err
 							}
-							opCh <- depOp
+							sendDone(depOp)
 							return nil
 						})
 					}
@@ -210,7 +210,7 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 			if err := s.executeOperation(ctx, project, op, state); err != nil {
 				return err
 			}
-			opCh <- op
+			sendDone(op)
 			return nil
 		})
 	}
@@ -245,7 +245,7 @@ func (s *composeService) executeOperation(ctx context.Context, project *types.Pr
 func (s *composeService) dispatchOperation(ctx context.Context, project *types.Project, op *Operation, state *executionState) error {
 	switch op.Type {
 	case OpCreateNetwork:
-		return s.executePlanCreateNetwork(ctx, project, op, state)
+		return s.executePlanCreateNetwork(ctx, project, op)
 	case OpRemoveNetwork:
 		return s.executePlanRemoveNetwork(ctx, project, op)
 	case OpDisconnectNetwork:
@@ -253,7 +253,7 @@ func (s *composeService) dispatchOperation(ctx context.Context, project *types.P
 	case OpConnectNetwork:
 		return s.executePlanConnectNetwork(ctx, op)
 	case OpCreateVolume:
-		return s.executePlanCreateVolume(ctx, project, op, state)
+		return s.executePlanCreateVolume(ctx, project, op)
 	case OpRemoveVolume:
 		return s.executePlanRemoveVolume(ctx, op)
 	case OpCreateContainer:
@@ -273,13 +273,9 @@ func (s *composeService) dispatchOperation(ctx context.Context, project *types.P
 	}
 }
 
-func (s *composeService) executePlanCreateNetwork(ctx context.Context, project *types.Project, op *Operation, state *executionState) error {
-	id, err := s.ensureNetwork(ctx, project, op.NetworkOp.NetworkKey, op.NetworkOp.Desired)
-	if err != nil {
-		return err
-	}
-	state.setNetworkID(op.NetworkOp.NetworkKey, id)
-	return nil
+func (s *composeService) executePlanCreateNetwork(ctx context.Context, project *types.Project, op *Operation) error {
+	_, err := s.ensureNetwork(ctx, project, op.NetworkOp.NetworkKey, op.NetworkOp.Desired)
+	return err
 }
 
 func (s *composeService) executePlanRemoveNetwork(ctx context.Context, project *types.Project, op *Operation) error {
@@ -301,17 +297,13 @@ func (s *composeService) executePlanConnectNetwork(ctx context.Context, op *Oper
 	return err
 }
 
-func (s *composeService) executePlanCreateVolume(ctx context.Context, project *types.Project, op *Operation, state *executionState) error {
+func (s *composeService) executePlanCreateVolume(ctx context.Context, project *types.Project, op *Operation) error {
 	volume := *op.VolumeOp.Desired
 	volume.CustomLabels = volume.CustomLabels.Add(api.VolumeLabel, op.VolumeOp.VolumeKey)
 	volume.CustomLabels = volume.CustomLabels.Add(api.ProjectLabel, project.Name)
 	volume.CustomLabels = volume.CustomLabels.Add(api.VersionLabel, api.ComposeVersion)
-	id, err := s.ensureVolume(ctx, op.VolumeOp.VolumeKey, volume, project)
-	if err != nil {
-		return err
-	}
-	state.setVolumeID(op.VolumeOp.VolumeKey, id)
-	return nil
+	_, err := s.ensureVolume(ctx, op.VolumeOp.VolumeKey, volume, project)
+	return err
 }
 
 func (s *composeService) executePlanRemoveVolume(ctx context.Context, op *Operation) error {
@@ -410,8 +402,18 @@ func (s *composeService) executePlanStopContainer(ctx context.Context, op *Opera
 }
 
 func (s *composeService) executePlanRemoveContainer(ctx context.Context, op *Operation) error {
-	service := op.ContainerOp.Service
-	return s.stopAndRemoveContainer(ctx, *op.ContainerOp.Existing, &service, op.ContainerOp.Timeout, false)
+	ctr := *op.ContainerOp.Existing
+	eventName := getContainerProgressName(ctr)
+	s.events.On(removingEvent(eventName))
+	_, err := s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
+		Force: true,
+	})
+	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
+		s.events.On(errorEvent(eventName, "Error while Removing"))
+		return err
+	}
+	s.events.On(removedEvent(eventName))
+	return nil
 }
 
 func (s *composeService) executePlanRunPlugin(ctx context.Context, project *types.Project, op *Operation) error {
