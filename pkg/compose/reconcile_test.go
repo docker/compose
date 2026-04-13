@@ -131,6 +131,7 @@ func TestReconcileCreateMissingNetwork(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -170,6 +171,7 @@ func TestReconcileSkipUpToDateNetwork(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -236,6 +238,7 @@ func TestReconcileRecreateChangedNetwork(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -275,6 +278,7 @@ func TestReconcileCreateMissingVolume(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -325,6 +329,7 @@ func TestReconcileScaleUp(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -380,6 +385,7 @@ func TestReconcileScaleDown(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -423,6 +429,7 @@ func TestReconcileRecreateContainer(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -471,6 +478,7 @@ func TestReconcileNoChanges(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -506,15 +514,16 @@ func TestReconcileOrphans(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 		RemoveOrphans:        true,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-web-1  reason: scale up
-2. stop container testproject-old-1  reason: orphan container
-[2] -> 3. remove container testproject-old-1  reason: orphan container
+1. stop container testproject-old-1  reason: orphan container
+[1] -> 2. remove container testproject-old-1  reason: orphan container
+[2] -> 3. create container testproject-web-1  reason: scale up
 `)
 }
 
@@ -540,6 +549,7 @@ func TestReconcilePluginService(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -576,6 +586,7 @@ func TestReconcileDependencyEdges(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -624,6 +635,7 @@ func TestReconcileScaleUpMultipleServices(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -671,6 +683,7 @@ func TestReconcileScaleDownMultipleServices(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -710,6 +723,7 @@ func TestReconcileScaleToZero(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -753,6 +767,7 @@ func TestReconcileScaleDownRemovesObsoleteFirst(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -792,6 +807,7 @@ func TestReconcileScaleUpNoRecreate(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateNever, // --no-recreate
 		RecreateDependencies: api.RecreateNever,
 	})
@@ -841,6 +857,7 @@ func TestReconcileForceRecreateNoDeps(t *testing.T) {
 
 	// Only target "my-service" with force recreate; deps get "never"
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateForce,
 		RecreateDependencies: api.RecreateNever,
 		Services:             []string{"my-service"},
@@ -901,6 +918,7 @@ func TestReconcileNetworkConfigChanged(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -953,6 +971,7 @@ func TestReconcileVolumeConfigChanged(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -985,6 +1004,7 @@ func TestReconcileExternalNetworkSkipped(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1016,6 +1036,7 @@ func TestReconcileExternalVolumeSkipped(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1046,6 +1067,7 @@ func TestReconcileOrphansNotRemovedByDefault(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 		RemoveOrphans:        false,
@@ -1091,6 +1113,7 @@ func TestReconcileContainerCreateDependsOnNetworkAndVolume(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1147,6 +1170,7 @@ func TestReconcileImageDigestChanged(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1198,6 +1222,7 @@ func TestReconcileDeadContainerGetsStarted(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1245,6 +1270,7 @@ func TestReconcileExitedContainerNoOps(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1290,6 +1316,7 @@ func TestReconcileForceRecreateUpToDate(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateForce,
 		RecreateDependencies: api.RecreateForce,
 	})
@@ -1329,6 +1356,7 @@ func TestReconcileNeverRecreateStaleContainers(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateNever,
 		RecreateDependencies: api.RecreateNever,
 	})
@@ -1422,6 +1450,7 @@ func TestReconcileNetworkRecreateMultipleContainers(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1502,6 +1531,7 @@ func TestReconcileMultiNetworkContainerReconnectDeps(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1584,6 +1614,7 @@ func TestReconcileNetworkMatchByName(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1625,6 +1656,7 @@ func TestReconcileServiceWithUnknownNetwork(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1700,6 +1732,7 @@ func TestReconcileVolumeRecreateWithContainers(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1747,6 +1780,7 @@ func TestReconcileBindMountNotAffectedByVolumeReconcile(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1799,6 +1833,7 @@ func TestReconcileDiamondDependency(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1853,18 +1888,19 @@ func TestReconcileCascadingRestart(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
 1. create container testproject-_testproject-db-1  reason: config hash changed
-2. stop container testproject-web-1  reason: dependency "db" is being recreated (restart: true)
-[1] -> 3. stop container testproject-db-1  reason: config hash changed
-[3] -> 4. remove container testproject-db-1  reason: config hash changed
-[4] -> 5. rename container testproject-db-1  reason: config hash changed
-[5] -> 6. start container testproject-db-1  reason: config hash changed
-[6,2] -> 7. start container testproject-web-1  reason: restart after dependency "db" recreated
+[1] -> 2. stop container testproject-db-1  reason: config hash changed
+[2] -> 3. remove container testproject-db-1  reason: config hash changed
+[3] -> 4. rename container testproject-db-1  reason: config hash changed
+[4] -> 5. start container testproject-db-1  reason: config hash changed
+[4] -> 6. stop container testproject-web-1  reason: dependency "db" is being recreated (restart: true)
+[5,6] -> 7. start container testproject-web-1  reason: restart after dependency "db" recreated
 `)
 }
 
@@ -1910,6 +1946,7 @@ func TestReconcileNoCascadingRestartWhenFalse(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1949,6 +1986,7 @@ func TestReconcileScaleUpWithConfigChange(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -1991,6 +2029,7 @@ func TestReconcileScaleDownWithConfigChange(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2033,6 +2072,7 @@ func TestReconcileCustomContainerNameScaleError(t *testing.T) {
 	}
 
 	_, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2078,6 +2118,7 @@ func TestReconcileTargetedServiceDependencyPolicy(t *testing.T) {
 
 	// Target only "web" with force-recreate; deps get "never" — db is NOT recreated
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateForce,
 		RecreateDependencies: api.RecreateNever,
 		Services:             []string{"web"},
@@ -2093,6 +2134,7 @@ func TestReconcileTargetedServiceDependencyPolicy(t *testing.T) {
 
 	// Same setup but deps get "diverged" — db IS stale so it gets recreated too
 	plan2, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateForce,
 		RecreateDependencies: api.RecreateDiverged,
 		Services:             []string{"web"},
@@ -2143,6 +2185,7 @@ func TestReconcileNonTargetedServiceSkipped(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 		Services:             []string{"web"},
@@ -2178,6 +2221,7 @@ func TestReconcileEmptyProject(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2209,19 +2253,20 @@ func TestReconcileMultipleOrphans(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 		RemoveOrphans:        true,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-web-1  reason: scale up
-2. stop container testproject-old-a-1  reason: orphan container
-3. stop container testproject-old-b-1  reason: orphan container
-4. stop container testproject-old-c-1  reason: orphan container
-[2] -> 5. remove container testproject-old-a-1  reason: orphan container
-[3] -> 6. remove container testproject-old-b-1  reason: orphan container
-[4] -> 7. remove container testproject-old-c-1  reason: orphan container
+1. stop container testproject-old-a-1  reason: orphan container
+2. stop container testproject-old-b-1  reason: orphan container
+3. stop container testproject-old-c-1  reason: orphan container
+[1] -> 4. remove container testproject-old-a-1  reason: orphan container
+[2] -> 5. remove container testproject-old-b-1  reason: orphan container
+[3] -> 6. remove container testproject-old-c-1  reason: orphan container
+[4,5,6] -> 7. create container testproject-web-1  reason: scale up
 `)
 }
 
@@ -2251,6 +2296,7 @@ func TestReconcilePluginServiceIgnoresRecreatePolicy(t *testing.T) {
 
 	// Test with RecreateNever — plugin should still get an op
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateNever,
 		RecreateDependencies: api.RecreateNever,
 	})
@@ -2261,6 +2307,7 @@ func TestReconcilePluginServiceIgnoresRecreatePolicy(t *testing.T) {
 
 	// Test with RecreateForce — same result
 	plan2, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateForce,
 		RecreateDependencies: api.RecreateForce,
 	})
@@ -2302,6 +2349,7 @@ func TestReconcileNonContiguousScaleDown(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2341,6 +2389,7 @@ func TestReconcileScaleUpFillsAfterMax(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2400,6 +2449,7 @@ func TestReconcileInvalidContainerNumberFallback(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2436,6 +2486,7 @@ func TestReconcilePausedContainerGetsStarted(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2470,6 +2521,7 @@ func TestReconcileRestartingContainerNoOps(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2539,6 +2591,7 @@ func TestReconcileNetworkCheckSkippedNonRunning(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2593,6 +2646,7 @@ func TestReconcileSwarmNetworkSkipped(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2648,6 +2702,7 @@ func TestReconcileNilNetworkSettingsNoPanic(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2699,6 +2754,7 @@ func TestReconcileExternalNetworkResolvedFromContainer(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2737,6 +2793,7 @@ func TestReconcileAnonymousVolumeNoOps(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2808,6 +2865,7 @@ func TestReconcileVolumeRecreateUnrelatedServiceUnaffected(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2854,6 +2912,7 @@ func TestReconcileCircularDependencyNoPanic(t *testing.T) {
 
 	// Should not panic — expandServiceDependencies uses a seen map
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2900,18 +2959,19 @@ func TestReconcileCascadingRestartMultipleDepsOneRecreated(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
 1. create container tp-db-1_tp-db-1  reason: config hash changed
-2. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
-[1] -> 3. stop container tp-db-1  reason: config hash changed
-[3] -> 4. remove container tp-db-1  reason: config hash changed
-[4] -> 5. rename container tp-db-1  reason: config hash changed
-[5] -> 6. start container tp-db-1  reason: config hash changed
-[6,2] -> 7. start container tp-web-1  reason: restart after dependency "db" recreated
+[1] -> 2. stop container tp-db-1  reason: config hash changed
+[2] -> 3. remove container tp-db-1  reason: config hash changed
+[3] -> 4. rename container tp-db-1  reason: config hash changed
+[4] -> 5. start container tp-db-1  reason: config hash changed
+[4] -> 6. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
+[5,6] -> 7. start container tp-web-1  reason: restart after dependency "db" recreated
 `)
 }
 
@@ -2954,6 +3014,7 @@ func TestReconcileCascadingRestartSkippedForExitedDependent(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -2992,6 +3053,7 @@ func TestReconcileCustomContainerNameScale1Allowed(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3042,6 +3104,7 @@ func TestReconcileCustomContainerNameScale0Allowed(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3086,6 +3149,7 @@ func TestReconcileShortContainerIDInRecreate(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3184,6 +3248,7 @@ func TestReconcileTwoServicesShareRecreatedVolume(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3226,6 +3291,7 @@ func TestReconcileDependsOnMissingServiceNoPanic(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3287,6 +3353,7 @@ func TestReconcileStaleConfigAndNetworkRecreate(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3366,6 +3433,7 @@ func TestReconcileVolumeMountMissingTriggersRecreate(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3440,6 +3508,7 @@ func TestReconcileMultipleVolumesOneMissing(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3486,6 +3555,7 @@ func TestReconcileTimeoutPropagated(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 		Timeout:              &timeout,
@@ -3525,6 +3595,7 @@ func TestReconcileScaleUpFromZeroContainers(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3561,6 +3632,7 @@ func TestReconcileAllContainersObsolete(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3613,6 +3685,7 @@ func TestReconcileScaleDownStaleRemovedCurrentKept(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3664,6 +3737,7 @@ func TestReconcileRecreateNoEdgeToRunningDependency(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3710,6 +3784,7 @@ func TestReconcileTwoServicesDependOnSameService(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3753,6 +3828,7 @@ func TestReconcileContainerCreateDependsOnRecreatedNetwork(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3803,6 +3879,7 @@ func TestReconcileCascadingRestartSkippedWhenAlreadyRecreating(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3859,6 +3936,7 @@ func TestReconcileMultiplePluginServices(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -3892,6 +3970,7 @@ func TestReconcileOrphanAlreadyStopped(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 		RemoveOrphans:        true,
@@ -3956,6 +4035,7 @@ func TestReconcileExternalVolumeResolvedFromContainer(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -4006,6 +4086,7 @@ func TestReconcileServiceDependsOnMissingNetworkVolumeAndService(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -4044,6 +4125,7 @@ func TestReconcileInheritFlagPropagated(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 		Inherit:              true,
@@ -4130,6 +4212,7 @@ func TestReconcileMultiNetworkAndContainerRecreate(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -4205,6 +4288,7 @@ func TestReconcileCascadingRestartWithVolumeRecreatedDep(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
 		Recreate:             api.RecreateDiverged,
 		RecreateDependencies: api.RecreateDiverged,
 	})
@@ -4251,8 +4335,9 @@ func TestReconcileOrphanContainersTouched(t *testing.T) {
 	}
 
 	plan, err := Reconcile(project, observed, ReconcileOptions{
-		Recreate:      api.RecreateDiverged,
-		RemoveOrphans: true,
+		StartContainers: true,
+		Recreate:        api.RecreateDiverged,
+		RemoveOrphans:   true,
 	})
 	assert.NilError(t, err)
 
@@ -4267,6 +4352,440 @@ func TestReconcileOrphanContainersTouched(t *testing.T) {
 	// ContainerTouched should return true for this container
 	assert.Assert(t, plan.ContainerTouched(ctrName),
 		"orphan with stop+remove ops should be touched")
+}
+
+// ---------------------------------------------------------------------------
+// TestReconcilePruneCleansDanglingDependsOn verifies that after pruning stale
+// network ops for recreated containers, no operation has a DependsOn reference
+// to a deleted operation.
+// ---------------------------------------------------------------------------
+
+func TestReconcilePruneCleansDanglingDependsOn(t *testing.T) {
+	// Setup: container with stale config hash connected to network with stale hash.
+	// Both container and network will be recreated.
+	svc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		Networks: map[string]*types.ServiceNetworkConfig{
+			"default": nil,
+		},
+	}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": svc,
+		},
+		Networks: types.Networks{
+			"default": types.NetworkConfig{Name: "testproject_default"},
+		},
+	}
+
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "ctr-web-old12",
+					Names: []string{"/testproject-web-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "testproject",
+						api.ConfigHashLabel:      "stale-hash",
+					},
+					NetworkSettings: &container.NetworkSettingsSummary{
+						Networks: map[string]*network.EndpointSettings{
+							"testproject_default": {NetworkID: "net-old"},
+						},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{
+			"default": {
+				ID:         "net-old",
+				Name:       "testproject_default",
+				ConfigHash: "outdated-hash",
+			},
+		},
+		Volumes: map[string]ObservedVolume{},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	// Verify: every DependsOn in plan points to an existing operation
+	for _, op := range plan.Operations {
+		for _, depID := range op.DependsOn {
+			_, exists := plan.Operations[depID]
+			assert.Assert(t, exists, "operation %q has dangling DependsOn reference to %q", op.ID, depID)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestReconcileSkipUpToDateVolume verifies that a volume whose config hash
+// matches the observed state produces no volume operations.
+// ---------------------------------------------------------------------------
+
+func TestReconcileSkipUpToDateVolume(t *testing.T) {
+	vol := types.VolumeConfig{Name: "testproject_data"}
+	hash, err := VolumeHash(vol)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": types.ServiceConfig{Name: "web", Image: "nginx"},
+		},
+		Volumes: types.Volumes{
+			"data": vol,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data": {
+				Name:       "testproject_data",
+				Driver:     "local",
+				ConfigHash: hash,
+			},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	for _, op := range plan.Operations {
+		if op.Type == OpCreateVolume || op.Type == OpRemoveVolume {
+			t.Fatalf("unexpected volume operation: %s", op.ID)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestReconcileVolumeRecreateAndConfigHashStale verifies that when a container
+// has both a stale config hash AND its volume is being recreated, the volume
+// recreate path takes precedence.
+// ---------------------------------------------------------------------------
+
+func TestReconcileVolumeRecreateAndConfigHashStale(t *testing.T) {
+	svc := types.ServiceConfig{
+		Name:  "app",
+		Image: "nginx",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: "volume", Source: "data", Target: "/data"},
+		},
+	}
+
+	originalVol := types.VolumeConfig{Name: "testproject_data"}
+	originalHash, err := VolumeHash(originalVol)
+	assert.NilError(t, err)
+
+	updatedVol := types.VolumeConfig{
+		Name:   "testproject_data",
+		Labels: types.Labels{"version": "2"},
+	}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"app": svc,
+		},
+		Volumes: types.Volumes{
+			"data": updatedVol,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"app": {
+				{
+					ID:    "ctr-app",
+					Names: []string{"/testproject-app-1"},
+					State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "app",
+						api.ContainerNumberLabel: "1",
+						api.ProjectLabel:         "testproject",
+						api.ConfigHashLabel:      "stale-container-hash",
+					},
+					Mounts: []container.MountPoint{
+						{Type: "volume", Name: "testproject_data"},
+					},
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data": {
+				Name:       "testproject_data",
+				Driver:     "local",
+				ConfigHash: originalHash,
+			},
+		},
+		Orphans: Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	// The volume recreate path creates a simple create-container (no rename op),
+	// because the volume recreation removes the old container.
+	for _, op := range plan.Operations {
+		if op.Type == OpRenameContainer && op.ServiceName == "app" {
+			t.Fatalf("unexpected rename op for app: volume recreate path should not produce a rename chain")
+		}
+	}
+
+	// There should be a create-container for app
+	found := false
+	for _, op := range plan.Operations {
+		if op.Type == OpCreateContainer && op.ServiceName == "app" {
+			found = true
+			break
+		}
+	}
+	assert.Assert(t, found, "expected create-container op for app")
+}
+
+// ---------------------------------------------------------------------------
+// TestReconcileRemovingContainerNoStart verifies that a container in "removing"
+// state does not get a start operation.
+// ---------------------------------------------------------------------------
+
+func TestReconcileRemovingContainerNoStart(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+	hash, err := ServiceHash(svc)
+	assert.NilError(t, err)
+
+	ctr := makeContainer("testproject", "web", 1, hash)
+	ctr.State = "removing"
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{"web": {ctr}},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans:     Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	for _, op := range plan.Operations {
+		if op.Type == OpStartContainer && op.ServiceName == "web" {
+			t.Fatalf("unexpected start op for container in removing state: %s", op.ID)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestReconcileCreateDoesNotIncludeStartOps verifies that when StartContainers
+// is false (docker compose create), recreated containers don't get start ops
+// and non-running containers don't get start ops.
+// ---------------------------------------------------------------------------
+
+func TestReconcileCreateDoesNotIncludeStartOps(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Image: "nginx"}
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": svc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"web": {
+				{
+					ID:    "abc123def456",
+					Names: []string{"/testproject-web-1"},
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      "stale-hash",
+						api.ProjectLabel:         "testproject",
+					},
+					State: container.StateRunning,
+				},
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      false, // docker compose create
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	for _, op := range plan.Operations {
+		if op.Type == OpStartContainer {
+			// Network recreation starts are acceptable
+			if op.ContainerOp != nil && op.ContainerOp.NetworkRecreate {
+				continue
+			}
+			t.Fatalf("unexpected start op when StartContainers is false: %s (reason: %s)", op.ID, op.Reason)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestReconcileOrphansRemovedBeforeServiceCreation verifies that orphan
+// container removal operations are dependencies of service container creation.
+// ---------------------------------------------------------------------------
+
+func TestReconcileOrphansRemovedBeforeServiceCreation(t *testing.T) {
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"web": types.ServiceConfig{Name: "web", Image: "nginx"},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers:  map[string]Containers{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+		Orphans: Containers{
+			makeContainer("testproject", "old", 1, "hash-old"),
+		},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+		RemoveOrphans:        true,
+	})
+	assert.NilError(t, err)
+
+	// Find the create-container op for web
+	var createOp *Operation
+	for _, op := range plan.Operations {
+		if op.Type == OpCreateContainer && op.ServiceName == "web" {
+			createOp = op
+			break
+		}
+	}
+	assert.Assert(t, createOp != nil, "expected create-container op for web")
+
+	// Find the remove-container op for orphan
+	orphanRemoveID := "remove-container:testproject-old-1"
+	_, hasRemove := plan.Operations[orphanRemoveID]
+	assert.Assert(t, hasRemove, "expected remove-container op for orphan")
+
+	// Assert create-container depends on orphan removal
+	found := false
+	for _, dep := range createOp.DependsOn {
+		if dep == orphanRemoveID {
+			found = true
+			break
+		}
+	}
+	assert.Assert(t, found, "create-container:web should depend on orphan removal, got deps: %v", createOp.DependsOn)
+}
+
+// ---------------------------------------------------------------------------
+// TestReconcileCascadingRestartStopDependsOnRename verifies that when a
+// dependent service is restarted due to dependency recreation, its stop
+// operation depends on the dependency's rename (completion of recreation).
+// ---------------------------------------------------------------------------
+
+func TestReconcileCascadingRestartStopDependsOnRename(t *testing.T) {
+	dbSvc := types.ServiceConfig{Name: "db", Image: "postgres"}
+	webSvc := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db": types.ServiceDependency{
+				Condition: "service_started",
+				Restart:   true,
+			},
+		},
+	}
+	webHash, err := ServiceHash(webSvc)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name: "testproject",
+		Services: types.Services{
+			"db":  dbSvc,
+			"web": webSvc,
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "testproject",
+		Containers: map[string]Containers{
+			"db": {
+				makeContainer("testproject", "db", 1, "stale-hash"),
+			},
+			"web": {
+				makeContainer("testproject", "web", 1, webHash),
+			},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+
+	// Find stop-container:testproject-web-1
+	stopOp, exists := plan.Operations["stop-container:testproject-web-1"]
+	assert.Assert(t, exists, "expected stop-container op for web")
+
+	// It should depend on the rename op for db
+	renameID := "rename-container:testproject-db-1"
+	_, hasRename := plan.Operations[renameID]
+	assert.Assert(t, hasRename, "expected rename-container op for db")
+
+	found := false
+	for _, dep := range stopOp.DependsOn {
+		if dep == renameID {
+			found = true
+			break
+		}
+	}
+	assert.Assert(t, found, "stop-container:web should depend on rename-container:db, got deps: %v", stopOp.DependsOn)
 }
 
 // ---------------------------------------------------------------------------

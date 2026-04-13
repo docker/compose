@@ -246,6 +246,7 @@ type ReconcileOptions struct {
 	Inherit              bool
 	Timeout              *time.Duration
 	RemoveOrphans        bool
+	StartContainers      bool // include OpStartContainer in the plan (true for up, false for create)
 }
 
 // Reconcile computes the set of operations needed to bring the observed state
@@ -941,45 +942,30 @@ func reconcileServiceContainers(
 				Reason:    reason,
 			}
 
-			// 5. Start the new container (depends on rename)
-			startID := fmt.Sprintf("start-container:%s", ctrName)
-			plan.Operations[startID] = &Operation{
-				ID:          startID,
-				Type:        OpStartContainer,
-				ServiceName: service.Name,
-				Resource:    ctrName,
-				ContainerOp: &ContainerOperation{
-					Service:       service,
-					ContainerName: ctrName,
-					// Existing is nil here; executePlanStartContainer will
-					// look up the container by name after rename.
-				},
-				DependsOn: []string{renameID},
-				Reason:    reason,
+			// 5. Start the new container (depends on rename) — only when StartContainers is set.
+			// docker compose create should not start containers; docker compose up should.
+			if opts.StartContainers {
+				startID := fmt.Sprintf("start-container:%s", ctrName)
+				plan.Operations[startID] = &Operation{
+					ID:          startID,
+					Type:        OpStartContainer,
+					ServiceName: service.Name,
+					Resource:    ctrName,
+					ContainerOp: &ContainerOperation{
+						Service:       service,
+						ContainerName: ctrName,
+						// Existing is nil here; executePlanStartContainer will
+						// look up the container by name after rename.
+					},
+					DependsOn: []string{renameID},
+					Reason:    reason,
+				}
 			}
 			continue
 		}
 
-		// Container is up-to-date; check if it needs starting
-		switch ctr.State {
-		case container.StateRunning, container.StateCreated, container.StateRestarting, container.StateExited:
-			// no action needed
-		default:
-			ctrName := getCanonicalContainerName(ctr)
-			id := fmt.Sprintf("start-container:%s", ctrName)
-			plan.Operations[id] = &Operation{
-				ID:          id,
-				Type:        OpStartContainer,
-				ServiceName: service.Name,
-				Resource:    ctrName,
-				ContainerOp: &ContainerOperation{
-					Service:       service,
-					ContainerName: ctrName,
-					Existing:      &ctr,
-				},
-				Reason: fmt.Sprintf("container not running (state: %s)", ctr.State),
-			}
-		}
+		// Container is up-to-date; add a start op if needed
+		maybeAddStartOp(service, ctr, plan, opts)
 	}
 
 	// Scale up: create missing containers
@@ -1007,6 +993,33 @@ func reconcileServiceContainers(
 	return nil
 }
 
+// maybeAddStartOp adds an OpStartContainer for a container that is up-to-date
+// but not in a running/created/restarting/exited/removing state, and only when
+// StartContainers is enabled.
+func maybeAddStartOp(service types.ServiceConfig, ctr container.Summary, plan *ReconciliationPlan, opts ReconcileOptions) {
+	switch ctr.State {
+	case container.StateRunning, container.StateCreated, container.StateRestarting, container.StateExited, container.StateRemoving:
+		return
+	}
+	if !opts.StartContainers {
+		return
+	}
+	ctrName := getCanonicalContainerName(ctr)
+	id := fmt.Sprintf("start-container:%s", ctrName)
+	plan.Operations[id] = &Operation{
+		ID:          id,
+		Type:        OpStartContainer,
+		ServiceName: service.Name,
+		Resource:    ctrName,
+		ContainerOp: &ContainerOperation{
+			Service:       service,
+			ContainerName: ctrName,
+			Existing:      &ctr,
+		},
+		Reason: fmt.Sprintf("container not running (state: %s)", ctr.State),
+	}
+}
+
 // buildDependencyEdges wires up DependsOn and Dependents for container operations
 // based on service dependencies, network dependencies, and volume dependencies.
 //
@@ -1018,14 +1031,38 @@ func reconcileServiceContainers(
 // ordering.
 func buildDependencyEdges(project *types.Project, plan *ReconciliationPlan) {
 	readyOpsByService := indexReadyOps(plan)
+	orphanRemoveIDs := collectOrphanRemoveIDs(plan)
 
 	for _, op := range plan.Operations {
 		if (op.Type == OpCreateContainer || op.Type == OpStartContainer) && op.ContainerOp != nil {
 			addOperationDependencies(project, plan, op, readyOpsByService)
+			// Ensure orphan containers are removed before new containers are
+			// created to avoid port conflicts or resource contention.
+			addOrphanDependencies(op, orphanRemoveIDs)
 		}
 	}
 
 	buildReverseEdges(plan)
+}
+
+// collectOrphanRemoveIDs returns the IDs of all orphan remove-container operations.
+func collectOrphanRemoveIDs(plan *ReconciliationPlan) []string {
+	var ids []string
+	for _, op := range plan.Operations {
+		if op.Type == OpRemoveContainer && op.Reason == "orphan container" {
+			ids = append(ids, op.ID)
+		}
+	}
+	return ids
+}
+
+// addOrphanDependencies makes an operation depend on all orphan removal ops.
+func addOrphanDependencies(op *Operation, orphanRemoveIDs []string) {
+	for _, id := range orphanRemoveIDs {
+		if !slices.Contains(op.DependsOn, id) {
+			op.DependsOn = append(op.DependsOn, id)
+		}
+	}
 }
 
 // indexReadyOps indexes the "service ready" operation for each service name.
@@ -1193,21 +1230,24 @@ func expandServiceDependencies(project *types.Project, services []string) []stri
 // dependencies are being recreated and that have restart: true in their
 // depends_on config.
 func addCascadingRestarts(project *types.Project, observed *ObservedState, plan *ReconciliationPlan, opts ReconcileOptions) {
-	// Collect services being recreated (rename ops indicate a recreate chain)
-	recreatedServices := map[string]bool{}
+	// Collect services being recreated and map service name -> rename op IDs.
+	// The rename op is the point at which the old container is fully replaced,
+	// so dependent stops should wait for it.
+	recreatedServiceRenameOps := map[string][]string{}
 	for _, op := range plan.Operations {
 		if op.Type == OpRenameContainer {
-			recreatedServices[op.ServiceName] = true
+			recreatedServiceRenameOps[op.ServiceName] = append(recreatedServiceRenameOps[op.ServiceName], op.ID)
 		}
 	}
-	if len(recreatedServices) == 0 {
+	if len(recreatedServiceRenameOps) == 0 {
 		return
 	}
 
 	// For each service in the project, check if it depends on a recreated service with restart: true
 	for _, service := range project.Services {
 		for depName, dep := range service.DependsOn {
-			if !dep.Restart || !recreatedServices[depName] {
+			renameOps := recreatedServiceRenameOps[depName]
+			if !dep.Restart || len(renameOps) == 0 {
 				continue
 			}
 			// This service's dependency is being recreated and has restart: true.
@@ -1222,6 +1262,8 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 				}
 
 				stopID := fmt.Sprintf("stop-container:%s", ctrName)
+				stopDeps := make([]string, len(renameOps))
+				copy(stopDeps, renameOps)
 				plan.Operations[stopID] = &Operation{
 					ID:          stopID,
 					Type:        OpStopContainer,
@@ -1233,7 +1275,8 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 						Existing:      &ctr,
 						Timeout:       opts.Timeout,
 					},
-					Reason: fmt.Sprintf("dependency %q is being recreated (restart: true)", depName),
+					DependsOn: stopDeps,
+					Reason:    fmt.Sprintf("dependency %q is being recreated (restart: true)", depName),
 				}
 
 				startID := fmt.Sprintf("start-container:%s", ctrName)
