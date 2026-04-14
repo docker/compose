@@ -178,6 +178,11 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 
 	expect := len(plan.Operations)
 	eg, ctx := errgroup.WithContext(ctx)
+	if s.maxConcurrency > 0 {
+		// +1 to reserve a slot for the consumer goroutine that schedules
+		// dependent operations, same pattern as graphTraversal.visit().
+		eg.SetLimit(s.maxConcurrency + 1)
+	}
 	opCh := make(chan *Operation, expect)
 
 	// sendDone sends a completed operation to the consumer goroutine,
