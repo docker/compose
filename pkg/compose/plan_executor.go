@@ -42,13 +42,15 @@ import (
 // executionState tracks the results of operations as they complete, allowing
 // dependent operations to resolve service references.
 type executionState struct {
-	mu         sync.Mutex
-	containers map[string]Containers // service name -> containers created/updated
+	mu           sync.Mutex
+	containers   map[string]Containers // service name -> containers created/updated
+	containerIDs map[string]string     // container name -> container ID (populated by create, used by start after rename)
 }
 
 func newExecutionState() *executionState {
 	return &executionState{
-		containers: make(map[string]Containers),
+		containers:   make(map[string]Containers),
+		containerIDs: make(map[string]string),
 	}
 }
 
@@ -74,6 +76,19 @@ func (es *executionState) getContainers(serviceName string) Containers {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 	return slices.Clone(es.containers[serviceName])
+}
+
+func (es *executionState) setContainerID(containerName, containerID string) {
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	es.containerIDs[containerName] = containerID
+}
+
+func (es *executionState) getContainerID(containerName string) (string, bool) {
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	id, ok := es.containerIDs[containerName]
+	return id, ok
 }
 
 // resolveServiceReferences replaces service references in a ServiceConfig with
@@ -245,7 +260,7 @@ func (s *composeService) executeOperation(ctx context.Context, project *types.Pr
 func (s *composeService) dispatchOperation(ctx context.Context, project *types.Project, op *Operation, state *executionState) error {
 	switch op.Type {
 	case OpCreateNetwork:
-		return s.executePlanCreateNetwork(ctx, project, op)
+		return s.executePlanCreateNetwork(ctx, op)
 	case OpRemoveNetwork:
 		return s.executePlanRemoveNetwork(ctx, project, op)
 	case OpDisconnectNetwork:
@@ -259,13 +274,13 @@ func (s *composeService) dispatchOperation(ctx context.Context, project *types.P
 	case OpCreateContainer:
 		return s.executePlanCreateContainer(ctx, project, op, state)
 	case OpStartContainer:
-		return s.executePlanStartContainer(ctx, op)
+		return s.executePlanStartContainer(ctx, op, state)
 	case OpStopContainer:
 		return s.executePlanStopContainer(ctx, op)
 	case OpRemoveContainer:
 		return s.executePlanRemoveContainer(ctx, op)
 	case OpRenameContainer:
-		return s.executePlanRenameContainer(ctx, op)
+		return s.executePlanRenameContainer(ctx, op, state)
 	case OpRunPlugin:
 		return s.executePlanRunPlugin(ctx, project, op)
 	case OpEmitEvent:
@@ -275,8 +290,8 @@ func (s *composeService) dispatchOperation(ctx context.Context, project *types.P
 	}
 }
 
-func (s *composeService) executePlanCreateNetwork(ctx context.Context, project *types.Project, op *Operation) error {
-	_, err := s.ensureNetwork(ctx, project, op.NetworkOp.NetworkKey, op.NetworkOp.Desired)
+func (s *composeService) executePlanCreateNetwork(ctx context.Context, op *Operation) error {
+	_, err := s.createNetworkIdempotent(ctx, op.NetworkOp.Desired)
 	return err
 }
 
@@ -304,8 +319,7 @@ func (s *composeService) executePlanCreateVolume(ctx context.Context, project *t
 	volume.CustomLabels = volume.CustomLabels.Add(api.VolumeLabel, op.VolumeOp.VolumeKey)
 	volume.CustomLabels = volume.CustomLabels.Add(api.ProjectLabel, project.Name)
 	volume.CustomLabels = volume.CustomLabels.Add(api.VersionLabel, api.ComposeVersion)
-	_, err := s.ensureVolume(ctx, op.VolumeOp.VolumeKey, volume, project)
-	return err
+	return s.createVolumeIdempotent(ctx, volume)
 }
 
 func (s *composeService) executePlanRemoveVolume(ctx context.Context, op *Operation) error {
@@ -349,27 +363,38 @@ func (s *composeService) executePlanCreateContainer(ctx context.Context, project
 		return err
 	}
 	state.addContainer(op.ServiceName, ctr)
+	state.setContainerID(op.ContainerOp.ContainerName, ctr.ID)
 	return nil
 }
 
-func (s *composeService) executePlanRenameContainer(ctx context.Context, op *Operation) error {
+func (s *composeService) executePlanRenameContainer(ctx context.Context, op *Operation, state *executionState) error {
 	_, err := s.apiClient().ContainerRename(ctx, op.RenameOp.CurrentName, client.ContainerRenameOptions{
 		NewName: op.RenameOp.NewName,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	// Propagate the container ID under the new name so that subsequent
+	// operations (e.g. start) can resolve it without an extra API call.
+	if id, ok := state.getContainerID(op.RenameOp.CurrentName); ok {
+		state.setContainerID(op.RenameOp.NewName, id)
+	}
+	return nil
 }
 
-func (s *composeService) executePlanStartContainer(ctx context.Context, op *Operation) error {
+func (s *composeService) executePlanStartContainer(ctx context.Context, op *Operation, state *executionState) error {
 	var containerID string
-	if op.ContainerOp.Existing != nil {
+	switch {
+	case op.ContainerOp.Existing != nil:
 		containerID = op.ContainerOp.Existing.ID
-	} else {
-		// Container was just created/renamed; look it up by name
-		res, err := s.apiClient().ContainerInspect(ctx, op.ContainerOp.ContainerName, client.ContainerInspectOptions{})
-		if err != nil {
-			return fmt.Errorf("cannot start container %s: %w", op.ContainerOp.ContainerName, err)
+	default:
+		// Container was just created/renamed; resolve ID from execution state
+		// (populated by executePlanCreateContainer and executePlanRenameContainer).
+		id, ok := state.getContainerID(op.ContainerOp.ContainerName)
+		if !ok {
+			return fmt.Errorf("cannot start container %s: ID not found in execution state", op.ContainerOp.ContainerName)
 		}
-		containerID = res.Container.ID
+		containerID = id
 	}
 	startMx.Lock()
 	_, err := s.apiClient().ContainerStart(ctx, containerID, client.ContainerStartOptions{})
