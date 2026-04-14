@@ -100,6 +100,12 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 			return err
 		}
 
+		// Skip provider services when the caller opted out (e.g. watch rebuild),
+		// since providers were already set up during initial "up".
+		if service.Provider != nil && options.SkipProviders {
+			return nil
+		}
+
 		return tracing.SpanWrapFunc("service/apply", tracing.ServiceOptions(service), func(ctx context.Context) error {
 			strategy := options.RecreateDependencies
 			if slices.Contains(options.Services, name) {
