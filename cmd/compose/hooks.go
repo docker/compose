@@ -19,23 +19,58 @@ package compose
 import (
 	"encoding/json"
 	"io"
+	"os"
 
 	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/compose/v5/cmd/formatter"
 )
 
 const deepLink = "docker-desktop://dashboard/logs"
 
-const composeLogsHint = "Filter, search, and stream logs from all your Compose services\nin one place with Docker Desktop's Logs view. " + deepLink
+func composeLogsHint() string {
+	return "Filter, search, and stream logs from all your Compose services\nin one place with Docker Desktop's Logs view. " + hintLink(deepLink)
+}
 
-const dockerLogsHint = "View and search logs for all containers in one place\nwith Docker Desktop's Logs view. " + deepLink
+func dockerLogsHint() string {
+	return "View and search logs for all containers in one place\nwith Docker Desktop's Logs view. " + hintLink(deepLink)
+}
+
+// hintLink returns a clickable OSC 8 terminal hyperlink when ANSI is allowed,
+// or the plain URL when ANSI output is suppressed via NO_COLOR or COMPOSE_ANSI.
+func hintLink(url string) string {
+	if shouldDisableAnsi() {
+		return url
+	}
+	return formatter.OSC8Link(url, url)
+}
+
+// shouldDisableAnsi checks whether ANSI escape sequences should be explicitly
+// suppressed via environment variables. The hook runs as a separate subprocess
+// where the normal PersistentPreRunE (which calls formatter.SetANSIMode) is
+// skipped, so we check NO_COLOR and COMPOSE_ANSI directly.
+//
+// TTY detection is intentionally omitted: the hook produces a JSON response
+// whose template is rendered by the parent Docker CLI process via
+// PrintNextSteps (which itself emits bold ANSI unconditionally). The hook
+// subprocess cannot reliably detect whether the parent's output is a terminal.
+func shouldDisableAnsi() bool {
+	if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
+		return true
+	}
+	if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && v == formatter.Never {
+		return true
+	}
+	return false
+}
 
 // hookHint defines a hint that can be returned by the hooks handler.
 // When checkFlags is nil, the hint is always returned for the matching command.
 // When checkFlags is set, the hint is only returned if the check passes.
 type hookHint struct {
-	template   string
+	template   func() string
 	checkFlags func(flags map[string]string) bool
 }
 
@@ -96,6 +131,6 @@ func handleHook(args []string, w io.Writer) error {
 	enc.SetEscapeHTML(false)
 	return enc.Encode(hooks.Response{
 		Type:     hooks.NextSteps,
-		Template: hint.template,
+		Template: hint.template(),
 	})
 }

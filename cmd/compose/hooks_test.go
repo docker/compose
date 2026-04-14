@@ -19,10 +19,13 @@ package compose
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/docker/cli/cli-plugins/hooks"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/cmd/formatter"
 )
 
 func TestHandleHook_NoArgs(t *testing.T) {
@@ -52,7 +55,7 @@ func TestHandleHook_UnknownCommand(t *testing.T) {
 func TestHandleHook_LogsCommand(t *testing.T) {
 	tests := []struct {
 		rootCmd  string
-		wantHint string
+		wantHint func() string
 	}{
 		{rootCmd: "compose logs", wantHint: composeLogsHint},
 		{rootCmd: "logs", wantHint: dockerLogsHint},
@@ -68,7 +71,7 @@ func TestHandleHook_LogsCommand(t *testing.T) {
 
 			msg := unmarshalResponse(t, buf.Bytes())
 			assert.Equal(t, msg.Type, hooks.NextSteps)
-			assert.Equal(t, msg.Template, tt.wantHint)
+			assert.Equal(t, msg.Template, tt.wantHint())
 		})
 	}
 }
@@ -112,12 +115,59 @@ func TestHandleHook_ComposeUpDetached(t *testing.T) {
 
 			if tt.wantHint {
 				msg := unmarshalResponse(t, buf.Bytes())
-				assert.Equal(t, msg.Template, composeLogsHint)
+				assert.Equal(t, msg.Template, composeLogsHint())
 			} else {
 				assert.Equal(t, buf.String(), "")
 			}
 		})
 	}
+}
+
+func TestHandleHook_HintContainsOSC8Link(t *testing.T) {
+	// Ensure ANSI is not suppressed by the test runner environment
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("COMPOSE_ANSI", "")
+	data := marshalHookData(t, hooks.Request{
+		RootCmd: "compose logs",
+	})
+	var buf bytes.Buffer
+	err := handleHook([]string{data}, &buf)
+	assert.NilError(t, err)
+
+	msg := unmarshalResponse(t, buf.Bytes())
+	// Verify the template contains the OSC 8 hyperlink sequence
+	wantLink := formatter.OSC8Link(deepLink, deepLink)
+	assert.Assert(t, len(wantLink) > len(deepLink), "OSC8Link should wrap the URL with escape sequences")
+	assert.Assert(t, strings.Contains(msg.Template, wantLink), "hint should contain OSC 8 hyperlink")
+}
+
+func TestHandleHook_NoColorDisablesOsc8(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	data := marshalHookData(t, hooks.Request{
+		RootCmd: "compose logs",
+	})
+	var buf bytes.Buffer
+	err := handleHook([]string{data}, &buf)
+	assert.NilError(t, err)
+
+	msg := unmarshalResponse(t, buf.Bytes())
+	// With NO_COLOR set, the hint should contain the plain URL without escape sequences
+	assert.Assert(t, strings.Contains(msg.Template, deepLink), "hint should contain the deep link URL")
+	assert.Assert(t, !strings.Contains(msg.Template, "\033"), "hint should not contain ANSI escape sequences")
+}
+
+func TestHandleHook_ComposeAnsiNeverDisablesOsc8(t *testing.T) {
+	t.Setenv("COMPOSE_ANSI", "never")
+	data := marshalHookData(t, hooks.Request{
+		RootCmd: "compose logs",
+	})
+	var buf bytes.Buffer
+	err := handleHook([]string{data}, &buf)
+	assert.NilError(t, err)
+
+	msg := unmarshalResponse(t, buf.Bytes())
+	assert.Assert(t, strings.Contains(msg.Template, deepLink), "hint should contain the deep link URL")
+	assert.Assert(t, !strings.Contains(msg.Template, "\033"), "hint should not contain ANSI escape sequences")
 }
 
 func marshalHookData(t *testing.T, data hooks.Request) string {
