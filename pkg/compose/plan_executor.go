@@ -268,6 +268,8 @@ func (s *composeService) dispatchOperation(ctx context.Context, project *types.P
 		return s.executePlanRenameContainer(ctx, op)
 	case OpRunPlugin:
 		return s.executePlanRunPlugin(ctx, project, op)
+	case OpEmitEvent:
+		return s.executePlanEmitEvent(op)
 	default:
 		return fmt.Errorf("unknown operation type: %d", op.Type)
 	}
@@ -319,9 +321,6 @@ func (s *composeService) executePlanCreateContainer(ctx context.Context, project
 		return err
 	}
 
-	eventName := "Container " + op.ContainerOp.ContainerName
-	s.events.On(creatingEvent(eventName))
-
 	labels := mergeLabels(service.Labels, service.CustomLabels)
 
 	// When Existing is set, this is the "create" step of a recreate chain:
@@ -349,27 +348,18 @@ func (s *composeService) executePlanCreateContainer(ctx context.Context, project
 	if err != nil {
 		return err
 	}
-	s.events.On(createdEvent(eventName))
-
 	state.addContainer(op.ServiceName, ctr)
 	return nil
 }
 
 func (s *composeService) executePlanRenameContainer(ctx context.Context, op *Operation) error {
-	eventName := "Container " + op.RenameOp.NewName
-	s.events.On(newEvent(eventName, api.Working, "Recreate"))
 	_, err := s.apiClient().ContainerRename(ctx, op.RenameOp.CurrentName, client.ContainerRenameOptions{
 		NewName: op.RenameOp.NewName,
 	})
-	if err != nil {
-		return err
-	}
-	s.events.On(newEvent(eventName, api.Done, "Recreated"))
-	return nil
+	return err
 }
 
 func (s *composeService) executePlanStartContainer(ctx context.Context, op *Operation) error {
-	eventName := "Container " + op.ContainerOp.ContainerName
 	var containerID string
 	if op.ContainerOp.Existing != nil {
 		containerID = op.ContainerOp.Existing.ID
@@ -381,15 +371,10 @@ func (s *composeService) executePlanStartContainer(ctx context.Context, op *Oper
 		}
 		containerID = res.Container.ID
 	}
-	s.events.On(startingEvent(eventName))
 	startMx.Lock()
 	_, err := s.apiClient().ContainerStart(ctx, containerID, client.ContainerStartOptions{})
 	startMx.Unlock()
-	if err != nil {
-		return err
-	}
-	s.events.On(startedEvent(eventName))
-	return nil
+	return err
 }
 
 func (s *composeService) executePlanStopContainer(ctx context.Context, op *Operation) error {
@@ -398,26 +383,27 @@ func (s *composeService) executePlanStopContainer(ctx context.Context, op *Opera
 		s := op.ContainerOp.Service
 		svc = &s
 	}
-	return s.stopContainer(ctx, svc, *op.ContainerOp.Existing, op.ContainerOp.Timeout, nil)
+	return s.stopContainerCore(ctx, svc, *op.ContainerOp.Existing, op.ContainerOp.Timeout, nil)
 }
 
 func (s *composeService) executePlanRemoveContainer(ctx context.Context, op *Operation) error {
 	ctr := *op.ContainerOp.Existing
-	eventName := getContainerProgressName(ctr)
-	s.events.On(removingEvent(eventName))
 	_, err := s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
 		Force: true,
 	})
 	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
-		s.events.On(errorEvent(eventName, "Error while Removing"))
 		return err
 	}
-	s.events.On(removedEvent(eventName))
 	return nil
 }
 
 func (s *composeService) executePlanRunPlugin(ctx context.Context, project *types.Project, op *Operation) error {
 	return s.runPlugin(ctx, project, op.PluginOp.Service, op.PluginOp.Action)
+}
+
+func (s *composeService) executePlanEmitEvent(op *Operation) error {
+	s.events.On(newEvent(op.EventOp.EventName, op.EventOp.Status, op.EventOp.Text))
+	return nil
 }
 
 // DisplayPlan performs a topological sort of operations and displays them
@@ -445,6 +431,8 @@ func DisplayPlan(plan *ReconciliationPlan, w io.Writer) error {
 		case op.RenameOp != nil:
 			serviceOps[op.ServiceName] = append(serviceOps[op.ServiceName], op)
 		case op.PluginOp != nil:
+			serviceOps[op.ServiceName] = append(serviceOps[op.ServiceName], op)
+		case op.EventOp != nil:
 			serviceOps[op.ServiceName] = append(serviceOps[op.ServiceName], op)
 		}
 	}
@@ -520,6 +508,8 @@ func opVerb(t OperationType) string {
 		return "stop"
 	case OpRunPlugin:
 		return "plugin"
+	case OpEmitEvent:
+		return "emit"
 	default:
 		return "unknown"
 	}

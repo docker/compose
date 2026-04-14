@@ -47,6 +47,7 @@ const (
 	OpRemoveContainer
 	OpRenameContainer
 	OpRunPlugin
+	OpEmitEvent
 )
 
 // String returns a human-readable name for the operation type.
@@ -76,6 +77,8 @@ func (o OperationType) String() string {
 		return "rename-container"
 	case OpRunPlugin:
 		return "run-plugin"
+	case OpEmitEvent:
+		return "emit-event"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(o))
 	}
@@ -93,6 +96,7 @@ type Operation struct {
 	PluginOp           *PluginOperation
 	ContainerNetworkOp *ContainerNetworkOperation
 	RenameOp           *RenameOperation
+	EventOp            *EventOperation
 	DependsOn          []string
 	Reason             string
 }
@@ -132,6 +136,13 @@ type ContainerOperation struct {
 type RenameOperation struct {
 	CurrentName string
 	NewName     string
+}
+
+// EventOperation holds details for emitting a progress event.
+type EventOperation struct {
+	EventName string
+	Status    api.EventStatus // api.Working, api.Done, api.Error
+	Text      string          // e.g. "Recreate", "Recreated", "Creating", "Created"
 }
 
 // PluginOperation holds details for plugin service operations.
@@ -233,6 +244,8 @@ func opKind(op *Operation) string {
 		return "volume"
 	case op.PluginOp != nil:
 		return "plugin"
+	case op.EventOp != nil:
+		return "event"
 	default:
 		return "container"
 	}
@@ -370,33 +383,50 @@ func reconcileServices(
 func reconcileOrphans(orphans Containers, plan *ReconciliationPlan, opts ReconcileOptions) {
 	for _, ctr := range orphans {
 		ctrName := getCanonicalContainerName(ctr)
+		serviceName := ctr.Labels[api.ServiceLabel]
+		eventName := "Container " + ctrName
+
+		emitStoppingID := fmt.Sprintf("emit-stopping:%s", ctrName)
+		plan.Operations[emitStoppingID] = emitEventOp(emitStoppingID, serviceName, ctrName, eventName, api.Working, api.StatusStopping, nil)
+
 		stopID := fmt.Sprintf("stop-container:%s", ctrName)
 		plan.Operations[stopID] = &Operation{
 			ID:          stopID,
 			Type:        OpStopContainer,
-			ServiceName: ctr.Labels[api.ServiceLabel],
+			ServiceName: serviceName,
 			Resource:    ctrName,
 			ContainerOp: &ContainerOperation{
 				ContainerName: ctrName,
 				Existing:      &ctr,
 				Timeout:       opts.Timeout,
 			},
-			Reason: "orphan container",
+			DependsOn: []string{emitStoppingID},
+			Reason:    "orphan container",
 		}
+
+		emitStoppedID := fmt.Sprintf("emit-stopped:%s", ctrName)
+		plan.Operations[emitStoppedID] = emitEventOp(emitStoppedID, serviceName, ctrName, eventName, api.Done, api.StatusStopped, []string{stopID})
+
+		emitRemovingID := fmt.Sprintf("emit-removing:%s", ctrName)
+		plan.Operations[emitRemovingID] = emitEventOp(emitRemovingID, serviceName, ctrName, eventName, api.Working, api.StatusRemoving, []string{emitStoppedID})
+
 		removeID := fmt.Sprintf("remove-container:%s", ctrName)
 		plan.Operations[removeID] = &Operation{
 			ID:          removeID,
 			Type:        OpRemoveContainer,
-			ServiceName: ctr.Labels[api.ServiceLabel],
+			ServiceName: serviceName,
 			Resource:    ctrName,
 			ContainerOp: &ContainerOperation{
 				ContainerName: ctrName,
 				Existing:      &ctr,
 				Timeout:       opts.Timeout,
 			},
-			DependsOn: []string{stopID},
+			DependsOn: []string{emitRemovingID},
 			Reason:    "orphan container",
 		}
+
+		emitRemovedID := fmt.Sprintf("emit-removed:%s", ctrName)
+		plan.Operations[emitRemovedID] = emitEventOp(emitRemovedID, serviceName, ctrName, eventName, api.Done, api.StatusRemoved, []string{removeID})
 	}
 }
 
@@ -445,14 +475,19 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 		var disconnectIDs []string
 		for _, ctr := range connectedContainers {
 			ctrName := getCanonicalContainerName(ctr)
+			serviceName := ctr.Labels[api.ServiceLabel]
+			eventName := "Container " + ctrName
 
-			// Stop the container (needed before disconnect)
+			// Emit Stopping event + Stop the container (needed before disconnect)
 			stopID := fmt.Sprintf("stop-container:%s", ctrName)
 			if _, exists := plan.Operations[stopID]; !exists {
+				emitStoppingID := fmt.Sprintf("emit-stopping:%s", ctrName)
+				plan.Operations[emitStoppingID] = emitEventOp(emitStoppingID, serviceName, ctrName, eventName, api.Working, api.StatusStopping, nil)
+
 				plan.Operations[stopID] = &Operation{
 					ID:          stopID,
 					Type:        OpStopContainer,
-					ServiceName: ctr.Labels[api.ServiceLabel],
+					ServiceName: serviceName,
 					Resource:    ctrName,
 					ContainerOp: &ContainerOperation{
 						ContainerName:   ctrName,
@@ -460,8 +495,12 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 						Timeout:         opts.Timeout,
 						NetworkRecreate: true,
 					},
-					Reason: fmt.Sprintf("network %q is being recreated", n.Name),
+					DependsOn: []string{emitStoppingID},
+					Reason:    fmt.Sprintf("network %q is being recreated", n.Name),
 				}
+
+				emitStoppedID := fmt.Sprintf("emit-stopped:%s", ctrName)
+				plan.Operations[emitStoppedID] = emitEventOp(emitStoppedID, serviceName, ctrName, eventName, api.Done, api.StatusStopped, []string{stopID})
 			}
 
 			// Disconnect the container from the network
@@ -511,6 +550,8 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 		// Reconnect and restart containers
 		for _, ctr := range connectedContainers {
 			ctrName := getCanonicalContainerName(ctr)
+			serviceName := ctr.Labels[api.ServiceLabel]
+			eventName := "Container " + ctrName
 
 			// Connect the container to the new network
 			connectID := fmt.Sprintf("connect-network:%s/%s", n.Name, ctrName)
@@ -526,27 +567,43 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 				Reason:    fmt.Sprintf("network %q has been recreated", n.Name),
 			}
 
-			// Start the container (depends on all connect ops for this container)
-			startID := fmt.Sprintf("start-container:%s", ctrName)
-			if existing, exists := plan.Operations[startID]; exists {
+			// Emit Starting event
+			emitStartingID := fmt.Sprintf("emit-starting:%s", ctrName)
+			if _, exists := plan.Operations[emitStartingID]; !exists {
+				plan.Operations[emitStartingID] = emitEventOp(emitStartingID, serviceName, ctrName, eventName, api.Working, api.StatusStarting, []string{connectID})
+			} else if !slices.Contains(plan.Operations[emitStartingID].DependsOn, connectID) {
 				// Container is connected to multiple recreated networks;
-				// add the new connect op as a dependency.
-				if !slices.Contains(existing.DependsOn, connectID) {
-					existing.DependsOn = append(existing.DependsOn, connectID)
+				// add the connect op as a dependency of the existing emit-starting.
+				plan.Operations[emitStartingID].DependsOn = append(plan.Operations[emitStartingID].DependsOn, connectID)
+			}
+
+			// Start the container (depends on emit-starting)
+			startID := fmt.Sprintf("start-container:%s", ctrName)
+			if existingOp, exists := plan.Operations[startID]; exists {
+				// Container is connected to multiple recreated networks;
+				// the start already exists, make sure it depends on emit-starting.
+				if !slices.Contains(existingOp.DependsOn, emitStartingID) {
+					existingOp.DependsOn = append(existingOp.DependsOn, emitStartingID)
 				}
 			} else {
 				plan.Operations[startID] = &Operation{
 					ID:          startID,
 					Type:        OpStartContainer,
-					ServiceName: ctr.Labels[api.ServiceLabel],
+					ServiceName: serviceName,
 					Resource:    ctrName,
 					ContainerOp: &ContainerOperation{
 						ContainerName: ctrName,
 						Existing:      &ctr,
 					},
-					DependsOn: []string{connectID},
+					DependsOn: []string{emitStartingID},
 					Reason:    fmt.Sprintf("network %q has been recreated", n.Name),
 				}
+			}
+
+			// Emit Started event
+			emitStartedID := fmt.Sprintf("emit-started:%s", ctrName)
+			if _, exists := plan.Operations[emitStartedID]; !exists {
+				plan.Operations[emitStartedID] = emitEventOp(emitStartedID, serviceName, ctrName, eventName, api.Done, api.StatusStarted, []string{startID})
 			}
 		}
 	}
@@ -616,40 +673,55 @@ func reconcileVolumes(project *types.Project, observed *ObservedState, plan *Rec
 		var removeContainerIDs []string
 		for _, ctr := range connectedContainers {
 			ctrName := getCanonicalContainerName(ctr)
+			serviceName := ctr.Labels[api.ServiceLabel]
+			eventName := "Container " + ctrName
 
-			// Stop the container
+			// Stop the container with event wrapping
 			stopID := fmt.Sprintf("stop-container:%s", ctrName)
 			if _, exists := plan.Operations[stopID]; !exists {
+				emitStoppingID := fmt.Sprintf("emit-stopping:%s", ctrName)
+				plan.Operations[emitStoppingID] = emitEventOp(emitStoppingID, serviceName, ctrName, eventName, api.Working, api.StatusStopping, nil)
+
 				plan.Operations[stopID] = &Operation{
 					ID:          stopID,
 					Type:        OpStopContainer,
-					ServiceName: ctr.Labels[api.ServiceLabel],
+					ServiceName: serviceName,
 					Resource:    ctrName,
 					ContainerOp: &ContainerOperation{
 						ContainerName: ctrName,
 						Existing:      &ctr,
 						Timeout:       opts.Timeout,
 					},
-					Reason: fmt.Sprintf("volume %q is being recreated", v.Name),
+					DependsOn: []string{emitStoppingID},
+					Reason:    fmt.Sprintf("volume %q is being recreated", v.Name),
 				}
+
+				emitStoppedID := fmt.Sprintf("emit-stopped:%s", ctrName)
+				plan.Operations[emitStoppedID] = emitEventOp(emitStoppedID, serviceName, ctrName, eventName, api.Done, api.StatusStopped, []string{stopID})
 			}
 
 			// Remove the container (volumes require container removal, not just stop)
 			removeID := fmt.Sprintf("remove-container:%s", ctrName)
 			if _, exists := plan.Operations[removeID]; !exists {
+				emitRemovingID := fmt.Sprintf("emit-removing:%s", ctrName)
+				plan.Operations[emitRemovingID] = emitEventOp(emitRemovingID, serviceName, ctrName, eventName, api.Working, api.StatusRemoving, []string{"emit-stopped:" + ctrName})
+
 				plan.Operations[removeID] = &Operation{
 					ID:          removeID,
 					Type:        OpRemoveContainer,
-					ServiceName: ctr.Labels[api.ServiceLabel],
+					ServiceName: serviceName,
 					Resource:    ctrName,
 					ContainerOp: &ContainerOperation{
 						ContainerName: ctrName,
 						Existing:      &ctr,
 						Timeout:       opts.Timeout,
 					},
-					DependsOn: []string{stopID},
+					DependsOn: []string{emitRemovingID},
 					Reason:    fmt.Sprintf("volume %q is being recreated", v.Name),
 				}
+
+				emitRemovedID := fmt.Sprintf("emit-removed:%s", ctrName)
+				plan.Operations[emitRemovedID] = emitEventOp(emitRemovedID, serviceName, ctrName, eventName, api.Done, api.StatusRemoved, []string{removeID})
 			}
 			removeContainerIDs = append(removeContainerIDs, removeID)
 		}
@@ -804,8 +876,13 @@ func reconcileServiceContainers(
 	actual := len(containers)
 	for i, ctr := range containers {
 		if i >= expected {
-			// Scale down: stop + remove
+			// Scale down: emit(Stopping) → stop → emit(Stopped) → emit(Removing) → remove → emit(Removed)
 			ctrName := getCanonicalContainerName(ctr)
+			eventName := "Container " + ctrName
+
+			emitStoppingID := fmt.Sprintf("emit-stopping:%s", ctrName)
+			plan.Operations[emitStoppingID] = emitEventOp(emitStoppingID, service.Name, ctrName, eventName, api.Working, api.StatusStopping, nil)
+
 			stopID := fmt.Sprintf("stop-container:%s", ctrName)
 			plan.Operations[stopID] = &Operation{
 				ID:          stopID,
@@ -818,8 +895,16 @@ func reconcileServiceContainers(
 					Existing:      &ctr,
 					Timeout:       opts.Timeout,
 				},
-				Reason: "scale down",
+				DependsOn: []string{emitStoppingID},
+				Reason:    "scale down",
 			}
+
+			emitStoppedID := fmt.Sprintf("emit-stopped:%s", ctrName)
+			plan.Operations[emitStoppedID] = emitEventOp(emitStoppedID, service.Name, ctrName, eventName, api.Done, api.StatusStopped, []string{stopID})
+
+			emitRemovingID := fmt.Sprintf("emit-removing:%s", ctrName)
+			plan.Operations[emitRemovingID] = emitEventOp(emitRemovingID, service.Name, ctrName, eventName, api.Working, api.StatusRemoving, []string{emitStoppedID})
+
 			removeID := fmt.Sprintf("remove-container:%s", ctrName)
 			plan.Operations[removeID] = &Operation{
 				ID:          removeID,
@@ -832,9 +917,13 @@ func reconcileServiceContainers(
 					Existing:      &ctr,
 					Timeout:       opts.Timeout,
 				},
-				DependsOn: []string{stopID},
+				DependsOn: []string{emitRemovingID},
 				Reason:    "scale down",
 			}
+
+			emitRemovedID := fmt.Sprintf("emit-removed:%s", ctrName)
+			plan.Operations[emitRemovedID] = emitEventOp(emitRemovedID, service.Name, ctrName, eventName, api.Done, api.StatusRemoved, []string{removeID})
+
 			continue
 		}
 
@@ -869,12 +958,17 @@ func reconcileServiceContainers(
 		}
 		if recreate {
 			ctrName := getCanonicalContainerName(ctr)
+			eventName := "Container " + ctrName
 			number, _ := strconv.Atoi(ctr.Labels[api.ContainerNumberLabel])
 			idPrefix := ctr.ID
 			if len(idPrefix) > 12 {
 				idPrefix = idPrefix[:12]
 			}
 			tmpName := fmt.Sprintf("%s_%s", idPrefix, ctrName)
+
+			// 0. Emit "Recreate" event (entry point of the chain)
+			emitRecreateID := fmt.Sprintf("emit-recreate:%s", ctrName)
+			plan.Operations[emitRecreateID] = emitEventOp(emitRecreateID, service.Name, ctrName, eventName, api.Working, "Recreate", nil)
 
 			// 1. Create new container with temp name (inheriting from old if needed)
 			createID := fmt.Sprintf("create-container:%s", tmpName)
@@ -890,7 +984,8 @@ func reconcileServiceContainers(
 					Existing:        &ctr,
 					Inherit:         opts.Inherit,
 				},
-				Reason: reason,
+				DependsOn: []string{emitRecreateID},
+				Reason:    reason,
 			}
 
 			// 2. Stop old container (depends on create being ready)
@@ -944,6 +1039,7 @@ func reconcileServiceContainers(
 
 			// 5. Start the new container (depends on rename) — only when StartContainers is set.
 			// docker compose create should not start containers; docker compose up should.
+			lastOpID := renameID
 			if opts.StartContainers {
 				startID := fmt.Sprintf("start-container:%s", ctrName)
 				plan.Operations[startID] = &Operation{
@@ -960,7 +1056,13 @@ func reconcileServiceContainers(
 					DependsOn: []string{renameID},
 					Reason:    reason,
 				}
+				lastOpID = startID
 			}
+
+			// 6. Emit "Recreated" event (end of chain)
+			emitRecreatedID := fmt.Sprintf("emit-recreated:%s", ctrName)
+			plan.Operations[emitRecreatedID] = emitEventOp(emitRecreatedID, service.Name, ctrName, eventName, api.Done, "Recreated", []string{lastOpID})
+
 			continue
 		}
 
@@ -968,14 +1070,19 @@ func reconcileServiceContainers(
 		maybeAddStartOp(service, ctr, plan, opts)
 	}
 
-	// Scale up: create missing containers
+	// Scale up: emit(Creating) → create → emit(Created)
 	next := nextContainerNumber(containers)
 	for i := 0; i < expected-actual; i++ {
 		number := next + i
 		name := getContainerName(project.Name, service, number)
-		id := fmt.Sprintf("create-container:%s", name)
-		plan.Operations[id] = &Operation{
-			ID:          id,
+		eventName := "Container " + name
+
+		emitCreatingID := fmt.Sprintf("emit-creating:%s", name)
+		plan.Operations[emitCreatingID] = emitEventOp(emitCreatingID, service.Name, name, eventName, api.Working, api.StatusCreating, nil)
+
+		createID := fmt.Sprintf("create-container:%s", name)
+		plan.Operations[createID] = &Operation{
+			ID:          createID,
 			Type:        OpCreateContainer,
 			ServiceName: service.Name,
 			Resource:    name,
@@ -986,8 +1093,12 @@ func reconcileServiceContainers(
 				Inherit:         opts.Inherit,
 				Timeout:         opts.Timeout,
 			},
-			Reason: "scale up",
+			DependsOn: []string{emitCreatingID},
+			Reason:    "scale up",
 		}
+
+		emitCreatedID := fmt.Sprintf("emit-created:%s", name)
+		plan.Operations[emitCreatedID] = emitEventOp(emitCreatedID, service.Name, name, eventName, api.Done, api.StatusCreated, []string{createID})
 	}
 
 	return nil
@@ -1005,9 +1116,15 @@ func maybeAddStartOp(service types.ServiceConfig, ctr container.Summary, plan *R
 		return
 	}
 	ctrName := getCanonicalContainerName(ctr)
-	id := fmt.Sprintf("start-container:%s", ctrName)
-	plan.Operations[id] = &Operation{
-		ID:          id,
+	eventName := "Container " + ctrName
+	reason := fmt.Sprintf("container not running (state: %s)", ctr.State)
+
+	emitStartingID := fmt.Sprintf("emit-starting:%s", ctrName)
+	plan.Operations[emitStartingID] = emitEventOp(emitStartingID, service.Name, ctrName, eventName, api.Working, api.StatusStarting, nil)
+
+	startID := fmt.Sprintf("start-container:%s", ctrName)
+	plan.Operations[startID] = &Operation{
+		ID:          startID,
 		Type:        OpStartContainer,
 		ServiceName: service.Name,
 		Resource:    ctrName,
@@ -1016,8 +1133,12 @@ func maybeAddStartOp(service types.ServiceConfig, ctr container.Summary, plan *R
 			ContainerName: ctrName,
 			Existing:      &ctr,
 		},
-		Reason: fmt.Sprintf("container not running (state: %s)", ctr.State),
+		DependsOn: []string{emitStartingID},
+		Reason:    reason,
 	}
+
+	emitStartedID := fmt.Sprintf("emit-started:%s", ctrName)
+	plan.Operations[emitStartedID] = emitEventOp(emitStartedID, service.Name, ctrName, eventName, api.Done, api.StatusStarted, []string{startID})
 }
 
 // buildDependencyEdges wires up DependsOn and Dependents for container operations
@@ -1080,15 +1201,25 @@ func indexReadyOps(plan *ReconciliationPlan) map[string][]string {
 	readyOpsByService := map[string][]string{}
 	for id, op := range plan.Operations {
 		switch op.Type {
-		case OpStartContainer:
-			if len(op.DependsOn) == 1 {
-				if dep := plan.Operations[op.DependsOn[0]]; dep != nil && dep.Type == OpRenameContainer {
+		case OpEmitEvent:
+			if op.EventOp != nil {
+				switch op.EventOp.Text {
+				case "Recreated":
+					// End of recreate chain — this is the ready op
+					readyOpsByService[op.ServiceName] = append(readyOpsByService[op.ServiceName], id)
+				case api.StatusCreated:
+					// End of fresh create chain — this is the ready op
 					readyOpsByService[op.ServiceName] = append(readyOpsByService[op.ServiceName], id)
 				}
 			}
 		case OpCreateContainer:
+			// Fresh create without event wrapping (e.g. volume-recreated containers)
+			// Only if no emit-created exists for this container.
 			if op.ContainerOp != nil && op.ContainerOp.Existing == nil {
-				readyOpsByService[op.ServiceName] = append(readyOpsByService[op.ServiceName], id)
+				emitCreatedID := fmt.Sprintf("emit-created:%s", op.ContainerOp.ContainerName)
+				if _, hasEmit := plan.Operations[emitCreatedID]; !hasEmit {
+					readyOpsByService[op.ServiceName] = append(readyOpsByService[op.ServiceName], id)
+				}
 			}
 		case OpRunPlugin:
 			readyOpsByService[op.ServiceName] = append(readyOpsByService[op.ServiceName], id)
@@ -1261,9 +1392,15 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 					continue
 				}
 
+				eventName := "Container " + ctrName
+
+				// Emit Stopping event (depends on rename ops of the dependency)
+				emitStoppingID := fmt.Sprintf("emit-stopping:%s", ctrName)
+				stoppingDeps := make([]string, len(renameOps))
+				copy(stoppingDeps, renameOps)
+				plan.Operations[emitStoppingID] = emitEventOp(emitStoppingID, service.Name, ctrName, eventName, api.Working, api.StatusStopping, stoppingDeps)
+
 				stopID := fmt.Sprintf("stop-container:%s", ctrName)
-				stopDeps := make([]string, len(renameOps))
-				copy(stopDeps, renameOps)
 				plan.Operations[stopID] = &Operation{
 					ID:          stopID,
 					Type:        OpStopContainer,
@@ -1275,18 +1412,33 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 						Existing:      &ctr,
 						Timeout:       opts.Timeout,
 					},
-					DependsOn: stopDeps,
+					DependsOn: []string{emitStoppingID},
 					Reason:    fmt.Sprintf("dependency %q is being recreated (restart: true)", depName),
 				}
+
+				emitStoppedID := fmt.Sprintf("emit-stopped:%s", ctrName)
+				plan.Operations[emitStoppedID] = emitEventOp(emitStoppedID, service.Name, ctrName, eventName, api.Done, api.StatusStopped, []string{stopID})
+
+				// Emit Starting event
+				emitStartingID := fmt.Sprintf("emit-starting:%s", ctrName)
 
 				startID := fmt.Sprintf("start-container:%s", ctrName)
 				if existingStart, exists := plan.Operations[startID]; exists {
 					// A start operation already exists (e.g. from network recreation).
-					// Add our stop as a dependency instead of overwriting.
-					if !slices.Contains(existingStart.DependsOn, stopID) {
-						existingStart.DependsOn = append(existingStart.DependsOn, stopID)
+					// Add our emit-stopped as a dependency of the existing emit-starting.
+					if existingEmitStarting, ok := plan.Operations[emitStartingID]; ok {
+						if !slices.Contains(existingEmitStarting.DependsOn, emitStoppedID) {
+							existingEmitStarting.DependsOn = append(existingEmitStarting.DependsOn, emitStoppedID)
+						}
+					} else {
+						// No emit-starting exists yet; add stop as dep to start directly.
+						if !slices.Contains(existingStart.DependsOn, stopID) {
+							existingStart.DependsOn = append(existingStart.DependsOn, stopID)
+						}
 					}
 				} else {
+					plan.Operations[emitStartingID] = emitEventOp(emitStartingID, service.Name, ctrName, eventName, api.Working, api.StatusStarting, []string{emitStoppedID})
+
 					plan.Operations[startID] = &Operation{
 						ID:          startID,
 						Type:        OpStartContainer,
@@ -1297,9 +1449,12 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 							ContainerName: ctrName,
 							Existing:      &ctr,
 						},
-						DependsOn: []string{stopID},
+						DependsOn: []string{emitStartingID},
 						Reason:    fmt.Sprintf("restart after dependency %q recreated", depName),
 					}
+
+					emitStartedID := fmt.Sprintf("emit-started:%s", ctrName)
+					plan.Operations[emitStartedID] = emitEventOp(emitStartedID, service.Name, ctrName, eventName, api.Done, api.StatusStarted, []string{startID})
 				}
 			}
 			break // Only need to process once per service
@@ -1353,9 +1508,59 @@ func findStaleNetworkOps(plan *ReconciliationPlan, recreated map[string]bool) []
 			if isNetworkStopForRecreatedContainer(op, recreated) {
 				toDelete = append(toDelete, id)
 			}
+		case OpEmitEvent:
+			// Remove event ops associated with network recreation for containers
+			// that are being recreated (their container IDs will be stale).
+			if op.EventOp != nil && recreated[op.Resource] {
+				// Check if this event op is part of a network recreation chain
+				// by checking if it's associated with a stop/start that would be pruned.
+				if isNetworkEventForRecreatedContainer(plan, op, recreated) {
+					toDelete = append(toDelete, id)
+				}
+			}
 		}
 	}
 	return toDelete
+}
+
+// isNetworkEventForRecreatedContainer checks whether an event op belongs to a
+// network recreation chain for a container that is being recreated.
+func isNetworkEventForRecreatedContainer(plan *ReconciliationPlan, op *Operation, recreated map[string]bool) bool {
+	if !recreated[op.Resource] {
+		return false
+	}
+	// Check if this event depends on or is depended upon by network recreation ops.
+	// An event for a network-recreated container's stop/start chain should be pruned.
+	// We check by looking at the dependencies: if this event's deps include a network
+	// stop/start, or if a network stop/start depends on this event.
+	for _, depID := range op.DependsOn {
+		dep, ok := plan.Operations[depID]
+		if !ok {
+			continue
+		}
+		if dep.Type == OpStopContainer && isNetworkStopForRecreatedContainer(dep, recreated) {
+			return true
+		}
+		if dep.Type == OpStartContainer && isNetworkStartForRecreatedContainer(plan, dep, recreated) {
+			return true
+		}
+		if dep.Type == OpConnectNetwork && isNetworkOpForRecreatedContainer(dep, recreated) {
+			return true
+		}
+	}
+	// Also check if any network stop/start depends on this event
+	for _, otherOp := range plan.Operations {
+		if !slices.Contains(otherOp.DependsOn, op.ID) {
+			continue
+		}
+		if otherOp.Type == OpStopContainer && isNetworkStopForRecreatedContainer(otherOp, recreated) {
+			return true
+		}
+		if otherOp.Type == OpStartContainer && isNetworkStartForRecreatedContainer(plan, otherOp, recreated) {
+			return true
+		}
+	}
+	return false
 }
 
 func isNetworkOpForRecreatedContainer(op *Operation, recreated map[string]bool) bool {
@@ -1403,6 +1608,23 @@ func deletePlanOps(plan *ReconciliationPlan, ids []string) {
 			}
 		}
 		op.DependsOn = cleaned
+	}
+}
+
+// emitEventOp creates an Operation of type OpEmitEvent for progress reporting.
+func emitEventOp(id, serviceName, resource, eventName string, status api.EventStatus, text string, dependsOn []string) *Operation {
+	return &Operation{
+		ID:          id,
+		Type:        OpEmitEvent,
+		ServiceName: serviceName,
+		Resource:    resource,
+		EventOp: &EventOperation{
+			EventName: eventName,
+			Status:    status,
+			Text:      text,
+		},
+		DependsOn: dependsOn,
+		Reason:    text,
 	}
 }
 

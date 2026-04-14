@@ -18,6 +18,7 @@ package compose
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -138,7 +139,9 @@ func TestReconcileCreateMissingNetwork(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
 1. create network testproject_default  reason: network does not exist
-[1] -> 2. create container testproject-web-1  reason: scale up
+2. emit event testproject-web-1  reason: Creating
+[1,2] -> 3. create container testproject-web-1  reason: scale up
+[3] -> 4. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -244,12 +247,16 @@ func TestReconcileRecreateChangedNetwork(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-web-1  reason: network "testproject_default" is being recreated
-[1] -> 2. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
-[2] -> 3. remove network testproject_default  reason: config hash changed
-[3] -> 4. create network testproject_default  reason: config hash changed
-[4] -> 5. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
-[5] -> 6. start container testproject-web-1  reason: network "testproject_default" has been recreated
+1. emit event testproject-web-1  reason: Stopping
+[1] -> 2. stop container testproject-web-1  reason: network "testproject_default" is being recreated
+[2] -> 3. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
+[2] -> 4. emit event testproject-web-1  reason: Stopped
+[3] -> 5. remove network testproject_default  reason: config hash changed
+[5] -> 6. create network testproject_default  reason: config hash changed
+[6] -> 7. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
+[7] -> 8. emit event testproject-web-1  reason: Starting
+[8] -> 9. start container testproject-web-1  reason: network "testproject_default" has been recreated
+[9] -> 10. emit event testproject-web-1  reason: Started
 `)
 }
 
@@ -285,7 +292,9 @@ func TestReconcileCreateMissingVolume(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
 1. create volume testproject_data  reason: volume does not exist
-[1] -> 2. create container testproject-web-1  reason: scale up
+2. emit event testproject-web-1  reason: Creating
+[1,2] -> 3. create container testproject-web-1  reason: scale up
+[3] -> 4. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -335,7 +344,9 @@ func TestReconcileScaleUp(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-web-2  reason: scale up
+1. emit event testproject-web-2  reason: Creating
+[1] -> 2. create container testproject-web-2  reason: scale up
+[2] -> 3. emit event testproject-web-2  reason: Created
 `)
 }
 
@@ -391,8 +402,12 @@ func TestReconcileScaleDown(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-web-2  reason: scale down
-[1] -> 2. remove container testproject-web-2  reason: scale down
+1. emit event testproject-web-2  reason: Stopping
+[1] -> 2. stop container testproject-web-2  reason: scale down
+[2] -> 3. emit event testproject-web-2  reason: Stopped
+[3] -> 4. emit event testproject-web-2  reason: Removing
+[4] -> 5. remove container testproject-web-2  reason: scale down
+[5] -> 6. emit event testproject-web-2  reason: Removed
 `)
 }
 
@@ -435,11 +450,13 @@ func TestReconcileRecreateContainer(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container abc123def456_testproject-web-1  reason: config hash changed
-[1] -> 2. stop container testproject-web-1  reason: config hash changed
-[2] -> 3. remove container testproject-web-1  reason: config hash changed
-[3] -> 4. rename container testproject-web-1  reason: config hash changed
-[4] -> 5. start container testproject-web-1  reason: config hash changed
+1. emit event testproject-web-1  reason: Recreate
+[1] -> 2. create container abc123def456_testproject-web-1  reason: config hash changed
+[2] -> 3. stop container testproject-web-1  reason: config hash changed
+[3] -> 4. remove container testproject-web-1  reason: config hash changed
+[4] -> 5. rename container testproject-web-1  reason: config hash changed
+[5] -> 6. start container testproject-web-1  reason: config hash changed
+[6] -> 7. emit event testproject-web-1  reason: Recreated
 `)
 }
 
@@ -521,9 +538,15 @@ func TestReconcileOrphans(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-old-1  reason: orphan container
-[1] -> 2. remove container testproject-old-1  reason: orphan container
-[2] -> 3. create container testproject-web-1  reason: scale up
+1. emit event testproject-web-1  reason: Creating
+2. emit event testproject-old-1  reason: Stopping
+[2] -> 3. stop container testproject-old-1  reason: orphan container
+[3] -> 4. emit event testproject-old-1  reason: Stopped
+[4] -> 5. emit event testproject-old-1  reason: Removing
+[5] -> 6. remove container testproject-old-1  reason: orphan container
+[1,6] -> 7. create container testproject-web-1  reason: scale up
+[6] -> 8. emit event testproject-old-1  reason: Removed
+[7] -> 9. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -592,8 +615,12 @@ func TestReconcileDependencyEdges(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-db-1  reason: scale up
-[1] -> 2. create container testproject-web-1  reason: scale up
+1. emit event testproject-db-1  reason: Creating
+2. emit event testproject-web-1  reason: Creating
+[1] -> 3. create container testproject-db-1  reason: scale up
+[3] -> 4. emit event testproject-db-1  reason: Created
+[4,2] -> 5. create container testproject-web-1  reason: scale up
+[5] -> 6. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -641,9 +668,15 @@ func TestReconcileScaleUpMultipleServices(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container scale-basic-tests-back-2  reason: scale up
-2. create container scale-basic-tests-front-2  reason: scale up
-3. create container scale-basic-tests-front-3  reason: scale up
+1. emit event scale-basic-tests-back-2  reason: Creating
+2. emit event scale-basic-tests-front-2  reason: Creating
+3. emit event scale-basic-tests-front-3  reason: Creating
+[1] -> 4. create container scale-basic-tests-back-2  reason: scale up
+[2] -> 5. create container scale-basic-tests-front-2  reason: scale up
+[3] -> 6. create container scale-basic-tests-front-3  reason: scale up
+[4] -> 7. emit event scale-basic-tests-back-2  reason: Created
+[5] -> 8. emit event scale-basic-tests-front-2  reason: Created
+[6] -> 9. emit event scale-basic-tests-front-3  reason: Created
 `)
 }
 
@@ -689,10 +722,18 @@ func TestReconcileScaleDownMultipleServices(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container scale-basic-tests-back-2  reason: scale down
-2. stop container scale-basic-tests-front-3  reason: scale down
-[1] -> 3. remove container scale-basic-tests-back-2  reason: scale down
-[2] -> 4. remove container scale-basic-tests-front-3  reason: scale down
+1. emit event scale-basic-tests-back-2  reason: Stopping
+2. emit event scale-basic-tests-front-3  reason: Stopping
+[1] -> 3. stop container scale-basic-tests-back-2  reason: scale down
+[2] -> 4. stop container scale-basic-tests-front-3  reason: scale down
+[3] -> 5. emit event scale-basic-tests-back-2  reason: Stopped
+[4] -> 6. emit event scale-basic-tests-front-3  reason: Stopped
+[5] -> 7. emit event scale-basic-tests-back-2  reason: Removing
+[6] -> 8. emit event scale-basic-tests-front-3  reason: Removing
+[7] -> 9. remove container scale-basic-tests-back-2  reason: scale down
+[8] -> 10. remove container scale-basic-tests-front-3  reason: scale down
+[9] -> 11. emit event scale-basic-tests-back-2  reason: Removed
+[10] -> 12. emit event scale-basic-tests-front-3  reason: Removed
 `)
 }
 
@@ -729,10 +770,18 @@ func TestReconcileScaleToZero(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-dbadmin-1  reason: scale down
-2. stop container testproject-dbadmin-2  reason: scale down
-[1] -> 3. remove container testproject-dbadmin-1  reason: scale down
-[2] -> 4. remove container testproject-dbadmin-2  reason: scale down
+1. emit event testproject-dbadmin-1  reason: Stopping
+2. emit event testproject-dbadmin-2  reason: Stopping
+[1] -> 3. stop container testproject-dbadmin-1  reason: scale down
+[2] -> 4. stop container testproject-dbadmin-2  reason: scale down
+[3] -> 5. emit event testproject-dbadmin-1  reason: Stopped
+[4] -> 6. emit event testproject-dbadmin-2  reason: Stopped
+[5] -> 7. emit event testproject-dbadmin-1  reason: Removing
+[6] -> 8. emit event testproject-dbadmin-2  reason: Removing
+[7] -> 9. remove container testproject-dbadmin-1  reason: scale down
+[8] -> 10. remove container testproject-dbadmin-2  reason: scale down
+[9] -> 11. emit event testproject-dbadmin-1  reason: Removed
+[10] -> 12. emit event testproject-dbadmin-2  reason: Removed
 `)
 }
 
@@ -774,8 +823,12 @@ func TestReconcileScaleDownRemovesObsoleteFirst(t *testing.T) {
 	assert.NilError(t, err)
 	// Obsolete container (db-1) is removed first, up-to-date one (db-2) stays
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-db-1  reason: scale down
-[1] -> 2. remove container testproject-db-1  reason: scale down
+1. emit event testproject-db-1  reason: Stopping
+[1] -> 2. stop container testproject-db-1  reason: scale down
+[2] -> 3. emit event testproject-db-1  reason: Stopped
+[3] -> 4. emit event testproject-db-1  reason: Removing
+[4] -> 5. remove container testproject-db-1  reason: scale down
+[5] -> 6. emit event testproject-db-1  reason: Removed
 `)
 }
 
@@ -814,8 +867,12 @@ func TestReconcileScaleUpNoRecreate(t *testing.T) {
 	assert.NilError(t, err)
 	// Only new containers created, no recreates despite stale hash
 	assert.Equal(t, plan.String(), `
-1. create container testproject-test-3  reason: scale up
-2. create container testproject-test-4  reason: scale up
+1. emit event testproject-test-3  reason: Creating
+2. emit event testproject-test-4  reason: Creating
+[1] -> 3. create container testproject-test-3  reason: scale up
+[2] -> 4. create container testproject-test-4  reason: scale up
+[3] -> 5. emit event testproject-test-3  reason: Created
+[4] -> 6. emit event testproject-test-4  reason: Created
 `)
 }
 
@@ -865,11 +922,13 @@ func TestReconcileForceRecreateNoDeps(t *testing.T) {
 	assert.NilError(t, err)
 	// Only my-service is recreated, db is left untouched
 	assert.Equal(t, plan.String(), `
-1. create container recreate-no-_recreate-no-deps-my-service-1  reason: force recreate
-[1] -> 2. stop container recreate-no-deps-my-service-1  reason: force recreate
-[2] -> 3. remove container recreate-no-deps-my-service-1  reason: force recreate
-[3] -> 4. rename container recreate-no-deps-my-service-1  reason: force recreate
-[4] -> 5. start container recreate-no-deps-my-service-1  reason: force recreate
+1. emit event recreate-no-deps-my-service-1  reason: Recreate
+[1] -> 2. create container recreate-no-_recreate-no-deps-my-service-1  reason: force recreate
+[2] -> 3. stop container recreate-no-deps-my-service-1  reason: force recreate
+[3] -> 4. remove container recreate-no-deps-my-service-1  reason: force recreate
+[4] -> 5. rename container recreate-no-deps-my-service-1  reason: force recreate
+[5] -> 6. start container recreate-no-deps-my-service-1  reason: force recreate
+[6] -> 7. emit event recreate-no-deps-my-service-1  reason: Recreated
 `)
 }
 
@@ -924,9 +983,11 @@ func TestReconcileNetworkConfigChanged(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-test-1  reason: scale up
+1. emit event testproject-test-1  reason: Creating
 2. remove network testproject_mynet  reason: config hash changed
-[2] -> 3. create network testproject_mynet  reason: config hash changed
+[1] -> 3. create container testproject-test-1  reason: scale up
+[2] -> 4. create network testproject_mynet  reason: config hash changed
+[3] -> 5. emit event testproject-test-1  reason: Created
 `)
 }
 
@@ -977,9 +1038,11 @@ func TestReconcileVolumeConfigChanged(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-app-1  reason: scale up
+1. emit event testproject-app-1  reason: Creating
 2. remove volume testproject_my_vol  reason: config hash changed
-[2] -> 3. create volume testproject_my_vol  reason: config hash changed
+[1] -> 3. create container testproject-app-1  reason: scale up
+[2] -> 4. create volume testproject_my_vol  reason: config hash changed
+[3] -> 5. emit event testproject-app-1  reason: Created
 `)
 }
 
@@ -1011,7 +1074,9 @@ func TestReconcileExternalNetworkSkipped(t *testing.T) {
 	assert.NilError(t, err)
 	// External network is not created — only the container
 	assert.Equal(t, plan.String(), `
-1. create container testproject-web-1  reason: scale up
+1. emit event testproject-web-1  reason: Creating
+[1] -> 2. create container testproject-web-1  reason: scale up
+[2] -> 3. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -1043,7 +1108,9 @@ func TestReconcileExternalVolumeSkipped(t *testing.T) {
 	assert.NilError(t, err)
 	// External volume is not created — only the container
 	assert.Equal(t, plan.String(), `
-1. create container testproject-web-1  reason: scale up
+1. emit event testproject-web-1  reason: Creating
+[1] -> 2. create container testproject-web-1  reason: scale up
+[2] -> 3. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -1075,7 +1142,9 @@ func TestReconcileOrphansNotRemovedByDefault(t *testing.T) {
 	assert.NilError(t, err)
 	// Orphan is ignored — only the web container is created
 	assert.Equal(t, plan.String(), `
-1. create container testproject-web-1  reason: scale up
+1. emit event testproject-web-1  reason: Creating
+[1] -> 2. create container testproject-web-1  reason: scale up
+[2] -> 3. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -1121,7 +1190,9 @@ func TestReconcileContainerCreateDependsOnNetworkAndVolume(t *testing.T) {
 	assert.Equal(t, plan.String(), `
 1. create network testproject_mynet  reason: network does not exist
 2. create volume testproject_myvol  reason: volume does not exist
-[1,2] -> 3. create container testproject-app-1  reason: scale up
+3. emit event testproject-app-1  reason: Creating
+[1,2,3] -> 4. create container testproject-app-1  reason: scale up
+[4] -> 5. emit event testproject-app-1  reason: Created
 `)
 }
 
@@ -1176,11 +1247,13 @@ func TestReconcileImageDigestChanged(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container ctr1_testproject-web-1  reason: image digest changed
-[1] -> 2. stop container testproject-web-1  reason: image digest changed
-[2] -> 3. remove container testproject-web-1  reason: image digest changed
-[3] -> 4. rename container testproject-web-1  reason: image digest changed
-[4] -> 5. start container testproject-web-1  reason: image digest changed
+1. emit event testproject-web-1  reason: Recreate
+[1] -> 2. create container ctr1_testproject-web-1  reason: image digest changed
+[2] -> 3. stop container testproject-web-1  reason: image digest changed
+[3] -> 4. remove container testproject-web-1  reason: image digest changed
+[4] -> 5. rename container testproject-web-1  reason: image digest changed
+[5] -> 6. start container testproject-web-1  reason: image digest changed
+[6] -> 7. emit event testproject-web-1  reason: Recreated
 `)
 }
 
@@ -1228,7 +1301,9 @@ func TestReconcileDeadContainerGetsStarted(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. start container testproject-web-1  reason: container not running (state: dead)
+1. emit event testproject-web-1  reason: Starting
+[1] -> 2. start container testproject-web-1  reason: container not running (state: dead)
+[2] -> 3. emit event testproject-web-1  reason: Started
 `)
 }
 
@@ -1322,11 +1397,13 @@ func TestReconcileForceRecreateUpToDate(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container abc123def456_testproject-web-1  reason: force recreate
-[1] -> 2. stop container testproject-web-1  reason: force recreate
-[2] -> 3. remove container testproject-web-1  reason: force recreate
-[3] -> 4. rename container testproject-web-1  reason: force recreate
-[4] -> 5. start container testproject-web-1  reason: force recreate
+1. emit event testproject-web-1  reason: Recreate
+[1] -> 2. create container abc123def456_testproject-web-1  reason: force recreate
+[2] -> 3. stop container testproject-web-1  reason: force recreate
+[3] -> 4. remove container testproject-web-1  reason: force recreate
+[4] -> 5. rename container testproject-web-1  reason: force recreate
+[5] -> 6. start container testproject-web-1  reason: force recreate
+[6] -> 7. emit event testproject-web-1  reason: Recreated
 `)
 }
 
@@ -1456,16 +1533,24 @@ func TestReconcileNetworkRecreateMultipleContainers(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-web-1  reason: network "testproject_default" is being recreated
-2. stop container testproject-worker-1  reason: network "testproject_default" is being recreated
-[1] -> 3. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
-[2] -> 4. disconnect network testproject-worker-1 from testproject_default  reason: network "testproject_default" is being recreated
-[3,4] -> 5. remove network testproject_default  reason: config hash changed
-[5] -> 6. create network testproject_default  reason: config hash changed
-[6] -> 7. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
-[6] -> 8. connect network testproject-worker-1 to testproject_default  reason: network "testproject_default" has been recreated
-[7] -> 9. start container testproject-web-1  reason: network "testproject_default" has been recreated
-[8] -> 10. start container testproject-worker-1  reason: network "testproject_default" has been recreated
+1. emit event testproject-web-1  reason: Stopping
+2. emit event testproject-worker-1  reason: Stopping
+[1] -> 3. stop container testproject-web-1  reason: network "testproject_default" is being recreated
+[2] -> 4. stop container testproject-worker-1  reason: network "testproject_default" is being recreated
+[3] -> 5. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
+[3] -> 6. emit event testproject-web-1  reason: Stopped
+[4] -> 7. disconnect network testproject-worker-1 from testproject_default  reason: network "testproject_default" is being recreated
+[4] -> 8. emit event testproject-worker-1  reason: Stopped
+[5,7] -> 9. remove network testproject_default  reason: config hash changed
+[9] -> 10. create network testproject_default  reason: config hash changed
+[10] -> 11. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
+[10] -> 12. connect network testproject-worker-1 to testproject_default  reason: network "testproject_default" has been recreated
+[11] -> 13. emit event testproject-web-1  reason: Starting
+[12] -> 14. emit event testproject-worker-1  reason: Starting
+[13] -> 15. start container testproject-web-1  reason: network "testproject_default" has been recreated
+[14] -> 16. start container testproject-worker-1  reason: network "testproject_default" has been recreated
+[15] -> 17. emit event testproject-web-1  reason: Started
+[16] -> 18. emit event testproject-worker-1  reason: Started
 `)
 }
 
@@ -1537,24 +1622,29 @@ func TestReconcileMultiNetworkContainerReconnectDeps(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	// The start-container op must depend on BOTH connect ops.
-	startOp, exists := plan.Operations["start-container:testproject-web-1"]
-	assert.Assert(t, exists, "start-container op must exist")
-	assert.Assert(t, len(startOp.DependsOn) == 2, "start must depend on both connect ops, got %v", startOp.DependsOn)
+	// The emit-starting op must depend on BOTH connect ops.
+	emitStartingOp, exists := plan.Operations["emit-starting:testproject-web-1"]
+	assert.Assert(t, exists, "emit-starting op must exist")
+	assert.Assert(t, len(emitStartingOp.DependsOn) == 2, "emit-starting must depend on both connect ops, got %v", emitStartingOp.DependsOn)
 
-	// Both connect ops must be listed
+	// Both connect ops must be listed as deps of emit-starting
 	connectFe := "connect-network:testproject_frontend/testproject-web-1"
 	connectBe := "connect-network:testproject_backend/testproject-web-1"
 	for _, dep := range []string{connectFe, connectBe} {
 		found := false
-		for _, d := range startOp.DependsOn {
+		for _, d := range emitStartingOp.DependsOn {
 			if d == dep {
 				found = true
 				break
 			}
 		}
-		assert.Assert(t, found, "start-container should depend on %s", dep)
+		assert.Assert(t, found, "emit-starting should depend on %s", dep)
 	}
+
+	// The start-container op must depend on emit-starting
+	startOp, startExists := plan.Operations["start-container:testproject-web-1"]
+	assert.Assert(t, startExists, "start-container op must exist")
+	assert.Assert(t, slices.Contains(startOp.DependsOn, "emit-starting:testproject-web-1"), "start must depend on emit-starting, got %v", startOp.DependsOn)
 }
 
 func TestReconcileNetworkMatchByName(t *testing.T) {
@@ -1620,12 +1710,16 @@ func TestReconcileNetworkMatchByName(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-web-1  reason: network "testproject_default" is being recreated
-[1] -> 2. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
-[2] -> 3. remove network testproject_default  reason: config hash changed
-[3] -> 4. create network testproject_default  reason: config hash changed
-[4] -> 5. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
-[5] -> 6. start container testproject-web-1  reason: network "testproject_default" has been recreated
+1. emit event testproject-web-1  reason: Stopping
+[1] -> 2. stop container testproject-web-1  reason: network "testproject_default" is being recreated
+[2] -> 3. disconnect network testproject-web-1 from testproject_default  reason: network "testproject_default" is being recreated
+[2] -> 4. emit event testproject-web-1  reason: Stopped
+[3] -> 5. remove network testproject_default  reason: config hash changed
+[5] -> 6. create network testproject_default  reason: config hash changed
+[6] -> 7. connect network testproject-web-1 to testproject_default  reason: network "testproject_default" has been recreated
+[7] -> 8. emit event testproject-web-1  reason: Starting
+[8] -> 9. start container testproject-web-1  reason: network "testproject_default" has been recreated
+[9] -> 10. emit event testproject-web-1  reason: Started
 `)
 }
 
@@ -1663,7 +1757,9 @@ func TestReconcileServiceWithUnknownNetwork(t *testing.T) {
 	assert.NilError(t, err)
 	// Should still produce a create container op without panicking
 	assert.Equal(t, plan.String(), `
-1. create container testproject-web-1  reason: scale up
+1. emit event testproject-web-1  reason: Creating
+[1] -> 2. create container testproject-web-1  reason: scale up
+[2] -> 3. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -1738,11 +1834,15 @@ func TestReconcileVolumeRecreateWithContainers(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-app-1  reason: volume "testproject_data" is being recreated
-[1] -> 2. remove container testproject-app-1  reason: volume "testproject_data" is being recreated
-[2] -> 3. remove volume testproject_data  reason: config hash changed
-[3] -> 4. create volume testproject_data  reason: config hash changed
-[4] -> 5. create container testproject-app-1  reason: volume "data" is being recreated
+1. emit event testproject-app-1  reason: Stopping
+[1] -> 2. stop container testproject-app-1  reason: volume "testproject_data" is being recreated
+[2] -> 3. emit event testproject-app-1  reason: Stopped
+[3] -> 4. emit event testproject-app-1  reason: Removing
+[4] -> 5. remove container testproject-app-1  reason: volume "testproject_data" is being recreated
+[5] -> 6. emit event testproject-app-1  reason: Removed
+[5] -> 7. remove volume testproject_data  reason: config hash changed
+[7] -> 8. create volume testproject_data  reason: config hash changed
+[8] -> 9. create container testproject-app-1  reason: volume "data" is being recreated
 `)
 }
 
@@ -1839,10 +1939,18 @@ func TestReconcileDiamondDependency(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-d-1  reason: scale up
-[1] -> 2. create container testproject-b-1  reason: scale up
-[1] -> 3. create container testproject-c-1  reason: scale up
-[2,3] -> 4. create container testproject-a-1  reason: scale up
+1. emit event testproject-a-1  reason: Creating
+2. emit event testproject-b-1  reason: Creating
+3. emit event testproject-c-1  reason: Creating
+4. emit event testproject-d-1  reason: Creating
+[4] -> 5. create container testproject-d-1  reason: scale up
+[5] -> 6. emit event testproject-d-1  reason: Created
+[6,2] -> 7. create container testproject-b-1  reason: scale up
+[6,3] -> 8. create container testproject-c-1  reason: scale up
+[7] -> 9. emit event testproject-b-1  reason: Created
+[8] -> 10. emit event testproject-c-1  reason: Created
+[9,10,1] -> 11. create container testproject-a-1  reason: scale up
+[11] -> 12. emit event testproject-a-1  reason: Created
 `)
 }
 
@@ -1894,13 +2002,19 @@ func TestReconcileCascadingRestart(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-_testproject-db-1  reason: config hash changed
-[1] -> 2. stop container testproject-db-1  reason: config hash changed
-[2] -> 3. remove container testproject-db-1  reason: config hash changed
-[3] -> 4. rename container testproject-db-1  reason: config hash changed
-[4] -> 5. start container testproject-db-1  reason: config hash changed
-[4] -> 6. stop container testproject-web-1  reason: dependency "db" is being recreated (restart: true)
-[5,6] -> 7. start container testproject-web-1  reason: restart after dependency "db" recreated
+1. emit event testproject-db-1  reason: Recreate
+[1] -> 2. create container testproject-_testproject-db-1  reason: config hash changed
+[2] -> 3. stop container testproject-db-1  reason: config hash changed
+[3] -> 4. remove container testproject-db-1  reason: config hash changed
+[4] -> 5. rename container testproject-db-1  reason: config hash changed
+[5] -> 6. emit event testproject-web-1  reason: Stopping
+[5] -> 7. start container testproject-db-1  reason: config hash changed
+[6] -> 8. stop container testproject-web-1  reason: dependency "db" is being recreated (restart: true)
+[7] -> 9. emit event testproject-db-1  reason: Recreated
+[8] -> 10. emit event testproject-web-1  reason: Stopped
+[10] -> 11. emit event testproject-web-1  reason: Starting
+[9,11] -> 12. start container testproject-web-1  reason: restart after dependency "db" recreated
+[12] -> 13. emit event testproject-web-1  reason: Started
 `)
 }
 
@@ -1952,11 +2066,13 @@ func TestReconcileNoCascadingRestartWhenFalse(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-_testproject-db-1  reason: config hash changed
-[1] -> 2. stop container testproject-db-1  reason: config hash changed
-[2] -> 3. remove container testproject-db-1  reason: config hash changed
-[3] -> 4. rename container testproject-db-1  reason: config hash changed
-[4] -> 5. start container testproject-db-1  reason: config hash changed
+1. emit event testproject-db-1  reason: Recreate
+[1] -> 2. create container testproject-_testproject-db-1  reason: config hash changed
+[2] -> 3. stop container testproject-db-1  reason: config hash changed
+[3] -> 4. remove container testproject-db-1  reason: config hash changed
+[4] -> 5. rename container testproject-db-1  reason: config hash changed
+[5] -> 6. start container testproject-db-1  reason: config hash changed
+[6] -> 7. emit event testproject-db-1  reason: Recreated
 `)
 }
 
@@ -1992,13 +2108,19 @@ func TestReconcileScaleUpWithConfigChange(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-_testproject-web-1  reason: config hash changed
-2. create container testproject-web-2  reason: scale up
-3. create container testproject-web-3  reason: scale up
-[1] -> 4. stop container testproject-web-1  reason: config hash changed
-[4] -> 5. remove container testproject-web-1  reason: config hash changed
-[5] -> 6. rename container testproject-web-1  reason: config hash changed
-[6] -> 7. start container testproject-web-1  reason: config hash changed
+1. emit event testproject-web-2  reason: Creating
+2. emit event testproject-web-3  reason: Creating
+3. emit event testproject-web-1  reason: Recreate
+[1] -> 4. create container testproject-web-2  reason: scale up
+[2] -> 5. create container testproject-web-3  reason: scale up
+[3] -> 6. create container testproject-_testproject-web-1  reason: config hash changed
+[4] -> 7. emit event testproject-web-2  reason: Created
+[5] -> 8. emit event testproject-web-3  reason: Created
+[6] -> 9. stop container testproject-web-1  reason: config hash changed
+[9] -> 10. remove container testproject-web-1  reason: config hash changed
+[10] -> 11. rename container testproject-web-1  reason: config hash changed
+[11] -> 12. start container testproject-web-1  reason: config hash changed
+[12] -> 13. emit event testproject-web-1  reason: Recreated
 `)
 }
 
@@ -2035,13 +2157,19 @@ func TestReconcileScaleDownWithConfigChange(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-_testproject-web-1  reason: config hash changed
-2. stop container testproject-web-2  reason: scale down
-[1] -> 3. stop container testproject-web-1  reason: config hash changed
-[2] -> 4. remove container testproject-web-2  reason: scale down
-[3] -> 5. remove container testproject-web-1  reason: config hash changed
-[5] -> 6. rename container testproject-web-1  reason: config hash changed
-[6] -> 7. start container testproject-web-1  reason: config hash changed
+1. emit event testproject-web-1  reason: Recreate
+2. emit event testproject-web-2  reason: Stopping
+[1] -> 3. create container testproject-_testproject-web-1  reason: config hash changed
+[2] -> 4. stop container testproject-web-2  reason: scale down
+[3] -> 5. stop container testproject-web-1  reason: config hash changed
+[4] -> 6. emit event testproject-web-2  reason: Stopped
+[5] -> 7. remove container testproject-web-1  reason: config hash changed
+[6] -> 8. emit event testproject-web-2  reason: Removing
+[7] -> 9. rename container testproject-web-1  reason: config hash changed
+[8] -> 10. remove container testproject-web-2  reason: scale down
+[9] -> 11. start container testproject-web-1  reason: config hash changed
+[10] -> 12. emit event testproject-web-2  reason: Removed
+[11] -> 13. emit event testproject-web-1  reason: Recreated
 `)
 }
 
@@ -2125,11 +2253,13 @@ func TestReconcileTargetedServiceDependencyPolicy(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container testproject-_testproject-web-1  reason: force recreate
-[1] -> 2. stop container testproject-web-1  reason: force recreate
-[2] -> 3. remove container testproject-web-1  reason: force recreate
-[3] -> 4. rename container testproject-web-1  reason: force recreate
-[4] -> 5. start container testproject-web-1  reason: force recreate
+1. emit event testproject-web-1  reason: Recreate
+[1] -> 2. create container testproject-_testproject-web-1  reason: force recreate
+[2] -> 3. stop container testproject-web-1  reason: force recreate
+[3] -> 4. remove container testproject-web-1  reason: force recreate
+[4] -> 5. rename container testproject-web-1  reason: force recreate
+[5] -> 6. start container testproject-web-1  reason: force recreate
+[6] -> 7. emit event testproject-web-1  reason: Recreated
 `)
 
 	// Same setup but deps get "diverged" — db IS stale so it gets recreated too
@@ -2141,16 +2271,20 @@ func TestReconcileTargetedServiceDependencyPolicy(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan2.String(), `
-1. create container testproject-_testproject-db-1  reason: config hash changed
-[1] -> 2. stop container testproject-db-1  reason: config hash changed
-[2] -> 3. remove container testproject-db-1  reason: config hash changed
-[3] -> 4. rename container testproject-db-1  reason: config hash changed
-[4] -> 5. start container testproject-db-1  reason: config hash changed
-[5] -> 6. create container testproject-_testproject-web-1  reason: force recreate
-[6] -> 7. stop container testproject-web-1  reason: force recreate
-[7] -> 8. remove container testproject-web-1  reason: force recreate
-[8] -> 9. rename container testproject-web-1  reason: force recreate
-[9,5] -> 10. start container testproject-web-1  reason: force recreate
+1. emit event testproject-db-1  reason: Recreate
+2. emit event testproject-web-1  reason: Recreate
+[1] -> 3. create container testproject-_testproject-db-1  reason: config hash changed
+[3] -> 4. stop container testproject-db-1  reason: config hash changed
+[4] -> 5. remove container testproject-db-1  reason: config hash changed
+[5] -> 6. rename container testproject-db-1  reason: config hash changed
+[6] -> 7. start container testproject-db-1  reason: config hash changed
+[7] -> 8. emit event testproject-db-1  reason: Recreated
+[2,8] -> 9. create container testproject-_testproject-web-1  reason: force recreate
+[9] -> 10. stop container testproject-web-1  reason: force recreate
+[10] -> 11. remove container testproject-web-1  reason: force recreate
+[11] -> 12. rename container testproject-web-1  reason: force recreate
+[8,12] -> 13. start container testproject-web-1  reason: force recreate
+[13] -> 14. emit event testproject-web-1  reason: Recreated
 `)
 }
 
@@ -2193,11 +2327,13 @@ func TestReconcileNonTargetedServiceSkipped(t *testing.T) {
 	assert.NilError(t, err)
 	// Only web is recreated — worker is completely skipped
 	assert.Equal(t, plan.String(), `
-1. create container testproject-_testproject-web-1  reason: config hash changed
-[1] -> 2. stop container testproject-web-1  reason: config hash changed
-[2] -> 3. remove container testproject-web-1  reason: config hash changed
-[3] -> 4. rename container testproject-web-1  reason: config hash changed
-[4] -> 5. start container testproject-web-1  reason: config hash changed
+1. emit event testproject-web-1  reason: Recreate
+[1] -> 2. create container testproject-_testproject-web-1  reason: config hash changed
+[2] -> 3. stop container testproject-web-1  reason: config hash changed
+[3] -> 4. remove container testproject-web-1  reason: config hash changed
+[4] -> 5. rename container testproject-web-1  reason: config hash changed
+[5] -> 6. start container testproject-web-1  reason: config hash changed
+[6] -> 7. emit event testproject-web-1  reason: Recreated
 `)
 }
 
@@ -2260,13 +2396,27 @@ func TestReconcileMultipleOrphans(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container testproject-old-a-1  reason: orphan container
-2. stop container testproject-old-b-1  reason: orphan container
-3. stop container testproject-old-c-1  reason: orphan container
-[1] -> 4. remove container testproject-old-a-1  reason: orphan container
-[2] -> 5. remove container testproject-old-b-1  reason: orphan container
-[3] -> 6. remove container testproject-old-c-1  reason: orphan container
-[4,5,6] -> 7. create container testproject-web-1  reason: scale up
+1. emit event testproject-web-1  reason: Creating
+2. emit event testproject-old-a-1  reason: Stopping
+3. emit event testproject-old-b-1  reason: Stopping
+4. emit event testproject-old-c-1  reason: Stopping
+[2] -> 5. stop container testproject-old-a-1  reason: orphan container
+[3] -> 6. stop container testproject-old-b-1  reason: orphan container
+[4] -> 7. stop container testproject-old-c-1  reason: orphan container
+[5] -> 8. emit event testproject-old-a-1  reason: Stopped
+[6] -> 9. emit event testproject-old-b-1  reason: Stopped
+[7] -> 10. emit event testproject-old-c-1  reason: Stopped
+[8] -> 11. emit event testproject-old-a-1  reason: Removing
+[9] -> 12. emit event testproject-old-b-1  reason: Removing
+[10] -> 13. emit event testproject-old-c-1  reason: Removing
+[11] -> 14. remove container testproject-old-a-1  reason: orphan container
+[12] -> 15. remove container testproject-old-b-1  reason: orphan container
+[13] -> 16. remove container testproject-old-c-1  reason: orphan container
+[14] -> 17. emit event testproject-old-a-1  reason: Removed
+[15] -> 18. emit event testproject-old-b-1  reason: Removed
+[1,14,15,16] -> 19. create container testproject-web-1  reason: scale up
+[16] -> 20. emit event testproject-old-c-1  reason: Removed
+[19] -> 21. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -2355,10 +2505,18 @@ func TestReconcileNonContiguousScaleDown(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container tp-web-3  reason: scale down
-2. stop container tp-web-5  reason: scale down
-[1] -> 3. remove container tp-web-3  reason: scale down
-[2] -> 4. remove container tp-web-5  reason: scale down
+1. emit event tp-web-3  reason: Stopping
+2. emit event tp-web-5  reason: Stopping
+[1] -> 3. stop container tp-web-3  reason: scale down
+[2] -> 4. stop container tp-web-5  reason: scale down
+[3] -> 5. emit event tp-web-3  reason: Stopped
+[4] -> 6. emit event tp-web-5  reason: Stopped
+[5] -> 7. emit event tp-web-3  reason: Removing
+[6] -> 8. emit event tp-web-5  reason: Removing
+[7] -> 9. remove container tp-web-3  reason: scale down
+[8] -> 10. remove container tp-web-5  reason: scale down
+[9] -> 11. emit event tp-web-3  reason: Removed
+[10] -> 12. emit event tp-web-5  reason: Removed
 `)
 }
 
@@ -2396,7 +2554,9 @@ func TestReconcileScaleUpFillsAfterMax(t *testing.T) {
 	assert.NilError(t, err)
 	// New container numbered 4 (max+1), not 2 (the gap)
 	assert.Equal(t, plan.String(), `
-1. create container tp-web-4  reason: scale up
+1. emit event tp-web-4  reason: Creating
+[1] -> 2. create container tp-web-4  reason: scale up
+[2] -> 3. emit event tp-web-4  reason: Created
 `)
 }
 
@@ -2456,8 +2616,12 @@ func TestReconcileInvalidContainerNumberFallback(t *testing.T) {
 	assert.NilError(t, err)
 	// Container with invalid number (older Created) is removed via scale down
 	assert.Equal(t, plan.String(), `
-1. stop container tp-web-1  reason: scale down
-[1] -> 2. remove container tp-web-1  reason: scale down
+1. emit event tp-web-1  reason: Stopping
+[1] -> 2. stop container tp-web-1  reason: scale down
+[2] -> 3. emit event tp-web-1  reason: Stopped
+[3] -> 4. emit event tp-web-1  reason: Removing
+[4] -> 5. remove container tp-web-1  reason: scale down
+[5] -> 6. emit event tp-web-1  reason: Removed
 `)
 }
 
@@ -2492,7 +2656,9 @@ func TestReconcilePausedContainerGetsStarted(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. start container tp-web-1  reason: container not running (state: paused)
+1. emit event tp-web-1  reason: Starting
+[1] -> 2. start container tp-web-1  reason: container not running (state: paused)
+[2] -> 3. emit event tp-web-1  reason: Started
 `)
 }
 
@@ -2872,11 +3038,15 @@ func TestReconcileVolumeRecreateUnrelatedServiceUnaffected(t *testing.T) {
 	assert.NilError(t, err)
 	// Only app is affected — worker has no volume ops
 	assert.Equal(t, plan.String(), `
-1. stop container tp-app-1  reason: volume "tp_data" is being recreated
-[1] -> 2. remove container tp-app-1  reason: volume "tp_data" is being recreated
-[2] -> 3. remove volume tp_data  reason: config hash changed
-[3] -> 4. create volume tp_data  reason: config hash changed
-[4] -> 5. create container tp-app-1  reason: volume "data" is being recreated
+1. emit event tp-app-1  reason: Stopping
+[1] -> 2. stop container tp-app-1  reason: volume "tp_data" is being recreated
+[2] -> 3. emit event tp-app-1  reason: Stopped
+[3] -> 4. emit event tp-app-1  reason: Removing
+[4] -> 5. remove container tp-app-1  reason: volume "tp_data" is being recreated
+[5] -> 6. emit event tp-app-1  reason: Removed
+[5] -> 7. remove volume tp_data  reason: config hash changed
+[7] -> 8. create volume tp_data  reason: config hash changed
+[8] -> 9. create container tp-app-1  reason: volume "data" is being recreated
 `)
 }
 
@@ -2965,13 +3135,19 @@ func TestReconcileCascadingRestartMultipleDepsOneRecreated(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container tp-db-1_tp-db-1  reason: config hash changed
-[1] -> 2. stop container tp-db-1  reason: config hash changed
-[2] -> 3. remove container tp-db-1  reason: config hash changed
-[3] -> 4. rename container tp-db-1  reason: config hash changed
-[4] -> 5. start container tp-db-1  reason: config hash changed
-[4] -> 6. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
-[5,6] -> 7. start container tp-web-1  reason: restart after dependency "db" recreated
+1. emit event tp-db-1  reason: Recreate
+[1] -> 2. create container tp-db-1_tp-db-1  reason: config hash changed
+[2] -> 3. stop container tp-db-1  reason: config hash changed
+[3] -> 4. remove container tp-db-1  reason: config hash changed
+[4] -> 5. rename container tp-db-1  reason: config hash changed
+[5] -> 6. emit event tp-web-1  reason: Stopping
+[5] -> 7. start container tp-db-1  reason: config hash changed
+[6] -> 8. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
+[7] -> 9. emit event tp-db-1  reason: Recreated
+[8] -> 10. emit event tp-web-1  reason: Stopped
+[10] -> 11. emit event tp-web-1  reason: Starting
+[9,11] -> 12. start container tp-web-1  reason: restart after dependency "db" recreated
+[12] -> 13. emit event tp-web-1  reason: Started
 `)
 }
 
@@ -3021,11 +3197,13 @@ func TestReconcileCascadingRestartSkippedForExitedDependent(t *testing.T) {
 	assert.NilError(t, err)
 	// Only db is recreated — web is exited, no cascading restart
 	assert.Equal(t, plan.String(), `
-1. create container tp-db-1_tp-db-1  reason: config hash changed
-[1] -> 2. stop container tp-db-1  reason: config hash changed
-[2] -> 3. remove container tp-db-1  reason: config hash changed
-[3] -> 4. rename container tp-db-1  reason: config hash changed
-[4] -> 5. start container tp-db-1  reason: config hash changed
+1. emit event tp-db-1  reason: Recreate
+[1] -> 2. create container tp-db-1_tp-db-1  reason: config hash changed
+[2] -> 3. stop container tp-db-1  reason: config hash changed
+[3] -> 4. remove container tp-db-1  reason: config hash changed
+[4] -> 5. rename container tp-db-1  reason: config hash changed
+[5] -> 6. start container tp-db-1  reason: config hash changed
+[6] -> 7. emit event tp-db-1  reason: Recreated
 `)
 }
 
@@ -3059,7 +3237,9 @@ func TestReconcileCustomContainerNameScale1Allowed(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container my-app  reason: scale up
+1. emit event my-app  reason: Creating
+[1] -> 2. create container my-app  reason: scale up
+[2] -> 3. emit event my-app  reason: Created
 `)
 }
 
@@ -3110,8 +3290,12 @@ func TestReconcileCustomContainerNameScale0Allowed(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container my-app  reason: scale down
-[1] -> 2. remove container my-app  reason: scale down
+1. emit event my-app  reason: Stopping
+[1] -> 2. stop container my-app  reason: scale down
+[2] -> 3. emit event my-app  reason: Stopped
+[3] -> 4. emit event my-app  reason: Removing
+[4] -> 5. remove container my-app  reason: scale down
+[5] -> 6. emit event my-app  reason: Removed
 `)
 }
 
@@ -3155,11 +3339,13 @@ func TestReconcileShortContainerIDInRecreate(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container abc123_tp-web-1  reason: config hash changed
-[1] -> 2. stop container tp-web-1  reason: config hash changed
-[2] -> 3. remove container tp-web-1  reason: config hash changed
-[3] -> 4. rename container tp-web-1  reason: config hash changed
-[4] -> 5. start container tp-web-1  reason: config hash changed
+1. emit event tp-web-1  reason: Recreate
+[1] -> 2. create container abc123_tp-web-1  reason: config hash changed
+[2] -> 3. stop container tp-web-1  reason: config hash changed
+[3] -> 4. remove container tp-web-1  reason: config hash changed
+[4] -> 5. rename container tp-web-1  reason: config hash changed
+[5] -> 6. start container tp-web-1  reason: config hash changed
+[6] -> 7. emit event tp-web-1  reason: Recreated
 `)
 }
 
@@ -3254,14 +3440,22 @@ func TestReconcileTwoServicesShareRecreatedVolume(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container tp-app-1  reason: volume "tp_shared" is being recreated
-2. stop container tp-worker-1  reason: volume "tp_shared" is being recreated
-[1] -> 3. remove container tp-app-1  reason: volume "tp_shared" is being recreated
-[2] -> 4. remove container tp-worker-1  reason: volume "tp_shared" is being recreated
-[3,4] -> 5. remove volume tp_shared  reason: config hash changed
-[5] -> 6. create volume tp_shared  reason: config hash changed
-[6] -> 7. create container tp-app-1  reason: volume "shared" is being recreated
-[6] -> 8. create container tp-worker-1  reason: volume "shared" is being recreated
+1. emit event tp-app-1  reason: Stopping
+2. emit event tp-worker-1  reason: Stopping
+[1] -> 3. stop container tp-app-1  reason: volume "tp_shared" is being recreated
+[2] -> 4. stop container tp-worker-1  reason: volume "tp_shared" is being recreated
+[3] -> 5. emit event tp-app-1  reason: Stopped
+[4] -> 6. emit event tp-worker-1  reason: Stopped
+[5] -> 7. emit event tp-app-1  reason: Removing
+[6] -> 8. emit event tp-worker-1  reason: Removing
+[7] -> 9. remove container tp-app-1  reason: volume "tp_shared" is being recreated
+[8] -> 10. remove container tp-worker-1  reason: volume "tp_shared" is being recreated
+[9] -> 11. emit event tp-app-1  reason: Removed
+[10] -> 12. emit event tp-worker-1  reason: Removed
+[9,10] -> 13. remove volume tp_shared  reason: config hash changed
+[13] -> 14. create volume tp_shared  reason: config hash changed
+[14] -> 15. create container tp-app-1  reason: volume "shared" is being recreated
+[14] -> 16. create container tp-worker-1  reason: volume "shared" is being recreated
 `)
 }
 
@@ -3298,7 +3492,9 @@ func TestReconcileDependsOnMissingServiceNoPanic(t *testing.T) {
 	assert.NilError(t, err)
 	// "ghost" is silently ignored — web is created without dependency edge
 	assert.Equal(t, plan.String(), `
-1. create container tp-web-1  reason: scale up
+1. emit event tp-web-1  reason: Creating
+[1] -> 2. create container tp-web-1  reason: scale up
+[2] -> 3. emit event tp-web-1  reason: Created
 `)
 }
 
@@ -3439,11 +3635,13 @@ func TestReconcileVolumeMountMissingTriggersRecreate(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container abc123def456_tp-web-1  reason: volume configuration changed
-[1] -> 2. stop container tp-web-1  reason: volume configuration changed
-[2] -> 3. remove container tp-web-1  reason: volume configuration changed
-[3] -> 4. rename container tp-web-1  reason: volume configuration changed
-[4] -> 5. start container tp-web-1  reason: volume configuration changed
+1. emit event tp-web-1  reason: Recreate
+[1] -> 2. create container abc123def456_tp-web-1  reason: volume configuration changed
+[2] -> 3. stop container tp-web-1  reason: volume configuration changed
+[3] -> 4. remove container tp-web-1  reason: volume configuration changed
+[4] -> 5. rename container tp-web-1  reason: volume configuration changed
+[5] -> 6. start container tp-web-1  reason: volume configuration changed
+[6] -> 7. emit event tp-web-1  reason: Recreated
 `)
 }
 
@@ -3514,11 +3712,13 @@ func TestReconcileMultipleVolumesOneMissing(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container abc123def456_tp-web-1  reason: volume configuration changed
-[1] -> 2. stop container tp-web-1  reason: volume configuration changed
-[2] -> 3. remove container tp-web-1  reason: volume configuration changed
-[3] -> 4. rename container tp-web-1  reason: volume configuration changed
-[4] -> 5. start container tp-web-1  reason: volume configuration changed
+1. emit event tp-web-1  reason: Recreate
+[1] -> 2. create container abc123def456_tp-web-1  reason: volume configuration changed
+[2] -> 3. stop container tp-web-1  reason: volume configuration changed
+[3] -> 4. remove container tp-web-1  reason: volume configuration changed
+[4] -> 5. rename container tp-web-1  reason: volume configuration changed
+[5] -> 6. start container tp-web-1  reason: volume configuration changed
+[6] -> 7. emit event tp-web-1  reason: Recreated
 `)
 }
 
@@ -3562,8 +3762,12 @@ func TestReconcileTimeoutPropagated(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container tp-web-2  reason: scale down
-[1] -> 2. remove container tp-web-2  reason: scale down
+1. emit event tp-web-2  reason: Stopping
+[1] -> 2. stop container tp-web-2  reason: scale down
+[2] -> 3. emit event tp-web-2  reason: Stopped
+[3] -> 4. emit event tp-web-2  reason: Removing
+[4] -> 5. remove container tp-web-2  reason: scale down
+[5] -> 6. emit event tp-web-2  reason: Removed
 `)
 	// Verify timeout is set on the stop op
 	stopOp := plan.Operations["stop-container:tp-web-2"]
@@ -3601,8 +3805,12 @@ func TestReconcileScaleUpFromZeroContainers(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container tp-web-1  reason: scale up
-2. create container tp-web-2  reason: scale up
+1. emit event tp-web-1  reason: Creating
+2. emit event tp-web-2  reason: Creating
+[1] -> 3. create container tp-web-1  reason: scale up
+[2] -> 4. create container tp-web-2  reason: scale up
+[3] -> 5. emit event tp-web-1  reason: Created
+[4] -> 6. emit event tp-web-2  reason: Created
 `)
 }
 
@@ -3638,21 +3846,27 @@ func TestReconcileAllContainersObsolete(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container tp-web-1_tp-web-1  reason: config hash changed
-2. create container tp-web-2_tp-web-2  reason: config hash changed
-3. create container tp-web-3_tp-web-3  reason: config hash changed
-[1] -> 4. stop container tp-web-1  reason: config hash changed
-[2] -> 5. stop container tp-web-2  reason: config hash changed
-[3] -> 6. stop container tp-web-3  reason: config hash changed
-[4] -> 7. remove container tp-web-1  reason: config hash changed
-[5] -> 8. remove container tp-web-2  reason: config hash changed
-[6] -> 9. remove container tp-web-3  reason: config hash changed
-[7] -> 10. rename container tp-web-1  reason: config hash changed
-[8] -> 11. rename container tp-web-2  reason: config hash changed
-[9] -> 12. rename container tp-web-3  reason: config hash changed
-[10] -> 13. start container tp-web-1  reason: config hash changed
-[11] -> 14. start container tp-web-2  reason: config hash changed
-[12] -> 15. start container tp-web-3  reason: config hash changed
+1. emit event tp-web-1  reason: Recreate
+2. emit event tp-web-2  reason: Recreate
+3. emit event tp-web-3  reason: Recreate
+[1] -> 4. create container tp-web-1_tp-web-1  reason: config hash changed
+[2] -> 5. create container tp-web-2_tp-web-2  reason: config hash changed
+[3] -> 6. create container tp-web-3_tp-web-3  reason: config hash changed
+[4] -> 7. stop container tp-web-1  reason: config hash changed
+[5] -> 8. stop container tp-web-2  reason: config hash changed
+[6] -> 9. stop container tp-web-3  reason: config hash changed
+[7] -> 10. remove container tp-web-1  reason: config hash changed
+[8] -> 11. remove container tp-web-2  reason: config hash changed
+[9] -> 12. remove container tp-web-3  reason: config hash changed
+[10] -> 13. rename container tp-web-1  reason: config hash changed
+[11] -> 14. rename container tp-web-2  reason: config hash changed
+[12] -> 15. rename container tp-web-3  reason: config hash changed
+[13] -> 16. start container tp-web-1  reason: config hash changed
+[14] -> 17. start container tp-web-2  reason: config hash changed
+[15] -> 18. start container tp-web-3  reason: config hash changed
+[16] -> 19. emit event tp-web-1  reason: Recreated
+[17] -> 20. emit event tp-web-2  reason: Recreated
+[18] -> 21. emit event tp-web-3  reason: Recreated
 `)
 }
 
@@ -3692,10 +3906,18 @@ func TestReconcileScaleDownStaleRemovedCurrentKept(t *testing.T) {
 	assert.NilError(t, err)
 	// Both stale containers removed, current container #2 survives
 	assert.Equal(t, plan.String(), `
-1. stop container tp-web-1  reason: scale down
-2. stop container tp-web-3  reason: scale down
-[1] -> 3. remove container tp-web-1  reason: scale down
-[2] -> 4. remove container tp-web-3  reason: scale down
+1. emit event tp-web-1  reason: Stopping
+2. emit event tp-web-3  reason: Stopping
+[1] -> 3. stop container tp-web-1  reason: scale down
+[2] -> 4. stop container tp-web-3  reason: scale down
+[3] -> 5. emit event tp-web-1  reason: Stopped
+[4] -> 6. emit event tp-web-3  reason: Stopped
+[5] -> 7. emit event tp-web-1  reason: Removing
+[6] -> 8. emit event tp-web-3  reason: Removing
+[7] -> 9. remove container tp-web-1  reason: scale down
+[8] -> 10. remove container tp-web-3  reason: scale down
+[9] -> 11. emit event tp-web-1  reason: Removed
+[10] -> 12. emit event tp-web-3  reason: Removed
 `)
 }
 
@@ -3744,11 +3966,13 @@ func TestReconcileRecreateNoEdgeToRunningDependency(t *testing.T) {
 	assert.NilError(t, err)
 	// No dependency edge on db — it has no "ready" op in the plan
 	assert.Equal(t, plan.String(), `
-1. create container tp-web-1_tp-web-1  reason: config hash changed
-[1] -> 2. stop container tp-web-1  reason: config hash changed
-[2] -> 3. remove container tp-web-1  reason: config hash changed
-[3] -> 4. rename container tp-web-1  reason: config hash changed
-[4] -> 5. start container tp-web-1  reason: config hash changed
+1. emit event tp-web-1  reason: Recreate
+[1] -> 2. create container tp-web-1_tp-web-1  reason: config hash changed
+[2] -> 3. stop container tp-web-1  reason: config hash changed
+[3] -> 4. remove container tp-web-1  reason: config hash changed
+[4] -> 5. rename container tp-web-1  reason: config hash changed
+[5] -> 6. start container tp-web-1  reason: config hash changed
+[6] -> 7. emit event tp-web-1  reason: Recreated
 `)
 }
 
@@ -3790,9 +4014,15 @@ func TestReconcileTwoServicesDependOnSameService(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container tp-db-1  reason: scale up
-[1] -> 2. create container tp-web-1  reason: scale up
-[1] -> 3. create container tp-worker-1  reason: scale up
+1. emit event tp-db-1  reason: Creating
+2. emit event tp-web-1  reason: Creating
+3. emit event tp-worker-1  reason: Creating
+[1] -> 4. create container tp-db-1  reason: scale up
+[4] -> 5. emit event tp-db-1  reason: Created
+[5,2] -> 6. create container tp-web-1  reason: scale up
+[5,3] -> 7. create container tp-worker-1  reason: scale up
+[6] -> 8. emit event tp-web-1  reason: Created
+[7] -> 9. emit event tp-worker-1  reason: Created
 `)
 }
 
@@ -3834,9 +4064,11 @@ func TestReconcileContainerCreateDependsOnRecreatedNetwork(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. remove network tp_default  reason: config hash changed
-[1] -> 2. create network tp_default  reason: config hash changed
-[2] -> 3. create container tp-web-1  reason: scale up
+1. emit event tp-web-1  reason: Creating
+2. remove network tp_default  reason: config hash changed
+[2] -> 3. create network tp_default  reason: config hash changed
+[3,1] -> 4. create container tp-web-1  reason: scale up
+[4] -> 5. emit event tp-web-1  reason: Created
 `)
 }
 
@@ -3886,16 +4118,20 @@ func TestReconcileCascadingRestartSkippedWhenAlreadyRecreating(t *testing.T) {
 	assert.NilError(t, err)
 	// web is already being recreated — cascading restart does NOT add a duplicate stop
 	assert.Equal(t, plan.String(), `
-1. create container tp-db-1_tp-db-1  reason: config hash changed
-[1] -> 2. stop container tp-db-1  reason: config hash changed
-[2] -> 3. remove container tp-db-1  reason: config hash changed
-[3] -> 4. rename container tp-db-1  reason: config hash changed
-[4] -> 5. start container tp-db-1  reason: config hash changed
-[5] -> 6. create container tp-web-1_tp-web-1  reason: config hash changed
-[6] -> 7. stop container tp-web-1  reason: config hash changed
-[7] -> 8. remove container tp-web-1  reason: config hash changed
-[8] -> 9. rename container tp-web-1  reason: config hash changed
-[9,5] -> 10. start container tp-web-1  reason: config hash changed
+1. emit event tp-db-1  reason: Recreate
+2. emit event tp-web-1  reason: Recreate
+[1] -> 3. create container tp-db-1_tp-db-1  reason: config hash changed
+[3] -> 4. stop container tp-db-1  reason: config hash changed
+[4] -> 5. remove container tp-db-1  reason: config hash changed
+[5] -> 6. rename container tp-db-1  reason: config hash changed
+[6] -> 7. start container tp-db-1  reason: config hash changed
+[7] -> 8. emit event tp-db-1  reason: Recreated
+[2,8] -> 9. create container tp-web-1_tp-web-1  reason: config hash changed
+[9] -> 10. stop container tp-web-1  reason: config hash changed
+[10] -> 11. remove container tp-web-1  reason: config hash changed
+[11] -> 12. rename container tp-web-1  reason: config hash changed
+[8,12] -> 13. start container tp-web-1  reason: config hash changed
+[13] -> 14. emit event tp-web-1  reason: Recreated
 `)
 	// Verify exactly one stop op for web
 	var stopCount int
@@ -3977,8 +4213,12 @@ func TestReconcileOrphanAlreadyStopped(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. stop container tp-old-1  reason: orphan container
-[1] -> 2. remove container tp-old-1  reason: orphan container
+1. emit event tp-old-1  reason: Stopping
+[1] -> 2. stop container tp-old-1  reason: orphan container
+[2] -> 3. emit event tp-old-1  reason: Stopped
+[3] -> 4. emit event tp-old-1  reason: Removing
+[4] -> 5. remove container tp-old-1  reason: orphan container
+[5] -> 6. emit event tp-old-1  reason: Removed
 `)
 }
 
@@ -4092,10 +4332,14 @@ func TestReconcileServiceDependsOnMissingNetworkVolumeAndService(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container tp-db-1  reason: scale up
-2. create network tp_mynet  reason: network does not exist
-3. create volume tp_data  reason: volume does not exist
-[1,2,3] -> 4. create container tp-web-1  reason: scale up
+1. create network tp_mynet  reason: network does not exist
+2. create volume tp_data  reason: volume does not exist
+3. emit event tp-db-1  reason: Creating
+4. emit event tp-web-1  reason: Creating
+[3] -> 5. create container tp-db-1  reason: scale up
+[5] -> 6. emit event tp-db-1  reason: Created
+[1,2,6,4] -> 7. create container tp-web-1  reason: scale up
+[7] -> 8. emit event tp-web-1  reason: Created
 `)
 }
 
@@ -4132,12 +4376,16 @@ func TestReconcileInheritFlagPropagated(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create container tp-web-1_tp-web-1  reason: config hash changed
-2. create container tp-web-2  reason: scale up
-[1] -> 3. stop container tp-web-1  reason: config hash changed
-[3] -> 4. remove container tp-web-1  reason: config hash changed
-[4] -> 5. rename container tp-web-1  reason: config hash changed
-[5] -> 6. start container tp-web-1  reason: config hash changed
+1. emit event tp-web-2  reason: Creating
+2. emit event tp-web-1  reason: Recreate
+[1] -> 3. create container tp-web-2  reason: scale up
+[2] -> 4. create container tp-web-1_tp-web-1  reason: config hash changed
+[3] -> 5. emit event tp-web-2  reason: Created
+[4] -> 6. stop container tp-web-1  reason: config hash changed
+[6] -> 7. remove container tp-web-1  reason: config hash changed
+[7] -> 8. rename container tp-web-1  reason: config hash changed
+[8] -> 9. start container tp-web-1  reason: config hash changed
+[9] -> 10. emit event tp-web-1  reason: Recreated
 `)
 	// Verify Inherit is set on both create ops
 	for _, op := range plan.Operations {
@@ -4769,23 +5017,29 @@ func TestReconcileCascadingRestartStopDependsOnRename(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	// Find stop-container:testproject-web-1
-	stopOp, exists := plan.Operations["stop-container:testproject-web-1"]
-	assert.Assert(t, exists, "expected stop-container op for web")
+	// The emit-stopping event for web should depend on the rename op for db
+	// (cascading restart: stop waits for dependency recreation to complete)
+	emitStoppingOp, exists := plan.Operations["emit-stopping:testproject-web-1"]
+	assert.Assert(t, exists, "expected emit-stopping op for web")
 
-	// It should depend on the rename op for db
 	renameID := "rename-container:testproject-db-1"
 	_, hasRename := plan.Operations[renameID]
 	assert.Assert(t, hasRename, "expected rename-container op for db")
 
 	found := false
-	for _, dep := range stopOp.DependsOn {
+	for _, dep := range emitStoppingOp.DependsOn {
 		if dep == renameID {
 			found = true
 			break
 		}
 	}
-	assert.Assert(t, found, "stop-container:web should depend on rename-container:db, got deps: %v", stopOp.DependsOn)
+	assert.Assert(t, found, "emit-stopping:web should depend on rename-container:db, got deps: %v", emitStoppingOp.DependsOn)
+
+	// And stop-container:web should depend on emit-stopping:web
+	stopOp, stopExists := plan.Operations["stop-container:testproject-web-1"]
+	assert.Assert(t, stopExists, "expected stop-container op for web")
+	assert.Assert(t, slices.Contains(stopOp.DependsOn, "emit-stopping:testproject-web-1"),
+		"stop-container:web should depend on emit-stopping:web, got deps: %v", stopOp.DependsOn)
 }
 
 // ---------------------------------------------------------------------------
