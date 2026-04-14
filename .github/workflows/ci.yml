@@ -216,6 +216,26 @@ jobs:
       - name: Build example provider
         run: make example-provider
 
+      - name: Pre-pull e2e test images
+        run: |
+          # Pull images used by e2e fixtures in parallel to avoid test
+          # timeouts caused by slow downloads on cold CI runners.
+          images=(
+            "alpine"
+            "nginx"
+            "nginx:alpine"
+            "busybox"
+            "bash"
+            "hello-world"
+            "mariadb"
+            "fluent/fluent-bit:3.1.7-debug"
+            "alpine/curl"
+          )
+          for img in "${images[@]}"; do
+            docker pull "$img" &
+          done
+          wait
+
       - name: Build
         uses: docker/bake-action@82490499d2e5613fcead7e128237ef0b0ea210f7 # v7
         with:
