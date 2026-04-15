@@ -1446,7 +1446,12 @@ func addCascadingRestartOps(
 		}
 	}
 
-	// Start chain: merge with existing start or create new one.
+	// Start chain: only when StartContainers is set. Otherwise the start
+	// is handled by startService via InDependencyOrder, which respects
+	// depends_on conditions and gives services time to become ready.
+	if !opts.StartContainers {
+		return
+	}
 	emitStartingID := fmt.Sprintf("emit-starting:%s", ctrName)
 	startID := fmt.Sprintf("start-container:%s", ctrName)
 	if existingStart, exists := plan.Operations[startID]; exists {

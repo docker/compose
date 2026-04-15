@@ -5227,6 +5227,117 @@ func TestReconcileCascadingRestartOrderingPreservesLogDrivers(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Cascading restart — StartContainers flag behavior
+// ---------------------------------------------------------------------------
+
+// TestReconcileCascadingRestartWithStartContainers verifies that when
+// StartContainers is true, the cascading restart produces both stop AND start
+// operations for the dependent service in the plan. The start waits for the
+// dependency to be fully recreated.
+func TestReconcileCascadingRestartWithStartContainers(t *testing.T) {
+	fluentbit := types.ServiceConfig{Name: "fluentbit", Image: "fluent/fluent-bit:latest"}
+	app := types.ServiceConfig{
+		Name: "app", Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"fluentbit": {Condition: "service_started", Restart: true},
+		},
+	}
+	appHash, err := ServiceHash(app)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name:     "tp",
+		Services: types.Services{"fluentbit": fluentbit, "app": app},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"fluentbit": {makeContainer("tp", "fluentbit", 1, "stale")},
+			"app":       {makeContainer("tp", "app", 1, appHash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. emit event tp-app-1  reason: Stopping
+[1] -> 2. stop container tp-app-1  reason: dependency "fluentbit" is being recreated (restart: true)
+[2] -> 3. emit event tp-app-1  reason: Stopped
+[3] -> 4. emit event tp-fluentbit-1  reason: Recreate
+[3] -> 5. emit event tp-app-1  reason: Starting
+[4] -> 6. create container tp-fluentbit_tp-fluentbit-1  reason: config hash changed
+[6] -> 7. stop container tp-fluentbit-1  reason: config hash changed
+[7] -> 8. remove container tp-fluentbit-1  reason: config hash changed
+[8] -> 9. rename container tp-fluentbit-1  reason: config hash changed
+[9] -> 10. start container tp-fluentbit-1  reason: config hash changed
+[10] -> 11. emit event tp-fluentbit-1  reason: Recreated
+[11,5] -> 12. start container tp-app-1  reason: restart after dependency "fluentbit" recreated
+[12] -> 13. emit event tp-app-1  reason: Started
+`)
+}
+
+// TestReconcileCascadingRestartWithoutStartContainers verifies that when
+// StartContainers is false (docker compose create, used by up -d), the
+// cascading restart produces only the STOP operations for the dependent.
+// The start is NOT in the plan — it is delegated to startService via
+// InDependencyOrder, which respects depends_on conditions and gives
+// services time to become ready (e.g. fluentd logging driver needs the
+// dependency to be listening before the dependent can start).
+func TestReconcileCascadingRestartWithoutStartContainers(t *testing.T) {
+	fluentbit := types.ServiceConfig{Name: "fluentbit", Image: "fluent/fluent-bit:latest"}
+	app := types.ServiceConfig{
+		Name: "app", Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"fluentbit": {Condition: "service_started", Restart: true},
+		},
+	}
+	appHash, err := ServiceHash(app)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name:     "tp",
+		Services: types.Services{"fluentbit": fluentbit, "app": app},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"fluentbit": {makeContainer("tp", "fluentbit", 1, "stale")},
+			"app":       {makeContainer("tp", "app", 1, appHash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      false,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	// No start ops for app — only stop + recreate of dependency.
+	// The start of app will be handled by startService after ExecutePlan.
+	assert.Equal(t, plan.String(), `
+1. emit event tp-app-1  reason: Stopping
+[1] -> 2. stop container tp-app-1  reason: dependency "fluentbit" is being recreated (restart: true)
+[2] -> 3. emit event tp-app-1  reason: Stopped
+[3] -> 4. emit event tp-fluentbit-1  reason: Recreate
+[4] -> 5. create container tp-fluentbit_tp-fluentbit-1  reason: config hash changed
+[5] -> 6. stop container tp-fluentbit-1  reason: config hash changed
+[6] -> 7. remove container tp-fluentbit-1  reason: config hash changed
+[7] -> 8. rename container tp-fluentbit-1  reason: config hash changed
+[8] -> 9. emit event tp-fluentbit-1  reason: Recreated
+`)
+}
+
+// ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
