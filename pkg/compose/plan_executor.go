@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/errdefs"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -163,6 +164,7 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 	if _, err := topologicalSort(plan); err != nil {
 		return err
 	}
+	logrus.Debugf("plan: executing %d operations", len(plan.Operations))
 
 	// Pre-populate execution state with existing containers so that
 	// resolveServiceReferences can find containers for services not
@@ -199,9 +201,11 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 		for {
 			select {
 			case <-ctx.Done():
+				logrus.Debugf("plan: consumer exiting on context cancellation, %d operations remaining", expect)
 				return nil
 			case doneOp := <-opCh:
 				expect--
+				logrus.Debugf("plan: operation %s completed, %d remaining", doneOp.ID, expect)
 				if expect == 0 {
 					return nil
 				}
@@ -211,6 +215,7 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 					depCount[depID]--
 					if depCount[depID] == 0 {
 						depOp := plan.Operations[depID]
+						logrus.Debugf("plan: scheduling %s (%s) — all dependencies satisfied", depOp.ID, depOp.Type)
 						eg.Go(func() error {
 							if err := s.executeOperation(ctx, project, depOp, state); err != nil {
 								return err
@@ -226,6 +231,7 @@ func (s *composeService) ExecutePlan(ctx context.Context, project *types.Project
 
 	// Launch root operations
 	for _, op := range plan.Roots() {
+		logrus.Debugf("plan: launching root operation %s (%s)", op.ID, op.Type)
 		eg.Go(func() error {
 			if err := s.executeOperation(ctx, project, op, state); err != nil {
 				return err
@@ -254,6 +260,7 @@ func (s *composeService) executeOperation(ctx context.Context, project *types.Pr
 
 	err := s.dispatchOperation(ctx, project, op, state)
 	if err != nil {
+		logrus.Debugf("plan: operation %s failed: %v", op.ID, err)
 		span.SetStatus(codes.Error, err.Error())
 		span.RecordError(err)
 	} else {
