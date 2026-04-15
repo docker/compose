@@ -1361,13 +1361,15 @@ func expandServiceDependencies(project *types.Project, services []string) []stri
 // dependencies are being recreated and that have restart: true in their
 // depends_on config.
 func addCascadingRestarts(project *types.Project, observed *ObservedState, plan *ReconciliationPlan, opts ReconcileOptions) {
-	// Collect services being recreated and map service name -> rename op IDs.
-	// The rename op is the point at which the old container is fully replaced,
-	// so dependent stops should wait for it.
+	// Collect services being recreated.
 	recreatedServiceRenameOps := map[string][]string{}
+	recreatedServiceEntryOps := map[string][]string{} // emit-recreate IDs (entry points of recreate chains)
 	for _, op := range plan.Operations {
 		if op.Type == OpRenameContainer {
 			recreatedServiceRenameOps[op.ServiceName] = append(recreatedServiceRenameOps[op.ServiceName], op.ID)
+		}
+		if op.Type == OpEmitEvent && op.EventOp != nil && op.EventOp.Text == "Recreate" {
+			recreatedServiceEntryOps[op.ServiceName] = append(recreatedServiceEntryOps[op.ServiceName], op.ID)
 		}
 	}
 	if len(recreatedServiceRenameOps) == 0 {
@@ -1377,88 +1379,101 @@ func addCascadingRestarts(project *types.Project, observed *ObservedState, plan 
 	// For each service in the project, check if it depends on a recreated service with restart: true
 	for _, service := range project.Services {
 		for depName, dep := range service.DependsOn {
-			renameOps := recreatedServiceRenameOps[depName]
-			if !dep.Restart || len(renameOps) == 0 {
+			if !dep.Restart || len(recreatedServiceRenameOps[depName]) == 0 {
 				continue
 			}
-			// This service's dependency is being recreated and has restart: true.
-			// Add stop+start ops for its running containers (if not already being stopped).
 			for _, ctr := range observed.Containers[service.Name] {
-				ctrName := getCanonicalContainerName(ctr)
-				if _, exists := plan.Operations["stop-container:"+ctrName]; exists {
-					continue
-				}
-				if ctr.State != container.StateRunning {
-					continue
-				}
-
-				eventName := "Container " + ctrName
-
-				// Emit Stopping event (depends on rename ops of the dependency)
-				emitStoppingID := fmt.Sprintf("emit-stopping:%s", ctrName)
-				stoppingDeps := make([]string, len(renameOps))
-				copy(stoppingDeps, renameOps)
-				plan.Operations[emitStoppingID] = emitEventOp(emitStoppingID, service.Name, ctrName, eventName, api.Working, api.StatusStopping, stoppingDeps)
-
-				stopID := fmt.Sprintf("stop-container:%s", ctrName)
-				plan.Operations[stopID] = &Operation{
-					ID:          stopID,
-					Type:        OpStopContainer,
-					ServiceName: service.Name,
-					Resource:    ctrName,
-					ContainerOp: &ContainerOperation{
-						Service:       service,
-						ContainerName: ctrName,
-						Existing:      &ctr,
-						Timeout:       opts.Timeout,
-					},
-					DependsOn: []string{emitStoppingID},
-					Reason:    fmt.Sprintf("dependency %q is being recreated (restart: true)", depName),
-				}
-
-				emitStoppedID := fmt.Sprintf("emit-stopped:%s", ctrName)
-				plan.Operations[emitStoppedID] = emitEventOp(emitStoppedID, service.Name, ctrName, eventName, api.Done, api.StatusStopped, []string{stopID})
-
-				// Emit Starting event
-				emitStartingID := fmt.Sprintf("emit-starting:%s", ctrName)
-
-				startID := fmt.Sprintf("start-container:%s", ctrName)
-				if existingStart, exists := plan.Operations[startID]; exists {
-					// A start operation already exists (e.g. from network recreation).
-					// Add our emit-stopped as a dependency of the existing emit-starting.
-					if existingEmitStarting, ok := plan.Operations[emitStartingID]; ok {
-						if !slices.Contains(existingEmitStarting.DependsOn, emitStoppedID) {
-							existingEmitStarting.DependsOn = append(existingEmitStarting.DependsOn, emitStoppedID)
-						}
-					} else {
-						// No emit-starting exists yet; add stop as dep to start directly.
-						if !slices.Contains(existingStart.DependsOn, stopID) {
-							existingStart.DependsOn = append(existingStart.DependsOn, stopID)
-						}
-					}
-				} else {
-					plan.Operations[emitStartingID] = emitEventOp(emitStartingID, service.Name, ctrName, eventName, api.Working, api.StatusStarting, []string{emitStoppedID})
-
-					plan.Operations[startID] = &Operation{
-						ID:          startID,
-						Type:        OpStartContainer,
-						ServiceName: service.Name,
-						Resource:    ctrName,
-						ContainerOp: &ContainerOperation{
-							Service:       service,
-							ContainerName: ctrName,
-							Existing:      &ctr,
-						},
-						DependsOn: []string{emitStartingID},
-						Reason:    fmt.Sprintf("restart after dependency %q recreated", depName),
-					}
-
-					emitStartedID := fmt.Sprintf("emit-started:%s", ctrName)
-					plan.Operations[emitStartedID] = emitEventOp(emitStartedID, service.Name, ctrName, eventName, api.Done, api.StatusStarted, []string{startID})
-				}
+				addCascadingRestartOps(service, ctr, depName, recreatedServiceEntryOps[depName], plan, opts)
 			}
 			break // Only need to process once per service
 		}
+	}
+}
+
+// addCascadingRestartOps adds stop+start operations for a single container
+// of a dependent service whose dependency is being recreated.
+func addCascadingRestartOps(
+	service types.ServiceConfig,
+	ctr container.Summary,
+	depName string,
+	recreateEntryOps []string,
+	plan *ReconciliationPlan,
+	opts ReconcileOptions,
+) {
+	ctrName := getCanonicalContainerName(ctr)
+	if _, exists := plan.Operations["stop-container:"+ctrName]; exists {
+		return
+	}
+	if ctr.State != container.StateRunning {
+		return
+	}
+
+	eventName := "Container " + ctrName
+
+	// Stop chain: emit-stopping → stop → emit-stopped.
+	// The stop runs BEFORE the dependency recreate chain starts: the
+	// recreate entry point (emit-recreate) is updated to depend on
+	// emit-stopped, ensuring the dependent is fully stopped before the
+	// dependency is recreated (e.g. fluentd logging driver flushing).
+	emitStoppingID := fmt.Sprintf("emit-stopping:%s", ctrName)
+	plan.Operations[emitStoppingID] = emitEventOp(emitStoppingID, service.Name, ctrName, eventName, api.Working, api.StatusStopping, nil)
+
+	stopID := fmt.Sprintf("stop-container:%s", ctrName)
+	plan.Operations[stopID] = &Operation{
+		ID:          stopID,
+		Type:        OpStopContainer,
+		ServiceName: service.Name,
+		Resource:    ctrName,
+		ContainerOp: &ContainerOperation{
+			Service:       service,
+			ContainerName: ctrName,
+			Existing:      &ctr,
+			Timeout:       opts.Timeout,
+		},
+		DependsOn: []string{emitStoppingID},
+		Reason:    fmt.Sprintf("dependency %q is being recreated (restart: true)", depName),
+	}
+
+	emitStoppedID := fmt.Sprintf("emit-stopped:%s", ctrName)
+	plan.Operations[emitStoppedID] = emitEventOp(emitStoppedID, service.Name, ctrName, eventName, api.Done, api.StatusStopped, []string{stopID})
+
+	// Block the dependency's recreate chain until the dependent is stopped.
+	for _, entryID := range recreateEntryOps {
+		if entryOp, ok := plan.Operations[entryID]; ok {
+			if !slices.Contains(entryOp.DependsOn, emitStoppedID) {
+				entryOp.DependsOn = append(entryOp.DependsOn, emitStoppedID)
+			}
+		}
+	}
+
+	// Start chain: merge with existing start or create new one.
+	emitStartingID := fmt.Sprintf("emit-starting:%s", ctrName)
+	startID := fmt.Sprintf("start-container:%s", ctrName)
+	if existingStart, exists := plan.Operations[startID]; exists {
+		if existingEmitStarting, ok := plan.Operations[emitStartingID]; ok {
+			if !slices.Contains(existingEmitStarting.DependsOn, emitStoppedID) {
+				existingEmitStarting.DependsOn = append(existingEmitStarting.DependsOn, emitStoppedID)
+			}
+		} else if !slices.Contains(existingStart.DependsOn, stopID) {
+			existingStart.DependsOn = append(existingStart.DependsOn, stopID)
+		}
+	} else {
+		plan.Operations[emitStartingID] = emitEventOp(emitStartingID, service.Name, ctrName, eventName, api.Working, api.StatusStarting, []string{emitStoppedID})
+		plan.Operations[startID] = &Operation{
+			ID:          startID,
+			Type:        OpStartContainer,
+			ServiceName: service.Name,
+			Resource:    ctrName,
+			ContainerOp: &ContainerOperation{
+				Service:       service,
+				ContainerName: ctrName,
+				Existing:      &ctr,
+			},
+			DependsOn: []string{emitStartingID},
+			Reason:    fmt.Sprintf("restart after dependency %q recreated", depName),
+		}
+		emitStartedID := fmt.Sprintf("emit-started:%s", ctrName)
+		plan.Operations[emitStartedID] = emitEventOp(emitStartedID, service.Name, ctrName, eventName, api.Done, api.StatusStarted, []string{startID})
 	}
 }
 

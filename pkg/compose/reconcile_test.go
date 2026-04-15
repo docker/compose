@@ -2002,18 +2002,18 @@ func TestReconcileCascadingRestart(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. emit event testproject-db-1  reason: Recreate
-[1] -> 2. create container testproject-_testproject-db-1  reason: config hash changed
-[2] -> 3. stop container testproject-db-1  reason: config hash changed
-[3] -> 4. remove container testproject-db-1  reason: config hash changed
-[4] -> 5. rename container testproject-db-1  reason: config hash changed
-[5] -> 6. emit event testproject-web-1  reason: Stopping
-[5] -> 7. start container testproject-db-1  reason: config hash changed
-[6] -> 8. stop container testproject-web-1  reason: dependency "db" is being recreated (restart: true)
-[7] -> 9. emit event testproject-db-1  reason: Recreated
-[8] -> 10. emit event testproject-web-1  reason: Stopped
-[10] -> 11. emit event testproject-web-1  reason: Starting
-[9,11] -> 12. start container testproject-web-1  reason: restart after dependency "db" recreated
+1. emit event testproject-web-1  reason: Stopping
+[1] -> 2. stop container testproject-web-1  reason: dependency "db" is being recreated (restart: true)
+[2] -> 3. emit event testproject-web-1  reason: Stopped
+[3] -> 4. emit event testproject-db-1  reason: Recreate
+[3] -> 5. emit event testproject-web-1  reason: Starting
+[4] -> 6. create container testproject-_testproject-db-1  reason: config hash changed
+[6] -> 7. stop container testproject-db-1  reason: config hash changed
+[7] -> 8. remove container testproject-db-1  reason: config hash changed
+[8] -> 9. rename container testproject-db-1  reason: config hash changed
+[9] -> 10. start container testproject-db-1  reason: config hash changed
+[10] -> 11. emit event testproject-db-1  reason: Recreated
+[11,5] -> 12. start container testproject-web-1  reason: restart after dependency "db" recreated
 [12] -> 13. emit event testproject-web-1  reason: Started
 `)
 }
@@ -3135,18 +3135,18 @@ func TestReconcileCascadingRestartMultipleDepsOneRecreated(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. emit event tp-db-1  reason: Recreate
-[1] -> 2. create container tp-db-1_tp-db-1  reason: config hash changed
-[2] -> 3. stop container tp-db-1  reason: config hash changed
-[3] -> 4. remove container tp-db-1  reason: config hash changed
-[4] -> 5. rename container tp-db-1  reason: config hash changed
-[5] -> 6. emit event tp-web-1  reason: Stopping
-[5] -> 7. start container tp-db-1  reason: config hash changed
-[6] -> 8. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
-[7] -> 9. emit event tp-db-1  reason: Recreated
-[8] -> 10. emit event tp-web-1  reason: Stopped
-[10] -> 11. emit event tp-web-1  reason: Starting
-[9,11] -> 12. start container tp-web-1  reason: restart after dependency "db" recreated
+1. emit event tp-web-1  reason: Stopping
+[1] -> 2. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
+[2] -> 3. emit event tp-web-1  reason: Stopped
+[3] -> 4. emit event tp-db-1  reason: Recreate
+[3] -> 5. emit event tp-web-1  reason: Starting
+[4] -> 6. create container tp-db-1_tp-db-1  reason: config hash changed
+[6] -> 7. stop container tp-db-1  reason: config hash changed
+[7] -> 8. remove container tp-db-1  reason: config hash changed
+[8] -> 9. rename container tp-db-1  reason: config hash changed
+[9] -> 10. start container tp-db-1  reason: config hash changed
+[10] -> 11. emit event tp-db-1  reason: Recreated
+[11,5] -> 12. start container tp-web-1  reason: restart after dependency "db" recreated
 [12] -> 13. emit event tp-web-1  reason: Started
 `)
 }
@@ -4970,7 +4970,8 @@ func TestReconcileOrphansRemovedBeforeServiceCreation(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestReconcileCascadingRestartStopDependsOnRename verifies that when a
 // dependent service is restarted due to dependency recreation, its stop
-// operation depends on the dependency's rename (completion of recreation).
+// operation is independent (no dependency on rename) while only the start
+// depends on the recreated dependency being ready.
 // ---------------------------------------------------------------------------
 
 func TestReconcileCascadingRestartStopDependsOnRename(t *testing.T) {
@@ -5017,29 +5018,212 @@ func TestReconcileCascadingRestartStopDependsOnRename(t *testing.T) {
 	})
 	assert.NilError(t, err)
 
-	// The emit-stopping event for web should depend on the rename op for db
-	// (cascading restart: stop waits for dependency recreation to complete)
+	// The emit-stopping event for web should have NO dependency on the rename op
+	// for db — the stop is independent so it can run in parallel with the
+	// recreate chain. Only the start depends on the recreated dependency.
 	emitStoppingOp, exists := plan.Operations["emit-stopping:testproject-web-1"]
 	assert.Assert(t, exists, "expected emit-stopping op for web")
+	assert.Assert(t, len(emitStoppingOp.DependsOn) == 0,
+		"emit-stopping:web should have no deps, got: %v", emitStoppingOp.DependsOn)
 
-	renameID := "rename-container:testproject-db-1"
-	_, hasRename := plan.Operations[renameID]
-	assert.Assert(t, hasRename, "expected rename-container op for db")
-
-	found := false
-	for _, dep := range emitStoppingOp.DependsOn {
-		if dep == renameID {
-			found = true
-			break
-		}
-	}
-	assert.Assert(t, found, "emit-stopping:web should depend on rename-container:db, got deps: %v", emitStoppingOp.DependsOn)
-
-	// And stop-container:web should depend on emit-stopping:web
+	// stop-container:web should depend on emit-stopping:web
 	stopOp, stopExists := plan.Operations["stop-container:testproject-web-1"]
 	assert.Assert(t, stopExists, "expected stop-container op for web")
 	assert.Assert(t, slices.Contains(stopOp.DependsOn, "emit-stopping:testproject-web-1"),
 		"stop-container:web should depend on emit-stopping:web, got deps: %v", stopOp.DependsOn)
+
+	// start-container:web should depend on emit-recreated for db
+	startOp, startExists := plan.Operations["start-container:testproject-web-1"]
+	assert.Assert(t, startExists, "expected start-container op for web")
+	recreatedID := "emit-recreated:testproject-db-1"
+	assert.Assert(t, slices.Contains(startOp.DependsOn, recreatedID),
+		"start-container:web should depend on %s, got deps: %v", recreatedID, startOp.DependsOn)
+}
+
+// ---------------------------------------------------------------------------
+// Cascading restart ordering — regression tests
+// ---------------------------------------------------------------------------
+
+// TestReconcileCascadingRestartStopBeforeRecreate verifies that when a
+// dependency is recreated (restart: true), the dependent is stopped BEFORE
+// (or in parallel with) the dependency's recreate chain, not after.
+//
+// This prevents a deadlock when the dependent uses a logging driver (e.g.
+// fluentd) that connects to the dependency: stopping the dependent after the
+// dependency is already down causes Docker to hang flushing logs to a dead
+// endpoint.
+func TestReconcileCascadingRestartStopBeforeRecreate(t *testing.T) {
+	fluentbit := types.ServiceConfig{
+		Name:  "fluentbit",
+		Image: "fluent/fluent-bit:latest",
+	}
+	app := types.ServiceConfig{
+		Name:  "app",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"fluentbit": {Condition: "service_started", Restart: true},
+		},
+	}
+	appHash, err := ServiceHash(app)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name:     "tp",
+		Services: types.Services{"fluentbit": fluentbit, "app": app},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"fluentbit": {makeContainer("tp", "fluentbit", 1, "stale")},
+			"app":       {makeContainer("tp", "app", 1, appHash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. emit event tp-app-1  reason: Stopping
+[1] -> 2. stop container tp-app-1  reason: dependency "fluentbit" is being recreated (restart: true)
+[2] -> 3. emit event tp-app-1  reason: Stopped
+[3] -> 4. emit event tp-fluentbit-1  reason: Recreate
+[3] -> 5. emit event tp-app-1  reason: Starting
+[4] -> 6. create container tp-fluentbit_tp-fluentbit-1  reason: config hash changed
+[6] -> 7. stop container tp-fluentbit-1  reason: config hash changed
+[7] -> 8. remove container tp-fluentbit-1  reason: config hash changed
+[8] -> 9. rename container tp-fluentbit-1  reason: config hash changed
+[9] -> 10. start container tp-fluentbit-1  reason: config hash changed
+[10] -> 11. emit event tp-fluentbit-1  reason: Recreated
+[11,5] -> 12. start container tp-app-1  reason: restart after dependency "fluentbit" recreated
+[12] -> 13. emit event tp-app-1  reason: Started
+`)
+}
+
+// TestReconcileCascadingRestartMultiDepsStopIsIndependent verifies that when
+// a service depends on multiple services with restart:true, and only one is
+// recreated, the stop of the dependent is still independent (no dep on rename).
+func TestReconcileCascadingRestartMultiDepsStopIsIndependent(t *testing.T) {
+	db := types.ServiceConfig{Name: "db", Image: "postgres"}
+	cache := types.ServiceConfig{Name: "cache", Image: "redis"}
+	cacheHash, err := ServiceHash(cache)
+	assert.NilError(t, err)
+	web := types.ServiceConfig{
+		Name:  "web",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"db":    {Condition: "service_started", Restart: true},
+			"cache": {Condition: "service_started", Restart: true},
+		},
+	}
+	webHash, err := ServiceHash(web)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name:     "tp",
+		Services: types.Services{"db": db, "cache": cache, "web": web},
+	}
+	observed := &ObservedState{
+		ProjectName: "tp",
+		Containers: map[string]Containers{
+			"db":    {makeContainer("tp", "db", 1, "stale")},
+			"cache": {makeContainer("tp", "cache", 1, cacheHash)},
+			"web":   {makeContainer("tp", "web", 1, webHash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. emit event tp-web-1  reason: Stopping
+[1] -> 2. stop container tp-web-1  reason: dependency "db" is being recreated (restart: true)
+[2] -> 3. emit event tp-web-1  reason: Stopped
+[3] -> 4. emit event tp-db-1  reason: Recreate
+[3] -> 5. emit event tp-web-1  reason: Starting
+[4] -> 6. create container tp-db-1_tp-db-1  reason: config hash changed
+[6] -> 7. stop container tp-db-1  reason: config hash changed
+[7] -> 8. remove container tp-db-1  reason: config hash changed
+[8] -> 9. rename container tp-db-1  reason: config hash changed
+[9] -> 10. start container tp-db-1  reason: config hash changed
+[10] -> 11. emit event tp-db-1  reason: Recreated
+[11,5] -> 12. start container tp-web-1  reason: restart after dependency "db" recreated
+[12] -> 13. emit event tp-web-1  reason: Started
+`)
+}
+
+// TestReconcileCascadingRestartOrderingPreservesLogDrivers is the exact
+// scenario that caused a CI hang: fluentbit is recreated, app uses fluentd
+// logging driver pointing to fluentbit. The stop of app must happen while
+// fluentbit is still running to allow log flushing.
+func TestReconcileCascadingRestartOrderingPreservesLogDrivers(t *testing.T) {
+	fluentbit := types.ServiceConfig{
+		Name:  "fluentbit",
+		Image: "fluent/fluent-bit:3.1.7-debug",
+		Ports: []types.ServicePortConfig{
+			{Target: 24224, Published: "24224", Protocol: "tcp"},
+		},
+	}
+	app := types.ServiceConfig{
+		Name:  "app",
+		Image: "nginx",
+		DependsOn: types.DependsOnConfig{
+			"fluentbit": {Condition: "service_started", Restart: true},
+		},
+		// LogDriver would be configured in the real compose file but
+		// the reconciliation logic doesn't look at it — what matters
+		// is the depends_on restart:true and the operation ordering.
+	}
+	appHash, err := ServiceHash(app)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Name:     "e2e-logging-driver",
+		Services: types.Services{"fluentbit": fluentbit, "app": app},
+	}
+	observed := &ObservedState{
+		ProjectName: "e2e-logging-driver",
+		Containers: map[string]Containers{
+			"fluentbit": {makeContainer("e2e-logging-driver", "fluentbit", 1, "outdated-hash")},
+			"app":       {makeContainer("e2e-logging-driver", "app", 1, appHash)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+		Orphans:  Containers{},
+	}
+
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		StartContainers:      true,
+		Recreate:             api.RecreateDiverged,
+		RecreateDependencies: api.RecreateDiverged,
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), `
+1. emit event e2e-logging-driver-app-1  reason: Stopping
+[1] -> 2. stop container e2e-logging-driver-app-1  reason: dependency "fluentbit" is being recreated (restart: true)
+[2] -> 3. emit event e2e-logging-driver-app-1  reason: Stopped
+[3] -> 4. emit event e2e-logging-driver-fluentbit-1  reason: Recreate
+[3] -> 5. emit event e2e-logging-driver-app-1  reason: Starting
+[4] -> 6. create container e2e-logging-_e2e-logging-driver-fluentbit-1  reason: config hash changed
+[6] -> 7. stop container e2e-logging-driver-fluentbit-1  reason: config hash changed
+[7] -> 8. remove container e2e-logging-driver-fluentbit-1  reason: config hash changed
+[8] -> 9. rename container e2e-logging-driver-fluentbit-1  reason: config hash changed
+[9] -> 10. start container e2e-logging-driver-fluentbit-1  reason: config hash changed
+[10] -> 11. emit event e2e-logging-driver-fluentbit-1  reason: Recreated
+[11,5] -> 12. start container e2e-logging-driver-app-1  reason: restart after dependency "fluentbit" recreated
+[12] -> 13. emit event e2e-logging-driver-app-1  reason: Started
+`)
 }
 
 // ---------------------------------------------------------------------------
