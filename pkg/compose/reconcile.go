@@ -442,6 +442,10 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 		n := net
 		existing, found := observed.Networks[key]
 		if !found {
+			eventName := "Network " + n.Name
+			emitCreatingID := fmt.Sprintf("emit-creating-network:%s", n.Name)
+			plan.Operations[emitCreatingID] = emitEventOp(emitCreatingID, "", n.Name, eventName, api.Working, api.StatusCreating, nil)
+
 			id := fmt.Sprintf("create-network:%s", n.Name)
 			plan.Operations[id] = &Operation{
 				ID:       id,
@@ -451,8 +455,12 @@ func reconcileNetworks(project *types.Project, observed *ObservedState, plan *Re
 					NetworkKey: key,
 					Desired:    &n,
 				},
-				Reason: "network does not exist",
+				DependsOn: []string{emitCreatingID},
+				Reason:    "network does not exist",
 			}
+
+			emitCreatedID := fmt.Sprintf("emit-created-network:%s", n.Name)
+			plan.Operations[emitCreatedID] = emitEventOp(emitCreatedID, "", n.Name, eventName, api.Done, api.StatusCreated, []string{id})
 			continue
 		}
 		desiredHash, err := NetworkHash(&n)
@@ -641,6 +649,10 @@ func reconcileVolumes(project *types.Project, observed *ObservedState, plan *Rec
 		v := vol
 		existing, found := observed.Volumes[key]
 		if !found {
+			eventName := "Volume " + v.Name
+			emitCreatingID := fmt.Sprintf("emit-creating-volume:%s", v.Name)
+			plan.Operations[emitCreatingID] = emitEventOp(emitCreatingID, "", v.Name, eventName, api.Working, api.StatusCreating, nil)
+
 			id := fmt.Sprintf("create-volume:%s", v.Name)
 			plan.Operations[id] = &Operation{
 				ID:       id,
@@ -650,8 +662,12 @@ func reconcileVolumes(project *types.Project, observed *ObservedState, plan *Rec
 					VolumeKey: key,
 					Desired:   &v,
 				},
-				Reason: "volume does not exist",
+				DependsOn: []string{emitCreatingID},
+				Reason:    "volume does not exist",
 			}
+
+			emitCreatedID := fmt.Sprintf("emit-created-volume:%s", v.Name)
+			plan.Operations[emitCreatedID] = emitEventOp(emitCreatedID, "", v.Name, eventName, api.Done, api.StatusCreated, []string{id})
 			continue
 		}
 		desiredHash, err := VolumeHash(v)

@@ -138,10 +138,12 @@ func TestReconcileCreateMissingNetwork(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create network testproject_default  reason: network does not exist
+1. emit event testproject_default  reason: Creating
 2. emit event testproject-web-1  reason: Creating
-[1,2] -> 3. create container testproject-web-1  reason: scale up
-[3] -> 4. emit event testproject-web-1  reason: Created
+[1] -> 3. create network testproject_default  reason: network does not exist
+[3,2] -> 4. create container testproject-web-1  reason: scale up
+[3] -> 5. emit event testproject_default  reason: Created
+[4] -> 6. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -291,10 +293,12 @@ func TestReconcileCreateMissingVolume(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create volume testproject_data  reason: volume does not exist
+1. emit event testproject_data  reason: Creating
 2. emit event testproject-web-1  reason: Creating
-[1,2] -> 3. create container testproject-web-1  reason: scale up
-[3] -> 4. emit event testproject-web-1  reason: Created
+[1] -> 3. create volume testproject_data  reason: volume does not exist
+[3,2] -> 4. create container testproject-web-1  reason: scale up
+[3] -> 5. emit event testproject_data  reason: Created
+[4] -> 6. emit event testproject-web-1  reason: Created
 `)
 }
 
@@ -1188,11 +1192,15 @@ func TestReconcileContainerCreateDependsOnNetworkAndVolume(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create network testproject_mynet  reason: network does not exist
-2. create volume testproject_myvol  reason: volume does not exist
+1. emit event testproject_mynet  reason: Creating
+2. emit event testproject_myvol  reason: Creating
 3. emit event testproject-app-1  reason: Creating
-[1,2,3] -> 4. create container testproject-app-1  reason: scale up
-[4] -> 5. emit event testproject-app-1  reason: Created
+[1] -> 4. create network testproject_mynet  reason: network does not exist
+[2] -> 5. create volume testproject_myvol  reason: volume does not exist
+[4] -> 6. emit event testproject_mynet  reason: Created
+[4,5,3] -> 7. create container testproject-app-1  reason: scale up
+[5] -> 8. emit event testproject_myvol  reason: Created
+[7] -> 9. emit event testproject-app-1  reason: Created
 `)
 }
 
@@ -4332,14 +4340,18 @@ func TestReconcileServiceDependsOnMissingNetworkVolumeAndService(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), `
-1. create network tp_mynet  reason: network does not exist
-2. create volume tp_data  reason: volume does not exist
+1. emit event tp_mynet  reason: Creating
+2. emit event tp_data  reason: Creating
 3. emit event tp-db-1  reason: Creating
 4. emit event tp-web-1  reason: Creating
-[3] -> 5. create container tp-db-1  reason: scale up
-[5] -> 6. emit event tp-db-1  reason: Created
-[1,2,6,4] -> 7. create container tp-web-1  reason: scale up
-[7] -> 8. emit event tp-web-1  reason: Created
+[1] -> 5. create network tp_mynet  reason: network does not exist
+[2] -> 6. create volume tp_data  reason: volume does not exist
+[3] -> 7. create container tp-db-1  reason: scale up
+[5] -> 8. emit event tp_mynet  reason: Created
+[6] -> 9. emit event tp_data  reason: Created
+[7] -> 10. emit event tp-db-1  reason: Created
+[5,6,10,4] -> 11. create container tp-web-1  reason: scale up
+[11] -> 12. emit event tp-web-1  reason: Created
 `)
 }
 
