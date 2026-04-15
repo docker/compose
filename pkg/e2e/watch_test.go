@@ -335,7 +335,7 @@ func TestWatchMultiServices(t *testing.T) {
 	testFile := filepath.Join(tmpdir, "test")
 	assert.NilError(t, os.WriteFile(testFile, []byte("test"), 0o600))
 
-	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--watch")
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--build", "--watch")
 	buffer := bytes.NewBuffer(nil)
 	cmd.Stdout = buffer
 	watch := icmd.StartCmd(cmd)
@@ -345,7 +345,7 @@ func TestWatchMultiServices(t *testing.T) {
 			return poll.Success()
 		}
 		return poll.Continue("%v", watch.Stdout())
-	})
+	}, poll.WithTimeout(90*time.Second))
 
 	waitRebuild := func(service string, expected string) {
 		poll.WaitOn(t, func(l poll.LogT) poll.Result {
@@ -354,7 +354,7 @@ func TestWatchMultiServices(t *testing.T) {
 				return poll.Success()
 			}
 			return poll.Continue("%v", cat.Combined())
-		})
+		}, poll.WithTimeout(90*time.Second))
 	}
 	waitRebuild("a", "test")
 	waitRebuild("b", "test")

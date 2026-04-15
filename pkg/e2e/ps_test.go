@@ -32,6 +32,9 @@ func TestPs(t *testing.T) {
 	c := NewParallelCLI(t)
 	const projectName = "e2e-ps"
 
+	// ensure clean state from any previous failed run
+	c.RunDockerComposeCmdNoCheck(t, "--project-name", projectName, "down", "--remove-orphans")
+
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	assert.NilError(t, res.Error)
 	t.Cleanup(func() {

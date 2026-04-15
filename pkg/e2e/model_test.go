@@ -21,9 +21,11 @@ import (
 )
 
 func TestComposeModel(t *testing.T) {
-	t.Skip("waiting for docker-model release")
+	if _, err := findPluginExecutable(DockerModelExecutableName); err != nil {
+		t.Skip("docker-model plugin not available")
+	}
 	c := NewParallelCLI(t)
 	defer c.cleanupWithDown(t, "model-test")
 
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/model/compose.yaml", "run", "test", "sh", "-c", "curl ${FOO_URL}")
+	c.RunDockerComposeCmd(t, "-p", "model-test", "-f", "./fixtures/model/compose.yaml", "run", "--rm", "test", "sh", "-c", "curl ${FOO_URL}")
 }

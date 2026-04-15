@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -31,9 +30,6 @@ import (
 )
 
 func TestPause(t *testing.T) {
-	if _, ok := os.LookupEnv("CI"); ok {
-		t.Skip("Skipping test on CI... flaky")
-	}
 	cli := NewParallelCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=e2e-pause",
 		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))

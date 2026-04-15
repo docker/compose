@@ -36,8 +36,11 @@ func TestRunBuildOnce(t *testing.T) {
 
 	t.Run("dependency with pull_policy build is built only once", func(t *testing.T) {
 		projectName := randomProjectName("build-once")
-		_ = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "down", "--rmi", "local", "--remove-orphans", "-v")
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "--verbose", "run", "--build", "--rm", "curl")
+		composeFile := "./fixtures/run-test/build-once.yaml"
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "down", "--rmi", "local", "--remove-orphans", "-v")
+		})
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "--verbose", "run", "--build", "--rm", "curl")
 
 		output := res.Stdout()
 
@@ -45,14 +48,15 @@ func TestRunBuildOnce(t *testing.T) {
 
 		assert.Equal(t, nginxBuilds, 1, "nginx should build once, built %d times\nOutput:\n%s", nginxBuilds, output)
 		assert.Assert(t, strings.Contains(res.Stdout(), "curl service"))
-
-		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once.yaml", "down", "--remove-orphans")
 	})
 
 	t.Run("nested dependencies build only once each", func(t *testing.T) {
 		projectName := randomProjectName("build-nested")
-		_ = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--rmi", "local", "--remove-orphans", "-v")
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "--verbose", "run", "--build", "--rm", "app")
+		composeFile := "./fixtures/run-test/build-once-nested.yaml"
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "down", "--rmi", "local", "--remove-orphans", "-v")
+		})
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "--verbose", "run", "--build", "--rm", "app")
 
 		output := res.Stdout()
 
@@ -64,14 +68,15 @@ func TestRunBuildOnce(t *testing.T) {
 		assert.Equal(t, apiBuilds, 1, "api should build once, built %d times\nOutput:\n%s", apiBuilds, output)
 		assert.Equal(t, appBuilds, 1, "app should build once, built %d times\nOutput:\n%s", appBuilds, output)
 		assert.Assert(t, strings.Contains(output, "App running"))
-
-		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-nested.yaml", "down", "--rmi", "local", "--remove-orphans", "-v")
 	})
 
 	t.Run("service with no dependencies builds once", func(t *testing.T) {
 		projectName := randomProjectName("build-simple")
-		_ = c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--rmi", "local", "--remove-orphans")
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "run", "--build", "--rm", "simple")
+		composeFile := "./fixtures/run-test/build-once-no-deps.yaml"
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "down", "--rmi", "local", "--remove-orphans", "-v")
+		})
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "run", "--build", "--rm", "simple")
 
 		output := res.Stdout()
 
@@ -79,8 +84,6 @@ func TestRunBuildOnce(t *testing.T) {
 
 		assert.Equal(t, simpleBuilds, 1, "simple should build once, built %d times\nOutput:\n%s", simpleBuilds, output)
 		assert.Assert(t, strings.Contains(res.Stdout(), "Simple service"))
-
-		c.RunDockerComposeCmd(t, "-p", projectName, "-f", "./fixtures/run-test/build-once-no-deps.yaml", "down", "--remove-orphans")
 	})
 }
 

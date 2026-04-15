@@ -140,16 +140,13 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 }
 
 func TestAttachRestart(t *testing.T) {
-	t.Skip("Skipping test until we can fix it")
-
-	if _, ok := os.LookupEnv("CI"); ok {
-		t.Skip("Skipping test on CI... flaky")
-	}
 	c := NewParallelCLI(t)
 
 	cmd := c.NewDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
 	res := icmd.StartCmd(cmd)
-	defer c.RunDockerComposeCmd(t, "-p", "attach-restart", "down")
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "-p", "attach-restart", "down")
+	})
 
 	c.WaitForCondition(t, func() (bool, string) {
 		debug := res.Combined()

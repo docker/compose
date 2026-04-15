@@ -46,8 +46,9 @@ func TestUnusedMissingEnvFile(t *testing.T) {
 
 func TestRunEnvFile(t *testing.T) {
 	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, "run_dotenv")
+	const projectName = "run-dotenv"
+	defer c.cleanupWithDown(t, projectName)
 
-	res := c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/env_file", "run", "serviceC", "env")
+	res := c.RunDockerComposeCmd(t, "-p", projectName, "--project-directory", "./fixtures/env_file", "run", "--rm", "serviceC", "env")
 	res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
 }

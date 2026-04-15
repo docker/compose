@@ -410,6 +410,25 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 	})
 
 	t.Run("builder does not support multi-arch", func(t *testing.T) {
+		// Docker Desktop with containerd image store uses the docker driver
+		// but supports multi-platform builds, so this error won't occur.
+		inspect := c.RunDockerCmd(t, "buildx", "inspect", "--bootstrap")
+		output := inspect.Stdout()
+		isDockerDriver := false
+		platforms := ""
+		for _, line := range strings.Split(output, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "Driver:") {
+				isDockerDriver = strings.TrimSpace(strings.TrimPrefix(trimmed, "Driver:")) == "docker"
+			}
+			if strings.HasPrefix(trimmed, "Platforms:") {
+				platforms = trimmed
+			}
+		}
+		if isDockerDriver && strings.Contains(platforms, "linux/amd64") && strings.Contains(platforms, "linux/arm64") {
+			t.Skip("docker driver supports multi-platform (containerd image store enabled)")
+		}
+
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,

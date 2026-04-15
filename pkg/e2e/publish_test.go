@@ -18,11 +18,14 @@ package e2e
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 )
 
 func TestPublishChecks(t *testing.T) {
@@ -135,6 +138,20 @@ func TestPublish(t *testing.T) {
 	t.Cleanup(func() {
 		c.RunDockerCmd(t, "rm", "--force", registryName)
 	})
+
+	// Wait for registry to be ready
+	registryURL := "http://" + registry + "/v2/"
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		resp, err := http.Get(registryURL) //nolint:gosec,noctx
+		if err != nil {
+			return poll.Continue("registry not ready: %v", err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode < 500 {
+			return poll.Success()
+		}
+		return poll.Continue("registry not ready, status %d", resp.StatusCode)
+	}, poll.WithTimeout(10*time.Second), poll.WithDelay(100*time.Millisecond))
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/oci/compose.yaml", "-f", "./fixtures/publish/oci/compose-override.yaml",
 		"-p", projectName, "publish", "--with-env", "--yes", "--insecure-registry", registry+"/test:test")

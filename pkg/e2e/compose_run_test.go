@@ -20,9 +20,11 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 )
 
 func TestLocalComposeRun(t *testing.T) {
@@ -207,8 +209,14 @@ func TestLocalComposeRun(t *testing.T) {
 
 		res = c.RunDockerCmd(t, "stop", containerID)
 		res.Assert(t, icmd.Success)
-		res = c.RunDockerCmd(t, "ps", "--all", "--filter", "name=run-test-nginx", "--format", "'{{.Names}}'")
-		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test-nginx"), res.Stdout())
+		// --rm auto-removal is async, wait for the container to be removed
+		poll.WaitOn(t, func(l poll.LogT) poll.Result {
+			res = c.RunDockerCmd(t, "ps", "--all", "--filter", "name=run-test-nginx", "--format", "'{{.Names}}'")
+			if strings.Contains(res.Stdout(), "run-test-nginx") {
+				return poll.Continue("container still present: %s", res.Stdout())
+			}
+			return poll.Success()
+		}, poll.WithTimeout(10*time.Second), poll.WithDelay(500*time.Millisecond))
 	})
 
 	t.Run("compose run --env", func(t *testing.T) {

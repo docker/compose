@@ -79,7 +79,9 @@ func (b *SafeBuffer) RequireEventuallyContains(t testing.TB, v string) {
 		}
 		return poll.Success()
 	},
-		poll.WithTimeout(2*time.Second),
+		// 10s: container startup on Docker Desktop (macOS) with VM overhead
+		// can take 3-8s vs <1s on native Linux CI
+		poll.WithTimeout(10*time.Second),
 		poll.WithDelay(20*time.Millisecond),
 	)
 }
