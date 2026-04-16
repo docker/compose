@@ -56,7 +56,8 @@ JSON messages MUST include a `type` and a `message` attribute.
 `type` can be either:
 - `info`: Reports status updates to the user. Compose will render message as the service state in the progress UI
 - `error`: Lets the user know something went wrong with details about the error. Compose will render the message as the reason for the service failure.
-- `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. See next section for further details.
+- `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. The variable is automatically prefixed with the service name. See next section for further details.
+- `rawsetenv`: Same as `setenv`, but the variable is injected as-is without the service name prefix. Useful when applications require exact variable names that cannot be altered.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
 
 ```mermaid
@@ -98,6 +99,16 @@ automatically prefixing it with the service name. For example, if `awesomecloud 
 ```
 Then the `app` service, which depends on the service managed by the provider, will receive a `DATABASE_URL` environment variable injected
 into its runtime environment.
+
+When the provider command sends a `rawsetenv` JSON message, Compose injects the variable as-is without any prefix:
+```json
+{"type": "rawsetenv", "message": "SECRET_KEY=xxx"}
+```
+The `app` service will receive `SECRET_KEY` exactly as specified, regardless of the provider service name.
+This is useful when injecting secrets or configuration values that must match exact variable names expected by
+applications or frameworks. Unlike `setenv`, which avoids collisions through automatic prefixing, `rawsetenv` keys
+are the provider's responsibility to keep unique. If multiple providers emit the same `rawsetenv` key, the last one
+to run will overwrite previous values.
 
 > __Note:__  The `compose up` provider command _MUST_ be idempotent. If resource is already running, the command _MUST_ set
 > the same environment variables to ensure consistent configuration of dependent services.
