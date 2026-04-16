@@ -76,6 +76,27 @@ func TestDependsOnMultipleProviders(t *testing.T) {
 	env := getEnv(res.Combined())
 	assert.Check(t, slices.Contains(env, "PROVIDER1_URL=https://magic.cloud/provider1"), env)
 	assert.Check(t, slices.Contains(env, "PROVIDER2_URL=https://magic.cloud/provider2"), env)
+	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
+}
+
+func TestProviderRawSetEnv(t *testing.T) {
+	provider, err := findExecutable("example-provider")
+	assert.NilError(t, err)
+
+	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	c := NewParallelCLI(t, WithEnv("PATH="+path))
+	const projectName = "rawsetenv"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv.yaml", "--project-name", projectName, "up")
+	res.Assert(t, icmd.Success)
+	env := getEnv(res.Combined(), false)
+	// setenv: prefixed with service name
+	assert.Check(t, slices.Contains(env, "SECRETS_URL=https://magic.cloud/secrets"), env)
+	// rawsetenv: injected as-is without prefix
+	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
 }
 
 func getEnv(out string) []string {
