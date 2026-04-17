@@ -35,9 +35,28 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// runTarget is the internal representation of a run target (service or job).
+// It carries only what's needed for one-off container execution: a name and
+// the container specification. ServiceConfig-only fields (Deploy, Scale, Profiles)
+// are intentionally excluded.
+type runTarget struct {
+	Name string
+	types.ContainerSpec
+}
+
+// toServiceConfig converts a runTarget into a ServiceConfig for functions
+// in the container creation chain that still require it. This is the single
+// bridge point; future refactoring will push ContainerSpec deeper.
+func (t runTarget) toServiceConfig() types.ServiceConfig {
+	return types.ServiceConfig{
+		Name:          t.Name,
+		ContainerSpec: t.ContainerSpec,
+	}
+}
+
 type prepareRunResult struct {
 	containerID string
-	service     types.ServiceConfig
+	target      runTarget
 	created     container.Summary
 }
 
@@ -55,15 +74,15 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	go cmd.ForwardAllSignals(ctx, s.apiClient(), result.containerID, sigc)
 	defer signal.Stop(sigc)
 
-	// If the service has post_start hooks, set up a goroutine that waits for
+	// If the target has post_start hooks, set up a goroutine that waits for
 	// the container to start and then executes them. This is needed because
 	// cmd.RunStart both starts and attaches to the container in one call,
 	// so we can't run hooks sequentially between start and attach.
 	var hookErrCh chan error
-	if len(result.service.PostStart) > 0 {
+	if len(result.target.PostStart) > 0 {
 		hookErrCh = make(chan error, 1)
 		go func() {
-			hookErrCh <- s.runPostStartHooksOnEvent(ctx, result.containerID, result.service, result.created)
+			hookErrCh <- s.runPostStartHooksOnEvent(ctx, result.containerID, result.target, result.created)
 		}()
 	}
 
@@ -90,7 +109,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 
 // runPostStartHooksOnEvent listens for the container's start event and executes
 // post_start lifecycle hooks once the container is running.
-func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, containerID string, service types.ServiceConfig, ctr container.Summary) error {
+func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, containerID string, target runTarget, ctr container.Summary) error {
 	evtCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -111,6 +130,7 @@ func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, container
 		// Container started, run hooks
 	}
 
+	service := target.toServiceConfig()
 	for _, hook := range service.PostStart {
 		if err := s.runHook(ctx, ctr, service, hook, nil); err != nil {
 			return err
@@ -133,34 +153,29 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	service, err := serviceConfigForRun(project, opts)
+	target, err := resolveRunTarget(project, opts)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
 
-	applyRunOptions(project, &service, opts)
+	applyRunOptions(project, &target, opts)
 
-	if err := s.stdin().CheckTty(opts.Interactive, service.Tty); err != nil {
+	if err := s.stdin().CheckTty(opts.Interactive, target.Tty); err != nil {
 		return prepareRunResult{}, err
 	}
 
 	slug := stringid.GenerateRandomID()
-	if service.ContainerName == "" {
-		service.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, service.Name, stringid.TruncateID(slug), api.Separator)
+	if target.ContainerName == "" {
+		target.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, target.Name, stringid.TruncateID(slug), api.Separator)
 	}
-	one := 1
-	service.Scale = &one
-	service.Restart = ""
-	if service.Deploy != nil {
-		service.Deploy.RestartPolicy = nil
-	}
-	service.CustomLabels = service.CustomLabels.
+	target.Restart = ""
+	target.CustomLabels = target.CustomLabels.
 		Add(api.SlugLabel, slug).
 		Add(api.OneoffLabel, "True")
 
-	// Only ensure image exists for the target service, dependencies were already handled by startDependencies
+	// Only ensure image exists for the target, dependencies were already handled by startDependencies
 	buildOpts := prepareBuildOptions(opts)
-	if err := s.ensureImagesExists(ctx, project, buildOpts, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
+	if err := s.ensureImagesExists(ctx, project, buildOpts, opts.QuietPull); err != nil {
 		return prepareRunResult{}, err
 	}
 
@@ -170,18 +185,12 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 
 	if !opts.NoDeps {
-		if err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, observedState, 0); err != nil {
+		if err := s.waitDependencies(ctx, project, target.Name, target.DependsOn, observedState, 0); err != nil {
 			return prepareRunResult{}, err
 		}
 	}
-	createOpts := createOptions{
-		AutoRemove:        opts.AutoRemove,
-		AttachStdin:       opts.Interactive,
-		UseNetworkAliases: opts.UseNetworkAliases,
-		Labels:            mergeLabels(service.Labels, service.CustomLabels),
-	}
 
-	err = newConvergence(project.ServiceNames(), observedState, nil, nil, s).resolveContainerReferences(&service.ContainerSpec)
+	err = newConvergence(project.ServiceNames(), observedState, nil, nil, s).resolveContainerReferences(&target.ContainerSpec)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
@@ -189,6 +198,18 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	err = s.ensureModels(ctx, project, opts.QuietPull)
 	if err != nil {
 		return prepareRunResult{}, err
+	}
+
+	// Bridge to ServiceConfig for container creation layer
+	service := target.toServiceConfig()
+	one := 1
+	service.Scale = &one
+
+	createOpts := createOptions{
+		AutoRemove:        opts.AutoRemove,
+		AttachStdin:       opts.Interactive,
+		UseNetworkAliases: opts.UseNetworkAliases,
+		Labels:            mergeLabels(service.Labels, service.CustomLabels),
 	}
 
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, -1, createOpts)
@@ -209,43 +230,26 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	err = s.injectConfigs(ctx, project, service, inspect.Container.ID)
 	return prepareRunResult{
 		containerID: created.ID,
-		service:     service,
+		target:      target,
 		created:     created,
 	}, err
 }
 
-// serviceConfigForRun resolves the run target and returns a ServiceConfig
-// suitable for container creation. For jobs, a ServiceConfig is built from
-// the job's Name and ContainerSpec.
-func serviceConfigForRun(project *types.Project, opts api.RunOptions) (types.ServiceConfig, error) {
-	svc, job, err := resolveRunTarget(project, opts)
-	if err != nil {
-		return types.ServiceConfig{}, err
-	}
-	if svc != nil {
-		return *svc, nil
-	}
-	return types.ServiceConfig{
-		Name:          job.Name,
-		ContainerSpec: job.ContainerSpec,
-	}, nil
-}
-
-// resolveRunTarget returns either a ServiceConfig or a JobConfig depending on
-// which field is set in opts. Exactly one of the two returned pointers is non-nil.
-func resolveRunTarget(project *types.Project, opts api.RunOptions) (*types.ServiceConfig, *types.JobConfig, error) {
+// resolveRunTarget looks up the run target (service or job) in the project
+// and returns a runTarget carrying only Name + ContainerSpec.
+func resolveRunTarget(project *types.Project, opts api.RunOptions) (runTarget, error) {
 	if opts.Job != "" {
 		job, ok := project.Jobs[opts.Job]
 		if !ok {
-			return nil, nil, fmt.Errorf("no such job: %s", opts.Job)
+			return runTarget{}, fmt.Errorf("no such job: %s", opts.Job)
 		}
-		return nil, &job, nil
+		return runTarget{Name: job.Name, ContainerSpec: job.ContainerSpec}, nil
 	}
 	service, err := project.GetService(opts.Service)
 	if err != nil {
-		return nil, nil, err
+		return runTarget{}, err
 	}
-	return &service, nil, nil
+	return runTarget{Name: service.Name, ContainerSpec: service.ContainerSpec}, nil
 }
 
 func prepareBuildOptions(opts api.RunOptions) *api.BuildOptions {
@@ -258,48 +262,48 @@ func prepareBuildOptions(opts api.RunOptions) *api.BuildOptions {
 	return &buildOptsCopy
 }
 
-func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
-	service.Tty = opts.Tty
-	service.StdinOpen = opts.Interactive
-	service.ContainerName = opts.Name
+func applyRunOptions(project *types.Project, target *runTarget, opts api.RunOptions) {
+	target.Tty = opts.Tty
+	target.StdinOpen = opts.Interactive
+	target.ContainerName = opts.Name
 
 	if len(opts.Command) > 0 {
-		service.Command = opts.Command
+		target.Command = opts.Command
 	}
 	if opts.User != "" {
-		service.User = opts.User
+		target.User = opts.User
 	}
 
 	if len(opts.CapAdd) > 0 {
-		service.CapAdd = append(service.CapAdd, opts.CapAdd...)
-		service.CapDrop = slices.DeleteFunc(service.CapDrop, func(e string) bool { return slices.Contains(opts.CapAdd, e) })
+		target.CapAdd = append(target.CapAdd, opts.CapAdd...)
+		target.CapDrop = slices.DeleteFunc(target.CapDrop, func(e string) bool { return slices.Contains(opts.CapAdd, e) })
 	}
 	if len(opts.CapDrop) > 0 {
-		service.CapDrop = append(service.CapDrop, opts.CapDrop...)
-		service.CapAdd = slices.DeleteFunc(service.CapAdd, func(e string) bool { return slices.Contains(opts.CapDrop, e) })
+		target.CapDrop = append(target.CapDrop, opts.CapDrop...)
+		target.CapAdd = slices.DeleteFunc(target.CapAdd, func(e string) bool { return slices.Contains(opts.CapDrop, e) })
 	}
 	if opts.WorkingDir != "" {
-		service.WorkingDir = opts.WorkingDir
+		target.WorkingDir = opts.WorkingDir
 	}
 	if opts.Entrypoint != nil {
-		service.Entrypoint = opts.Entrypoint
+		target.Entrypoint = opts.Entrypoint
 		if len(opts.Command) == 0 {
-			service.Command = []string{}
+			target.Command = []string{}
 		}
 	}
 	if len(opts.Environment) > 0 {
 		cmdEnv := types.NewMappingWithEquals(opts.Environment)
-		serviceOverrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
+		overrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
 			v, ok := envResolver(project.Environment)(s)
 			return v, ok
 		}).RemoveEmpty()
-		if service.Environment == nil {
-			service.Environment = types.MappingWithEquals{}
+		if target.Environment == nil {
+			target.Environment = types.MappingWithEquals{}
 		}
-		service.Environment.OverrideBy(serviceOverrideEnv)
+		target.Environment.OverrideBy(overrideEnv)
 	}
 	for k, v := range opts.Labels {
-		service.Labels = service.Labels.Add(k, v)
+		target.Labels = target.Labels.Add(k, v)
 	}
 }
 

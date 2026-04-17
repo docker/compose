@@ -36,12 +36,10 @@ func TestResolveRunTarget_Service(t *testing.T) {
 			},
 		},
 	}
-	svc, job, err := resolveRunTarget(project, api.RunOptions{Service: "web"})
+	target, err := resolveRunTarget(project, api.RunOptions{Service: "web"})
 	assert.NilError(t, err)
-	assert.Assert(t, svc != nil)
-	assert.Assert(t, job == nil)
-	assert.Equal(t, svc.Name, "web")
-	assert.Equal(t, svc.Image, "nginx")
+	assert.Equal(t, target.Name, "web")
+	assert.Equal(t, target.Image, "nginx")
 }
 
 func TestResolveRunTarget_Job(t *testing.T) {
@@ -60,14 +58,12 @@ func TestResolveRunTarget_Job(t *testing.T) {
 			},
 		},
 	}
-	svc, job, err := resolveRunTarget(project, api.RunOptions{Job: "migrate"})
+	target, err := resolveRunTarget(project, api.RunOptions{Job: "migrate"})
 	assert.NilError(t, err)
-	assert.Assert(t, svc == nil)
-	assert.Assert(t, job != nil)
-	assert.Equal(t, job.Name, "migrate")
-	assert.Equal(t, job.Image, "myapp")
-	assert.DeepEqual(t, []string(job.Command), []string{"python", "manage.py", "migrate"})
-	assert.Equal(t, len(job.DependsOn), 1)
+	assert.Equal(t, target.Name, "migrate")
+	assert.Equal(t, target.Image, "myapp")
+	assert.DeepEqual(t, []string(target.Command), []string{"python", "manage.py", "migrate"})
+	assert.Equal(t, len(target.DependsOn), 1)
 }
 
 func TestResolveRunTarget_JobNotFound(t *testing.T) {
@@ -75,7 +71,7 @@ func TestResolveRunTarget_JobNotFound(t *testing.T) {
 		Services: types.Services{},
 		Jobs:     types.Jobs{},
 	}
-	_, _, err := resolveRunTarget(project, api.RunOptions{Job: "nonexistent"})
+	_, err := resolveRunTarget(project, api.RunOptions{Job: "nonexistent"})
 	assert.ErrorContains(t, err, "no such job: nonexistent")
 }
 
@@ -83,7 +79,7 @@ func TestResolveRunTarget_ServiceNotFound(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{},
 	}
-	_, _, err := resolveRunTarget(project, api.RunOptions{Service: "nonexistent"})
+	_, err := resolveRunTarget(project, api.RunOptions{Service: "nonexistent"})
 	assert.ErrorContains(t, err, "nonexistent")
 }
 
@@ -115,11 +111,25 @@ func TestResolveRunTarget_JobPreservesContainerSpec(t *testing.T) {
 			},
 		},
 	}
-	_, job, err := resolveRunTarget(project, api.RunOptions{Job: "backup"})
+	target, err := resolveRunTarget(project, api.RunOptions{Job: "backup"})
 	assert.NilError(t, err)
-	assert.Equal(t, job.Image, "postgres")
-	assert.Equal(t, job.WorkingDir, "/data")
-	assert.Equal(t, *job.Environment["PGHOST"], "db")
-	assert.Equal(t, len(job.Volumes), 1)
-	assert.Equal(t, job.Volumes[0].Source, "/backups")
+	assert.Equal(t, target.Image, "postgres")
+	assert.Equal(t, target.WorkingDir, "/data")
+	assert.Equal(t, *target.Environment["PGHOST"], "db")
+	assert.Equal(t, len(target.Volumes), 1)
+	assert.Equal(t, target.Volumes[0].Source, "/backups")
+}
+
+func TestRunTarget_ToServiceConfig(t *testing.T) {
+	target := runTarget{
+		Name: "test",
+		ContainerSpec: types.ContainerSpec{
+			Image:   "myimage",
+			Command: types.ShellCommand{"echo", "hello"},
+		},
+	}
+	svc := target.toServiceConfig()
+	assert.Equal(t, svc.Name, "test")
+	assert.Equal(t, svc.Image, "myimage")
+	assert.DeepEqual(t, []string(svc.Command), []string{"echo", "hello"})
 }
