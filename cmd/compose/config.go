@@ -257,7 +257,9 @@ func imagesOnly(project *types.Project) *types.Project {
 	digests := types.Services{}
 	for name, config := range project.Services {
 		digests[name] = types.ServiceConfig{
-			Image: config.Image,
+			ContainerSpec: types.ContainerSpec{
+				Image: config.Image,
+			},
 		}
 	}
 	project = &types.Project{Services: digests}
@@ -308,7 +310,9 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 		service := s.(map[string]any)
 		if image, ok := service["image"]; ok {
 			p.Services[name] = types.ServiceConfig{
-				Image: image.(string),
+				ContainerSpec: types.ContainerSpec{
+					Image: image.(string),
+				},
 			}
 		}
 	}

@@ -79,25 +79,33 @@ func Test_dockerFilePath(t *testing.T) {
 func Test_addBuildDependencies(t *testing.T) {
 	project := &types.Project{Services: types.Services{
 		"test": types.ServiceConfig{
-			Build: &types.BuildConfig{
-				AdditionalContexts: map[string]string{
-					"foo": "service:foo",
-					"bar": "service:bar",
+			ContainerSpec: types.ContainerSpec{
+				Build: &types.BuildConfig{
+					AdditionalContexts: map[string]string{
+						"foo": "service:foo",
+						"bar": "service:bar",
+					},
 				},
 			},
 		},
 		"foo": types.ServiceConfig{
-			Build: &types.BuildConfig{
-				AdditionalContexts: map[string]string{
-					"zot": "service:zot",
+			ContainerSpec: types.ContainerSpec{
+				Build: &types.BuildConfig{
+					AdditionalContexts: map[string]string{
+						"zot": "service:zot",
+					},
 				},
 			},
 		},
 		"bar": types.ServiceConfig{
-			Build: &types.BuildConfig{},
+			ContainerSpec: types.ContainerSpec{
+				Build: &types.BuildConfig{},
+			},
 		},
 		"zot": types.ServiceConfig{
-			Build: &types.BuildConfig{},
+			ContainerSpec: types.ContainerSpec{
+				Build: &types.BuildConfig{},
+			},
 		},
 	}}
 

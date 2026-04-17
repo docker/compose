@@ -133,7 +133,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	service, err := project.GetService(opts.Service)
+	service, err := serviceConfigForRun(project, opts)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
@@ -181,7 +181,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		Labels:            mergeLabels(service.Labels, service.CustomLabels),
 	}
 
-	err = newConvergence(project.ServiceNames(), observedState, nil, nil, s).resolveServiceReferences(&service)
+	err = newConvergence(project.ServiceNames(), observedState, nil, nil, s).resolveContainerReferences(&service.ContainerSpec)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
@@ -214,13 +214,47 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}, err
 }
 
+// serviceConfigForRun resolves the run target and returns a ServiceConfig
+// suitable for container creation. For jobs, a ServiceConfig is built from
+// the job's Name and ContainerSpec.
+func serviceConfigForRun(project *types.Project, opts api.RunOptions) (types.ServiceConfig, error) {
+	svc, job, err := resolveRunTarget(project, opts)
+	if err != nil {
+		return types.ServiceConfig{}, err
+	}
+	if svc != nil {
+		return *svc, nil
+	}
+	return types.ServiceConfig{
+		Name:          job.Name,
+		ContainerSpec: job.ContainerSpec,
+	}, nil
+}
+
+// resolveRunTarget returns either a ServiceConfig or a JobConfig depending on
+// which field is set in opts. Exactly one of the two returned pointers is non-nil.
+func resolveRunTarget(project *types.Project, opts api.RunOptions) (*types.ServiceConfig, *types.JobConfig, error) {
+	if opts.Job != "" {
+		job, ok := project.Jobs[opts.Job]
+		if !ok {
+			return nil, nil, fmt.Errorf("no such job: %s", opts.Job)
+		}
+		return nil, &job, nil
+	}
+	service, err := project.GetService(opts.Service)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &service, nil, nil
+}
+
 func prepareBuildOptions(opts api.RunOptions) *api.BuildOptions {
 	if opts.Build == nil {
 		return nil
 	}
-	// Create a copy of build options and restrict to only the target service
+	// Create a copy of build options and restrict to only the target service/job
 	buildOptsCopy := *opts.Build
-	buildOptsCopy.Services = []string{opts.Service}
+	buildOptsCopy.Services = []string{opts.TargetName()}
 	return &buildOptsCopy
 }
 
@@ -270,7 +304,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 }
 
 func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {
-	project = project.WithServicesDisabled(options.Service)
+	project = project.WithServicesDisabled(options.TargetName())
 
 	err := s.Create(ctx, project, api.CreateOptions{
 		Build:         options.Build,

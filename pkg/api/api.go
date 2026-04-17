@@ -419,6 +419,7 @@ type RunOptions struct {
 	Project           *types.Project
 	Name              string
 	Service           string
+	Job               string
 	Command           []string
 	Entrypoint        []string
 	Detach            bool
@@ -436,6 +437,14 @@ type RunOptions struct {
 	NoDeps            bool
 	// used by exec
 	Index int
+}
+
+// TargetName returns the effective name of the run target (service or job).
+func (o RunOptions) TargetName() string {
+	if o.Job != "" {
+		return o.Job
+	}
+	return o.Service
 }
 
 // AttachOptions group options of the Attach API

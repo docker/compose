@@ -147,6 +147,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+replace github.com/compose-spec/compose-go/v2 => /Users/nicolas/go/src/github.com/compose-spec/compose-go
+
 exclude (
 	// FIXME(thaJeztah): remove this once kubernetes updated their dependencies to no longer need this.
 	//

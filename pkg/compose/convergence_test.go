@@ -38,10 +38,12 @@ import (
 
 func TestContainerName(t *testing.T) {
 	s := types.ServiceConfig{
-		Name:          "testservicename",
-		ContainerName: "testcontainername",
-		Scale:         intPtr(1),
-		Deploy:        &types.DeployConfig{},
+		Name:   "testservicename",
+		Scale:  intPtr(1),
+		Deploy: &types.DeployConfig{},
+		ContainerSpec: types.ContainerSpec{
+			ContainerName: "testcontainername",
+		},
 	}
 	ret, err := getScale(s)
 	assert.NilError(t, err)
@@ -418,12 +420,14 @@ func TestCreateMobyContainer(t *testing.T) {
 
 	service := types.ServiceConfig{
 		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"a": {
-				Priority: 10,
-			},
-			"b": {
-				Priority: 100,
+		ContainerSpec: types.ContainerSpec{
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"a": {
+					Priority: 10,
+				},
+				"b": {
+					Priority: 100,
+				},
 			},
 		},
 	}
@@ -517,9 +521,11 @@ func TestCreateMobyContainerLegacyAPI(t *testing.T) {
 
 	service := types.ServiceConfig{
 		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"a": {Priority: 10},
-			"b": {Priority: 100},
+		ContainerSpec: types.ContainerSpec{
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"a": {Priority: 10},
+				"b": {Priority: 100},
+			},
 		},
 	}
 	project := types.Project{
@@ -606,9 +612,11 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 
 	service := types.ServiceConfig{
 		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"a": {Priority: 10},
-			"b": {Priority: 100},
+		ContainerSpec: types.ContainerSpec{
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"a": {Priority: 10},
+				"b": {Priority: 100},
+			},
 		},
 	}
 	project := types.Project{

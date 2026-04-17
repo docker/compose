@@ -306,8 +306,10 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 					// Hack: create a fake ServiceConfig so we pull missing volume image
 					n := fmt.Sprintf("%s:volume %d", name, i)
 					needPull[n] = types.ServiceConfig{
-						Name:  n,
-						Image: vol.Source,
+						Name: n,
+						ContainerSpec: types.ContainerSpec{
+							Image: vol.Source,
+						},
 					}
 				}
 			}

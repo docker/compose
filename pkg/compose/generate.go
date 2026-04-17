@@ -85,9 +85,11 @@ func (s *composeService) createProjectFromContainers(containers []container.Summ
 		service, ok := services[serviceLabel]
 		if !ok {
 			service = types.ServiceConfig{
-				Name:   serviceLabel,
-				Image:  c.Image,
-				Labels: c.Labels,
+				Name: serviceLabel,
+				ContainerSpec: types.ContainerSpec{
+					Image:  c.Image,
+					Labels: c.Labels,
+				},
 			}
 		}
 		service.Scale = increment(service.Scale)

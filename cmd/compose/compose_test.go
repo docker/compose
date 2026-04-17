@@ -27,13 +27,17 @@ func TestFilterServices(t *testing.T) {
 	p := &types.Project{
 		Services: types.Services{
 			"foo": {
-				Name:  "foo",
-				Links: []string{"bar"},
+				Name: "foo",
+				ContainerSpec: types.ContainerSpec{
+					Links: []string{"bar"},
+				},
 			},
 			"bar": {
 				Name: "bar",
-				DependsOn: map[string]types.ServiceDependency{
-					"zot": {},
+				ContainerSpec: types.ContainerSpec{
+					DependsOn: map[string]types.ServiceDependency{
+						"zot": {},
+					},
 				},
 			},
 			"zot": {

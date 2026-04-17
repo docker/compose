@@ -130,7 +130,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	err = c.resolveServiceReferences(&service)
+	err = c.resolveContainerReferences(&service.ContainerSpec)
 	if err != nil {
 		return err
 	}
@@ -268,66 +268,66 @@ func getScale(config types.ServiceConfig) (int, error) {
 	return scale, nil
 }
 
-// resolveServiceReferences replaces reference to another service with reference to an actual container
-func (c *convergence) resolveServiceReferences(service *types.ServiceConfig) error {
-	err := c.resolveVolumeFrom(service)
+// resolveContainerReferences replaces reference to another service with reference to an actual container
+func (c *convergence) resolveContainerReferences(spec *types.ContainerSpec) error {
+	err := c.resolveVolumeFrom(spec)
 	if err != nil {
 		return err
 	}
 
-	err = c.resolveSharedNamespaces(service)
+	err = c.resolveSharedNamespaces(spec)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
-	for i, vol := range service.VolumesFrom {
-		spec := strings.Split(vol, ":")
-		if len(spec) == 0 {
+func (c *convergence) resolveVolumeFrom(spec *types.ContainerSpec) error {
+	for i, vol := range spec.VolumesFrom {
+		parts := strings.Split(vol, ":")
+		if len(parts) == 0 {
 			continue
 		}
-		if spec[0] == "container" {
-			service.VolumesFrom[i] = spec[1]
+		if parts[0] == "container" {
+			spec.VolumesFrom[i] = parts[1]
 			continue
 		}
-		name := spec[0]
+		name := parts[0]
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share volume with service %s: container missing", name)
 		}
-		service.VolumesFrom[i] = dependencies.sorted()[0].ID
+		spec.VolumesFrom[i] = dependencies.sorted()[0].ID
 	}
 	return nil
 }
 
-func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) error {
-	str := service.NetworkMode
+func (c *convergence) resolveSharedNamespaces(spec *types.ContainerSpec) error {
+	str := spec.NetworkMode
 	if name := getDependentServiceFromMode(str); name != "" {
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
 		}
-		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
+		spec.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	str = service.Ipc
+	str = spec.Ipc
 	if name := getDependentServiceFromMode(str); name != "" {
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
 		}
-		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
+		spec.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	str = service.Pid
+	str = spec.Pid
 	if name := getDependentServiceFromMode(str); name != "" {
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
 		}
-		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
+		spec.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
 	return nil

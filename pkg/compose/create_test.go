@@ -86,7 +86,7 @@ func TestBuildVolumeMount(t *testing.T) {
 }
 
 func TestServiceImageName(t *testing.T) {
-	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
+	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{ContainerSpec: composetypes.ContainerSpec{Image: "myImage"}}, "myProject"), "myImage")
 	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Name: "aService"}, "myProject"), "myProject-aService")
 }
 
@@ -109,27 +109,29 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		Services: composetypes.Services{
 			"myService": {
 				Name: "myService",
-				Volumes: []composetypes.ServiceVolumeConfig{
-					{
-						Type:   composetypes.VolumeTypeVolume,
-						Target: "/var/myvolume1",
-					},
-					{
-						Type:   composetypes.VolumeTypeVolume,
-						Target: "/var/myvolume2",
-					},
-					{
-						Type:   composetypes.VolumeTypeVolume,
-						Source: "myVolume3",
-						Target: "/var/myvolume3",
-						Volume: &composetypes.ServiceVolumeVolume{
-							Subpath: "etc",
+				ContainerSpec: composetypes.ContainerSpec{
+					Volumes: []composetypes.ServiceVolumeConfig{
+						{
+							Type:   composetypes.VolumeTypeVolume,
+							Target: "/var/myvolume1",
 						},
-					},
-					{
-						Type:   composetypes.VolumeTypeNamedPipe,
-						Source: "\\\\.\\pipe\\docker_engine_windows",
-						Target: "\\\\.\\pipe\\docker_engine",
+						{
+							Type:   composetypes.VolumeTypeVolume,
+							Target: "/var/myvolume2",
+						},
+						{
+							Type:   composetypes.VolumeTypeVolume,
+							Source: "myVolume3",
+							Target: "/var/myvolume3",
+							Volume: &composetypes.ServiceVolumeVolume{
+								Subpath: "etc",
+							},
+						},
+						{
+							Type:   composetypes.VolumeTypeNamedPipe,
+							Source: "\\\\.\\pipe\\docker_engine_windows",
+							Target: "\\\\.\\pipe\\docker_engine",
+						},
 					},
 				},
 			},
@@ -195,12 +197,14 @@ func TestDefaultNetworkSettings(t *testing.T) {
 	t.Run("returns the network with the highest priority as primary when service has multiple networks", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
 			Name: "myService",
-			Networks: map[string]*composetypes.ServiceNetworkConfig{
-				"myNetwork1": {
-					Priority: 10,
-				},
-				"myNetwork2": {
-					Priority: 1000,
+			ContainerSpec: composetypes.ContainerSpec{
+				Networks: map[string]*composetypes.ServiceNetworkConfig{
+					"myNetwork1": {
+						Priority: 10,
+					},
+					"myNetwork2": {
+						Priority: 1000,
+					},
 				},
 			},
 		}
@@ -276,9 +280,11 @@ func TestDefaultNetworkSettings(t *testing.T) {
 	t.Run("returns only primary network in EndpointsConfig for API < 1.44", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
 			Name: "myService",
-			Networks: map[string]*composetypes.ServiceNetworkConfig{
-				"myNetwork1": {Priority: 10},
-				"myNetwork2": {Priority: 1000},
+			ContainerSpec: composetypes.ContainerSpec{
+				Networks: map[string]*composetypes.ServiceNetworkConfig{
+					"myNetwork1": {Priority: 10},
+					"myNetwork2": {Priority: 1000},
+				},
 			},
 		}
 		project := composetypes.Project{
@@ -299,8 +305,10 @@ func TestDefaultNetworkSettings(t *testing.T) {
 
 	t.Run("returns defined network mode if explicitly set", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
-			Name:        "myService",
-			NetworkMode: "host",
+			Name: "myService",
+			ContainerSpec: composetypes.ContainerSpec{
+				NetworkMode: "host",
+			},
 		}
 		project := composetypes.Project{
 			Name:     "myProject",
@@ -323,19 +331,21 @@ func TestCreateEndpointSettings(t *testing.T) {
 	eps, err := createEndpointSettings(&composetypes.Project{
 		Name: "projName",
 	}, composetypes.ServiceConfig{
-		Name:          "serviceName",
-		ContainerName: "containerName",
-		Networks: map[string]*composetypes.ServiceNetworkConfig{
-			"netName": {
-				Priority:     100,
-				Aliases:      []string{"alias1", "alias2"},
-				Ipv4Address:  "10.16.17.18",
-				Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
-				LinkLocalIPs: []string{"169.254.10.20"},
-				MacAddress:   "02:00:00:00:00:01",
-				DriverOpts: composetypes.Options{
-					"driverOpt1": "optval1",
-					"driverOpt2": "optval2",
+		Name: "serviceName",
+		ContainerSpec: composetypes.ContainerSpec{
+			ContainerName: "containerName",
+			Networks: map[string]*composetypes.ServiceNetworkConfig{
+				"netName": {
+					Priority:     100,
+					Aliases:      []string{"alias1", "alias2"},
+					Ipv4Address:  "10.16.17.18",
+					Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
+					LinkLocalIPs: []string{"169.254.10.20"},
+					MacAddress:   "02:00:00:00:00:01",
+					DriverOpts: composetypes.Options{
+						"driverOpt1": "optval1",
+						"driverOpt2": "optval2",
+					},
 				},
 			},
 		},

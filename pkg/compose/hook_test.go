@@ -80,7 +80,9 @@ func TestRunHook_ConsoleSize(t *testing.T) {
 
 			service := types.ServiceConfig{
 				Name: "test",
-				Tty:  tc.tty,
+				ContainerSpec: types.ContainerSpec{
+					Tty: tc.tty,
+				},
 			}
 			hook := types.ServiceHook{Command: []string{"echo", "hello"}}
 			ctr := container.Summary{ID: "container123"}
