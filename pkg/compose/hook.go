@@ -31,13 +31,13 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
-func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
+func (s *composeService) runHook(ctx context.Context, ctr container.Summary, name string, tty bool, hook types.ServiceHook, listener api.ContainerEventListener) error {
 	wOut := utils.GetWriter(func(line string) {
 		listener(api.ContainerEvent{
 			Type:    api.HookEventLog,
 			Source:  getContainerNameWithoutProject(ctr) + " ->",
 			ID:      ctr.ID,
-			Service: service.Name,
+			Service: name,
 			Line:    line,
 		})
 	})
@@ -58,13 +58,13 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 	}
 
 	if detached {
-		return s.runWaitExec(ctx, exec.ID, service, listener)
+		return s.runWaitExec(ctx, exec.ID, name, tty, listener)
 	}
 
 	attachOptions := client.ExecAttachOptions{
-		TTY: service.Tty,
+		TTY: tty,
 	}
-	if service.Tty {
+	if tty {
 		height, width := s.stdout().GetTtySize()
 		attachOptions.ConsoleSize = client.ConsoleSize{
 			Width:  width,
@@ -77,7 +77,7 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 	}
 	defer attach.Close()
 
-	if service.Tty {
+	if tty {
 		_, err = io.Copy(wOut, attach.Reader)
 	} else {
 		_, err = stdcopy.StdCopy(wOut, wOut, attach.Reader)
@@ -91,15 +91,15 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 		return err
 	}
 	if inspected.ExitCode != 0 {
-		return fmt.Errorf("%s hook exited with status %d", service.Name, inspected.ExitCode)
+		return fmt.Errorf("%s hook exited with status %d", name, inspected.ExitCode)
 	}
 	return nil
 }
 
-func (s *composeService) runWaitExec(ctx context.Context, execID string, service types.ServiceConfig, listener api.ContainerEventListener) error {
+func (s *composeService) runWaitExec(ctx context.Context, execID string, name string, tty bool, listener api.ContainerEventListener) error {
 	_, err := s.apiClient().ExecStart(ctx, execID, client.ExecStartOptions{
 		Detach: listener == nil,
-		TTY:    service.Tty,
+		TTY:    tty,
 	})
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func (s *composeService) runWaitExec(ctx context.Context, execID string, service
 			}
 			if !inspect.Running {
 				if inspect.ExitCode != 0 {
-					return fmt.Errorf("%s hook exited with status %d", service.Name, inspect.ExitCode)
+					return fmt.Errorf("%s hook exited with status %d", name, inspect.ExitCode)
 				}
 				return nil
 			}

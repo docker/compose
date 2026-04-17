@@ -916,12 +916,12 @@ func (s *composeService) startService(ctx context.Context,
 			continue
 		}
 
-		err = s.injectSecrets(ctx, project, service, ctr.ID)
+		err = s.injectSecrets(ctx, project, service.Name, &service.ContainerSpec, ctr.ID)
 		if err != nil {
 			return err
 		}
 
-		err = s.injectConfigs(ctx, project, service, ctr.ID)
+		err = s.injectConfigs(ctx, project, service.Name, &service.ContainerSpec, ctr.ID)
 		if err != nil {
 			return err
 		}
@@ -934,7 +934,7 @@ func (s *composeService) startService(ctx context.Context,
 		}
 
 		for _, hook := range service.PostStart {
-			err = s.runHook(ctx, ctr, service, hook, listener)
+			err = s.runHook(ctx, ctr, service.Name, service.Tty, hook, listener)
 			if err != nil {
 				return err
 			}

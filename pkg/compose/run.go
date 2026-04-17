@@ -130,9 +130,8 @@ func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, container
 		// Container started, run hooks
 	}
 
-	service := target.toServiceConfig()
-	for _, hook := range service.PostStart {
-		if err := s.runHook(ctx, ctr, service, hook, nil); err != nil {
+	for _, hook := range target.PostStart {
+		if err := s.runHook(ctx, ctr, target.Name, target.Tty, hook, nil); err != nil {
 			return err
 		}
 	}
@@ -222,12 +221,12 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	err = s.injectSecrets(ctx, project, service, inspect.Container.ID)
+	err = s.injectSecrets(ctx, project, target.Name, &target.ContainerSpec, inspect.Container.ID)
 	if err != nil {
 		return prepareRunResult{containerID: created.ID}, err
 	}
 
-	err = s.injectConfigs(ctx, project, service, inspect.Container.ID)
+	err = s.injectConfigs(ctx, project, target.Name, &target.ContainerSpec, inspect.Container.ID)
 	return prepareRunResult{
 		containerID: created.ID,
 		target:      target,

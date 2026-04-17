@@ -111,7 +111,7 @@ func TestRunHook_ConsoleSize(t *testing.T) {
 			assert.NilError(t, err)
 
 			noopListener := func(api.ContainerEvent) {}
-			err = s.(*composeService).runHook(t.Context(), ctr, service, hook, noopListener)
+			err = s.(*composeService).runHook(t.Context(), ctr, service.Name, service.Tty, hook, noopListener)
 			assert.NilError(t, err)
 		})
 	}
