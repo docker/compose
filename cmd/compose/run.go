@@ -187,20 +187,12 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				return err
 			}
 
-			project, _, err := p.ToProject(ctx, dockerCli, backend, nil, composecli.WithoutEnvironmentResolution)
+			project, _, err := p.ToProject(ctx, dockerCli, backend, []string{options.ServiceOrJob}, composecli.WithoutEnvironmentResolution)
 			if err != nil {
 				return err
 			}
 
 			isJob := isJobName(project, options.ServiceOrJob)
-			if isJob {
-				project, err = project.WithSelectedJob(options.ServiceOrJob)
-			} else {
-				project, err = project.WithSelectedServices([]string{options.ServiceOrJob})
-			}
-			if err != nil {
-				return err
-			}
 
 			project, err = project.WithServicesEnvironmentResolved(true)
 			if err != nil {

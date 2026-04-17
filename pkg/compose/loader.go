@@ -122,26 +122,28 @@ func (s *composeService) postProcessProject(project *types.Project, options api.
 		return nil, errors.New("project name can't be empty. Use ProjectName option to set a valid name")
 	}
 
+	// When the target is a job, skip service-oriented processing (profiles, service selection)
+	// and only select the job's service dependencies.
+	if len(options.Services) == 1 && project.Jobs != nil {
+		if _, ok := project.Jobs[options.Services[0]]; ok {
+			s.addCustomLabels(project, options)
+			project, err := project.WithSelectedJob(options.Services[0])
+			if err != nil {
+				return nil, err
+			}
+			if !options.All {
+				project = project.WithoutUnnecessaryResources()
+			}
+			return project, nil
+		}
+	}
+
 	project, err := project.WithServicesEnabled(options.Services...)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add custom labels
-	for name, s := range project.Services {
-		s.CustomLabels = map[string]string{
-			api.ProjectLabel:     project.Name,
-			api.ServiceLabel:     name,
-			api.VersionLabel:     api.ComposeVersion,
-			api.WorkingDirLabel:  project.WorkingDir,
-			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
-			api.OneoffLabel:      "False",
-		}
-		if len(options.EnvFiles) != 0 {
-			s.CustomLabels[api.EnvironmentFileLabel] = strings.Join(options.EnvFiles, ",")
-		}
-		project.Services[name] = s
-	}
+	s.addCustomLabels(project, options)
 
 	project, err = project.WithSelectedServices(options.Services)
 	if err != nil {
@@ -154,4 +156,21 @@ func (s *composeService) postProcessProject(project *types.Project, options api.
 	}
 
 	return project, nil
+}
+
+func (s *composeService) addCustomLabels(project *types.Project, options api.ProjectLoadOptions) {
+	for name, svc := range project.Services {
+		svc.CustomLabels = map[string]string{
+			api.ProjectLabel:     project.Name,
+			api.ServiceLabel:     name,
+			api.VersionLabel:     api.ComposeVersion,
+			api.WorkingDirLabel:  project.WorkingDir,
+			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+			api.OneoffLabel:      "False",
+		}
+		if len(options.EnvFiles) != 0 {
+			svc.CustomLabels[api.EnvironmentFileLabel] = strings.Join(options.EnvFiles, ",")
+		}
+		project.Services[name] = svc
+	}
 }

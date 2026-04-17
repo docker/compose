@@ -35,7 +35,7 @@ Define and run multi-container applications with Docker
 | [`push`](compose_push.md)       | Push service images                                                                     |
 | [`restart`](compose_restart.md) | Restart service containers                                                              |
 | [`rm`](compose_rm.md)           | Removes stopped service containers                                                      |
-| [`run`](compose_run.md)         | Run a one-off command on a service                                                      |
+| [`run`](compose_run.md)         | Run a one-off command on a service or job                                               |
 | [`scale`](compose_scale.md)     | Scale services                                                                          |
 | [`start`](compose_start.md)     | Start services                                                                          |
 | [`stats`](compose_stats.md)     | Display a live stream of container(s) resource usage statistics                         |
