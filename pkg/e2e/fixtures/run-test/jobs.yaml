@@ -18,3 +18,10 @@ jobs:
   with-command:
     image: alpine
     command: echo "default command"
+
+  with-build:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+        RUN echo "built-job-marker" > /marker.txt
+    command: cat /marker.txt

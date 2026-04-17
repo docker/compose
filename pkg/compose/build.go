@@ -51,7 +51,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions, localImages map[string]api.ImageSummary) (map[string]string, error) {
 	imageIDs := map[string]string{}
-	serviceToBuild := types.Services{}
+	imagesToBuild := map[string]types.ContainerSpec{}
 
 	var policy types.DependencyOption = types.IgnoreDependencies
 	if options.Deps {
@@ -63,7 +63,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	// Separate job names from service names and collect buildable jobs
-	serviceNames := collectBuildableJobs(options.Services, project, localImages, serviceToBuild)
+	serviceNames := collectBuildableJobs(options.Services, project, localImages, imagesToBuild)
 
 	// also include services used as additional_contexts with service: prefix
 	serviceNames = addBuildDependencies(serviceNames, project)
@@ -89,14 +89,14 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 			return nil
 		}
-		serviceToBuild[serviceName] = *service
+		imagesToBuild[serviceName] = service.ContainerSpec
 		return nil
 	}, policy)
 	if err != nil {
 		return imageIDs, err
 	}
 
-	if len(serviceToBuild) == 0 {
+	if len(imagesToBuild) == 0 {
 		return imageIDs, nil
 	}
 
@@ -105,9 +105,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return nil, err
 	}
 	if bake {
-		return s.doBuildBake(ctx, project, serviceToBuild, options)
+		return s.doBuildBake(ctx, project, imagesToBuild, options)
 	}
-	return s.doBuildClassic(ctx, project, serviceToBuild, options)
+	return s.doBuildClassic(ctx, project, imagesToBuild, options)
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool) error {
@@ -176,7 +176,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 // collectBuildableJobs separates job names from service names in the given list.
 // Jobs that need building are added to serviceToBuild. Returns only the service names.
-func collectBuildableJobs(names []string, project *types.Project, localImages map[string]api.ImageSummary, serviceToBuild map[string]types.ServiceConfig) []string {
+func collectBuildableJobs(names []string, project *types.Project, localImages map[string]api.ImageSummary, imagesToBuild map[string]types.ContainerSpec) []string {
 	var serviceNames []string
 	for _, name := range names {
 		job, ok := project.Jobs[name]
@@ -189,10 +189,7 @@ func collectBuildableJobs(names []string, project *types.Project, localImages ma
 		}
 		image := api.ImageNameOrDefault(job.Image, name, project.Name)
 		if _, present := localImages[image]; !present || job.PullPolicy == types.PullPolicyBuild {
-			serviceToBuild[name] = types.ServiceConfig{
-				Name:          name,
-				ContainerSpec: job.ContainerSpec,
-			}
+			imagesToBuild[name] = job.ContainerSpec
 		}
 	}
 	return serviceNames
@@ -284,9 +281,9 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 //
 // Finally, standard proxy variables based on the Docker client configuration are added, but will not overwrite
 // any values if already present.
-func resolveAndMergeBuildArgs(proxyConfig map[string]string, project *types.Project, service types.ServiceConfig, opts api.BuildOptions) types.MappingWithEquals {
+func resolveAndMergeBuildArgs(proxyConfig map[string]string, project *types.Project, spec types.ContainerSpec, opts api.BuildOptions) types.MappingWithEquals {
 	result := make(types.MappingWithEquals).
-		OverrideBy(service.Build.Args).
+		OverrideBy(spec.Build.Args).
 		OverrideBy(opts.Args).
 		Resolve(envResolver(project.Environment))
 
@@ -301,17 +298,17 @@ func resolveAndMergeBuildArgs(proxyConfig map[string]string, project *types.Proj
 	return result
 }
 
-func getImageBuildLabels(project *types.Project, service types.ServiceConfig) types.Labels {
+func getImageBuildLabels(project *types.Project, name string, spec types.ContainerSpec) types.Labels {
 	ret := make(types.Labels)
-	if service.Build != nil {
-		for k, v := range service.Build.Labels {
+	if spec.Build != nil {
+		for k, v := range spec.Build.Labels {
 			ret.Add(k, v)
 		}
 	}
 
 	ret.Add(api.VersionLabel, api.ComposeVersion)
 	ret.Add(api.ProjectLabel, project.Name)
-	ret.Add(api.ServiceLabel, service.Name)
+	ret.Add(api.ServiceLabel, name)
 	return ret
 }
 

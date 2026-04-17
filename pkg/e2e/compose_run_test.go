@@ -315,6 +315,14 @@ func TestLocalComposeRun(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "down", "--remove-orphans")
 	})
 
+	t.Run("compose run job with build", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "--rm", "--build", "with-build")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "built-job-marker", res.Stdout())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "down", "--remove-orphans", "--rmi=local")
+	})
+
 	t.Run("compose run unknown job or service", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "nonexistent")
 		res.Assert(t, icmd.Expected{
