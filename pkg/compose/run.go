@@ -44,16 +44,6 @@ type runTarget struct {
 	types.ContainerSpec
 }
 
-// toServiceConfig converts a runTarget into a ServiceConfig for functions
-// in the container creation chain that still require it. This is the single
-// bridge point; future refactoring will push ContainerSpec deeper.
-func (t runTarget) toServiceConfig() types.ServiceConfig {
-	return types.ServiceConfig{
-		Name:          t.Name,
-		ContainerSpec: t.ContainerSpec,
-	}
-}
-
 type prepareRunResult struct {
 	containerID string
 	target      runTarget
@@ -199,22 +189,27 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	// Bridge to ServiceConfig for container creation layer
-	service := target.toServiceConfig()
-	one := 1
-	service.Scale = &one
-
 	createOpts := createOptions{
 		AutoRemove:        opts.AutoRemove,
 		AttachStdin:       opts.Interactive,
 		UseNetworkAliases: opts.UseNetworkAliases,
-		Labels:            mergeLabels(service.Labels, service.CustomLabels),
+		Labels:            mergeLabels(target.Labels, target.CustomLabels),
 	}
 
-	created, err := s.createContainer(ctx, project, service, service.ContainerName, -1, createOpts)
+	eventName := "Container " + target.ContainerName
+	s.events.On(creatingEvent(eventName))
+	created, err := s.createMobyContainer(ctx, project, target.Name, &target.ContainerSpec, nil, target.ContainerName, -1, nil, createOpts)
 	if err != nil {
+		if ctx.Err() == nil {
+			s.events.On(api.Resource{
+				ID:     eventName,
+				Status: api.Error,
+				Text:   err.Error(),
+			})
+		}
 		return prepareRunResult{}, err
 	}
+	s.events.On(createdEvent(eventName))
 
 	inspect, err := s.apiClient().ContainerInspect(ctx, created.ID, client.ContainerInspectOptions{})
 	if err != nil {

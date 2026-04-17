@@ -119,17 +119,3 @@ func TestResolveRunTarget_JobPreservesContainerSpec(t *testing.T) {
 	assert.Equal(t, len(target.Volumes), 1)
 	assert.Equal(t, target.Volumes[0].Source, "/backups")
 }
-
-func TestRunTarget_ToServiceConfig(t *testing.T) {
-	target := runTarget{
-		Name: "test",
-		ContainerSpec: types.ContainerSpec{
-			Image:   "myimage",
-			Command: types.ShellCommand{"echo", "hello"},
-		},
-	}
-	svc := target.toServiceConfig()
-	assert.Equal(t, svc.Name, "test")
-	assert.Equal(t, svc.Image, "myimage")
-	assert.DeepEqual(t, []string(svc.Command), []string{"echo", "hello"})
-}

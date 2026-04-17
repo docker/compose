@@ -763,9 +763,13 @@ var Separator = "-"
 
 // GetImageNameOrDefault computes the default image name for a service, used to tag built images
 func GetImageNameOrDefault(service types.ServiceConfig, projectName string) string {
-	imageName := service.Image
-	if imageName == "" {
-		imageName = projectName + Separator + service.Name
+	return ImageNameOrDefault(service.Image, service.Name, projectName)
+}
+
+// ImageNameOrDefault returns image if non-empty, otherwise builds a default from name and projectName.
+func ImageNameOrDefault(image, name, projectName string) string {
+	if image != "" {
+		return image
 	}
-	return imageName
+	return projectName + Separator + name
 }

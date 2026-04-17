@@ -168,7 +168,8 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	}
 	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(client.ImageInspectResult{}, nil)
 
-	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
+	svc := project.Services["myService"]
+	mounts, err := s.buildContainerMountOptions(t.Context(), project, "myService", &svc.ContainerSpec, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -180,7 +181,8 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
-	mounts, err = s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
+	svc2 := project.Services["myService"]
+	mounts, err = s.buildContainerMountOptions(t.Context(), project, "myService", &svc2.ContainerSpec, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -223,7 +225,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			}),
 		}
 
-		networkMode, networkConfig, err := defaultNetworkSettings(&project, service, 1, nil, true, "1.44")
+		networkMode, networkConfig, err := defaultNetworkSettings(&project, service.Name, &service.ContainerSpec, 1, nil, true, "1.44")
 		assert.NilError(t, err)
 		assert.Equal(t, string(networkMode), "myProject_myNetwork2")
 		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 2))
@@ -253,7 +255,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			}),
 		}
 
-		networkMode, networkConfig, err := defaultNetworkSettings(&project, service, 1, nil, true, "1.44")
+		networkMode, networkConfig, err := defaultNetworkSettings(&project, service.Name, &service.ContainerSpec, 1, nil, true, "1.44")
 		assert.NilError(t, err)
 		assert.Equal(t, string(networkMode), "myProject_default")
 		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 1))
@@ -271,7 +273,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			},
 		}
 
-		networkMode, networkConfig, err := defaultNetworkSettings(&project, service, 1, nil, true, "1.44")
+		networkMode, networkConfig, err := defaultNetworkSettings(&project, service.Name, &service.ContainerSpec, 1, nil, true, "1.44")
 		assert.NilError(t, err)
 		assert.Equal(t, string(networkMode), "none")
 		assert.Check(t, cmp.Nil(networkConfig))
@@ -296,7 +298,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			}),
 		}
 
-		networkMode, networkConfig, err := defaultNetworkSettings(&project, service, 1, nil, true, "1.43")
+		networkMode, networkConfig, err := defaultNetworkSettings(&project, service.Name, &service.ContainerSpec, 1, nil, true, "1.43")
 		assert.NilError(t, err)
 		assert.Equal(t, string(networkMode), "myProject_myNetwork2")
 		assert.Check(t, cmp.Len(networkConfig.EndpointsConfig, 1))
@@ -320,7 +322,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 			}),
 		}
 
-		networkMode, networkConfig, err := defaultNetworkSettings(&project, service, 1, nil, true, "1.44")
+		networkMode, networkConfig, err := defaultNetworkSettings(&project, service.Name, &service.ContainerSpec, 1, nil, true, "1.44")
 		assert.NilError(t, err)
 		assert.Equal(t, string(networkMode), "host")
 		assert.Check(t, cmp.Nil(networkConfig))
@@ -328,28 +330,26 @@ func TestDefaultNetworkSettings(t *testing.T) {
 }
 
 func TestCreateEndpointSettings(t *testing.T) {
-	eps, err := createEndpointSettings(&composetypes.Project{
-		Name: "projName",
-	}, composetypes.ServiceConfig{
-		Name: "serviceName",
-		ContainerSpec: composetypes.ContainerSpec{
-			ContainerName: "containerName",
-			Networks: map[string]*composetypes.ServiceNetworkConfig{
-				"netName": {
-					Priority:     100,
-					Aliases:      []string{"alias1", "alias2"},
-					Ipv4Address:  "10.16.17.18",
-					Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
-					LinkLocalIPs: []string{"169.254.10.20"},
-					MacAddress:   "02:00:00:00:00:01",
-					DriverOpts: composetypes.Options{
-						"driverOpt1": "optval1",
-						"driverOpt2": "optval2",
-					},
+	spec := &composetypes.ContainerSpec{
+		ContainerName: "containerName",
+		Networks: map[string]*composetypes.ServiceNetworkConfig{
+			"netName": {
+				Priority:     100,
+				Aliases:      []string{"alias1", "alias2"},
+				Ipv4Address:  "10.16.17.18",
+				Ipv6Address:  "fdb4:7a7f:373a:3f0c::42",
+				LinkLocalIPs: []string{"169.254.10.20"},
+				MacAddress:   "02:00:00:00:00:01",
+				DriverOpts: composetypes.Options{
+					"driverOpt1": "optval1",
+					"driverOpt2": "optval2",
 				},
 			},
 		},
-	}, 0, "netName", []string{"link1", "link2"}, true)
+	}
+	eps, err := createEndpointSettings(&composetypes.Project{
+		Name: "projName",
+	}, "serviceName", spec, 0, "netName", []string{"link1", "link2"}, true)
 	assert.NilError(t, err)
 	macAddr, _ := net.ParseMAC("02:00:00:00:00:01")
 	assert.Check(t, cmp.DeepEqual(eps, &network.EndpointSettings{
@@ -487,7 +487,8 @@ volumes:
 			})
 			assert.NilError(t, err)
 			s := &composeService{}
-			binds, mounts, err := s.buildContainerVolumes(t.Context(), *p, p.Services["test"], nil)
+			svc := p.Services["test"]
+			binds, mounts, err := s.buildContainerVolumes(t.Context(), *p, "test", &svc.ContainerSpec, nil)
 			assert.NilError(t, err)
 			assert.DeepEqual(t, tt.binds, binds)
 			assert.DeepEqual(t, tt.mounts, mounts)
