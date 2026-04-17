@@ -164,7 +164,6 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		Add(api.SlugLabel, slug).
 		Add(api.OneoffLabel, "True")
 
-	// Only ensure image exists for the target, dependencies were already handled by startDependencies
 	buildOpts := prepareBuildOptions(opts)
 	if err := s.ensureImagesExists(ctx, project, buildOpts, opts.QuietPull); err != nil {
 		return prepareRunResult{}, err

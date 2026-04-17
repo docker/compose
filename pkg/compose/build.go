@@ -62,22 +62,25 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		options.Services = project.ServiceNames()
 	}
 
+	// Separate job names from service names and collect buildable jobs
+	serviceNames := collectBuildableJobs(options.Services, project, localImages, serviceToBuild)
+
 	// also include services used as additional_contexts with service: prefix
-	options.Services = addBuildDependencies(options.Services, project)
+	serviceNames = addBuildDependencies(serviceNames, project)
 
 	// Some build dependencies we just introduced may not be enabled
 	var err error
-	project, err = project.WithServicesEnabled(options.Services...)
+	project, err = project.WithServicesEnabled(serviceNames...)
 	if err != nil {
 		return nil, err
 	}
 
-	project, err = project.WithSelectedServices(options.Services)
+	project, err = project.WithSelectedServices(serviceNames)
 	if err != nil {
 		return nil, err
 	}
 
-	err = project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
+	err = project.ForEachService(serviceNames, func(serviceName string, service *types.ServiceConfig) error {
 		if service.Build == nil {
 			return nil
 		}
@@ -111,6 +114,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	for name, service := range project.Services {
 		if service.Provider == nil && service.Image == "" && service.Build == nil {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
+		}
+	}
+	for name, job := range project.Jobs {
+		if job.Image == "" && job.Build == nil {
+			return fmt.Errorf("invalid job %q. Must specify either image or build", name)
 		}
 	}
 
@@ -166,6 +174,30 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	return nil
 }
 
+// collectBuildableJobs separates job names from service names in the given list.
+// Jobs that need building are added to serviceToBuild. Returns only the service names.
+func collectBuildableJobs(names []string, project *types.Project, localImages map[string]api.ImageSummary, serviceToBuild map[string]types.ServiceConfig) []string {
+	var serviceNames []string
+	for _, name := range names {
+		job, ok := project.Jobs[name]
+		if !ok {
+			serviceNames = append(serviceNames, name)
+			continue
+		}
+		if job.Build == nil {
+			continue
+		}
+		image := api.ImageNameOrDefault(job.Image, name, project.Name)
+		if _, present := localImages[image]; !present || job.PullPolicy == types.PullPolicyBuild {
+			serviceToBuild[name] = types.ServiceConfig{
+				Name:          name,
+				ContainerSpec: job.ContainerSpec,
+			}
+		}
+	}
+	return serviceNames
+}
+
 func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.ImageSummary, projectName string) {
 	for i, vol := range service.Volumes {
 		if vol.Type == types.VolumeTypeImage {
@@ -198,6 +230,9 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 				imageNames.Add(volume.Source)
 			}
 		}
+	}
+	for _, job := range project.Jobs {
+		imageNames.Add(api.ImageNameOrDefault(job.Image, job.Name, project.Name))
 	}
 	imgs, err := s.getImageSummaries(ctx, imageNames.Elements())
 	if err != nil {

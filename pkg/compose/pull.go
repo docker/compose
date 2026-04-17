@@ -290,6 +290,23 @@ func encodedAuth(ref reference.Named, configFile authProvider) (string, error) {
 	return base64.URLEncoding.EncodeToString(buf), nil
 }
 
+// collectPullableJobs adds jobs that need pulling to the needPull map.
+// Jobs with a build config are skipped (they'll be built instead).
+func collectPullableJobs(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig) {
+	for name, job := range project.Jobs {
+		if job.Image == "" || job.Build != nil {
+			continue
+		}
+		imgName := api.ImageNameOrDefault(job.Image, name, project.Name)
+		if _, ok := images[imgName]; !ok {
+			needPull[name] = types.ServiceConfig{
+				Name:          name,
+				ContainerSpec: job.ContainerSpec,
+			}
+		}
+	}
+}
+
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
 	needPull := map[string]types.ServiceConfig{}
 	for name, service := range project.Services {
@@ -314,8 +331,8 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 				}
 			}
 		}
-
 	}
+	collectPullableJobs(project, images, needPull)
 	if len(needPull) == 0 {
 		return nil
 	}
