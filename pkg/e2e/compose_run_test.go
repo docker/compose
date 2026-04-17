@@ -78,7 +78,7 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Stdout(), "run-test-back"), res.Stdout())
 	})
 
-	t.Run("down", func(t *testing.T) {
+	t.Run("down --remove-orphans", func(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "down", "--remove-orphans")
 		res := c.RunDockerCmd(t, "ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())

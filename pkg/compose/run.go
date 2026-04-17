@@ -190,39 +190,17 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	createOpts := createOptions{
-		AutoRemove:        opts.AutoRemove,
-		AttachStdin:       opts.Interactive,
-		UseNetworkAliases: opts.UseNetworkAliases,
-		Labels:            mergeLabels(target.Labels, target.CustomLabels),
-	}
-
-	eventName := "Container " + target.ContainerName
-	s.events.On(creatingEvent(eventName))
-	created, err := s.createMobyContainer(ctx, project, target.Name, &target.ContainerSpec, nil, target.ContainerName, -1, nil, createOpts)
-	if err != nil {
-		if ctx.Err() == nil {
-			s.events.On(api.Resource{
-				ID:     eventName,
-				Status: api.Error,
-				Text:   err.Error(),
-			})
-		}
-		return prepareRunResult{}, err
-	}
-	s.events.On(createdEvent(eventName))
-
-	inspect, err := s.apiClient().ContainerInspect(ctx, created.ID, client.ContainerInspectOptions{})
+	created, err := s.createOneOffContainer(ctx, project, target, opts)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
 
-	err = s.injectSecrets(ctx, project, target.Name, &target.ContainerSpec, inspect.Container.ID)
+	err = s.injectSecrets(ctx, project, target.Name, &target.ContainerSpec, created.ID)
 	if err != nil {
 		return prepareRunResult{containerID: created.ID}, err
 	}
 
-	err = s.injectConfigs(ctx, project, target.Name, &target.ContainerSpec, inspect.Container.ID)
+	err = s.injectConfigs(ctx, project, target.Name, &target.ContainerSpec, created.ID)
 	return prepareRunResult{
 		containerID: created.ID,
 		target:      target,
@@ -245,6 +223,36 @@ func resolveRunTarget(project *types.Project, opts api.RunOptions) (runTarget, e
 		return runTarget{}, err
 	}
 	return runTarget{Name: service.Name, ContainerSpec: service.ContainerSpec}, nil
+}
+
+func (s *composeService) createOneOffContainer(ctx context.Context, project *types.Project, target runTarget, opts api.RunOptions) (container.Summary, error) {
+	hash, err := ContainerSpecHash(target.ContainerSpec)
+	if err != nil {
+		return container.Summary{}, err
+	}
+	createOpts := createOptions{
+		AutoRemove:        opts.AutoRemove,
+		AttachStdin:       opts.Interactive,
+		UseNetworkAliases: opts.UseNetworkAliases,
+		Labels: mergeLabels(target.Labels, target.CustomLabels).
+			Add(api.ConfigHashLabel, hash),
+	}
+
+	eventName := "Container " + target.ContainerName
+	s.events.On(creatingEvent(eventName))
+	created, err := s.createMobyContainer(ctx, project, target.Name, &target.ContainerSpec, nil, target.ContainerName, -1, nil, createOpts)
+	if err != nil {
+		if ctx.Err() == nil {
+			s.events.On(api.Resource{
+				ID:     eventName,
+				Status: api.Error,
+				Text:   err.Error(),
+			})
+		}
+		return container.Summary{}, err
+	}
+	s.events.On(createdEvent(eventName))
+	return created, nil
 }
 
 func prepareBuildOptions(opts api.RunOptions) *api.BuildOptions {
