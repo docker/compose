@@ -435,6 +435,8 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
+	Publish           []string
+	Volumes           []string
 	// used by exec
 	Index int
 }

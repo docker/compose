@@ -24,7 +24,6 @@ import (
 
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
-	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -84,7 +83,6 @@ func (options runOptions) apply(project *types.Project, isJob bool) (*types.Proj
 	}
 
 	if isJob {
-		// Jobs are not in project.Services, nothing more to apply
 		return project, nil
 	}
 
@@ -96,27 +94,13 @@ func (options runOptions) apply(project *types.Project, isJob bool) (*types.Proj
 	target.Tty = !options.noTty
 	target.StdinOpen = options.interactive
 
-	// --service-ports and --publish are incompatible
+	// For services, ports are stripped unless --service-ports is set.
+	// Jobs always keep their declared ports (handled in applyRunOptions).
 	if !options.servicePorts {
 		if len(target.Ports) > 0 {
 			logrus.Debug("Running service without ports exposed as --service-ports=false")
 		}
 		target.Ports = []types.ServicePortConfig{}
-		for _, p := range options.publish {
-			config, err := types.ParsePortConfig(p)
-			if err != nil {
-				return nil, err
-			}
-			target.Ports = append(target.Ports, config...)
-		}
-	}
-
-	for _, v := range options.volumes {
-		volume, err := format.ParseVolume(v)
-		if err != nil {
-			return nil, err
-		}
-		target.Volumes = append(target.Volumes, volume)
 	}
 
 	for name := range project.Services {
@@ -349,6 +333,8 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		Labels:            labels,
 		UseNetworkAliases: options.useAliases,
 		NoDeps:            options.noDeps,
+		Publish:           options.publish,
+		Volumes:           options.volumes,
 		Index:             0,
 	}
 	if isJob {

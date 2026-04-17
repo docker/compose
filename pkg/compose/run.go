@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"slices"
 
+	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
@@ -31,6 +32,7 @@ import (
 	"github.com/moby/moby/api/types/events"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/stringid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -298,6 +300,22 @@ func applyRunOptions(project *types.Project, target *runTarget, opts api.RunOpti
 	}
 	for k, v := range opts.Labels {
 		target.Labels = target.Labels.Add(k, v)
+	}
+	for _, p := range opts.Publish {
+		config, err := types.ParsePortConfig(p)
+		if err != nil {
+			logrus.Warnf("invalid publish value %q: %v", p, err)
+			continue
+		}
+		target.Ports = append(target.Ports, config...)
+	}
+	for _, v := range opts.Volumes {
+		volume, err := format.ParseVolume(v)
+		if err != nil {
+			logrus.Warnf("invalid volume value %q: %v", v, err)
+			continue
+		}
+		target.Volumes = append(target.Volumes, volume)
 	}
 }
 
