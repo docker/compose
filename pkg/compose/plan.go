@@ -18,6 +18,7 @@ package compose
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -139,9 +140,14 @@ func (p *Plan) addNode(op Operation, group string, deps ...*PlanNode) *PlanNode 
 func (p *Plan) String() string {
 	var sb strings.Builder
 	for _, node := range p.Nodes {
-		deps := make([]string, len(node.DependsOn))
+		depIDs := make([]int, len(node.DependsOn))
 		for i, d := range node.DependsOn {
-			deps[i] = strconv.Itoa(d.ID)
+			depIDs[i] = d.ID
+		}
+		sort.Ints(depIDs)
+		deps := make([]string, len(depIDs))
+		for i, id := range depIDs {
+			deps[i] = strconv.Itoa(id)
 		}
 		fmt.Fprintf(&sb, "[%s] -> #%d %s, %s, %s",
 			strings.Join(deps, ","),

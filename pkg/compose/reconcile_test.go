@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -27,7 +28,7 @@ import (
 )
 
 // noPrompt is a Prompt that should never be called in tests that don't expect it.
-func noPrompt(msg string, def bool) (bool, error) {
+func noPrompt(msg string, _ bool) (bool, error) {
 	panic("unexpected prompt call: " + msg)
 }
 
@@ -62,9 +63,11 @@ func TestReconcileNetworks_CreateMissing(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	assert.Assert(t, containsLine(s, "CreateNetwork, not found"))
-	assert.Equal(t, len(plan.Nodes), 2)
+	// Sorted alphabetically: backend before frontend
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 network:backend, CreateNetwork, not found
+[] -> #2 network:frontend, CreateNetwork, not found
+`)+"\n")
 }
 
 func TestReconcileNetworks_ExistingMatch(t *testing.T) {
@@ -126,18 +129,16 @@ func TestReconcileNetworks_Diverged(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers: map[string][]ObservedContainer{
-			"web": {
-				{
-					ID: "c1", Number: 1, State: container.StateRunning,
-					Summary: container.Summary{
-						ID: "c1",
-						Labels: map[string]string{
-							api.ServiceLabel:         "web",
-							api.ContainerNumberLabel: "1",
-						},
+			"web": {{
+				ID: "c1aabbccddee", Number: 1, State: container.StateRunning,
+				Summary: container.Summary{
+					ID: "c1aabbccddee",
+					Labels: map[string]string{
+						api.ServiceLabel:         "web",
+						api.ContainerNumberLabel: "1",
 					},
 				},
-			},
+			}},
 		},
 		Networks: map[string]ObservedNetwork{
 			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"},
@@ -148,14 +149,16 @@ func TestReconcileNetworks_Diverged(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	// Network recreation sequence
-	assert.Assert(t, containsLine(s, "StopContainer, network frontend config changed"))
-	assert.Assert(t, containsLine(s, "DisconnectNetwork, network frontend recreate"))
-	assert.Assert(t, containsLine(s, "RemoveNetwork, config hash diverged"))
-	assert.Assert(t, containsLine(s, "CreateNetwork, recreate after config change"))
-	// Container recreation follows (the container was connected to the old network)
-	assert.Assert(t, containsLine(s, "recreate:web:1"))
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, StopContainer, network frontend config changed
+[1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
+[2] -> #3 network:frontend, RemoveNetwork, config hash diverged
+[3] -> #4 network:frontend, CreateNetwork, recreate after config change
+[4] -> #5 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
+[5] -> #6 service:web:1, StopContainer, replaced by #5 [recreate:web:1]
+[6] -> #7 service:web:1, RemoveContainer, replaced by #5 [recreate:web:1]
+[7] -> #8 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+`)+"\n")
 }
 
 func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
@@ -181,12 +184,12 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 		ProjectName: "myproject",
 		Containers: map[string][]ObservedContainer{
 			"web": {{
-				ID: "c1", Number: 1, State: container.StateRunning,
-				Summary: container.Summary{ID: "c1", Labels: map[string]string{api.ServiceLabel: "web", api.ContainerNumberLabel: "1"}},
+				ID: "c1aabbccddee", Number: 1, State: container.StateRunning,
+				Summary: container.Summary{ID: "c1aabbccddee", Labels: map[string]string{api.ServiceLabel: "web", api.ContainerNumberLabel: "1"}},
 			}},
 			"api": {{
-				ID: "c2", Number: 1, State: container.StateRunning,
-				Summary: container.Summary{ID: "c2", Labels: map[string]string{api.ServiceLabel: "api", api.ContainerNumberLabel: "1"}},
+				ID: "c2aabbccddee", Number: 1, State: container.StateRunning,
+				Summary: container.Summary{ID: "c2aabbccddee", Labels: map[string]string{api.ServiceLabel: "api", api.ContainerNumberLabel: "1"}},
 			}},
 		},
 		Networks: map[string]ObservedNetwork{
@@ -198,15 +201,23 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	// Both containers stopped and disconnected before network removal
-	assert.Assert(t, containsLine(s, "StopContainer, network frontend config changed"))
-	assert.Assert(t, containsLine(s, "DisconnectNetwork, network frontend recreate"))
-	assert.Assert(t, containsLine(s, "RemoveNetwork, config hash diverged"))
-	assert.Assert(t, containsLine(s, "CreateNetwork, recreate after config change"))
-	// Both containers get recreated after network
-	assert.Assert(t, containsLine(s, "recreate:web:1"))
-	assert.Assert(t, containsLine(s, "recreate:api:1"))
+	// Services sorted alphabetically: api before web
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:api:1, StopContainer, network frontend config changed
+[] -> #2 service:web:1, StopContainer, network frontend config changed
+[1] -> #3 service:api:1, DisconnectNetwork, network frontend recreate
+[2] -> #4 service:web:1, DisconnectNetwork, network frontend recreate
+[3,4] -> #5 network:frontend, RemoveNetwork, config hash diverged
+[5] -> #6 network:frontend, CreateNetwork, recreate after config change
+[6] -> #7 service:api:1, CreateContainer, config changed (tmpName) [recreate:api:1]
+[7] -> #8 service:api:1, StopContainer, replaced by #7 [recreate:api:1]
+[8] -> #9 service:api:1, RemoveContainer, replaced by #7 [recreate:api:1]
+[9] -> #10 service:api:1, RenameContainer, finalize recreate [recreate:api:1]
+[6] -> #11 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
+[11] -> #12 service:web:1, StopContainer, replaced by #11 [recreate:web:1]
+[12] -> #13 service:web:1, RemoveContainer, replaced by #11 [recreate:web:1]
+[13] -> #14 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+`)+"\n")
 }
 
 // --- Volume tests ---
@@ -226,8 +237,9 @@ func TestReconcileVolumes_CreateMissing(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	expected := "[] -> #1 volume:data, CreateVolume, not found\n"
-	assert.Equal(t, plan.String(), expected)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 volume:data, CreateVolume, not found
+`)+"\n")
 }
 
 func TestReconcileVolumes_ExistingMatch(t *testing.T) {
@@ -288,8 +300,14 @@ func TestReconcileVolumes_DivergedConfirmed(t *testing.T) {
 		ProjectName: "myproject",
 		Containers: map[string][]ObservedContainer{
 			"db": {{
-				ID: "c1", Number: 1, State: container.StateRunning,
-				Summary: container.Summary{ID: "c1", Labels: map[string]string{api.ServiceLabel: "db", api.ContainerNumberLabel: "1"}},
+				ID: "c1aabbccddee", Number: 1, State: container.StateRunning,
+				Summary: container.Summary{
+					ID: "c1aabbccddee",
+					Labels: map[string]string{
+						api.ServiceLabel:         "db",
+						api.ContainerNumberLabel: "1",
+					},
+				},
 			}},
 		},
 		Networks: map[string]ObservedNetwork{},
@@ -301,20 +319,20 @@ func TestReconcileVolumes_DivergedConfirmed(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), alwaysYesPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	// Volume recreation sequence
-	assert.Assert(t, containsLine(s, "StopContainer, volume data config changed"))
-	assert.Assert(t, containsLine(s, "RemoveContainer, volume data config changed"))
-	assert.Assert(t, containsLine(s, "RemoveVolume, config hash diverged"))
-	assert.Assert(t, containsLine(s, "CreateVolume, recreate after config change"))
-	// Container is recreated since its config hash diverges after volume removal
-	assert.Assert(t, containsLine(s, "CreateContainer,"))
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, StopContainer, volume data config changed
+[1] -> #2 service:db:1, RemoveContainer, volume data config changed
+[2] -> #3 volume:data, RemoveVolume, config hash diverged
+[3] -> #4 volume:data, CreateVolume, recreate after config change
+[4] -> #5 service:db:1, CreateContainer, config changed (tmpName) [recreate:db:1]
+[5] -> #6 service:db:1, StopContainer, replaced by #5 [recreate:db:1]
+[6] -> #7 service:db:1, RemoveContainer, replaced by #5 [recreate:db:1]
+[7] -> #8 service:db:1, RenameContainer, finalize recreate [recreate:db:1]
+`)+"\n")
 }
 
 func TestReconcileVolumes_DivergedDeclined(t *testing.T) {
 	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
-	hash, err := VolumeHash(vol)
-	assert.NilError(t, err)
 
 	project := &types.Project{
 		Name:    "myproject",
@@ -349,14 +367,12 @@ func TestReconcileVolumes_DivergedDeclined(t *testing.T) {
 		},
 		Networks: map[string]ObservedNetwork{},
 		Volumes: map[string]ObservedVolume{
-			// Volume hash doesn't match, but user declines recreation
-			"data": {Name: vol.Name, ConfigHash: hash + "old"},
+			"data": {Name: vol.Name, ConfigHash: "oldhash"},
 		},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), alwaysNoPrompt)
 	assert.NilError(t, err)
-	// Volume not recreated, container is up-to-date -> empty plan
 	assert.Assert(t, plan.IsEmpty())
 }
 
@@ -379,8 +395,9 @@ func TestReconcileContainers_NewProject(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	expected := "[] -> #1 service:web:1, CreateContainer, no existing container\n"
-	assert.Equal(t, plan.String(), expected)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, CreateContainer, no existing container
+`)+"\n")
 }
 
 func TestReconcileContainers_AlreadyRunning(t *testing.T) {
@@ -436,13 +453,12 @@ func TestReconcileContainers_ConfigChanged(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	assert.Assert(t, containsLine(s, "CreateContainer, config changed (tmpName)"))
-	assert.Assert(t, containsLine(s, "StopContainer, replaced by"))
-	assert.Assert(t, containsLine(s, "RemoveContainer, replaced by"))
-	assert.Assert(t, containsLine(s, "RenameContainer, finalize recreate"))
-	// All 4 nodes share the same group
-	assert.Assert(t, containsLine(s, "[recreate:web:1]"))
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
+[1] -> #2 service:web:1, StopContainer, replaced by #1 [recreate:web:1]
+[2] -> #3 service:web:1, RemoveContainer, replaced by #1 [recreate:web:1]
+[3] -> #4 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+`)+"\n")
 }
 
 func TestReconcileContainers_ScaleUp(t *testing.T) {
@@ -471,10 +487,10 @@ func TestReconcileContainers_ScaleUp(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	assert.Assert(t, containsLine(s, "service:web:2, CreateContainer, no existing container"))
-	assert.Assert(t, containsLine(s, "service:web:3, CreateContainer, no existing container"))
-	assert.Equal(t, len(plan.Nodes), 2)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:2, CreateContainer, no existing container
+[] -> #2 service:web:3, CreateContainer, no existing container
+`)+"\n")
 }
 
 func TestReconcileContainers_ScaleDown(t *testing.T) {
@@ -512,10 +528,10 @@ func TestReconcileContainers_ScaleDown(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	assert.Assert(t, containsLine(s, "StopContainer, scale down"))
-	assert.Assert(t, containsLine(s, "RemoveContainer, scale down"))
-	assert.Equal(t, len(plan.Nodes), 2)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:2, StopContainer, scale down
+[1] -> #2 service:web:2, RemoveContainer, scale down
+`)+"\n")
 }
 
 func TestReconcileContainers_ForceRecreate(t *testing.T) {
@@ -547,9 +563,12 @@ func TestReconcileContainers_ForceRecreate(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, opts, noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	assert.Assert(t, containsLine(s, "recreate:web:1"))
-	assert.Equal(t, len(plan.Nodes), 4) // create + stop + remove + rename
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
+[1] -> #2 service:web:1, StopContainer, replaced by #1 [recreate:web:1]
+[2] -> #3 service:web:1, RemoveContainer, replaced by #1 [recreate:web:1]
+[3] -> #4 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+`)+"\n")
 }
 
 func TestReconcileContainers_NeverRecreate(t *testing.T) {
@@ -582,7 +601,7 @@ func TestReconcileContainers_NeverRecreate(t *testing.T) {
 	assert.Assert(t, plan.IsEmpty())
 }
 
-func TestReconcileContainers_StoppedNeedsStart(t *testing.T) {
+func TestReconcileContainers_ExitedIsNoop(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Scale: intPtr(1)}
 	hash := mustServiceHash(t, svc)
 
@@ -607,15 +626,7 @@ func TestReconcileContainers_StoppedNeedsStart(t *testing.T) {
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
-	// exited state is not "running", "created", or "restarting" → gets a StartContainer
-	// Actually per the code, StateExited is handled explicitly as no-op in current convergence
-	// Let me check: the switch has case StateExited with no action. So it should be empty.
-	// Wait, looking at the reconciler code: the default case starts it. But StateExited is not
-	// explicitly handled — it falls through to default. Let me re-read...
-	// The switch is: Running, Created, Restarting → noop. Exited → is not listed, falls to default → start.
-	// BUT in the original convergence.go:199, StateExited is a noop. Let me fix.
-	// Actually wait: convergence.go:199 shows "case container.StateExited:" with NO body, so it's a noop.
-	// My reconciler should match. Let me verify this is tested correctly.
+	// Exited containers are left as-is, matching convergence.go:199 behavior
 	assert.Assert(t, plan.IsEmpty())
 }
 
@@ -641,10 +652,10 @@ func TestReconcileOrphans(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, opts, noPrompt)
 	assert.NilError(t, err)
 
-	s := plan.String()
-	assert.Assert(t, containsLine(s, "StopContainer, orphaned container"))
-	assert.Assert(t, containsLine(s, "RemoveContainer, orphaned container"))
-	assert.Equal(t, len(plan.Nodes), 2)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 orphan:myproject-old-1, StopContainer, orphaned container
+[1] -> #2 orphan:myproject-old-1, RemoveContainer, orphaned container
+`)+"\n")
 }
 
 // --- Helpers ---
@@ -654,41 +665,4 @@ func mustServiceHash(t *testing.T, svc types.ServiceConfig) string {
 	h, err := ServiceHash(svc)
 	assert.NilError(t, err)
 	return h
-}
-
-func containsLine(s, substr string) bool {
-	for _, line := range splitLines(s) {
-		if containsStr(line, substr) {
-			return true
-		}
-	}
-	return false
-}
-
-func splitLines(s string) []string {
-	var lines []string
-	start := 0
-	for i := range len(s) {
-		if s[i] == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-	if start < len(s) {
-		lines = append(lines, s[start:])
-	}
-	return lines
-}
-
-func containsStr(s, substr string) bool {
-	return len(s) >= len(substr) && searchStr(s, substr)
-}
-
-func searchStr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
