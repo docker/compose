@@ -94,7 +94,8 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 
 // reconcileNetworks adds plan nodes for network creation or recreation.
 func (r *reconciler) reconcileNetworks() error {
-	for key, desired := range r.project.Networks {
+	for _, key := range sortedKeys(r.project.Networks) {
+		desired := r.project.Networks[key]
 		if desired.External {
 			continue
 		}
@@ -187,7 +188,8 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 
 // reconcileVolumes adds plan nodes for volume creation or recreation.
 func (r *reconciler) reconcileVolumes() error {
-	for key, desired := range r.project.Volumes {
+	for _, key := range sortedKeys(r.project.Volumes) {
+		desired := r.project.Volumes[key]
 		if desired.External {
 			continue
 		}
@@ -285,10 +287,11 @@ func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
 }
 
 // servicesUsingNetwork returns the names of services that reference the given
-// compose network key.
+// compose network key, sorted for deterministic plan output.
 func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 	var names []string
-	for _, svc := range r.project.Services {
+	for _, key := range sortedKeys(r.project.Services) {
+		svc := r.project.Services[key]
 		if _, ok := svc.Networks[networkKey]; ok {
 			names = append(names, svc.Name)
 		}
@@ -297,10 +300,11 @@ func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 }
 
 // servicesUsingVolume returns the names of services that mount the given
-// compose volume key.
+// compose volume key, sorted for deterministic plan output.
 func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	var names []string
-	for _, svc := range r.project.Services {
+	for _, key := range sortedKeys(r.project.Services) {
+		svc := r.project.Services[key]
 		for _, v := range svc.Volumes {
 			if v.Source == volumeKey {
 				names = append(names, svc.Name)
@@ -338,10 +342,13 @@ func (r *reconciler) reconcileContainers() error {
 // dependencies are reconciled before the services that depend on them.
 func (r *reconciler) visitInDependencyOrder(g *Graph) error {
 	visited := map[string]bool{}
+	// Sort vertex keys for deterministic plan output in tests
+	keys := sortedKeys(g.Vertices)
 	for {
 		// Find a vertex whose all children are visited
 		var next *Vertex
-		for _, v := range g.Vertices {
+		for _, k := range keys {
+			v := g.Vertices[k]
 			if visited[v.Key] {
 				continue
 			}
@@ -501,7 +508,7 @@ func (r *reconciler) mustRecreate(expected types.ServiceConfig, oc ObservedConta
 
 // hasNetworkMismatch checks if the container is not connected to all expected networks.
 func (r *reconciler) hasNetworkMismatch(expected types.ServiceConfig, oc ObservedContainer) bool {
-	for net := range expected.Networks {
+	for _, net := range sortedKeys(expected.Networks) {
 		expectedID := ""
 		if obs, ok := r.observed.Networks[net]; ok {
 			expectedID = obs.ID
@@ -636,7 +643,8 @@ func (r *reconciler) planStopDependents(service types.ServiceConfig) []*PlanNode
 // references, plus the last node of dependency services.
 func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode {
 	var deps []*PlanNode
-	for net := range service.Networks {
+	// Sort map keys for deterministic plan output in tests
+	for _, net := range sortedKeys(service.Networks) {
 		if node, ok := r.networkNodes[net]; ok {
 			deps = append(deps, node)
 		}
@@ -648,7 +656,7 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 			}
 		}
 	}
-	for depName := range service.DependsOn {
+	for _, depName := range sortedKeys(service.DependsOn) {
 		if node, ok := r.serviceNodes[depName]; ok {
 			deps = append(deps, node)
 		}
@@ -702,6 +710,17 @@ func (r *reconciler) observedSummaries(serviceName string) []container.Summary {
 		result[i] = oc.Summary
 	}
 	return result
+}
+
+// sortedKeys returns the keys of a map sorted alphabetically.
+// This ensures deterministic iteration order for reproducible plan output in tests.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // serviceLabel is a package-level shorthand for the service label key.
