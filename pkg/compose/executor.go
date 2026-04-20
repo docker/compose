@@ -144,6 +144,8 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 		return exec.execRemoveContainer(ctx, op)
 	case OpRenameContainer:
 		return exec.execRenameContainer(ctx, node)
+	case OpRunProvider:
+		return exec.compose.runPlugin(ctx, exec.project, *op.Service, "up")
 	default:
 		return fmt.Errorf("unknown operation type: %s", op.Type)
 	}
@@ -191,7 +193,21 @@ func (exec *planExecutor) execRemoveVolume(ctx context.Context, op Operation) er
 
 func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNode) error {
 	op := node.Operation
-	labels := mergeLabels(op.Service.Labels, op.Service.CustomLabels)
+	service := *op.Service
+
+	// Resolve service references (network_mode, ipc, pid, volumes_from) to actual
+	// container IDs. This must happen at execution time because the referenced
+	// containers may have just been created by earlier plan nodes.
+	observedState, err := exec.compose.getContainers(ctx, exec.project.Name, oneOffExclude, true)
+	if err != nil {
+		return err
+	}
+	conv := newConvergence(exec.project.ServiceNames(), observedState, nil, nil, exec.compose)
+	if err := conv.resolveServiceReferences(&service); err != nil {
+		return err
+	}
+
+	labels := mergeLabels(service.Labels, service.CustomLabels)
 	if op.Container != nil {
 		// This is a recreate: add the replace label
 		replacedName := op.Service.ContainerName
@@ -207,7 +223,7 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 		UseNetworkAliases: true,
 		Labels:            labels,
 	}
-	ctr, err := exec.compose.createMobyContainer(ctx, exec.project, *op.Service, op.Name, op.Number, op.Inherited, opts)
+	ctr, err := exec.compose.createMobyContainer(ctx, exec.project, service, op.Name, op.Number, op.Inherited, opts)
 	if err != nil {
 		return err
 	}
@@ -306,14 +322,19 @@ func (exec *planExecutor) buildGroupTracker(plan *Plan) *groupTracker {
 			continue
 		}
 		if _, ok := gt.groups[node.Group]; !ok {
-			// Derive the event name from the container being recreated
-			eventName := node.Group // fallback
-			if node.Operation.Container != nil {
-				eventName = getContainerProgressName(*node.Operation.Container)
-			}
-			gt.groups[node.Group] = &groupState{eventName: eventName}
+			gt.groups[node.Group] = &groupState{}
 		}
 		gt.groups[node.Group].total++
+		// Pick the event name from a node that has the existing container reference
+		if gt.groups[node.Group].eventName == "" && node.Operation.Container != nil {
+			gt.groups[node.Group].eventName = getContainerProgressName(*node.Operation.Container)
+		}
+	}
+	// Fallback for groups where no node had a Container (shouldn't happen for recreate)
+	for name, gs := range gt.groups {
+		if gs.eventName == "" {
+			gs.eventName = name
+		}
 	}
 	return gt
 }

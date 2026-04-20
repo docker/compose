@@ -159,14 +159,6 @@ func (containers Containers) filter(predicates ...containerPredicate) Containers
 	return filtered
 }
 
-func (containers Containers) names() []string {
-	var names []string
-	for _, c := range containers {
-		names = append(names, getCanonicalContainerName(c))
-	}
-	return names
-}
-
 // forEachContainerConcurrent runs fn for every container concurrently and waits for all goroutines.
 func forEachContainerConcurrent(ctx context.Context, containers Containers, fn func(context.Context, container.Summary) error) error {
 	eg, ctx := errgroup.WithContext(ctx)
