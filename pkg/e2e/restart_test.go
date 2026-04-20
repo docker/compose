@@ -98,6 +98,37 @@ func TestRestartWithDependencies(t *testing.T) {
 	assert.Assert(t, strings.Contains(out, fmt.Sprintf("Container e2e-restart-deps-%s-1 Running", depNoRestart)), out)
 }
 
+func TestDependentContainerRestartedOnRecreate(t *testing.T) {
+	c := NewCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-dep-restart",
+	))
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "down", "--remove-orphans")
+	})
+
+	// First up
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose-depends-on.yaml", "up", "-d")
+
+	// Recreate nginx (change label) → with-restart depends with restart:true
+	// so it should be stopped then restarted (same container, not replaced)
+	cli := NewCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-dep-restart",
+		"LABEL=recreate",
+	))
+	res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose-depends-on.yaml", "up", "-d")
+	out := res.Combined()
+
+	// The dependent with restart:true should have been stopped then started
+	assert.Assert(t, strings.Contains(out, "e2e-dep-restart-with-restart-1"),
+		"expected dependent container in output: %s", out)
+
+	// All 3 containers should be running after convergence
+	res = c.RunDockerComposeCmd(t, "ps", "--format", "{{.State}}")
+	for _, line := range strings.Split(strings.TrimSpace(res.Stdout()), "\n") {
+		assert.Equal(t, strings.TrimSpace(line), "running", "expected all containers running")
+	}
+}
+
 func TestRestartWithProfiles(t *testing.T) {
 	c := NewParallelCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=e2e-restart-profiles",

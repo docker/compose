@@ -153,6 +153,33 @@ func TestScaleDoesntRecreate(t *testing.T) {
 	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
 }
 
+func TestUpIdempotent(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-idempotent"
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+
+	res := c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-simple-1", projectName), "-f", "{{ .Id }}")
+	initialID := strings.TrimSpace(res.Stdout())
+
+	// Second up with no changes
+	res = c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+
+	assert.Assert(t, strings.Contains(res.Stderr(), "Running"),
+		"expected Running in output: %s", res.Stderr())
+	assert.Assert(t, !strings.Contains(res.Stderr(), "Recreated"),
+		"unexpected Recreated: %s", res.Stderr())
+
+	// Container ID unchanged
+	res = c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-simple-1", projectName), "-f", "{{ .Id }}")
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), initialID)
+}
+
 func TestUpWithDependencyNotRequired(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "compose-e2e-dependency-not-required"

@@ -159,6 +159,31 @@ func TestUpRecreateVolumes(t *testing.T) {
 	res.Assert(t, icmd.Expected{Out: "zot"})
 }
 
+func TestUpRecreateVolumesAlsoRecreatesContainers(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-recreate-vol-ctr"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+
+	// Get initial container ID
+	res := c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-app-1", projectName), "-f", "{{ .Id }}")
+	initialID := strings.TrimSpace(res.Stdout())
+
+	// Change volume config + auto-confirm → volume and container recreated
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/compose2.yaml",
+		"--project-name", projectName, "up", "-d", "-y")
+
+	// Container ID should have changed (container was removed and recreated
+	// because Docker requires container removal to delete a volume)
+	res = c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-app-1", projectName), "-f", "{{ .Id }}")
+	newID := strings.TrimSpace(res.Stdout())
+	assert.Assert(t, newID != initialID, "expected container to be recreated after volume change")
+}
+
 func TestUpRecreateVolumes_IgnoreBinds(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "compose-e2e-recreate-volumes"

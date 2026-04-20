@@ -406,3 +406,30 @@ func TestUnnecessaryResources(t *testing.T) {
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/external/compose.yaml", "-p", projectName, "up", "-d", "test")
 	// Should not fail as missing external network is not used
 }
+
+func TestReplaceLabelOnRecreate(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "replace-label"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	// First up: fresh container has no replace label
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/replace-label/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+	res := c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-svc-1", projectName),
+		"-f", `{{ index .Config.Labels "com.docker.compose.replace" }}`)
+	res.Assert(t, icmd.Expected{Out: ""})
+
+	// Second up with changed env triggers recreate
+	cli := NewCLI(t, WithEnv("TAG=v2"))
+	res = cli.RunDockerComposeCmd(t, "-f", "./fixtures/replace-label/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+	assert.Assert(t, strings.Contains(res.Stderr(), "Recreated"), res.Stderr())
+
+	// Recreated container should have replace label pointing to old name
+	res = c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-svc-1", projectName),
+		"-f", `{{ index .Config.Labels "com.docker.compose.replace" }}`)
+	assert.Assert(t, strings.Contains(res.Stdout(), "svc-1"),
+		"expected replace label with 'svc-1', got: %s", res.Stdout())
+}

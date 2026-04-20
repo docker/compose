@@ -201,6 +201,37 @@ func TestInterfaceName(t *testing.T) {
 	res.Assert(t, icmd.Expected{Out: "foobar@"})
 }
 
+func TestNetworkConfigChangeReconnectsContainers(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "network_config_reconnect"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/network-recreate/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+
+	netName := fmt.Sprintf("%s_test", projectName)
+	res := c.RunDockerCmd(t, "network", "inspect", netName, "-f", "{{ .Id }}")
+	initialNetID := strings.TrimSpace(res.Stdout())
+
+	// Change network config (label) -> network recreated
+	cli := NewCLI(t, WithEnv("FOO=changed"))
+	cli.RunDockerComposeCmd(t, "-f", "./fixtures/network-recreate/compose.yaml",
+		"--project-name", projectName, "up", "-d")
+
+	// Network ID must have changed
+	res = c.RunDockerCmd(t, "network", "inspect", netName, "-f", "{{ .Id }}")
+	newNetID := strings.TrimSpace(res.Stdout())
+	assert.Assert(t, newNetID != initialNetID, "expected network to be recreated with new ID")
+
+	// Container must be connected to the new network
+	res = c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-web-1", projectName),
+		"-f", `{{ range .NetworkSettings.Networks }}{{ .NetworkID }}{{ end }}`)
+	assert.Assert(t, strings.Contains(res.Stdout(), newNetID),
+		"expected container on new network %s, got: %s", newNetID, res.Stdout())
+}
+
 func TestNetworkRecreate(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "network_recreate"

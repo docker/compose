@@ -1,0 +1,6 @@
+services:
+  svc:
+    image: alpine
+    command: sleep infinity
+    environment:
+      - TAG=${TAG:-v1}
