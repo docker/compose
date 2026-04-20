@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
@@ -89,7 +90,9 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	}
 
 	// --- Containers ---
-	raw, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
+	// Use oneOffInclude to detect orphaned one-off containers (matching the
+	// previous behavior of create() which used oneOffInclude + isOrphaned).
+	raw, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return nil, err
 	}
@@ -103,13 +106,12 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		knownServices[ds.Name] = true
 	}
 
-	for _, c := range raw.filter(isNotOneOff) {
-		oc := toObservedContainer(c)
+	for _, c := range raw {
 		svcName := c.Labels[api.ServiceLabel]
-		if knownServices[svcName] {
-			state.Containers[svcName] = append(state.Containers[svcName], oc)
-		} else {
-			state.Orphans = append(state.Orphans, oc)
+		if isNotOneOff(c) && knownServices[svcName] {
+			state.Containers[svcName] = append(state.Containers[svcName], toObservedContainer(c))
+		} else if isOrphaned(project)(c) {
+			state.Orphans = append(state.Orphans, toObservedContainer(c))
 		}
 	}
 
@@ -178,4 +180,62 @@ func toObservedContainer(c container.Summary) ObservedContainer {
 		ConnectedNetworks: networks,
 		Summary:           c,
 	}
+}
+
+// setResolvedNetworks injects network IDs already resolved by ensureNetworks
+// into the observed state, so the reconciler can compare container connections
+// against actual network IDs.
+func (s *ObservedState) setResolvedNetworks(networks map[string]string, project *types.Project) {
+	for key, id := range networks {
+		if obs, exists := s.Networks[key]; exists {
+			obs.ID = id
+			s.Networks[key] = obs
+		} else {
+			nw := project.Networks[key]
+			s.Networks[key] = ObservedNetwork{ID: id, Name: nw.Name}
+		}
+	}
+}
+
+// setResolvedVolumes injects volume names already resolved by ensureProjectVolumes
+// into the observed state.
+func (s *ObservedState) setResolvedVolumes(volumes map[string]string) {
+	for key, id := range volumes {
+		if obs, exists := s.Volumes[key]; exists {
+			obs.Name = id
+			s.Volumes[key] = obs
+		} else {
+			s.Volumes[key] = ObservedVolume{Name: id}
+		}
+	}
+}
+
+// emitRunningEvents emits "Running" progress events for containers that are already
+// running and have no operations planned for them. This matches the previous behavior
+// where convergence.ensureService emitted runningEvent for up-to-date containers.
+func emitRunningEvents(observed *ObservedState, plan *Plan, events api.EventProcessor) {
+	// Collect all container IDs that appear in the plan
+	planned := map[string]bool{}
+	for _, node := range plan.Nodes {
+		if node.Operation.Container != nil {
+			planned[node.Operation.Container.ID] = true
+		}
+	}
+
+	for _, containers := range observed.Containers {
+		for _, oc := range containers {
+			if oc.State == container.StateRunning && !planned[oc.ID] {
+				events.On(newEvent("Container "+oc.Name, api.Done, api.StatusRunning))
+			}
+		}
+	}
+}
+
+// orphanNames returns the names of orphaned containers as a comma-separated string.
+func (s *ObservedState) orphanNames() string {
+	names := make([]string, len(s.Orphans))
+	for i, o := range s.Orphans {
+		names[i] = o.Name
+	}
+	return strings.Join(names, ", ")
 }

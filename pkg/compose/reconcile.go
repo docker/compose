@@ -30,6 +30,19 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// toReconcileOptions maps api.CreateOptions to ReconcileOptions.
+func toReconcileOptions(options api.CreateOptions) ReconcileOptions {
+	return ReconcileOptions{
+		Services:             options.Services,
+		Recreate:             options.Recreate,
+		RecreateDependencies: options.RecreateDependencies,
+		Inherit:              options.Inherit,
+		Timeout:              options.Timeout,
+		RemoveOrphans:        options.RemoveOrphans,
+		SkipProviders:        options.SkipProviders,
+	}
+}
+
 // ReconcileOptions controls how the reconciler compares desired and observed state.
 type ReconcileOptions struct {
 	Services             []string       // targeted services (empty = all)
@@ -387,7 +400,15 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		return nil
 	}
 	if service.Provider != nil {
-		// Provider services are handled by plugins, not by the reconciler
+		svc := service
+		deps := r.infrastructureDeps(service)
+		node := r.plan.addNode(Operation{
+			Type:       OpRunProvider,
+			ResourceID: fmt.Sprintf("provider:%s", service.Name),
+			Cause:      "provider service",
+			Service:    &svc,
+		}, "", deps...)
+		r.serviceNodes[service.Name] = node
 		return nil
 	}
 
@@ -473,7 +494,9 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		}, "", infraDeps...)
 	}
 
-	r.serviceNodes[service.Name] = lastNode
+	if lastNode != nil {
+		r.serviceNodes[service.Name] = lastNode
+	}
 	return nil
 }
 
@@ -657,7 +680,7 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 		}
 	}
 	for _, depName := range sortedKeys(service.DependsOn) {
-		if node, ok := r.serviceNodes[depName]; ok {
+		if node, ok := r.serviceNodes[depName]; ok && node != nil {
 			deps = append(deps, node)
 		}
 	}

@@ -48,6 +48,9 @@ const (
 	OpStopContainer
 	OpRemoveContainer
 	OpRenameContainer
+
+	// Provider operations
+	OpRunProvider
 )
 
 // String returns the human-readable name of an OperationType.
@@ -75,6 +78,8 @@ func (o OperationType) String() string {
 		return "RemoveContainer"
 	case OpRenameContainer:
 		return "RenameContainer"
+	case OpRunProvider:
+		return "RunProvider"
 	default:
 		return fmt.Sprintf("Unknown(%d)", int(o))
 	}
