@@ -207,7 +207,7 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 	}
 
 	labels := mergeLabels(service.Labels, service.CustomLabels)
-	if op.Container != nil {
+	if op.Inherited != nil {
 		// This is a recreate: add the replace label
 		replacedName := op.Service.ContainerName
 		if replacedName == "" {
