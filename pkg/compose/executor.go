@@ -198,12 +198,11 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 	// Resolve service references (network_mode, ipc, pid, volumes_from) to actual
 	// container IDs. This must happen at execution time because the referenced
 	// containers may have just been created by earlier plan nodes.
-	observedState, err := exec.compose.getContainers(ctx, exec.project.Name, oneOffExclude, true)
+	containersByService, err := exec.compose.getContainersByService(ctx, exec.project.Name)
 	if err != nil {
 		return err
 	}
-	conv := newConvergence(exec.project.ServiceNames(), observedState, nil, nil, exec.compose)
-	if err := conv.resolveServiceReferences(&service); err != nil {
+	if err := resolveServiceReferences(&service, containersByService); err != nil {
 		return err
 	}
 
