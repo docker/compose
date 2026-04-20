@@ -148,6 +148,7 @@ func (r *reconciler) planCreateNetwork(key string, nw *types.NetworkConfig) *Pla
 // planRecreateNetwork adds the full sequence for a diverged network:
 // stop affected containers → disconnect → remove network → create network.
 func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) error {
+	observed := r.observed.Networks[key]
 	affectedServices := r.servicesUsingNetwork(key)
 	affectedContainers := r.containersForServices(affectedServices)
 
@@ -164,7 +165,7 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 		stopNodes = append(stopNodes, node)
 	}
 
-	// Disconnect all affected containers (each depends on its own stop)
+	// Disconnect all affected containers from the *observed* network (each depends on its own stop)
 	var disconnectNodes []*PlanNode
 	for i, oc := range affectedContainers {
 		node := r.plan.addNode(Operation{
@@ -172,18 +173,17 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[serviceLabel], oc.Number),
 			Cause:      fmt.Sprintf("network %s recreate", key),
 			Container:  &affectedContainers[i].Summary,
-			Name:       nw.Name,
+			Name:       observed.Name,
 		}, "", stopNodes[i])
 		disconnectNodes = append(disconnectNodes, node)
 	}
 
-	// Remove network (depends on all disconnects)
+	// Remove the *observed* network (depends on all disconnects)
 	removeNode := r.plan.addNode(Operation{
 		Type:       OpRemoveNetwork,
 		ResourceID: fmt.Sprintf("network:%s", key),
 		Cause:      "config hash diverged",
-		Name:       nw.Name,
-		Network:    nw,
+		Name:       observed.Name,
 	}, "", disconnectNodes...)
 
 	// Create network (depends on remove)
@@ -251,6 +251,7 @@ func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig) *Plan
 // Containers must be removed (not just stopped) because Docker does not allow
 // removing a volume that is referenced by any container, even a stopped one.
 func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
+	observed := r.observed.Volumes[key]
 	affectedServices := r.servicesUsingVolume(key)
 	affectedContainers := r.containersForServices(affectedServices)
 
@@ -279,13 +280,12 @@ func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
 		removeNodes = append(removeNodes, node)
 	}
 
-	// Remove volume (depends on all container removals)
+	// Remove the *observed* volume (depends on all container removals)
 	removeVolNode := r.plan.addNode(Operation{
 		Type:       OpRemoveVolume,
 		ResourceID: fmt.Sprintf("volume:%s", key),
 		Cause:      "config hash diverged",
-		Name:       vol.Name,
-		Volume:     vol,
+		Name:       observed.Name,
 	}, "", removeNodes...)
 
 	// Create volume (depends on remove)
