@@ -49,37 +49,6 @@ const (
 // re-creating container, adding or removing replicas, or starting stopped containers.
 // Cross services dependencies are managed by creating services in expected order and updating `service:xx` reference
 // when a service has converged, so dependent ones can be managed with resolved containers references.
-type convergence struct {
-	compose    *composeService
-	services   map[string]Containers
-	networks   map[string]string
-	volumes    map[string]string
-	stateMutex sync.Mutex
-}
-
-func (c *convergence) getObservedState(serviceName string) Containers {
-	c.stateMutex.Lock()
-	defer c.stateMutex.Unlock()
-	return c.services[serviceName]
-}
-
-func newConvergence(services []string, state Containers, networks map[string]string, volumes map[string]string, s *composeService) *convergence {
-	observedState := map[string]Containers{}
-	for _, s := range services {
-		observedState[s] = Containers{}
-	}
-	for _, c := range state.filter(isNotOneOff) {
-		service := c.Labels[api.ServiceLabel]
-		observedState[service] = append(observedState[service], c)
-	}
-	return &convergence{
-		compose:  s,
-		services: observedState,
-		networks: networks,
-		volumes:  volumes,
-	}
-}
-
 func getScale(config types.ServiceConfig) (int, error) {
 	scale := config.GetScale()
 	if scale > 1 && config.ContainerName != "" {
@@ -90,21 +59,18 @@ func getScale(config types.ServiceConfig) (int, error) {
 	return scale, nil
 }
 
-// resolveServiceReferences replaces reference to another service with reference to an actual container
-func (c *convergence) resolveServiceReferences(service *types.ServiceConfig) error {
-	err := c.resolveVolumeFrom(service)
-	if err != nil {
+// resolveServiceReferences replaces references to other services with references
+// to actual container IDs. It resolves VolumesFrom, NetworkMode, IPC and PID
+// shared namespaces. The containersByService map provides the observed containers
+// grouped by service name.
+func resolveServiceReferences(service *types.ServiceConfig, containersByService map[string]Containers) error {
+	if err := resolveVolumeFrom(service, containersByService); err != nil {
 		return err
 	}
-
-	err = c.resolveSharedNamespaces(service)
-	if err != nil {
-		return err
-	}
-	return nil
+	return resolveSharedNamespaces(service, containersByService)
 }
 
-func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
+func resolveVolumeFrom(service *types.ServiceConfig, containersByService map[string]Containers) error {
 	for i, vol := range service.VolumesFrom {
 		spec := strings.Split(vol, ":")
 		if len(spec) == 0 {
@@ -115,7 +81,7 @@ func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
 			continue
 		}
 		name := spec[0]
-		dependencies := c.getObservedState(name)
+		dependencies := containersByService[name]
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share volume with service %s: container missing", name)
 		}
@@ -124,25 +90,32 @@ func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
 	return nil
 }
 
-func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) error {
-	resolve := func(field *string, noun string) error {
-		if name := getDependentServiceFromMode(*field); name != "" {
-			dependencies := c.getObservedState(name)
-			if len(dependencies) == 0 {
-				return fmt.Errorf("cannot share %s namespace with service %s: container missing", noun, name)
-			}
-			*field = types.ContainerPrefix + dependencies.sorted()[0].ID
+func resolveSharedNamespaces(service *types.ServiceConfig, containersByService map[string]Containers) error {
+	if name := getDependentServiceFromMode(service.NetworkMode); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
 		}
-		return nil
+		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	if err := resolve(&service.NetworkMode, "network"); err != nil {
-		return err
+	if name := getDependentServiceFromMode(service.Ipc); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
+		}
+		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
-	if err := resolve(&service.Ipc, "IPC"); err != nil {
-		return err
+
+	if name := getDependentServiceFromMode(service.Pid); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
+		}
+		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
-	return resolve(&service.Pid, "PID")
+
+	return nil
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
