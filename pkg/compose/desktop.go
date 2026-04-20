@@ -21,23 +21,48 @@ import (
 	"strings"
 
 	"github.com/moby/moby/client"
+
+	"github.com/docker/compose/v5/internal/desktop"
 )
 
-// engineLabelDesktopAddress is used to detect that Compose is running with a
-// Docker Desktop context. When this label is present, the value is an endpoint
-// address for an in-memory socket (AF_UNIX or named pipe).
-const engineLabelDesktopAddress = "com.docker.desktop.address"
-
-func (s *composeService) isDesktopIntegrationActive(ctx context.Context) (bool, error) {
+// desktopEndpoint returns the Docker Desktop API socket address discovered
+// from the Docker engine info labels. It returns "" when the active engine
+// is not a Docker Desktop instance.
+func (s *composeService) desktopEndpoint(ctx context.Context) (string, error) {
 	res, err := s.apiClient().Info(ctx, client.InfoOptions{})
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	for _, l := range res.Info.Labels {
-		k, _, ok := strings.Cut(l, "=")
-		if ok && k == engineLabelDesktopAddress {
-			return true, nil
+		k, v, ok := strings.Cut(l, "=")
+		if ok && k == desktop.EngineLabel {
+			return v, nil
 		}
 	}
-	return false, nil
+	return "", nil
+}
+
+// isDesktopIntegrationActive returns true when Docker Desktop is the active engine.
+func (s *composeService) isDesktopIntegrationActive(ctx context.Context) (bool, error) {
+	endpoint, err := s.desktopEndpoint(ctx)
+	return endpoint != "", err
+}
+
+// isDesktopFeatureActive checks whether a Docker Desktop feature is both
+// available (feature flag) and enabled by the user (settings). Returns false
+// silently when Desktop is not running or unreachable.
+func (s *composeService) isDesktopFeatureActive(ctx context.Context, feature string) bool {
+	endpoint, err := s.desktopEndpoint(ctx)
+	if err != nil || endpoint == "" {
+		return false
+	}
+
+	ddClient := desktop.NewClient(endpoint)
+	defer ddClient.Close() //nolint:errcheck
+
+	enabled, err := ddClient.IsFeatureEnabled(ctx, feature)
+	if err != nil {
+		return false
+	}
+	return enabled
 }

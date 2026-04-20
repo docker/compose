@@ -44,6 +44,7 @@ func pluginMain() {
 			}
 
 			cmd := commands.RootCommand(cli, backendOptions)
+			cmd.AddCommand(commands.HooksCommand())
 			originalPreRunE := cmd.PersistentPreRunE
 			cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 				// initialize the cli instance

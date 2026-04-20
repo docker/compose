@@ -215,6 +215,8 @@ type composeService struct {
 	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
+
+	runtimeAPIVersion runtimeVersionCache
 }
 
 // Close releases any connections/resources held by the underlying clients.
@@ -491,22 +493,39 @@ func (s *composeService) isSwarmEnabled(ctx context.Context) (bool, error) {
 	return swarmEnabled.val, swarmEnabled.err
 }
 
+// runtimeVersionCache caches a version string after a successful lookup.
+// Errors (including context cancellation) are not cached so that
+// subsequent calls can retry with a fresh context.
 type runtimeVersionCache struct {
-	once sync.Once
-	val  string
-	err  error
+	mu  sync.Mutex
+	val string
 }
 
-var runtimeVersion runtimeVersionCache
+// RuntimeAPIVersion returns the negotiated API version that will be used for
+// requests to the Docker daemon. It triggers version negotiation via Ping so
+// that version-gated request shaping matches the version subsequent API calls
+// will actually use.
+//
+// After negotiation, Compose should never rely on features or request attributes
+// not defined by this API version, even if the daemon's raw version is higher.
+func (s *composeService) RuntimeAPIVersion(ctx context.Context) (string, error) {
+	s.runtimeAPIVersion.mu.Lock()
+	defer s.runtimeAPIVersion.mu.Unlock()
+	if s.runtimeAPIVersion.val != "" {
+		return s.runtimeAPIVersion.val, nil
+	}
 
-func (s *composeService) RuntimeVersion(ctx context.Context) (string, error) {
-	// TODO(thaJeztah): this should use Client.ClientVersion), which has the negotiated version.
-	runtimeVersion.once.Do(func() {
-		version, err := s.apiClient().ServerVersion(ctx, client.ServerVersionOptions{})
-		if err != nil {
-			runtimeVersion.err = err
-		}
-		runtimeVersion.val = version.APIVersion
-	})
-	return runtimeVersion.val, runtimeVersion.err
+	cli := s.apiClient()
+	_, err := cli.Ping(ctx, client.PingOptions{NegotiateAPIVersion: true})
+	if err != nil {
+		return "", err
+	}
+
+	version := cli.ClientVersion()
+	if version == "" {
+		return "", fmt.Errorf("docker client returned empty version after successful API negotiation")
+	}
+
+	s.runtimeAPIVersion.val = version
+	return s.runtimeAPIVersion.val, nil
 }

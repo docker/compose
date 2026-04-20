@@ -17,6 +17,8 @@
 package compose
 
 import (
+	"errors"
+	"os"
 	"slices"
 	"testing"
 
@@ -99,4 +101,65 @@ services:
 	assert.DeepEqual(t, expectedLayers, layers, cmp.FilterPath(func(path cmp.Path) bool {
 		return !slices.Contains([]string{".Data", ".Digest", ".Size"}, path.String())
 	}, cmp.Ignore()))
+}
+
+func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
+	dir := t.TempDir()
+	envPath := dir + "/secrets.env"
+	secretData := `AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"`
+	err := os.WriteFile(envPath, []byte(secretData), 0o600)
+	assert.NilError(t, err)
+
+	project := &types.Project{
+		Services: types.Services{
+			"web": {
+				Name:  "web",
+				Image: "nginx",
+				EnvFiles: []types.EnvFile{
+					{Path: envPath, Required: true},
+				},
+			},
+		},
+	}
+
+	declined := func(message string, defaultValue bool) (bool, error) {
+		return false, nil
+	}
+	svc := &composeService{
+		prompt: declined,
+	}
+
+	accept, err := svc.preChecks(t.Context(), project, api.PublishOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, accept, false)
+}
+
+func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
+	project := &types.Project{
+		Services: types.Services{
+			"web": {
+				Name:  "web",
+				Image: "nginx",
+				Volumes: []types.ServiceVolumeConfig{
+					{
+						Type:   types.VolumeTypeBind,
+						Source: "/host/path",
+						Target: "/container/path",
+					},
+				},
+			},
+		},
+	}
+
+	declined := func(message string, defaultValue bool) (bool, error) {
+		return false, nil
+	}
+	svc := &composeService{
+		prompt: declined,
+		events: &ignore{},
+	}
+
+	err := svc.publish(t.Context(), project, "docker.io/myorg/myapp:latest", api.PublishOptions{})
+	assert.Assert(t, errors.Is(err, api.ErrCanceled),
+		"expected api.ErrCanceled when user declines, got: %v", err)
 }

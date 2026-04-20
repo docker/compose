@@ -94,13 +94,15 @@ type LogKeyboard struct {
 	Watch                 *KeyboardWatch
 	Detach                func()
 	IsDockerDesktopActive bool
+	IsLogsViewEnabled     bool
 	logLevel              KEYBOARD_LOG_LEVEL
 	signalChannel         chan<- os.Signal
 }
 
-func NewKeyboardManager(isDockerDesktopActive bool, sc chan<- os.Signal) *LogKeyboard {
+func NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled bool, sc chan<- os.Signal) *LogKeyboard {
 	return &LogKeyboard{
 		IsDockerDesktopActive: isDockerDesktopActive,
+		IsLogsViewEnabled:     isLogsViewEnabled,
 		logLevel:              INFO,
 		signalChannel:         sc,
 	}
@@ -173,6 +175,10 @@ func (lk *LogKeyboard) navigationMenu() string {
 		items = append(items, shortcutKeyColor("o")+navColor(" View Config"))
 	}
 
+	if lk.IsLogsViewEnabled {
+		items = append(items, shortcutKeyColor("l")+navColor(" View Logs"))
+	}
+
 	isEnabled := " Enable"
 	if lk.Watch != nil && lk.Watch.Watching {
 		isEnabled = " Disable"
@@ -226,6 +232,24 @@ func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Proje
 				if err != nil {
 					err = fmt.Errorf("could not open Docker Desktop Compose UI")
 					lk.keyboardError("View Config", err)
+				}
+				return err
+			})()
+	}()
+}
+
+func (lk *LogKeyboard) openDDLogsView(ctx context.Context) {
+	if !lk.IsLogsViewEnabled {
+		return
+	}
+	go func() {
+		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/logsview", tracing.SpanOptions{},
+			func(ctx context.Context) error {
+				link := "docker-desktop://dashboard/logs"
+				err := open.Run(link)
+				if err != nil {
+					err = fmt.Errorf("could not open Docker Desktop Logs view: %w", err)
+					lk.keyboardError("View Logs", err)
 				}
 				return err
 			})()
@@ -311,6 +335,8 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 		lk.ToggleWatch(ctx, options)
 	case 'o':
 		lk.openDDComposeUI(ctx, project)
+	case 'l':
+		lk.openDDLogsView(ctx)
 	}
 	switch key := event.Key; key {
 	case keyboard.KeyCtrlC:

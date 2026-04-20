@@ -87,13 +87,20 @@ func moveCursorDown(lines int) {
 }
 
 func newLine() {
-	// Like \n
 	fmt.Print("\012")
 }
 
+// lenAnsi returns the visible length of s after stripping ANSI escape codes.
 func lenAnsi(s string) int {
-	// len has into consideration ansi codes, if we want
-	// the len of the actual len(string) we need to strip
-	// all ansi codes
 	return len(stripansi.Strip(s))
+}
+
+// OSC8Link wraps text in an OSC 8 terminal hyperlink escape sequence with
+// underline styling, making it clickable in supported terminal emulators.
+// When ANSI output is disabled, returns the plain text without escape sequences.
+func OSC8Link(url, text string) string {
+	if disableAnsi {
+		return text
+	}
+	return "\033]8;;" + url + "\033\\\033[4m" + text + "\033[24m\033]8;;\033\\"
 }

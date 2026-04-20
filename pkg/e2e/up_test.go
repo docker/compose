@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 
@@ -87,7 +86,7 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	RequireServiceState(t, c, "dependency", "running")
 
 	t.Log("Simulating Ctrl-C")
-	require.NoError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT),
+	assert.NilError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT),
 		"Failed to send SIGINT to compose up process")
 
 	t.Log("Waiting for `compose up` to exit")
@@ -98,7 +97,7 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 		if exitErr.ExitCode() == -1 {
 			t.Fatalf("`compose up` was killed: %v", err)
 		}
-		require.Equal(t, 130, exitErr.ExitCode())
+		assert.Equal(t, 130, exitErr.ExitCode())
 	}
 
 	RequireServiceState(t, c, "app", "exited")

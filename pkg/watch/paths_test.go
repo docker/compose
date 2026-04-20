@@ -20,25 +20,24 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
 )
 
 func TestGreatestExistingAncestor(t *testing.T) {
 	f := NewTempDirFixture(t)
 
 	p, err := greatestExistingAncestor(f.Path())
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	assert.Equal(t, f.Path(), p)
 
 	p, err = greatestExistingAncestor(f.JoinPath("missing"))
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	assert.Equal(t, f.Path(), p)
 
 	missingTopLevel := "/missingDir/a/b/c"
 	if runtime.GOOS == "windows" {
-		missingTopLevel = "C:\\missingDir\\a\\b\\c"
+		missingTopLevel = `C:\missingDir\a\b\c`
 	}
 	_, err = greatestExistingAncestor(missingTopLevel)
-	assert.Contains(t, err.Error(), "cannot watch root directory")
+	assert.ErrorContains(t, err, "cannot watch root directory")
 }

@@ -19,6 +19,16 @@ package compose
 // Docker Engine API version constants.
 // These versions correspond to specific Docker Engine releases and their features.
 const (
+	// apiVersion144 represents Docker Engine API version 1.44 (Engine v25.0).
+	//
+	// New features in this version:
+	//  - ContainerCreate API accepts multiple EndpointsConfig entries
+	//
+	// Before this version:
+	//  - Only a single EndpointsConfig entry was accepted in ContainerCreate
+	//  - Extra networks must be connected individually after container creation via NetworkConnect
+	apiVersion144 = "1.44"
+
 	// apiVersion148 represents Docker Engine API version 1.48 (Engine v28.0).
 	//
 	// New features in this version:

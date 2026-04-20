@@ -260,7 +260,7 @@ func TestLocalComposeRun(t *testing.T) {
 
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "the input device is not a TTY",
+			Err:      "cannot attach stdin to a TTY-enabled container because stdin is not a terminal",
 		})
 	})
 
@@ -275,7 +275,7 @@ func TestLocalComposeRun(t *testing.T) {
 
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "the input device is not a TTY",
+			Err:      "cannot attach stdin to a TTY-enabled container because stdin is not a terminal",
 		})
 	})
 }

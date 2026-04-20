@@ -125,10 +125,10 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		}
 		switch msg.Type {
 		case ErrorType:
-			s.events.On(newEvent(service.Name, api.Error, msg.Message))
+			s.events.On(newEvent(service.Name, api.Error, firstLine(msg.Message)))
 			return nil, errors.New(msg.Message)
 		case InfoType:
-			s.events.On(newEvent(service.Name, api.Working, msg.Message))
+			s.events.On(newEvent(service.Name, api.Working, firstLine(msg.Message)))
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
@@ -280,4 +280,13 @@ func (c CommandMetadata) CheckRequiredParameters(provider types.ServiceProviderC
 		}
 	}
 	return nil
+}
+
+// firstLine returns the first line of s, stripping any trailing newlines.
+func firstLine(s string) string {
+	s = strings.TrimRight(s, "\n")
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
 }

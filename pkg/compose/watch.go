@@ -662,9 +662,10 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("service(s) %q successfully built", services))
 
 	err = s.create(ctx, project, api.CreateOptions{
-		Services: services,
-		Inherit:  true,
-		Recreate: api.RecreateForce,
+		Services:      services,
+		Inherit:       true,
+		Recreate:      api.RecreateForce,
+		SkipProviders: true,
 	})
 	if err != nil {
 		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate services after update. Error: %v", err))

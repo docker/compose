@@ -17,21 +17,74 @@
 package compose
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"io"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 
 	compose "github.com/docker/compose/v5/pkg/api"
 )
+
+// newStdWriter is copied from github.com/moby/moby/daemon/internal/stdcopymux
+// because NewStdWriter was moved to a daemon-internal package in moby v2 and
+// is no longer publicly importable. We need it in tests to produce multiplexed
+// streams that stdcopy.StdCopy can demultiplex.
+
+const (
+	stdWriterPrefixLen = 8
+	stdWriterFdIndex   = 0
+	stdWriterSizeIndex = 4
+)
+
+var bufPool = &sync.Pool{New: func() any { return bytes.NewBuffer(nil) }}
+
+type stdWriter struct {
+	io.Writer
+	prefix byte
+}
+
+func (w *stdWriter) Write(p []byte) (int, error) {
+	if w == nil || w.Writer == nil {
+		return 0, errors.New("writer not instantiated")
+	}
+	if p == nil {
+		return 0, nil
+	}
+
+	header := [stdWriterPrefixLen]byte{stdWriterFdIndex: w.prefix}
+	binary.BigEndian.PutUint32(header[stdWriterSizeIndex:], uint32(len(p)))
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Write(header[:])
+	buf.Write(p)
+
+	n, err := w.Writer.Write(buf.Bytes())
+	n -= stdWriterPrefixLen
+	if n < 0 {
+		n = 0
+	}
+
+	buf.Reset()
+	bufPool.Put(buf)
+	return n, err
+}
+
+func newStdWriter(w io.Writer, streamType stdcopy.StdType) io.Writer {
+	return &stdWriter{
+		Writer: w,
+		prefix: byte(streamType),
+	}
+}
 
 func TestComposeService_Logs_Demux(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
@@ -39,7 +92,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	api, cli := prepareMocks(mockCtrl)
 	tested, err := NewComposeService(cli)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	name := strings.ToLower(testProject)
 
@@ -68,13 +121,13 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 		_ = c1Reader.Close()
 		_ = c1Writer.Close()
 	})
-	c1Stdout := stdcopy.NewStdWriter(c1Writer, stdcopy.Stdout)
-	c1Stderr := stdcopy.NewStdWriter(c1Writer, stdcopy.Stderr)
+	c1Stdout := newStdWriter(c1Writer, stdcopy.Stdout)
+	c1Stderr := newStdWriter(c1Writer, stdcopy.Stderr)
 	go func() {
 		_, err := c1Stdout.Write([]byte("hello stdout\n"))
-		assert.NoError(t, err, "Writing to fake stdout")
+		assert.NilError(t, err, "Writing to fake stdout")
 		_, err = c1Stderr.Write([]byte("hello stderr\n"))
-		assert.NoError(t, err, "Writing to fake stderr")
+		assert.NilError(t, err, "Writing to fake stderr")
 		_ = c1Writer.Close()
 	}()
 	api.EXPECT().ContainerLogs(anyCancellableContext(), "c", gomock.Any()).
@@ -90,13 +143,8 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	consumer := &testLogConsumer{}
 	err = tested.Logs(t.Context(), name, consumer, opts)
-	require.NoError(t, err)
-
-	require.Equal(
-		t,
-		[]string{"hello stdout", "hello stderr"},
-		consumer.LogsForContainer("c"),
-	)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []string{"hello stdout", "hello stderr"}, consumer.LogsForContainer("c"))
 }
 
 // TestComposeService_Logs_ServiceFiltering ensures that we do not include
@@ -112,7 +160,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 
 	api, cli := prepareMocks(mockCtrl)
 	tested, err := NewComposeService(cli)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	name := strings.ToLower(testProject)
 
@@ -163,12 +211,12 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 		Project: proj,
 	}
 	err = tested.Logs(t.Context(), name, consumer, opts)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
-	require.Equal(t, []string{"hello c1"}, consumer.LogsForContainer("c1"))
-	require.Equal(t, []string{"hello c2"}, consumer.LogsForContainer("c2"))
-	require.Empty(t, consumer.LogsForContainer("c3"))
-	require.Equal(t, []string{"hello c4"}, consumer.LogsForContainer("c4"))
+	assert.Assert(t, is.DeepEqual([]string{"hello c1"}, consumer.LogsForContainer("c1")))
+	assert.Assert(t, is.DeepEqual([]string{"hello c2"}, consumer.LogsForContainer("c2")))
+	assert.Assert(t, is.Len(consumer.LogsForContainer("c3"), 0))
+	assert.Assert(t, is.DeepEqual([]string{"hello c4"}, consumer.LogsForContainer("c4")))
 }
 
 type testLogConsumer struct {

@@ -22,11 +22,14 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-func KeyboardMetrics(ctx context.Context, enabled, isDockerDesktopActive bool) {
+func KeyboardMetrics(ctx context.Context, enabled, isDockerDesktopActive, isLogsViewEnabled bool) {
 	commandAvailable := []string{}
 	if isDockerDesktopActive {
 		commandAvailable = append(commandAvailable, "gui")
 		commandAvailable = append(commandAvailable, "gui/composeview")
+	}
+	if isLogsViewEnabled {
+		commandAvailable = append(commandAvailable, "gui/logsview")
 	}
 
 	AddAttributeToSpan(ctx,

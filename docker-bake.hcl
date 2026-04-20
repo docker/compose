@@ -146,3 +146,17 @@ target "image-cross" {
   inherits = ["meta-helper", "binary-cross"]
   output = ["type=image"]
 }
+
+target "image-module-cross" {
+  inherits = ["meta-helper", "binary-cross"]
+  target = "module"
+  output = ["type=image"]
+  platforms = [
+    "darwin/amd64",
+    "darwin/arm64",
+    "linux/amd64",
+    "linux/arm64",
+    "windows/amd64",
+    "windows/arm64",
+  ]
+}

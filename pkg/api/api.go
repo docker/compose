@@ -278,6 +278,8 @@ type CreateOptions struct {
 	Timeout *time.Duration
 	// QuietPull makes the pulling process quiet
 	QuietPull bool
+	// SkipProviders skips provider services during convergence (e.g. watch rebuild)
+	SkipProviders bool
 }
 
 // StartOptions group options of the Start API

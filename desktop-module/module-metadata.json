@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "content": [
+    {
+      "type": "cli-plugin",
+      "name": "compose"
+    }
+  ]
+}

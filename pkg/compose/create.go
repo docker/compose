@@ -252,7 +252,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	apiVersion, err := s.RuntimeVersion(ctx)
+	apiVersion, err := s.RuntimeAPIVersion(ctx)
 	if err != nil {
 		return createConfigs{}, err
 	}
@@ -563,13 +563,17 @@ func defaultNetworkSettings(project *types.Project,
 	// so we can pass all the extra networks we want the container to be connected to
 	// in the network configuration instead of connecting the container to each extra
 	// network individually after creation.
-	for _, networkKey := range serviceNetworks {
-		epSettings, err := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
-		if err != nil {
-			return "", nil, err
+	// For older API versions, extra networks are connected via NetworkConnect after
+	// container creation (see createMobyContainer in convergence.go).
+	if !versions.LessThan(version, apiVersion144) {
+		for _, networkKey := range serviceNetworks {
+			epSettings, err := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
+			if err != nil {
+				return "", nil, err
+			}
+			mobyNetworkName := project.Networks[networkKey].Name
+			endpointsConfig[mobyNetworkName] = epSettings
 		}
-		mobyNetworkName := project.Networks[networkKey].Name
-		endpointsConfig[mobyNetworkName] = epSettings
 	}
 
 	networkConfig := &network.NetworkingConfig{
@@ -897,7 +901,9 @@ func (s *composeService) buildContainerVolumes(
 				}
 			}
 		case mount.TypeImage:
-			version, err := s.RuntimeVersion(ctx)
+			// The daemon validates image mounts against the negotiated API version
+			// from the request path, not the server's own max version.
+			version, err := s.RuntimeAPIVersion(ctx)
 			if err != nil {
 				return nil, nil, err
 			}

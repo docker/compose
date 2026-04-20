@@ -41,7 +41,8 @@ func TestImages(t *testing.T) {
 
 	args := projectFilter(strings.ToLower(testProject))
 	listOpts := client.ContainerListOptions{All: true, Filters: args}
-	api.EXPECT().ServerVersion(gomock.Any(), gomock.Any()).Return(client.ServerVersionResult{APIVersion: "1.96"}, nil).AnyTimes()
+	api.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{APIVersion: "1.96"}, nil).AnyTimes()
+	api.EXPECT().ClientVersion().Return("1.96").AnyTimes()
 	timeStr1 := "2025-06-06T06:06:06.000000000Z"
 	created1, _ := time.Parse(time.RFC3339Nano, timeStr1)
 	timeStr2 := "2025-03-03T03:03:03.000000000Z"
