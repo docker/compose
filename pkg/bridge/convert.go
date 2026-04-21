@@ -178,7 +178,7 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 			if err != nil {
 				return nil, err
 			}
-			exposed.Add(strconv.Itoa(int(p.Num())))
+			exposed.Add(p.Port())
 		}
 		for _, port := range service.Ports {
 			exposed.Add(strconv.Itoa(int(port.Target)))
