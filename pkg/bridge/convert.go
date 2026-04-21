@@ -232,9 +232,7 @@ func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName strin
 		}
 		defer func() { _ = stream.Close() }()
 
-		out := dockerCli.Out()
-		err = jsonmessage.DisplayJSONMessagesStream(stream, out, out.FD(), out.IsTerminal(), nil)
-		if err != nil {
+		if err := jsonmessage.DisplayStream(stream, dockerCli.Out()); err != nil {
 			return image.InspectResponse{}, err
 		}
 		if inspect, err = dockerCli.Client().ImageInspect(ctx, imageName); err != nil {
