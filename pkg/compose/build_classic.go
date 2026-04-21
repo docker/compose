@@ -268,24 +268,21 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 	defer response.Body.Close() //nolint:errcheck
 
 	imageID := ""
-	aux := func(msg jsonstream.Message) {
+	err = jsonmessage.DisplayStream(response.Body, buildBuff, jsonmessage.WithAuxCallback(func(msg jsonstream.Message) {
 		var result buildtypes.Result
 		if err := json.Unmarshal(*msg.Aux, &result); err != nil {
 			logrus.Errorf("Failed to parse aux message: %s", err)
 		} else {
 			imageID = result.ID
 		}
-	}
-
-	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.FD(), true, aux)
+	}))
 	if err != nil {
 		var jerr *jsonstream.Error
 		if errors.As(err, &jerr) {
 			// If no error code is set, default to 1
-			if jerr.Code == 0 {
-				jerr.Code = 1
-			}
-			return "", cli.StatusError{Status: jerr.Message, StatusCode: jerr.Code}
+			//
+			// TODO(thaJeztah): DisplayStream should return a errdefs Error corresponding with the status-code.
+			return "", cli.StatusError{Status: jerr.Message, StatusCode: max(1, jerr.Code)}
 		}
 		return "", err
 	}
