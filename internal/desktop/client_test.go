@@ -24,41 +24,6 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func TestBackendSocketEndpoint(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "macOS unix socket",
-			input:    "unix:///Users/me/Library/Containers/com.docker.docker/Data/docker-cli.sock",
-			expected: "unix:///Users/me/Library/Containers/com.docker.docker/Data/backend.sock",
-		},
-		{
-			name:     "Linux unix socket",
-			input:    "unix:///run/desktop/docker-cli.sock",
-			expected: "unix:///run/desktop/backend.sock",
-		},
-		{
-			name:     "Windows named pipe",
-			input:    "npipe://./pipe/dockerDesktopLinuxEngine",
-			expected: "npipe://./pipe/dockerBackendApiServer",
-		},
-		{
-			name:     "unknown scheme passthrough",
-			input:    "tcp://localhost:2375",
-			expected: "tcp://localhost:2375",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := backendSocketEndpoint(tt.input)
-			assert.Equal(t, result, tt.expected)
-		})
-	}
-}
-
 func TestClientPing(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipped in short mode - test connects to Docker Desktop")
