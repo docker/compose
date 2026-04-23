@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/internal/desktop"
 )
 
 const deepLink = "docker-desktop://dashboard/logs"
@@ -74,7 +76,9 @@ type hookHint struct {
 	checkFlags func(flags map[string]string) bool
 }
 
-// hooksHints maps hook root commands to their hint definitions.
+// hooksHints maps hook root commands to their hint definitions. All current
+// hints promote Docker Desktop's Logs view; emission is additionally gated on
+// the FeatureLogsTab flag in handleHook.
 var hooksHints = map[string]hookHint{
 	// standalone "docker logs" (not a compose subcommand)
 	"logs":         {template: dockerLogsHint},
@@ -90,11 +94,17 @@ var hooksHints = map[string]hookHint{
 	},
 }
 
+// logsTabEnabled reports whether Docker Desktop is the active engine and the
+// LogsTab feature flag is enabled. Overridable for tests.
+var logsTabEnabled = func(ctx context.Context) bool {
+	return desktop.IsFeatureActiveStandalone(ctx, desktop.FeatureLogsTab)
+}
+
 // HooksCommand returns the hidden subcommand that the Docker CLI invokes
 // after command execution when the compose plugin has hooks configured.
 // Docker Desktop is responsible for registering which commands trigger hooks
-// and for gating on feature flags/settings — the hook handler simply
-// responds with the appropriate hint message.
+// in the docker CLI config; the handler gates all hints on the LogsTab
+// feature flag before emitting them.
 func HooksCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    metadata.HookSubcommandName,
@@ -103,12 +113,12 @@ func HooksCommand() *cobra.Command {
 		// (plugin initialization) from running for hook invocations.
 		PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleHook(args, cmd.OutOrStdout())
+			return handleHook(cmd.Context(), args, cmd.OutOrStdout())
 		},
 	}
 }
 
-func handleHook(args []string, w io.Writer) error {
+func handleHook(ctx context.Context, args []string, w io.Writer) error {
 	if len(args) == 0 {
 		return nil
 	}
@@ -124,6 +134,10 @@ func handleHook(args []string, w io.Writer) error {
 	}
 
 	if hint.checkFlags != nil && !hint.checkFlags(hookData.Flags) {
+		return nil
+	}
+
+	if !logsTabEnabled(ctx) {
 		return nil
 	}
 

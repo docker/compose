@@ -18,7 +18,9 @@ package compose
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -28,16 +30,24 @@ import (
 	"github.com/docker/compose/v5/cmd/formatter"
 )
 
+// TestMain stubs the Docker Desktop feature-flag check so handleHook tests
+// don't attempt a live engine call. Individual tests can still override
+// isFeatureEnabled with their own stub + t.Cleanup to restore.
+func TestMain(m *testing.M) {
+	logsTabEnabled = func(context.Context) bool { return true }
+	os.Exit(m.Run())
+}
+
 func TestHandleHook_NoArgs(t *testing.T) {
 	var buf bytes.Buffer
-	err := handleHook(nil, &buf)
+	err := handleHook(t.Context(), nil, &buf)
 	assert.NilError(t, err)
 	assert.Equal(t, buf.String(), "")
 }
 
 func TestHandleHook_InvalidJSON(t *testing.T) {
 	var buf bytes.Buffer
-	err := handleHook([]string{"not json"}, &buf)
+	err := handleHook(t.Context(), []string{"not json"}, &buf)
 	assert.NilError(t, err)
 	assert.Equal(t, buf.String(), "")
 }
@@ -47,7 +57,7 @@ func TestHandleHook_UnknownCommand(t *testing.T) {
 		RootCmd: "compose push",
 	})
 	var buf bytes.Buffer
-	err := handleHook([]string{data}, &buf)
+	err := handleHook(t.Context(), []string{data}, &buf)
 	assert.NilError(t, err)
 	assert.Equal(t, buf.String(), "")
 }
@@ -66,7 +76,7 @@ func TestHandleHook_LogsCommand(t *testing.T) {
 				RootCmd: tt.rootCmd,
 			})
 			var buf bytes.Buffer
-			err := handleHook([]string{data}, &buf)
+			err := handleHook(t.Context(), []string{data}, &buf)
 			assert.NilError(t, err)
 
 			msg := unmarshalResponse(t, buf.Bytes())
@@ -110,7 +120,7 @@ func TestHandleHook_ComposeUpDetached(t *testing.T) {
 				Flags:   tt.flags,
 			})
 			var buf bytes.Buffer
-			err := handleHook([]string{data}, &buf)
+			err := handleHook(t.Context(), []string{data}, &buf)
 			assert.NilError(t, err)
 
 			if tt.wantHint {
@@ -131,7 +141,7 @@ func TestHandleHook_HintContainsOSC8Link(t *testing.T) {
 		RootCmd: "compose logs",
 	})
 	var buf bytes.Buffer
-	err := handleHook([]string{data}, &buf)
+	err := handleHook(t.Context(), []string{data}, &buf)
 	assert.NilError(t, err)
 
 	msg := unmarshalResponse(t, buf.Bytes())
@@ -147,7 +157,7 @@ func TestHandleHook_NoColorDisablesOsc8(t *testing.T) {
 		RootCmd: "compose logs",
 	})
 	var buf bytes.Buffer
-	err := handleHook([]string{data}, &buf)
+	err := handleHook(t.Context(), []string{data}, &buf)
 	assert.NilError(t, err)
 
 	msg := unmarshalResponse(t, buf.Bytes())
@@ -156,13 +166,29 @@ func TestHandleHook_NoColorDisablesOsc8(t *testing.T) {
 	assert.Assert(t, !strings.Contains(msg.Template, "\033"), "hint should not contain ANSI escape sequences")
 }
 
+func TestHandleHook_FeatureFlagDisabledSuppressesHint(t *testing.T) {
+	prev := logsTabEnabled
+	t.Cleanup(func() { logsTabEnabled = prev })
+	logsTabEnabled = func(context.Context) bool { return false }
+
+	for _, rootCmd := range []string{"compose logs", "logs"} {
+		t.Run(rootCmd, func(t *testing.T) {
+			data := marshalHookData(t, hooks.Request{RootCmd: rootCmd})
+			var buf bytes.Buffer
+			err := handleHook(t.Context(), []string{data}, &buf)
+			assert.NilError(t, err)
+			assert.Equal(t, buf.String(), "")
+		})
+	}
+}
+
 func TestHandleHook_ComposeAnsiNeverDisablesOsc8(t *testing.T) {
 	t.Setenv("COMPOSE_ANSI", "never")
 	data := marshalHookData(t, hooks.Request{
 		RootCmd: "compose logs",
 	})
 	var buf bytes.Buffer
-	err := handleHook([]string{data}, &buf)
+	err := handleHook(t.Context(), []string{data}, &buf)
 	assert.NilError(t, err)
 
 	msg := unmarshalResponse(t, buf.Bytes())

@@ -22,31 +22,14 @@ import (
 	"github.com/docker/compose/v5/internal/desktop"
 )
 
-func (s *composeService) desktopEndpoint(ctx context.Context) (string, error) {
-	return desktop.Endpoint(ctx, s.apiClient())
-}
-
 // isDesktopIntegrationActive returns true when Docker Desktop is the active engine.
 func (s *composeService) isDesktopIntegrationActive(ctx context.Context) (bool, error) {
-	endpoint, err := s.desktopEndpoint(ctx)
+	endpoint, err := desktop.Endpoint(ctx, s.apiClient())
 	return endpoint != "", err
 }
 
-// isDesktopFeatureActive checks whether a Docker Desktop feature is both
-// available (feature flag) and enabled by the user (settings). Returns false
-// silently when Desktop is not running or unreachable.
+// isDesktopFeatureActive checks whether a Docker Desktop feature flag is
+// enabled. Returns false silently when Desktop is not running or unreachable.
 func (s *composeService) isDesktopFeatureActive(ctx context.Context, feature string) bool {
-	endpoint, err := s.desktopEndpoint(ctx)
-	if err != nil || endpoint == "" {
-		return false
-	}
-
-	ddClient := desktop.NewClient(endpoint)
-	defer ddClient.Close() //nolint:errcheck
-
-	enabled, err := ddClient.IsFeatureEnabled(ctx, feature)
-	if err != nil {
-		return false
-	}
-	return enabled
+	return desktop.IsFeatureActive(ctx, s.apiClient(), feature)
 }
