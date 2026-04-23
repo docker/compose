@@ -1,5 +1,5 @@
 # CI relies on this ARG. Don't remove or rename it
-ARG COMPOSE_VERSION=v5.1.1
+ARG COMPOSE_VERSION=v5.1.3
 FROM docker/compose-bin:${COMPOSE_VERSION} AS compose-bin
 
 
