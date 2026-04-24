@@ -526,7 +526,7 @@ func (f *notifyFixture) rebuildWatcher() {
 	}
 
 	// create a new watcher
-	notify, err := NewWatcher(f.paths)
+	notify, err := NewWatcher(f.paths, EmptyMatcher{})
 	if err != nil {
 		f.T().Fatal(err)
 	}

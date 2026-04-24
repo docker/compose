@@ -80,8 +80,8 @@ func (EmptyMatcher) MatchesEntireDir(f string) (bool, error) { return false, nil
 
 var _ PathMatcher = EmptyMatcher{}
 
-func NewWatcher(paths []string) (Notify, error) {
-	return newWatcher(paths)
+func NewWatcher(paths []string, ignore PathMatcher) (Notify, error) {
+	return newWatcher(paths, ignore)
 }
 
 const WindowsBufferSizeEnvVar = "COMPOSE_WATCH_WINDOWS_BUFFER_SIZE"
