@@ -198,8 +198,9 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	eg, ctx := errgroup.WithContext(ctx)
 
 	var (
-		rules []watchRule
-		paths []string
+		rules          []watchRule
+		paths          []string
+		ignoreMatchers []watch.PathMatcher
 	)
 	for serviceName, service := range project.Services {
 		config, err := loadDevelopmentConfig(service, project)
@@ -254,6 +255,11 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 					}
 				}
 			}
+			ignore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
+			if err != nil {
+				return nil, err
+			}
+			ignoreMatchers = append(ignoreMatchers, ignore)
 			paths = append(paths, trigger.Path)
 		}
 
@@ -268,7 +274,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 		return nil, fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
-	watcher, err := watch.NewWatcher(paths)
+	watcher, err := watch.NewWatcher(paths, watch.NewCompositeMatcher(ignoreMatchers...))
 	if err != nil {
 		return nil, err
 	}

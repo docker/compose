@@ -45,6 +45,7 @@ type naiveNotify struct {
 	// the notify list. It might be better to store this in a tree
 	// structure, so we can filter the list quickly.
 	notifyList map[string]bool
+	ignore     PathMatcher
 
 	isWatcherRecursive bool
 	watcher            *fsnotify.Watcher
@@ -113,6 +114,10 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 
 	return filepath.WalkDir(dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
+			if os.IsPermission(err) && d.shouldIgnore(path) {
+				logrus.Debugf("Ignoring path: %s", path)
+				return nil
+			}
 			return err
 		}
 
@@ -240,6 +245,11 @@ func (d *naiveNotify) shouldSkipDir(path string) bool {
 		return false
 	}
 
+	// If path is present in the ignore list then we should ignore it
+	if d.shouldIgnore(path) {
+		return true
+	}
+
 	// Suppose we're watching
 	// /src/.tiltignore
 	// but the .tiltignore file doesn't exist.
@@ -260,6 +270,26 @@ func (d *naiveNotify) shouldSkipDir(path string) bool {
 	return true
 }
 
+func (d *naiveNotify) shouldIgnore(path string) bool {
+	if d.ignore == nil {
+		return false
+	}
+	matches, err := d.ignore.MatchesEntireDir(path)
+	if err != nil {
+		logrus.Debugf("error checking ignored directory %q: %v", path, err)
+		return false
+	}
+	if matches {
+		return true
+	}
+	matches, err = d.ignore.Matches(path)
+	if err != nil {
+		logrus.Debugf("error checking ignored path %q: %v", path, err)
+		return false
+	}
+	return matches
+}
+
 func (d *naiveNotify) add(path string) error {
 	err := d.watcher.Add(path)
 	if err != nil {
@@ -270,7 +300,7 @@ func (d *naiveNotify) add(path string) error {
 	return nil
 }
 
-func newWatcher(paths []string) (Notify, error) {
+func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		if strings.Contains(err.Error(), "too many open files") && runtime.GOOS == "linux" {
@@ -297,9 +327,9 @@ func newWatcher(paths []string) (Notify, error) {
 		}
 		notifyList[path] = true
 	}
-
 	wmw := &naiveNotify{
 		notifyList:         notifyList,
+		ignore:             ignore,
 		watcher:            fsw,
 		events:             fsw.Events,
 		wrappedEvents:      wrappedEvents,
