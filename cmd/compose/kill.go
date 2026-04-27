@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/compose"
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
@@ -63,19 +62,17 @@ func runKill(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
+	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+		err := backend.Kill(ctx, name, api.KillOptions{
+			RemoveOrphans: opts.removeOrphans,
+			Project:       project,
+			Services:      services,
+			Signal:        opts.signal,
+		})
+		if errors.Is(err, api.ErrNoResources) {
+			_, _ = fmt.Fprintln(stdinfo(dockerCli), "No container to kill")
+			return nil
+		}
 		return err
-	}
-	err = backend.Kill(ctx, name, api.KillOptions{
-		RemoveOrphans: opts.removeOrphans,
-		Project:       project,
-		Services:      services,
-		Signal:        opts.signal,
 	})
-	if errors.Is(err, api.ErrNoResources) {
-		_, _ = fmt.Fprintln(stdinfo(dockerCli), "No container to kill")
-		return nil
-	}
-	return err
 }

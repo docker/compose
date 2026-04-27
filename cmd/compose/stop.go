@@ -18,13 +18,11 @@ package compose
 
 import (
 	"context"
-	"time"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/compose"
 )
 
 type stopOptions struct {
@@ -59,19 +57,11 @@ func runStop(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	if err != nil {
 		return err
 	}
-
-	var timeout *time.Duration
-	if opts.timeChanged {
-		timeoutValue := time.Duration(opts.timeout) * time.Second
-		timeout = &timeoutValue
-	}
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
-	return backend.Stop(ctx, name, api.StopOptions{
-		Timeout:  timeout,
-		Services: services,
-		Project:  project,
+	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+		return backend.Stop(ctx, name, api.StopOptions{
+			Timeout:  optionalTimeout(opts.timeout, opts.timeChanged),
+			Services: services,
+			Project:  project,
+		})
 	})
 }

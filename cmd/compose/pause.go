@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/compose"
 )
 
 type pauseOptions struct {
@@ -50,14 +49,11 @@ func runPause(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	if err != nil {
 		return err
 	}
-
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
-	return backend.Pause(ctx, name, api.PauseOptions{
-		Services: services,
-		Project:  project,
+	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+		return backend.Pause(ctx, name, api.PauseOptions{
+			Services: services,
+			Project:  project,
+		})
 	})
 }
 
@@ -85,13 +81,10 @@ func runUnPause(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 	if err != nil {
 		return err
 	}
-
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
-	return backend.UnPause(ctx, name, api.PauseOptions{
-		Services: services,
-		Project:  project,
+	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+		return backend.UnPause(ctx, name, api.PauseOptions{
+			Services: services,
+			Project:  project,
+		})
 	})
 }

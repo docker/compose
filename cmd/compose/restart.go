@@ -18,13 +18,11 @@ package compose
 
 import (
 	"context"
-	"time"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/compose"
 )
 
 type restartOptions struct {
@@ -69,20 +67,12 @@ func runRestart(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		}
 	}
 
-	var timeout *time.Duration
-	if opts.timeChanged {
-		timeoutValue := time.Duration(opts.timeout) * time.Second
-		timeout = &timeoutValue
-	}
-
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
-	return backend.Restart(ctx, name, api.RestartOptions{
-		Timeout:  timeout,
-		Services: services,
-		Project:  project,
-		NoDeps:   opts.noDeps,
+	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+		return backend.Restart(ctx, name, api.RestartOptions{
+			Timeout:  optionalTimeout(opts.timeout, opts.timeChanged),
+			Services: services,
+			Project:  project,
+			NoDeps:   opts.noDeps,
+		})
 	})
 }

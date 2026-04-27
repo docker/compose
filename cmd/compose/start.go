@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/compose"
 )
 
 type startOptions struct {
@@ -58,20 +57,17 @@ func runStart(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 		return err
 	}
 
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
-
 	var timeout time.Duration
 	if opts.waitTimeout > 0 {
 		timeout = time.Duration(opts.waitTimeout) * time.Second
 	}
-	return backend.Start(ctx, name, api.StartOptions{
-		AttachTo:    services,
-		Project:     project,
-		Services:    services,
-		Wait:        opts.wait,
-		WaitTimeout: timeout,
+	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+		return backend.Start(ctx, name, api.StartOptions{
+			AttachTo:    services,
+			Project:     project,
+			Services:    services,
+			Wait:        opts.wait,
+			WaitTimeout: timeout,
+		})
 	})
 }
