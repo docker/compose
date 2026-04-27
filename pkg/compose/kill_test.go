@@ -44,7 +44,7 @@ func TestKillAll(t *testing.T) {
 	name := strings.ToLower(testProject)
 
 	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
-		Filters: projectFilter(name).Add("label", hasConfigHashLabel()),
+		Filters: projectFilter(name).Add("label", api.ConfigHashLabel),
 	}).Return(client.ContainerListResult{
 		Items: []container.Summary{
 			testContainer("service1", "123", false),
@@ -83,7 +83,7 @@ func TestKillSignal(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 	listOptions := client.ContainerListOptions{
-		Filters: projectFilter(name).Add("label", serviceFilter(serviceName), hasConfigHashLabel()),
+		Filters: projectFilter(name).Add("label", serviceFilter(serviceName), api.ConfigHashLabel),
 	}
 
 	api.EXPECT().ContainerList(t.Context(), listOptions).Return(client.ContainerListResult{
@@ -145,7 +145,7 @@ func anyCancellableContext() gomock.Matcher {
 }
 
 func projectFilterListOpt(withOneOff bool) client.ContainerListOptions {
-	filter := projectFilter(strings.ToLower(testProject)).Add("label", hasConfigHashLabel())
+	filter := projectFilter(strings.ToLower(testProject)).Add("label", api.ConfigHashLabel)
 	if !withOneOff {
 		filter.Add("label", oneOffFilter(false))
 	}

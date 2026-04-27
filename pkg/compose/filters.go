@@ -24,16 +24,21 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// labelFilter returns a label filter string of the form "key=value".
+func labelFilter(key, value string) string {
+	return fmt.Sprintf("%s=%s", key, value)
+}
+
 func projectFilter(projectName string) client.Filters {
-	return make(client.Filters).Add("label", fmt.Sprintf("%s=%s", api.ProjectLabel, projectName))
+	return make(client.Filters).Add("label", labelFilter(api.ProjectLabel, projectName))
 }
 
 func serviceFilter(serviceName string) string {
-	return fmt.Sprintf("%s=%s", api.ServiceLabel, serviceName)
+	return labelFilter(api.ServiceLabel, serviceName)
 }
 
 func networkFilter(name string) string {
-	return fmt.Sprintf("%s=%s", api.NetworkLabel, name)
+	return labelFilter(api.NetworkLabel, name)
 }
 
 func oneOffFilter(b bool) string {
@@ -45,9 +50,5 @@ func oneOffFilter(b bool) string {
 }
 
 func containerNumberFilter(index int) string {
-	return fmt.Sprintf("%s=%d", api.ContainerNumberLabel, index)
-}
-
-func hasConfigHashLabel() string {
-	return api.ConfigHashLabel
+	return labelFilter(api.ContainerNumberLabel, fmt.Sprintf("%d", index))
 }

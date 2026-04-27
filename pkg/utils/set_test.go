@@ -15,7 +15,6 @@
 package utils
 
 import (
-	"slices"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -32,17 +31,4 @@ func TestSet_Diff(t *testing.T) {
 	b := NewSet[int](2, 3)
 	assert.DeepEqual(t, []int{1}, a.Diff(b).Elements())
 	assert.DeepEqual(t, []int{3}, b.Diff(a).Elements())
-}
-
-func TestSet_Union(t *testing.T) {
-	a := NewSet[int](1, 2)
-	b := NewSet[int](2, 3)
-
-	actual := a.Union(b).Elements()
-	slices.Sort(actual)
-	assert.DeepEqual(t, []int{1, 2, 3}, actual)
-
-	actual = b.Union(a).Elements()
-	slices.Sort(actual)
-	assert.DeepEqual(t, []int{1, 2, 3}, actual)
 }

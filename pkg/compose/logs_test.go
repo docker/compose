@@ -98,7 +98,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
 		All:     true,
-		Filters: projectFilter(name).Add("label", oneOffFilter(false), hasConfigHashLabel()),
+		Filters: projectFilter(name).Add("label", oneOffFilter(false), api.ConfigHashLabel),
 	}).Return(
 		client.ContainerListResult{
 			Items: []containerType.Summary{
@@ -166,7 +166,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 
 	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
 		All:     true,
-		Filters: projectFilter(name).Add("label", oneOffFilter(false), hasConfigHashLabel()),
+		Filters: projectFilter(name).Add("label", oneOffFilter(false), api.ConfigHashLabel),
 	}).Return(
 		client.ContainerListResult{
 			Items: []containerType.Summary{

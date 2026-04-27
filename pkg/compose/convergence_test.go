@@ -73,7 +73,7 @@ func TestServiceLinks(t *testing.T) {
 		Filters: projectFilter(testProject).Add("label",
 			serviceFilter("db"),
 			oneOffFilter(false),
-			hasConfigHashLabel(),
+			api.ConfigHashLabel,
 		),
 		All: true,
 	}
@@ -201,7 +201,7 @@ func TestServiceLinks(t *testing.T) {
 			Filters: projectFilter(testProject).Add("label",
 				serviceFilter("web"),
 				oneOffFilter(false),
-				hasConfigHashLabel(),
+				api.ConfigHashLabel,
 			),
 			All: true,
 		}
