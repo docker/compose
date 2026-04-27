@@ -299,7 +299,7 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 
 func (s *composeService) stopContainer(ctx context.Context, service *types.ServiceConfig, ctr containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
 	eventName := getContainerProgressName(ctr)
-	s.events.On(stoppingEvent(eventName))
+	s.events.On(newEvent(eventName, api.Working, api.StatusStopping))
 
 	if service != nil {
 		for _, hook := range service.PreStop {
@@ -321,7 +321,7 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 		s.events.On(errorEvent(eventName, "Error while Stopping"))
 		return err
 	}
-	s.events.On(stoppedEvent(eventName))
+	s.events.On(newEvent(eventName, api.Done, api.StatusStopped))
 	return nil
 }
 

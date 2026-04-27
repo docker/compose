@@ -193,7 +193,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		name := getContainerProgressName(ctr)
 		switch ctr.State {
 		case container.StateRunning:
-			c.compose.events.On(runningEvent(name))
+			c.compose.events.On(newEvent(name, api.Done, api.StatusRunning))
 		case container.StateCreated:
 		case container.StateRestarting:
 		case container.StateExited:
@@ -927,7 +927,7 @@ func (s *composeService) startService(ctx context.Context,
 		}
 
 		eventName := getContainerProgressName(ctr)
-		s.events.On(startingEvent(eventName))
+		s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
 		_, err = s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
 		if err != nil {
 			return err
@@ -940,7 +940,7 @@ func (s *composeService) startService(ctx context.Context,
 			}
 		}
 
-		s.events.On(startedEvent(eventName))
+		s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
 	}
 	return nil
 }

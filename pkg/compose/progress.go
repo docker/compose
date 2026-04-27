@@ -52,64 +52,9 @@ func creatingEvent(id string) api.Resource {
 	return newEvent(id, api.Working, api.StatusCreating)
 }
 
-// startingEvent creates a new Starting in progress Resource
-func startingEvent(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusStarting)
-}
-
-// startedEvent creates a new Started in progress Resource
-func startedEvent(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusStarted)
-}
-
-// waiting creates a new waiting event
-func waiting(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusWaiting)
-}
-
-// healthy creates a new healthy event
-func healthy(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusHealthy)
-}
-
-// exited creates a new exited event
-func exited(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusExited)
-}
-
-// restartingEvent creates a new Restarting in progress Resource
-func restartingEvent(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusRestarting)
-}
-
-// runningEvent creates a new Running in progress Resource
-func runningEvent(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusRunning)
-}
-
 // createdEvent creates a new Created (done) Resource
 func createdEvent(id string) api.Resource {
 	return newEvent(id, api.Done, api.StatusCreated)
-}
-
-// stoppingEvent creates a new Stopping in progress Resource
-func stoppingEvent(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusStopping)
-}
-
-// stoppedEvent creates a new Stopping in progress Resource
-func stoppedEvent(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusStopped)
-}
-
-// killingEvent creates a new Killing in progress Resource
-func killingEvent(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusKilling)
-}
-
-// killedEvent creates a new Killed in progress Resource
-func killedEvent(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusKilled)
 }
 
 // removingEvent creates a new Removing in progress Resource
@@ -132,17 +77,22 @@ func builtEvent(id string) api.Resource {
 	return newEvent("Image "+id, api.Done, api.StatusBuilt)
 }
 
-// pullingEvent creates a new pulling (in progress) Resource
-func pullingEvent(id string) api.Resource {
-	return newEvent("Image "+id, api.Working, api.StatusPulling)
+// waiting creates a new waiting event; kept as a named func for use as a function value.
+func waiting(id string) api.Resource {
+	return newEvent(id, api.Working, api.StatusWaiting)
 }
 
-// pulledEvent creates a new pulled (done) Resource
-func pulledEvent(id string) api.Resource {
-	return newEvent("Image "+id, api.Done, api.StatusPulled)
+// healthy creates a new healthy event; kept as a named func for use as a function value.
+func healthy(id string) api.Resource {
+	return newEvent(id, api.Done, api.StatusHealthy)
 }
 
-// skippedEvent creates a new Skipped Resource
+// exited creates a new exited event; kept as a named func for use as a function value.
+func exited(id string) api.Resource {
+	return newEvent(id, api.Done, api.StatusExited)
+}
+
+// skippedEvent creates a new Skipped Resource; kept as a named func for use as a function value.
 func skippedEvent(id string, reason string) api.Resource {
 	return api.Resource{
 		ID:     id,

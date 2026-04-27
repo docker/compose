@@ -175,7 +175,7 @@ func getUnwrappedErrorMessage(err error) string {
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, quietPull bool, defaultPlatform string) (string, error) {
 	resource := "Image " + service.Image
-	s.events.On(pullingEvent(service.Image))
+	s.events.On(newEvent("Image "+service.Image, api.Working, api.StatusPulling))
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
 		return "", err
@@ -246,7 +246,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			toPullProgressEvent(resource, jm, s.events)
 		}
 	}
-	s.events.On(pulledEvent(service.Image))
+	s.events.On(newEvent("Image "+service.Image, api.Done, api.StatusPulled))
 
 	inspected, err := s.apiClient().ImageInspect(ctx, service.Image)
 	if err != nil {

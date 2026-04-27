@@ -93,14 +93,14 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 					}
 				}
 				eventName := getContainerProgressName(ctr)
-				s.events.On(restartingEvent(eventName))
+				s.events.On(newEvent(eventName, api.Working, api.StatusRestarting))
 				_, err = s.apiClient().ContainerRestart(ctx, ctr.ID, client.ContainerRestartOptions{
 					Timeout: utils.DurationSecondToInt(options.Timeout),
 				})
 				if err != nil {
 					return err
 				}
-				s.events.On(startedEvent(eventName))
+				s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
 				for _, hook := range def.PostStart {
 					err = s.runHook(ctx, ctr, def, hook, nil)
 					if err != nil {
