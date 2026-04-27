@@ -252,21 +252,10 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 
 func (s *composeService) removeImage(ctx context.Context, image string) error {
 	id := fmt.Sprintf("Image %s", image)
-	s.events.On(newEvent(id, api.Working, "Removing"))
-	_, err := s.apiClient().ImageRemove(ctx, image, client.ImageRemoveOptions{})
-	if err == nil {
-		s.events.On(newEvent(id, api.Done, "Removed"))
-		return nil
-	}
-	if errdefs.IsConflict(err) {
-		s.events.On(newEvent(id, api.Warning, "Resource is still in use"))
-		return nil
-	}
-	if errdefs.IsNotFound(err) {
-		s.events.On(newEvent(id, api.Done, "Warning: No resource found to remove"))
-		return nil
-	}
-	return err
+	return s.removeResource(ctx, id, func() error {
+		_, err := s.apiClient().ImageRemove(ctx, image, client.ImageRemoveOptions{})
+		return err
+	})
 }
 
 func (s *composeService) removeVolume(ctx context.Context, id string) error {
@@ -278,20 +267,29 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 		return nil
 	}
 
-	s.events.On(newEvent(resource, api.Working, "Removing"))
-	_, err = s.apiClient().VolumeRemove(ctx, id, client.VolumeRemoveOptions{
-		Force: true,
+	return s.removeResource(ctx, resource, func() error {
+		_, err := s.apiClient().VolumeRemove(ctx, id, client.VolumeRemoveOptions{
+			Force: true,
+		})
+		return err
 	})
+}
+
+// removeResource emits a "Removing" progress event, calls op, then emits the appropriate
+// completion event based on the error: nil→Removed, conflict→still-in-use warning, not-found→gone warning.
+func (s *composeService) removeResource(ctx context.Context, eventID string, op func() error) error {
+	s.events.On(newEvent(eventID, api.Working, "Removing"))
+	err := op()
 	if err == nil {
-		s.events.On(newEvent(resource, api.Done, "Removed"))
+		s.events.On(newEvent(eventID, api.Done, "Removed"))
 		return nil
 	}
 	if errdefs.IsConflict(err) {
-		s.events.On(newEvent(resource, api.Warning, "Resource is still in use"))
+		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use"))
 		return nil
 	}
 	if errdefs.IsNotFound(err) {
-		s.events.On(newEvent(resource, api.Done, "Warning: No resource found to remove"))
+		s.events.On(newEvent(eventID, api.Done, "Warning: No resource found to remove"))
 		return nil
 	}
 	return err
