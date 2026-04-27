@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"time"
 
 	"github.com/docker/cli/cli/command"
@@ -27,7 +26,7 @@ import (
 )
 
 // withBackend creates a compose backend and passes it to fn.
-func withBackend(ctx context.Context, dockerCli command.Cli, opts *BackendOptions, fn func(api.Compose) error) error {
+func withBackend(dockerCli command.Cli, opts *BackendOptions, fn func(api.Compose) error) error {
 	backend, err := compose.NewComposeService(dockerCli, opts.Options...)
 	if err != nil {
 		return err

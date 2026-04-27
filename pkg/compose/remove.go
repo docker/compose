@@ -27,7 +27,7 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
+func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error { //nolint:gocyclo
 	projectName = strings.ToLower(projectName)
 
 	if options.Stop {

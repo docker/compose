@@ -38,7 +38,7 @@ func TestPs(t *testing.T) {
 	assert.NilError(t, err)
 
 	listOpts := client.ContainerListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", api.ConfigHashLabel, oneOffFilter(false)),
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.ConfigHashLabel, oneOffFilter(false)),
 		All:     false,
 	}
 	c1, inspect1 := containerDetails("service1", "123", containerType.StateRunning, containerType.Healthy, 0)

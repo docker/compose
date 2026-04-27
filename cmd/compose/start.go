@@ -61,7 +61,7 @@ func runStart(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	if opts.waitTimeout > 0 {
 		timeout = time.Duration(opts.waitTimeout) * time.Second
 	}
-	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+	return withBackend(dockerCli, backendOptions, func(backend api.Compose) error {
 		return backend.Start(ctx, name, api.StartOptions{
 			AttachTo:    services,
 			Project:     project,

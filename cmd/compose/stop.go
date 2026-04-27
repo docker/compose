@@ -57,7 +57,7 @@ func runStop(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	if err != nil {
 		return err
 	}
-	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+	return withBackend(dockerCli, backendOptions, func(backend api.Compose) error {
 		return backend.Stop(ctx, name, api.StopOptions{
 			Timeout:  optionalTimeout(opts.timeout, opts.timeChanged),
 			Services: services,

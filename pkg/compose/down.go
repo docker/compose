@@ -252,7 +252,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 
 func (s *composeService) removeImage(ctx context.Context, image string) error {
 	id := fmt.Sprintf("Image %s", image)
-	return s.removeResource(ctx, id, func() error {
+	return s.removeResource(id, func() error {
 		_, err := s.apiClient().ImageRemove(ctx, image, client.ImageRemoveOptions{})
 		return err
 	})
@@ -267,7 +267,7 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 		return nil
 	}
 
-	return s.removeResource(ctx, resource, func() error {
+	return s.removeResource(resource, func() error {
 		_, err := s.apiClient().VolumeRemove(ctx, id, client.VolumeRemoveOptions{
 			Force: true,
 		})
@@ -277,7 +277,7 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 
 // removeResource emits a "Removing" progress event, calls op, then emits the appropriate
 // completion event based on the error: nil→Removed, conflict→still-in-use warning, not-found→gone warning.
-func (s *composeService) removeResource(ctx context.Context, eventID string, op func() error) error {
+func (s *composeService) removeResource(eventID string, op func() error) error {
 	s.events.On(newEvent(eventID, api.Working, "Removing"))
 	err := op()
 	if err == nil {

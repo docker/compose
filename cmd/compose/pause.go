@@ -49,7 +49,7 @@ func runPause(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	if err != nil {
 		return err
 	}
-	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+	return withBackend(dockerCli, backendOptions, func(backend api.Compose) error {
 		return backend.Pause(ctx, name, api.PauseOptions{
 			Services: services,
 			Project:  project,
@@ -81,7 +81,7 @@ func runUnPause(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 	if err != nil {
 		return err
 	}
-	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+	return withBackend(dockerCli, backendOptions, func(backend api.Compose) error {
 		return backend.UnPause(ctx, name, api.PauseOptions{
 			Services: services,
 			Project:  project,

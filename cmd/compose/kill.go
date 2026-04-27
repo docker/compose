@@ -62,7 +62,7 @@ func runKill(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
-	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+	return withBackend(dockerCli, backendOptions, func(backend api.Compose) error {
 		err := backend.Kill(ctx, name, api.KillOptions{
 			RemoveOrphans: opts.removeOrphans,
 			Project:       project,

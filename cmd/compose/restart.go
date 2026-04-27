@@ -67,7 +67,7 @@ func runRestart(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		}
 	}
 
-	return withBackend(ctx, dockerCli, backendOptions, func(backend api.Compose) error {
+	return withBackend(dockerCli, backendOptions, func(backend api.Compose) error {
 		return backend.Restart(ctx, name, api.RestartOptions{
 			Timeout:  optionalTimeout(opts.timeout, opts.timeChanged),
 			Services: services,
