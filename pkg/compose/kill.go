@@ -22,7 +22,6 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -57,21 +56,17 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		return api.ErrNoResources
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
-	containers.forEach(func(ctr container.Summary) {
-		eg.Go(func() error {
-			eventName := getContainerProgressName(ctr)
-			s.events.On(newEvent(eventName, api.Working, api.StatusKilling))
-			_, err := s.apiClient().ContainerKill(ctx, ctr.ID, client.ContainerKillOptions{
-				Signal: options.Signal,
-			})
-			if err != nil {
-				s.events.On(errorEvent(eventName, "Error while Killing"))
-				return err
-			}
-			s.events.On(newEvent(eventName, api.Done, api.StatusKilled))
-			return nil
+	return forEachContainerConcurrent(ctx, containers, func(ctx context.Context, ctr container.Summary) error {
+		eventName := getContainerProgressName(ctr)
+		s.events.On(newEvent(eventName, api.Working, api.StatusKilling))
+		_, err := s.apiClient().ContainerKill(ctx, ctr.ID, client.ContainerKillOptions{
+			Signal: options.Signal,
 		})
+		if err != nil {
+			s.events.On(errorEvent(eventName, "Error while Killing"))
+			return err
+		}
+		s.events.On(newEvent(eventName, api.Done, api.StatusKilled))
+		return nil
 	})
-	return eg.Wait()
 }
