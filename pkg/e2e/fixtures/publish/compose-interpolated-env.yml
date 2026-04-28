@@ -1,0 +1,5 @@
+services:
+  serviceA:
+    image: "alpine:3.12"
+    environment:
+      TEST: "${SOMEVAR}"

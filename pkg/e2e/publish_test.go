@@ -32,21 +32,48 @@ func TestPublishChecks(t *testing.T) {
 	c := NewParallelCLI(t)
 	const projectName = "compose-e2e-explicit-profiles"
 
-	t.Run("publish error env_file", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-env-file.yml",
-			"-p", projectName, "publish", "test/test")
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: `service "serviceA" has env_file declared.
-To avoid leaking sensitive data,`})
+	t.Run("publish prompt env_file declined", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-env-file.yml",
+			"-p", projectName, "publish", "test/test", "--dry-run")
+		cmd.Stdin = strings.NewReader("n\n")
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{ExitCode: 130})
+		out := res.Combined()
+		assert.Assert(t, strings.Contains(out, "you are about to publish env-related declarations within your OCI artifact."), out)
+		assert.Assert(t, strings.Contains(out, `service "serviceA": env_file declared`), out)
+		assert.Assert(t, strings.Contains(out, "Are you ok to publish these env declarations?"), out)
+		assert.Assert(t, !strings.Contains(out, "test/test published"), out)
 	})
 
-	t.Run("publish multiple errors env_file and environment", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-multi-env-config.yml",
-			"-p", projectName, "publish", "test/test")
-		// we don't in which order the services will be loaded, so we can't predict the order of the error messages
-		assert.Assert(t, strings.Contains(res.Combined(), `service "serviceB" has env_file declared.`), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), `To avoid leaking sensitive data, you must either explicitly allow the sending of environment variables by using the --with-env flag,
-or remove sensitive data from your Compose configuration
-`), res.Combined())
+	t.Run("publish prompt suspicious env declined", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-environment.yml",
+			"-p", projectName, "publish", "test/test", "--dry-run")
+		cmd.Stdin = strings.NewReader("n\n")
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{ExitCode: 130})
+		out := res.Combined()
+		assert.Assert(t, strings.Contains(out, `service "serviceA": literal value for "MYSQL_ROOT_PASSWORD"`), out)
+	})
+
+	t.Run("publish success interpolated env", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/compose-interpolated-env.yml",
+			"-p", projectName, "publish", "test/test", "-y", "--dry-run")
+		assert.Assert(t, strings.Contains(res.Combined(), "test/test publishing"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
+	})
+
+	t.Run("publish prompt aggregates env_file and suspicious literals", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-multi-env-config.yml",
+			"-p", projectName, "publish", "test/test", "--dry-run")
+		cmd.Stdin = strings.NewReader("n\n")
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{ExitCode: 130})
+		out := res.Combined()
+		// Order is non-deterministic between services; assert each line independently.
+		assert.Assert(t, strings.Contains(out, `service "serviceB": env_file declared`), out)
+		assert.Assert(t, strings.Contains(out, `service "serviceA": literal value for "DB_PASSWORD"`), out)
+		assert.Assert(t, strings.Contains(out, `service "serviceB": literal value for "API_KEY"`), out)
+		assert.Assert(t, strings.Contains(out, "Use --with-env to silence this prompt"), out)
 	})
 
 	t.Run("publish success environment", func(t *testing.T) {

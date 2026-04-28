@@ -2,10 +2,10 @@ services:
   serviceA:
     image: "alpine:3.12"
     environment:
-      - "FOO=bar"
+      - "DB_PASSWORD=bar"
   serviceB:
     image: "alpine:3.12"
     env_file:
       - publish.env
     environment:
-      - "BAR=baz"
+      - "API_KEY=baz"

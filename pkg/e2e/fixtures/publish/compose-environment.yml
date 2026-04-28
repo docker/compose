@@ -2,6 +2,6 @@ services:
   serviceA:
     image: "alpine:3.12"
     environment:
-        - "FOO=bar"
+        - "MYSQL_ROOT_PASSWORD=bar"
   serviceB:
     image: "alpine:3.12"
