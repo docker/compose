@@ -18,28 +18,12 @@ package compose
 
 import (
 	"context"
-	"strings"
-
-	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/desktop"
 )
 
-// desktopEndpoint returns the Docker Desktop API socket address discovered
-// from the Docker engine info labels. It returns "" when the active engine
-// is not a Docker Desktop instance.
 func (s *composeService) desktopEndpoint(ctx context.Context) (string, error) {
-	res, err := s.apiClient().Info(ctx, client.InfoOptions{})
-	if err != nil {
-		return "", err
-	}
-	for _, l := range res.Info.Labels {
-		k, v, ok := strings.Cut(l, "=")
-		if ok && k == desktop.EngineLabel {
-			return v, nil
-		}
-	}
-	return "", nil
+	return desktop.Endpoint(ctx, s.apiClient())
 }
 
 // isDesktopIntegrationActive returns true when Docker Desktop is the active engine.

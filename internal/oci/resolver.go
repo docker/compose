@@ -19,6 +19,7 @@ package oci
 import (
 	"context"
 	"io"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -35,28 +36,35 @@ import (
 	"github.com/docker/compose/v5/internal/registry"
 )
 
-// NewResolver setup an OCI Resolver based on docker/cli config to provide registry credentials
-func NewResolver(config *configfile.ConfigFile, insecureRegistries ...string) remotes.Resolver {
-	return docker.NewResolver(docker.ResolverOptions{
-		Hosts: docker.ConfigureDefaultRegistries(
-			docker.WithAuthorizer(docker.NewDockerAuthorizer(
-				docker.WithAuthCreds(func(host string) (string, string, error) {
-					host = registry.GetAuthConfigKey(host)
-					auth, err := config.GetAuthConfig(host)
-					if err != nil {
-						return "", "", err
-					}
-					if auth.IdentityToken != "" {
-						return "", auth.IdentityToken, nil
-					}
-					return auth.Username, auth.Password, nil
-				}),
-			)),
-			docker.WithPlainHTTP(func(domain string) (bool, error) {
-				// Should be used for testing **only**
-				return slices.Contains(insecureRegistries, domain), nil
+// NewResolver sets up an OCI Resolver based on docker/cli config to provide
+// registry credentials. When transport is non-nil it is used as the HTTP
+// transport for all registry calls (e.g. to route through Docker Desktop's
+// PAC-aware proxy); nil falls back to containerd's default transport.
+func NewResolver(config *configfile.ConfigFile, transport http.RoundTripper, insecureRegistries ...string) remotes.Resolver {
+	opts := []docker.RegistryOpt{
+		docker.WithAuthorizer(docker.NewDockerAuthorizer(
+			docker.WithAuthCreds(func(host string) (string, string, error) {
+				host = registry.GetAuthConfigKey(host)
+				auth, err := config.GetAuthConfig(host)
+				if err != nil {
+					return "", "", err
+				}
+				if auth.IdentityToken != "" {
+					return "", auth.IdentityToken, nil
+				}
+				return auth.Username, auth.Password, nil
 			}),
-		),
+		)),
+		docker.WithPlainHTTP(func(domain string) (bool, error) {
+			// Should be used for testing **only**
+			return slices.Contains(insecureRegistries, domain), nil
+		}),
+	}
+	if transport != nil {
+		opts = append(opts, docker.WithClient(&http.Client{Transport: transport}))
+	}
+	return docker.NewResolver(docker.ResolverOptions{
+		Hosts: docker.ConfigureDefaultRegistries(opts...),
 	})
 }
 

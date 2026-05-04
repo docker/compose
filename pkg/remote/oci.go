@@ -20,10 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/containerd/containerd/v2/core/images"
@@ -32,6 +34,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/oci"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -79,7 +82,7 @@ func ociRemoteLoaderEnabled() (bool, error) {
 }
 
 func NewOCIRemoteLoader(dockerCli command.Cli, offline bool, options api.OCIOptions) loader.ResourceLoader {
-	return ociRemoteLoader{
+	return &ociRemoteLoader{
 		dockerCli:          dockerCli,
 		offline:            offline,
 		known:              map[string]string{},
@@ -92,14 +95,26 @@ type ociRemoteLoader struct {
 	offline            bool
 	known              map[string]string
 	insecureRegistries []string
+
+	// HTTP transport for the OCI resolver, initialized lazily so DD
+	// detection happens once per loader rather than per Load() call.
+	transportOnce sync.Once
+	transport     http.RoundTripper
 }
 
-func (g ociRemoteLoader) Accept(path string) bool {
+func (g *ociRemoteLoader) httpTransport(ctx context.Context) http.RoundTripper {
+	g.transportOnce.Do(func() {
+		g.transport = desktop.ProxyTransportFor(ctx, g.dockerCli.Client())
+	})
+	return g.transport
+}
+
+func (g *ociRemoteLoader) Accept(path string) bool {
 	return strings.HasPrefix(path, OciPrefix)
 }
 
 //nolint:gocyclo
-func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) {
+func (g *ociRemoteLoader) Load(ctx context.Context, path string) (string, error) {
 	enabled, err := ociRemoteLoaderEnabled()
 	if err != nil {
 		return "", err
@@ -119,7 +134,7 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", err
 		}
 
-		resolver := oci.NewResolver(g.dockerCli.ConfigFile(), g.insecureRegistries...)
+		resolver := oci.NewResolver(g.dockerCli.ConfigFile(), g.httpTransport(ctx), g.insecureRegistries...)
 
 		descriptor, content, err := oci.Get(ctx, resolver, ref)
 		if err != nil {
@@ -179,11 +194,11 @@ func (g ociRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 	return filepath.Join(local, "compose.yaml"), nil
 }
 
-func (g ociRemoteLoader) Dir(path string) string {
+func (g *ociRemoteLoader) Dir(path string) string {
 	return g.known[path]
 }
 
-func (g ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest spec.Manifest, ref reference.Named, resolver remotes.Resolver) error {
+func (g *ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, manifest spec.Manifest, ref reference.Named, resolver remotes.Resolver) error {
 	err := os.MkdirAll(local, 0o700)
 	if err != nil {
 		return err
@@ -259,4 +274,4 @@ func writeEnvFile(layer spec.Descriptor, local string, content []byte) error {
 	return err
 }
 
-var _ loader.ResourceLoader = ociRemoteLoader{}
+var _ loader.ResourceLoader = (*ociRemoteLoader)(nil)

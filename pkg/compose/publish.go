@@ -37,6 +37,7 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/oci"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose/transform"
@@ -94,7 +95,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			insecureRegistries = append(insecureRegistries, reference.Domain(named))
 		}
 
-		resolver := oci.NewResolver(s.configFile(), insecureRegistries...)
+		resolver := oci.NewResolver(s.configFile(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
 
 		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 		if err != nil {
