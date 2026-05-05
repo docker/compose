@@ -1,30 +1,28 @@
 name: PR Review
 on:
-  issue_comment:               # Enables /review command in PR comments
-    types: [created]
-  pull_request_review_comment: # Captures feedback on review comments for learning
-    types: [created]
-  pull_request:                # Triggers auto-review on PR open (same-repo branches only; fork PRs use /review)
-    types: [ready_for_review, opened]
+  issue_comment:
+    types: [ created ]
+  workflow_run:
+    workflows: [ "PR Review - Trigger" ]
+    types: [ completed ]
 
 permissions:
-  contents: read # Required at top level so `GITHUB_TOKEN` for `issue_comment` events can read repository contents.
+  contents: read # Required at top-level to give `issue_comment` events access to the secrets below.
 
 jobs:
   review:
-    if: >-
+    if: |
       github.event_name == 'issue_comment' ||
-      github.event_name == 'pull_request_review_comment' ||
-      github.event.pull_request.user.login != 'dependabot[bot]'
-    uses: docker/cagent-action/.github/workflows/review-pr.yml@dba0ca51938c78afb363625363c50582243218d6 # v1.3.1
+      github.event.workflow_run.conclusion == 'success'
+    uses: docker/cagent-action/.github/workflows/review-pr.yml@2369328cd25777eb0a4ff959a399b6d1a5204fc7 # v1.4.4
     # Scoped to the job so other jobs in this workflow aren't over-permissioned
     permissions:
-      contents: read       # Read repository files and PR diffs
-      pull-requests: write # Post review comments and approve/request changes
-      issues: write        # Create security incident issues if secrets are detected in output
-      checks: write        # (Optional) Show review progress as a check run on the PR
-    secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      CAGENT_ORG_MEMBERSHIP_TOKEN: ${{ secrets.CAGENT_ORG_MEMBERSHIP_TOKEN }}         # PAT with read:org scope; gates auto-reviews to org members only
-      CAGENT_REVIEWER_APP_ID: ${{ secrets.CAGENT_REVIEWER_APP_ID }}                   # GitHub App ID; reviews appear as your app instead of github-actions[bot]
-      CAGENT_REVIEWER_APP_PRIVATE_KEY: ${{ secrets.CAGENT_REVIEWER_APP_PRIVATE_KEY }} # GitHub App private key; paired with App ID above
+      contents: read # Read repository files and PR diffs
+      pull-requests: write # Post review comments
+      issues: write # Create security incident issues if secrets detected
+      checks: write # (Optional) Show review progress as a check run
+      id-token: write # Required for OIDC authentication to AWS Secrets Manager
+      actions: read # Download artifacts from trigger workflow
+    with:
+      trigger-run-id: ${{ github.event_name == 'workflow_run' && format('{0}',
+        github.event.workflow_run.id) || '' }}
