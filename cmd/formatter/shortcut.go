@@ -31,6 +31,7 @@ import (
 	"github.com/eiannone/keyboard"
 	"github.com/skratchdot/open-golang/open"
 
+	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -238,14 +239,14 @@ func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Proje
 	}()
 }
 
-func (lk *LogKeyboard) openDDLogsView(ctx context.Context) {
+func (lk *LogKeyboard) openDDLogsView(ctx context.Context, project *types.Project) {
 	if !lk.IsLogsViewEnabled {
 		return
 	}
 	go func() {
 		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/logsview", tracing.SpanOptions{},
 			func(ctx context.Context) error {
-				link := "docker-desktop://dashboard/logs"
+				link := desktop.BuildLogsURL(project.Name)
 				err := open.Run(link)
 				if err != nil {
 					err = fmt.Errorf("could not open Docker Desktop Logs view: %w", err)
@@ -336,7 +337,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	case 'o':
 		lk.openDDComposeUI(ctx, project)
 	case 'l':
-		lk.openDDLogsView(ctx)
+		lk.openDDLogsView(ctx, project)
 	}
 	switch key := event.Key; key {
 	case keyboard.KeyCtrlC:

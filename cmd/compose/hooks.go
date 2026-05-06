@@ -21,7 +21,9 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"time"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/spf13/cobra"
@@ -30,14 +32,12 @@ import (
 	"github.com/docker/compose/v5/internal/desktop"
 )
 
-const deepLink = "docker-desktop://dashboard/logs"
-
-func composeLogsHint() string {
-	return "Filter, search, and stream logs from all your Compose services\nin one place with Docker Desktop's Logs view. " + hintLink(deepLink)
+func composeLogsHint(appID string) string {
+	return "Filter, search, and stream logs from all your Compose services\nin one place with Docker Desktop's Logs view. " + hintLink(desktop.BuildLogsURL(appID))
 }
 
-func dockerLogsHint() string {
-	return "View and search logs for all containers in one place\nwith Docker Desktop's Logs view. " + hintLink(deepLink)
+func dockerLogsHint(appID string) string {
+	return "View and search logs for all containers in one place\nwith Docker Desktop's Logs view. " + hintLink(desktop.BuildLogsURL(appID))
 }
 
 // hintLink returns a clickable OSC 8 terminal hyperlink when ANSI is allowed,
@@ -68,36 +68,89 @@ func shouldDisableAnsi() bool {
 	return false
 }
 
-// hookHint defines a hint that can be returned by the hooks handler.
-// When checkFlags is nil, the hint is always returned for the matching command.
-// When checkFlags is set, the hint is only returned if the check passes.
 type hookHint struct {
-	template   func() string
-	checkFlags func(flags map[string]string) bool
+	template       func(appID string) string
+	checkFlags     func(flags map[string]string) bool
+	resolveProject bool
 }
 
-// hooksHints maps hook root commands to their hint definitions. All current
-// hints promote Docker Desktop's Logs view; emission is additionally gated on
-// the FeatureLogsTab flag in handleHook.
 var hooksHints = map[string]hookHint{
-	// standalone "docker logs" (not a compose subcommand)
+	// "docker logs": the CLI hook payload doesn't carry the positional
+	// container id, so the link is emitted unfiltered.
 	"logs":         {template: dockerLogsHint},
-	"compose logs": {template: composeLogsHint},
+	"compose logs": {template: composeLogsHint, resolveProject: true},
 	"compose up": {
-		template: composeLogsHint,
+		template:       composeLogsHint,
+		resolveProject: true,
 		checkFlags: func(flags map[string]string) bool {
-			// Only show the hint when running in detached mode
-			_, hasDetach := flags["detach"]
-			_, hasD := flags["d"]
-			return hasDetach || hasD
+			return hasFlag(flags, "detach", "d")
 		},
 	},
 }
 
-// logsTabEnabled reports whether Docker Desktop is the active engine and the
-// LogsTab feature flag is enabled. Overridable for tests.
-var logsTabEnabled = func(ctx context.Context) bool {
-	return desktop.IsFeatureActiveStandalone(ctx, desktop.FeatureLogsTab)
+// Test seams. Replace via t.Cleanup; not safe to mutate from t.Parallel().
+var (
+	logsTabEnabled = func(ctx context.Context) bool {
+		return desktop.IsFeatureActiveStandalone(ctx, desktop.FeatureLogsTab)
+	}
+	resolveAppID = defaultResolveAppID
+)
+
+const projectNameResolveTimeout = 250 * time.Millisecond
+
+// Root-command flags whose values change which project the loader would
+// resolve. The hook payload exposes flag names but not values, so when any
+// is set we skip the appId rather than emit a wrong filter. workdir is the
+// deprecated alias for --project-directory; env-file can set
+// COMPOSE_PROJECT_NAME via the .env file it points at.
+var projectScopingFlags = []string{
+	"project-name", "p",
+	"file", "f",
+	"project-directory", "workdir",
+	"env-file",
+}
+
+func defaultResolveAppID(ctx context.Context, flags map[string]string) string {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return resolveAppIDIn(ctx, flags, workDir)
+}
+
+// Split from defaultResolveAppID so tests can pass a t.TempDir() instead
+// of mutating process state via t.Chdir.
+func resolveAppIDIn(ctx context.Context, flags map[string]string, workDir string) string {
+	if hasFlag(flags, projectScopingFlags...) {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(ctx, projectNameResolveTimeout)
+	defer cancel()
+
+	opts, err := cli.NewProjectOptions(nil,
+		cli.WithWorkingDirectory(workDir),
+		cli.WithOsEnv,
+		cli.WithDotEnv,
+		cli.WithConfigFileEnv,
+		cli.WithDefaultConfigPath,
+	)
+	if err != nil {
+		return ""
+	}
+	project, err := opts.LoadProject(ctx)
+	if err != nil {
+		return ""
+	}
+	return project.Name
+}
+
+func hasFlag(flags map[string]string, names ...string) bool {
+	for _, n := range names {
+		if _, ok := flags[n]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // HooksCommand returns the hidden subcommand that the Docker CLI invokes
@@ -141,10 +194,15 @@ func handleHook(ctx context.Context, args []string, w io.Writer) error {
 		return nil
 	}
 
+	var appID string
+	if hint.resolveProject {
+		appID = resolveAppID(ctx, hookData.Flags)
+	}
+
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	return enc.Encode(hooks.Response{
 		Type:     hooks.NextSteps,
-		Template: hint.template(),
+		Template: hint.template(appID),
 	})
 }
