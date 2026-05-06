@@ -157,3 +157,57 @@ func TestDontRecurseWhenWatchingParentsOfNonExistentFiles(t *testing.T) {
 		t.Fatalf("watching more than 5 files: %d", n)
 	}
 }
+
+func TestShouldSkipDirWithNegatedChildException(t *testing.T) {
+	repoRoot := t.TempDir()
+	ignore, err := DockerIgnoreTesterFromContents(repoRoot, "bazel-bin/\n!bazel-bin/app-binary\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{
+		ignore:     ignore,
+		notifyList: map[string]bool{repoRoot: true},
+	}
+
+	bazelBin := filepath.Join(repoRoot, "bazel-bin")
+	assert.Assert(t, !d.shouldSkipDir(bazelBin), "expected bazel-bin to remain traversable for negated child patterns")
+}
+
+func TestShouldIgnorePathStillMatchesDirectoryPattern(t *testing.T) {
+	repoRoot := t.TempDir()
+	ignore, err := DockerIgnoreTesterFromContents(repoRoot, "bazel-bin/\n!bazel-bin/app-binary\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{ignore: ignore}
+
+	bazelBin := filepath.Join(repoRoot, "bazel-bin")
+	assert.Assert(t, d.shouldIgnore(bazelBin), "expected bazel-bin path to match ignore pattern")
+}
+
+func TestShouldSkipDirForIgnoredSubtreeWithoutException(t *testing.T) {
+	repoRoot := t.TempDir()
+	ignore, err := DockerIgnoreTesterFromContents(repoRoot, "bazel-bin/\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{
+		ignore:     ignore,
+		notifyList: map[string]bool{repoRoot: true},
+	}
+
+	bazelBin := filepath.Join(repoRoot, "bazel-bin")
+	assert.Assert(t, d.shouldSkipDir(bazelBin), "expected fully ignored directory subtree to be skipped")
+}
+
+func TestShouldSkipDirDoesNotSkipAncestorOfWatchedPath(t *testing.T) {
+	repoRoot := t.TempDir()
+	ignore, err := DockerIgnoreTesterFromContents(repoRoot, "parent/\n")
+	assert.NilError(t, err)
+
+	watchedPath := filepath.Join(repoRoot, "parent", "child", "non-existent")
+	d := &naiveNotify{
+		ignore:     ignore,
+		notifyList: map[string]bool{watchedPath: true},
+	}
+
+	parent := filepath.Join(repoRoot, "parent")
+	assert.Assert(t, !d.shouldSkipDir(parent), "expected parent directory to remain traversable when it contains a watched path")
+}
