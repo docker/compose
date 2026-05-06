@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/docker/cli/cli/command"
@@ -41,6 +42,31 @@ const EngineLabel = "com.docker.desktop.address"
 
 // FeatureLogsTab is the feature flag name for the Docker Desktop Logs view.
 const FeatureLogsTab = "LogsTab"
+
+const logsDeepLink = "docker-desktop://dashboard/logs"
+
+// LogsAppIDMaxLen mirrors the byte-length cap Docker Desktop's URL handler
+// applies to the appId query parameter; values longer than this are
+// truncated by the receiver, so we trim ahead of time to avoid emitting
+// hyperlinks that will be silently shortened. The slice in BuildLogsURL is
+// a byte slice — Compose project names are restricted to the ASCII set
+// `[a-z0-9_-]` by loader.NormalizeProjectName, so a byte cap and a rune
+// cap coincide for any value that could legitimately reach this builder.
+const LogsAppIDMaxLen = 256
+
+// BuildLogsURL returns the deep link that opens Docker Desktop's Logs view,
+// optionally pre-filtered to a Compose project. An empty appID yields the
+// unfiltered URL.
+func BuildLogsURL(appID string) string {
+	if appID == "" {
+		return logsDeepLink
+	}
+	if len(appID) > LogsAppIDMaxLen {
+		appID = appID[:LogsAppIDMaxLen]
+	}
+	q := url.Values{"appId": []string{appID}}
+	return logsDeepLink + "?" + q.Encode()
+}
 
 // identify this client in the logs
 var userAgent = "compose/" + internal.Version

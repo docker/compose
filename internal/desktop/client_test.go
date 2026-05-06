@@ -18,11 +18,53 @@ package desktop
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"gotest.tools/v3/assert"
 )
+
+func TestBuildLogsURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		appID string
+		want  string
+	}{
+		{
+			name:  "empty app id yields paramless url",
+			appID: "",
+			want:  "docker-desktop://dashboard/logs",
+		},
+		{
+			name:  "simple project name",
+			appID: "myapp",
+			want:  "docker-desktop://dashboard/logs?appId=myapp",
+		},
+		{
+			name:  "name with hyphen and digits is preserved",
+			appID: "my-app-2",
+			want:  "docker-desktop://dashboard/logs?appId=my-app-2",
+		},
+		{
+			name:  "characters that need percent-encoding are escaped",
+			appID: "weird name/with spaces",
+			want:  "docker-desktop://dashboard/logs?appId=weird+name%2Fwith+spaces",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, BuildLogsURL(tt.appID), tt.want)
+		})
+	}
+}
+
+func TestBuildLogsURL_TruncatesLongAppID(t *testing.T) {
+	long := strings.Repeat("a", LogsAppIDMaxLen+50)
+	got := BuildLogsURL(long)
+	want := "docker-desktop://dashboard/logs?appId=" + strings.Repeat("a", LogsAppIDMaxLen)
+	assert.Equal(t, got, want)
+}
 
 func TestClientPing(t *testing.T) {
 	if testing.Short() {
