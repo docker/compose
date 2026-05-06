@@ -116,7 +116,7 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 		if err != nil {
 			if os.IsPermission(err) && d.shouldIgnore(path) {
 				logrus.Debugf("Ignoring path: %s", path)
-				return nil
+				return filepath.SkipDir
 			}
 			return err
 		}
@@ -185,6 +185,10 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
 		err := filepath.WalkDir(e.Name, func(path string, info fs.DirEntry, err error) error {
 			if err != nil {
+				if os.IsPermission(err) && d.shouldIgnore(path) {
+					logrus.Debugf("Ignoring path: %s", path)
+					return filepath.SkipDir
+				}
 				return err
 			}
 
@@ -245,11 +249,6 @@ func (d *naiveNotify) shouldSkipDir(path string) bool {
 		return false
 	}
 
-	// If path is present in the ignore list then we should ignore it
-	if d.shouldIgnore(path) {
-		return true
-	}
-
 	// Suppose we're watching
 	// /src/.tiltignore
 	// but the .tiltignore file doesn't exist.
@@ -262,15 +261,28 @@ func (d *naiveNotify) shouldSkipDir(path string) bool {
 	// - A child of a directory that's in our notify list, or
 	// - A parent of a directory that's in our notify list
 	//   (i.e., to cover the "path doesn't exist" case).
+	//
+	// We prioritize "parent of watched path" checks before ignore checks so
+	// one trigger's ignore rules can't hide another trigger's nested watch root.
+	isChildOfWatchedDir := false
 	for root := range d.notifyList {
-		if pathutil.IsChild(root, path) || pathutil.IsChild(path, root) {
+		if pathutil.IsChild(path, root) {
 			return false
 		}
+		if pathutil.IsChild(root, path) {
+			isChildOfWatchedDir = true
+		}
 	}
-	return true
+
+	// skip the dir if ignore rules match this full subtree.
+	if d.shouldIgnoreEntireDir(path) {
+		return true
+	}
+
+	return !isChildOfWatchedDir
 }
 
-func (d *naiveNotify) shouldIgnore(path string) bool {
+func (d *naiveNotify) shouldIgnoreEntireDir(path string) bool {
 	if d.ignore == nil {
 		return false
 	}
@@ -282,7 +294,14 @@ func (d *naiveNotify) shouldIgnore(path string) bool {
 	if matches {
 		return true
 	}
-	matches, err = d.ignore.Matches(path)
+	return false
+}
+
+func (d *naiveNotify) shouldIgnore(path string) bool {
+	if d.ignore == nil {
+		return false
+	}
+	matches, err := d.ignore.Matches(path)
 	if err != nil {
 		logrus.Debugf("error checking ignored path %q: %v", path, err)
 		return false

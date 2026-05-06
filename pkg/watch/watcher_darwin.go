@@ -115,7 +115,7 @@ func (d *fseventNotify) Errors() chan error {
 	return d.errors
 }
 
-func newWatcher(paths []string, _ PathMatcher) (Notify, error) {
+func newWatcher(paths []string, _ ...PathMatcher) (Notify, error) {
 	dw := &fseventNotify{
 		stream: &fsevents.EventStream{
 			Latency: 50 * time.Millisecond,
