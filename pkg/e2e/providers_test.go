@@ -29,6 +29,37 @@ import (
 	"gotest.tools/v3/icmd"
 )
 
+// TestProviderStopHook verifies that "docker compose stop" invokes the provider
+// binary's "stop" subcommand. The example provider writes a sentinel file at
+// PROVIDER_STOP_MARKER when its stop subcommand runs.
+func TestProviderStopHook(t *testing.T) {
+	provider, err := findExecutable("example-provider")
+	assert.NilError(t, err)
+
+	markerFile := filepath.Join(t.TempDir(), "example-provider-stop-marker")
+
+	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	c := NewParallelCLI(t, WithEnv(
+		"PATH="+path,
+		"PROVIDER_STOP_MARKER="+markerFile,
+	))
+	const projectName = "provider-stop-hook"
+
+	t.Cleanup(func() {
+		_ = os.Remove(markerFile)
+		c.cleanupWithDown(t, projectName)
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/provider-stop.yaml", "--project-name", projectName, "up", "-d")
+	res.Assert(t, icmd.Success)
+
+	res = c.RunDockerComposeCmd(t, "-f", "fixtures/providers/provider-stop.yaml", "--project-name", projectName, "stop")
+	res.Assert(t, icmd.Success)
+
+	_, statErr := os.Stat(markerFile)
+	assert.NilError(t, statErr, "expected example-provider stop subcommand to write marker file %q", markerFile)
+}
+
 func TestDependsOnMultipleProviders(t *testing.T) {
 	provider, err := findExecutable("example-provider")
 	assert.NilError(t, err)

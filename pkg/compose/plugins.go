@@ -72,6 +72,10 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
+	if command == "stop" {
+		return nil
+	}
+
 	mux.Lock()
 	defer mux.Unlock()
 	for name, s := range project.Services {
@@ -86,7 +90,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	return nil
 }
 
-func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (types.Mapping, error) {
+func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (types.Mapping, error) { //nolint:gocyclo
 	var action string
 	switch command {
 	case "up":
@@ -95,6 +99,9 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	case "down":
 		s.events.On(removingEvent(service.Name))
 		action = "remove"
+	case "stop":
+		s.events.On(stoppingEvent(service.Name))
+		action = "stop"
 	default:
 		return nil, fmt.Errorf("unsupported plugin command: %s", command)
 	}
@@ -152,6 +159,8 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		s.events.On(createdEvent(service.Name))
 	case "down":
 		s.events.On(removedEvent(service.Name))
+	case "stop":
+		s.events.On(stoppedEvent(service.Name))
 	}
 	return variables, nil
 }
@@ -178,6 +187,10 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 		currentCommandMetadata = cmdOptionsMetadata.Up
 	case "down":
 		currentCommandMetadata = cmdOptionsMetadata.Down
+	case "stop":
+		if cmdOptionsMetadata.Stop != nil {
+			currentCommandMetadata = *cmdOptionsMetadata.Stop
+		}
 	}
 
 	provider := *service.Provider
@@ -241,13 +254,14 @@ func (s *composeService) getPluginMetadata(path, command string, project *types.
 }
 
 type ProviderMetadata struct {
-	Description string          `json:"description"`
-	Up          CommandMetadata `json:"up"`
-	Down        CommandMetadata `json:"down"`
+	Description string           `json:"description"`
+	Up          CommandMetadata  `json:"up"`
+	Down        CommandMetadata  `json:"down"`
+	Stop        *CommandMetadata `json:"stop,omitempty"`
 }
 
 func (p ProviderMetadata) IsEmpty() bool {
-	return p.Description == "" && p.Up.Parameters == nil && p.Down.Parameters == nil
+	return p.Description == "" && p.Up.Parameters == nil && p.Down.Parameters == nil && p.Stop == nil
 }
 
 type CommandMetadata struct {

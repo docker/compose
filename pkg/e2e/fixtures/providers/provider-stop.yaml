@@ -1,0 +1,13 @@
+services:
+  test:
+    image: alpine
+    command: echo ok
+    depends_on:
+      - provider
+  provider:
+    provider:
+      type: example-provider
+      options:
+        name: provider
+        type: test
+        size: 1

@@ -30,7 +30,7 @@ the resource(s) needed to run a service.
 If `provider.type` doesn't resolve into any of those, Compose will report an error and interrupt the `up` command.
 
 To be a valid Compose extension, provider command *MUST* accept a `compose` command (which can be hidden)
-with subcommands `up` and `down`.
+with subcommands `up` and `down`. It *MAY* additionally implement a `stop` subcommand to support `docker compose stop`.
 
 ## Up lifecycle
 
@@ -107,6 +107,20 @@ into its runtime environment.
 `down` lifecycle is equivalent to `up` with the `<provider> compose --project-name <NAME> down <SERVICE>` command.
 The provider is responsible for releasing all resources associated with the service.
 
+## Stop lifecycle
+
+When the user runs `docker compose stop`, Compose invokes `<provider> compose --project-name <NAME> stop <SERVICE>` for each
+provider-backed service in reverse dependency order. The provider should pause the resource without releasing it, so a later
+`docker compose start` or `docker compose up` can resume it. Any `setenv` JSON message returned during `stop` is ignored,
+since dependent services are also stopping.
+
+The `stop` hook is opt-in: Compose invokes it only when the provider declares a `stop` block in its `metadata` subcommand
+output. Providers that do not advertise `stop` in metadata (or do not implement the `metadata` subcommand at all) are
+silently skipped during `docker compose stop`, preserving backward compatibility with providers that pre-date this hook.
+
+The `--timeout` flag of `docker compose stop` applies only to container services; provider stop hooks are not subject to
+this timeout and are responsible for managing their own shutdown duration.
+
 ## Provide metadata about options
 
 Compose extensions *MAY* optionally implement a `metadata` subcommand to provide information about the parameters accepted by the `up` and `down` commands.  
@@ -153,6 +167,16 @@ The expected JSON output format is:
         "type": "string"
       }
     ]
+  },
+  "stop": {
+    "parameters": [
+      {
+        "name": "name",
+        "description": "Name of the database to be stopped",
+        "required": true,
+        "type": "string"
+      }
+    ]
   }
 }
 ```
@@ -160,6 +184,7 @@ The top elements are:
 - `description`: Human-readable description of the provider
 - `up`: Object describing the parameters accepted by the `up` command
 - `down`: Object describing the parameters accepted by the `down` command
+- `stop`: Object describing the parameters accepted by the `stop` command (optional)
 
 And for each command parameter, you should include the following properties:
 - `name`: The parameter name (without `--` prefix)
