@@ -1,0 +1,3 @@
+services:
+  redis:
+    image: redis:${REDIS_VERSION}

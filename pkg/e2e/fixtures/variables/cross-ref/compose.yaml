@@ -1,0 +1,9 @@
+variables:
+  BASE: "acme"
+  IMAGE: "${BASE}/api"
+  TAG: "1.4.2"
+  FULL: "${IMAGE}:${TAG}"
+
+services:
+  api:
+    image: "${FULL}"

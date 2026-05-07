@@ -1,0 +1,3 @@
+variables:
+  APP_VERSION: "1.0.0"
+  REDIS_VERSION: "7.0"

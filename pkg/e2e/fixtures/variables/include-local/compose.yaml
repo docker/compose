@@ -1,0 +1,14 @@
+variables:
+  REDIS_VERSION: "7.2"
+
+include:
+  - path: ./redis/compose.yaml
+    variables:
+      REDIS_VERSION: "7.4"
+  - path: ./postgres/compose.yaml
+    variables_file:
+      - ./variables.yaml
+
+services:
+  api:
+    image: api:latest

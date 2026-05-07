@@ -1,0 +1,9 @@
+variables_file:
+  - ./variables/base.yaml
+  - ./variables/dev.yaml
+
+services:
+  api:
+    image: ghcr.io/acme/api:${APP_VERSION}
+  redis:
+    image: redis:${REDIS_VERSION}

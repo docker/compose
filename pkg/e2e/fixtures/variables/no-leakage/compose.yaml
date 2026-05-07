@@ -1,0 +1,9 @@
+include:
+  - path: ./redis/compose.yaml
+    variables:
+      MODULE: "redis-only"
+  - path: ./postgres/compose.yaml
+
+services:
+  api:
+    image: "api:latest"

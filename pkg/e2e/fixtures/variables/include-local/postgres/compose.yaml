@@ -1,0 +1,3 @@
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION}

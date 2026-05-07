@@ -51,6 +51,7 @@ import (
 	"github.com/docker/compose/v5/pkg/compose"
 	"github.com/docker/compose/v5/pkg/remote"
 	"github.com/docker/compose/v5/pkg/utils"
+	"github.com/docker/compose/v5/pkg/variables"
 )
 
 const (
@@ -144,6 +145,8 @@ type ProjectOptions struct {
 	WorkDir            string
 	ProjectDir         string
 	EnvFiles           []string
+	Vars               []string
+	VarFiles           []string
 	Compatibility      bool
 	Progress           string
 	Offline            bool
@@ -227,6 +230,8 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.insecureRegistries, "insecure-registry", []string{}, "Use insecure registry to pull Compose OCI artifacts. Doesn't apply to images")
 	_ = f.MarkHidden("insecure-registry")
 	f.StringArrayVar(&o.EnvFiles, "env-file", defaultStringArrayVar(ComposeEnvFiles), "Specify an alternate environment file")
+	f.StringArrayVar(&o.Vars, "var", []string{}, "Set a Compose-time variable (KEY=VALUE), repeatable")
+	f.StringArrayVar(&o.VarFiles, "var-file", []string{}, "Load Compose-time variables from a YAML file (variables: map)")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
@@ -293,6 +298,21 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 		po = append(po, cli.WithResourceLoader(r))
 	}
 
+	// Strip Compose-time variable extension keys before compose-go
+	// schema-validates the model. Strip preserves `${VAR}` placeholders
+	// so callers like `--no-interpolate` and ExtractVariables behave as
+	// before.
+	if cleanup, configPaths, err := o.stripVariables(ctx, remotes); err == nil {
+		if cleanup != nil {
+			defer cleanup()
+		}
+		if configPaths != nil {
+			o = o.withConfigPaths(configPaths)
+		}
+	} else {
+		return nil, err
+	}
+
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
 		return nil, err
@@ -303,6 +323,35 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 	}
 
 	return options.LoadModel(ctx)
+}
+
+// withConfigPaths returns a copy of o with ConfigPaths replaced.
+func (o *ProjectOptions) withConfigPaths(paths []string) *ProjectOptions {
+	cp := *o
+	cp.ConfigPaths = paths
+	return &cp
+}
+
+// stripVariables runs the strip-only preprocessor for code paths that
+// load the raw Compose model (no body interpolation). Returns
+// (cleanup, rendered config paths, err). Both rendered paths and
+// cleanup are nil if no preprocessing happened.
+func (o *ProjectOptions) stripVariables(ctx context.Context, remotes []loader.ResourceLoader) (func(), []string, error) {
+	discovered, err := o.toProjectOptions()
+	if err != nil {
+		// Discovery error is reported again by the actual load below.
+		return nil, nil, nil //nolint:nilerr
+	}
+	paths := append([]string{}, discovered.ConfigPaths...)
+	if len(paths) == 0 || anyRemoteConfigPath(remotes, paths) {
+		return nil, nil, nil
+	}
+	shell := buildShellLookup(o.EnvFiles, o.ProjectDir)
+	result, err := variables.Strip(ctx, paths, o.Vars, o.VarFiles, shell)
+	if err != nil {
+		return nil, nil, err
+	}
+	return result.Cleanup, result.ConfigPaths, nil
 }
 
 // ToProject loads a Compose project using the LoadProject API.
@@ -335,10 +384,19 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		}
 	}
 
+	configPaths, workingDir, origConfigPaths, cleanup, err := o.preprocessVariables(ctx, remotes, &po)
+	if err != nil {
+		return nil, metrics, err
+	}
+	if cleanup != nil {
+		defer cleanup()
+	}
+	preprocessed := origConfigPaths != nil
+
 	loadOpts := api.ProjectLoadOptions{
 		ProjectName:       o.ProjectName,
-		ConfigPaths:       o.ConfigPaths,
-		WorkingDir:        o.ProjectDir,
+		ConfigPaths:       configPaths,
+		WorkingDir:        workingDir,
 		EnvFiles:          o.EnvFiles,
 		Profiles:          o.Profiles,
 		Services:          services,
@@ -347,6 +405,8 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		Compatibility:     o.Compatibility,
 		ProjectOptionsFns: po,
 		LoadListeners:     []api.LoadListener{metricsListener},
+		Vars:              o.Vars,
+		VarFiles:          o.VarFiles,
 		OCI: api.OCIOptions{
 			InsecureRegistries: o.insecureRegistries,
 		},
@@ -357,7 +417,97 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		return nil, metrics, err
 	}
 
+	// Replace tempdir-rooted ComposeFiles with the user's original
+	// paths so labels/output reflect what the user actually invoked.
+	if preprocessed && len(origConfigPaths) == len(project.ComposeFiles) {
+		for i := range project.ComposeFiles {
+			project.ComposeFiles[i] = origConfigPaths[i]
+		}
+	}
+
 	return project, metrics, nil
+}
+
+// preprocessVariables runs the Compose-time variables preprocessor.
+// It returns (effectiveConfigPaths, effectiveWorkingDir,
+// originalConfigPaths, cleanup, err). originalConfigPaths is non-nil
+// only when preprocessing actually ran. The caller appends a loader
+// option that skips compose-go's own interpolation in that case.
+func (o *ProjectOptions) preprocessVariables(ctx context.Context, remotes []loader.ResourceLoader, po *[]cli.ProjectOptionsFn) ([]string, string, []string, func(), error) {
+	configPaths := o.ConfigPaths
+	workingDir := o.ProjectDir
+
+	discovered, err := o.toProjectOptions(*po...)
+	if err != nil {
+		return configPaths, workingDir, nil, nil, nil //nolint:nilerr // discovery failure is reported again by backend.LoadProject
+	}
+	discoveredPaths := append([]string{}, discovered.ConfigPaths...)
+	if len(discoveredPaths) == 0 {
+		return configPaths, workingDir, nil, nil, nil
+	}
+	if anyRemoteConfigPath(remotes, discoveredPaths) {
+		return configPaths, workingDir, nil, nil, nil
+	}
+
+	shell := buildShellLookup(o.EnvFiles, o.ProjectDir)
+	result, rerr := variables.Render(ctx, discoveredPaths, o.Vars, o.VarFiles, shell)
+	if rerr != nil {
+		return configPaths, workingDir, nil, nil, rerr
+	}
+	if workingDir == "" {
+		workingDir = filepath.Dir(discoveredPaths[0])
+	}
+	*po = append(*po, cli.WithLoadOptions(func(lo *loader.Options) {
+		lo.SkipInterpolation = true
+	}))
+	return result.ConfigPaths, workingDir, discoveredPaths, result.Cleanup, nil
+}
+
+func anyRemoteConfigPath(remotes []loader.ResourceLoader, paths []string) bool {
+	for _, p := range paths {
+		for _, r := range remotes {
+			if r.Accept(p) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// buildShellLookup returns a function that mirrors compose-go's view
+// of the environment: os.Environ overlaid with values loaded from
+// .env files (os env wins per existing precedence).
+func buildShellLookup(envFiles []string, projectDir string) func(string) (string, bool) {
+	env := composegoutils.GetAsEqualsMap(os.Environ())
+	files := append([]string{}, envFiles...)
+	if len(files) == 0 {
+		base := projectDir
+		if base == "" {
+			if pwd, err := os.Getwd(); err == nil {
+				base = pwd
+			}
+		}
+		if base != "" {
+			candidate := filepath.Join(base, ".env")
+			if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
+				files = append(files, candidate)
+			}
+		}
+	}
+	if len(files) > 0 {
+		fromFile, err := dotenv.GetEnvFromFile(env, files)
+		if err == nil {
+			for k, v := range fromFile {
+				if _, exists := env[k]; !exists {
+					env[k] = v
+				}
+			}
+		}
+	}
+	return func(name string) (string, bool) {
+		v, ok := env[name]
+		return v, ok
+	}
 }
 
 func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceLoader {

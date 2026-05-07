@@ -1,0 +1,6 @@
+variables:
+  APP_VERSION: "from-yaml"
+
+services:
+  api:
+    image: "ghcr.io/acme/api:${APP_VERSION}"

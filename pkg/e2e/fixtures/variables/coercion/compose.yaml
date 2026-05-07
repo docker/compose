@@ -1,0 +1,12 @@
+variables:
+  PORT: 8080
+  ENABLED: true
+  TAG: "1.4.2"
+
+services:
+  api:
+    image: "api:${TAG}"
+    ports:
+      - "${PORT}:80"
+    environment:
+      ENABLED: "${ENABLED}"

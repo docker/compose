@@ -1,0 +1,2 @@
+variables:
+  APP_VERSION: "from-cli-var-file"

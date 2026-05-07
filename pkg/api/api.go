@@ -71,6 +71,12 @@ type ProjectLoadOptions struct {
 	// This is optional - pass nil or empty slice if not needed.
 	LoadListeners []LoadListener
 
+	// Vars are CLI `--var KEY=VALUE` declarations applied during
+	// Compose-time variable preprocessing.
+	Vars []string
+	// VarFiles are CLI `--var-file PATH` declarations.
+	VarFiles []string
+
 	OCI OCIOptions
 }
 

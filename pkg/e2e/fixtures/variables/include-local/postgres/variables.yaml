@@ -1,0 +1,2 @@
+variables:
+  POSTGRES_VERSION: "16.2"

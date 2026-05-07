@@ -1,0 +1,3 @@
+services:
+  postgres:
+    image: "postgres:${MODULE:-empty}"

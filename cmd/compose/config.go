@@ -37,6 +37,7 @@ import (
 	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
+	"github.com/docker/compose/v5/pkg/variables"
 )
 
 type configOptions struct {
@@ -524,22 +525,75 @@ func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions
 		return err
 	}
 
-	variables := template.ExtractVariables(model, template.DefaultPattern)
+	placeholders := template.ExtractVariables(model, template.DefaultPattern)
+
+	// Resolve Compose-time `variables:` so we can show their values
+	// next to placeholder metadata. Errors are non-fatal here — we
+	// fall back to placeholders-only output so this debug surface
+	// stays usable even on broken configs.
+	shell := buildShellLookup(opts.EnvFiles, opts.ProjectDir)
+	render, _ := variables.Render(ctx, opts.ConfigPaths, opts.Vars, opts.VarFiles, shell)
+	if render != nil {
+		defer render.Cleanup()
+	}
+
+	type variableInfo struct {
+		Name          string `yaml:"name" json:"Name"`
+		DefaultValue  string `yaml:"defaultvalue" json:"DefaultValue"`
+		PresenceValue string `yaml:"presencevalue" json:"PresenceValue"`
+		Required      bool   `yaml:"required" json:"Required"`
+		ResolvedValue string `yaml:"resolvedvalue,omitempty" json:"ResolvedValue,omitempty"`
+		Source        string `yaml:"source,omitempty" json:"Source,omitempty"`
+	}
+	rows := map[string]*variableInfo{}
+	for name, v := range placeholders {
+		rows[name] = &variableInfo{
+			Name:          name,
+			Required:      v.Required,
+			DefaultValue:  v.DefaultValue,
+			PresenceValue: v.PresenceValue,
+		}
+	}
+	if render != nil {
+		actives := map[string]variables.DebugEntry{}
+		for _, e := range render.Debug {
+			if e.Active {
+				actives[e.Name] = e
+			}
+		}
+		for name, e := range actives {
+			r, ok := rows[name]
+			if !ok {
+				r = &variableInfo{Name: name}
+				rows[name] = r
+			}
+			r.ResolvedValue = e.Resolved
+			r.Source = string(e.Source)
+		}
+	}
+
+	names := make([]string, 0, len(rows))
+	for n := range rows {
+		names = append(names, n)
+	}
+	sort.Strings(names)
 
 	if opts.Format == "yaml" {
-		result, err := yaml.Marshal(variables)
+		data, err := yaml.Marshal(rows)
 		if err != nil {
 			return err
 		}
-		fmt.Print(string(result))
+		fmt.Print(string(data))
 		return nil
 	}
 
-	return formatter.Print(variables, opts.Format, dockerCli.Out(), func(w io.Writer) {
-		for name, variable := range variables {
-			_, _ = fmt.Fprintf(w, "%s\t%t\t%s\t%s\n", name, variable.Required, variable.DefaultValue, variable.PresenceValue)
+	return formatter.Print(rows, opts.Format, dockerCli.Out(), func(w io.Writer) {
+		for _, n := range names {
+			r := rows[n]
+			_, _ = fmt.Fprintf(w, "%s\t%t\t%s\t%s\t%s\t%s\n",
+				r.Name, r.Required, r.DefaultValue, r.PresenceValue, r.ResolvedValue, r.Source)
 		}
-	}, "NAME", "REQUIRED", "DEFAULT VALUE", "ALTERNATE VALUE")
+	}, "NAME", "REQUIRED", "DEFAULT VALUE", "ALTERNATE VALUE", "RESOLVED VALUE", "SOURCE")
 }
 
 func runEnvironment(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
