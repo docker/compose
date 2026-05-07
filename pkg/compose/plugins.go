@@ -265,7 +265,7 @@ type ProviderMetadata struct {
 }
 
 func (p ProviderMetadata) IsEmpty() bool {
-	return p.Description == "" && p.Up.Parameters == nil && p.Down.Parameters == nil && p.Stop == nil
+	return p.Description == "" && p.Up.Parameters == nil && p.Down.Parameters == nil
 }
 
 type CommandMetadata struct {

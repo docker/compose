@@ -52,14 +52,9 @@ func TestProviderMetadata_IsEmpty(t *testing.T) {
 			want:     false,
 		},
 		{
-			name:     "only Stop set",
-			metadata: ProviderMetadata{Stop: &CommandMetadata{Parameters: param}},
-			want:     false,
-		},
-		{
-			name:     "Stop set with empty parameters",
+			name:     "only Stop set is empty",
 			metadata: ProviderMetadata{Stop: &CommandMetadata{}},
-			want:     false,
+			want:     true,
 		},
 		{
 			name: "all fields set",
