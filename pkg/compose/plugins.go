@@ -66,6 +66,9 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	if err != nil {
 		return err
 	}
+	if cmd == nil {
+		return nil
+	}
 
 	variables, err := s.executePlugin(cmd, command, service)
 	if err != nil {
@@ -188,9 +191,10 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	case "down":
 		currentCommandMetadata = cmdOptionsMetadata.Down
 	case "stop":
-		if cmdOptionsMetadata.Stop != nil {
-			currentCommandMetadata = *cmdOptionsMetadata.Stop
+		if cmdOptionsMetadata.Stop == nil {
+			return nil, nil
 		}
+		currentCommandMetadata = *cmdOptionsMetadata.Stop
 	}
 
 	provider := *service.Provider
