@@ -368,10 +368,13 @@ func (s *composeService) prepareContainerMACAddress(service types.ServiceConfig,
 	return nil
 }
 
-func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, cfg *types.ServiceNetworkConfig, useNetworkAliases bool) []string {
+func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, cfg *types.ServiceNetworkConfig, useNetworkAliases bool) []string {
 	aliases := []string{getContainerName(project.Name, service, serviceIndex)}
 	if useNetworkAliases {
-		aliases = append(aliases, service.Name)
+		// service name is not registered as an alias on external networks; see warnExternalNetworkAliases
+		if n := project.Networks[networkKey]; !n.External {
+			aliases = append(aliases, service.Name)
+		}
 		if cfg != nil {
 			aliases = append(aliases, cfg.Aliases...)
 		}
@@ -445,7 +448,7 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 	}
 
 	return &network.EndpointSettings{
-		Aliases:     getAliases(p, service, serviceIndex, config, useNetworkAliases),
+		Aliases:     getAliases(p, service, serviceIndex, networkKey, config, useNetworkAliases),
 		Links:       links,
 		IPAddress:   ipv4Address,
 		IPv6Gateway: ipv6Address,

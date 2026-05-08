@@ -17,8 +17,12 @@
 package compose
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
+	composetypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/sirupsen/logrus"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -99,6 +103,135 @@ func TestShouldFollowStartEvent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := shouldFollowStartEvent(tt.event, tt.attached, tt.attachTo)
 			assert.Equal(t, got, tt.want)
+		})
+	}
+}
+
+func TestWarnExternalNetworkAliases(t *testing.T) {
+	tests := []struct {
+		name        string
+		project     *composetypes.Project
+		expected    []string
+		notExpected []string
+	}{
+		{
+			name: "internal-only network emits no warning",
+			project: &composetypes.Project{
+				Networks: composetypes.Networks{"internal": {}},
+				Services: composetypes.Services{
+					"web": {
+						Name:     "web",
+						Networks: map[string]*composetypes.ServiceNetworkConfig{"internal": nil},
+					},
+				},
+			},
+			notExpected: []string{"not registered as aliases"},
+		},
+		{
+			name: "external network emits one warning listing services in sorted order",
+			project: &composetypes.Project{
+				Networks: composetypes.Networks{"shared": {External: true}},
+				Services: composetypes.Services{
+					"web": {
+						Name:     "web",
+						Networks: map[string]*composetypes.ServiceNetworkConfig{"shared": nil},
+					},
+					"db": {
+						Name:     "db",
+						Networks: map[string]*composetypes.ServiceNetworkConfig{"shared": nil},
+					},
+				},
+			},
+			expected: []string{
+				`service names [db, web] not registered as aliases on external network`,
+				`networks.shared.aliases`,
+			},
+		},
+		{
+			name: "service with explicit self-alias is excluded from the warning",
+			project: &composetypes.Project{
+				Networks: composetypes.Networks{"shared": {External: true}},
+				Services: composetypes.Services{
+					"web": {
+						Name: "web",
+						Networks: map[string]*composetypes.ServiceNetworkConfig{
+							"shared": {Aliases: []string{"web"}},
+						},
+					},
+					"db": {
+						Name:     "db",
+						Networks: map[string]*composetypes.ServiceNetworkConfig{"shared": nil},
+					},
+				},
+			},
+			expected: []string{
+				`service names [db] not registered as aliases on external network`,
+				`networks.shared.aliases`,
+			},
+			notExpected: []string{"web"},
+		},
+		{
+			name: "all services explicitly self-aliased emits no warning",
+			project: &composetypes.Project{
+				Networks: composetypes.Networks{"shared": {External: true}},
+				Services: composetypes.Services{
+					"web": {
+						Name: "web",
+						Networks: map[string]*composetypes.ServiceNetworkConfig{
+							"shared": {Aliases: []string{"web"}},
+						},
+					},
+				},
+			},
+			notExpected: []string{"not registered as aliases"},
+		},
+		{
+			name: "multiple external networks each emit their own warning",
+			project: &composetypes.Project{
+				Networks: composetypes.Networks{
+					"sharedA": {External: true},
+					"sharedB": {External: true},
+				},
+				Services: composetypes.Services{
+					"web": {
+						Name: "web",
+						Networks: map[string]*composetypes.ServiceNetworkConfig{
+							"sharedA": nil,
+							"sharedB": nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`networks.sharedA.aliases`,
+				`networks.sharedB.aliases`,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			origOut := logrus.StandardLogger().Out
+			origLevel := logrus.GetLevel()
+			origFormatter := logrus.StandardLogger().Formatter
+			logrus.SetOutput(&buf)
+			logrus.SetLevel(logrus.WarnLevel)
+			logrus.SetFormatter(&logrus.TextFormatter{DisableColors: true, DisableTimestamp: true})
+			t.Cleanup(func() {
+				logrus.SetOutput(origOut)
+				logrus.SetLevel(origLevel)
+				logrus.SetFormatter(origFormatter)
+			})
+
+			warnExternalNetworkAliases(tt.project)
+
+			out := buf.String()
+			for _, s := range tt.expected {
+				assert.Assert(t, strings.Contains(out, s), "expected %q in output:\n%s", s, out)
+			}
+			for _, s := range tt.notExpected {
+				assert.Assert(t, !strings.Contains(out, s), "did not expect %q in output:\n%s", s, out)
+			}
 		})
 	}
 }
