@@ -211,3 +211,30 @@ func TestShouldSkipDirDoesNotSkipAncestorOfWatchedPath(t *testing.T) {
 	parent := filepath.Join(repoRoot, "parent")
 	assert.Assert(t, !d.shouldSkipDir(parent), "expected parent directory to remain traversable when it contains a watched path")
 }
+
+func TestShouldSkipDirIntersectRequiresAllTriggersToAgree(t *testing.T) {
+	repoRoot := t.TempDir()
+	ignoreVendor, err := DockerIgnoreTesterFromContents(repoRoot, "vendor/\n")
+	assert.NilError(t, err)
+	ignoreTmp, err := DockerIgnoreTesterFromContents(repoRoot, "tmp/\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{
+		ignore:     NewIntersectMatcher(ignoreVendor, ignoreTmp),
+		notifyList: map[string]bool{repoRoot: true},
+	}
+
+	vendorDir := filepath.Join(repoRoot, "vendor")
+	assert.Assert(t, !d.shouldSkipDir(vendorDir), "vendor must remain watched when another trigger does not ignore it")
+
+	ignoreBuild1, err := DockerIgnoreTesterFromContents(repoRoot, "build/\n")
+	assert.NilError(t, err)
+	ignoreBuild2, err := DockerIgnoreTesterFromContents(repoRoot, "build/\n")
+	assert.NilError(t, err)
+	d2 := &naiveNotify{
+		ignore:     NewIntersectMatcher(ignoreBuild1, ignoreBuild2),
+		notifyList: map[string]bool{repoRoot: true},
+	}
+	buildDir := filepath.Join(repoRoot, "build")
+	assert.Assert(t, d2.shouldSkipDir(buildDir), "when every trigger ignores the same subtree, watcher may skip it")
+}

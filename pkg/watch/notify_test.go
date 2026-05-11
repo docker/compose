@@ -50,6 +50,46 @@ func TestWindowsBufferSize(t *testing.T) {
 	})
 }
 
+func TestNewIntersectMatcher(t *testing.T) {
+	root := t.TempDir()
+
+	vendorOnly, err := DockerIgnoreTesterFromContents(root, "vendor/\n")
+	assert.NilError(t, err)
+	tmpOnly, err := DockerIgnoreTesterFromContents(root, "tmp/\n")
+	assert.NilError(t, err)
+
+	inter := NewIntersectMatcher(vendorOnly, tmpOnly)
+
+	vendorFile := filepath.Join(root, "vendor", "a.go")
+	matches, err := inter.Matches(vendorFile)
+	assert.NilError(t, err)
+	assert.Assert(t, !matches, "only one trigger ignores vendor; intersection must not treat path as ignored")
+
+	bothIgnoreBuild1, err := DockerIgnoreTesterFromContents(root, "build/\n")
+	assert.NilError(t, err)
+	bothIgnoreBuild2, err := DockerIgnoreTesterFromContents(root, "build/\n")
+	assert.NilError(t, err)
+	interBuild := NewIntersectMatcher(bothIgnoreBuild1, bothIgnoreBuild2)
+	buildFile := filepath.Join(root, "build", "out")
+	matches, err = interBuild.Matches(buildFile)
+	assert.NilError(t, err)
+	assert.Assert(t, matches)
+
+	dirEntire1, err := DockerIgnoreTesterFromContents(root, "cache/\n")
+	assert.NilError(t, err)
+	dirEntire2, err := DockerIgnoreTesterFromContents(root, "cache/\n")
+	assert.NilError(t, err)
+	interDir := NewIntersectMatcher(dirEntire1, dirEntire2)
+	entire, err := interDir.MatchesEntireDir(filepath.Join(root, "cache"))
+	assert.NilError(t, err)
+	assert.Assert(t, entire)
+
+	partialEntire := NewIntersectMatcher(vendorOnly, tmpOnly)
+	entire, err = partialEntire.MatchesEntireDir(filepath.Join(root, "vendor"))
+	assert.NilError(t, err)
+	assert.Assert(t, !entire, "must not skip whole dir unless every matcher agrees it is entirely ignorable")
+}
+
 func TestNoEvents(t *testing.T) {
 	f := newNotifyFixture(t)
 	f.assertEvents()
