@@ -104,11 +104,19 @@ func TestLoggingDriver(t *testing.T) {
 		host = "HOST=host.docker.internal"
 	}
 
-	cmd := c.NewDockerComposeCmd(t, "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
+	cmd := c.NewDockerComposeCmd(t, "--verbose", "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
 	cmd.Env = append(cmd.Env, host, "BAR=foo")
-	icmd.RunCmd(cmd).Assert(t, icmd.Success)
+	cmd.Timeout = 60 * time.Second
+	res = icmd.RunCmd(cmd)
+	t.Logf("first up stdout:\n%s", res.Stdout())
+	t.Logf("first up stderr:\n%s", res.Stderr())
+	res.Assert(t, icmd.Success)
 
-	cmd = c.NewDockerComposeCmd(t, "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
+	cmd = c.NewDockerComposeCmd(t, "--verbose", "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
 	cmd.Env = append(cmd.Env, host, "BAR=zot")
-	icmd.RunCmd(cmd).Assert(t, icmd.Success)
+	cmd.Timeout = 60 * time.Second
+	res = icmd.RunCmd(cmd)
+	t.Logf("second up stdout:\n%s", res.Stdout())
+	t.Logf("second up stderr:\n%s", res.Stderr())
+	res.Assert(t, icmd.Success)
 }

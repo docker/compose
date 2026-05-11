@@ -300,12 +300,23 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 func (s *composeService) stopContainer(ctx context.Context, service *types.ServiceConfig, ctr containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
 	eventName := getContainerProgressName(ctr)
 	s.events.On(stoppingEvent(eventName))
+	err := s.stopContainerCore(ctx, service, ctr, timeout, listener)
+	if err != nil {
+		s.events.On(errorEvent(eventName, "Error while Stopping"))
+		return err
+	}
+	s.events.On(stoppedEvent(eventName))
+	return nil
+}
 
+// stopContainerCore performs the actual container stop (pre-stop hooks + API call)
+// without emitting progress events. Used by the plan executor which manages
+// events as separate plan operations.
+func (s *composeService) stopContainerCore(ctx context.Context, service *types.ServiceConfig, ctr containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
 	if service != nil {
 		for _, hook := range service.PreStop {
 			err := s.runHook(ctx, ctr, *service, hook, listener)
 			if err != nil {
-				// Ignore errors indicating that some containers were already stopped or removed.
 				if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
 					return nil
 				}
@@ -313,16 +324,10 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 			}
 		}
 	}
-
 	_, err := s.apiClient().ContainerStop(ctx, ctr.ID, client.ContainerStopOptions{
 		Timeout: utils.DurationSecondToInt(timeout),
 	})
-	if err != nil {
-		s.events.On(errorEvent(eventName, "Error while Stopping"))
-		return err
-	}
-	s.events.On(stoppedEvent(eventName))
-	return nil
+	return err
 }
 
 func (s *composeService) stopContainers(ctx context.Context, serv *types.ServiceConfig, containers []containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {

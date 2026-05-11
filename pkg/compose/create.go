@@ -87,43 +87,141 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	prepareNetworks(project)
 
-	networks, err := s.ensureNetworks(ctx, project)
-	if err != nil {
-		return err
-	}
-
-	volumes, err := s.ensureProjectVolumes(ctx, project)
-	if err != nil {
-		return err
-	}
-
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-	orphans := observedState.filter(isOrphaned(project))
-	if len(orphans) > 0 && !options.IgnoreOrphans {
-		if options.RemoveOrphans {
-			err := s.removeContainers(ctx, orphans, nil, nil, false)
-			if err != nil {
-				return err
-			}
-		} else {
-			logrus.Warnf("Found orphan containers (%s) for this project. If "+
-				"you removed or renamed this service in your compose "+
-				"file, you can run this command with the "+
-				"--remove-orphans flag to clean it up.", orphans.names())
-		}
-	}
-
 	// Temporary implementation of use_api_socket until we get actual support inside docker engine
 	project, err = s.useAPISocket(project)
 	if err != nil {
 		return err
 	}
 
-	return newConvergence(options.Services, observedState, networks, volumes, s).apply(ctx, project, options)
+	// Phase 1: Inspect current state
+	observed, err := s.InspectState(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	// Handle orphan containers
+	if len(observed.Orphans) > 0 && !options.IgnoreOrphans {
+		if !options.RemoveOrphans {
+			logrus.Warnf("Found orphan containers (%s) for this project. If "+
+				"you removed or renamed this service in your compose "+
+				"file, you can run this command with the "+
+				"--remove-orphans flag to clean it up.", observed.Orphans.names())
+		}
+	}
+
+	// Validate external resources exist before reconciling
+	if err := s.validateExternalNetworks(ctx, project, options.Services); err != nil {
+		return err
+	}
+	if err := s.validateExternalVolumes(ctx, project, options.Services); err != nil {
+		return err
+	}
+
+	// Phase 2: Reconcile desired vs observed state (pure function)
+	plan, err := Reconcile(project, observed, ReconcileOptions{
+		Recreate:             options.Recreate,
+		RecreateDependencies: options.RecreateDependencies,
+		Services:             options.Services,
+		Inherit:              options.Inherit,
+		Timeout:              options.Timeout,
+		RemoveOrphans:        options.RemoveOrphans,
+	})
+	if err != nil {
+		return err
+	}
+
+	s.emitUntouchedContainerEvents(project, observed, plan)
+
+	if plan.IsEmpty() {
+		return nil
+	}
+
+	// Phase 3: Execute the plan
+	return s.ExecutePlan(ctx, project, plan, observed)
+}
+
+// emitUntouchedContainerEvents emits progress events for containers that are
+// already up-to-date and running, so that callers (e.g. scale) can see them.
+func (s *composeService) emitUntouchedContainerEvents(project *types.Project, observed *ObservedState, plan *ReconciliationPlan) {
+	for _, service := range project.Services {
+		for _, ctr := range observed.Containers[service.Name] {
+			ctrName := getCanonicalContainerName(ctr)
+			if plan.ContainerTouched(ctrName) {
+				continue
+			}
+			if ctr.State == container.StateRunning {
+				s.events.On(runningEvent(getContainerProgressName(ctr)))
+			}
+		}
+	}
+}
+
+// validateExternalNetworks checks that external networks exist for services
+// that are part of the current operation. Returns an error if a required
+// external network is not found.
+func (s *composeService) validateExternalNetworks(ctx context.Context, project *types.Project, services []string) error {
+	for key, net := range project.Networks {
+		if !net.External {
+			continue
+		}
+		// Check if any targeted service uses this network
+		usedByTargetedService := false
+		for _, service := range project.Services {
+			if len(services) > 0 && !slices.Contains(services, service.Name) {
+				continue
+			}
+			if _, ok := service.Networks[key]; ok {
+				usedByTargetedService = true
+				break
+			}
+		}
+		if !usedByTargetedService {
+			continue
+		}
+		_, err := s.resolveExternalNetwork(ctx, &net)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateExternalVolumes checks that external volumes exist for services
+// that are part of the current operation. Returns an error if a required
+// external volume is not found.
+func (s *composeService) validateExternalVolumes(ctx context.Context, project *types.Project, services []string) error {
+	for key, vol := range project.Volumes {
+		if !vol.External {
+			continue
+		}
+		// Check if any targeted service uses this volume
+		usedByTargetedService := false
+		for _, service := range project.Services {
+			if len(services) > 0 && !slices.Contains(services, service.Name) {
+				continue
+			}
+			for _, v := range service.Volumes {
+				if v.Type == string(mount.TypeVolume) && v.Source == key {
+					usedByTargetedService = true
+					break
+				}
+			}
+			if usedByTargetedService {
+				break
+			}
+		}
+		if !usedByTargetedService {
+			continue
+		}
+		_, err := s.apiClient().VolumeInspect(ctx, vol.Name, client.VolumeInspectOptions{})
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return fmt.Errorf("external volume %q not found", vol.Name)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -134,35 +232,6 @@ func prepareNetworks(project *types.Project) {
 			Add(api.VersionLabel, api.ComposeVersion)
 		project.Networks[k] = nw
 	}
-}
-
-func (s *composeService) ensureNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
-	networks := map[string]string{}
-	for name, nw := range project.Networks {
-		id, err := s.ensureNetwork(ctx, project, name, &nw)
-		if err != nil {
-			return nil, err
-		}
-		networks[name] = id
-		project.Networks[name] = nw
-	}
-	return networks, nil
-}
-
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
-	ids := map[string]string{}
-	for k, volume := range project.Volumes {
-		volume.CustomLabels = volume.CustomLabels.Add(api.VolumeLabel, k)
-		volume.CustomLabels = volume.CustomLabels.Add(api.ProjectLabel, project.Name)
-		volume.CustomLabels = volume.CustomLabels.Add(api.VersionLabel, api.ComposeVersion)
-		id, err := s.ensureVolume(ctx, k, volume, project)
-		if err != nil {
-			return nil, err
-		}
-		ids[k] = id
-	}
-
-	return ids, nil
 }
 
 //nolint:gocyclo
@@ -1313,231 +1382,64 @@ func buildImageOptions(image *types.ServiceVolumeImage) *mount.ImageOptions {
 	}
 }
 
-func (s *composeService) ensureNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (string, error) {
-	if n.External {
-		return s.resolveExternalNetwork(ctx, n)
-	}
-
-	id, err := s.resolveOrCreateNetwork(ctx, project, name, n)
-	if errdefs.IsConflict(err) {
-		// Maybe another execution of `docker compose up|run` created same network
-		// let's retry once
-		return s.resolveOrCreateNetwork(ctx, project, name, n)
-	}
-	return id, err
-}
-
-func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (string, error) { //nolint:gocyclo
-	// This is containers that could be left after a diverged network was removed
-	var dangledContainers Containers
-
-	// First, try to find a unique network matching by name or ID
-	res, err := s.apiClient().NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{})
-	if err == nil {
-		inspect := res.Network
-		// NetworkInspect will match on ID prefix, so double check we get the expected one
-		// as looking for network named `db` we could erroneously match network ID `db9086999caf`
-		if inspect.Name == n.Name || inspect.ID == n.Name {
-			p, ok := inspect.Labels[api.ProjectLabel]
-			if !ok {
-				logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
-					"Set `external: true` to use an existing network", n.Name)
-			} else if p != project.Name {
-				logrus.Warnf("a network with name %s exists but was not created for project %q.\n"+
-					"Set `external: true` to use an existing network", n.Name, project.Name)
-			}
-			if inspect.Labels[api.NetworkLabel] != name {
-				return "", fmt.Errorf(
-					"network %s was found but has incorrect label %s set to %q (expected: %q)",
-					n.Name,
-					api.NetworkLabel,
-					inspect.Labels[api.NetworkLabel],
-					name,
-				)
-			}
-
-			hash := inspect.Labels[api.ConfigHashLabel]
-			expected, err := NetworkHash(n)
-			if err != nil {
-				return "", err
-			}
-			if hash == "" || hash == expected {
-				return inspect.ID, nil
-			}
-
-			dangledContainers, err = s.removeDivergedNetwork(ctx, project, name, n)
-			if err != nil {
-				return "", err
-			}
-		}
-	}
-	// ignore other errors. Typically, an ambiguous request by name results in some generic `invalidParameter` error
-
-	// Either not found, or name is ambiguous - use NetworkList to list by name
-	nwList, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: make(client.Filters).Add("name", n.Name),
-	})
-	if err != nil {
-		return "", err
-	}
-
-	// NetworkList Matches all or part of a network name, so we have to filter for a strict match
-	networks := slices.DeleteFunc(nwList.Items, func(net network.Summary) bool {
-		return net.Name != n.Name
-	})
-
-	for _, nw := range networks {
-		if nw.Labels[api.ProjectLabel] == project.Name &&
-			nw.Labels[api.NetworkLabel] == name {
-			return nw.ID, nil
-		}
-	}
-
-	// we could have set NetworkList with a projectFilter and networkFilter but not doing so allows to catch this
-	// scenario were a network with same name exists but doesn't have label, and use of `CheckDuplicate: true`
-	// prevents to create another one.
-	if len(networks) > 0 {
-		logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
-			"Set `external: true` to use an existing network", n.Name)
-		return networks[0].ID, nil
-	}
-
-	var ipam *network.IPAM
-	if n.Ipam.Config != nil {
-		var config []network.IPAMConfig
-		for _, pool := range n.Ipam.Config {
-			c, err := parseIPAMPool(pool)
-			if err != nil {
-				return "", err
-			}
-			config = append(config, c)
-		}
-		ipam = &network.IPAM{
-			Driver: n.Ipam.Driver,
-			Config: config,
-		}
-	}
+// createNetworkIdempotent creates a network or returns its ID if it already exists.
+// Unlike ensureNetwork, this does NOT perform reconciliation (no diverged-network
+// removal, no container reconnection). The reconciliation plan handles those as
+// explicit operations. This method is used by the plan executor.
+func (s *composeService) createNetworkIdempotent(ctx context.Context, n *types.NetworkConfig) (string, error) {
 	hash, err := NetworkHash(n)
 	if err != nil {
 		return "", err
 	}
 	n.CustomLabels = n.CustomLabels.Add(api.ConfigHashLabel, hash)
+	createOpts, err := s.buildNetworkCreateOptions(n)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
+	if err == nil {
+		return resp.ID, nil
+	}
+
+	// If the network already exists (race with another compose instance),
+	// resolve its ID instead of failing.
+	if !errdefs.IsConflict(err) {
+		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
+	}
+	res, inspectErr := s.apiClient().NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{})
+	if inspectErr != nil {
+		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
+	}
+	return res.Network.ID, nil
+}
+
+// buildNetworkCreateOptions constructs the NetworkCreateOptions from a NetworkConfig.
+func (s *composeService) buildNetworkCreateOptions(n *types.NetworkConfig) (client.NetworkCreateOptions, error) {
 	createOpts := client.NetworkCreateOptions{
 		Labels:     mergeLabels(n.Labels, n.CustomLabels),
 		Driver:     n.Driver,
 		Options:    n.DriverOpts,
 		Internal:   n.Internal,
 		Attachable: n.Attachable,
-		IPAM:       ipam,
 		EnableIPv6: n.EnableIPv6,
 		EnableIPv4: n.EnableIPv4,
 	}
 
 	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
-		createOpts.IPAM = &network.IPAM{}
-	}
-
-	if n.Ipam.Driver != "" {
-		createOpts.IPAM.Driver = n.Ipam.Driver
-	}
-
-	for _, ipamConfig := range n.Ipam.Config {
-		c, err := parseIPAMPool(ipamConfig)
-		if err != nil {
-			return "", err
+		createOpts.IPAM = &network.IPAM{
+			Driver: n.Ipam.Driver,
 		}
-		createOpts.IPAM.Config = append(createOpts.IPAM.Config, c)
-	}
-
-	networkEventName := fmt.Sprintf("Network %s", n.Name)
-	s.events.On(creatingEvent(networkEventName))
-
-	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
-	if err != nil {
-		s.events.On(errorEvent(networkEventName, err.Error()))
-		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
-	}
-	s.events.On(createdEvent(networkEventName))
-
-	err = s.connectNetwork(ctx, n.Name, dangledContainers, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return resp.ID, nil
-}
-
-func (s *composeService) removeDivergedNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (Containers, error) {
-	// Remove services attached to this network to force recreation
-	var services []string
-	for _, service := range project.Services.Filter(func(config types.ServiceConfig) bool {
-		_, ok := config.Networks[name]
-		return ok
-	}) {
-		services = append(services, service.Name)
-	}
-
-	// Stop containers so we can remove network
-	// They will be restarted (actually: recreated) with the updated network
-	err := s.stop(ctx, project.Name, api.StopOptions{
-		Services: services,
-		Project:  project,
-	}, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, services...)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.disconnectNetwork(ctx, n.Name, containers)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.apiClient().NetworkRemove(ctx, n.Name, client.NetworkRemoveOptions{})
-	eventName := fmt.Sprintf("Network %s", n.Name)
-	s.events.On(removedEvent(eventName))
-	return containers, err
-}
-
-func (s *composeService) disconnectNetwork(
-	ctx context.Context,
-	nwName string,
-	containers Containers,
-) error {
-	for _, c := range containers {
-		_, err := s.apiClient().NetworkDisconnect(ctx, nwName, client.NetworkDisconnectOptions{
-			Container: c.ID,
-			Force:     true,
-		})
-		if err != nil {
-			return err
+		for _, ipamConfig := range n.Ipam.Config {
+			c, err := parseIPAMPool(ipamConfig)
+			if err != nil {
+				return client.NetworkCreateOptions{}, err
+			}
+			createOpts.IPAM.Config = append(createOpts.IPAM.Config, c)
 		}
 	}
 
-	return nil
-}
-
-func (s *composeService) connectNetwork(
-	ctx context.Context,
-	nwName string,
-	containers Containers,
-	config *network.EndpointSettings,
-) error {
-	for _, c := range containers {
-		_, err := s.apiClient().NetworkConnect(ctx, nwName, client.NetworkConnectOptions{
-			Container:      c.ID,
-			EndpointConfig: config,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return createOpts, nil
 }
 
 func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.NetworkConfig) (string, error) {
@@ -1591,105 +1493,16 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 }
 
-func (s *composeService) ensureVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) (string, error) {
-	inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name, client.VolumeInspectOptions{})
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return "", err
-		}
-		if volume.External {
-			return "", fmt.Errorf("external volume %q not found", volume.Name)
-		}
-		err = s.createVolume(ctx, volume)
-		return volume.Name, err
-	}
-
-	if volume.External {
-		return volume.Name, nil
-	}
-
-	// Volume exists with name, but let's double-check this is the expected one
-	p, ok := inspected.Volume.Labels[api.ProjectLabel]
-	if !ok {
-		logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
-	}
-	if ok && p != project.Name {
-		logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, p, project.Name)
-	}
-
-	expected, err := VolumeHash(volume)
-	if err != nil {
-		return "", err
-	}
-	actual, ok := inspected.Volume.Labels[api.ConfigHashLabel]
-	if ok && actual != expected {
-		msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
-		confirm, err := s.prompt(msg, false)
-		if err != nil {
-			return "", err
-		}
-		if confirm {
-			err = s.removeDivergedVolume(ctx, name, volume, project)
-			if err != nil {
-				return "", err
-			}
-			return volume.Name, s.createVolume(ctx, volume)
-		}
-	}
-	return inspected.Volume.Name, nil
-}
-
-func (s *composeService) removeDivergedVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) error {
-	// Remove services mounting divergent volume
-	var services []string
-	for _, service := range project.Services.Filter(func(config types.ServiceConfig) bool {
-		for _, cfg := range config.Volumes {
-			if cfg.Source == name {
-				return true
-			}
-		}
-		return false
-	}) {
-		services = append(services, service.Name)
-	}
-
-	err := s.stop(ctx, project.Name, api.StopOptions{
-		Services: services,
-		Project:  project,
-	}, nil)
-	if err != nil {
-		return err
-	}
-
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, services...)
-	if err != nil {
-		return err
-	}
-
-	// FIXME (ndeloof) we have to remove container so we can recreate volume
-	// but doing so we can't inherit anonymous volumes from previous instance
-	err = s.remove(ctx, containers, api.RemoveOptions{
-		Services: services,
-		Project:  project,
-	})
-	if err != nil {
-		return err
-	}
-
-	_, err = s.apiClient().VolumeRemove(ctx, volume.Name, client.VolumeRemoveOptions{
-		Force: true,
-	})
-	return err
-}
-
-func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
-	eventName := fmt.Sprintf("Volume %s", volume.Name)
-	s.events.On(creatingEvent(eventName))
+// createVolumeIdempotent creates a volume or succeeds silently if it already exists.
+// Unlike ensureVolume, this does NOT perform reconciliation (no diverged-volume
+// removal, no user prompt). The reconciliation plan handles those as explicit
+// operations. This method is used by the plan executor.
+func (s *composeService) createVolumeIdempotent(ctx context.Context, volume types.VolumeConfig) error {
 	hash, err := VolumeHash(volume)
 	if err != nil {
 		return err
 	}
-	volume.CustomLabels.Add(api.ConfigHashLabel, hash)
+	volume.CustomLabels = volume.CustomLabels.Add(api.ConfigHashLabel, hash)
 	_, err = s.apiClient().VolumeCreate(ctx, client.VolumeCreateOptions{
 		Labels:     mergeLabels(volume.Labels, volume.CustomLabels),
 		Name:       volume.Name,
@@ -1697,10 +1510,8 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		DriverOpts: volume.DriverOpts,
 	})
 	if err != nil {
-		s.events.On(errorEvent(eventName, err.Error()))
-		return err
+		return fmt.Errorf("failed to create volume %s: %w", volume.Name, err)
 	}
-	s.events.On(createdEvent(eventName))
 	return nil
 }
 
