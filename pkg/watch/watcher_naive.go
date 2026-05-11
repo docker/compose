@@ -114,10 +114,6 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 
 	return filepath.WalkDir(dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
-			if os.IsPermission(err) && d.shouldIgnore(path) {
-				logrus.Debugf("Ignoring path: %s", path)
-				return filepath.SkipDir
-			}
 			return err
 		}
 
@@ -185,10 +181,6 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
 		err := filepath.WalkDir(e.Name, func(path string, info fs.DirEntry, err error) error {
 			if err != nil {
-				if os.IsPermission(err) && d.shouldIgnore(path) {
-					logrus.Debugf("Ignoring path: %s", path)
-					return filepath.SkipDir
-				}
 				return err
 			}
 
@@ -228,6 +220,10 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 }
 
 func (d *naiveNotify) shouldNotify(path string) bool {
+	if d.shouldIgnore(path) {
+		return false
+	}
+
 	if _, ok := d.notifyList[path]; ok {
 		// We generally don't care when directories change at the root of an ADD
 		stat, err := os.Lstat(path)
@@ -249,21 +245,10 @@ func (d *naiveNotify) shouldSkipDir(path string) bool {
 		return false
 	}
 
-	// Suppose we're watching
-	// /src/.tiltignore
-	// but the .tiltignore file doesn't exist.
-	//
-	// Our watcher will create an inotify watch on /src/.
-	//
-	// But then we want to make sure we don't recurse from /src/ down to /src/node_modules.
-	//
-	// To handle this case, we only want to traverse dirs that are:
-	// - A child of a directory that's in our notify list, or
-	// - A parent of a directory that's in our notify list
-	//   (i.e., to cover the "path doesn't exist" case).
-	//
-	// We prioritize "parent of watched path" checks before ignore checks so
-	// one trigger's ignore rules can't hide another trigger's nested watch root.
+	// Only walk directories that are under a notifyList path, or that are under an ancestor of one
+	// (Start() may watch a parent when the target is missing or is a file).
+	// Check ancestor/descendant vs notifyList before ignores
+	// so ignore patterns cannot block reaching the watched root.
 	isChildOfWatchedDir := false
 	for root := range d.notifyList {
 		if pathutil.IsChild(path, root) {
@@ -294,7 +279,7 @@ func (d *naiveNotify) shouldIgnoreEntireDir(path string) bool {
 	if matches {
 		return true
 	}
-	return false
+	return matches
 }
 
 func (d *naiveNotify) shouldIgnore(path string) bool {

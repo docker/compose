@@ -198,10 +198,10 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	eg, ctx := errgroup.WithContext(ctx)
 
 	var (
-		rules          []watchRule
-		paths          []string
-		ignoreMatchers []watch.PathMatcher
+		rules            []watchRule
+		watchRootIgnores map[string][]watch.PathMatcher // abs watch path -> per-trigger ignore matchers
 	)
+	watchRootIgnores = make(map[string][]watch.PathMatcher)
 	for serviceName, service := range project.Services {
 		config, err := loadDevelopmentConfig(service, project)
 		if err != nil {
@@ -259,8 +259,13 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 			if err != nil {
 				return nil, err
 			}
-			ignoreMatchers = append(ignoreMatchers, ignore)
-			paths = append(paths, trigger.Path)
+
+			absPath, err := filepath.Abs(trigger.Path)
+			if err != nil {
+				return nil, err
+			}
+			absPath = filepath.Clean(absPath)
+			watchRootIgnores[absPath] = append(watchRootIgnores[absPath], ignore)
 		}
 
 		serviceWatchRules, err := getWatchRules(config, service)
@@ -270,14 +275,24 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 		rules = append(rules, serviceWatchRules...)
 	}
 
-	if len(paths) == 0 {
+	if len(watchRootIgnores) == 0 {
 		return nil, fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
-	watcher, err := watch.NewWatcher(paths, watch.NewCompositeMatcher(ignoreMatchers...))
-	if err != nil {
-		return nil, err
+	watchers := make([]watch.Notify, 0, len(watchRootIgnores))
+	for path, matchers := range watchRootIgnores {
+		merged := watch.NewIntersectMatcher(matchers...)
+		triggerWatcher, err := watch.NewWatcher([]string{path}, merged)
+		if err != nil {
+			for _, w := range watchers {
+				_ = w.Close()
+			}
+			return nil, err
+		}
+		watchers = append(watchers, triggerWatcher)
 	}
+
+	watcher := watch.NewMultiWatcher(watchers...)
 
 	err = watcher.Start()
 	if err != nil {

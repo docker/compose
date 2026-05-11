@@ -17,11 +17,13 @@
 package watch
 
 import (
+	"errors"
 	"expvar"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 )
 
 var numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
@@ -84,6 +86,83 @@ func NewWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 	return newWatcher(paths, ignore)
 }
 
+type multiNotify struct {
+	children []Notify
+	events   chan FileEvent
+	errors   chan error
+}
+
+func NewMultiWatcher(children ...Notify) Notify {
+	return &multiNotify{
+		children: children,
+		events:   make(chan FileEvent),
+		errors:   make(chan error),
+	}
+}
+
+func (m *multiNotify) Start() error {
+	for i := range m.children {
+		if err := m.children[i].Start(); err != nil {
+			for j := 0; j < i; j++ {
+				_ = m.children[j].Close()
+			}
+			return err
+		}
+	}
+
+	var eventsWG sync.WaitGroup
+	eventsWG.Add(len(m.children))
+	for i := range m.children {
+		child := m.children[i]
+		go func() {
+			defer eventsWG.Done()
+			for e := range child.Events() {
+				m.events <- e
+			}
+		}()
+	}
+	go func() {
+		eventsWG.Wait()
+		close(m.events)
+	}()
+
+	var errorsWG sync.WaitGroup
+	errorsWG.Add(len(m.children))
+	for i := range m.children {
+		child := m.children[i]
+		go func() {
+			defer errorsWG.Done()
+			for err := range child.Errors() {
+				m.errors <- err
+			}
+		}()
+	}
+	go func() {
+		errorsWG.Wait()
+		close(m.errors)
+	}()
+
+	return nil
+}
+
+func (m *multiNotify) Close() error {
+	var errs []error
+	for _, child := range m.children {
+		if err := child.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (m *multiNotify) Events() chan FileEvent {
+	return m.events
+}
+
+func (m *multiNotify) Errors() chan error {
+	return m.errors
+}
+
 const WindowsBufferSizeEnvVar = "COMPOSE_WATCH_WINDOWS_BUFFER_SIZE"
 
 const defaultBufferSize int = 65536
@@ -134,3 +213,48 @@ func (c CompositePathMatcher) MatchesEntireDir(f string) (bool, error) {
 }
 
 var _ PathMatcher = CompositePathMatcher{}
+
+// intersectPathMatcher matches iff every matcher matches. With several develop.watch
+// triggers on one watch root, skip/filter a path only when every trigger's ignores agree.
+type intersectPathMatcher struct {
+	Matchers []PathMatcher
+}
+
+// NewIntersectMatcher returns a PathMatcher that matches iff every matcher matches.
+func NewIntersectMatcher(matchers ...PathMatcher) PathMatcher {
+	if len(matchers) == 0 {
+		return EmptyMatcher{}
+	}
+	if len(matchers) == 1 {
+		return matchers[0]
+	}
+	return intersectPathMatcher{Matchers: matchers}
+}
+
+func (i intersectPathMatcher) Matches(f string) (bool, error) {
+	for _, t := range i.Matchers {
+		ret, err := t.Matches(f)
+		if err != nil {
+			return false, err
+		}
+		if !ret {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (i intersectPathMatcher) MatchesEntireDir(f string) (bool, error) {
+	for _, t := range i.Matchers {
+		ret, err := t.MatchesEntireDir(f)
+		if err != nil {
+			return false, err
+		}
+		if !ret {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+var _ PathMatcher = intersectPathMatcher{}
