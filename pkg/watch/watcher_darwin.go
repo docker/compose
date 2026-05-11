@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsevents"
+	"github.com/sirupsen/logrus"
 
 	pathutil "github.com/docker/compose/v5/internal/paths"
 )
@@ -39,6 +40,7 @@ type fseventNotify struct {
 	stop   chan struct{}
 
 	pathsWereWatching map[string]any
+	ignore            PathMatcher
 	closeOnce         sync.Once
 }
 
@@ -59,6 +61,10 @@ func (d *fseventNotify) loop() {
 				if e.Flags&fsevents.ItemIsDir == fsevents.ItemIsDir && e.Flags&fsevents.ItemCreated == fsevents.ItemCreated && isPathWereWatching {
 					// This is the first create for the path that we're watching. We always get exactly one of these
 					// even after we get the HistoryDone event. Skip it.
+					continue
+				}
+
+				if !d.shouldNotify(e.Path) {
 					continue
 				}
 
@@ -115,7 +121,38 @@ func (d *fseventNotify) Errors() chan error {
 	return d.errors
 }
 
-func newWatcher(paths []string, _ ...PathMatcher) (Notify, error) {
+func (d *fseventNotify) shouldNotify(path string) bool {
+	if d.shouldIgnore(path) {
+		return false
+	}
+
+	if _, ok := d.pathsWereWatching[path]; ok {
+		stat, err := os.Lstat(path)
+		isDir := err == nil && stat.IsDir()
+		return !isDir
+	}
+
+	for root := range d.pathsWereWatching {
+		if pathutil.IsChild(root, path) {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *fseventNotify) shouldIgnore(path string) bool {
+	if d.ignore == nil {
+		return false
+	}
+	matches, err := d.ignore.Matches(path)
+	if err != nil {
+		logrus.Debugf("error checking ignored path %q: %v", path, err)
+		return false
+	}
+	return matches
+}
+
+func newWatcher(paths []string, ignore PathMatcher) (Notify, error) {
 	dw := &fseventNotify{
 		stream: &fsevents.EventStream{
 			Latency: 50 * time.Millisecond,
@@ -127,6 +164,7 @@ func newWatcher(paths []string, _ ...PathMatcher) (Notify, error) {
 		events: make(chan FileEvent),
 		errors: make(chan error),
 		stop:   make(chan struct{}),
+		ignore: ignore,
 	}
 
 	paths = pathutil.EncompassingPaths(paths)
