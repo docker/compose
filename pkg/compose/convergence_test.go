@@ -38,10 +38,12 @@ import (
 
 func TestContainerName(t *testing.T) {
 	s := types.ServiceConfig{
-		Name:          "testservicename",
-		ContainerName: "testcontainername",
-		Scale:         intPtr(1),
-		Deploy:        &types.DeployConfig{},
+		Name:   "testservicename",
+		Scale:  intPtr(1),
+		Deploy: &types.DeployConfig{},
+		ContainerSpec: types.ContainerSpec{
+			ContainerName: "testcontainername",
+		},
 	}
 	ret, err := getScale(s)
 	assert.NilError(t, err)
@@ -95,7 +97,7 @@ func TestServiceLinks(t *testing.T) {
 			Items: []container.Summary{c},
 		}, nil)
 
-		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s.Name, &s.ContainerSpec, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -120,7 +122,7 @@ func TestServiceLinks(t *testing.T) {
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return(client.ContainerListResult{
 			Items: []container.Summary{c},
 		}, nil)
-		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s.Name, &s.ContainerSpec, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -145,7 +147,7 @@ func TestServiceLinks(t *testing.T) {
 			Items: []container.Summary{c},
 		}, nil)
 
-		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s.Name, &s.ContainerSpec, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -171,7 +173,7 @@ func TestServiceLinks(t *testing.T) {
 			Items: []container.Summary{c},
 		}, nil)
 
-		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s.Name, &s.ContainerSpec, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 4)
@@ -209,7 +211,7 @@ func TestServiceLinks(t *testing.T) {
 			Items: []container.Summary{c},
 		}, nil)
 
-		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s, 1)
+		links, err := tested.(*composeService).getLinks(t.Context(), testProject, s.Name, &s.ContainerSpec, 1)
 		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
@@ -418,12 +420,14 @@ func TestCreateMobyContainer(t *testing.T) {
 
 	service := types.ServiceConfig{
 		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"a": {
-				Priority: 10,
-			},
-			"b": {
-				Priority: 100,
+		ContainerSpec: types.ContainerSpec{
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"a": {
+					Priority: 10,
+				},
+				"b": {
+					Priority: 100,
+				},
 			},
 		},
 	}
@@ -457,8 +461,13 @@ func TestCreateMobyContainer(t *testing.T) {
 		},
 	}, nil)
 
-	_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service, "test", 0, nil, createOptions{
-		Labels: make(types.Labels),
+	hash, err := ServiceHash(service)
+	assert.NilError(t, err)
+	_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service.Name, &service.ContainerSpec, service.Deploy, "test", 0, nil, createOptions{
+		Labels: types.Labels{
+			"com.docker.compose.config-hash": hash,
+			"com.docker.compose.depends_on":  "",
+		},
 	})
 	var falseBool bool
 	want := client.ContainerCreateOptions{
@@ -467,7 +476,7 @@ func TestCreateMobyContainer(t *testing.T) {
 			AttachStderr: true,
 			Image:        "bork-test",
 			Labels: map[string]string{
-				"com.docker.compose.config-hash": "8dbce408396f8986266bc5deba0c09cfebac63c95c2238e405c7bee5f1bd84b8",
+				"com.docker.compose.config-hash": hash,
 				"com.docker.compose.depends_on":  "",
 			},
 		},
@@ -517,9 +526,11 @@ func TestCreateMobyContainerLegacyAPI(t *testing.T) {
 
 	service := types.ServiceConfig{
 		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"a": {Priority: 10},
-			"b": {Priority: 100},
+		ContainerSpec: types.ContainerSpec{
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"a": {Priority: 10},
+				"b": {Priority: 100},
+			},
 		},
 	}
 	project := types.Project{
@@ -570,7 +581,7 @@ func TestCreateMobyContainerLegacyAPI(t *testing.T) {
 		},
 	}, nil)
 
-	_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service, "test", 0, nil, createOptions{
+	_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service.Name, &service.ContainerSpec, service.Deploy, "test", 0, nil, createOptions{
 		Labels:            make(types.Labels),
 		UseNetworkAliases: true,
 	})
@@ -606,9 +617,11 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 
 	service := types.ServiceConfig{
 		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"a": {Priority: 10},
-			"b": {Priority: 100},
+		ContainerSpec: types.ContainerSpec{
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"a": {Priority: 10},
+				"b": {Priority: 100},
+			},
 		},
 	}
 	project := types.Project{
@@ -637,7 +650,7 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 			return client.ContainerRemoveResult{}, nil
 		})
 
-	_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service, "test", 0, nil, createOptions{
+	_, err = tested.(*composeService).createMobyContainer(t.Context(), &project, service.Name, &service.ContainerSpec, service.Deploy, "test", 0, nil, createOptions{
 		Labels:            make(types.Labels),
 		UseNetworkAliases: true,
 	})

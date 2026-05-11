@@ -113,10 +113,12 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: envPath, Required: true},
+				Name: "web",
+				ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: envPath, Required: true},
+					},
 				},
 			},
 		},
@@ -138,13 +140,15 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				Volumes: []types.ServiceVolumeConfig{
-					{
-						Type:   types.VolumeTypeBind,
-						Source: "/host/path",
-						Target: "/container/path",
+				Name: "web",
+				ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					Volumes: []types.ServiceVolumeConfig{
+						{
+							Type:   types.VolumeTypeBind,
+							Source: "/host/path",
+							Target: "/container/path",
+						},
 					},
 				},
 			},

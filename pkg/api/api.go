@@ -419,6 +419,7 @@ type RunOptions struct {
 	Project           *types.Project
 	Name              string
 	Service           string
+	Job               string
 	Command           []string
 	Entrypoint        []string
 	Detach            bool
@@ -434,8 +435,18 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
+	Publish           []string
+	Volumes           []string
 	// used by exec
 	Index int
+}
+
+// TargetName returns the effective name of the run target (service or job).
+func (o RunOptions) TargetName() string {
+	if o.Job != "" {
+		return o.Job
+	}
+	return o.Service
 }
 
 // AttachOptions group options of the Attach API
@@ -754,9 +765,13 @@ var Separator = "-"
 
 // GetImageNameOrDefault computes the default image name for a service, used to tag built images
 func GetImageNameOrDefault(service types.ServiceConfig, projectName string) string {
-	imageName := service.Image
-	if imageName == "" {
-		imageName = projectName + Separator + service.Name
+	return ImageNameOrDefault(service.Image, service.Name, projectName)
+}
+
+// ImageNameOrDefault returns image if non-empty, otherwise builds a default from name and projectName.
+func ImageNameOrDefault(image, name, projectName string) string {
+	if image != "" {
+		return image
 	}
-	return imageName
+	return projectName + Separator + name
 }

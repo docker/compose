@@ -1,0 +1,27 @@
+services:
+  db:
+    image: alpine
+    command: sleep infinity
+
+jobs:
+  simple:
+    image: alpine
+    command: echo "job executed"
+
+  with-deps:
+    image: alpine
+    command: echo "job with deps"
+    depends_on:
+      db:
+        condition: service_started
+
+  with-command:
+    image: alpine
+    command: echo "default command"
+
+  with-build:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+        RUN echo "built-job-marker" > /marker.txt
+    command: cat /marker.txt

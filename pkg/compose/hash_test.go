@@ -37,7 +37,9 @@ func serviceConfig(replicas int) types.ServiceConfig {
 		Deploy: &types.DeployConfig{
 			Replicas: &replicas,
 		},
-		Name:  "foo",
-		Image: "bar",
+		Name: "foo",
+		ContainerSpec: types.ContainerSpec{
+			Image: "bar",
+		},
 	}
 }

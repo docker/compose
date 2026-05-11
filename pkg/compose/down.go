@@ -303,7 +303,7 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 
 	if service != nil {
 		for _, hook := range service.PreStop {
-			err := s.runHook(ctx, ctr, *service, hook, listener)
+			err := s.runHook(ctx, ctr, service.Name, service.Tty, hook, listener)
 			if err != nil {
 				// Ignore errors indicating that some containers were already stopped or removed.
 				if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {

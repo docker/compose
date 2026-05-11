@@ -80,7 +80,9 @@ func TestRunHook_ConsoleSize(t *testing.T) {
 
 			service := types.ServiceConfig{
 				Name: "test",
-				Tty:  tc.tty,
+				ContainerSpec: types.ContainerSpec{
+					Tty: tc.tty,
+				},
 			}
 			hook := types.ServiceHook{Command: []string{"echo", "hello"}}
 			ctr := container.Summary{ID: "container123"}
@@ -109,7 +111,7 @@ func TestRunHook_ConsoleSize(t *testing.T) {
 			assert.NilError(t, err)
 
 			noopListener := func(api.ContainerEvent) {}
-			err = s.(*composeService).runHook(t.Context(), ctr, service, hook, noopListener)
+			err = s.(*composeService).runHook(t.Context(), ctr, service.Name, service.Tty, hook, noopListener)
 			assert.NilError(t, err)
 		})
 	}

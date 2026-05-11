@@ -29,20 +29,26 @@ func TestApplyPullOptions(t *testing.T) {
 			"must-build": {
 				Name: "must-build",
 				// No image, local build only
-				Build: &types.BuildConfig{
-					Context: ".",
+				ContainerSpec: types.ContainerSpec{
+					Build: &types.BuildConfig{
+						Context: ".",
+					},
 				},
 			},
 			"has-build": {
-				Name:  "has-build",
-				Image: "registry.example.com/myservice",
-				Build: &types.BuildConfig{
-					Context: ".",
+				Name: "has-build",
+				ContainerSpec: types.ContainerSpec{
+					Image: "registry.example.com/myservice",
+					Build: &types.BuildConfig{
+						Context: ".",
+					},
 				},
 			},
 			"must-pull": {
-				Name:  "must-pull",
-				Image: "registry.example.com/another-service",
+				Name: "must-pull",
+				ContainerSpec: types.ContainerSpec{
+					Image: "registry.example.com/another-service",
+				},
 			},
 		},
 	}

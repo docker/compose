@@ -1,5 +1,5 @@
 command: docker compose run
-short: Run a one-off command on a service
+short: Run a one-off command on a service or job
 long: |-
     Runs a one-time command against a service.
 
@@ -54,7 +54,7 @@ long: |-
 
     This runs a database upgrade script, and removes the container when finished running, even if a restart policy is
     specified in the service configuration.
-usage: docker compose run [OPTIONS] SERVICE [COMMAND] [ARGS...]
+usage: docker compose run [OPTIONS] SERVICE|JOB [COMMAND] [ARGS...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

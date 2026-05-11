@@ -87,7 +87,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			eg.Go(func() error {
 				def := project.Services[service]
 				for _, hook := range def.PreStop {
-					err = s.runHook(ctx, ctr, def, hook, nil)
+					err = s.runHook(ctx, ctr, def.Name, def.Tty, hook, nil)
 					if err != nil {
 						return err
 					}
@@ -102,7 +102,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 				}
 				s.events.On(startedEvent(eventName))
 				for _, hook := range def.PostStart {
-					err = s.runHook(ctx, ctr, def, hook, nil)
+					err = s.runHook(ctx, ctr, def.Name, def.Tty, hook, nil)
 					if err != nil {
 						return err
 					}

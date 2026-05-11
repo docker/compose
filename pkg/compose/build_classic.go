@@ -45,7 +45,7 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, serviceToBuild types.Services, options api.BuildOptions) (map[string]string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, imagesToBuild map[string]types.ContainerSpec, options api.BuildOptions) (map[string]string, error) {
 	imageIDs := map[string]string{}
 
 	// Not using bake, additional_context: service:xx is implemented by building images in dependency order
@@ -82,14 +82,14 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 
 	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "classic"))
-		service, ok := serviceToBuild[name]
+		spec, ok := imagesToBuild[name]
 		if !ok {
 			return nil
 		}
 
-		image := api.GetImageNameOrDefault(service, project.Name)
+		image := api.ImageNameOrDefault(spec.Image, name, project.Name)
 		s.events.On(buildingEvent(image))
-		id, err := s.doBuildImage(ctx, project, service, options)
+		id, err := s.doBuildImage(ctx, project, name, spec, options)
 		if err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 }
 
 //nolint:gocyclo
-func (s *composeService) doBuildImage(ctx context.Context, project *types.Project, service types.ServiceConfig, options api.BuildOptions) (string, error) {
+func (s *composeService) doBuildImage(ctx context.Context, project *types.Project, name string, spec types.ContainerSpec, options api.BuildOptions) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
 		dockerfileCtx io.ReadCloser
@@ -126,29 +126,29 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 		relDockerfile string
 	)
 
-	if len(service.Build.Platforms) > 1 {
+	if len(spec.Build.Platforms) > 1 {
 		return "", fmt.Errorf("the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
-	if service.Build.Privileged {
+	if spec.Build.Privileged {
 		return "", fmt.Errorf("the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
-	if len(service.Build.AdditionalContexts) > 0 {
+	if len(spec.Build.AdditionalContexts) > 0 {
 		return "", fmt.Errorf("the classic builder doesn't support additional contexts, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
-	if len(service.Build.SSH) > 0 {
+	if len(spec.Build.SSH) > 0 {
 		return "", fmt.Errorf("the classic builder doesn't support SSH keys, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
-	if len(service.Build.Secrets) > 0 {
+	if len(spec.Build.Secrets) > 0 {
 		return "", fmt.Errorf("the classic builder doesn't support secrets, set DOCKER_BUILDKIT=1 to use BuildKit")
 	}
 
-	if service.Build.Labels == nil {
-		service.Build.Labels = make(map[string]string)
+	if spec.Build.Labels == nil {
+		spec.Build.Labels = make(map[string]string)
 	}
-	service.Build.Labels[api.ImageBuilderLabel] = "classic"
+	spec.Build.Labels[api.ImageBuilderLabel] = "classic"
 
-	dockerfileName := dockerFilePath(service.Build.Context, service.Build.Dockerfile)
-	specifiedContext := service.Build.Context
+	dockerfileName := dockerFilePath(spec.Build.Context, spec.Build.Dockerfile)
+	specifiedContext := spec.Build.Context
 	progBuff := s.stdout()
 	buildBuff := s.stdout()
 
@@ -251,8 +251,8 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 			RegistryToken: authConfig.RegistryToken,
 		}
 	}
-	buildOpts := imageBuildOptions(s.getProxyConfig(), project, service, options)
-	imageName := api.GetImageNameOrDefault(service, project.Name)
+	buildOpts := imageBuildOptions(s.getProxyConfig(), project, spec, options)
+	imageName := api.ImageNameOrDefault(spec.Image, name, project.Name)
 	buildOpts.Tags = append(buildOpts.Tags, imageName)
 	buildOpts.Dockerfile = relDockerfile
 	buildOpts.AuthConfigs = authConfigs
@@ -293,15 +293,15 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 	return imageID, nil
 }
 
-func imageBuildOptions(proxyConfigs map[string]string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) client.ImageBuildOptions {
-	config := service.Build
+func imageBuildOptions(proxyConfigs map[string]string, project *types.Project, spec types.ContainerSpec, options api.BuildOptions) client.ImageBuildOptions {
+	config := spec.Build
 	return client.ImageBuildOptions{
 		Version:     buildtypes.BuilderV1,
 		Tags:        config.Tags,
 		NoCache:     config.NoCache,
 		Remove:      true,
 		PullParent:  config.Pull,
-		BuildArgs:   resolveAndMergeBuildArgs(proxyConfigs, project, service, options),
+		BuildArgs:   resolveAndMergeBuildArgs(proxyConfigs, project, spec, options),
 		Labels:      config.Labels,
 		NetworkMode: config.Network,
 		ExtraHosts:  config.ExtraHosts.AsList(":"),

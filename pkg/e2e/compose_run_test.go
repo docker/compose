@@ -78,7 +78,7 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Stdout(), "run-test-back"), res.Stdout())
 	})
 
-	t.Run("down", func(t *testing.T) {
+	t.Run("down --remove-orphans", func(t *testing.T) {
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "down", "--remove-orphans")
 		res := c.RunDockerCmd(t, "ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
@@ -276,6 +276,57 @@ func TestLocalComposeRun(t *testing.T) {
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "cannot attach stdin to a TTY-enabled container because stdin is not a terminal",
+		})
+	})
+
+	t.Run("compose run job without dependencies", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "--rm", "simple")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "job executed", res.Stdout())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "down", "--remove-orphans")
+	})
+
+	t.Run("compose run job starts dependencies", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "--rm", "with-deps")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "job with deps", res.Stdout())
+		// db service should have been started as a dependency
+		assert.Assert(t, strings.Contains(res.Combined(), "db"), res.Combined())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "down", "--remove-orphans")
+	})
+
+	t.Run("compose run job with command override", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "--rm", "with-command", "echo", "overridden")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "overridden", res.Stdout())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "down", "--remove-orphans")
+	})
+
+	t.Run("compose run job with --no-deps skips dependencies", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "--rm", "--no-deps", "with-deps")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "job with deps", res.Stdout())
+		// db service should NOT have been started
+		assert.Assert(t, !strings.Contains(res.Combined(), "db Started"), res.Combined())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "down", "--remove-orphans")
+	})
+
+	t.Run("compose run job with build", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "--rm", "--build", "with-build")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "built-job-marker", res.Stdout())
+
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/jobs.yaml", "down", "--remove-orphans", "--rmi=local")
+	})
+
+	t.Run("compose run unknown job or service", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/run-test/jobs.yaml", "run", "nonexistent")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
 		})
 	})
 }

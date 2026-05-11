@@ -35,14 +35,18 @@ func createTestProject() *types.Project {
 		Services: types.Services{
 			"test1": {
 				Name: "test1",
-				DependsOn: map[string]types.ServiceDependency{
-					"test2": {},
+				ContainerSpec: types.ContainerSpec{
+					DependsOn: map[string]types.ServiceDependency{
+						"test2": {},
+					},
 				},
 			},
 			"test2": {
 				Name: "test2",
-				DependsOn: map[string]types.ServiceDependency{
-					"test3": {},
+				ContainerSpec: types.ContainerSpec{
+					DependsOn: map[string]types.ServiceDependency{
+						"test3": {},
+					},
 				},
 			},
 			"test3": {
@@ -54,8 +58,10 @@ func createTestProject() *types.Project {
 
 func TestTraversalWithMultipleParents(t *testing.T) {
 	dependent := types.ServiceConfig{
-		Name:      "dependent",
-		DependsOn: make(types.DependsOnConfig),
+		Name: "dependent",
+		ContainerSpec: types.ContainerSpec{
+			DependsOn: make(types.DependsOnConfig),
+		},
 	}
 
 	project := types.Project{
@@ -124,8 +130,10 @@ func TestBuildGraph(t *testing.T) {
 			desc: "builds graph with single service",
 			services: types.Services{
 				"test": {
-					Name:      "test",
-					DependsOn: types.DependsOnConfig{},
+					Name: "test",
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{},
+					},
 				},
 			},
 			expectedVertices: map[string]*Vertex{
@@ -142,12 +150,16 @@ func TestBuildGraph(t *testing.T) {
 			desc: "builds graph with two separate services",
 			services: types.Services{
 				"test": {
-					Name:      "test",
-					DependsOn: types.DependsOnConfig{},
+					Name: "test",
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{},
+					},
 				},
 				"another": {
-					Name:      "another",
-					DependsOn: types.DependsOnConfig{},
+					Name: "another",
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{},
+					},
 				},
 			},
 			expectedVertices: map[string]*Vertex{
@@ -172,13 +184,17 @@ func TestBuildGraph(t *testing.T) {
 			services: types.Services{
 				"test": {
 					Name: "test",
-					DependsOn: types.DependsOnConfig{
-						"another": types.ServiceDependency{},
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{
+							"another": types.ServiceDependency{},
+						},
 					},
 				},
 				"another": {
-					Name:      "another",
-					DependsOn: types.DependsOnConfig{},
+					Name: "another",
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{},
+					},
 				},
 			},
 			expectedVertices: map[string]*Vertex{
@@ -207,19 +223,25 @@ func TestBuildGraph(t *testing.T) {
 			services: types.Services{
 				"test": {
 					Name: "test",
-					DependsOn: types.DependsOnConfig{
-						"another": types.ServiceDependency{},
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{
+							"another": types.ServiceDependency{},
+						},
 					},
 				},
 				"another": {
 					Name: "another",
-					DependsOn: types.DependsOnConfig{
-						"another_dep": types.ServiceDependency{},
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{
+							"another_dep": types.ServiceDependency{},
+						},
 					},
 				},
 				"another_dep": {
-					Name:      "another_dep",
-					DependsOn: types.DependsOnConfig{},
+					Name: "another_dep",
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{},
+					},
 				},
 			},
 			expectedVertices: map[string]*Vertex{
@@ -284,12 +306,14 @@ func TestBuildGraphDependsOn(t *testing.T) {
 			services: types.Services{
 				"test": {
 					Name: "test",
-					DependsOn: types.DependsOnConfig{
-						"test-removed-init-container": types.ServiceDependency{
-							Condition:  "service_completed_successfully",
-							Restart:    false,
-							Extensions: types.Extensions(nil),
-							Required:   false,
+					ContainerSpec: types.ContainerSpec{
+						DependsOn: types.DependsOnConfig{
+							"test-removed-init-container": types.ServiceDependency{
+								Condition:  "service_completed_successfully",
+								Restart:    false,
+								Extensions: types.Extensions(nil),
+								Required:   false,
+							},
 						},
 					},
 				},

@@ -115,7 +115,7 @@ type buildStatus struct {
 	Image  string `json:"image.name"`
 }
 
-func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
+func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, imagesToBuild map[string]types.ContainerSpec, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
 	displayMode := progressui.DisplayMode(options.Progress)
@@ -143,31 +143,39 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		group          bakeGroup
 		privileged     bool
 		read           []string
-		expectedImages = make(map[string]string, len(serviceToBeBuild)) // service name -> expected image
-		targets        = make(map[string]string, len(serviceToBeBuild)) // service name -> build target
+		expectedImages = make(map[string]string, len(imagesToBuild)) // service name -> expected image
+		targets        = make(map[string]string, len(imagesToBuild)) // service name -> build target
 	)
 
-	// produce a unique ID for service used as bake target
-	for serviceName := range project.Services {
-		t := strings.ReplaceAll(serviceName, ".", "_")
+	// produce a unique ID for each build target (services + jobs)
+	assignTarget := func(name string) {
+		t := strings.ReplaceAll(name, ".", "_")
 		for {
-			if _, ok := targets[serviceName]; !ok {
-				targets[serviceName] = t
-				break
+			if _, ok := targets[name]; !ok {
+				targets[name] = t
+				return
 			}
 			t += "_"
 		}
 	}
+	for serviceName := range project.Services {
+		assignTarget(serviceName)
+	}
+	for name := range imagesToBuild {
+		if _, ok := targets[name]; !ok {
+			assignTarget(name)
+		}
+	}
 
 	var secretsEnv []string
-	for serviceName, service := range project.Services {
-		if service.Build == nil {
-			continue
+	addBakeTarget := func(name string, spec types.ContainerSpec) {
+		if spec.Build == nil {
+			return
 		}
-		buildConfig := *service.Build
-		labels := getImageBuildLabels(project, service)
+		buildConfig := *spec.Build
+		labels := getImageBuildLabels(project, name, spec)
 
-		args := resolveAndMergeBuildArgs(s.getProxyConfig(), project, service, options).ToMapping()
+		args := resolveAndMergeBuildArgs(s.getProxyConfig(), project, spec, options).ToMapping()
 		for k, v := range args {
 			args[k] = strings.ReplaceAll(v, "${", "$${")
 		}
@@ -183,11 +191,11 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 		var outputs []string
 		var call string
-		push := options.Push && service.Image != ""
+		push := options.Push && spec.Image != ""
 		switch {
 		case options.Check:
 			call = "lint"
-		case len(service.Build.Platforms) > 1:
+		case len(spec.Build.Platforms) > 1:
 			outputs = []string{fmt.Sprintf("type=image,push=%t", push)}
 		default:
 			if push {
@@ -205,15 +213,15 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			}
 		}
 
-		image := api.GetImageNameOrDefault(service, project.Name)
+		image := api.ImageNameOrDefault(spec.Image, name, project.Name)
 		s.events.On(buildingEvent(image))
 
-		expectedImages[serviceName] = image
+		expectedImages[name] = image
 
-		pull := service.Build.Pull || options.Pull
-		noCache := service.Build.NoCache || options.NoCache
+		pull := spec.Build.Pull || options.Pull
+		noCache := spec.Build.NoCache || options.NoCache
 
-		target := targets[serviceName]
+		target := targets[name]
 
 		secrets, env := toBakeSecrets(project, buildConfig.Secrets)
 		secretsEnv = append(secretsEnv, env...)
@@ -248,12 +256,22 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		}
 	}
 
-	// create a bake group with targets for services to build
-	for serviceName, service := range serviceToBeBuild {
-		if service.Build == nil {
+	for serviceName, service := range project.Services {
+		addBakeTarget(serviceName, service.ContainerSpec)
+	}
+	for name, spec := range imagesToBuild {
+		if _, ok := project.Services[name]; ok {
+			continue // already processed as a service
+		}
+		addBakeTarget(name, spec)
+	}
+
+	// create a bake group with targets to build
+	for name, spec := range imagesToBuild {
+		if spec.Build == nil {
 			continue
 		}
-		group.Targets = append(group.Targets, targets[serviceName])
+		group.Targets = append(group.Targets, targets[name])
 	}
 
 	cfg.Groups["default"] = group
@@ -397,7 +415,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	results := map[string]string{}
-	for name := range serviceToBeBuild {
+	for name := range imagesToBuild {
 		image := expectedImages[name]
 		target := targets[name]
 		built, ok := md[target]

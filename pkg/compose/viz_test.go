@@ -35,64 +35,74 @@ func TestViz(t *testing.T) {
 		WorkingDir: "/home",
 		Services: types.Services{
 			"service1": {
-				Name:  "service1",
-				Image: "image-for-service1",
-				Ports: []types.ServicePortConfig{
-					{
-						Published: "80",
-						Target:    80,
-						Protocol:  "tcp",
+				Name: "service1",
+				ContainerSpec: types.ContainerSpec{
+					Image: "image-for-service1",
+					Ports: []types.ServicePortConfig{
+						{
+							Published: "80",
+							Target:    80,
+							Protocol:  "tcp",
+						},
+						{
+							Published: "53",
+							Target:    533,
+							Protocol:  "udp",
+						},
 					},
-					{
-						Published: "53",
-						Target:    533,
-						Protocol:  "udp",
+					Networks: map[string]*types.ServiceNetworkConfig{
+						"internal": nil,
 					},
-				},
-				Networks: map[string]*types.ServiceNetworkConfig{
-					"internal": nil,
 				},
 			},
 			"service2": {
-				Name:  "service2",
-				Image: "image-for-service2",
-				Ports: []types.ServicePortConfig{},
+				Name: "service2",
+				ContainerSpec: types.ContainerSpec{
+					Image: "image-for-service2",
+					Ports: []types.ServicePortConfig{},
+				},
 			},
 			"service3": {
-				Name:  "service3",
-				Image: "some-image",
-				DependsOn: map[string]types.ServiceDependency{
-					"service2": {},
-					"service1": {},
+				Name: "service3",
+				ContainerSpec: types.ContainerSpec{
+					Image: "some-image",
+					DependsOn: map[string]types.ServiceDependency{
+						"service2": {},
+						"service1": {},
+					},
 				},
 			},
 			"service4": {
-				Name:  "service4",
-				Image: "another-image",
-				DependsOn: map[string]types.ServiceDependency{
-					"service3": {},
-				},
-				Ports: []types.ServicePortConfig{
-					{
-						Published: "8080",
-						Target:    80,
+				Name: "service4",
+				ContainerSpec: types.ContainerSpec{
+					Image: "another-image",
+					DependsOn: map[string]types.ServiceDependency{
+						"service3": {},
 					},
-				},
-				Networks: map[string]*types.ServiceNetworkConfig{
-					"external": nil,
+					Ports: []types.ServicePortConfig{
+						{
+							Published: "8080",
+							Target:    80,
+						},
+					},
+					Networks: map[string]*types.ServiceNetworkConfig{
+						"external": nil,
+					},
 				},
 			},
 			"With host IP": {
-				Name:  "With host IP",
-				Image: "user/image-name",
-				DependsOn: map[string]types.ServiceDependency{
-					"service1": {},
-				},
-				Ports: []types.ServicePortConfig{
-					{
-						Published: "8888",
-						Target:    8080,
-						HostIP:    "127.0.0.1",
+				Name: "With host IP",
+				ContainerSpec: types.ContainerSpec{
+					Image: "user/image-name",
+					DependsOn: map[string]types.ServiceDependency{
+						"service1": {},
+					},
+					Ports: []types.ServicePortConfig{
+						{
+							Published: "8888",
+							Target:    8080,
+							HostIP:    "127.0.0.1",
+						},
 					},
 				},
 			},

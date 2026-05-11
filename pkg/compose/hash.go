@@ -42,6 +42,19 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	return digest.SHA256.FromBytes(bytes).Encoded(), nil
 }
 
+// ContainerSpecHash computes the configuration hash for a ContainerSpec (used by jobs and one-off containers).
+func ContainerSpecHash(o types.ContainerSpec) (string, error) {
+	o.Build = nil
+	o.PullPolicy = ""
+	o.DependsOn = nil
+
+	bytes, err := json.Marshal(o)
+	if err != nil {
+		return "", err
+	}
+	return digest.SHA256.FromBytes(bytes).Encoded(), nil
+}
+
 // NetworkHash computes the configuration hash for a network.
 func NetworkHash(o *types.NetworkConfig) (string, error) {
 	bytes, err := json.Marshal(o)

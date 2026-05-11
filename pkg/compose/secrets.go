@@ -35,16 +35,16 @@ const (
 	configMount mountType = "config"
 )
 
-func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
-	return s.injectFileReferences(ctx, project, service, id, secretMount)
+func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, name string, spec *types.ContainerSpec, id string) error {
+	return s.injectFileReferences(ctx, project, name, spec, id, secretMount)
 }
 
-func (s *composeService) injectConfigs(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
-	return s.injectFileReferences(ctx, project, service, id, configMount)
+func (s *composeService) injectConfigs(ctx context.Context, project *types.Project, name string, spec *types.ContainerSpec, id string) error {
+	return s.injectFileReferences(ctx, project, name, spec, id, configMount)
 }
 
-func (s *composeService) injectFileReferences(ctx context.Context, project *types.Project, service types.ServiceConfig, id string, mountType mountType) error {
-	mounts, sources := s.getFilesAndMap(project, service, mountType)
+func (s *composeService) injectFileReferences(ctx context.Context, project *types.Project, name string, spec *types.ContainerSpec, id string, mountType mountType) error {
+	mounts, sources := getFilesAndMap(project, spec, mountType)
 
 	for _, mount := range mounts {
 		content, err := s.resolveFileContent(project, sources[mount.Source], mountType)
@@ -55,8 +55,8 @@ func (s *composeService) injectFileReferences(ctx context.Context, project *type
 			continue
 		}
 
-		if service.ReadOnly {
-			return fmt.Errorf("cannot create %s %q in read-only service %s: `file` is the sole supported option", mountType, sources[mount.Source].Name, service.Name)
+		if spec.ReadOnly {
+			return fmt.Errorf("cannot create %s %q in read-only service %s: `file` is the sole supported option", mountType, sources[mount.Source].Name, name)
 		}
 
 		s.setDefaultTarget(&mount, mountType)
@@ -68,14 +68,14 @@ func (s *composeService) injectFileReferences(ctx context.Context, project *type
 	return nil
 }
 
-func (s *composeService) getFilesAndMap(project *types.Project, service types.ServiceConfig, mountType mountType) ([]types.FileReferenceConfig, map[string]types.FileObjectConfig) {
+func getFilesAndMap(project *types.Project, spec *types.ContainerSpec, mountType mountType) ([]types.FileReferenceConfig, map[string]types.FileObjectConfig) {
 	var files []types.FileReferenceConfig
 	var fileMap map[string]types.FileObjectConfig
 
 	switch mountType {
 	case secretMount:
-		files = make([]types.FileReferenceConfig, len(service.Secrets))
-		for i, config := range service.Secrets {
+		files = make([]types.FileReferenceConfig, len(spec.Secrets))
+		for i, config := range spec.Secrets {
 			files[i] = types.FileReferenceConfig(config)
 		}
 		fileMap = make(map[string]types.FileObjectConfig)
@@ -83,8 +83,8 @@ func (s *composeService) getFilesAndMap(project *types.Project, service types.Se
 			fileMap[k] = types.FileObjectConfig(v)
 		}
 	case configMount:
-		files = make([]types.FileReferenceConfig, len(service.Configs))
-		for i, config := range service.Configs {
+		files = make([]types.FileReferenceConfig, len(spec.Configs))
+		for i, config := range spec.Configs {
 			files[i] = types.FileReferenceConfig(config)
 		}
 		fileMap = make(map[string]types.FileObjectConfig)

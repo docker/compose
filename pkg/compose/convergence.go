@@ -130,7 +130,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	err = c.resolveServiceReferences(&service)
+	err = c.resolveContainerReferences(&service.ContainerSpec)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	for i := 0; i < expected-actual; i++ {
 		// Scale UP
 		number := next + i
-		name := getContainerName(project.Name, service, number)
+		name := getContainerName(project.Name, service.Name, service.ContainerName, number)
 		eventOpts := tracing.SpanOptions{trace.WithAttributes(attribute.String("container.name", name))}
 		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/scale/up", eventOpts, func(ctx context.Context) error {
 			opts := createOptions{
@@ -268,66 +268,66 @@ func getScale(config types.ServiceConfig) (int, error) {
 	return scale, nil
 }
 
-// resolveServiceReferences replaces reference to another service with reference to an actual container
-func (c *convergence) resolveServiceReferences(service *types.ServiceConfig) error {
-	err := c.resolveVolumeFrom(service)
+// resolveContainerReferences replaces reference to another service with reference to an actual container
+func (c *convergence) resolveContainerReferences(spec *types.ContainerSpec) error {
+	err := c.resolveVolumeFrom(spec)
 	if err != nil {
 		return err
 	}
 
-	err = c.resolveSharedNamespaces(service)
+	err = c.resolveSharedNamespaces(spec)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
-	for i, vol := range service.VolumesFrom {
-		spec := strings.Split(vol, ":")
-		if len(spec) == 0 {
+func (c *convergence) resolveVolumeFrom(spec *types.ContainerSpec) error {
+	for i, vol := range spec.VolumesFrom {
+		parts := strings.Split(vol, ":")
+		if len(parts) == 0 {
 			continue
 		}
-		if spec[0] == "container" {
-			service.VolumesFrom[i] = spec[1]
+		if parts[0] == "container" {
+			spec.VolumesFrom[i] = parts[1]
 			continue
 		}
-		name := spec[0]
+		name := parts[0]
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share volume with service %s: container missing", name)
 		}
-		service.VolumesFrom[i] = dependencies.sorted()[0].ID
+		spec.VolumesFrom[i] = dependencies.sorted()[0].ID
 	}
 	return nil
 }
 
-func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) error {
-	str := service.NetworkMode
+func (c *convergence) resolveSharedNamespaces(spec *types.ContainerSpec) error {
+	str := spec.NetworkMode
 	if name := getDependentServiceFromMode(str); name != "" {
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
 		}
-		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
+		spec.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	str = service.Ipc
+	str = spec.Ipc
 	if name := getDependentServiceFromMode(str); name != "" {
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
 		}
-		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
+		spec.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	str = service.Pid
+	str = spec.Pid
 	if name := getDependentServiceFromMode(str); name != "" {
 		dependencies := c.getObservedState(name)
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
 		}
-		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
+		spec.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
 	return nil
@@ -416,10 +416,10 @@ func checkExpectedVolumes(expected types.ServiceConfig, actual container.Summary
 	return false
 }
 
-func getContainerName(projectName string, service types.ServiceConfig, number int) string {
-	name := getDefaultContainerName(projectName, service.Name, strconv.Itoa(number))
-	if service.ContainerName != "" {
-		name = service.ContainerName
+func getContainerName(projectName string, serviceName string, containerName string, number int) string {
+	name := getDefaultContainerName(projectName, serviceName, strconv.Itoa(number))
+	if containerName != "" {
+		name = containerName
 	}
 	return name
 }
@@ -604,9 +604,16 @@ func nextContainerNumber(containers []container.Summary) int {
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
 	name string, number int, opts createOptions,
 ) (ctr container.Summary, err error) {
+	hash, err := ServiceHash(service)
+	if err != nil {
+		return ctr, err
+	}
+	opts.Labels[api.ConfigHashLabel] = hash
+	opts.Labels[api.DependenciesLabel] = formatDependencies(service.DependsOn)
+
 	eventName := "Container " + name
 	s.events.On(creatingEvent(eventName))
-	ctr, err = s.createMobyContainer(ctx, project, service, name, number, nil, opts)
+	ctr, err = s.createMobyContainer(ctx, project, service.Name, &service.ContainerSpec, service.Deploy, name, number, nil, opts)
 	if err != nil {
 		if ctx.Err() == nil {
 			s.events.On(api.Resource{
@@ -650,15 +657,22 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if replacedContainerName == "" {
 		replacedContainerName = service.Name + api.Separator + strconv.Itoa(number)
 	}
-	name := getContainerName(project.Name, service, number)
+	name := getContainerName(project.Name, service.Name, service.ContainerName, number)
 	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
+	hash, err := ServiceHash(service)
+	if err != nil {
+		return created, err
+	}
 	opts := createOptions{
 		AutoRemove:        false,
 		AttachStdin:       false,
 		UseNetworkAliases: true,
-		Labels:            mergeLabels(service.Labels, service.CustomLabels).Add(api.ContainerReplaceLabel, replacedContainerName),
+		Labels: mergeLabels(service.Labels, service.CustomLabels).
+			Add(api.ContainerReplaceLabel, replacedContainerName).
+			Add(api.ConfigHashLabel, hash).
+			Add(api.DependenciesLabel, formatDependencies(service.DependsOn)),
 	}
-	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited, opts)
+	created, err = s.createMobyContainer(ctx, project, service.Name, &service.ContainerSpec, service.Deploy, tmpName, number, inherited, opts)
 	if err != nil {
 		return created, err
 	}
@@ -700,15 +714,16 @@ func (s *composeService) startContainer(ctx context.Context, ctr container.Summa
 	return nil
 }
 
-func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
+func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project,
+	serviceName string, spec *types.ContainerSpec, deploy *types.DeployConfig,
 	name string, number int, inherit *container.Summary, opts createOptions,
 ) (container.Summary, error) {
 	var created container.Summary
-	cfgs, err := s.getCreateConfigs(ctx, project, service, number, inherit, opts)
+	cfgs, err := s.getCreateConfigs(ctx, project, serviceName, spec, deploy, number, inherit, opts)
 	if err != nil {
 		return created, err
 	}
-	platform := service.Platform
+	platform := spec.Platform
 	if platform == "" {
 		platform = project.Environment["DOCKER_DEFAULT_PLATFORM"]
 	}
@@ -734,7 +749,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	}
 	for _, warning := range response.Warnings {
 		s.events.On(api.Resource{
-			ID:     service.Name,
+			ID:     serviceName,
 			Status: api.Warning,
 			Text:   warning,
 		})
@@ -748,14 +763,14 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		return created, err
 	}
 	if versions.LessThan(apiVersion, apiVersion144) {
-		serviceNetworks := service.NetworksByPriority()
+		serviceNetworks := spec.NetworksByPriority()
 		for _, networkKey := range serviceNetworks {
 			mobyNetworkName := project.Networks[networkKey].Name
 			if string(cfgs.Host.NetworkMode) == mobyNetworkName {
 				// primary network already configured as part of ContainerCreate
 				continue
 			}
-			epSettings, err := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
+			epSettings, err := createEndpointSettings(project, serviceName, spec, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
 			if err != nil {
 				_, _ = s.apiClient().ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
 				return created, err
@@ -787,16 +802,16 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 }
 
 // getLinks mimics V1 compose/service.py::Service::_get_links()
-func (s *composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) ([]string, error) {
+func (s *composeService) getLinks(ctx context.Context, projectName string, serviceName string, spec *types.ContainerSpec, number int) ([]string, error) {
 	var links []string
 	format := func(k, v string) string {
 		return fmt.Sprintf("%s:%s", k, v)
 	}
-	getServiceContainers := func(serviceName string) (Containers, error) {
-		return s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+	getServiceContainers := func(svcName string) (Containers, error) {
+		return s.getContainers(ctx, projectName, oneOffExclude, true, svcName)
 	}
 
-	for _, rawLink := range service.Links {
+	for _, rawLink := range spec.Links {
 		// linkName if informed like in: "serviceName[:linkName]"
 		linkServiceName, linkName, ok := strings.Cut(rawLink, ":")
 		if !ok {
@@ -816,22 +831,22 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 		}
 	}
 
-	if service.Labels[api.OneoffLabel] == "True" {
-		cnts, err := getServiceContainers(service.Name)
+	if spec.Labels[api.OneoffLabel] == "True" {
+		cnts, err := getServiceContainers(serviceName)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range cnts {
 			containerName := getCanonicalContainerName(c)
 			links = append(links,
-				format(containerName, service.Name),
+				format(containerName, serviceName),
 				format(containerName, strings.TrimPrefix(containerName, projectName+api.Separator)),
 				format(containerName, containerName),
 			)
 		}
 	}
 
-	for _, rawExtLink := range service.ExternalLinks {
+	for _, rawExtLink := range spec.ExternalLinks {
 		externalLink, linkName, ok := strings.Cut(rawExtLink, ":")
 		if !ok {
 			linkName = externalLink
@@ -916,12 +931,12 @@ func (s *composeService) startService(ctx context.Context,
 			continue
 		}
 
-		err = s.injectSecrets(ctx, project, service, ctr.ID)
+		err = s.injectSecrets(ctx, project, service.Name, &service.ContainerSpec, ctr.ID)
 		if err != nil {
 			return err
 		}
 
-		err = s.injectConfigs(ctx, project, service, ctr.ID)
+		err = s.injectConfigs(ctx, project, service.Name, &service.ContainerSpec, ctr.ID)
 		if err != nil {
 			return err
 		}
@@ -934,7 +949,7 @@ func (s *composeService) startService(ctx context.Context,
 		}
 
 		for _, hook := range service.PostStart {
-			err = s.runHook(ctx, ctr, service, hook, listener)
+			err = s.runHook(ctx, ctr, service.Name, service.Tty, hook, listener)
 			if err != nil {
 				return err
 			}
@@ -943,6 +958,14 @@ func (s *composeService) startService(ctx context.Context,
 		s.events.On(startedEvent(eventName))
 	}
 	return nil
+}
+
+func formatDependencies(dependsOn types.DependsOnConfig) string {
+	var dependencies []string
+	for s, d := range dependsOn {
+		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", s, d.Condition, d.Restart))
+	}
+	return strings.Join(dependencies, ",")
 }
 
 func mergeLabels(ls ...types.Labels) types.Labels {

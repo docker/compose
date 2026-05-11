@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"slices"
 
+	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
@@ -31,13 +32,23 @@ import (
 	"github.com/moby/moby/api/types/events"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/stringid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// runTarget is the internal representation of a run target (service or job).
+// It carries only what's needed for one-off container execution: a name and
+// the container specification. ServiceConfig-only fields (Deploy, Scale, Profiles)
+// are intentionally excluded.
+type runTarget struct {
+	Name string
+	types.ContainerSpec
+}
+
 type prepareRunResult struct {
 	containerID string
-	service     types.ServiceConfig
+	target      runTarget
 	created     container.Summary
 }
 
@@ -55,15 +66,15 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	go cmd.ForwardAllSignals(ctx, s.apiClient(), result.containerID, sigc)
 	defer signal.Stop(sigc)
 
-	// If the service has post_start hooks, set up a goroutine that waits for
+	// If the target has post_start hooks, set up a goroutine that waits for
 	// the container to start and then executes them. This is needed because
 	// cmd.RunStart both starts and attaches to the container in one call,
 	// so we can't run hooks sequentially between start and attach.
 	var hookErrCh chan error
-	if len(result.service.PostStart) > 0 {
+	if len(result.target.PostStart) > 0 {
 		hookErrCh = make(chan error, 1)
 		go func() {
-			hookErrCh <- s.runPostStartHooksOnEvent(ctx, result.containerID, result.service, result.created)
+			hookErrCh <- s.runPostStartHooksOnEvent(ctx, result.containerID, result.target, result.created)
 		}()
 	}
 
@@ -90,7 +101,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 
 // runPostStartHooksOnEvent listens for the container's start event and executes
 // post_start lifecycle hooks once the container is running.
-func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, containerID string, service types.ServiceConfig, ctr container.Summary) error {
+func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, containerID string, target runTarget, ctr container.Summary) error {
 	evtCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -111,8 +122,8 @@ func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, container
 		// Container started, run hooks
 	}
 
-	for _, hook := range service.PostStart {
-		if err := s.runHook(ctx, ctr, service, hook, nil); err != nil {
+	for _, hook := range target.PostStart {
+		if err := s.runHook(ctx, ctr, target.Name, target.Tty, hook, nil); err != nil {
 			return err
 		}
 	}
@@ -133,34 +144,28 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	service, err := project.GetService(opts.Service)
+	target, err := resolveRunTarget(project, opts)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
 
-	applyRunOptions(project, &service, opts)
+	applyRunOptions(project, &target, opts)
 
-	if err := s.stdin().CheckTty(opts.Interactive, service.Tty); err != nil {
+	if err := s.stdin().CheckTty(opts.Interactive, target.Tty); err != nil {
 		return prepareRunResult{}, err
 	}
 
 	slug := stringid.GenerateRandomID()
-	if service.ContainerName == "" {
-		service.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, service.Name, stringid.TruncateID(slug), api.Separator)
+	if target.ContainerName == "" {
+		target.ContainerName = fmt.Sprintf("%[1]s%[4]s%[2]s%[4]srun%[4]s%[3]s", project.Name, target.Name, stringid.TruncateID(slug), api.Separator)
 	}
-	one := 1
-	service.Scale = &one
-	service.Restart = ""
-	if service.Deploy != nil {
-		service.Deploy.RestartPolicy = nil
-	}
-	service.CustomLabels = service.CustomLabels.
+	target.Restart = ""
+	target.CustomLabels = target.CustomLabels.
 		Add(api.SlugLabel, slug).
 		Add(api.OneoffLabel, "True")
 
-	// Only ensure image exists for the target service, dependencies were already handled by startDependencies
 	buildOpts := prepareBuildOptions(opts)
-	if err := s.ensureImagesExists(ctx, project, buildOpts, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
+	if err := s.ensureImagesExists(ctx, project, buildOpts, opts.QuietPull); err != nil {
 		return prepareRunResult{}, err
 	}
 
@@ -170,18 +175,12 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 
 	if !opts.NoDeps {
-		if err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, observedState, 0); err != nil {
+		if err := s.waitDependencies(ctx, project, target.Name, target.DependsOn, observedState, 0); err != nil {
 			return prepareRunResult{}, err
 		}
 	}
-	createOpts := createOptions{
-		AutoRemove:        opts.AutoRemove,
-		AttachStdin:       opts.Interactive,
-		UseNetworkAliases: opts.UseNetworkAliases,
-		Labels:            mergeLabels(service.Labels, service.CustomLabels),
-	}
 
-	err = newConvergence(project.ServiceNames(), observedState, nil, nil, s).resolveServiceReferences(&service)
+	err = newConvergence(project.ServiceNames(), observedState, nil, nil, s).resolveContainerReferences(&target.ContainerSpec)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
@@ -191,86 +190,144 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	created, err := s.createContainer(ctx, project, service, service.ContainerName, -1, createOpts)
+	created, err := s.createOneOffContainer(ctx, project, target, opts)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
 
-	inspect, err := s.apiClient().ContainerInspect(ctx, created.ID, client.ContainerInspectOptions{})
-	if err != nil {
-		return prepareRunResult{}, err
-	}
-
-	err = s.injectSecrets(ctx, project, service, inspect.Container.ID)
+	err = s.injectSecrets(ctx, project, target.Name, &target.ContainerSpec, created.ID)
 	if err != nil {
 		return prepareRunResult{containerID: created.ID}, err
 	}
 
-	err = s.injectConfigs(ctx, project, service, inspect.Container.ID)
+	err = s.injectConfigs(ctx, project, target.Name, &target.ContainerSpec, created.ID)
 	return prepareRunResult{
 		containerID: created.ID,
-		service:     service,
+		target:      target,
 		created:     created,
 	}, err
+}
+
+// resolveRunTarget looks up the run target (service or job) in the project
+// and returns a runTarget carrying only Name + ContainerSpec.
+func resolveRunTarget(project *types.Project, opts api.RunOptions) (runTarget, error) {
+	if opts.Job != "" {
+		job, ok := project.Jobs[opts.Job]
+		if !ok {
+			return runTarget{}, fmt.Errorf("no such job: %s", opts.Job)
+		}
+		return runTarget{Name: job.Name, ContainerSpec: job.ContainerSpec}, nil
+	}
+	service, err := project.GetService(opts.Service)
+	if err != nil {
+		return runTarget{}, err
+	}
+	return runTarget{Name: service.Name, ContainerSpec: service.ContainerSpec}, nil
+}
+
+func (s *composeService) createOneOffContainer(ctx context.Context, project *types.Project, target runTarget, opts api.RunOptions) (container.Summary, error) {
+	hash, err := ContainerSpecHash(target.ContainerSpec)
+	if err != nil {
+		return container.Summary{}, err
+	}
+	createOpts := createOptions{
+		AutoRemove:        opts.AutoRemove,
+		AttachStdin:       opts.Interactive,
+		UseNetworkAliases: opts.UseNetworkAliases,
+		Labels: mergeLabels(target.Labels, target.CustomLabels).
+			Add(api.ConfigHashLabel, hash),
+	}
+
+	eventName := "Container " + target.ContainerName
+	s.events.On(creatingEvent(eventName))
+	created, err := s.createMobyContainer(ctx, project, target.Name, &target.ContainerSpec, nil, target.ContainerName, -1, nil, createOpts)
+	if err != nil {
+		if ctx.Err() == nil {
+			s.events.On(api.Resource{
+				ID:     eventName,
+				Status: api.Error,
+				Text:   err.Error(),
+			})
+		}
+		return container.Summary{}, err
+	}
+	s.events.On(createdEvent(eventName))
+	return created, nil
 }
 
 func prepareBuildOptions(opts api.RunOptions) *api.BuildOptions {
 	if opts.Build == nil {
 		return nil
 	}
-	// Create a copy of build options and restrict to only the target service
+	// Create a copy of build options and restrict to only the target service/job
 	buildOptsCopy := *opts.Build
-	buildOptsCopy.Services = []string{opts.Service}
+	buildOptsCopy.Services = []string{opts.TargetName()}
 	return &buildOptsCopy
 }
 
-func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
-	service.Tty = opts.Tty
-	service.StdinOpen = opts.Interactive
-	service.ContainerName = opts.Name
+func applyRunOptions(project *types.Project, target *runTarget, opts api.RunOptions) {
+	target.Tty = opts.Tty
+	target.StdinOpen = opts.Interactive
+	target.ContainerName = opts.Name
 
 	if len(opts.Command) > 0 {
-		service.Command = opts.Command
+		target.Command = opts.Command
 	}
 	if opts.User != "" {
-		service.User = opts.User
+		target.User = opts.User
 	}
 
 	if len(opts.CapAdd) > 0 {
-		service.CapAdd = append(service.CapAdd, opts.CapAdd...)
-		service.CapDrop = slices.DeleteFunc(service.CapDrop, func(e string) bool { return slices.Contains(opts.CapAdd, e) })
+		target.CapAdd = append(target.CapAdd, opts.CapAdd...)
+		target.CapDrop = slices.DeleteFunc(target.CapDrop, func(e string) bool { return slices.Contains(opts.CapAdd, e) })
 	}
 	if len(opts.CapDrop) > 0 {
-		service.CapDrop = append(service.CapDrop, opts.CapDrop...)
-		service.CapAdd = slices.DeleteFunc(service.CapAdd, func(e string) bool { return slices.Contains(opts.CapDrop, e) })
+		target.CapDrop = append(target.CapDrop, opts.CapDrop...)
+		target.CapAdd = slices.DeleteFunc(target.CapAdd, func(e string) bool { return slices.Contains(opts.CapDrop, e) })
 	}
 	if opts.WorkingDir != "" {
-		service.WorkingDir = opts.WorkingDir
+		target.WorkingDir = opts.WorkingDir
 	}
 	if opts.Entrypoint != nil {
-		service.Entrypoint = opts.Entrypoint
+		target.Entrypoint = opts.Entrypoint
 		if len(opts.Command) == 0 {
-			service.Command = []string{}
+			target.Command = []string{}
 		}
 	}
 	if len(opts.Environment) > 0 {
 		cmdEnv := types.NewMappingWithEquals(opts.Environment)
-		serviceOverrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
+		overrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
 			v, ok := envResolver(project.Environment)(s)
 			return v, ok
 		}).RemoveEmpty()
-		if service.Environment == nil {
-			service.Environment = types.MappingWithEquals{}
+		if target.Environment == nil {
+			target.Environment = types.MappingWithEquals{}
 		}
-		service.Environment.OverrideBy(serviceOverrideEnv)
+		target.Environment.OverrideBy(overrideEnv)
 	}
 	for k, v := range opts.Labels {
-		service.Labels = service.Labels.Add(k, v)
+		target.Labels = target.Labels.Add(k, v)
+	}
+	for _, p := range opts.Publish {
+		config, err := types.ParsePortConfig(p)
+		if err != nil {
+			logrus.Warnf("invalid publish value %q: %v", p, err)
+			continue
+		}
+		target.Ports = append(target.Ports, config...)
+	}
+	for _, v := range opts.Volumes {
+		volume, err := format.ParseVolume(v)
+		if err != nil {
+			logrus.Warnf("invalid volume value %q: %v", v, err)
+			continue
+		}
+		target.Volumes = append(target.Volumes, volume)
 	}
 }
 
 func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {
-	project = project.WithServicesDisabled(options.Service)
+	project = project.WithServicesDisabled(options.TargetName())
 
 	err := s.Create(ctx, project, api.CreateOptions{
 		Build:         options.Build,

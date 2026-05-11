@@ -24,7 +24,6 @@ import (
 
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
-	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -43,7 +42,7 @@ import (
 
 type runOptions struct {
 	*composeOptions
-	Service       string
+	ServiceOrJob  string
 	Command       []string
 	environment   []string
 	envFiles      []string
@@ -70,16 +69,24 @@ type runOptions struct {
 	quietPull     bool
 }
 
-func (options runOptions) apply(project *types.Project) (*types.Project, error) {
+func (options runOptions) apply(project *types.Project, isJob bool) (*types.Project, error) {
 	if options.noDeps {
 		var err error
-		project, err = project.WithSelectedServices([]string{options.Service}, types.IgnoreDependencies)
+		if isJob {
+			project, err = project.WithSelectedJob(options.ServiceOrJob, types.IgnoreDependencies)
+		} else {
+			project, err = project.WithSelectedServices([]string{options.ServiceOrJob}, types.IgnoreDependencies)
+		}
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	target, err := project.GetService(options.Service)
+	if isJob {
+		return project, nil
+	}
+
+	target, err := project.GetService(options.ServiceOrJob)
 	if err != nil {
 		return nil, err
 	}
@@ -87,31 +94,17 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	target.Tty = !options.noTty
 	target.StdinOpen = options.interactive
 
-	// --service-ports and --publish are incompatible
+	// For services, ports are stripped unless --service-ports is set.
+	// Jobs always keep their declared ports (handled in applyRunOptions).
 	if !options.servicePorts {
 		if len(target.Ports) > 0 {
 			logrus.Debug("Running service without ports exposed as --service-ports=false")
 		}
 		target.Ports = []types.ServicePortConfig{}
-		for _, p := range options.publish {
-			config, err := types.ParsePortConfig(p)
-			if err != nil {
-				return nil, err
-			}
-			target.Ports = append(target.Ports, config...)
-		}
-	}
-
-	for _, v := range options.volumes {
-		volume, err := format.ParseVolume(v)
-		if err != nil {
-			return nil, err
-		}
-		target.Volumes = append(target.Volumes, volume)
 	}
 
 	for name := range project.Services {
-		if name == options.Service {
+		if name == options.ServiceOrJob {
 			project.Services[name] = target
 			break
 		}
@@ -159,11 +152,11 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 	var ttyFlag bool
 
 	cmd := &cobra.Command{
-		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
-		Short: "Run a one-off command on a service",
+		Use:   "run [OPTIONS] SERVICE|JOB [COMMAND] [ARGS...]",
+		Short: "Run a one-off command on a service or job",
 		Args:  cobra.MinimumNArgs(1),
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
-			options.Service = args[0]
+			options.ServiceOrJob = args[0]
 			if len(args) > 1 {
 				options.Command = args[1:]
 			}
@@ -177,18 +170,8 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				}
 				options.entrypointCmd = command
 			}
-			if cmd.Flags().Changed("tty") {
-				if cmd.Flags().Changed("no-TTY") {
-					return fmt.Errorf("--tty and --no-TTY can't be used together")
-				} else {
-					options.noTty = !ttyFlag
-				}
-			} else if !cmd.Flags().Changed("no-TTY") && !cmd.Flags().Changed("interactive") && !dockerCli.In().IsTerminal() {
-				// while `docker run` requires explicit `-it` flags, Compose enables interactive mode and TTY by default
-				// but when compose is used from a script that has stdin piped from another command, we just can't
-				// Here, we detect we run "by default" (user didn't passed explicit flags) and disable TTY allocation if
-				// we don't have an actual terminal to attach to for interactive mode
-				options.noTty = true
+			if err := resolveTTYFlag(cmd, &options, ttyFlag, dockerCli.In().IsTerminal()); err != nil {
+				return err
 			}
 
 			if options.quiet {
@@ -204,10 +187,12 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				return err
 			}
 
-			project, _, err := p.ToProject(ctx, dockerCli, backend, []string{options.Service}, composecli.WithoutEnvironmentResolution)
+			project, _, err := p.ToProject(ctx, dockerCli, backend, []string{options.ServiceOrJob}, composecli.WithoutEnvironmentResolution)
 			if err != nil {
 				return err
 			}
+
+			isJob := isJobName(project, options.ServiceOrJob)
 
 			project, err = project.WithServicesEnvironmentResolved(true)
 			if err != nil {
@@ -219,7 +204,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 			}
 
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
+			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli, isJob)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
@@ -257,7 +242,19 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 	return cmd
 }
 
-func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
+func resolveTTYFlag(cmd *cobra.Command, options *runOptions, ttyFlag bool, isTerminal bool) error {
+	if cmd.Flags().Changed("tty") {
+		if cmd.Flags().Changed("no-TTY") {
+			return fmt.Errorf("--tty and --no-TTY can't be used together")
+		}
+		options.noTty = !ttyFlag
+	} else if !cmd.Flags().Changed("no-TTY") && !cmd.Flags().Changed("interactive") && !isTerminal {
+		options.noTty = true
+	}
+	return nil
+}
+
+func normalizeRunFlags(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 	switch name {
 	case "volumes":
 		name = "volume"
@@ -267,8 +264,8 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
-	project, err := options.apply(project)
+func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli, isJob bool) error {
+	project, err := options.apply(project, isJob)
 	if err != nil {
 		return err
 	}
@@ -314,7 +311,6 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 			QuietPull:     options.quietPull,
 		},
 		Name:              options.name,
-		Service:           options.Service,
 		Command:           options.Command,
 		Detach:            options.Detach,
 		AutoRemove:        options.Remove,
@@ -329,11 +325,18 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		Labels:            labels,
 		UseNetworkAliases: options.useAliases,
 		NoDeps:            options.noDeps,
+		Publish:           options.publish,
+		Volumes:           options.volumes,
 		Index:             0,
+	}
+	if isJob {
+		runOpts.Job = options.ServiceOrJob
+	} else {
+		runOpts.Service = options.ServiceOrJob
 	}
 
 	for name, service := range project.Services {
-		if name == options.Service {
+		if name == options.ServiceOrJob {
 			service.StdinOpen = options.interactive
 			project.Services[name] = service
 		}
@@ -348,4 +351,13 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
+}
+
+// isJobName returns true if name refers to a job in the project (and not a service).
+func isJobName(project *types.Project, name string) bool {
+	if _, ok := project.Services[name]; ok {
+		return false
+	}
+	_, ok := project.Jobs[name]
+	return ok
 }
