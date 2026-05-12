@@ -18,6 +18,7 @@ package compose
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/moby/moby/client"
 
@@ -46,9 +47,9 @@ func oneOffFilter(b bool) string {
 	if b {
 		v = "True"
 	}
-	return fmt.Sprintf("%s=%s", api.OneoffLabel, v)
+	return labelFilter(api.OneoffLabel, v)
 }
 
 func containerNumberFilter(index int) string {
-	return labelFilter(api.ContainerNumberLabel, fmt.Sprintf("%d", index))
+	return labelFilter(api.ContainerNumberLabel, strconv.Itoa(index))
 }
