@@ -98,5 +98,8 @@ func (u Pipe) Confirm(message string, defaultValue bool) (bool, error) {
 	_, _ = fmt.Fprint(u.stdout, message)
 	var answer string
 	_, _ = fmt.Fscanln(u.stdin, &answer)
+	if answer == "" {
+		return defaultValue, nil
+	}
 	return utils.StringToBool(answer), nil
 }
