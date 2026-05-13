@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
+func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error { //nolint:gocyclo
 	projectName = strings.ToLower(projectName)
 
 	if options.Stop {
@@ -71,9 +70,9 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	}
 
 	var names []string
-	stoppedContainers.forEach(func(c container.Summary) {
+	for _, c := range stoppedContainers {
 		names = append(names, getCanonicalContainerName(c))
-	})
+	}
 
 	if len(names) == 0 {
 		return api.ErrNoResources

@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -61,7 +62,7 @@ func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...st
 	if len(selectedServices) == 1 {
 		f.Add("label", serviceFilter(selectedServices[0]))
 	}
-	f.Add("label", hasConfigHashLabel())
+	f.Add("label", api.ConfigHashLabel)
 	switch oneOff {
 	case oneOffOnly:
 		f.Add("label", oneOffFilter(true))
@@ -166,12 +167,18 @@ func (containers Containers) names() []string {
 	return names
 }
 
-func (containers Containers) forEach(fn func(container.Summary)) {
-	for _, c := range containers {
-		fn(c)
+// forEachContainerConcurrent runs fn for every container concurrently and waits for all goroutines.
+func forEachContainerConcurrent(ctx context.Context, containers Containers, fn func(context.Context, container.Summary) error) error {
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, ctr := range containers {
+		eg.Go(func() error {
+			return fn(ctx, ctr)
+		})
 	}
+	return eg.Wait()
 }
 
+// sorted sorts containers in place by canonical name and returns the (same) slice.
 func (containers Containers) sorted() Containers {
 	sort.Slice(containers, func(i, j int) bool {
 		return getCanonicalContainerName(containers[i]) < getCanonicalContainerName(containers[j])

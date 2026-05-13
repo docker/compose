@@ -43,9 +43,9 @@ type graphTraversal struct {
 	seen    map[string]struct{}
 	ignored map[string]struct{}
 
-	extremityNodesFn            func(*Graph) []*Vertex                        // leaves or roots
-	adjacentNodesFn             func(*Vertex) []*Vertex                       // getParents or getChildren
-	filterAdjacentByStatusFn    func(*Graph, string, ServiceStatus) []*Vertex // filterChildren or filterParents
+	extremityNodesFn            func(*Graph) []*Vertex                        // Leaves or Roots
+	adjacentNodesFn             func(*Vertex) []*Vertex                       // GetParents or GetChildren
+	filterAdjacentByStatusFn    func(*Graph, string, ServiceStatus) []*Vertex // FilterChildren or FilterParents
 	targetServiceStatus         ServiceStatus
 	adjacentServiceStatusToSkip ServiceStatus
 
@@ -55,9 +55,9 @@ type graphTraversal struct {
 
 func upDirectionTraversal(visitorFn func(context.Context, string) error) *graphTraversal {
 	return &graphTraversal{
-		extremityNodesFn:            leaves,
-		adjacentNodesFn:             getParents,
-		filterAdjacentByStatusFn:    filterChildren,
+		extremityNodesFn:            (*Graph).Leaves,
+		adjacentNodesFn:             (*Vertex).GetParents,
+		filterAdjacentByStatusFn:    (*Graph).FilterChildren,
 		adjacentServiceStatusToSkip: ServiceStopped,
 		targetServiceStatus:         ServiceStarted,
 		visitorFn:                   visitorFn,
@@ -66,9 +66,9 @@ func upDirectionTraversal(visitorFn func(context.Context, string) error) *graphT
 
 func downDirectionTraversal(visitorFn func(context.Context, string) error) *graphTraversal {
 	return &graphTraversal{
-		extremityNodesFn:            roots,
-		adjacentNodesFn:             getChildren,
-		filterAdjacentByStatusFn:    filterParents,
+		extremityNodesFn:            (*Graph).Roots,
+		adjacentNodesFn:             (*Vertex).GetChildren,
+		filterAdjacentByStatusFn:    (*Graph).FilterParents,
 		adjacentServiceStatusToSkip: ServiceStarted,
 		targetServiceStatus:         ServiceStopped,
 		visitorFn:                   visitorFn,
@@ -219,10 +219,6 @@ type Vertex struct {
 	Parents  map[string]*Vertex
 }
 
-func getParents(v *Vertex) []*Vertex {
-	return v.GetParents()
-}
-
 // GetParents returns a slice with the parent vertices of the Vertex
 func (v *Vertex) GetParents() []*Vertex {
 	var res []*Vertex
@@ -230,10 +226,6 @@ func (v *Vertex) GetParents() []*Vertex {
 		res = append(res, p)
 	}
 	return res
-}
-
-func getChildren(v *Vertex) []*Vertex {
-	return v.GetChildren()
 }
 
 // getAncestors return all descendents for a vertex, might contain duplicates
@@ -339,10 +331,6 @@ func (g *Graph) AddEdge(source string, destination string) error {
 	return nil
 }
 
-func leaves(g *Graph) []*Vertex {
-	return g.Leaves()
-}
-
 // Leaves returns the slice of leaves of the graph
 func (g *Graph) Leaves() []*Vertex {
 	g.lock.Lock()
@@ -356,10 +344,6 @@ func (g *Graph) Leaves() []*Vertex {
 	}
 
 	return res
-}
-
-func roots(g *Graph) []*Vertex {
-	return g.Roots()
 }
 
 // Roots returns the slice of "Roots" of the graph
@@ -383,10 +367,6 @@ func (g *Graph) UpdateStatus(key string, status ServiceStatus) {
 	g.Vertices[key].Status = status
 }
 
-func filterChildren(g *Graph, k string, s ServiceStatus) []*Vertex {
-	return g.FilterChildren(k, s)
-}
-
 // FilterChildren returns children of a certain vertex that are in a certain status
 func (g *Graph) FilterChildren(key string, status ServiceStatus) []*Vertex {
 	g.lock.Lock()
@@ -402,10 +382,6 @@ func (g *Graph) FilterChildren(key string, status ServiceStatus) []*Vertex {
 	}
 
 	return res
-}
-
-func filterParents(g *Graph, k string, s ServiceStatus) []*Vertex {
-	return g.FilterParents(k, s)
 }
 
 // FilterParents returns the parents of a certain vertex that are in a certain status
@@ -462,17 +438,7 @@ func (g *Graph) visit(key string, path []string, discovered []string, finished [
 		}
 	}
 
-	discovered = remove(discovered, key)
+	discovered = slices.DeleteFunc(discovered, func(s string) bool { return s == key })
 	finished = append(finished, key)
 	return discovered, finished, nil
-}
-
-func remove(slice []string, item string) []string {
-	var s []string
-	for _, i := range slice {
-		if i != item {
-			s = append(s, i)
-		}
-	}
-	return s
 }

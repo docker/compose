@@ -51,9 +51,9 @@ func (s Set[T]) Remove(v T) bool {
 	return ok
 }
 
-func (s Set[T]) Clear() {
-	for v := range s {
-		delete(s, v)
+func (s Set[T]) RemoveAll(elements ...T) {
+	for _, e := range elements {
+		s.Remove(e)
 	}
 }
 
@@ -63,12 +63,6 @@ func (s Set[T]) Elements() []T {
 		elements = append(elements, v)
 	}
 	return elements
-}
-
-func (s Set[T]) RemoveAll(elements ...T) {
-	for _, e := range elements {
-		s.Remove(e)
-	}
 }
 
 func (s Set[T]) Diff(other Set[T]) Set[T] {
@@ -81,6 +75,18 @@ func (s Set[T]) Diff(other Set[T]) Set[T] {
 	return out
 }
 
+// Clear removes all elements from the set.
+//
+// Deprecated: Clear is retained for API compatibility; prefer re-assigning a new Set.
+func (s Set[T]) Clear() {
+	for v := range s {
+		delete(s, v)
+	}
+}
+
+// Union returns a new set containing all elements from both s and other.
+//
+// Deprecated: Union is retained for API compatibility.
 func (s Set[T]) Union(other Set[T]) Set[T] {
 	out := make(Set[T])
 	for k := range s {

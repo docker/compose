@@ -60,7 +60,7 @@ func (c *monitor) Start(ctx context.Context) error {
 		All: true,
 		Filters: projectFilter(c.project).Add("label",
 			oneOffFilter(false),
-			hasConfigHashLabel(),
+			api.ConfigHashLabel,
 		),
 	})
 	if err != nil {

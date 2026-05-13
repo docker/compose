@@ -285,8 +285,8 @@ func (c CommandMetadata) CheckRequiredParameters(provider types.ServiceProviderC
 // firstLine returns the first line of s, stripping any trailing newlines.
 func firstLine(s string) string {
 	s = strings.TrimRight(s, "\n")
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		return s[:i]
+	if before, _, ok := strings.Cut(s, "\n"); ok {
+		return before
 	}
 	return s
 }

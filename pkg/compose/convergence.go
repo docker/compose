@@ -193,7 +193,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		name := getContainerProgressName(ctr)
 		switch ctr.State {
 		case container.StateRunning:
-			c.compose.events.On(runningEvent(name))
+			c.compose.events.On(newEvent(name, api.Done, api.StatusRunning))
 		case container.StateCreated:
 		case container.StateRestarting:
 		case container.StateExited:
@@ -303,34 +303,24 @@ func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
 }
 
 func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) error {
-	str := service.NetworkMode
-	if name := getDependentServiceFromMode(str); name != "" {
-		dependencies := c.getObservedState(name)
-		if len(dependencies) == 0 {
-			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
+	resolve := func(field *string, noun string) error {
+		if name := getDependentServiceFromMode(*field); name != "" {
+			dependencies := c.getObservedState(name)
+			if len(dependencies) == 0 {
+				return fmt.Errorf("cannot share %s namespace with service %s: container missing", noun, name)
+			}
+			*field = types.ContainerPrefix + dependencies.sorted()[0].ID
 		}
-		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
+		return nil
 	}
 
-	str = service.Ipc
-	if name := getDependentServiceFromMode(str); name != "" {
-		dependencies := c.getObservedState(name)
-		if len(dependencies) == 0 {
-			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
-		}
-		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
+	if err := resolve(&service.NetworkMode, "network"); err != nil {
+		return err
 	}
-
-	str = service.Pid
-	if name := getDependentServiceFromMode(str); name != "" {
-		dependencies := c.getObservedState(name)
-		if len(dependencies) == 0 {
-			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
-		}
-		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
+	if err := resolve(&service.Ipc, "IPC"); err != nil {
+		return err
 	}
-
-	return nil
+	return resolve(&service.Pid, "PID")
 }
 
 func (c *convergence) mustRecreate(expected types.ServiceConfig, actual container.Summary, policy string) (bool, error) {
@@ -927,7 +917,7 @@ func (s *composeService) startService(ctx context.Context,
 		}
 
 		eventName := getContainerProgressName(ctr)
-		s.events.On(startingEvent(eventName))
+		s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
 		_, err = s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
 		if err != nil {
 			return err
@@ -940,7 +930,7 @@ func (s *composeService) startService(ctx context.Context,
 			}
 		}
 
-		s.events.On(startedEvent(eventName))
+		s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
 	}
 	return nil
 }
