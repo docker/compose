@@ -90,6 +90,7 @@ func up(options options, args []string) {
 		fmt.Printf(`{ "type": "info", "message": "Processing ... %d%%" }%s`, i*100/options.size, lineSeparator)
 	}
 	fmt.Printf(`{ "type": "setenv", "message": "URL=https://magic.cloud/%s" }%s`, servicename, lineSeparator)
+	fmt.Printf(`{ "type": "rawsetenv", "message": "CLOUD_REGION=us-east-1" }%s`, lineSeparator)
 }
 
 func down(_ *cobra.Command, _ []string) {
