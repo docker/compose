@@ -164,7 +164,7 @@ func TestShouldSkipDirWithNegatedChildException(t *testing.T) {
 	assert.NilError(t, err)
 
 	d := &naiveNotify{
-		ignore:     ignore,
+		ignore:     map[string]PathMatcher{repoRoot: ignore},
 		notifyList: map[string]bool{repoRoot: true},
 	}
 
@@ -177,10 +177,37 @@ func TestShouldIgnorePathStillMatchesDirectoryPattern(t *testing.T) {
 	ignore, err := DockerIgnoreTesterFromContents(repoRoot, "bazel-bin/\n!bazel-bin/app-binary\n")
 	assert.NilError(t, err)
 
-	d := &naiveNotify{ignore: ignore}
+	d := &naiveNotify{ignore: map[string]PathMatcher{repoRoot: ignore}}
 
 	bazelBin := filepath.Join(repoRoot, "bazel-bin")
-	assert.Assert(t, d.shouldIgnore(bazelBin), "expected bazel-bin path to match ignore pattern")
+	assert.Assert(t, d.shouldIgnore(repoRoot, bazelBin), "expected bazel-bin path to match ignore pattern")
+}
+
+func TestShouldIgnoreLooksUpMatcherByWatchRoot(t *testing.T) {
+	repoRoot := t.TempDir()
+	otherRoot := t.TempDir()
+	ignore, err := DockerIgnoreTesterFromContents(repoRoot, "vendor/\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{ignore: map[string]PathMatcher{repoRoot: ignore}}
+
+	vendorFile := filepath.Join(repoRoot, "vendor", "x.go")
+	assert.Assert(t, d.shouldIgnore(repoRoot, vendorFile), "expected matcher keyed to watched root to apply")
+	assert.Assert(t, !d.shouldIgnore(otherRoot, vendorFile), "expected unrelated watch root not to apply matcher")
+}
+
+func TestShouldIgnoreEntireDirLooksUpMatcherByWatchRoot(t *testing.T) {
+	repoRoot := t.TempDir()
+	ignore, err := DockerIgnoreTesterFromContents(repoRoot, "vendor/\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{
+		ignore:     map[string]PathMatcher{repoRoot: ignore},
+		notifyList: map[string]bool{repoRoot: true},
+	}
+
+	vendorDir := filepath.Join(repoRoot, "vendor")
+	assert.Assert(t, d.shouldIgnoreEntireDir(repoRoot, vendorDir), "expected directory matcher keyed to watched root to apply")
 }
 
 func TestShouldSkipDirForIgnoredSubtreeWithoutException(t *testing.T) {
@@ -189,7 +216,7 @@ func TestShouldSkipDirForIgnoredSubtreeWithoutException(t *testing.T) {
 	assert.NilError(t, err)
 
 	d := &naiveNotify{
-		ignore:     ignore,
+		ignore:     map[string]PathMatcher{repoRoot: ignore},
 		notifyList: map[string]bool{repoRoot: true},
 	}
 
@@ -204,7 +231,7 @@ func TestShouldSkipDirDoesNotSkipAncestorOfWatchedPath(t *testing.T) {
 
 	watchedPath := filepath.Join(repoRoot, "parent", "child", "non-existent")
 	d := &naiveNotify{
-		ignore:     ignore,
+		ignore:     map[string]PathMatcher{watchedPath: ignore},
 		notifyList: map[string]bool{watchedPath: true},
 	}
 
@@ -220,7 +247,7 @@ func TestShouldSkipDirIntersectRequiresAllTriggersToAgree(t *testing.T) {
 	assert.NilError(t, err)
 
 	d := &naiveNotify{
-		ignore:     NewIntersectMatcher(ignoreVendor, ignoreTmp),
+		ignore:     map[string]PathMatcher{repoRoot: NewIntersectMatcher(ignoreVendor, ignoreTmp)},
 		notifyList: map[string]bool{repoRoot: true},
 	}
 
@@ -232,7 +259,7 @@ func TestShouldSkipDirIntersectRequiresAllTriggersToAgree(t *testing.T) {
 	ignoreBuild2, err := DockerIgnoreTesterFromContents(repoRoot, "build/\n")
 	assert.NilError(t, err)
 	d2 := &naiveNotify{
-		ignore:     NewIntersectMatcher(ignoreBuild1, ignoreBuild2),
+		ignore:     map[string]PathMatcher{repoRoot: NewIntersectMatcher(ignoreBuild1, ignoreBuild2)},
 		notifyList: map[string]bool{repoRoot: true},
 	}
 	buildDir := filepath.Join(repoRoot, "build")

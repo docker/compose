@@ -198,10 +198,12 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	eg, ctx := errgroup.WithContext(ctx)
 
 	var (
-		rules            []watchRule
-		watchRootIgnores map[string][]watch.PathMatcher // abs watch path -> per-trigger ignore matchers
+		rules              []watchRule
+		paths              []string
+		ignoresByWatchPath map[string]watch.PathMatcher
 	)
-	watchRootIgnores = make(map[string][]watch.PathMatcher)
+	ignoresByWatchPath = make(map[string]watch.PathMatcher)
+
 	for serviceName, service := range project.Services {
 		config, err := loadDevelopmentConfig(service, project)
 		if err != nil {
@@ -255,19 +257,18 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 					}
 				}
 			}
-			ignore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
+			var ignore watch.PathMatcher
+			ignore, err = watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
 			if err != nil {
 				return nil, err
 			}
 
-			absPath, err := filepath.Abs(trigger.Path)
-			if err != nil {
-				return nil, err
+			if existingMatcher, exists := ignoresByWatchPath[trigger.Path]; exists {
+				ignore = watch.NewIntersectMatcher(existingMatcher, ignore)
 			}
-			absPath = filepath.Clean(absPath)
-			watchRootIgnores[absPath] = append(watchRootIgnores[absPath], ignore)
+			ignoresByWatchPath[trigger.Path] = ignore
+			paths = append(paths, trigger.Path)
 		}
-
 		serviceWatchRules, err := getWatchRules(config, service)
 		if err != nil {
 			return nil, err
@@ -275,24 +276,14 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 		rules = append(rules, serviceWatchRules...)
 	}
 
-	if len(watchRootIgnores) == 0 {
+	if len(paths) == 0 {
 		return nil, fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
-	watchers := make([]watch.Notify, 0, len(watchRootIgnores))
-	for path, matchers := range watchRootIgnores {
-		merged := watch.NewIntersectMatcher(matchers...)
-		triggerWatcher, err := watch.NewWatcher([]string{path}, merged)
-		if err != nil {
-			for _, w := range watchers {
-				_ = w.Close()
-			}
-			return nil, err
-		}
-		watchers = append(watchers, triggerWatcher)
+	watcher, err := watch.NewWatcher(paths, ignoresByWatchPath)
+	if err != nil {
+		return nil, err
 	}
-
-	watcher := watch.NewMultiWatcher(watchers...)
 
 	err = watcher.Start()
 	if err != nil {

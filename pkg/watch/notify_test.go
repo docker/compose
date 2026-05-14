@@ -90,6 +90,84 @@ func TestNewIntersectMatcher(t *testing.T) {
 	assert.Assert(t, !entire, "must not skip whole dir unless every matcher agrees it is entirely ignorable")
 }
 
+func TestWatchRespectsDockerignore(t *testing.T) {
+	f := newNotifyFixture(t)
+
+	root := f.TempDir("root")
+	ignore, err := DockerIgnoreTesterFromContents(root, "vendor/\n")
+	assert.NilError(t, err)
+
+	f.ignores = map[string]PathMatcher{root: ignore}
+	f.watch(root)
+	f.fsync()
+	f.events = nil
+
+	kept := filepath.Join(root, "src", "main.go")
+	f.WriteFile(kept, "package main\n")
+	f.assertEvents(filepath.Join(root, "src"), kept)
+	f.events = nil
+
+	ignored := filepath.Join(root, "vendor", "mod", "x.go")
+	f.WriteFile(ignored, "module x\n")
+	f.assertEvents()
+}
+
+func TestWatchPerRootIgnoresDoNotLeak(t *testing.T) {
+	f := newNotifyFixture(t)
+
+	rootA := f.TempDir("root-a")
+	rootB := f.TempDir("root-b")
+	ignoreA, err := DockerIgnoreTesterFromContents(rootA, "vendor/\n")
+	assert.NilError(t, err)
+
+	f.ignores = map[string]PathMatcher{rootA: ignoreA}
+	f.watch(rootA)
+	f.watch(rootB)
+	f.fsync()
+	f.events = nil
+
+	ignoredUnderA := filepath.Join(rootA, "vendor", "x.go")
+	f.WriteFile(ignoredUnderA, "ignored\n")
+	f.assertEvents()
+
+	keptUnderB := filepath.Join(rootB, "vendor", "x.go")
+	f.WriteFile(keptUnderB, "kept\n")
+	f.assertEvents(filepath.Join(rootB, "vendor"), keptUnderB)
+}
+
+func TestWatchIntersectMatcherRequiresAllTriggers(t *testing.T) {
+	f := newNotifyFixture(t)
+
+	root := f.TempDir("root")
+	ignoreVendor, err := DockerIgnoreTesterFromContents(root, "vendor/\n")
+	assert.NilError(t, err)
+	ignoreTmp, err := DockerIgnoreTesterFromContents(root, "tmp/\n")
+	assert.NilError(t, err)
+
+	f.ignores = map[string]PathMatcher{root: NewIntersectMatcher(ignoreVendor, ignoreTmp)}
+	f.watch(root)
+	f.fsync()
+	f.events = nil
+
+	vendorFile := filepath.Join(root, "vendor", "x", "go.mod")
+	f.WriteFile(vendorFile, "module x\n")
+	f.assertEvents(filepath.Join(root, "vendor"), filepath.Join(root, "vendor", "x"), vendorFile)
+
+	ignoreBuild1, err := DockerIgnoreTesterFromContents(root, "build/\n")
+	assert.NilError(t, err)
+	ignoreBuild2, err := DockerIgnoreTesterFromContents(root, "build/\n")
+	assert.NilError(t, err)
+
+	f.ignores = map[string]PathMatcher{root: NewIntersectMatcher(ignoreBuild1, ignoreBuild2)}
+	f.rebuildWatcher()
+	f.fsync()
+	f.events = nil
+
+	buildFile := filepath.Join(root, "build", "out", "a")
+	f.WriteFile(buildFile, "artifact\n")
+	f.assertEvents()
+}
+
 func TestNoEvents(t *testing.T) {
 	f := newNotifyFixture(t)
 	f.assertEvents()
@@ -533,9 +611,10 @@ type notifyFixture struct {
 	cancel func()
 	out    *bytes.Buffer
 	*TempDirFixture
-	notify Notify
-	paths  []string
-	events []FileEvent
+	notify  Notify
+	paths   []string
+	ignores map[string]PathMatcher
+	events  []FileEvent
 }
 
 func newNotifyFixture(t *testing.T) *notifyFixture {
@@ -566,7 +645,7 @@ func (f *notifyFixture) rebuildWatcher() {
 	}
 
 	// create a new watcher
-	notify, err := NewWatcher(f.paths, EmptyMatcher{})
+	notify, err := NewWatcher(f.paths, f.ignores)
 	if err != nil {
 		f.T().Fatal(err)
 	}
