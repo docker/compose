@@ -17,13 +17,11 @@
 package watch
 
 import (
-	"errors"
 	"expvar"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 )
 
 var numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
@@ -82,85 +80,8 @@ func (EmptyMatcher) MatchesEntireDir(f string) (bool, error) { return false, nil
 
 var _ PathMatcher = EmptyMatcher{}
 
-func NewWatcher(paths []string, ignore PathMatcher) (Notify, error) {
+func NewWatcher(paths []string, ignore map[string]PathMatcher) (Notify, error) {
 	return newWatcher(paths, ignore)
-}
-
-type multiNotify struct {
-	children []Notify
-	events   chan FileEvent
-	errors   chan error
-}
-
-func NewMultiWatcher(children ...Notify) Notify {
-	return &multiNotify{
-		children: children,
-		events:   make(chan FileEvent),
-		errors:   make(chan error),
-	}
-}
-
-func (m *multiNotify) Start() error {
-	for i := range m.children {
-		if err := m.children[i].Start(); err != nil {
-			for j := 0; j < i; j++ {
-				_ = m.children[j].Close()
-			}
-			return err
-		}
-	}
-
-	var eventsWG sync.WaitGroup
-	eventsWG.Add(len(m.children))
-	for i := range m.children {
-		child := m.children[i]
-		go func() {
-			defer eventsWG.Done()
-			for e := range child.Events() {
-				m.events <- e
-			}
-		}()
-	}
-	go func() {
-		eventsWG.Wait()
-		close(m.events)
-	}()
-
-	var errorsWG sync.WaitGroup
-	errorsWG.Add(len(m.children))
-	for i := range m.children {
-		child := m.children[i]
-		go func() {
-			defer errorsWG.Done()
-			for err := range child.Errors() {
-				m.errors <- err
-			}
-		}()
-	}
-	go func() {
-		errorsWG.Wait()
-		close(m.errors)
-	}()
-
-	return nil
-}
-
-func (m *multiNotify) Close() error {
-	var errs []error
-	for _, child := range m.children {
-		if err := child.Close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Join(errs...)
-}
-
-func (m *multiNotify) Events() chan FileEvent {
-	return m.events
-}
-
-func (m *multiNotify) Errors() chan error {
-	return m.errors
 }
 
 const WindowsBufferSizeEnvVar = "COMPOSE_WATCH_WINDOWS_BUFFER_SIZE"

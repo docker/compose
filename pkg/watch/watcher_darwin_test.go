@@ -26,7 +26,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func newFseventNotifyFixture(repo string, ignore PathMatcher) *fseventNotify {
+func newFseventNotifyFixture(repo string, ignore map[string]PathMatcher) *fseventNotify {
 	return &fseventNotify{
 		pathsWereWatching: map[string]any{repo: struct{}{}},
 		ignore:            ignore,
@@ -90,7 +90,7 @@ func TestFseventNotifyShouldNotifyRespectsDockerignore(t *testing.T) {
 	ignore, err := DockerIgnoreTesterFromContents(repo, "vendor/\n")
 	assert.NilError(t, err)
 
-	d := newFseventNotifyFixture(repo, ignore)
+	d := newFseventNotifyFixture(repo, map[string]PathMatcher{repo: ignore})
 	kept := filepath.Join(repo, "src", "main.go")
 	assert.NilError(t, os.MkdirAll(filepath.Dir(kept), 0o755))
 	assert.NilError(t, os.WriteFile(kept, []byte("x"), 0o644))
@@ -107,7 +107,7 @@ func TestFseventNotifyShouldNotifyDockerignoreNegation(t *testing.T) {
 	ignore, err := DockerIgnoreTesterFromContents(repo, "bazel-bin/\n!bazel-bin/app-binary\n")
 	assert.NilError(t, err)
 
-	d := newFseventNotifyFixture(repo, ignore)
+	d := newFseventNotifyFixture(repo, map[string]PathMatcher{repo: ignore})
 
 	ignoredChild := filepath.Join(repo, "bazel-bin", "cache", "out")
 	assert.NilError(t, os.MkdirAll(filepath.Dir(ignoredChild), 0o755))
@@ -127,7 +127,7 @@ func TestFseventNotifyShouldNotifyIntersectMatcher(t *testing.T) {
 	ignoreTmp, err := DockerIgnoreTesterFromContents(repo, "tmp/\n")
 	assert.NilError(t, err)
 
-	d := newFseventNotifyFixture(repo, NewIntersectMatcher(ignoreVendor, ignoreTmp))
+	d := newFseventNotifyFixture(repo, map[string]PathMatcher{repo: NewIntersectMatcher(ignoreVendor, ignoreTmp)})
 	vendorFile := filepath.Join(repo, "vendor", "x", "go.mod")
 	assert.NilError(t, os.MkdirAll(filepath.Dir(vendorFile), 0o755))
 	assert.NilError(t, os.WriteFile(vendorFile, []byte("module x\n"), 0o644))
@@ -137,7 +137,7 @@ func TestFseventNotifyShouldNotifyIntersectMatcher(t *testing.T) {
 	assert.NilError(t, err)
 	ignoreBuild2, err := DockerIgnoreTesterFromContents(repo, "build/\n")
 	assert.NilError(t, err)
-	d2 := newFseventNotifyFixture(repo, NewIntersectMatcher(ignoreBuild1, ignoreBuild2))
+	d2 := newFseventNotifyFixture(repo, map[string]PathMatcher{repo: NewIntersectMatcher(ignoreBuild1, ignoreBuild2)})
 	buildFile := filepath.Join(repo, "build", "out", "a")
 	assert.NilError(t, os.MkdirAll(filepath.Dir(buildFile), 0o755))
 	assert.NilError(t, os.WriteFile(buildFile, []byte("x"), 0o644))
@@ -149,8 +149,20 @@ func TestFseventNotifyShouldIgnoreDockerignoreDirectory(t *testing.T) {
 	ignore, err := DockerIgnoreTesterFromContents(repo, "bazel-bin/\n!bazel-bin/app-binary\n")
 	assert.NilError(t, err)
 
-	d := newFseventNotifyFixture(repo, ignore)
+	d := newFseventNotifyFixture(repo, map[string]PathMatcher{repo: ignore})
 	bazelBin := filepath.Join(repo, "bazel-bin")
 	assert.NilError(t, os.MkdirAll(bazelBin, 0o755))
-	assert.Assert(t, d.shouldIgnore(bazelBin), "expected directory path to match dockerignore")
+	assert.Assert(t, d.shouldIgnore(repo, bazelBin), "expected directory path to match dockerignore")
+}
+
+func TestFseventNotifyShouldIgnoreLooksUpMatcherByWatchRoot(t *testing.T) {
+	repo := t.TempDir()
+	other := t.TempDir()
+	ignore, err := DockerIgnoreTesterFromContents(repo, "vendor/\n")
+	assert.NilError(t, err)
+
+	d := newFseventNotifyFixture(repo, map[string]PathMatcher{repo: ignore})
+	vendorFile := filepath.Join(repo, "vendor", "x.go")
+	assert.Assert(t, d.shouldIgnore(repo, vendorFile), "expected matcher keyed to watched root to apply")
+	assert.Assert(t, !d.shouldIgnore(other, vendorFile), "expected unrelated watch root not to apply matcher")
 }
