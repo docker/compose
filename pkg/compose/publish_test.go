@@ -134,6 +134,32 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	assert.Equal(t, accept, false)
 }
 
+func Test_preChecks_bind_mount_skipped_with_assume_yes(t *testing.T) {
+	project := &types.Project{
+		Services: types.Services{
+			"web": {
+				Name:  "web",
+				Image: "nginx",
+				Volumes: []types.ServiceVolumeConfig{
+					{
+						Type:   types.VolumeTypeBind,
+						Source: "/host/path",
+						Target: "/container/path",
+					},
+				},
+			},
+		},
+	}
+
+	svc := &composeService{
+		prompt: AlwaysOkPrompt(),
+	}
+
+	accept, err := svc.preChecks(t.Context(), project, api.PublishOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, accept, true)
+}
+
 func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
