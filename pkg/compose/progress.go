@@ -57,6 +57,16 @@ func createdEvent(id string) api.Resource {
 	return newEvent(id, api.Done, api.StatusCreated)
 }
 
+// stoppingEvent creates a new Stopping in progress Resource
+func stoppingEvent(id string) api.Resource {
+	return newEvent(id, api.Working, api.StatusStopping)
+}
+
+// stoppedEvent creates a new Stopped (done) Resource
+func stoppedEvent(id string) api.Resource {
+	return newEvent(id, api.Done, api.StatusStopped)
+}
+
 // removingEvent creates a new Removing in progress Resource
 func removingEvent(id string) api.Resource {
 	return newEvent(id, api.Working, api.StatusRemoving)
