@@ -29,12 +29,12 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/dotenv"
-	"github.com/compose-spec/compose-go/v2/loader"
-	composepaths "github.com/compose-spec/compose-go/v2/paths"
-	"github.com/compose-spec/compose-go/v2/types"
-	composegoutils "github.com/compose-spec/compose-go/v2/utils"
+	"github.com/compose-spec/compose-go/v3/cli"
+	"github.com/compose-spec/compose-go/v3/dotenv"
+	"github.com/compose-spec/compose-go/v3/loader"
+	composepaths "github.com/compose-spec/compose-go/v3/paths"
+	"github.com/compose-spec/compose-go/v3/types"
+	composegoutils "github.com/compose-spec/compose-go/v3/utils"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/command"
@@ -317,7 +317,13 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		case "extends":
 			metrics.CountExtends++
 		case "include":
-			paths := metadata["path"].(types.StringList)
+			var paths []string
+			switch p := metadata["path"].(type) {
+			case []string:
+				paths = p
+			case types.StringList:
+				paths = p
+			}
 			for _, path := range paths {
 				var isRemote bool
 				for _, r := range remotes {

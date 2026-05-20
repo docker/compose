@@ -22,8 +22,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/cli"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/docker/cli/cli/command"
 	cliopts "github.com/docker/cli/opts"
 	"github.com/spf13/cobra"

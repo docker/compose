@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/docker/cli/cli/streams"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
