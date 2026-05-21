@@ -49,7 +49,7 @@ options:
     - option: since
       value_type: string
       description: |
-        Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)
+        Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes). Accepts the same formats as `docker container logs --since`.
       deprecated: false
       hidden: false
       experimental: false
@@ -82,7 +82,7 @@ options:
     - option: until
       value_type: string
       description: |
-        Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)
+        Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes). Accepts the same formats as `docker container logs --until`.
       deprecated: false
       hidden: false
       experimental: false
