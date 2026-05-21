@@ -302,7 +302,11 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 		api.Separator = "_"
 	}
 
-	return options.LoadModel(ctx)
+	model, err := options.LoadModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return model.Dict(), nil
 }
 
 // ToProject loads a Compose project using the LoadProject API.

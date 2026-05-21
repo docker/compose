@@ -157,4 +157,4 @@ exclude (
 )
 
 // Test compose-spec/compose-go#874 (v3 yaml.Node-based loader)
-replace github.com/compose-spec/compose-go/v3 => github.com/ndeloof/compose-go/v3 v3.0.0-20260520203259-be243038d95d
+replace github.com/compose-spec/compose-go/v3 => github.com/ndeloof/compose-go/v3 v3.0.0-20260521063750-212e4aea5300
