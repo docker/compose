@@ -46,7 +46,7 @@ type naiveNotify struct {
 	// structure, so we can filter the list quickly.
 	notifyList map[string]bool
 	// ignore maps each notifyList root to the merged PathMatcher for paths under it.
-	ignore     map[string]PathMatcher
+	ignore map[string]PathMatcher
 
 	isWatcherRecursive bool
 	watcher            *fsnotify.Watcher
@@ -254,23 +254,17 @@ func (d *naiveNotify) shouldSkipDir(path string) bool {
 	// root's patterns cannot block reaching another root.
 	// When walking beneath a watched ancestor, prune subtrees only with that root's
 	// matcher from d.ignore.
-	isChildOfWatchedDir := false
-	var dir string
 	for root := range d.notifyList {
 		if pathutil.IsChild(path, root) {
 			return false
 		}
 		if pathutil.IsChild(root, path) {
-			isChildOfWatchedDir = true
-			dir = root
+			if !d.shouldIgnoreEntireDir(root, path) {
+				return false
+			}
 		}
 	}
-
-	if isChildOfWatchedDir && d.shouldIgnoreEntireDir(dir, path) {
-		return true
-	}
-
-	return !isChildOfWatchedDir
+	return true
 }
 
 func (d *naiveNotify) shouldIgnoreEntireDir(dir, path string) bool {
