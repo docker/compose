@@ -1,0 +1,12 @@
+services:
+  app:
+    image: alpine
+    volumes:
+      - my_vol:/my_vol
+
+volumes:
+  my_vol:
+    labels:
+      com.docker.compose.volume.recreate-when-spec-updated: "true"
+      foo: bar
+
