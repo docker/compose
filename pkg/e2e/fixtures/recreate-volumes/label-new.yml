@@ -1,0 +1,15 @@
+services:
+  app:
+    image: alpine
+    volumes:
+      - my_vol:/my_vol
+      - no_recreate_label:/no_recreate_label
+
+volumes:
+  my_vol:
+    labels:
+      com.docker.compose.volume.recreate-when-spec-updated: "true"
+      foo: zot
+  no_recreate_label:
+    labels:
+      foo: zot

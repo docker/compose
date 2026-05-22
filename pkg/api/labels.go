@@ -33,6 +33,9 @@ const (
 	ContainerNumberLabel = "com.docker.compose.container-number"
 	// VolumeLabel allow to track resource related to a compose volume
 	VolumeLabel = "com.docker.compose.volume"
+	// VolumeRecreateWhenSpecUpdatedLabel, when set to true, causes the volume to be recreated when its specification is updated. Otherwise, the volume is not recreated.
+	// WARNING: Recreating a volume may result in data loss, depending on the volume driver.
+	VolumeRecreateWhenSpecUpdatedLabel = "com.docker.compose.volume.recreate-when-spec-updated"
 	// NetworkLabel allow to track resource related to a compose network
 	NetworkLabel = "com.docker.compose.network"
 	// WorkingDirLabel stores absolute path to compose project working directory

@@ -43,6 +43,7 @@ import (
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type createOptions struct {
@@ -1623,8 +1624,8 @@ func (s *composeService) ensureVolume(ctx context.Context, name string, volume t
 	}
 	actual, ok := inspected.Volume.Labels[api.ConfigHashLabel]
 	if ok && actual != expected {
-		msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
-		confirm, err := s.prompt(msg, false)
+		// use the volume label from the compose file.
+		confirm, err := confirmVolumeRecreate(volume.Labels, s.prompt, volume.Name)
 		if err != nil {
 			return "", err
 		}
@@ -1637,6 +1638,25 @@ func (s *composeService) ensureVolume(ctx context.Context, name string, volume t
 		}
 	}
 	return inspected.Volume.Name, nil
+}
+
+func confirmVolumeRecreate(labels map[string]string, prompt Prompt, name string) (bool, error) {
+	recreate, ok := labels[api.VolumeRecreateWhenSpecUpdatedLabel]
+	msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file.", name)
+	// if label not set or set to false, ask user to confirm volume recreate,
+	// if set to true, recreate without asking
+	if ok && utils.StringToBool(recreate) {
+		logrus.Warnf("%s The label %s is set to %s, so the volume is being recreated.",
+			msg, api.VolumeRecreateWhenSpecUpdatedLabel, recreate)
+		return true, nil
+	} else {
+		promptMsg := msg + " Recreate (data will be lost)?"
+		c, err := prompt(promptMsg, false)
+		if err != nil {
+			return false, err
+		}
+		return c, nil
+	}
 }
 
 func (s *composeService) removeDivergedVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) error {
