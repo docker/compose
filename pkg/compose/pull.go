@@ -67,6 +67,32 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 	i := 0
 	for name, service := range project.Services {
+		for j, vol := range service.Volumes {
+			if vol.Type != types.VolumeTypeImage {
+				continue
+			}
+
+			if _, ok := imagesBeingPulled[vol.Source]; ok {
+				continue
+			}
+			imagesBeingPulled[vol.Source] = name
+
+			volService := types.ServiceConfig{
+				Name:  fmt.Sprintf("%s:volume %d", name, j),
+				Image: vol.Source,
+			}
+
+			eg.Go(func() error {
+				_, err := s.pullServiceImage(ctx, volService, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				if err != nil {
+					s.events.On(errorEvent("Image "+vol.Source, getUnwrappedErrorMessage(err)))
+					if !opts.IgnoreFailures {
+						return err
+					}
+				}
+				return nil
+			})
+		}
 		if service.Image == "" {
 			s.events.On(api.Resource{
 				ID:      name,
