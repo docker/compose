@@ -67,6 +67,48 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 	i := 0
 	for name, service := range project.Services {
+		for j, vol := range service.Volumes {
+			if vol.Type != types.VolumeTypeImage {
+				continue
+			}
+
+			if _, ok := imagesBeingPulled[vol.Source]; ok {
+				continue
+			}
+
+			volService := types.ServiceConfig{
+				Name:  fmt.Sprintf("%s:volume %d", name, j),
+				Image: vol.Source,
+			}
+
+			// Skip volume images that are produced by a buildable service
+			if opts.IgnoreBuildable && isServiceImageToBuild(volService, project.Services) {
+				s.events.On(api.Resource{
+					ID:      "Image " + vol.Source,
+					Status:  api.Done,
+					Text:    "Skipped",
+					Details: "Image can be built",
+				})
+				continue
+			}
+
+			imagesBeingPulled[vol.Source] = name
+
+			eg.Go(func() error {
+				_, err := s.pullServiceImage(ctx, volService, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				if err != nil {
+					if isServiceImageToBuild(volService, project.Services) {
+						mustBuild = append(mustBuild, vol.Source)
+						return nil
+					}
+					s.events.On(errorEvent("Image "+vol.Source, getUnwrappedErrorMessage(err)))
+					if !opts.IgnoreFailures {
+						return err
+					}
+				}
+				return nil
+			})
+		}
 		if service.Image == "" {
 			s.events.On(api.Resource{
 				ID:      name,
