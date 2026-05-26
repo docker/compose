@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -42,6 +43,7 @@ import (
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
+	warnExternalNetworkAliases(project)
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
@@ -313,4 +315,36 @@ func shouldFollowStartEvent(event api.ContainerEvent, attached []string, attachT
 		return false
 	}
 	return true
+}
+
+// warnExternalNetworkAliases emits one warning per external network the project is connected to, listing the services
+// whose service-name alias is intentionally not registered (see getAliases). Services that already include their own
+// name under the network's explicit aliases are excluded, so the warning disappears once the user adopts the
+// workaround. Must be called before Run() to avoid interleaving with the TUI progress display.
+func warnExternalNetworkAliases(project *types.Project) {
+	byNetwork := map[string][]string{}
+	for _, service := range project.Services {
+		for networkKey, cfg := range service.Networks {
+			n := project.Networks[networkKey]
+			if !n.External {
+				continue
+			}
+			if cfg != nil && slices.Contains(cfg.Aliases, service.Name) {
+				continue
+			}
+			byNetwork[networkKey] = append(byNetwork[networkKey], service.Name)
+		}
+	}
+	networks := make([]string, 0, len(byNetwork))
+	for k := range byNetwork {
+		networks = append(networks, k)
+	}
+	slices.Sort(networks)
+	for _, networkKey := range networks {
+		services := byNetwork[networkKey]
+		slices.Sort(services)
+		logrus.Warnf("service names [%s] not registered as aliases on external "+
+			"network %q; add them under each service's networks.%s.aliases if needed",
+			strings.Join(services, ", "), networkKey, networkKey)
+	}
 }

@@ -218,3 +218,63 @@ func TestNetworkRecreate(t *testing.T) {
 		t.Fatalf("unexpected output, missing expected events, stderr: %s", err)
 	}
 }
+
+func TestExternalNetworkAliases(t *testing.T) {
+	const projectName = "network_external_alias_e2e"
+	const externalNet = projectName + "_external"
+
+	c := NewParallelCLI(t, WithEnv("EXTERNAL_NETWORK="+externalNet))
+
+	c.RunDockerOrExitError(t, "network", "rm", externalNet)
+	c.RunDockerCmd(t, "network", "create", externalNet)
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+		c.RunDockerOrExitError(t, "network", "rm", externalNet)
+	})
+
+	upRes := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-external-alias/compose.yaml",
+		"--project-name", projectName,
+		"up", "-d")
+
+	internalNet := projectName + "_default"
+
+	t.Run("warning lists services without explicit external-net alias and excludes self-aliased ones", func(t *testing.T) {
+		var warningLine string
+		for line := range strings.SplitSeq(upRes.Combined(), "\n") {
+			if strings.Contains(line, `not registered as aliases on external network`) {
+				warningLine = line
+				break
+			}
+		}
+		assert.Assert(t, warningLine != "", "expected warning line in output:\n%s", upRes.Combined())
+		assert.Assert(t, strings.Contains(warningLine, "web"), warningLine)
+		assert.Assert(t, strings.Contains(warningLine, "external-net"), warningLine)
+		assert.Assert(t, !strings.Contains(warningLine, "db"),
+			"db declares its own external-net alias and must be excluded from the warning: %s", warningLine)
+	})
+
+	t.Run("service name is an alias on internal network", func(t *testing.T) {
+		res := c.RunDockerCmd(t, "inspect", projectName+"-web-1", "-f",
+			fmt.Sprintf(`{{ range (index .NetworkSettings.Networks %q).Aliases }}[{{ . }}]{{ end }}`, internalNet))
+		assert.Assert(t, strings.Contains(res.Stdout(), "[web]"), res.Stdout())
+	})
+
+	t.Run("service name is not an alias on external network", func(t *testing.T) {
+		res := c.RunDockerCmd(t, "inspect", projectName+"-web-1", "-f",
+			fmt.Sprintf(`{{ range (index .NetworkSettings.Networks %q).Aliases }}[{{ . }}]{{ end }}`, externalNet))
+		assert.Assert(t, !strings.Contains(res.Stdout(), "[web]"), res.Stdout())
+	})
+
+	t.Run("explicit alias under networks.<external>.aliases is registered on external network", func(t *testing.T) {
+		res := c.RunDockerCmd(t, "inspect", projectName+"-db-1", "-f",
+			fmt.Sprintf(`{{ range (index .NetworkSettings.Networks %q).Aliases }}[{{ . }}]{{ end }}`, externalNet))
+		assert.Assert(t, strings.Contains(res.Stdout(), "[db]"), res.Stdout())
+	})
+
+	t.Run("service name resolves on internal network", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-external-alias/compose.yaml",
+			"--project-name", projectName,
+			"exec", "-T", "web", "ping", "-c1", "db")
+		assert.Assert(t, strings.Contains(res.Combined(), "1 packets transmitted"), res.Combined())
+	})
+}

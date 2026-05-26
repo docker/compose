@@ -365,6 +365,26 @@ func TestCreateEndpointSettings(t *testing.T) {
 	}, cmpopts.EquateComparable(netip.Addr{})))
 }
 
+func TestCreateEndpointSettings_ExternalNetwork(t *testing.T) {
+	eps, err := createEndpointSettings(&composetypes.Project{
+		Name: "projName",
+		Networks: composetypes.Networks{
+			"netName": {External: true},
+		},
+	}, composetypes.ServiceConfig{
+		Name:          "serviceName",
+		ContainerName: "containerName",
+		Networks: map[string]*composetypes.ServiceNetworkConfig{
+			"netName": {
+				Aliases: []string{"alias1"},
+			},
+		},
+	}, 0, "netName", nil, true)
+	assert.NilError(t, err)
+	assert.Check(t, cmp.DeepEqual(eps.Aliases, []string{"containerName", "alias1"}),
+		"service name must not be added as alias on external networks")
+}
+
 func Test_buildContainerVolumes(t *testing.T) {
 	pwd, err := os.Getwd()
 	assert.NilError(t, err)
