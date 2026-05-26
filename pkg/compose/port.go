@@ -26,18 +26,40 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
+func (s *composeService) Ports(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
 	projectName = strings.ToLower(projectName)
 	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, service, options.Index)
 	if err != nil {
-		return "", 0, err
+		return nil, err
 	}
-	for _, p := range ctr.Ports {
-		if p.PrivatePort == port && p.Type == options.Protocol {
-			return p.IP.String(), int(p.PublicPort), nil
+
+	if port != 0 {
+		for _, p := range ctr.Ports {
+			if p.PrivatePort == port && p.Type == options.Protocol {
+				return api.PortPublishers{{
+					URL:           p.IP.String(),
+					TargetPort:    int(p.PrivatePort),
+					PublishedPort: int(p.PublicPort),
+					Protocol:      p.Type,
+				}}, nil
+			}
 		}
+		return nil, portNotFoundError(options.Protocol, port, ctr)
 	}
-	return "", 0, portNotFoundError(options.Protocol, port, ctr)
+
+	var publishers api.PortPublishers
+	for _, p := range ctr.Ports {
+		if options.Protocol != "" && p.Type != options.Protocol {
+			continue
+		}
+		publishers = append(publishers, api.PortPublisher{
+			URL:           p.IP.String(),
+			TargetPort:    int(p.PrivatePort),
+			PublishedPort: int(p.PublicPort),
+			Protocol:      p.Type,
+		})
+	}
+	return publishers, nil
 }
 
 func portNotFoundError(protocol string, port uint16, ctr container.Summary) error {
