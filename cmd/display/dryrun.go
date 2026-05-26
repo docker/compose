@@ -16,6 +16,7 @@
 
 package display
 
+// DRYRUN_PREFIX is the prefix prepended to output lines when running in dry-run mode.
 const (
 	DRYRUN_PREFIX = " DRY-RUN MODE - "
 )
