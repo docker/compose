@@ -178,7 +178,7 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 			if err != nil {
 				return nil, err
 			}
-			exposed.Add(strconv.Itoa(int(p.Num())))
+			exposed.Add(p.Port())
 		}
 		for _, port := range service.Ports {
 			exposed.Add(strconv.Itoa(int(port.Target)))
@@ -232,9 +232,7 @@ func inspectWithPull(ctx context.Context, dockerCli command.Cli, imageName strin
 		}
 		defer func() { _ = stream.Close() }()
 
-		out := dockerCli.Out()
-		err = jsonmessage.DisplayJSONMessagesStream(stream, out, out.FD(), out.IsTerminal(), nil)
-		if err != nil {
+		if err := jsonmessage.DisplayStream(stream, dockerCli.Out()); err != nil {
 			return image.InspectResponse{}, err
 		}
 		if inspect, err = dockerCli.Client().ImageInspect(ctx, imageName); err != nil {
