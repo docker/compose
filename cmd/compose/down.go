@@ -22,6 +22,8 @@ import (
 	"os"
 	"time"
 
+	composecli "github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -34,6 +36,7 @@ import (
 
 type downOptions struct {
 	*ProjectOptions
+	all           bool
 	removeOrphans bool
 	timeChanged   bool
 	timeout       int
@@ -48,12 +51,33 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	downCmd := &cobra.Command{
 		Use:   "down [OPTIONS] [SERVICES]",
 		Short: "Stop and remove containers, networks",
+		Long: `Stops containers and removes containers, networks, volumes, and images created by up.
+
+By default, the only things removed are:
+
+- Containers for services defined in the Compose file.
+- Networks defined in the networks section of the Compose file.
+- The default network, if one is used.
+
+Networks and volumes defined as external are never removed.
+
+Anonymous volumes are not removed by default. However, as they don't have a stable name, they are not automatically
+mounted by a subsequent up. For data that needs to persist between updates, use explicit paths as bind mounts or
+named volumes.
+
+Use --all to remove every resource for the project, including services from inactive profiles and orphan containers.`,
+		Example: `docker compose down
+docker compose down -v --remove-orphans
+docker compose down --all -v`,
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
 			if opts.images != "" {
 				if opts.images != "all" && opts.images != "local" {
 					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
 				}
+			}
+			if opts.all && len(args) > 0 {
+				return fmt.Errorf("cannot combine --all with service arguments")
 			}
 			return nil
 		}),
@@ -63,6 +87,7 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := downCmd.Flags()
+	flags.BoolVar(&opts.all, "all", false, "Remove all resources for the project, including inactive profile services and orphan containers")
 	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file")
 	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
@@ -79,7 +104,12 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 }
 
 func runDown(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts downOptions, services []string) error {
-	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
+	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
+	if err != nil {
+		return err
+	}
+
+	project, name, err := getDownProjectOrName(ctx, dockerCli, backend, opts, services)
 	if err != nil {
 		return err
 	}
@@ -89,11 +119,9 @@ func runDown(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
-	if err != nil {
-		return err
-	}
+
 	return backend.Down(ctx, name, api.DownOptions{
+		All:           opts.all,
 		RemoveOrphans: opts.removeOrphans,
 		Project:       project,
 		Timeout:       timeout,
@@ -101,4 +129,33 @@ func runDown(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		Volumes:       opts.volumes,
 		Services:      services,
 	})
+}
+
+func getDownProjectOrName(ctx context.Context, dockerCli command.Cli, backend api.Compose, opts downOptions, services []string) (*types.Project, string, error) {
+	if !opts.all {
+		return opts.projectOrName(ctx, dockerCli, services...)
+	}
+
+	allProjectOpts := *opts.ProjectOptions
+	allProjectOpts.Profiles = []string{"*"}
+	allProjectOpts.All = true
+
+	project, _, err := allProjectOpts.ToProject(ctx, dockerCli, backend, nil, composecli.WithDiscardEnvFile, composecli.WithoutEnvironmentResolution)
+	if err == nil {
+		return project, project.Name, nil
+	}
+
+	if len(allProjectOpts.ConfigPaths) > 0 {
+		return nil, "", err
+	}
+
+	name := allProjectOpts.ProjectName
+	if name == "" {
+		name = os.Getenv(ComposeProjectName)
+	}
+	if name != "" {
+		return nil, name, nil
+	}
+
+	return nil, "", err
 }
