@@ -319,3 +319,25 @@ func TestLoadProject_MissingComposeFile(t *testing.T) {
 	assert.Assert(t, err != nil)
 	assert.Assert(t, project == nil)
 }
+
+func TestLoadProject_DirectoryAsComposeFile(t *testing.T) {
+	// Reproduce the misleading error described in https://github.com/docker/compose/issues/13649:
+	// when COMPOSE_FILE is set to a directory (e.g. COMPOSE_FILE="" resolves to the working
+	// directory via filepath.Abs("")), the error "read <dir>: is a directory" was shown.
+	// The fix should return a clear error message instead.
+	tmpDir := t.TempDir()
+
+	service, err := NewComposeService(nil)
+	require.NoError(t, err)
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{tmpDir},
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, project)
+	assert.Contains(t, err.Error(), "is a directory")
+	assert.Contains(t, err.Error(), "Compose file")
+	// Ensure the old opaque error message is NOT present
+	assert.NotContains(t, err.Error(), "read "+tmpDir+": is a directory")
+}

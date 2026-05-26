@@ -298,11 +298,43 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 		return nil, err
 	}
 
+	if err := checkConfigPathsNotDirectories(options.ConfigPaths, remotes); err != nil {
+		return nil, err
+	}
+
 	if o.Compatibility || utils.StringToBool(options.Environment[ComposeCompatibility]) {
 		api.Separator = "_"
 	}
 
 	return options.LoadModel(ctx)
+}
+
+// checkConfigPathsNotDirectories returns an error if any local config path is a
+// directory rather than a file. Remote resource paths and stdin ("-") are skipped.
+//
+// This guards against COMPOSE_FILE being set to a directory (e.g. COMPOSE_FILE=""
+// which filepath.Abs resolves to the working directory).
+func checkConfigPathsNotDirectories(configPaths []string, remoteLoaders []loader.ResourceLoader) error {
+	for _, configPath := range configPaths {
+		if configPath == "-" {
+			continue
+		}
+		isRemote := false
+		for _, r := range remoteLoaders {
+			if r.Accept(configPath) {
+				isRemote = true
+				break
+			}
+		}
+		if isRemote {
+			continue
+		}
+		if info, err := os.Stat(configPath); err == nil && info.IsDir() {
+			return fmt.Errorf("path %q is a directory, not a Compose file; "+
+				"check the COMPOSE_FILE environment variable or the -f flag", configPath)
+		}
+	}
+	return nil
 }
 
 // ToProject loads a Compose project using the LoadProject API.

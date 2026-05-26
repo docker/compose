@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -31,6 +32,36 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
+// checkConfigPathsForDirectories returns an error if any config path in configPaths
+// is a local directory instead of a file. Remote paths (accepted by remoteLoaders)
+// and the special "-" (stdin) value are skipped.
+//
+// This provides a clear error when COMPOSE_FILE is set to a directory path (e.g.,
+// "COMPOSE_FILE=" resolves to the working directory via filepath.Abs("")).
+func checkConfigPathsForDirectories(configPaths []string, remoteLoaders []loader.ResourceLoader) error {
+	for _, configPath := range configPaths {
+		if configPath == "-" {
+			continue
+		}
+		isRemote := false
+		for _, r := range remoteLoaders {
+			if r.Accept(configPath) {
+				isRemote = true
+				break
+			}
+		}
+		if isRemote {
+			continue
+		}
+		info, err := os.Stat(configPath)
+		if err == nil && info.IsDir() {
+			return fmt.Errorf("path %q is a directory, not a Compose file; "+
+				"check the COMPOSE_FILE environment variable or the -f flag", configPath)
+		}
+	}
+	return nil
+}
+
 // LoadProject implements api.Compose.LoadProject
 // It loads and validates a Compose project from configuration files.
 func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoadOptions) (*types.Project, error) {
@@ -39,6 +70,10 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 
 	projectOptions, err := s.buildProjectOptions(options, remoteLoaders)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := checkConfigPathsForDirectories(projectOptions.ConfigPaths, remoteLoaders); err != nil {
 		return nil, err
 	}
 
