@@ -658,10 +658,26 @@ func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, er
 func (s *composeService) checkForBindMount(project *types.Project) map[string][]types.ServiceVolumeConfig {
 	allFindings := map[string][]types.ServiceVolumeConfig{}
 	for serviceName, config := range project.Services {
-		bindMounts := []types.ServiceVolumeConfig{}
+		var bindMounts []types.ServiceVolumeConfig
 		for _, volume := range config.Volumes {
 			if volume.Type == types.VolumeTypeBind {
 				bindMounts = append(bindMounts, volume)
+				continue
+			}
+			if volume.Type == types.VolumeTypeVolume && volume.Source != "" {
+				if topLevel, ok := project.Volumes[volume.Source]; ok {
+					if isDriverOptsBind(topLevel) {
+						device := strings.TrimSpace(topLevel.DriverOpts["device"])
+						bindMounts = append(bindMounts, types.ServiceVolumeConfig{
+							Type:        types.VolumeTypeBind,
+							Source:      device,
+							Target:      volume.Target,
+							ReadOnly:    volume.ReadOnly,
+							Consistency: volume.Consistency,
+							Bind:        volume.Bind,
+						})
+					}
+				}
 			}
 		}
 		if len(bindMounts) > 0 {
@@ -669,6 +685,27 @@ func (s *composeService) checkForBindMount(project *types.Project) map[string][]
 		}
 	}
 	return allFindings
+}
+
+func isDriverOptsBind(v types.VolumeConfig) bool {
+	if v.Driver != "" && v.Driver != "local" {
+		return false
+	}
+	opts := v.DriverOpts
+	if len(opts) == 0 {
+		return false
+	}
+	device := strings.TrimSpace(opts["device"])
+	if device == "" {
+		return false
+	}
+	for _, opt := range strings.Split(opts["o"], ",") {
+		switch strings.TrimSpace(opt) {
+		case "bind", "rbind":
+			return true
+		}
+	}
+	return false
 }
 
 func (s *composeService) checkForSensitiveData(ctx context.Context, project *types.Project) ([]secrets.DetectedSecret, error) {

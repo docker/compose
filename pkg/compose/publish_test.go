@@ -593,3 +593,124 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	assert.Assert(t, errors.Is(err, api.ErrCanceled),
 		"expected api.ErrCanceled when user declines, got: %v", err)
 }
+
+func Test_checkForBindMount_namedVolume_driverOptsBind(t *testing.T) {
+	project := &types.Project{
+		Services: types.Services{
+			"web": {
+				Name:  "web",
+				Image: "nginx",
+				Volumes: []types.ServiceVolumeConfig{
+					{
+						Type:   types.VolumeTypeVolume,
+						Source: "secret_host_data",
+						Target: "/mnt/data",
+					},
+					{
+						Type:   types.VolumeTypeVolume,
+						Source: "normal_vol",
+						Target: "/data",
+					},
+				},
+			},
+		},
+		Volumes: types.Volumes{
+			"secret_host_data": {
+				Driver: "local",
+				DriverOpts: map[string]string{
+					"type":   "none",
+					"o":      "bind",
+					"device": "/Users/admin/.ssh",
+				},
+			},
+			"normal_vol": {
+				Driver: "local",
+			},
+		},
+	}
+
+	svc := &composeService{}
+	findings := svc.checkForBindMount(project)
+
+	assert.Equal(t, 1, len(findings["web"]), "expected exactly one bind mount finding for web")
+	assert.Equal(t, "/Users/admin/.ssh", findings["web"][0].Source)
+	assert.Equal(t, "/mnt/data", findings["web"][0].Target)
+}
+
+func Test_isDriverOptsBind(t *testing.T) {
+	tests := []struct {
+		name     string
+		volume   types.VolumeConfig
+		expected bool
+	}{
+		{
+			name: "plain bind",
+			volume: types.VolumeConfig{
+				Driver:     "local",
+				DriverOpts: map[string]string{"o": "bind", "device": "/host/path"},
+			},
+			expected: true,
+		},
+		{
+			name: "rbind",
+			volume: types.VolumeConfig{
+				Driver:     "local",
+				DriverOpts: map[string]string{"o": "rbind", "device": "/host/path"},
+			},
+			expected: true,
+		},
+		{
+			name: "comma-separated ro,bind — validates split logic",
+			volume: types.VolumeConfig{
+				Driver:     "local",
+				DriverOpts: map[string]string{"o": "ro,bind", "device": "/host/path"},
+			},
+			expected: true,
+		},
+		{
+			name: "nobind must not match — guards against substring false positive",
+			volume: types.VolumeConfig{
+				Driver:     "local",
+				DriverOpts: map[string]string{"o": "nobind", "device": "/host/path"},
+			},
+			expected: false,
+		},
+		{
+			name: "no device key",
+			volume: types.VolumeConfig{
+				Driver:     "local",
+				DriverOpts: map[string]string{"o": "bind"},
+			},
+			expected: false,
+		},
+		{
+			name: "empty device value",
+			volume: types.VolumeConfig{
+				Driver:     "local",
+				DriverOpts: map[string]string{"o": "bind", "device": "   "},
+			},
+			expected: false,
+		},
+		{
+			name: "empty driver_opts",
+			volume: types.VolumeConfig{
+				Driver: "local",
+			},
+			expected: false,
+		},
+		{
+			name: "non-local driver",
+			volume: types.VolumeConfig{
+				Driver:     "nfs",
+				DriverOpts: map[string]string{"o": "bind", "device": "/host/path"},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isDriverOptsBind(tt.volume))
+		})
+	}
+}
