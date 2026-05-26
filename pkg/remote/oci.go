@@ -27,7 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v3/loader"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"

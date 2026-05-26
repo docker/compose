@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/cli"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/containerd/platforms"
 	"github.com/docker/cli/opts"
 	"github.com/moby/moby/api/types/container"

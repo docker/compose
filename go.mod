@@ -8,7 +8,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.11.0
+	github.com/compose-spec/compose-go/v3 v3.0.0-00010101000000-000000000000
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd/v2 v2.2.3
 	github.com/containerd/errdefs v1.0.0
@@ -155,3 +155,6 @@ exclude (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
+
+// Test compose-spec/compose-go#874 (v3 yaml.Node-based loader)
+replace github.com/compose-spec/compose-go/v3 => github.com/ndeloof/compose-go/v3 v3.0.0-20260521063750-212e4aea5300
