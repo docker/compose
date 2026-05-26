@@ -1,0 +1,7 @@
+services:
+  test:
+    image: bash
+    environment:
+      FULL_IMAGE: ${FULL_IMAGE}
+      BASE_URL: ${BASE_URL}
+    command: echo "ok"
