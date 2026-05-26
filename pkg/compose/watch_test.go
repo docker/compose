@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -193,4 +194,94 @@ func newFakeSyncer() *fakeSyncer {
 func (f *fakeSyncer) Sync(ctx context.Context, service string, paths []*sync.PathMapping) error {
 	f.synced <- paths
 	return nil
+}
+
+func TestInitialSyncFiles_DirectoryIncludesExistingFilesEvenIfOlderThanImage(t *testing.T) {
+	dir := t.TempDir()
+	hostDir := filepath.Join(dir, "src")
+	assert.NilError(t, os.MkdirAll(hostDir, 0o755))
+	hostFile := filepath.Join(hostDir, "test.txt")
+	assert.NilError(t, os.WriteFile(hostFile, []byte("hello"), 0o644))
+
+	fileTime := time.Now().Add(-24 * time.Hour)
+	assert.NilError(t, os.Chtimes(hostFile, fileTime, fileTime))
+
+	service := composeService{}
+	trigger := types.Trigger{
+		Path:        hostDir,
+		Action:      types.WatchActionSync,
+		Target:      "/app/src",
+		InitialSync: true,
+	}
+
+	got, err := service.initialSyncFiles(types.ServiceConfig{Name: "test"}, trigger, watch.EmptyMatcher{})
+	assert.NilError(t, err)
+
+	expected := []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: "/app/src/test.txt",
+	}}
+	assert.DeepEqual(t, expected, got)
+}
+
+func TestInitialSyncFiles_FileIncludesExistingFileEvenIfOlderThanImage(t *testing.T) {
+	dir := t.TempDir()
+	hostFile := filepath.Join(dir, "test.txt")
+	assert.NilError(t, os.WriteFile(hostFile, []byte("hello"), 0o644))
+
+	fileTime := time.Now().Add(-24 * time.Hour)
+	assert.NilError(t, os.Chtimes(hostFile, fileTime, fileTime))
+
+	service := composeService{}
+	trigger := types.Trigger{
+		Path:        hostFile,
+		Action:      types.WatchActionSync,
+		Target:      "/app/test.txt",
+		InitialSync: true,
+	}
+
+	got, err := service.initialSyncFiles(types.ServiceConfig{Name: "test"}, trigger, watch.EmptyMatcher{})
+	assert.NilError(t, err)
+
+	expected := []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: "/app/test.txt",
+	}}
+	assert.DeepEqual(t, expected, got)
+}
+
+func TestInitialSync_SyncsExistingFilesEvenIfOlderThanImage(t *testing.T) {
+	dir := t.TempDir()
+	hostDir := filepath.Join(dir, "src")
+	assert.NilError(t, os.MkdirAll(hostDir, 0o755))
+	hostFile := filepath.Join(hostDir, "test.txt")
+	assert.NilError(t, os.WriteFile(hostFile, []byte("hello"), 0o644))
+
+	fileTime := time.Now().Add(-24 * time.Hour)
+	assert.NilError(t, os.Chtimes(hostFile, fileTime, fileTime))
+
+	service := composeService{}
+	syncer := newFakeSyncer()
+	trigger := types.Trigger{
+		Path:        hostDir,
+		Action:      types.WatchActionSync,
+		Target:      "/app/src",
+		InitialSync: true,
+	}
+	serviceConfig := types.ServiceConfig{
+		Name:  "test",
+		Build: &types.BuildConfig{Context: dir},
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- service.initialSync(t.Context(), serviceConfig, trigger, syncer)
+	}()
+
+	expected := []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: "/app/src/test.txt",
+	}}
+	assert.DeepEqual(t, expected, <-syncer.synced)
+	assert.NilError(t, <-errCh)
 }

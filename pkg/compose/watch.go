@@ -248,7 +248,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 
 				if shouldInitialSync && isSync(trigger) {
 					// Need to check initial files are in container that are meant to be synced from watch action
-					err := s.initialSync(ctx, project, service, trigger, syncer)
+					err := s.initialSync(ctx, service, trigger, syncer)
 					if err != nil {
 						return nil, err
 					}
@@ -731,7 +731,7 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 
 // Walks develop.watch.path and checks which files should be copied inside the container
 // ignores develop.watch.ignore, Dockerfile, compose files, bind mounted paths and .git
-func (s *composeService) initialSync(ctx context.Context, project *types.Project, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
+func (s *composeService) initialSync(ctx context.Context, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
 	dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
 	if err != nil {
 		return err
@@ -753,7 +753,7 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 		dotGitIgnore,
 		triggerIgnore)
 
-	pathsToCopy, err := s.initialSyncFiles(ctx, project, service, trigger, ignoreInitialSync)
+	pathsToCopy, err := s.initialSyncFiles(service, trigger, ignoreInitialSync)
 	if err != nil {
 		return err
 	}
@@ -761,15 +761,9 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 	return syncer.Sync(ctx, service.Name, pathsToCopy)
 }
 
-// Syncs files from develop.watch.path if thy have been modified after the image has been created
-//
-//nolint:gocyclo
-func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Project, service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
+// Syncs files from develop.watch.path, ignoring bind-mounted and excluded paths.
+func (s *composeService) initialSyncFiles(service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
 	fi, err := os.Stat(trigger.Path)
-	if err != nil {
-		return nil, err
-	}
-	timeImageCreated, err := s.imageCreatedTime(ctx, project, service.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -794,15 +788,7 @@ func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Pr
 				}
 				return nil // skip file
 			}
-			info, err := d.Info()
-			if err != nil {
-				return err
-			}
 			if !d.IsDir() {
-				if info.ModTime().Before(timeImageCreated) {
-					// skip file if it was modified before image creation
-					return nil
-				}
 				rel, err := filepath.Rel(trigger.Path, path)
 				if err != nil {
 					return err
@@ -817,7 +803,7 @@ func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Pr
 		})
 	case mode.IsRegular():
 		// process file
-		if fi.ModTime().After(timeImageCreated) && !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 			pathsToCopy = append(pathsToCopy, &sync.PathMapping{
 				HostPath:      trigger.Path,
 				ContainerPath: trigger.Target,
@@ -831,29 +817,4 @@ func shouldIgnore(name string, ignore watch.PathMatcher) bool {
 	shouldIgnore, _ := ignore.Matches(name)
 	// ignore files that match any ignore pattern
 	return shouldIgnore
-}
-
-// gets the image creation time for a service
-func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Project, serviceName string) (time.Time, error) {
-	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		All:     true,
-		Filters: projectFilter(project.Name).Add("label", serviceFilter(serviceName)),
-	})
-	if err != nil {
-		return time.Now(), err
-	}
-	if len(res.Items) == 0 {
-		return time.Now(), fmt.Errorf("could not get created time for service's image")
-	}
-
-	img, err := s.apiClient().ImageInspect(ctx, res.Items[0].ImageID)
-	if err != nil {
-		return time.Now(), err
-	}
-	// Need to get the oldest one?
-	timeCreated, err := time.Parse(time.RFC3339Nano, img.Created)
-	if err != nil {
-		return time.Now(), err
-	}
-	return timeCreated, nil
 }
