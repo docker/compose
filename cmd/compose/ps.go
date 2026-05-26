@@ -69,19 +69,20 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	opts := psOptions{
 		ProjectOptions: p,
 	}
-	psCmd := &cobra.Command{
+	var psCmd *cobra.Command
+	psCmd = &cobra.Command{
 		Use:   "ps [OPTIONS] [SERVICE...]",
 		Short: "List containers",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return opts.parseFilter()
 		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPs(ctx, dockerCli, backendOptions, args, opts)
+			return runPs(ctx, dockerCli, backendOptions, args, opts, psCmd)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := psCmd.Flags()
-	flags.StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
+	flags.StringVar(&opts.Format, "format", "", cliflags.FormatHelp)
 	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property (supported filters: status)")
 	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
@@ -92,7 +93,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	return psCmd
 }
 
-func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, opts psOptions) error { //nolint:gocyclo
+func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, opts psOptions, cmd *cobra.Command) error { //nolint:gocyclo
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
@@ -152,8 +153,13 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 		return nil
 	}
 
-	if opts.Format == "" {
+	if len(opts.Format) == 0 {
 		opts.Format = dockerCli.ConfigFile().PsFormat
+	}
+	if len(opts.Format) == 0 {
+		opts.Format = "table"
+	} else if opts.Quiet && cmd.Flags().Changed("format") {
+		fmt.Fprintln(dockerCli.Err(), "WARNING: Ignoring custom format, because both --format and --quiet are set.")
 	}
 
 	containerCtx := cliformatter.Context{
