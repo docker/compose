@@ -280,7 +280,7 @@ func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cl
 		return "", err
 	}
 
-	project, _, err := o.ToProject(ctx, dockerCli, backend, nil)
+	project, _, err := o.ToProject(ctx, dockerCli, backend, nil, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return "", err
 	}
