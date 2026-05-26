@@ -43,6 +43,7 @@ import (
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type createOptions struct {
@@ -1624,7 +1625,7 @@ func (s *composeService) ensureVolume(ctx context.Context, name string, volume t
 	actual, ok := inspected.Volume.Labels[api.ConfigHashLabel]
 	if ok && actual != expected {
 		msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
-		confirm, err := s.prompt(msg, false)
+		confirm, err := confirmVolumeRecreate(inspected.Volume.Labels, s.prompt, msg)
 		if err != nil {
 			return "", err
 		}
@@ -1637,6 +1638,19 @@ func (s *composeService) ensureVolume(ctx context.Context, name string, volume t
 		}
 	}
 	return inspected.Volume.Name, nil
+}
+
+func confirmVolumeRecreate(labels map[string]string, prompt Prompt, promptMsg string) (bool, error) {
+	recreate, ok := labels[api.VolumeRecreateWhenSpecUpdatedLabel]
+	if ok {
+		return utils.StringToBool(recreate), nil
+	} else {
+		c, err := prompt(promptMsg, false)
+		if err != nil {
+			return false, err
+		}
+		return c, nil
+	}
 }
 
 func (s *composeService) removeDivergedVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) error {
