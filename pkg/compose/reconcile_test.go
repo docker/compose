@@ -582,6 +582,90 @@ func TestReconcileContainers_ExitedIsNoop(t *testing.T) {
 	assert.Assert(t, plan.IsEmpty())
 }
 
+// TestReconcileContainers_DependsOnChain verifies that a dependent service's
+// container creation depends on the last plan node of the service it depends
+// on (via reconciler.serviceNodes). Without this, services declared in
+// depends_on could start before their dependencies' operations complete.
+func TestReconcileContainers_DependsOnChain(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+			"web": {
+				Name:  "web",
+				Scale: intPtr(1),
+				DependsOn: types.DependsOnConfig{
+					"db": {Condition: types.ServiceConditionStarted},
+				},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	// db has no dependencies, so its CreateContainer has no deps.
+	// web depends on db, so its CreateContainer must depend on db's node #1.
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, CreateContainer, no existing container
+[1] -> #2 service:web:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// TestReconcileContainers_DependsOnScaleDown verifies that scale-down of a
+// service still propagates through serviceNodes, so a dependent service waits
+// for the scale-down's RemoveContainer to finish before starting its own ops.
+func TestReconcileContainers_DependsOnScaleDown(t *testing.T) {
+	svc := types.ServiceConfig{Name: "db", Scale: intPtr(0)}
+	hash := mustServiceHash(t, svc)
+
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": svc,
+			"web": {
+				Name:  "web",
+				Scale: intPtr(1),
+				DependsOn: types.DependsOnConfig{
+					"db": {Condition: types.ServiceConditionStarted},
+				},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"db": {{
+				ID: "c1", Number: 1, State: container.StateRunning, ConfigHash: hash,
+				Summary: container.Summary{
+					ID: "c1", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "db", api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+				},
+			}},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	// db scales 1→0: Stop+Remove. web's CreateContainer must depend on the
+	// Remove (#2), proving serviceNodes is updated even when only scale-down
+	// happens for the dependency.
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, StopContainer, scale down
+[1] -> #2 service:db:1, RemoveContainer, scale down
+[2] -> #3 service:web:1, CreateContainer, no existing container
+`)+"\n")
+}
+
 func TestReconcileOrphans(t *testing.T) {
 	project := &types.Project{
 		Name:     "myproject",
