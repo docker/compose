@@ -146,15 +146,16 @@ func TestReconcileNetworks_Diverged(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
+	// The recreate phase reuses the Stop from the network-recreate phase
+	// instead of emitting a second one against an already-stopped container.
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
 [] -> #1 service:web:1, StopContainer, network frontend config changed
 [1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
 [2] -> #3 network:frontend, RemoveNetwork, config hash diverged
 [3] -> #4 network:frontend, CreateNetwork, recreate after config change
 [4] -> #5 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
-[5] -> #6 service:web:1, StopContainer, replaced by #5 [recreate:web:1]
-[6] -> #7 service:web:1, RemoveContainer, replaced by #5 [recreate:web:1]
-[7] -> #8 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+[1,5] -> #6 service:web:1, RemoveContainer, replaced by #5 [recreate:web:1]
+[6] -> #7 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
 `)+"\n")
 }
 
@@ -198,7 +199,8 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	// Services sorted alphabetically: api before web
+	// Services sorted alphabetically: api before web. Each service's recreate
+	// reuses the Stop from the network-recreate phase (no second Stop).
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
 [] -> #1 service:api:1, StopContainer, network frontend config changed
 [] -> #2 service:web:1, StopContainer, network frontend config changed
@@ -207,13 +209,11 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 [3,4] -> #5 network:frontend, RemoveNetwork, config hash diverged
 [5] -> #6 network:frontend, CreateNetwork, recreate after config change
 [6] -> #7 service:api:1, CreateContainer, config changed (tmpName) [recreate:api:1]
-[7] -> #8 service:api:1, StopContainer, replaced by #7 [recreate:api:1]
-[8] -> #9 service:api:1, RemoveContainer, replaced by #7 [recreate:api:1]
-[9] -> #10 service:api:1, RenameContainer, finalize recreate [recreate:api:1]
-[6] -> #11 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
-[11] -> #12 service:web:1, StopContainer, replaced by #11 [recreate:web:1]
-[12] -> #13 service:web:1, RemoveContainer, replaced by #11 [recreate:web:1]
-[13] -> #14 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+[1,7] -> #8 service:api:1, RemoveContainer, replaced by #7 [recreate:api:1]
+[8] -> #9 service:api:1, RenameContainer, finalize recreate [recreate:api:1]
+[6] -> #10 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
+[2,10] -> #11 service:web:1, RemoveContainer, replaced by #10 [recreate:web:1]
+[11] -> #12 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
 `)+"\n")
 }
 
