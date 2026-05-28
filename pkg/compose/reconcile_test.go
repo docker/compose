@@ -32,9 +32,6 @@ func noPrompt(msg string, _ bool) (bool, error) {
 	panic("unexpected prompt call: " + msg)
 }
 
-func alwaysYesPrompt(string, bool) (bool, error) { return true, nil }
-func alwaysNoPrompt(string, bool) (bool, error)  { return false, nil }
-
 func defaultReconcileOptions() ReconcileOptions {
 	return ReconcileOptions{
 		Recreate:             api.RecreateDiverged,
@@ -282,56 +279,11 @@ func TestReconcileVolumes_ExternalSkipped(t *testing.T) {
 	assert.Assert(t, plan.IsEmpty())
 }
 
-func TestReconcileVolumes_DivergedConfirmed(t *testing.T) {
-	project := &types.Project{
-		Name:    "myproject",
-		Volumes: types.Volumes{"data": {Name: "myproject_data", Driver: "local"}},
-		Services: types.Services{
-			"db": {
-				Name:  "db",
-				Scale: intPtr(1),
-				Volumes: []types.ServiceVolumeConfig{
-					{Source: "data", Type: "volume"},
-				},
-			},
-		},
-	}
-	observed := &ObservedState{
-		ProjectName: "myproject",
-		Containers: map[string][]ObservedContainer{
-			"db": {{
-				ID: "c1aabbccddee", Number: 1, State: container.StateRunning,
-				Summary: container.Summary{
-					ID: "c1aabbccddee",
-					Labels: map[string]string{
-						api.ServiceLabel:         "db",
-						api.ContainerNumberLabel: "1",
-					},
-				},
-			}},
-		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes: map[string]ObservedVolume{
-			"data": {Name: "myproject_data", ConfigHash: "oldhash"},
-		},
-	}
-
-	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), alwaysYesPrompt)
-	assert.NilError(t, err)
-
-	assert.Equal(t, plan.String(), strings.TrimSpace(`
-[] -> #1 service:db:1, StopContainer, volume data config changed
-[1] -> #2 service:db:1, RemoveContainer, volume data config changed
-[2] -> #3 volume:data, RemoveVolume, config hash diverged
-[3] -> #4 volume:data, CreateVolume, recreate after config change
-[4] -> #5 service:db:1, CreateContainer, config changed (tmpName) [recreate:db:1]
-[5] -> #6 service:db:1, StopContainer, replaced by #5 [recreate:db:1]
-[6] -> #7 service:db:1, RemoveContainer, replaced by #5 [recreate:db:1]
-[7] -> #8 service:db:1, RenameContainer, finalize recreate [recreate:db:1]
-`)+"\n")
-}
-
-func TestReconcileVolumes_DivergedDeclined(t *testing.T) {
+// TestReconcileVolumes_DivergedIsIgnored verifies that a diverged volume
+// produces no plan operations: recreation of diverged volumes is owned by
+// ensureProjectVolumes (which prompts the user) and runs before reconcile,
+// so the reconciler must not duplicate that decision.
+func TestReconcileVolumes_DivergedIsIgnored(t *testing.T) {
 	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
 
 	project := &types.Project{
@@ -371,7 +323,7 @@ func TestReconcileVolumes_DivergedDeclined(t *testing.T) {
 		},
 	}
 
-	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), alwaysNoPrompt)
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 	assert.Assert(t, plan.IsEmpty())
 }

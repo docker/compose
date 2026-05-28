@@ -60,8 +60,12 @@ type reconciler struct {
 	project  *types.Project
 	observed *ObservedState
 	options  ReconcileOptions
-	prompt   Prompt
-	plan     *Plan
+	// prompt is wired through for future use: when divergence detection for
+	// volumes/networks migrates fully into the reconciler (today it lives in
+	// ensureProjectVolumes/ensureNetworks), prompts will fire from here. Kept
+	// available now so call sites do not have to change later.
+	prompt Prompt
+	plan   *Plan
 
 	// networkNodes and volumeNodes track the last plan node for each
 	// network/volume, so container creation nodes can depend on them.
@@ -73,7 +77,8 @@ type reconciler struct {
 }
 
 // reconcile is the main entry point: it builds a Plan from desired vs observed state.
-// The prompt function is called for interactive decisions (e.g. volume divergence).
+// The prompt function is reserved for future interactive decisions (see the
+// reconciler.prompt field).
 func reconcile(_ context.Context, project *types.Project, observed *ObservedState, options ReconcileOptions, prompt Prompt) (*Plan, error) {
 	r := &reconciler{
 		project:      project,
@@ -90,9 +95,7 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 		return nil, err
 	}
 
-	if err := r.reconcileVolumes(); err != nil {
-		return nil, err
-	}
+	r.reconcileVolumes()
 
 	if err := r.reconcileContainers(); err != nil {
 		return nil, err
@@ -199,38 +202,20 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 	return nil
 }
 
-// reconcileVolumes adds plan nodes for volume creation or recreation.
-func (r *reconciler) reconcileVolumes() error {
+// reconcileVolumes adds plan nodes for volume creation. Recreation of a
+// diverged volume is handled by ensureProjectVolumes (which already prompts
+// the user) before reconcile runs, so the reconciler does not duplicate that
+// decision here.
+func (r *reconciler) reconcileVolumes() {
 	for _, key := range sortedKeys(r.project.Volumes) {
 		desired := r.project.Volumes[key]
 		if desired.External {
 			continue
 		}
-		observed, exists := r.observed.Volumes[key]
-		if !exists {
+		if _, exists := r.observed.Volumes[key]; !exists {
 			r.planCreateVolume(key, &desired)
-			continue
 		}
-
-		expectedHash, err := VolumeHash(desired)
-		if err != nil {
-			return err
-		}
-		if observed.ConfigHash != "" && observed.ConfigHash != expectedHash {
-			confirmed, err := r.prompt(
-				fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", desired.Name),
-				false,
-			)
-			if err != nil {
-				return err
-			}
-			if confirmed {
-				r.planRecreateVolume(key, &desired)
-			}
-		}
-		// else: volume exists and config matches, nothing to do
 	}
-	return nil
 }
 
 // planCreateVolume adds a single CreateVolume node and records it for dependency tracking.
@@ -250,6 +235,12 @@ func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig) *Plan
 // stop affected containers → remove containers → remove volume → create volume.
 // Containers must be removed (not just stopped) because Docker does not allow
 // removing a volume that is referenced by any container, even a stopped one.
+//
+// Currently unused: divergence detection and recreation live in
+// ensureProjectVolumes (see create.go:1626). Kept in place so the reconciler
+// can take over that responsibility when the seam is consolidated.
+//
+//nolint:unused
 func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
 	observed := r.observed.Volumes[key]
 	affectedServices := r.servicesUsingVolume(key)
@@ -314,6 +305,10 @@ func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 
 // servicesUsingVolume returns the names of services that mount the given
 // compose volume key, sorted for deterministic plan output.
+//
+// Currently used only by planRecreateVolume (also unused — see its doc).
+//
+//nolint:unused
 func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	var names []string
 	for _, key := range sortedKeys(r.project.Services) {
