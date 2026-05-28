@@ -19,9 +19,11 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
@@ -36,6 +38,12 @@ type planExecutor struct {
 	compose *composeService
 	project *types.Project
 	pctx    *reconciliationContext
+
+	// containersByService is a live view used to resolve service references
+	// (network_mode: service:x, volumes_from, ipc, pid) without a daemon
+	// round-trip per create.
+	containersMu        sync.Mutex
+	containersByService map[string]Containers
 }
 
 // reconciliationContext holds results produced by completed nodes so that downstream
@@ -66,15 +74,16 @@ func (pc *reconciliationContext) get(nodeID int) operationResult {
 // executePlan walks the plan DAG, executing nodes in parallel where possible
 // while respecting dependency edges. It emits progress events and handles
 // group-based event aggregation for composite operations like recreate.
-func (s *composeService) executePlan(ctx context.Context, project *types.Project, plan *Plan) error {
+func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *Plan) error {
 	if plan.IsEmpty() {
 		return nil
 	}
 
 	exec := &planExecutor{
-		compose: s,
-		project: project,
-		pctx:    &reconciliationContext{results: map[int]operationResult{}},
+		compose:             s,
+		project:             project,
+		pctx:                &reconciliationContext{results: map[int]operationResult{}},
+		containersByService: observed.containersByService(),
 	}
 
 	// Build a done-channel per node so dependents can wait
@@ -194,15 +203,17 @@ func (exec *planExecutor) execRemoveVolume(ctx context.Context, op Operation) er
 func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNode) error {
 	op := node.Operation
 	service := *op.Service
+	// Detach VolumesFrom from the source slice: resolveServiceReferences mutates
+	// entries in place, and the shallow struct copy still shares the backing array.
+	service.VolumesFrom = slices.Clone(op.Service.VolumesFrom)
 
-	// Resolve service references (network_mode, ipc, pid, volumes_from) to actual
-	// container IDs. This must happen at execution time because the referenced
-	// containers may have just been created by earlier plan nodes.
-	containersByService, err := exec.compose.getContainersByService(ctx, exec.project.Name)
+	// Resolve service references (network_mode, ipc, pid, volumes_from) to
+	// actual container IDs from the in-memory view, which already includes
+	// any containers created by earlier plan nodes.
+	exec.containersMu.Lock()
+	err := resolveServiceReferences(&service, exec.containersByService)
+	exec.containersMu.Unlock()
 	if err != nil {
-		return err
-	}
-	if err := resolveServiceReferences(&service, containersByService); err != nil {
 		return err
 	}
 
@@ -231,6 +242,12 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 		ContainerID:   ctr.ID,
 		ContainerName: op.Name,
 	})
+
+	// Make the new container visible to subsequent execCreateContainer calls
+	// that resolve service references against op.Service.Name.
+	exec.containersMu.Lock()
+	exec.containersByService[op.Service.Name] = append(exec.containersByService[op.Service.Name], ctr)
+	exec.containersMu.Unlock()
 	return nil
 }
 
@@ -250,52 +267,37 @@ func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) e
 
 func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation) error {
 	_, err := exec.compose.apiClient().ContainerRemove(ctx, op.Container.ID, client.ContainerRemoveOptions{Force: true})
-	return err
+	if err != nil {
+		return err
+	}
+	// Why: a dependent service's create may resolve `network_mode: service:X`
+	// (or volumes_from / ipc / pid) against the live view. Containers.sorted()
+	// orders by canonical name; without this drop, a just-removed container
+	// can still win the lookup and the dependent receives a container:<id>
+	// reference that no longer exists in the daemon.
+	svcName := op.Container.Labels[api.ServiceLabel]
+	exec.containersMu.Lock()
+	exec.containersByService[svcName] = slices.DeleteFunc(
+		exec.containersByService[svcName],
+		func(c container.Summary) bool { return c.ID == op.Container.ID },
+	)
+	exec.containersMu.Unlock()
+	return nil
 }
 
 func (exec *planExecutor) execRenameContainer(ctx context.Context, node *PlanNode) error {
-	// Find the CreateContainer node in our dependencies to get the created container ID
-	var createdID string
-	for _, dep := range node.DependsOn {
-		r := exec.pctx.get(dep.ID)
-		if r.ContainerID != "" {
-			createdID = r.ContainerID
-			break
-		}
-		// Also check transitive: the create node may not be a direct dep
-		// Walk up the group chain
+	op := node.Operation
+	if op.CreateNodeID == 0 {
+		return fmt.Errorf("internal: rename node #%d missing CreateNodeID", node.ID)
 	}
-	// Fallback: walk all results in the group
+	createdID := exec.pctx.get(op.CreateNodeID).ContainerID
 	if createdID == "" {
-		for _, n := range node.DependsOn {
-			createdID = exec.findCreatedIDInChain(n)
-			if createdID != "" {
-				break
-			}
-		}
+		return fmt.Errorf("internal: rename node #%d: create node #%d returned empty ID", node.ID, op.CreateNodeID)
 	}
-	if createdID == "" {
-		return fmt.Errorf("rename: could not find created container ID for node #%d", node.ID)
-	}
-
 	_, err := exec.compose.apiClient().ContainerRename(ctx, createdID, client.ContainerRenameOptions{
-		NewName: node.Operation.Name,
+		NewName: op.Name,
 	})
 	return err
-}
-
-// findCreatedIDInChain walks the dependency chain to find a CreateContainer result.
-func (exec *planExecutor) findCreatedIDInChain(node *PlanNode) string {
-	r := exec.pctx.get(node.ID)
-	if r.ContainerID != "" {
-		return r.ContainerID
-	}
-	for _, dep := range node.DependsOn {
-		if id := exec.findCreatedIDInChain(dep); id != "" {
-			return id
-		}
-	}
-	return ""
 }
 
 // --- Group event tracking ---
@@ -446,4 +448,3 @@ func emitErrorEvent(node *PlanNode, events api.EventProcessor, err error) {
 		Text:   err.Error(),
 	})
 }
-

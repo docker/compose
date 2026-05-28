@@ -239,3 +239,20 @@ func (s *ObservedState) orphanNames() string {
 	}
 	return strings.Join(names, ", ")
 }
+
+// containersByService flattens the observed containers into the shape
+// resolveServiceReferences expects: project service name → raw Summaries.
+func (s *ObservedState) containersByService() map[string]Containers {
+	if s == nil {
+		return map[string]Containers{}
+	}
+	result := make(map[string]Containers, len(s.Containers))
+	for svc, ocs := range s.Containers {
+		summaries := make(Containers, len(ocs))
+		for i, oc := range ocs {
+			summaries[i] = oc.Summary
+		}
+		result[svc] = summaries
+	}
+	return result
+}

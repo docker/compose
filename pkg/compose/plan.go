@@ -88,22 +88,21 @@ func (o OperationType) String() string {
 }
 
 // Operation describes a single atomic action to be performed by the executor.
-// It carries all the data needed to execute the operation without further
-// decision-making.
 type Operation struct {
 	Type       OperationType
 	ResourceID string // e.g. "service:web:1", "network:backend", "volume:data"
 	Cause      string // why this operation is needed
 
 	// Resource-specific data (only the relevant fields are set per operation type)
-	Service   *types.ServiceConfig // for container operations
-	Container *container.Summary   // existing container (for stop/remove)
-	Inherited *container.Summary   // container to inherit anonymous volumes from (for create-as-replacement)
-	Number    int                  // container replica number (for create)
-	Name      string               // target container/resource name
-	Network   *types.NetworkConfig // for network operations
-	Volume    *types.VolumeConfig  // for volume operations
-	Timeout   *time.Duration       // for stop operations
+	Service      *types.ServiceConfig // for container operations
+	Container    *container.Summary   // existing container (for stop/remove)
+	Inherited    *container.Summary   // container to inherit anonymous volumes from (for create-as-replacement)
+	Number       int                  // container replica number (for create)
+	Name         string               // target container/resource name
+	Network      *types.NetworkConfig // for network operations
+	Volume       *types.VolumeConfig  // for volume operations
+	Timeout      *time.Duration       // for stop operations
+	CreateNodeID int                  // for OpRenameContainer: ID of the CreateContainer node whose result to rename
 }
 
 // PlanNode is a single node in the reconciliation DAG. It represents one

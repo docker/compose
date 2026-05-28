@@ -126,7 +126,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	// matching the previous convergence behavior for progress display.
 	emitRunningEvents(observed, plan, s.events)
 
-	return s.executePlan(ctx, project, plan)
+	return s.executePlan(ctx, project, observed, plan)
 }
 
 func prepareNetworks(project *types.Project) {
