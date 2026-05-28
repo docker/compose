@@ -181,8 +181,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		Labels:            mergeLabels(service.Labels, service.CustomLabels),
 	}
 
-	err = newConvergence(project.ServiceNames(), observedState, nil, nil, s).resolveServiceReferences(&service)
-	if err != nil {
+	if err := s.resolveRunServiceReferences(ctx, project.Name, &service); err != nil {
 		return prepareRunResult{}, err
 	}
 
@@ -267,6 +266,14 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	for k, v := range opts.Labels {
 		service.Labels = service.Labels.Add(k, v)
 	}
+}
+
+func (s *composeService) resolveRunServiceReferences(ctx context.Context, projectName string, service *types.ServiceConfig) error {
+	containersByService, err := s.getContainersByService(ctx, projectName)
+	if err != nil {
+		return err
+	}
+	return resolveServiceReferences(service, containersByService)
 }
 
 func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {

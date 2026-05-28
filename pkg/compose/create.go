@@ -97,33 +97,36 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-	orphans := observedState.filter(isOrphaned(project))
-	if len(orphans) > 0 && !options.IgnoreOrphans {
-		if options.RemoveOrphans {
-			err := s.removeContainers(ctx, orphans, nil, nil, false)
-			if err != nil {
-				return err
-			}
-		} else {
-			logrus.Warnf("Found orphan containers (%s) for this project. If "+
-				"you removed or renamed this service in your compose "+
-				"file, you can run this command with the "+
-				"--remove-orphans flag to clean it up.", orphans.names())
-		}
-	}
-
 	// Temporary implementation of use_api_socket until we get actual support inside docker engine
 	project, err = s.useAPISocket(project)
 	if err != nil {
 		return err
 	}
 
-	return newConvergence(options.Services, observedState, networks, volumes, s).apply(ctx, project, options)
+	observed, err := s.collectObservedState(ctx, project)
+	if err != nil {
+		return err
+	}
+	observed.setResolvedNetworks(networks, project)
+	observed.setResolvedVolumes(volumes)
+
+	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
+		logrus.Warnf("Found orphan containers (%s) for this project. If "+
+			"you removed or renamed this service in your compose "+
+			"file, you can run this command with the "+
+			"--remove-orphans flag to clean it up.", observed.orphanNames())
+	}
+
+	plan, err := reconcile(ctx, project, observed, toReconcileOptions(options), s.prompt)
+	if err != nil {
+		return err
+	}
+
+	// Emit "Running" events for containers that are already up-to-date,
+	// matching the previous convergence behavior for progress display.
+	emitRunningEvents(observed, plan, s.events)
+
+	return s.executePlan(ctx, project, observed, plan)
 }
 
 func prepareNetworks(project *types.Project) {
