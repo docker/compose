@@ -31,26 +31,28 @@ import (
 // Each operation maps to exactly one Docker API call.
 type OperationType int
 
+// OperationType values are explicit so that adding a new op in the middle of
+// the list does not silently shift other values.
 const (
 	// Network operations
-	OpCreateNetwork OperationType = iota
-	OpRemoveNetwork
-	OpDisconnectNetwork
-	OpConnectNetwork
+	OpCreateNetwork     OperationType = 1
+	OpRemoveNetwork     OperationType = 2
+	OpDisconnectNetwork OperationType = 3
+	OpConnectNetwork    OperationType = 4
 
 	// Volume operations
-	OpCreateVolume
-	OpRemoveVolume
+	OpCreateVolume OperationType = 10
+	OpRemoveVolume OperationType = 11
 
 	// Container operations
-	OpCreateContainer
-	OpStartContainer
-	OpStopContainer
-	OpRemoveContainer
-	OpRenameContainer
+	OpCreateContainer OperationType = 20
+	OpStartContainer  OperationType = 21
+	OpStopContainer   OperationType = 22
+	OpRemoveContainer OperationType = 23
+	OpRenameContainer OperationType = 24
 
 	// Provider operations
-	OpRunProvider
+	OpRunProvider OperationType = 30
 )
 
 // String returns the human-readable name of an OperationType.
