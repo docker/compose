@@ -640,9 +640,16 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 		r.stoppedByPlan[oc.ID] = stopNode
 	}
 
-	// 3. Remove old container. Depend on the (existing or new) stop and on
-	// the create node so the new container is in place before the old one
-	// goes away.
+	// 3. Remove old container. The invariant is "new container exists before
+	// old one is removed":
+	//   - !alreadyStopped: stopNode is the one we just created with
+	//     DependsOn=[createNode], so the chain remove → stop → create
+	//     guarantees the invariant transitively.
+	//   - alreadyStopped: stopNode comes from planRecreateNetwork and was
+	//     emitted before createNode. The transitive guarantee no longer
+	//     holds, so we add createNode to removeDeps explicitly. If anyone
+	//     ever drops the stop → create edge from the !alreadyStopped case,
+	//     they must add createNode here unconditionally.
 	removeDeps := []*PlanNode{stopNode}
 	if alreadyStopped {
 		removeDeps = append(removeDeps, createNode)
