@@ -38,6 +38,7 @@ func TestOperationTypeString(t *testing.T) {
 		{OpStopContainer, "StopContainer"},
 		{OpRemoveContainer, "RemoveContainer"},
 		{OpRenameContainer, "RenameContainer"},
+		{OpRunProvider, "RunProvider"},
 		{OperationType(999), "Unknown(999)"},
 	}
 	for _, tt := range tests {
