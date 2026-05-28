@@ -85,6 +85,11 @@ type reconciler struct {
 	// serviceNodes tracks the last plan node per service, so dependent
 	// services can order their operations after dependencies.
 	serviceNodes map[string]*PlanNode
+	// stoppedByPlan records containers already stopped by an earlier stage
+	// of the plan (typically planRecreateNetwork) so that downstream stages
+	// can chain on the existing OpStopContainer instead of emitting a second
+	// one against an already-stopped container.
+	stoppedByPlan map[string]*PlanNode // container ID → existing Stop node
 }
 
 // reconcile is the main entry point: it builds a Plan from desired vs observed state.
@@ -92,14 +97,15 @@ type reconciler struct {
 // reconciler.prompt field).
 func reconcile(_ context.Context, project *types.Project, observed *ObservedState, options ReconcileOptions, prompt Prompt) (*Plan, error) {
 	r := &reconciler{
-		project:      project,
-		observed:     observed,
-		options:      options,
-		prompt:       prompt,
-		plan:         &Plan{},
-		networkNodes: map[string]*PlanNode{},
-		volumeNodes:  map[string]*PlanNode{},
-		serviceNodes: map[string]*PlanNode{},
+		project:       project,
+		observed:      observed,
+		options:       options,
+		prompt:        prompt,
+		plan:          &Plan{},
+		networkNodes:  map[string]*PlanNode{},
+		volumeNodes:   map[string]*PlanNode{},
+		serviceNodes:  map[string]*PlanNode{},
+		stoppedByPlan: map[string]*PlanNode{},
 	}
 
 	if err := r.reconcileNetworks(); err != nil {
@@ -166,7 +172,9 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 	affectedServices := r.servicesUsingNetwork(key)
 	affectedContainers := r.containersForServices(affectedServices)
 
-	// Stop all affected containers
+	// Stop all affected containers, recording each Stop node so that a later
+	// recreate of the same container does not emit a second Stop against a
+	// container that is already stopped.
 	var stopNodes []*PlanNode
 	for i := range affectedContainers {
 		oc := &affectedContainers[i]
@@ -177,6 +185,7 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 			Container:  &oc.Summary,
 		}, "")
 		stopNodes = append(stopNodes, node)
+		r.stoppedByPlan[oc.ID] = node
 	}
 
 	// Disconnect all affected containers from the *observed* network (each depends on its own stop)
@@ -427,7 +436,9 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 
 	// Sort containers: obsolete first, then by number descending, then reverse
 	// to get the same ordering as the existing convergence code.
-	r.sortContainers(containers, service, strategy)
+	if err := r.sortContainers(containers, service, strategy); err != nil {
+		return err
+	}
 
 	// Collect dependency nodes that container creation should depend on
 	infraDeps := r.infrastructureDeps(service)
@@ -437,7 +448,9 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	// Process existing containers
 	for i, oc := range containers {
 		if i >= expected {
-			// Scale down: stop + remove excess containers
+			// Scale down: stop + remove excess containers. Track the remove
+			// node so dependent services wait for the scale-down to finish
+			// even when no other operation runs on this service.
 			stopNode := r.plan.addNode(Operation{
 				Type:       OpStopContainer,
 				ResourceID: fmt.Sprintf("service:%s:%d", service.Name, oc.Number),
@@ -445,7 +458,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Container:  &containers[i].Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
-			r.plan.addNode(Operation{
+			lastNode = r.plan.addNode(Operation{
 				Type:       OpRemoveContainer,
 				ResourceID: fmt.Sprintf("service:%s:%d", service.Name, oc.Number),
 				Cause:      "scale down",
@@ -610,22 +623,36 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 		Name:       tmpName,
 	}, group, allDeps...)
 
-	// 2. Stop old container
-	stopNode := r.plan.addNode(Operation{
-		Type:       OpStopContainer,
-		ResourceID: resID,
-		Cause:      fmt.Sprintf("replaced by #%d", createNode.ID),
-		Container:  &oc.Summary,
-		Timeout:    r.options.Timeout,
-	}, group, createNode)
+	// 2. Stop old container. If an earlier stage of the plan (e.g.
+	// planRecreateNetwork) already scheduled a Stop for this container,
+	// reuse it instead of emitting a second one against an already-stopped
+	// container. The reused node carries no group, which is fine: the
+	// recreate's group tracker still drives Working/Done from the create.
+	stopNode, alreadyStopped := r.stoppedByPlan[oc.ID]
+	if !alreadyStopped {
+		stopNode = r.plan.addNode(Operation{
+			Type:       OpStopContainer,
+			ResourceID: resID,
+			Cause:      fmt.Sprintf("replaced by #%d", createNode.ID),
+			Container:  &oc.Summary,
+			Timeout:    r.options.Timeout,
+		}, group, createNode)
+		r.stoppedByPlan[oc.ID] = stopNode
+	}
 
-	// 3. Remove old container
+	// 3. Remove old container. Depend on the (existing or new) stop and on
+	// the create node so the new container is in place before the old one
+	// goes away.
+	removeDeps := []*PlanNode{stopNode}
+	if alreadyStopped {
+		removeDeps = append(removeDeps, createNode)
+	}
 	removeNode := r.plan.addNode(Operation{
 		Type:       OpRemoveContainer,
 		ResourceID: resID,
 		Cause:      fmt.Sprintf("replaced by #%d", createNode.ID),
 		Container:  &oc.Summary,
-	}, group, stopNode)
+	}, group, removeDeps...)
 
 	// 4. Rename to final name. Link to the create node so the executor can
 	// fetch the resulting container ID directly.
@@ -691,10 +718,21 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 
 // sortContainers sorts containers the same way as convergence.go:138-160:
 // obsolete first, then by container number descending, then reversed.
-func (r *reconciler) sortContainers(containers []ObservedContainer, service types.ServiceConfig, policy string) {
+//
+// mustRecreate is evaluated once per container before sorting, both to avoid
+// quadratic re-evaluation in the comparator and to surface any hashing error
+// instead of silently treating the container as non-obsolete.
+func (r *reconciler) sortContainers(containers []ObservedContainer, service types.ServiceConfig, policy string) error {
+	obsolete := make(map[string]bool, len(containers))
+	for _, oc := range containers {
+		o, err := r.mustRecreate(service, oc, policy)
+		if err != nil {
+			return err
+		}
+		obsolete[oc.ID] = o
+	}
 	sort.Slice(containers, func(i, j int) bool {
-		obsi, _ := r.mustRecreate(service, containers[i], policy)
-		obsj, _ := r.mustRecreate(service, containers[j], policy)
+		obsi, obsj := obsolete[containers[i].ID], obsolete[containers[j].ID]
 		if obsi != obsj {
 			return obsi // obsolete first
 		}
@@ -705,6 +743,7 @@ func (r *reconciler) sortContainers(containers []ObservedContainer, service type
 		return containers[i].Summary.Created < containers[j].Summary.Created
 	})
 	slices.Reverse(containers)
+	return nil
 }
 
 // reconcileOrphans plans stop + remove for orphaned containers.
