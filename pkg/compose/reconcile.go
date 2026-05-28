@@ -622,13 +622,15 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 		Container:  &oc.Summary,
 	}, group, stopNode)
 
-	// 4. Rename to final name
+	// 4. Rename to final name. Link to the create node so the executor can
+	// fetch the resulting container ID directly.
 	finalName := getContainerName(r.project.Name, service, oc.Number)
 	renameNode := r.plan.addNode(Operation{
-		Type:       OpRenameContainer,
-		ResourceID: resID,
-		Cause:      "finalize recreate",
-		Name:       finalName,
+		Type:         OpRenameContainer,
+		ResourceID:   resID,
+		Cause:        "finalize recreate",
+		Name:         finalName,
+		CreateNodeID: createNode.ID,
 	}, group, removeNode)
 
 	return renameNode
@@ -740,4 +742,3 @@ func sortedKeys[V any](m map[string]V) []string {
 	sort.Strings(keys)
 	return keys
 }
-

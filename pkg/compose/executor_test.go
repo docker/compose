@@ -51,7 +51,7 @@ func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
 
 func TestExecutePlanEmpty(t *testing.T) {
 	svc, _ := newTestService(t)
-	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, &Plan{})
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), &Plan{})
 	assert.NilError(t, err)
 }
 
@@ -81,7 +81,7 @@ func TestExecutePlanCreateNetwork(t *testing.T) {
 		Network:    &nw,
 	}, "")
 
-	err := svc.executePlan(t.Context(), project, plan)
+	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
 	assert.NilError(t, err)
 }
 
@@ -116,8 +116,79 @@ func TestExecutePlanStopRemoveContainer(t *testing.T) {
 		Container:  &ctr,
 	}, "", stopNode)
 
-	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, plan)
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), plan)
 	assert.NilError(t, err)
+}
+
+// emptyObservedState returns an ObservedState with no containers/networks/volumes,
+// suitable for executor tests that don't exercise service-reference resolution.
+func emptyObservedState(project string) *ObservedState {
+	return &ObservedState{
+		ProjectName: project,
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+	}
+}
+
+// TestExecutePlanRemoveContainerDropsFromCache verifies that after a container
+// is removed, subsequent service-reference resolution does not see its stale ID.
+// Without this guarantee, a recreate followed by a dependent's create can pick
+// up the just-removed container, depending on the canonical-name sort order.
+func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	oldCtr := container.Summary{
+		ID:    "old-id",
+		Names: []string{"/test-web-1"},
+		Labels: map[string]string{
+			api.ServiceLabel:         "web",
+			api.ContainerNumberLabel: "1",
+		},
+	}
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), "old-id", gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+	apiClient.EXPECT().ContainerRemove(gomock.Any(), "old-id", gomock.Any()).
+		Return(client.ContainerRemoveResult{}, nil)
+
+	observed := &ObservedState{
+		ProjectName: "test",
+		Containers: map[string][]ObservedContainer{
+			"web": {{ID: "old-id", Summary: oldCtr}},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+	}
+
+	plan := &Plan{}
+	stopNode := plan.addNode(Operation{
+		Type:       OpStopContainer,
+		ResourceID: "service:web:1",
+		Cause:      "scale down",
+		Container:  &oldCtr,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpRemoveContainer,
+		ResourceID: "service:web:1",
+		Cause:      "scale down",
+		Container:  &oldCtr,
+	}, "", stopNode)
+
+	// Seed and run the plan via the same code path as production.
+	// After completion, the cache must no longer contain old-id.
+	exec := &planExecutor{
+		compose:             svc,
+		project:             &types.Project{Name: "test"},
+		pctx:                &reconciliationContext{results: map[int]operationResult{}},
+		containersByService: observed.containersByService(),
+	}
+	for _, node := range plan.Nodes {
+		assert.NilError(t, exec.executeNode(t.Context(), node))
+	}
+
+	assert.Equal(t, len(exec.containersByService["web"]), 0,
+		"removed container should be dropped from the live view")
 }
 
 // notFoundError implements the errdefs.ErrNotFound interface for test mocks.
