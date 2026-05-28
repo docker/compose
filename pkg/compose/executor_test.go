@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -135,6 +136,10 @@ func emptyObservedState(project string) *ObservedState {
 // is removed, subsequent service-reference resolution does not see its stale ID.
 // Without this guarantee, a recreate followed by a dependent's create can pick
 // up the just-removed container, depending on the canonical-name sort order.
+//
+// Goes through newPlanExecutor + run (i.e. the same code path executePlan
+// uses in production) so the test exercises the errgroup, done-channel
+// wiring and group tracker — not a hand-rolled loop over executeNode.
 func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
@@ -175,20 +180,77 @@ func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 		Container:  &oldCtr,
 	}, "", stopNode)
 
-	// Seed and run the plan via the same code path as production.
-	// After completion, the cache must no longer contain old-id.
-	exec := &planExecutor{
-		compose:             svc,
-		project:             &types.Project{Name: "test"},
-		pctx:                &reconciliationContext{results: map[int]operationResult{}},
-		containersByService: observed.containersByService(),
-	}
-	for _, node := range plan.Nodes {
-		assert.NilError(t, exec.executeNode(t.Context(), node))
-	}
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
+	assert.NilError(t, exec.run(t.Context(), plan))
 
 	assert.Equal(t, len(exec.containersByService["web"]), 0,
 		"removed container should be dropped from the live view")
+}
+
+// TestExecutePlanConcurrentRemovesCacheCoherence stresses the cache mutex by
+// scheduling N independent Stop+Remove pairs that the DAG lets the errgroup
+// run concurrently. After the plan completes the cache must be empty, with no
+// duplicates and no surviving entries — failure under -race would indicate a
+// missing or incorrect lock around containersByService.
+func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	const replicas = 5
+	ctrs := make([]container.Summary, replicas)
+	for i := range ctrs {
+		ctrs[i] = container.Summary{
+			ID:    fmt.Sprintf("c%d", i),
+			Names: []string{fmt.Sprintf("/test-web-%d", i+1)},
+			Labels: map[string]string{
+				api.ServiceLabel:         "web",
+				api.ContainerNumberLabel: fmt.Sprintf("%d", i+1),
+			},
+		}
+	}
+
+	// Each container gets exactly one Stop and one Remove. gomock matches by
+	// any order across calls, so concurrent execution is fine.
+	for i := range ctrs {
+		apiClient.EXPECT().ContainerStop(gomock.Any(), ctrs[i].ID, gomock.Any()).
+			Return(client.ContainerStopResult{}, nil)
+		apiClient.EXPECT().ContainerRemove(gomock.Any(), ctrs[i].ID, gomock.Any()).
+			Return(client.ContainerRemoveResult{}, nil)
+	}
+
+	webContainers := make([]ObservedContainer, replicas)
+	for i := range ctrs {
+		webContainers[i] = ObservedContainer{ID: ctrs[i].ID, Summary: ctrs[i]}
+	}
+	observed := &ObservedState{
+		ProjectName: "test",
+		Containers:  map[string][]ObservedContainer{"web": webContainers},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{},
+	}
+
+	// Build N independent Stop→Remove chains. The errgroup will fan them out
+	// across goroutines that all hammer containersByService under the mutex.
+	plan := &Plan{}
+	for i := range ctrs {
+		stop := plan.addNode(Operation{
+			Type:       OpStopContainer,
+			ResourceID: fmt.Sprintf("service:web:%d", i+1),
+			Cause:      "scale down",
+			Container:  &ctrs[i],
+		}, "")
+		plan.addNode(Operation{
+			Type:       OpRemoveContainer,
+			ResourceID: fmt.Sprintf("service:web:%d", i+1),
+			Cause:      "scale down",
+			Container:  &ctrs[i],
+		}, "", stop)
+	}
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
+	assert.NilError(t, exec.run(t.Context(), plan))
+
+	assert.Equal(t, len(exec.containersByService["web"]), 0,
+		"all removed containers should be dropped from the live view")
 }
 
 // notFoundError implements the errdefs.ErrNotFound interface for test mocks.
