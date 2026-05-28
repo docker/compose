@@ -60,10 +60,21 @@ type reconciler struct {
 	project  *types.Project
 	observed *ObservedState
 	options  ReconcileOptions
-	// prompt is wired through for future use: when divergence detection for
-	// volumes/networks migrates fully into the reconciler (today it lives in
-	// ensureProjectVolumes/ensureNetworks), prompts will fire from here. Kept
-	// available now so call sites do not have to change later.
+	// Seam-consolidation infrastructure.
+	//
+	// Today, divergence detection and recreation for volumes/networks live in
+	// ensureProjectVolumes/ensureNetworks (called before reconcile). The plan
+	// is to migrate that responsibility into the reconciler. The hooks below
+	// are kept so the migration can land in one commit instead of touching
+	// every caller:
+	//
+	//   - prompt (this field)               — user interaction
+	//   - planRecreateVolume (below)        — the volume recreate sequence
+	//   - servicesUsingVolume (below)       — its only caller today
+	//
+	// When the migration lands, remove all three together if it ends up
+	// shaped differently. The //nolint:unused markers on the helpers point
+	// here for context.
 	prompt Prompt
 	plan   *Plan
 
@@ -236,11 +247,7 @@ func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig) *Plan
 // Containers must be removed (not just stopped) because Docker does not allow
 // removing a volume that is referenced by any container, even a stopped one.
 //
-// Currently unused: divergence detection and recreation live in
-// ensureProjectVolumes (see create.go:1626). Kept in place so the reconciler
-// can take over that responsibility when the seam is consolidated.
-//
-//nolint:unused
+//nolint:unused // see reconciler.prompt field doc — seam consolidation.
 func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
 	observed := r.observed.Volumes[key]
 	affectedServices := r.servicesUsingVolume(key)
@@ -306,9 +313,7 @@ func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 // servicesUsingVolume returns the names of services that mount the given
 // compose volume key, sorted for deterministic plan output.
 //
-// Currently used only by planRecreateVolume (also unused — see its doc).
-//
-//nolint:unused
+//nolint:unused // see reconciler.prompt field doc — seam consolidation.
 func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	var names []string
 	for _, key := range sortedKeys(r.project.Services) {

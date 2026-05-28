@@ -75,15 +75,27 @@ func (pc *reconciliationContext) get(nodeID int) operationResult {
 // while respecting dependency edges. It emits progress events and handles
 // group-based event aggregation for composite operations like recreate.
 func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *Plan) error {
-	if plan.IsEmpty() {
-		return nil
-	}
+	return s.newPlanExecutor(project, observed).run(ctx, plan)
+}
 
-	exec := &planExecutor{
+// newPlanExecutor constructs a planExecutor seeded from the observed state.
+// Split out from executePlan so tests can inspect the executor's live state
+// (e.g. the containersByService cache) after running a plan.
+func (s *composeService) newPlanExecutor(project *types.Project, observed *ObservedState) *planExecutor {
+	return &planExecutor{
 		compose:             s,
 		project:             project,
 		pctx:                &reconciliationContext{results: map[int]operationResult{}},
 		containersByService: observed.containersByService(),
+	}
+}
+
+// run walks the plan DAG, executing nodes in parallel where possible while
+// respecting dependency edges. Emits progress events and handles group-based
+// event aggregation for composite operations like recreate.
+func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
+	if plan.IsEmpty() {
+		return nil
 	}
 
 	// Build a done-channel per node so dependents can wait
@@ -94,6 +106,7 @@ func (s *composeService) executePlan(ctx context.Context, project *types.Project
 
 	// Track group event state: first node emits Working, last emits Done
 	groups := exec.buildGroupTracker(plan)
+	events := exec.compose.events
 
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, node := range plan.Nodes {
@@ -108,15 +121,15 @@ func (s *composeService) executePlan(ctx context.Context, project *types.Project
 			}
 
 			// Emit group start event if this is the first node of a group
-			groups.onNodeStart(node, s.events)
+			groups.onNodeStart(node, events)
 
 			err := exec.executeNode(ctx, node)
 
 			if err == nil {
 				// Emit group done event if this is the last node of a group
-				groups.onNodeDone(node, s.events)
+				groups.onNodeDone(node, events)
 			} else if ctx.Err() == nil {
-				groups.onNodeError(node, s.events, err)
+				groups.onNodeError(node, events, err)
 			}
 
 			close(done[node.ID])
