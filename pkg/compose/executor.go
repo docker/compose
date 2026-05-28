@@ -447,6 +447,3 @@ func emitErrorEvent(node *PlanNode, events api.EventProcessor, err error) {
 	})
 }
 
-// getContainerProgressName returns the display name for a container in progress output.
-// Re-exported from convergence.go for use by the executor.
-var _ = getContainerProgressName // ensure it stays accessible

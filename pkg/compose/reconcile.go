@@ -158,7 +158,7 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 		oc := &affectedContainers[i]
 		node := r.plan.addNode(Operation{
 			Type:       OpStopContainer,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[serviceLabel], oc.Number),
+			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
 			Cause:      fmt.Sprintf("network %s config changed", key),
 			Container:  &oc.Summary,
 		}, "")
@@ -170,7 +170,7 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 	for i, oc := range affectedContainers {
 		node := r.plan.addNode(Operation{
 			Type:       OpDisconnectNetwork,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[serviceLabel], oc.Number),
+			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
 			Cause:      fmt.Sprintf("network %s recreate", key),
 			Container:  &affectedContainers[i].Summary,
 			Name:       observed.Name,
@@ -261,7 +261,7 @@ func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
 		oc := &affectedContainers[i]
 		node := r.plan.addNode(Operation{
 			Type:       OpStopContainer,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[serviceLabel], oc.Number),
+			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
 			Cause:      fmt.Sprintf("volume %s config changed", key),
 			Container:  &oc.Summary,
 		}, "")
@@ -273,7 +273,7 @@ func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
 	for i, oc := range affectedContainers {
 		node := r.plan.addNode(Operation{
 			Type:       OpRemoveContainer,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[serviceLabel], oc.Number),
+			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
 			Cause:      fmt.Sprintf("volume %s config changed", key),
 			Container:  &affectedContainers[i].Summary,
 		}, "", stopNodes[i])
@@ -468,7 +468,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		case container.StateRunning, container.StateCreated, container.StateRestarting, container.StateExited:
 			// Nothing to do (exited containers are left as-is, matching convergence.go behavior)
 		default:
-			// Stopped/exited container that needs starting
+			// Any other state (paused, dead, ...): attempt to (re)start
 			lastNode = r.plan.addNode(Operation{
 				Type:       OpStartContainer,
 				ResourceID: fmt.Sprintf("service:%s:%d", service.Name, oc.Number),
@@ -746,5 +746,3 @@ func sortedKeys[V any](m map[string]V) []string {
 	return keys
 }
 
-// serviceLabel is a package-level shorthand for the service label key.
-const serviceLabel = "com.docker.compose.service"
