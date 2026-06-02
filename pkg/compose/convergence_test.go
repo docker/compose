@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/moby/moby/api/types/container"

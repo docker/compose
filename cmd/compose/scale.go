@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 

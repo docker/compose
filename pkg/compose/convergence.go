@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/containerd/platforms"
 	"github.com/moby/moby/api/types/container"
 	mmount "github.com/moby/moby/api/types/mount"

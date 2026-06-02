@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/docker/cli/cli/streams"
 	"github.com/jonboulle/clockwork"
 	"github.com/moby/moby/api/types/container"

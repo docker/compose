@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/compose-spec/compose-go/v2/loader"
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/loader"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/google/go-cmp/cmp"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gotest.tools/v3/assert"

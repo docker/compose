@@ -29,8 +29,8 @@ import (
 	gsync "sync"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/compose-spec/compose-go/v2/utils"
+	"github.com/compose-spec/compose-go/v3/types"
+	"github.com/compose-spec/compose-go/v3/utils"
 	ccli "github.com/docker/cli/cli/command/container"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/moby/buildkit/util/progress/progressui"

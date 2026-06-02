@@ -25,7 +25,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/distribution/reference"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"

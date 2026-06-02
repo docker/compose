@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"

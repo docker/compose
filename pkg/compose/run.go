@@ -24,7 +24,7 @@ import (
 	"os/signal"
 	"slices"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
 	"github.com/moby/moby/api/types/container"

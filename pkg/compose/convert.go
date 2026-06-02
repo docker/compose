@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	compose "github.com/compose-spec/compose-go/v2/types"
+	compose "github.com/compose-spec/compose-go/v3/types"
 	"github.com/moby/moby/api/types/container"
 )
 
