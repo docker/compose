@@ -1,23 +1,27 @@
+---
 version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: github.com/docker/buildx
+        update-types:
+          - version-update:semver-minor
+      - dependency-name: github.com/moby/buildkit
+        update-types:
+          - version-update:semver-minor
+      - dependency-name: github.com/docker/cli
+        update-types:
+          - version-update:semver-major
+      - dependency-name: github.com/docker/docker
+        update-types:
+          - version-update:semver-major
+      - dependency-name: github.com/containerd/containerd
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      - dependency-name: go.opentelemetry.io/*
     schedule:
       interval: daily
-    ignore:
-      # docker + moby deps require coordination
-      - dependency-name: "github.com/docker/buildx"
-        # buildx is still 0.x
-        update-types: ["version-update:semver-minor"]
-      - dependency-name: "github.com/moby/buildkit"
-        # buildkit is still 0.x
-        update-types: [ "version-update:semver-minor" ]
-      - dependency-name: "github.com/docker/cli"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "github.com/docker/docker"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "github.com/containerd/containerd"
-        # containerd major/minor must be kept in sync with moby
-        update-types: [ "version-update:semver-major", "version-update:semver-minor" ]
-        # OTEL dependencies should be upgraded in sync with engine, cli, buildkit and buildx projects
-      - dependency-name: "go.opentelemetry.io/*"
