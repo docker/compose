@@ -1,10 +1,10 @@
 # CI relies on this ARG. Don't remove or rename it
-ARG COMPOSE_VERSION=v5.1.3
+ARG COMPOSE_VERSION=v5.1.4
 FROM docker/compose-bin:${COMPOSE_VERSION} AS compose-bin
 
 
 # DHI source: https://hub.docker.com/repository/docker/octopusdeploy/dhi-debian-base
-FROM octopusdeploy/dhi-debian-base:trixie-debian13@sha256:79ea7f22d1b7e3f73b0988258b62bcbf73da44f0d82476fbb95d811130168e55 AS compose-plugin
+FROM octopusdeploy/dhi-debian-base:trixie-debian13@sha256:436787c2d77ed1ef1cfe3ce5848f3968244d8948463a29094e1e672da9a6fa24 AS compose-plugin
 WORKDIR /home/compose
 COPY --chown=nonroot:nonroot --chmod=755 --from=compose-bin /docker-compose /usr/local/bin/docker-compose
 
