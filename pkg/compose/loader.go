@@ -64,6 +64,11 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 		return nil, err
 	}
 
+	// Resolve ref+ secret references (OpenBao, Vault, etc.)
+	if err := resolveSecretReferences(project); err != nil {
+		return nil, err
+	}
+
 	return project, nil
 }
 
