@@ -47,7 +47,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 
-	// remove cancellable context signal handler so we can forward signals to container without compose from exiting
+	// remove cancellable context signal handler so we can forward signals to container without compose exiting
 	signal.Reset()
 
 	sigc := make(chan os.Signal, 128)
