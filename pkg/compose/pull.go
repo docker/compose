@@ -214,7 +214,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", nil
 	}
 
-	// check if has error and the service has a build section
+	// check if it has an error and the service has a build section
 	// then the status should be warning instead of error
 	if err != nil && service.Build != nil {
 		s.events.On(api.Resource{
