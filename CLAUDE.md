@@ -25,3 +25,7 @@
 - Use `github.com/containerd/errdefs` instead of `github.com/docker/docker/errdefs`
 - In tests: use `t.Context()` instead of `context.Background()` or `context.TODO()`
 - Prefer `fmt.Fprintf` over `WriteString(fmt.Sprintf(...))`
+
+## Git
+
+- **All commits MUST be signed off (DCO)**. Always pass `--signoff` (`-s`) to `git commit` and `git commit --amend`.

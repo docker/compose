@@ -416,10 +416,10 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		output := inspect.Stdout()
 		isDockerDriver := false
 		platforms := ""
-		for _, line := range strings.Split(output, "\n") {
+		for line := range strings.SplitSeq(output, "\n") {
 			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "Driver:") {
-				isDockerDriver = strings.TrimSpace(strings.TrimPrefix(trimmed, "Driver:")) == "docker"
+			if after, ok := strings.CutPrefix(trimmed, "Driver:"); ok {
+				isDockerDriver = strings.TrimSpace(after) == "docker"
 			}
 			if strings.HasPrefix(trimmed, "Platforms:") {
 				platforms = trimmed
