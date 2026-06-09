@@ -10,6 +10,7 @@ options:
       value_type: bool
       default_value: "false"
       description: Follow log output
+      details_url: /reference/cli/docker/container/logs/#follow
       deprecated: false
       hidden: false
       experimental: false
@@ -50,7 +51,7 @@ options:
       value_type: string
       description: |
         Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)
-      details_url: /reference/cli/docker/container/logs/
+      details_url: /reference/cli/docker/container/logs/#since
       deprecated: false
       hidden: false
       experimental: false
@@ -63,6 +64,7 @@ options:
       default_value: all
       description: |
         Number of lines to show from the end of the logs for each container
+      details_url: /reference/cli/docker/container/logs/#tail
       deprecated: false
       hidden: false
       experimental: false
@@ -74,6 +76,7 @@ options:
       value_type: bool
       default_value: "false"
       description: Show timestamps
+      details_url: /reference/cli/docker/container/logs/#timestamps
       deprecated: false
       hidden: false
       experimental: false
