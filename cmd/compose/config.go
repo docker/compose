@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
@@ -519,7 +520,7 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 
 func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
 	opts.noInterpolate = true
-	model, err := opts.ToModel(ctx, dockerCli, services, cli.WithoutEnvironmentResolution)
+	model, err := opts.ToModel(ctx, dockerCli, services, cli.WithoutEnvironmentResolution, cli.WithLoadOptions(loader.WithSkipValidation))
 	if err != nil {
 		return err
 	}
