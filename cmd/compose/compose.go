@@ -138,17 +138,18 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 }
 
 type ProjectOptions struct {
-	ProjectName        string
-	Profiles           []string
-	ConfigPaths        []string
-	WorkDir            string
-	ProjectDir         string
-	EnvFiles           []string
-	Compatibility      bool
-	Progress           string
-	Offline            bool
-	All                bool
-	insecureRegistries []string
+	ProjectName           string
+	Profiles              []string
+	ConfigPaths           []string
+	WorkDir               string
+	ProjectDir            string
+	EnvFiles              []string
+	Compatibility         bool
+	Progress              string
+	Offline               bool
+	All                   bool
+	insecureRegistries    []string
+	remoteLoadersOverride []loader.ResourceLoader
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -361,6 +362,9 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 }
 
 func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceLoader {
+	if o.remoteLoadersOverride != nil {
+		return o.remoteLoadersOverride
+	}
 	if o.Offline {
 		return nil
 	}
