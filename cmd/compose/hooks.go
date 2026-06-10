@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v3/cli"
 	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/spf13/cobra"

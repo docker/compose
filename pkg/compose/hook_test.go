@@ -23,7 +23,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/creack/pty"
 	"github.com/docker/cli/cli/streams"
 	"github.com/moby/moby/api/types/container"

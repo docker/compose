@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v3/cli"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 

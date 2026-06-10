@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 

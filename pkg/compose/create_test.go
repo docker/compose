@@ -24,8 +24,8 @@ import (
 	"sort"
 	"testing"
 
-	composeloader "github.com/compose-spec/compose-go/v2/loader"
-	composetypes "github.com/compose-spec/compose-go/v2/types"
+	composeloader "github.com/compose-spec/compose-go/v3/loader"
+	composetypes "github.com/compose-spec/compose-go/v3/types"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/moby/moby/api/types/container"
 	mountTypes "github.com/moby/moby/api/types/mount"
