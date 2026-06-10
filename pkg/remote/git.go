@@ -28,9 +28,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/loader"
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/cli"
+	"github.com/compose-spec/compose-go/v3/loader"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/docker/cli/cli/command"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
 	"github.com/sirupsen/logrus"

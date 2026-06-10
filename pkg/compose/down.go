@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/containerd/errdefs"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"

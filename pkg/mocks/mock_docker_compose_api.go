@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	types "github.com/compose-spec/compose-go/v2/types"
+	types "github.com/compose-spec/compose-go/v3/types"
 	api "github.com/docker/compose/v5/pkg/api"
 	gomock "go.uber.org/mock/gomock"
 )

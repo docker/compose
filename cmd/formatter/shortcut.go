@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/buger/goterm"
-	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v3/types"
 	"github.com/eiannone/keyboard"
 	"github.com/skratchdot/open-golang/open"
 
