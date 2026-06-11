@@ -37,15 +37,15 @@ import (
 //
 // All OS-specific codepaths are handled by fsnotify.
 type naiveNotify struct {
-	// Paths that we're watching that should be passed up to the caller.
-	// Note that we may have to watch ancestors of these paths
-	// in order to fulfill the API promise.
+	// pathsToWatch are the actual paths registered with the OS watcher.
+	pathsToWatch []string
+	// notifyList holds the original trigger paths.
 	//
 	// We often need to check if paths are a child of a path in
 	// the notify list. It might be better to store this in a tree
 	// structure, so we can filter the list quickly.
 	notifyList map[string]bool
-	// ignore maps each notifyList root to the merged PathMatcher for paths under it.
+	// ignore maps each trigger path (from notifyList) to its isolated PathMatcher.
 	ignore map[string]PathMatcher
 
 	isWatcherRecursive bool
@@ -61,23 +61,12 @@ func (d *naiveNotify) Start() error {
 		return nil
 	}
 
-	notifyRoots := make([]string, 0, len(d.notifyList))
-
-	for path := range d.notifyList {
-		notifyRoots = append(notifyRoots, path)
-	}
-
-	pathsToWatch, err := greatestExistingAncestors(notifyRoots, d.ignore)
+	pathsToWatch, err := greatestExistingAncestors(d.pathsToWatch)
 	if err != nil {
 		return err
 	}
 	if d.isWatcherRecursive {
 		pathsToWatch = pathutil.EncompassingPaths(pathsToWatch)
-	}
-
-	_, d.ignore, err = normalizeWatchRoots(notifyRoots, d.ignore)
-	if err != nil {
-		return err
 	}
 
 	for _, name := range pathsToWatch {
@@ -236,7 +225,9 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 
 	for root := range d.notifyList {
 		if pathutil.IsChild(root, path) {
-			return !d.shouldIgnore(root, path)
+			if !d.shouldIgnore(root, path) {
+				return true
+			}
 		}
 	}
 	return false
@@ -249,11 +240,7 @@ func (d *naiveNotify) shouldSkipDir(path string) bool {
 	}
 
 	// Only walk directories under a notifyList path or under an ancestor of one
-	// (Start() may watch a parent when the target is missing or is a file).
-	// Decide ancestor/descendant versus notifyList before applying ignores so one
-	// root's patterns cannot block reaching another root.
-	// When walking beneath a watched ancestor, prune subtrees only with that root's
-	// matcher from d.ignore.
+	// Ignore a path only if every parent root's ignore matcher agrees
 	for root := range d.notifyList {
 		if pathutil.IsChild(path, root) {
 			return false
@@ -277,9 +264,6 @@ func (d *naiveNotify) shouldIgnoreEntireDir(dir, path string) bool {
 		if err != nil {
 			logrus.Debugf("error checking ignored directory %q: %v", path, err)
 			return false
-		}
-		if matches {
-			return true
 		}
 		return matches
 	}
@@ -334,14 +318,19 @@ func newWatcher(paths []string, ignore map[string]PathMatcher) (Notify, error) {
 		watchRoots = pathutil.EncompassingPaths(paths)
 	}
 
-	notifyList, normalizedIgnores, err := normalizeWatchRoots(watchRoots, ignore)
-	if err != nil {
-		return nil, fmt.Errorf("newWatcher: %w", err)
+	notifyList := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return nil, fmt.Errorf("newWatcher: %w", err)
+		}
+		notifyList[abs] = true
 	}
 
 	wmw := &naiveNotify{
+		pathsToWatch:       watchRoots,
 		notifyList:         notifyList,
-		ignore:             normalizedIgnores,
+		ignore:             ignore,
 		watcher:            fsw,
 		events:             fsw.Events,
 		wrappedEvents:      wrappedEvents,

@@ -265,9 +265,10 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 
 			if existingMatcher, exists := ignoresByWatchPath[trigger.Path]; exists {
 				ignore = watch.NewIntersectMatcher(existingMatcher, ignore)
+			} else {
+				paths = append(paths, trigger.Path)
 			}
 			ignoresByWatchPath[trigger.Path] = ignore
-			paths = append(paths, trigger.Path)
 		}
 		serviceWatchRules, err := getWatchRules(config, service)
 		if err != nil {
@@ -603,7 +604,8 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 		}
 		options.LogTo.Log(
 			api.WatchLogger,
-			fmt.Sprintf("service(s) %q restarted", services))
+			fmt.Sprintf("service(s) %q restarted", services),
+		)
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
@@ -770,7 +772,8 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 		dockerIgnores,
 		watch.EphemeralPathMatcher(),
 		dotGitIgnore,
-		triggerIgnore)
+		triggerIgnore,
+	)
 
 	pathsToCopy, err := s.initialSyncFiles(ctx, project, service, trigger, ignoreInitialSync)
 	if err != nil {

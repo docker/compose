@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	pathutil "github.com/docker/compose/v5/internal/paths"
 )
 
 func greatestExistingAncestor(path string) (string, error) {
@@ -42,47 +40,14 @@ func greatestExistingAncestor(path string) (string, error) {
 	return path, nil
 }
 
-func greatestExistingAncestors(paths []string, ignoreList map[string]PathMatcher) ([]string, error) {
-	result := []string{}
+func greatestExistingAncestors(paths []string) ([]string, error) {
+	result := make([]string, 0, len(paths))
 	for _, path := range paths {
 		newP, err := greatestExistingAncestor(path)
 		if err != nil {
 			return nil, fmt.Errorf("finding ancestor of %s: %w", path, err)
 		}
 		result = append(result, newP)
-		if path != newP {
-			ignore := ignoreList[path]
-			if oldMatcher, exists := ignoreList[newP]; exists {
-				ignore = NewIntersectMatcher(oldMatcher, ignore)
-			}
-			ignoreList[newP] = ignore
-			delete(ignoreList, path)
-		}
 	}
 	return result, nil
-}
-
-func normalizeWatchRoots(paths []string, ignore map[string]PathMatcher) (map[string]bool, map[string]PathMatcher, error) {
-	notifyList := make(map[string]bool, len(paths))
-	normalizedIgnores := make(map[string]PathMatcher, len(paths))
-
-	for _, root := range paths {
-		root, err := filepath.Abs(root)
-		if err != nil {
-			return nil, nil, err
-		}
-		notifyList[root] = true
-
-		matchers := make([]PathMatcher, 0, len(ignore))
-		for triggerPath, matcher := range ignore {
-			if matcher == nil {
-				continue
-			}
-			if root == triggerPath || pathutil.IsChild(root, triggerPath) || pathutil.IsChild(triggerPath, root) {
-				matchers = append(matchers, matcher)
-			}
-		}
-		normalizedIgnores[root] = NewIntersectMatcher(matchers...)
-	}
-	return notifyList, normalizedIgnores, nil
 }

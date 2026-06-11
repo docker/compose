@@ -28,8 +28,8 @@ import (
 
 func newFseventNotifyFixture(repo string, ignore map[string]PathMatcher) *fseventNotify {
 	return &fseventNotify{
-		pathsWereWatching: map[string]any{repo: struct{}{}},
-		ignore:            ignore,
+		notifyList: map[string]bool{repo: true},
+		ignore:     ignore,
 	}
 }
 
@@ -142,6 +142,47 @@ func TestFseventNotifyShouldNotifyIntersectMatcher(t *testing.T) {
 	assert.NilError(t, os.MkdirAll(filepath.Dir(buildFile), 0o755))
 	assert.NilError(t, os.WriteFile(buildFile, []byte("x"), 0o644))
 	assert.Assert(t, !d2.shouldNotify(buildFile), "expected path ignored by every intersect matcher not to notify")
+}
+
+func TestFseventNotifyShouldNotifyAnyRootSaysOK(t *testing.T) {
+	repoRoot := t.TempDir()
+	srcRoot := filepath.Join(repoRoot, "src")
+	assert.NilError(t, os.MkdirAll(srcRoot, 0o755))
+
+	// Service A watches repoRoot and ignores the entire src/ subtree.
+	// Service B watches repoRoot/src and ignores only node_modules/.
+	// A path is notified if ANY containing root's matcher does not suppress it.
+	parentIgnore, err := DockerIgnoreTesterFromContents(repoRoot, "src/\n")
+	assert.NilError(t, err)
+	childIgnore, err := DockerIgnoreTesterFromContents(srcRoot, "node_modules/\n")
+	assert.NilError(t, err)
+
+	d := &fseventNotify{
+		notifyList: map[string]bool{repoRoot: true, srcRoot: true},
+		ignore: map[string]PathMatcher{
+			repoRoot: parentIgnore,
+			srcRoot:  childIgnore,
+		},
+	}
+
+	// srcRoot does not ignore foo.ts, so it is notified even though repoRoot ignores src/.
+	fooFile := filepath.Join(srcRoot, "foo.ts")
+	assert.NilError(t, os.WriteFile(fooFile, []byte("x"), 0o644))
+	assert.Assert(t, d.shouldNotify(fooFile),
+		"file under child root must be notified; srcRoot does not ignore it even though repoRoot ignores src/")
+
+	// Every containing root ignores this path (repoRoot via src/, srcRoot via node_modules/).
+	nodeModulesFile := filepath.Join(srcRoot, "node_modules", "dep.js")
+	assert.NilError(t, os.MkdirAll(filepath.Dir(nodeModulesFile), 0o755))
+	assert.NilError(t, os.WriteFile(nodeModulesFile, []byte("x"), 0o644))
+	assert.Assert(t, !d.shouldNotify(nodeModulesFile),
+		"node_modules file must not be notified; all containing roots ignore it")
+
+	// repoRoot does not ignore main.go (outside src/), so it is notified.
+	otherFile := filepath.Join(repoRoot, "main.go")
+	assert.NilError(t, os.WriteFile(otherFile, []byte("x"), 0o644))
+	assert.Assert(t, d.shouldNotify(otherFile),
+		"file outside src/ must be notified; repoRoot does not ignore it")
 }
 
 func TestFseventNotifyShouldIgnoreDockerignoreDirectory(t *testing.T) {

@@ -123,7 +123,8 @@ func inotifyNodes() (int, error) {
 	pid := os.Getpid()
 
 	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf(
-		"find /proc/%d/fd -lname anon_inode:inotify -printf '%%hinfo/%%f\n' | xargs cat | grep -c '^inotify'", pid)).Output()
+		"find /proc/%d/fd -lname anon_inode:inotify -printf '%%hinfo/%%f\n' | xargs cat | grep -c '^inotify'", pid,
+	)).Output()
 	if err != nil {
 		return 0, fmt.Errorf("error running command to determine number of watched files: %w\n %s", err, output)
 	}
@@ -237,6 +238,92 @@ func TestShouldSkipDirDoesNotSkipAncestorOfWatchedPath(t *testing.T) {
 
 	parent := filepath.Join(repoRoot, "parent")
 	assert.Assert(t, !d.shouldSkipDir(parent), "expected parent directory to remain traversable when it contains a watched path")
+}
+
+func TestShouldSkipDirRequiresAllContainingRootsToAgree(t *testing.T) {
+	repoRoot := t.TempDir()
+	srcRoot := filepath.Join(repoRoot, "src")
+
+	// Service A watches repoRoot but does NOT list node_modules in its ignores.
+	// Service B watches src and ignores node_modules.
+	// node_modules under src must NOT be skipped — because service A (which also
+	// covers the path) has no rule for it. All containing roots must agree to skip.
+	rootIgnore, err := DockerIgnoreTesterFromContents(repoRoot, "need_perm_dir/\n")
+	assert.NilError(t, err)
+	childIgnore, err := DockerIgnoreTesterFromContents(srcRoot, "node_modules/\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{
+		ignore:     map[string]PathMatcher{repoRoot: rootIgnore, srcRoot: childIgnore},
+		notifyList: map[string]bool{repoRoot: true, srcRoot: true},
+	}
+
+	nodeModulesDir := filepath.Join(srcRoot, "node_modules")
+	assert.Assert(t, !d.shouldSkipDir(nodeModulesDir),
+		"node_modules under child root must not be skipped when a containing root (repoRoot) has no matching ignore rule")
+
+	// A legitimate subdir under src is also not skipped.
+	componentsDir := filepath.Join(srcRoot, "components")
+	assert.Assert(t, !d.shouldSkipDir(componentsDir),
+		"non-ignored directory under child root must remain watched")
+}
+
+func TestShouldSkipDirNotVetoedByUnrelatedChildTrigger(t *testing.T) {
+	repoRoot := t.TempDir()
+	srcRoot := filepath.Join(repoRoot, "src")
+
+	// Service A watches repoRoot and ignores root-owned-dir/.
+	// Service B watches repoRoot/src with an unrelated ignore.
+	// root-owned-dir is outside src, so service B has no opinion about it.
+	// The directory must still be skipped so the walker never enters it.
+	rootIgnore, err := DockerIgnoreTesterFromContents(repoRoot, "root-owned-dir/\n")
+	assert.NilError(t, err)
+	childIgnore, err := DockerIgnoreTesterFromContents(srcRoot, "node_modules/\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{
+		ignore:     map[string]PathMatcher{repoRoot: rootIgnore, srcRoot: childIgnore},
+		notifyList: map[string]bool{repoRoot: true, srcRoot: true},
+	}
+
+	rootOwnedDir := filepath.Join(repoRoot, "root-owned-dir")
+	assert.Assert(t, d.shouldSkipDir(rootOwnedDir),
+		"root-owned-dir must be skipped; child trigger must not veto parent's ignore")
+}
+
+func TestShouldNotifyAnyRootSaysOK(t *testing.T) {
+	repoRoot := t.TempDir()
+	srcRoot := filepath.Join(repoRoot, "src")
+
+	// Service A watches repoRoot and ignores the entire src/ subtree.
+	// Service B watches repoRoot/src and ignores only node_modules/.
+	// A path is notified if ANY containing root's matcher does not suppress it.
+	parentIgnore, err := DockerIgnoreTesterFromContents(repoRoot, "src/\n")
+	assert.NilError(t, err)
+	childIgnore, err := DockerIgnoreTesterFromContents(srcRoot, "node_modules/\n")
+	assert.NilError(t, err)
+
+	d := &naiveNotify{
+		ignore:     map[string]PathMatcher{repoRoot: parentIgnore, srcRoot: childIgnore},
+		notifyList: map[string]bool{repoRoot: true, srcRoot: true},
+	}
+
+	// A regular source file under src/ is notified because srcRoot's matcher does
+	// not ignore it, even though repoRoot ignores all of src/.
+	fooFile := filepath.Join(srcRoot, "foo.ts")
+	assert.Assert(t, d.shouldNotify(fooFile),
+		"file under child root must be notified; srcRoot does not ignore it even though repoRoot ignores src/")
+
+	// A file inside node_modules is not notified: every containing root ignores it
+	// (repoRoot ignores src/, srcRoot ignores node_modules/).
+	nodeModulesFile := filepath.Join(srcRoot, "node_modules", "dep.js")
+	assert.Assert(t, !d.shouldNotify(nodeModulesFile),
+		"node_modules file must not be notified; all containing roots ignore it")
+
+	// A file outside src/ is notified because repoRoot does not ignore it.
+	otherFile := filepath.Join(repoRoot, "main.go")
+	assert.Assert(t, d.shouldNotify(otherFile),
+		"file outside src/ must be notified; repoRoot does not ignore it")
 }
 
 func TestShouldSkipDirIntersectRequiresAllTriggersToAgree(t *testing.T) {
