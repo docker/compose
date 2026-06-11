@@ -499,40 +499,9 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 			}
 
 			detached, _ := cmd.Flags().GetBool("detach")
-			var ep api.EventProcessor
-			switch opts.Progress {
-			case "", display.ModeAuto:
-				switch {
-				case ansi == "never":
-					display.Mode = display.ModePlain
-					ep = display.Plain(dockerCli.Err())
-				case dockerCli.Out().IsTerminal():
-					ep = display.Full(dockerCli.Err(), stdinfo(dockerCli), detached)
-				default:
-					ep = display.Plain(dockerCli.Err())
-				}
-			case display.ModeTTY:
-				if ansi == "never" {
-					return fmt.Errorf("can't use --progress tty while ANSI support is disabled")
-				}
-				display.Mode = display.ModeTTY
-				ep = display.Full(dockerCli.Err(), stdinfo(dockerCli), detached)
-
-			case display.ModePlain:
-				if ansi == "always" {
-					return fmt.Errorf("can't use --progress plain while ANSI support is forced")
-				}
-				display.Mode = display.ModePlain
-				ep = display.Plain(dockerCli.Err())
-			case display.ModeQuiet, "none":
-				display.Mode = display.ModeQuiet
-				ep = display.Quiet()
-			case display.ModeJSON:
-				display.Mode = display.ModeJSON
-				logrus.SetFormatter(&logrus.JSONFormatter{})
-				ep = display.JSON(dockerCli.Err())
-			default:
-				return fmt.Errorf("unsupported --progress value %q", opts.Progress)
+			ep, err := selectEventProcessor(dockerCli, opts.Progress, ansi, detached)
+			if err != nil {
+				return err
 			}
 			backendOptions.Add(compose.WithEventProcessor(ep))
 
@@ -668,6 +637,47 @@ func stdinfo(dockerCli command.Cli) io.Writer {
 		return dockerCli.Out()
 	}
 	return dockerCli.Err()
+}
+
+// selectEventProcessor picks the EventProcessor for Compose progress rendering.
+//
+// In auto mode we probe Err() (not Out()) because the renderer writes to stderr;
+// probing stdout would force plain mode whenever stdout is redirected (e.g.
+// `docker compose up | tee log`) while stderr is still a terminal.
+func selectEventProcessor(dockerCli command.Cli, progress, ansi string, detached bool) (api.EventProcessor, error) {
+	switch progress {
+	case "", display.ModeAuto:
+		switch {
+		case ansi == "never":
+			display.Mode = display.ModePlain
+			return display.Plain(dockerCli.Err()), nil
+		case dockerCli.Err().IsTerminal():
+			return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached), nil
+		default:
+			return display.Plain(dockerCli.Err()), nil
+		}
+	case display.ModeTTY:
+		if ansi == "never" {
+			return nil, fmt.Errorf("can't use --progress tty while ANSI support is disabled")
+		}
+		display.Mode = display.ModeTTY
+		return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached), nil
+	case display.ModePlain:
+		if ansi == "always" {
+			return nil, fmt.Errorf("can't use --progress plain while ANSI support is forced")
+		}
+		display.Mode = display.ModePlain
+		return display.Plain(dockerCli.Err()), nil
+	case display.ModeQuiet, "none":
+		display.Mode = display.ModeQuiet
+		return display.Quiet(), nil
+	case display.ModeJSON:
+		display.Mode = display.ModeJSON
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+		return display.JSON(dockerCli.Err()), nil
+	default:
+		return nil, fmt.Errorf("unsupported --progress value %q", progress)
+	}
 }
 
 func setEnvWithDotEnv(opts ProjectOptions, dockerCli command.Cli) error {
