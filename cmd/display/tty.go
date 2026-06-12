@@ -268,16 +268,17 @@ func (w *ttyWriter) childrenTasks(parent string) iter.Seq[*task] {
 
 // lineData holds pre-computed formatting for a task line
 type lineData struct {
-	spinner     string // rendered spinner with color
-	prefix      string // dry-run prefix if any
-	taskID      string // possibly abbreviated
-	progress    string // progress bar and size info
-	status      string // rendered status with color
-	details     string // possibly abbreviated
-	timer       string // rendered timer with color
-	statusPad   int    // padding before status to align
-	timerPad    int    // padding before timer to align
-	statusColor colorFunc
+	spinner           string // rendered spinner with color
+	prefix            string // dry-run prefix if any
+	taskID            string // possibly abbreviated
+	progress          string // progress bar and (optionally) size info appended
+	progressSizeBytes int    // byte length of the trailing size suffix in progress, 0 if none
+	status            string // rendered status with color
+	details           string // possibly abbreviated
+	timer             string // rendered timer with color
+	statusPad         int    // padding before status to align
+	timerPad          int    // padding before timer to align
+	statusColor       colorFunc
 }
 
 func (w *ttyWriter) print() {
@@ -424,8 +425,8 @@ func (w *ttyWriter) adjustLineWidth(lines []lineData, timerLen int, terminalWidt
 			break
 		}
 
-		// First try to truncate details, then taskID
-		if !truncateDetails(lines, overflow) && !truncateLongestTaskID(lines, overflow, minIDLen) {
+		// Drop ancillary content (details, progress size info) before touching the taskID.
+		if !truncateDetails(lines, overflow) && !truncateProgressSize(lines) && !truncateLongestTaskID(lines, overflow, minIDLen) {
 			break // Can't truncate further
 		}
 	}
@@ -474,6 +475,21 @@ func computeOverflow(lines []lineData, maxBeforeStatus, maxStatusLen, timerLen, 
 		}
 	}
 	return maxOverflow
+}
+
+// truncateProgressSize drops the trailing "X.XMB / Y.YMB" size info from the
+// first line whose progress still carries it. Returns true if any line was
+// modified. Used to recover from overflow without abbreviating the taskID.
+func truncateProgressSize(lines []lineData) bool {
+	for i := range lines {
+		l := &lines[i]
+		if l.progressSizeBytes > 0 {
+			l.progress = l.progress[:len(l.progress)-l.progressSizeBytes]
+			l.progressSizeBytes = 0
+			return true
+		}
+	}
+	return false
 }
 
 // truncateDetails tries to truncate the first line's details to reduce overflow.
@@ -560,22 +576,26 @@ func (w *ttyWriter) prepareLineData(t *task) lineData {
 	}
 
 	var progress string
+	var progressSizeBytes int
 	if len(completion) > 0 {
 		progress = " [" + SuccessColor(strings.Join(completion, "")) + "]"
 		if !hideDetails {
-			progress += fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
+			sizeInfo := fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
+			progress += sizeInfo
+			progressSizeBytes = len(sizeInfo)
 		}
 	}
 
 	return lineData{
-		spinner:     spinner(t),
-		prefix:      prefix,
-		taskID:      t.ID,
-		progress:    progress,
-		status:      t.text,
-		statusColor: colorFn(t.status),
-		details:     t.details,
-		timer:       fmt.Sprintf("%.1fs", elapsed),
+		spinner:           spinner(t),
+		prefix:            prefix,
+		taskID:            t.ID,
+		progress:          progress,
+		progressSizeBytes: progressSizeBytes,
+		status:            t.text,
+		statusColor:       colorFn(t.status),
+		details:           t.details,
+		timer:             fmt.Sprintf("%.1fs", elapsed),
 	}
 }
 
