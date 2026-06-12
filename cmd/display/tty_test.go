@@ -270,6 +270,69 @@ func TestAdjustLineWidth_TaskIDCorrectlyTruncated(t *testing.T) {
 	assert.Assert(t, strings.HasSuffix(lines[0].taskID, "..."), "truncated taskID should end with ...")
 }
 
+// TestAdjustLineWidth_MultiByteTaskIDFits guards against drift between
+// applyPadding (rune-based) and maxBeforeStatusWidth (formerly byte-based):
+// a byte-based measurement falsely flags overflow for multi-byte taskIDs.
+func TestAdjustLineWidth_MultiByteTaskIDFits(t *testing.T) {
+	w := &ttyWriter{}
+	taskID := "Image 测试测试" // 10 runes, 18 bytes
+	lines := []lineData{{
+		taskID: taskID,
+		status: "Pulling",
+	}}
+
+	// terminalWidth=30 fits in runes (3+10+1+7+1+4 = 26) but not in bytes
+	// (3+18+1+7+1+4 = 34), so a byte-based measurement would truncate.
+	w.adjustLineWidth(lines, 4, 30)
+
+	assert.Equal(t, taskID, lines[0].taskID,
+		"taskID should not be modified when it fits terminal width in runes")
+}
+
+// TestTruncateLongestTaskID_PreservesValidUTF8 verifies that when truncation
+// of a multi-byte UTF-8 taskID is genuinely required, the resulting string
+// remains valid UTF-8. Byte-indexed slicing can land mid-rune and emit
+// replacement characters (�) into the rendered output.
+func TestTruncateLongestTaskID_PreservesValidUTF8(t *testing.T) {
+	taskID := "Image 测试测试测试测试" // 14 runes, 30 bytes
+	lines := []lineData{{taskID: taskID}}
+
+	truncateLongestTaskID(lines, 8, 10)
+
+	assert.Assert(t, utf8.ValidString(lines[0].taskID),
+		"truncated taskID must remain valid UTF-8, got %q", lines[0].taskID)
+	assert.Assert(t, strings.HasSuffix(lines[0].taskID, "..."),
+		"truncated taskID should end with ..., got %q", lines[0].taskID)
+}
+
+// TestTruncateProgressSize_PicksWidestLine verifies that dropping the size
+// suffix targets the line currently driving maxBeforeStatusWidth (the only
+// line whose shrink can reduce overflow), preserving size info on narrower
+// lines that are not the bottleneck.
+func TestTruncateProgressSize_PicksWidestLine(t *testing.T) {
+	narrowSuffix := " 5MB / 10MB"
+	wideSuffix := " 50MB / 100MB"
+	lines := []lineData{
+		{
+			taskID:            "Image short",
+			progress:          " [⣿⣿]" + narrowSuffix,
+			progressSizeBytes: len(narrowSuffix),
+		},
+		{
+			taskID:            "Image very-long-named-task",
+			progress:          " [⣿⣿⣿⣿⣿⣿⣿⣿]" + wideSuffix,
+			progressSizeBytes: len(wideSuffix),
+		},
+	}
+
+	truncateProgressSize(lines)
+
+	assert.Equal(t, 0, lines[1].progressSizeBytes,
+		"widest line should lose its size suffix first")
+	assert.Equal(t, len(narrowSuffix), lines[0].progressSizeBytes,
+		"narrower line should retain its size suffix")
+}
+
 func TestAdjustLineWidth_NoTruncationNeeded(t *testing.T) {
 	w := &ttyWriter{}
 	originalDetails := "short"
