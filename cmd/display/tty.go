@@ -449,7 +449,7 @@ func maxBeforeStatusWidth(lines []lineData) int {
 	var maxWidth int
 	for i := range lines {
 		l := &lines[i]
-		width := 3 + lenAnsi(l.prefix) + len(l.taskID) + lenAnsi(l.progress)
+		width := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
 		if width > maxWidth {
 			maxWidth = width
 		}
@@ -478,18 +478,29 @@ func computeOverflow(lines []lineData, maxBeforeStatus, maxStatusLen, timerLen, 
 }
 
 // truncateProgressSize drops the trailing "X.XMB / Y.YMB" size info from the
-// first line whose progress still carries it. Returns true if any line was
-// modified. Used to recover from overflow without abbreviating the taskID.
+// line currently driving maxBeforeStatusWidth — only that line's shrink can
+// reduce overflow. Returns true if any line was modified.
 func truncateProgressSize(lines []lineData) bool {
+	maxIdx := -1
+	var maxWidth int
 	for i := range lines {
 		l := &lines[i]
-		if l.progressSizeBytes > 0 {
-			l.progress = l.progress[:len(l.progress)-l.progressSizeBytes]
-			l.progressSizeBytes = 0
-			return true
+		if l.progressSizeBytes == 0 {
+			continue
+		}
+		w := lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
+		if maxIdx < 0 || w > maxWidth {
+			maxWidth = w
+			maxIdx = i
 		}
 	}
-	return false
+	if maxIdx < 0 {
+		return false
+	}
+	l := &lines[maxIdx]
+	l.progress = l.progress[:len(l.progress)-l.progressSizeBytes]
+	l.progressSizeBytes = 0
+	return true
 }
 
 // truncateDetails tries to truncate the first line's details to reduce overflow.
@@ -510,13 +521,14 @@ func truncateDetails(lines []lineData, overflow int) bool {
 }
 
 // truncateLongestTaskID truncates the longest taskID to reduce overflow.
-// Returns true if truncation was performed.
+// Returns true if truncation was performed. Lengths and slicing are in runes
+// to avoid emitting invalid UTF-8 when taskID contains multi-byte chars.
 func truncateLongestTaskID(lines []lineData, overflow, minIDLen int) bool {
 	longestIdx := -1
 	longestLen := minIDLen
 	for i := range lines {
-		if len(lines[i].taskID) > longestLen {
-			longestLen = len(lines[i].taskID)
+		if utf8.RuneCountInString(lines[i].taskID) > longestLen {
+			longestLen = utf8.RuneCountInString(lines[i].taskID)
 			longestIdx = i
 		}
 	}
@@ -527,10 +539,9 @@ func truncateLongestTaskID(lines []lineData, overflow, minIDLen int) bool {
 
 	l := &lines[longestIdx]
 	reduction := overflow + 3 // account for "..."
-	newLen := max(len(l.taskID)-reduction, minIDLen-3)
-	if newLen > 0 {
-		l.taskID = l.taskID[:newLen] + "..."
-	}
+	newLen := max(longestLen-reduction, minIDLen-3)
+	runes := []rune(l.taskID)
+	l.taskID = string(runes[:newLen]) + "..."
 	return true
 }
 
