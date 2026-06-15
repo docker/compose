@@ -7,6 +7,7 @@
 - [Contributing](#contributing)
 - [Legacy](#legacy)
 
+# This is an edit to this for example PR for CodeRabbit
 # Docker Compose
 
 [![GitHub release](https://img.shields.io/github/v/release/docker/compose.svg?style=flat-square)](https://github.com/docker/compose/releases/latest)
