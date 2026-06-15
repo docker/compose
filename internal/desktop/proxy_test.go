@@ -48,8 +48,33 @@ func TestHTTPProxySocketEndpoint_UnixSocketMissing(t *testing.T) {
 }
 
 func TestHTTPProxySocketEndpoint_WindowsNamedPipe(t *testing.T) {
-	got := httpProxySocketEndpoint("npipe://./pipe/dockerCli")
-	assert.Equal(t, got, "npipe://./pipe/dockerHttpProxy")
+	// The derived proxy endpoint must keep the engine endpoint's exact prefix
+	// and only swap the trailing pipe name, so the result stays dialable by
+	// winio (docker/compose#13824).
+	cases := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{
+			// The form Docker Desktop actually reports (observed on DD 29.5.2):
+			// backslash `\\.\pipe\` namespace.
+			name:     "backslash form (real Docker Desktop)",
+			endpoint: `npipe://\\.\pipe\docker_cli`,
+			want:     `npipe://\\.\pipe\dockerHttpProxy`,
+		},
+		{
+			// Forward-slash form some tooling uses; must work too.
+			name:     "forward-slash form",
+			endpoint: "npipe:////./pipe/dockerDesktopLinuxEngine",
+			want:     "npipe:////./pipe/dockerHttpProxy",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, httpProxySocketEndpoint(tc.endpoint), tc.want)
+		})
+	}
 }
 
 func TestHTTPProxySocketEndpoint_EmptyOrUnknown(t *testing.T) {
@@ -97,6 +122,51 @@ func TestProxyTransport_RoutesThroughDockerDesktop(t *testing.T) {
 	assert.Equal(t, tr.TLSHandshakeTimeout, src.TLSHandshakeTimeout)
 	assert.Equal(t, tr.ExpectContinueTimeout, src.ExpectContinueTimeout)
 	assert.Equal(t, tr.ForceAttemptHTTP2, src.ForceAttemptHTTP2)
+}
+
+// TestDDProxyFunc_BypassesLoopbackOnly exercises the proxy selection directly
+// (rather than through ProxyTransport, which needs a live socket) so it runs on
+// every platform, including Windows. This is the core of the
+// docker/compose#13824 fix: loopback targets must connect directly instead of
+// being forced through the Docker Desktop proxy. Everything else — including
+// hosts a local NO_PROXY would match — must still route through Desktop's
+// proxy, so Desktop keeps ownership of proxy decisions (docker/compose#13825
+// review).
+func TestDDProxyFunc_BypassesLoopbackOnly(t *testing.T) {
+	// Set NO_PROXY to confirm it is deliberately NOT honored: registry.internal
+	// must still be proxied.
+	t.Setenv("NO_PROXY", "registry.internal")
+	t.Setenv("no_proxy", "registry.internal")
+
+	proxyFunc := ddProxyFunc()
+
+	cases := []struct {
+		name      string
+		reqURL    string
+		wantProxy bool
+	}{
+		{"loopback name", "http://localhost:5000/v2/", false},
+		{"loopback IPv4", "http://127.0.0.1:5000/v2/", false},
+		{"loopback IPv4 subnet", "http://127.5.6.7:5000/v2/", false},
+		{"loopback IPv6", "http://[::1]:5000/v2/", false},
+		{"NO_PROXY host is not honored", "https://registry.internal/v2/", true},
+		{"external https", "https://registry-1.docker.io/v2/", true},
+		{"external http", "http://example.com/v2/", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, tc.reqURL, http.NoBody)
+			assert.NilError(t, err)
+			proxyURL, err := proxyFunc(req)
+			assert.NilError(t, err)
+			if tc.wantProxy {
+				assert.Assert(t, proxyURL != nil, "expected %s to route through the Docker Desktop proxy", tc.reqURL)
+				assert.Equal(t, proxyURL.Host, ddProxyHost)
+			} else {
+				assert.Assert(t, proxyURL == nil, "expected %s to bypass the proxy and connect directly", tc.reqURL)
+			}
+		})
+	}
 }
 
 func mustTouch(t *testing.T, path string) {
