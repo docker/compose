@@ -31,6 +31,13 @@ import (
 	"github.com/docker/compose/v5/internal/memnet"
 )
 
+// ddProxyHost is a sentinel hostname stamped into the proxy URL handed to the
+// stdlib transport. It is never resolved on the network: the transport's
+// DialContext recognizes it and routes the connection to Docker Desktop's
+// proxy socket instead. The .invalid TLD is reserved (RFC 6761) so it can
+// never collide with a real registry host.
+const ddProxyHost = "docker-desktop-http-proxy.invalid"
+
 // Endpoint returns the Docker Desktop API socket endpoint advertised via the
 // engine info labels, or "" when the active engine is not Docker Desktop.
 func Endpoint(ctx context.Context, apiClient client.APIClient) (string, error) {
@@ -51,8 +58,8 @@ func Endpoint(ctx context.Context, apiClient client.APIClient) (string, error) {
 // when the input is not a recognized form or when the derived unix socket
 // does not exist (older DD versions or non-DD installs).
 //
-// On macOS/Linux: unix:///path/to/Data/docker-cli.sock      → unix:///path/to/Data/httpproxy.sock
-// On Windows:    npipe://./pipe/dockerDesktopLinuxEngine    → npipe://./pipe/dockerHttpProxy
+// On macOS/Linux: unix:///path/to/Data/docker-cli.sock     → unix:///path/to/Data/httpproxy.sock
+// On Windows:    npipe://\\.\pipe\docker_cli               → npipe://\\.\pipe\dockerHttpProxy
 func httpProxySocketEndpoint(endpoint string) string {
 	if sockPath, ok := strings.CutPrefix(endpoint, "unix://"); ok {
 		proxyPath := filepath.Join(filepath.Dir(sockPath), "httpproxy.sock")
@@ -62,7 +69,20 @@ func httpProxySocketEndpoint(endpoint string) string {
 		return "unix://" + proxyPath
 	}
 	if strings.HasPrefix(endpoint, "npipe://") {
-		return "npipe://./pipe/dockerHttpProxy"
+		// Named pipes all live in the same `\\.\pipe\` namespace, so only the
+		// trailing pipe name differs. Swap it in place rather than rebuilding
+		// the endpoint string: this preserves the engine endpoint's exact
+		// prefix (Docker Desktop reports the backslash form
+		// `npipe://\\.\pipe\docker_cli`), which winio can dial. Hardcoding
+		// `npipe://./pipe/...` instead would yield the relative path
+		// `./pipe/dockerHttpProxy`, which fails with "open
+		// ./pipe/dockerHttpProxy: The system cannot find the path specified."
+		// (docker/compose#13824). LastIndexAny handles both the backslash form
+		// above and the forward-slash form `npipe:////./pipe/...`.
+		if idx := strings.LastIndexAny(endpoint, `/\`); idx >= 0 {
+			return endpoint[:idx+1] + "dockerHttpProxy"
+		}
+		return ""
 	}
 	return ""
 }
@@ -73,6 +93,13 @@ func httpProxySocketEndpoint(endpoint string) string {
 // transport in that case — for the OCI resolver this means containerd's
 // built-in transport). Pass "" for endpoint when DD is not the active
 // engine.
+//
+// Loopback targets (localhost, 127.0.0.0/8, ::1) bypass the proxy and connect
+// directly, so `compose publish` to a local/insecure registry behaves like
+// `docker push` instead of failing inside the proxy (docker/compose#13824).
+// All other registry traffic continues through Docker Desktop's proxy so
+// Desktop stays in control of proxy decisions (e.g. enterprise-managed
+// proxies); the local process NO_PROXY is deliberately not honored.
 //
 // When DD is available, the returned transport is a clone of
 // http.DefaultTransport with only Proxy and DialContext overridden, so it
@@ -95,11 +122,56 @@ func ProxyTransport(endpoint string) http.RoundTripper {
 	} else {
 		tr = &http.Transport{}
 	}
-	tr.Proxy = http.ProxyURL(&url.URL{Scheme: "http"})
-	tr.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
-		return memnet.DialEndpoint(ctx, proxyEndpoint)
+
+	tr.Proxy = ddProxyFunc()
+
+	// Bypassed (direct) requests reach DialContext with their real target
+	// address and use the standard dialer; proxied requests reach it with the
+	// sentinel proxy address and are routed to the Docker Desktop socket.
+	baseDial := tr.DialContext
+	if baseDial == nil {
+		baseDial = (&net.Dialer{}).DialContext
+	}
+	proxyAddr := net.JoinHostPort(ddProxyHost, "80")
+	tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if addr == proxyAddr {
+			return memnet.DialEndpoint(ctx, proxyEndpoint)
+		}
+		return baseDial(ctx, network, addr)
 	}
 	return tr
+}
+
+// ddProxyFunc returns a transport Proxy function that routes every request
+// through the Docker Desktop proxy except loopback targets, which connect
+// directly. Loopback is the only local bypass: all other registry traffic is
+// left to Docker Desktop's PAC-aware proxy so Desktop stays in control of
+// proxy decisions. In particular this does not honor the local process
+// NO_PROXY/no_proxy, which could otherwise let a broad value (such as "*" or
+// ".corp") bypass centrally managed enterprise proxy policy
+// (docker/compose#13825 review). The sentinel proxy URL resolves to
+// ddProxyHost, which DialContext intercepts.
+func ddProxyFunc() func(*http.Request) (*url.URL, error) {
+	proxyURL := &url.URL{Scheme: "http", Host: ddProxyHost}
+	return func(req *http.Request) (*url.URL, error) {
+		if isLoopbackHost(req.URL.Hostname()) {
+			return nil, nil
+		}
+		return proxyURL, nil
+	}
+}
+
+// isLoopbackHost reports whether host is the loopback name "localhost" or any
+// loopback IP (127.0.0.0/8, ::1). host must be a bare hostname with no port,
+// e.g. the result of url.URL.Hostname.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 // ProxyTransportFor discovers the Docker Desktop endpoint via apiClient and
