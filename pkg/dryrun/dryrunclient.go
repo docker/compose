@@ -397,6 +397,10 @@ func (d *DryRunClient) ImageHistory(ctx context.Context, imageName string, optio
 	return d.apiClient.ImageHistory(ctx, imageName, options...)
 }
 
+func (d *DryRunClient) ImageAttestations(ctx context.Context, imageName string, options ...client.ImageAttestationsOption) (client.ImageAttestationsResult, error) {
+	return d.apiClient.ImageAttestations(ctx, imageName, options...)
+}
+
 func (d *DryRunClient) ImageImport(ctx context.Context, source client.ImageImportSource, ref string, options client.ImageImportOptions) (client.ImageImportResult, error) {
 	return d.apiClient.ImageImport(ctx, source, ref, options)
 }
