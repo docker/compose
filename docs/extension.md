@@ -106,9 +106,14 @@ When the provider command sends a `rawsetenv` JSON message, Compose injects the 
 ```
 The `app` service will receive `SECRET_KEY` exactly as specified, regardless of the provider service name.
 This is useful when injecting secrets or configuration values that must match exact variable names expected by
-applications or frameworks. Unlike `setenv`, which avoids collisions through automatic prefixing, `rawsetenv` keys
-are the provider's responsibility to keep unique. If multiple providers emit the same `rawsetenv` key, the last one
-to run will overwrite previous values.
+applications or frameworks.
+
+Unlike `setenv`, which avoids collisions through automatic prefixing, `rawsetenv` keys are the provider's
+responsibility to keep unique. If a `rawsetenv` key collides with a variable already set on the dependent service,
+the existing value is overwritten and Compose logs a warning. This includes variables declared by the user in the
+service `environment` section as well as values emitted by other providers. Providers that are not linked by a
+`depends_on` relationship may run concurrently, so when several of them emit the same `rawsetenv` key the resulting
+value is not deterministic.
 
 > __Note:__  The `compose up` provider command _MUST_ be idempotent. If resource is already running, the command _MUST_ set
 > the same environment variables to ensure consistent configuration of dependent services.

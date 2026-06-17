@@ -76,7 +76,6 @@ func TestDependsOnMultipleProviders(t *testing.T) {
 	env := getEnv(res.Combined())
 	assert.Check(t, slices.Contains(env, "PROVIDER1_URL=https://magic.cloud/provider1"), env)
 	assert.Check(t, slices.Contains(env, "PROVIDER2_URL=https://magic.cloud/provider2"), env)
-	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
 }
 
 func TestProviderRawSetEnv(t *testing.T) {
@@ -92,11 +91,32 @@ func TestProviderRawSetEnv(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv.yaml", "--project-name", projectName, "up")
 	res.Assert(t, icmd.Success)
-	env := getEnv(res.Combined(), false)
+	env := getEnv(res.Combined())
 	// setenv: prefixed with service name
 	assert.Check(t, slices.Contains(env, "SECRETS_URL=https://magic.cloud/secrets"), env)
 	// rawsetenv: injected as-is without prefix
 	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
+}
+
+func TestProviderRawSetEnvOverridesUserEnv(t *testing.T) {
+	provider, err := findExecutable("example-provider")
+	assert.NilError(t, err)
+
+	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	c := NewParallelCLI(t, WithEnv("PATH="+path))
+	const projectName = "rawsetenv-override"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv-override.yaml", "--project-name", projectName, "up")
+	res.Assert(t, icmd.Success)
+	env := getEnv(res.Combined())
+	// rawsetenv overrides a user-defined environment variable
+	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
+	assert.Check(t, !slices.Contains(env, "CLOUD_REGION=user-defined-region"), env)
+	// the override is surfaced to the user rather than happening silently
+	assert.Check(t, strings.Contains(res.Combined(), "overrides environment variable"), res.Combined())
 }
 
 func getEnv(out string) []string {
