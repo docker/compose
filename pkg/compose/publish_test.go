@@ -593,3 +593,104 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	assert.Assert(t, errors.Is(err, api.ErrCanceled),
 		"expected api.ErrCanceled when user declines, got: %v", err)
 }
+
+func Test_composeFileAsByteReader_shortFormPorts(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	err := os.WriteFile(composePath, []byte(`name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+`), 0o600)
+	assert.NilError(t, err)
+
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir:  dir,
+		Environment: types.Mapping{"DASHBOARD_PORT": ""},
+		ConfigFiles: []types.ConfigFile{{Filename: composePath}},
+	})
+	assert.NilError(t, err)
+	project.ComposeFiles = []string{composePath}
+
+	reader, err := composeFileAsByteReader(t.Context(), composePath, project)
+	assert.NilError(t, err)
+	assert.Assert(t, reader != nil)
+}
+
+func Test_composeFileAsByteReader_shortFormPortsBasic(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	err := os.WriteFile(composePath, []byte(`name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - "8080:80"
+`), 0o600)
+	assert.NilError(t, err)
+
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir:  dir,
+		Environment: types.Mapping{},
+		ConfigFiles: []types.ConfigFile{{Filename: composePath}},
+	})
+	assert.NilError(t, err)
+	project.ComposeFiles = []string{composePath}
+
+	reader, err := composeFileAsByteReader(t.Context(), composePath, project)
+	assert.NilError(t, err)
+	assert.Assert(t, reader != nil)
+}
+
+func Test_composeFileAsByteReader_shortFormPortsIPBound(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	err := os.WriteFile(composePath, []byte(`name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - "127.0.0.1:8080:80"
+`), 0o600)
+	assert.NilError(t, err)
+
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir:  dir,
+		Environment: types.Mapping{},
+		ConfigFiles: []types.ConfigFile{{Filename: composePath}},
+	})
+	assert.NilError(t, err)
+	project.ComposeFiles = []string{composePath}
+
+	reader, err := composeFileAsByteReader(t.Context(), composePath, project)
+	assert.NilError(t, err)
+	assert.Assert(t, reader != nil)
+}
+
+func Test_composeFileAsByteReader_longFormPorts(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	err := os.WriteFile(composePath, []byte(`name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - target: 3000
+        published: "3000"
+`), 0o600)
+	assert.NilError(t, err)
+
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir:  dir,
+		Environment: types.Mapping{},
+		ConfigFiles: []types.ConfigFile{{Filename: composePath}},
+	})
+	assert.NilError(t, err)
+	project.ComposeFiles = []string{composePath}
+
+	reader, err := composeFileAsByteReader(t.Context(), composePath, project)
+	assert.NilError(t, err)
+	assert.Assert(t, reader != nil)
+}
