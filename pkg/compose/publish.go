@@ -255,8 +255,21 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 	}
 	for name, service := range base.Services {
 		for i, envFile := range service.EnvFiles {
+			// A real stat failure (e.g. permissions) is fatal, but a missing file is not:
+			// the project loader already rejects missing required env files before we get
+			// here, so an absent file at this point is an optional one.
+			_, statErr := os.Stat(envFile.Path)
+			if statErr != nil && !os.IsNotExist(statErr) {
+				return nil, fmt.Errorf("failed to access env file %s: %w", envFile.Path, statErr)
+			}
+			// The hash is derived from the path string alone, so the env_file is always
+			// rewritten to its opaque <hash>.env placeholder, even for a missing optional
+			// file, so the published artifact never leaks the local path. Only files that
+			// exist are registered for upload, mirroring the extends handling below.
 			hash := fmt.Sprintf("%x.env", sha256.Sum256([]byte(envFile.Path)))
-			envFiles[envFile.Path] = hash
+			if statErr == nil {
+				envFiles[envFile.Path] = hash
+			}
 			f, err = transform.ReplaceEnvFile(f, name, i, hash)
 			if err != nil {
 				return nil, err
@@ -690,6 +703,15 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 	for _, service := range project.Services {
 		// Check env files
 		for _, envFile := range service.EnvFiles {
+			if _, statErr := os.Stat(envFile.Path); statErr != nil {
+				if !os.IsNotExist(statErr) {
+					return nil, fmt.Errorf("failed to access env file %s: %w", envFile.Path, statErr)
+				}
+				if envFile.Required {
+					return nil, fmt.Errorf("env file %s not found", envFile.Path)
+				}
+				continue
+			}
 			findings, err := scan.ScanFile(envFile.Path)
 			if err != nil {
 				return nil, fmt.Errorf("failed to scan env file %s: %w", envFile.Path, err)
