@@ -99,7 +99,7 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 
 		resolver := oci.NewResolver(s.configFile(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
 
-		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
+		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion, options.Annotations)
 		if err != nil {
 			s.events.On(api.Resource{
 				ID:     repository,

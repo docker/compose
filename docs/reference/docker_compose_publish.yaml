@@ -5,6 +5,17 @@ usage: docker compose publish [OPTIONS] REPOSITORY[:TAG]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: annotation
+      value_type: stringArray
+      default_value: '[]'
+      description: |
+        Add custom metadata to the published OCI artifact (format: key=value)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: app
       value_type: bool
       default_value: "false"
