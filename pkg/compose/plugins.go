@@ -76,7 +76,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return nil
 	}
 
-	vars, err := s.executePlugin(cmd, command, service)
+	variables, err := s.executePlugin(cmd, command, service)
 	if err != nil {
 		return err
 	}
@@ -90,10 +90,13 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	for name, s := range project.Services {
 		if _, ok := s.DependsOn[service.Name]; ok {
 			prefix := strings.ToUpper(service.Name) + "_"
-			for key, val := range vars.prefixed {
+			for key, val := range variables.prefixed {
 				s.Environment[prefix+key] = &val
 			}
-			for key, val := range vars.raw {
+			for key, val := range variables.raw {
+				if existing, ok := s.Environment[key]; ok && existing != nil && *existing != val {
+					logrus.Warnf("provider %q overrides environment variable %q in service %q", service.Name, key, name)
+				}
 				s.Environment[key] = &val
 			}
 			project.Services[name] = s
@@ -131,7 +134,7 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	decoder := json.NewDecoder(stdout)
 	defer func() { _ = stdout.Close() }()
 
-	vars := pluginVariables{
+	variables := pluginVariables{
 		prefixed: types.Mapping{},
 		raw:      types.Mapping{},
 	}
@@ -156,13 +159,13 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 			if !found {
 				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
 			}
-			vars.prefixed[key] = val
+			variables.prefixed[key] = val
 		case RawSetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
 				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
 			}
-			vars.raw[key] = val
+			variables.raw[key] = val
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
@@ -183,7 +186,7 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	case "stop":
 		s.events.On(stoppedEvent(service.Name))
 	}
-	return vars, nil
+	return variables, nil
 }
 
 func (s *composeService) getPluginBinaryPath(provider string) (path string, err error) {
