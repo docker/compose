@@ -18,6 +18,7 @@ package compose
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -592,4 +593,27 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	err := svc.publish(t.Context(), project, "docker.io/myorg/myapp:latest", api.PublishOptions{})
 	assert.Assert(t, errors.Is(err, api.ErrCanceled),
 		"expected api.ErrCanceled when user declines, got: %v", err)
+}
+
+func Test_composeFileAsByteReader(t *testing.T) {
+	composeFile := []byte(`name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+`)
+	composePath := filepath.Join(t.TempDir(), "compose.yaml")
+	assert.NilError(t, os.WriteFile(composePath, composeFile, 0o600))
+
+	reader, err := composeFileAsByteReader(composePath)
+	assert.NilError(t, err)
+	actual, err := io.ReadAll(reader)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, actual, composeFile)
+}
+
+func Test_composeFileAsByteReader_missingFile(t *testing.T) {
+	_, err := composeFileAsByteReader(filepath.Join(t.TempDir(), "missing.yaml"))
+	assert.Assert(t, errors.Is(err, os.ErrNotExist))
 }

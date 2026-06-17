@@ -325,7 +325,7 @@ func (s *composeService) preChecks(ctx context.Context, project *types.Project, 
 			return false, err
 		}
 	}
-	detectedSecrets, err := s.checkForSensitiveData(ctx, project)
+	detectedSecrets, err := s.checkForSensitiveData(project)
 	if err != nil {
 		return false, err
 	}
@@ -602,7 +602,7 @@ func buildConfigContentPromptMessage(configs []string) string {
 
 // loadUnresolvedFile loads a single compose file with interpolation and
 // environment resolution skipped, so callers can inspect raw user-provided
-// values. Used by both checkEnvironmentVariables and composeFileAsByteReader.
+// values. Used by checkEnvironmentVariables.
 func loadUnresolvedFile(ctx context.Context, project *types.Project, filePath string) (*types.Project, error) {
 	return loader.LoadWithContext(ctx, types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
@@ -671,12 +671,12 @@ func (s *composeService) checkForBindMount(project *types.Project) map[string][]
 	return allFindings
 }
 
-func (s *composeService) checkForSensitiveData(ctx context.Context, project *types.Project) ([]secrets.DetectedSecret, error) {
+func (s *composeService) checkForSensitiveData(project *types.Project) ([]secrets.DetectedSecret, error) {
 	var allFindings []secrets.DetectedSecret
 	scan := scanner.NewDefaultScanner()
 	// Check all compose files
 	for _, file := range project.ComposeFiles {
-		in, err := composeFileAsByteReader(ctx, file, project)
+		in, err := composeFileAsByteReader(file)
 		if err != nil {
 			return nil, err
 		}
@@ -723,14 +723,10 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 	return allFindings, nil
 }
 
-func composeFileAsByteReader(ctx context.Context, filePath string, project *types.Project) (io.Reader, error) {
-	base, err := loadUnresolvedFile(ctx, project, filePath)
+func composeFileAsByteReader(filePath string) (io.Reader, error) {
+	in, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load compose file %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
 	}
-	in, err := base.MarshalYAML()
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewBuffer(in), nil
+	return bytes.NewReader(in), nil
 }
