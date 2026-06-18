@@ -123,7 +123,7 @@ options:
       value_type: bool
       default_value: "false"
       description: |
-        Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.
+        Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enabled/disabled by setting COMPOSE_MENU environment var.
       deprecated: false
       hidden: false
       experimental: false
