@@ -368,6 +368,85 @@ func TestWatchMultiServices(t *testing.T) {
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
 
+// TestWatchRebuildIgnoresDependencies verifies that when `compose up --watch`
+// rebuilds a service after a file change, the rebuild does NOT cascade to its
+// `depends_on` dependencies.
+//
+// Reproduces docker/compose#13853: `up --build` sets BuildOptions.Deps=true to
+// build images for dependencies on initial startup; the watch rebuild path
+// reused those BuildOptions without resetting Deps, so a single watched
+// service triggered builds for the whole dependency chain.
+//
+// The test scans build progress output between the "Rebuilding service(s)" and
+// "successfully built" markers and asserts only the watched service appears.
+func TestWatchRebuildIgnoresDependencies(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "test_watch_rebuild_deps"
+
+	defer c.cleanupWithDown(t, projectName)
+
+	tmpdir := t.TempDir()
+	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
+	CopyFile(t, filepath.Join("fixtures", "watch", "rebuild-deps.yaml"), composeFilePath)
+
+	testFile := filepath.Join(tmpdir, "test")
+	assert.NilError(t, os.WriteFile(testFile, []byte("initial"), 0o600))
+
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--build", "--watch")
+	buffer := bytes.NewBuffer(nil)
+	cmd.Stdout = buffer
+	cmd.Stderr = buffer
+	watch := icmd.StartCmd(cmd)
+	assert.NilError(t, watch.Error)
+	t.Cleanup(func() {
+		if watch.Cmd.Process != nil {
+			_ = watch.Cmd.Process.Kill()
+		}
+	})
+
+	// Wait until the watcher is actually running. "Watch enabled" is logged
+	// AFTER the initial up (and its build output) is done, so anchoring the
+	// cutoff here keeps initial-build noise out of the rebuild assertions.
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		if strings.Contains(buffer.String(), "Watch enabled") {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for watch to start: %v", buffer.String())
+	}, poll.WithTimeout(120*time.Second))
+
+	// Record the cutoff point in the log buffer so we only inspect output
+	// produced AFTER the file change triggers the rebuild.
+	logCutoff := buffer.Len()
+
+	// Trigger a rebuild of the frontend (only) by modifying the watched file.
+	assert.NilError(t, os.WriteFile(testFile, []byte("updated"), 0o600))
+
+	// Wait until the rebuild is reported as completed.
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		out := buffer.String()
+		if len(out) <= logCutoff {
+			return poll.Continue("no new output yet")
+		}
+		if strings.Contains(out[logCutoff:], `service(s) ["frontend"] successfully built`) {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for rebuild to finish: %v", out[logCutoff:])
+	}, poll.WithTimeout(120*time.Second), poll.WithDelay(time.Second))
+
+	rebuildLog := buffer.String()[logCutoff:]
+
+	// The watch rebuild must only touch the frontend service. The backend is
+	// an upstream dependency and must not be rebuilt.
+	assert.Assert(t, strings.Contains(rebuildLog, `Rebuilding service(s) ["frontend"]`),
+		"expected rebuild of frontend; got:\n%s", rebuildLog)
+	assert.Assert(t, !strings.Contains(rebuildLog, "backend Building"),
+		"backend was unexpectedly rebuilt; got:\n%s", rebuildLog)
+	assert.Assert(t, !strings.Contains(rebuildLog, "backend Built"),
+		"backend was unexpectedly rebuilt; got:\n%s", rebuildLog)
+
+	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
+}
+
 func TestWatchIncludes(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "test_watch_includes"

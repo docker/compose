@@ -634,10 +634,17 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 
 func (s *composeService) rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
-	// restrict the build to ONLY this service, not any of its dependencies
-	options.Build.Services = services
-	options.Build.Progress = string(progressui.PlainMode)
-	options.Build.Out = cutils.GetWriter(func(line string) {
+	// Work on a copy so concurrent watch events don't race on the shared
+	// BuildOptions pointer carried by WatchOptions.
+	buildOpts := *options.Build
+	// Restrict the build to ONLY the watched services, not any of their
+	// dependencies. `up --build` sets Deps=true so initial startup builds
+	// images for depends_on services; here we must reset it, otherwise a
+	// rebuild for service A cascades to its upstream dependency B.
+	buildOpts.Services = services
+	buildOpts.Deps = false
+	buildOpts.Progress = string(progressui.PlainMode)
+	buildOpts.Out = cutils.GetWriter(func(line string) {
 		options.LogTo.Log(api.WatchLogger, line)
 	})
 
@@ -647,7 +654,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	)
 	err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 		func(ctx context.Context) error {
-			imageNameToIdMap, err = s.build(ctx, project, *options.Build, nil)
+			imageNameToIdMap, err = s.build(ctx, project, buildOpts, nil)
 			return err
 		})(ctx)
 	if err != nil {
