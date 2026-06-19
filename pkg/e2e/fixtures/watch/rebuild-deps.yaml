@@ -1,0 +1,19 @@
+services:
+  backend:
+    build:
+      dockerfile_inline: |
+        FROM nginx
+        RUN mkdir /data
+        COPY backend /data/backend
+  frontend:
+    build:
+      dockerfile_inline: |
+        FROM nginx
+        RUN mkdir /data
+        COPY frontend /data/frontend
+    depends_on:
+      - backend
+    develop:
+      watch:
+        - path: frontend
+          action: rebuild

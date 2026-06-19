@@ -368,6 +368,61 @@ func TestWatchMultiServices(t *testing.T) {
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
 
+func TestWatchRebuildIgnoresDependencies(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "test_watch_rebuild_deps"
+
+	defer c.cleanupWithDown(t, projectName)
+
+	tmpdir := t.TempDir()
+	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
+	CopyFile(t, filepath.Join("fixtures", "watch", "rebuild-deps.yaml"), composeFilePath)
+
+	for _, svc := range []string{"backend", "frontend"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(tmpdir, svc), []byte("v1"), 0o600))
+	}
+
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--build", "--watch")
+	buffer := bytes.NewBuffer(nil)
+	cmd.Stdout = buffer
+	watch := icmd.StartCmd(cmd)
+	t.Cleanup(func() {
+		if watch.Cmd.Process != nil {
+			_ = watch.Cmd.Process.Kill()
+		}
+	})
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		if strings.Contains(watch.Stdout(), "Attaching to ") {
+			return poll.Success()
+		}
+		return poll.Continue("%v", watch.Stdout())
+	}, poll.WithTimeout(90*time.Second))
+
+	containerID := func(service string) string {
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps", "-q", service)
+		return strings.TrimSpace(res.Stdout())
+	}
+	backendID := containerID("backend")
+	assert.Assert(t, backendID != "")
+
+	t.Log("editing frontend code only")
+	assert.NilError(t, os.WriteFile(filepath.Join(tmpdir, "frontend"), []byte("v2"), 0o600))
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		cat := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", "frontend", "cat", "/data/frontend")
+		if strings.Contains(cat.Stdout(), "v2") {
+			return poll.Success()
+		}
+		return poll.Continue("%v", cat.Combined())
+	}, poll.WithTimeout(90*time.Second))
+
+	t.Log("backend must not be rebuilt nor recreated")
+	assert.Equal(t, backendID, containerID("backend"))
+
+	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
+}
+
 func TestWatchIncludes(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "test_watch_includes"

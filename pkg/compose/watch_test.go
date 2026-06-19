@@ -180,6 +180,37 @@ func TestWatch_Sync(t *testing.T) {
 	// TODO: there's not a great way to assert that the rebuild attempt happened
 }
 
+func TestSelectWatchServicesIgnoresDependencies(t *testing.T) {
+	project := &types.Project{
+		Name: "myProjectName",
+		Services: types.Services{
+			"backend": {
+				Name: "backend",
+			},
+			"stats": {
+				Name: "stats",
+				DependsOn: types.DependsOnConfig{
+					"backend": {
+						Condition: types.ServiceConditionStarted,
+						Restart:   true,
+						Required:  true,
+					},
+				},
+			},
+		},
+	}
+
+	selected, err := selectWatchServices(project, []string{"stats"})
+	assert.NilError(t, err)
+
+	_, ok := selected.Services["stats"]
+	assert.Assert(t, ok)
+	_, ok = selected.Services["backend"]
+	assert.Assert(t, !ok)
+	assert.Assert(t, len(selected.Services["stats"].DependsOn) == 0)
+	assert.Assert(t, len(project.Services["stats"].DependsOn) != 0)
+}
+
 type fakeSyncer struct {
 	synced chan []*sync.PathMapping
 }

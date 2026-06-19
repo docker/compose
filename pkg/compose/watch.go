@@ -138,6 +138,10 @@ func (s *composeService) Watch(ctx context.Context, project *types.Project, opti
 	return wait()
 }
 
+func selectWatchServices(project *types.Project, services []string) (*types.Project, error) {
+	return project.WithSelectedServices(services, types.IgnoreDependencies)
+}
+
 type watchRule struct {
 	types.Trigger
 	include watch.PathMatcher
@@ -188,7 +192,7 @@ func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 
 func (s *composeService) watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) { //nolint: gocyclo
 	var err error
-	if project, err = project.WithSelectedServices(options.Services); err != nil {
+	if project, err = selectWatchServices(project, options.Services); err != nil {
 		return nil, err
 	}
 	syncer, err := s.getSyncImplementation(project)
@@ -636,6 +640,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
 	// restrict the build to ONLY this service, not any of its dependencies
 	options.Build.Services = services
+	options.Build.Deps = false
 	options.Build.Progress = string(progressui.PlainMode)
 	options.Build.Out = cutils.GetWriter(func(line string) {
 		options.LogTo.Log(api.WatchLogger, line)
