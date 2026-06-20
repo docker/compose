@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
@@ -111,7 +112,11 @@ func (opts upOptions) OnExit() api.Cascade {
 }
 
 func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
-	up := upOptions{}
+	up := upOptions{
+		composeOptions: &composeOptions{
+			ProjectOptions: p,
+		},
+	}
 	create := createOptions{}
 	build := buildOptions{ProjectOptions: p}
 	upCmd := &cobra.Command{
@@ -348,6 +353,20 @@ func runUp(
 			Watch:          upOptions.watch,
 			Services:       services,
 			NavigationMenu: upOptions.navigationMenu && display.Mode != "plain" && dockerCli.In().IsTerminal(),
+		},
+		ReloadProject: func(ctx context.Context) (*types.Project, error) {
+			project, _, err := upOptions.ProjectOptions.ToProject(ctx, dockerCli, backend, services, cli.WithoutEnvironmentResolution)
+			if err != nil {
+				return nil, err
+			}
+			project, err = project.WithServicesEnvironmentResolved(true)
+			if err != nil {
+				return nil, err
+			}
+			if err := createOptions.Apply(project); err != nil {
+				return nil, err
+			}
+			return upOptions.apply(project, services)
 		},
 	})
 }

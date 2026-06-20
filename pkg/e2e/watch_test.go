@@ -447,6 +447,79 @@ func TestWatchRebuildIgnoresDependencies(t *testing.T) {
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
 
+func TestWatchRebuildUsesLatestProjectConfig(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "test_watch_rebuild_config"
+	const serviceName = "web"
+
+	defer c.cleanupWithDown(t, projectName, "--rmi=local")
+
+	tmpdir := t.TempDir()
+	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
+	CopyFile(t, filepath.Join("fixtures", "watch", "rebuild-config.yaml"), composeFilePath)
+	assert.NilError(t, os.WriteFile(filepath.Join(tmpdir, "Dockerfile"), []byte("FROM alpine\nRUN mkdir /data\nCOPY test /data/web\n"), 0o600))
+
+	envFilePath := filepath.Join(tmpdir, "watch.env")
+	assert.NilError(t, os.WriteFile(envFilePath, []byte("VALUE=initial\n"), 0o600))
+	testFile := filepath.Join(tmpdir, "test")
+	assert.NilError(t, os.WriteFile(testFile, []byte("initial"), 0o600))
+
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--build", "--watch")
+	buffer := bytes.NewBuffer(nil)
+	cmd.Stdout = buffer
+	cmd.Stderr = buffer
+	watch := icmd.StartCmd(cmd)
+	assert.NilError(t, watch.Error)
+	t.Cleanup(func() {
+		if watch.Cmd.Process != nil {
+			_ = watch.Cmd.Process.Kill()
+		}
+	})
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		if strings.Contains(buffer.String(), "Watch enabled") {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for watch to start: %v", buffer.String())
+	}, poll.WithTimeout(120*time.Second))
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		res := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", serviceName, "printenv", "VALUE")
+		if strings.Contains(res.Stdout(), "initial") {
+			return poll.Success()
+		}
+		return poll.Continue("expected initial VALUE before rebuild, got: %v", res.Combined())
+	}, poll.WithTimeout(30*time.Second), poll.WithDelay(time.Second))
+
+	logCutoff := buffer.Len()
+	assert.NilError(t, os.WriteFile(envFilePath, []byte("VALUE=updated\n"), 0o600))
+	assert.NilError(t, os.WriteFile(testFile, []byte("updated"), 0o600))
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		out := buffer.String()
+		if len(out) <= logCutoff {
+			return poll.Continue("no rebuild output yet")
+		}
+		if strings.Contains(out[logCutoff:], `service(s) ["web"] successfully built`) {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for rebuild to finish: %v", out[logCutoff:])
+	}, poll.WithTimeout(120*time.Second), poll.WithDelay(time.Second))
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		if watch.Cmd.ProcessState != nil {
+			return poll.Error(fmt.Errorf("watch process exited early: %s", watch.Cmd.ProcessState))
+		}
+		res := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", serviceName, "printenv", "VALUE")
+		if strings.Contains(res.Stdout(), "updated") {
+			return poll.Success()
+		}
+		return poll.Continue("expected updated VALUE after rebuild, got: %v", res.Combined())
+	}, poll.WithTimeout(120*time.Second), poll.WithDelay(time.Second))
+
+	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
+}
+
 func TestWatchIncludes(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "test_watch_includes"

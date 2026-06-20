@@ -180,6 +180,54 @@ func TestWatch_Sync(t *testing.T) {
 	// TODO: there's not a great way to assert that the rebuild attempt happened
 }
 
+func TestProjectForRebuildReloadsLatestConfig(t *testing.T) {
+	staleProject := &types.Project{
+		Name: "myProjectName",
+		Services: types.Services{
+			"web": {
+				Name:        "web",
+				Environment: types.MappingWithEquals{"VALUE": strPtr("initial")},
+				Build:       &types.BuildConfig{},
+				Develop: &types.DevelopConfig{
+					Watch: []types.Trigger{{Action: types.WatchActionRebuild, Path: "test"}},
+				},
+			},
+		},
+	}
+	freshProject := &types.Project{
+		Name: "myProjectName",
+		Services: types.Services{
+			"web": {
+				Name:        "web",
+				Environment: types.MappingWithEquals{"VALUE": strPtr("updated")},
+				Build:       &types.BuildConfig{},
+				Develop: &types.DevelopConfig{
+					Watch: []types.Trigger{{Action: types.WatchActionRebuild, Path: "test"}},
+				},
+			},
+		},
+	}
+
+	reloadCalled := false
+	project, err := projectForRebuild(t.Context(), staleProject, []string{"web"}, api.WatchOptions{
+		ReloadProject: func(ctx context.Context) (*types.Project, error) {
+			reloadCalled = true
+			return freshProject, nil
+		},
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, reloadCalled)
+
+	service, err := project.GetService("web")
+	assert.NilError(t, err)
+	assert.Equal(t, *service.Environment["VALUE"], "updated")
+	assert.Equal(t, service.PullPolicy, types.PullPolicyBuild)
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
 type fakeSyncer struct {
 	synced chan []*sync.PathMapping
 }

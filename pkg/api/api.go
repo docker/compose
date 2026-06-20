@@ -184,10 +184,14 @@ const WatchLogger = "#watch"
 
 // WatchOptions group options of the Watch API
 type WatchOptions struct {
-	Build    *BuildOptions
-	LogTo    LogConsumer
-	Prune    bool
+	Build *BuildOptions
+	LogTo LogConsumer
+	Prune bool
+	// Services passed in the command line to be watched
 	Services []string
+	// ReloadProject reloads the compose project before recreating services after
+	// a rebuild, so long-running watch sessions use current compose/env_file data.
+	ReloadProject func(ctx context.Context) (*types.Project, error)
 }
 
 // BuildOptions group options of the Build API
@@ -337,6 +341,8 @@ type StopOptions struct {
 type UpOptions struct {
 	Create CreateOptions
 	Start  StartOptions
+	// ReloadProject reloads the compose project for long-running up --watch sessions.
+	ReloadProject func(ctx context.Context) (*types.Project, error)
 }
 
 // DownOptions group options of the Down API
