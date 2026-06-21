@@ -6,6 +6,10 @@ services:
         RUN echo "backend_build_marker" > /built
     command: sleep infinity
     init: true
+    develop:
+      watch:
+        - path: backend-trigger
+          action: restart
   frontend:
     build:
       dockerfile_inline: |

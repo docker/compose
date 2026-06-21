@@ -19,6 +19,7 @@ package e2e
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -370,12 +371,12 @@ func TestWatchMultiServices(t *testing.T) {
 
 // TestWatchRebuildIgnoresDependencies verifies that when `compose up --watch`
 // rebuilds a service after a file change, the rebuild does NOT cascade to its
-// `depends_on` dependencies.
+// `depends_on` dependencies, even if those dependencies also have watch rules.
 //
-// Reproduces docker/compose#13853: `up --build` sets BuildOptions.Deps=true to
-// build images for dependencies on initial startup; the watch rebuild path
-// reused those BuildOptions without resetting Deps, so a single watched
-// service triggered builds for the whole dependency chain.
+// Reproduces docker/compose#13717 and docker/compose#13853: `up --build` sets
+// BuildOptions.Deps=true to build images for dependencies on initial startup;
+// the watch rebuild path reused those BuildOptions without resetting Deps, so
+// a single watched service triggered builds for the whole dependency chain.
 //
 // The test scans build progress output between the "Rebuilding service(s)" and
 // "successfully built" markers and asserts only the watched service appears.
@@ -391,6 +392,8 @@ func TestWatchRebuildIgnoresDependencies(t *testing.T) {
 
 	testFile := filepath.Join(tmpdir, "test")
 	assert.NilError(t, os.WriteFile(testFile, []byte("initial"), 0o600))
+	backendTrigger := filepath.Join(tmpdir, "backend-trigger")
+	assert.NilError(t, os.WriteFile(backendTrigger, []byte("initial"), 0o600))
 
 	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--build", "--watch")
 	buffer := bytes.NewBuffer(nil)
@@ -413,6 +416,16 @@ func TestWatchRebuildIgnoresDependencies(t *testing.T) {
 		}
 		return poll.Continue("waiting for watch to start: %v", buffer.String())
 	}, poll.WithTimeout(120*time.Second))
+
+	inspectBackend := func() map[string]any {
+		psRes := c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "ps", "--all", "--format=json", "backend")
+		var backend map[string]any
+		assert.NilError(t, json.Unmarshal([]byte(psRes.Stdout()), &backend),
+			"Invalid `compose ps` JSON: command output: %s", psRes.Combined())
+		return backend
+	}
+	backendBefore := inspectBackend()
+	assert.Equal(t, strings.ToLower(backendBefore["State"].(string)), "running")
 
 	// Record the cutoff point in the log buffer so we only inspect output
 	// produced AFTER the file change triggers the rebuild.
@@ -443,6 +456,10 @@ func TestWatchRebuildIgnoresDependencies(t *testing.T) {
 		"backend was unexpectedly rebuilt; got:\n%s", rebuildLog)
 	assert.Assert(t, !strings.Contains(rebuildLog, "backend Built"),
 		"backend was unexpectedly rebuilt; got:\n%s", rebuildLog)
+
+	backendAfter := inspectBackend()
+	assert.Equal(t, backendAfter["ID"], backendBefore["ID"], "backend container was unexpectedly recreated")
+	assert.Equal(t, strings.ToLower(backendAfter["State"].(string)), "running")
 
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
