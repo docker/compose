@@ -72,6 +72,8 @@ sequenceDiagram
     Compose-)Shell: pulling 75%
     Provider--)Compose: json { "setenv": "URL=http://cloud.com/abcd:1234" }
     Compose-)Compose: set DATABASE_URL
+    Provider--)Compose: json { "rawsetenv": "SECRET_KEY=xxx" }
+    Compose-)Compose: set SECRET_KEY (as-is)
     Provider-)Compose: EOF (command complete) exit 0
     Compose-)Shell: service started
 ```
@@ -128,7 +130,7 @@ The provider is responsible for releasing all resources associated with the serv
 When the user runs `docker compose stop`, Compose invokes `<provider> compose --project-name <NAME> stop <SERVICE>` for each
 provider-backed service in reverse dependency order. The provider should pause the resource without releasing it, so a later
 `docker compose up` can resume it (note that `docker compose start` only restarts existing containers and does not invoke
-provider hooks). Any `setenv` JSON message returned during `stop` is ignored, since dependent services are also stopping.
+provider hooks). Any `setenv` or `rawsetenv` JSON message returned during `stop` is ignored, since dependent services are also stopping.
 
 The `stop` hook is opt-in: Compose invokes it only when the provider declares a `stop` block in its `metadata` subcommand
 output. Providers that do not advertise `stop` in metadata (or do not implement the `metadata` subcommand at all) are
