@@ -1,0 +1,15 @@
+services:
+  test:
+    image: alpine
+    command: env
+    environment:
+      - CLOUD_REGION
+    depends_on:
+      - secrets
+  secrets:
+    provider:
+      type: example-provider
+      options:
+        name: secrets
+        type: test1
+        size: 1
