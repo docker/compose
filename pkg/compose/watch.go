@@ -147,6 +147,19 @@ type watchRule struct {
 
 func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 	hostPath := string(event)
+	// Keep the original path for the HostPath field of the returned PathMapping.
+	originalHostPath := hostPath
+
+	// Resolve the event path to its real path, mirroring the resolution
+	// done in loadDevelopmentConfig when processing the trigger path.
+	// This is necessary because inotify on Linux reports the actual filesystem
+	// path which may differ in case or symlink resolution from the path
+	// as originally specified in the compose file.
+	if realPath, err := filepath.EvalSymlinks(hostPath); err == nil {
+		hostPath = realPath
+	}
+	hostPath = filepath.Clean(hostPath)
+
 	if !pathutil.IsChild(r.Path, hostPath) {
 		return nil
 	}
@@ -181,7 +194,7 @@ func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 		containerPath = path.Join(r.Target, filepath.ToSlash(rel))
 	}
 	return &sync.PathMapping{
-		HostPath:      hostPath,
+		HostPath:      originalHostPath,
 		ContainerPath: containerPath,
 	}
 }
