@@ -61,50 +61,50 @@ example-bar-1   alpine    "/entrypoint.…"   bar        4 seconds ago   exited 
 By default, the `docker compose ps` command uses a table ("pretty") format to
 show the containers. The `--format` flag allows you to specify alternative
 presentations for the output. Currently, supported options are `pretty` (default),
-and `json`, which outputs information about the containers as a JSON array:
+and `json`, which outputs information about the containers as JSON Lines
+(one JSON object per line), aligned with the output of `docker ps --format json`:
 
 ```console
 $ docker compose ps --format json
-[{"ID":"1553b0236cf4d2715845f053a4ee97042c4f9a2ef655731ee34f1f7940eaa41a","Name":"example-bar-1","Command":"/docker-entrypoint.sh nginx -g 'daemon off;'","Project":"example","Service":"bar","State":"exited","Health":"","ExitCode":0,"Publishers":null},{"ID":"f02a4efaabb67416e1ff127d51c4b5578634a0ad5743bd65225ff7d1909a3fa0","Name":"example-foo-1","Command":"/docker-entrypoint.sh nginx -g 'daemon off;'","Project":"example","Service":"foo","State":"running","Health":"","ExitCode":0,"Publishers":[{"URL":"0.0.0.0","TargetPort":80,"PublishedPort":8080,"Protocol":"tcp"}]}]
+{"ID":"1553b0236cf4d2715845f053a4ee97042c4f9a2ef655731ee34f1f7940eaa41a","Name":"example-bar-1","Command":"/docker-entrypoint.sh nginx -g 'daemon off;'","Project":"example","Service":"bar","State":"exited","Health":"","ExitCode":0,"Publishers":null}
+{"ID":"f02a4efaabb67416e1ff127d51c4b5578634a0ad5743bd65225ff7d1909a3fa0","Name":"example-foo-1","Command":"/docker-entrypoint.sh nginx -g 'daemon off;'","Project":"example","Service":"foo","State":"running","Health":"","ExitCode":0,"Publishers":[{"URL":"0.0.0.0","TargetPort":80,"PublishedPort":8080,"Protocol":"tcp"}]}
 ```
 
 The JSON output allows you to use the information in other tools for further
 processing, for example, using the [`jq` utility](https://stedolan.github.io/jq/)
-to pretty-print the JSON:
+to pretty-print each object:
 
 ```console
 $ docker compose ps --format json | jq .
-[
-  {
-    "ID": "1553b0236cf4d2715845f053a4ee97042c4f9a2ef655731ee34f1f7940eaa41a",
-    "Name": "example-bar-1",
-    "Command": "/docker-entrypoint.sh nginx -g 'daemon off;'",
-    "Project": "example",
-    "Service": "bar",
-    "State": "exited",
-    "Health": "",
-    "ExitCode": 0,
-    "Publishers": null
-  },
-  {
-    "ID": "f02a4efaabb67416e1ff127d51c4b5578634a0ad5743bd65225ff7d1909a3fa0",
-    "Name": "example-foo-1",
-    "Command": "/docker-entrypoint.sh nginx -g 'daemon off;'",
-    "Project": "example",
-    "Service": "foo",
-    "State": "running",
-    "Health": "",
-    "ExitCode": 0,
-    "Publishers": [
-      {
-        "URL": "0.0.0.0",
-        "TargetPort": 80,
-        "PublishedPort": 8080,
-        "Protocol": "tcp"
-      }
-    ]
-  }
-]
+{
+  "ID": "1553b0236cf4d2715845f053a4ee97042c4f9a2ef655731ee34f1f7940eaa41a",
+  "Name": "example-bar-1",
+  "Command": "/docker-entrypoint.sh nginx -g 'daemon off;'",
+  "Project": "example",
+  "Service": "bar",
+  "State": "exited",
+  "Health": "",
+  "ExitCode": 0,
+  "Publishers": null
+}
+{
+  "ID": "f02a4efaabb67416e1ff127d51c4b5578634a0ad5743bd65225ff7d1909a3fa0",
+  "Name": "example-foo-1",
+  "Command": "/docker-entrypoint.sh nginx -g 'daemon off;'",
+  "Project": "example",
+  "Service": "foo",
+  "State": "running",
+  "Health": "",
+  "ExitCode": 0,
+  "Publishers": [
+    {
+      "URL": "0.0.0.0",
+      "TargetPort": 80,
+      "PublishedPort": 8080,
+      "Protocol": "tcp"
+    }
+  ]
+}
 ```
 
 ### <a name="status"></a> Filter containers by status (--status)
