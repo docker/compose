@@ -73,21 +73,18 @@ func TestDependsOnMultipleProviders(t *testing.T) {
 
 	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/depends-on-multiple-providers.yaml", "--project-name", projectName, "up")
 	res.Assert(t, icmd.Success)
-	env := getEnv(res.Combined(), false)
+	env := getEnv(res.Combined())
 	assert.Check(t, slices.Contains(env, "PROVIDER1_URL=https://magic.cloud/provider1"), env)
 	assert.Check(t, slices.Contains(env, "PROVIDER2_URL=https://magic.cloud/provider2"), env)
 }
 
-func getEnv(out string, run bool) []string {
+func getEnv(out string) []string {
 	var env []string
 	scanner := bufio.NewScanner(strings.NewReader(out))
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !run && strings.HasPrefix(line, "test-1  | ") {
+		if strings.HasPrefix(line, "test-1  | ") {
 			env = append(env, line[10:])
-		}
-		if run && strings.Contains(line, "=") && len(strings.Split(line, "=")) == 2 {
-			env = append(env, line)
 		}
 	}
 	slices.Sort(env)
