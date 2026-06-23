@@ -94,7 +94,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 				s.Environment[prefix+key] = &val
 			}
 			for key, val := range variables.raw {
-				if existing, ok := s.Environment[key]; ok && existing != nil && *existing != val {
+				if existing, ok := s.Environment[key]; ok && (existing == nil || *existing != val) {
 					logrus.Warnf("provider %q overrides environment variable %q in service %q", service.Name, key, name)
 				}
 				s.Environment[key] = &val

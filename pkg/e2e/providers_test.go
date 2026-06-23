@@ -119,6 +119,42 @@ func TestProviderRawSetEnvOverridesUserEnv(t *testing.T) {
 	assert.Check(t, strings.Contains(res.Combined(), "overrides environment variable"), res.Combined())
 }
 
+func TestProviderRawSetEnvOverridesInheritedEnv(t *testing.T) {
+	provider, err := findExecutable("example-provider")
+	assert.NilError(t, err)
+
+	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	c := NewParallelCLI(t, WithEnv("PATH="+path))
+	const projectName = "rawsetenv-inherit"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv-inherit.yaml", "--project-name", projectName, "up")
+	res.Assert(t, icmd.Success)
+	env := getEnv(res.Combined())
+	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
+	assert.Check(t, strings.Contains(res.Combined(), "overrides environment variable"), res.Combined())
+}
+
+func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
+	provider, err := findExecutable("example-provider")
+	assert.NilError(t, err)
+
+	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	c := NewParallelCLI(t, WithEnv("PATH="+path))
+	const projectName = "rawsetenv-inherit-map"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv-inherit-map.yaml", "--project-name", projectName, "up")
+	res.Assert(t, icmd.Success)
+	env := getEnv(res.Combined())
+	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
+	assert.Check(t, strings.Contains(res.Combined(), "overrides environment variable"), res.Combined())
+}
+
 func getEnv(out string) []string {
 	var env []string
 	scanner := bufio.NewScanner(strings.NewReader(out))
