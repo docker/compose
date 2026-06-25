@@ -47,7 +47,7 @@ func portNotFoundError(protocol string, port uint16, ctr container.Summary) erro
 
 	var containerPorts []string
 	for _, p := range ctr.Ports {
-		containerPorts = append(containerPorts, formatPort(p.Type, p.PublicPort))
+		containerPorts = append(containerPorts, formatPort(p.Type, p.PrivatePort))
 	}
 
 	name := strings.TrimPrefix(ctr.Names[0], "/")
