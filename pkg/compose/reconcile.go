@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -90,6 +91,19 @@ type reconciler struct {
 	// can chain on the existing OpStopContainer instead of emitting a second
 	// one against an already-stopped container.
 	stoppedByPlan map[string]*PlanNode // container ID → existing Stop node
+
+	// recreatedServices is the set of services with at least one container
+	// scheduled for recreation in the current plan. Services iterate in
+	// dependency order, so by the time a dependent is evaluated, all its
+	// parents are final — read by parentNamespaceRecreated to cascade
+	// recreates to dependents that would otherwise hold stale
+	// "container:<old_id>" references.
+	recreatedServices map[string]bool
+
+	// observedContainersByService memoizes ObservedState.containersByService()
+	// (an O(services * containers) build) for expectedConfigHash, which is
+	// called once per service.
+	observedContainersByService map[string]Containers
 }
 
 // reconcile is the main entry point: it builds a Plan from desired vs observed state.
@@ -97,15 +111,17 @@ type reconciler struct {
 // reconciler.prompt field).
 func reconcile(_ context.Context, project *types.Project, observed *ObservedState, options ReconcileOptions, prompt Prompt) (*Plan, error) {
 	r := &reconciler{
-		project:       project,
-		observed:      observed,
-		options:       options,
-		prompt:        prompt,
-		plan:          &Plan{},
-		networkNodes:  map[string]*PlanNode{},
-		volumeNodes:   map[string]*PlanNode{},
-		serviceNodes:  map[string]*PlanNode{},
-		stoppedByPlan: map[string]*PlanNode{},
+		project:                     project,
+		observed:                    observed,
+		options:                     options,
+		prompt:                      prompt,
+		plan:                        &Plan{},
+		networkNodes:                map[string]*PlanNode{},
+		volumeNodes:                 map[string]*PlanNode{},
+		serviceNodes:                map[string]*PlanNode{},
+		stoppedByPlan:               map[string]*PlanNode{},
+		recreatedServices:           map[string]bool{},
+		observedContainersByService: observed.containersByService(),
 	}
 
 	if err := r.reconcileNetworks(); err != nil {
@@ -434,11 +450,18 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		strategy = r.options.Recreate
 	}
 
-	// Sort containers: obsolete first, then by number descending, then reverse
-	// to get the same ordering as the existing convergence code.
-	if err := r.sortContainers(containers, service, strategy); err != nil {
+	// Precompute once per service: mustRecreate is called twice per container
+	// (sortContainers + main loop) and the hash/cascade inputs depend on the
+	// service, not the container.
+	expectedHash, err := serviceHashWithResolvedRefs(service, r.observedContainersByService)
+	if err != nil {
 		return err
 	}
+	parentRecreated := r.parentNamespaceRecreated(service)
+
+	// Sort containers: obsolete first, then by number descending, then reverse
+	// to get the same ordering as the existing convergence code.
+	r.sortContainers(containers, service, expectedHash, parentRecreated, strategy)
 
 	// Collect dependency nodes that container creation should depend on
 	infraDeps := r.infrastructureDeps(service)
@@ -467,12 +490,9 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			continue
 		}
 
-		recreate, err := r.mustRecreate(service, oc, strategy)
-		if err != nil {
-			return err
-		}
-		if recreate {
+		if r.mustRecreate(service, expectedHash, parentRecreated, oc, strategy) {
 			lastNode = r.planRecreateContainer(service, &containers[i], infraDeps)
+			r.recreatedServices[service.Name] = true
 			continue
 		}
 
@@ -513,33 +533,69 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	return nil
 }
 
-// mustRecreate mirrors the existing convergence.mustRecreate logic.
-func (r *reconciler) mustRecreate(expected types.ServiceConfig, oc ObservedContainer, policy string) (bool, error) {
-	if policy == api.RecreateNever {
-		return false, nil
+// mustRecreate decides whether oc must be recreated to match expected. The
+// expectedHash and parentRecreated inputs are precomputed once per service by
+// reconcileService — see expectedConfigHash and parentNamespaceRecreated for
+// the rationale (issue #13878).
+func (r *reconciler) mustRecreate(expected types.ServiceConfig, expectedHash string, parentRecreated bool, oc ObservedContainer, policy string) bool {
+	switch policy {
+	case api.RecreateNever:
+		return false
+	case api.RecreateForce:
+		return true
 	}
-	if policy == api.RecreateForce {
-		return true, nil
+	if parentRecreated {
+		return true
 	}
-	configHash, err := ServiceHash(expected)
-	if err != nil {
-		return false, err
-	}
-	if oc.ConfigHash != configHash {
-		return true, nil
+	if oc.ConfigHash != expectedHash {
+		return true
 	}
 	if oc.ImageDigest != expected.CustomLabels[api.ImageDigestLabel] {
-		return true, nil
+		return true
 	}
-
 	if oc.State == container.StateRunning && r.hasNetworkMismatch(expected, oc) {
-		return true, nil
+		return true
 	}
-	if r.hasVolumeMismatch(expected, oc) {
-		return true, nil
-	}
+	return r.hasVolumeMismatch(expected, oc)
+}
 
-	return false, nil
+// parentNamespaceRecreated reports whether any namespace- or volume-sharing
+// parent of svc has at least one container scheduled for recreation. The
+// parent set is derived from svc itself (network_mode/ipc/pid and volumes_from)
+// rather than depends_on, so the cascade fires only when a stale
+// "container:<id>" reference would otherwise be left behind.
+func (r *reconciler) parentNamespaceRecreated(svc types.ServiceConfig) bool {
+	for _, mode := range []string{svc.NetworkMode, svc.Ipc, svc.Pid} {
+		if name := getDependentServiceFromMode(mode); name != "" && r.recreatedServices[name] {
+			return true
+		}
+	}
+	for _, vol := range svc.VolumesFrom {
+		if strings.HasPrefix(vol, types.ContainerPrefix) {
+			continue
+		}
+		name, _, _ := strings.Cut(vol, ":")
+		if r.recreatedServices[name] {
+			return true
+		}
+	}
+	return false
+}
+
+// serviceHashWithResolvedRefs mirrors what the executor persists at create
+// time: service references (network_mode/ipc/pid: service:X, volumes_from) are
+// resolved against the observed containers snapshot before hashing. On
+// resolution failure (e.g. referenced parent absent) the raw form is hashed —
+// it cannot match the persisted hash either way, so recreation is forced.
+//
+// Only fields mutated by resolveServiceReferences need defensive copying.
+// svc.Networks (a map) is left shared because resolveServiceReferences does
+// not touch it; revisit if that changes.
+func serviceHashWithResolvedRefs(svc types.ServiceConfig, containers map[string]Containers) (string, error) {
+	resolved := svc
+	resolved.VolumesFrom = slices.Clone(svc.VolumesFrom)
+	_ = resolveServiceReferences(&resolved, containers)
+	return ServiceHash(resolved)
 }
 
 // hasNetworkMismatch checks if the container is not connected to all expected networks.
@@ -676,7 +732,9 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 }
 
 // planStopDependents plans stop operations for containers of services that
-// depend on the given service with restart: true.
+// depend on the given service with restart: true. Each emitted Stop is
+// recorded in stoppedByPlan so a later planRecreateContainer for the same
+// dependent reuses it instead of emitting a duplicate Stop.
 func (r *reconciler) planStopDependents(service types.ServiceConfig) []*PlanNode {
 	dependents := r.project.GetDependentsForService(service, func(dep types.ServiceDependency) bool {
 		return dep.Restart
@@ -684,6 +742,9 @@ func (r *reconciler) planStopDependents(service types.ServiceConfig) []*PlanNode
 	var nodes []*PlanNode
 	for _, depName := range dependents {
 		for i, oc := range r.observed.Containers[depName] {
+			if _, already := r.stoppedByPlan[oc.ID]; already {
+				continue
+			}
 			node := r.plan.addNode(Operation{
 				Type:       OpStopContainer,
 				ResourceID: fmt.Sprintf("service:%s:%d", depName, oc.Number),
@@ -691,6 +752,7 @@ func (r *reconciler) planStopDependents(service types.ServiceConfig) []*PlanNode
 				Container:  &r.observed.Containers[depName][i].Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
+			r.stoppedByPlan[oc.ID] = node
 			nodes = append(nodes, node)
 		}
 	}
@@ -726,17 +788,12 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 // sortContainers sorts containers the same way as convergence.go:138-160:
 // obsolete first, then by container number descending, then reversed.
 //
-// mustRecreate is evaluated once per container before sorting, both to avoid
-// quadratic re-evaluation in the comparator and to surface any hashing error
-// instead of silently treating the container as non-obsolete.
-func (r *reconciler) sortContainers(containers []ObservedContainer, service types.ServiceConfig, policy string) error {
+// mustRecreate is evaluated once per container before sorting to avoid
+// quadratic re-evaluation in the comparator.
+func (r *reconciler) sortContainers(containers []ObservedContainer, service types.ServiceConfig, expectedHash string, parentRecreated bool, policy string) {
 	obsolete := make(map[string]bool, len(containers))
 	for _, oc := range containers {
-		o, err := r.mustRecreate(service, oc, policy)
-		if err != nil {
-			return err
-		}
-		obsolete[oc.ID] = o
+		obsolete[oc.ID] = r.mustRecreate(service, expectedHash, parentRecreated, oc, policy)
 	}
 	sort.Slice(containers, func(i, j int) bool {
 		obsi, obsj := obsolete[containers[i].ID], obsolete[containers[j].ID]
@@ -750,7 +807,6 @@ func (r *reconciler) sortContainers(containers []ObservedContainer, service type
 		return containers[i].Summary.Created < containers[j].Summary.Created
 	})
 	slices.Reverse(containers)
-	return nil
 }
 
 // reconcileOrphans plans stop + remove for orphaned containers.
