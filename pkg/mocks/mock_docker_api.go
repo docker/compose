@@ -756,6 +756,26 @@ func (mr *MockAPIClientMockRecorder) ExecStart(arg0, arg1, arg2 any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecStart", reflect.TypeOf((*MockAPIClient)(nil).ExecStart), arg0, arg1, arg2)
 }
 
+// ImageAttestations mocks base method.
+func (m *MockAPIClient) ImageAttestations(arg0 context.Context, arg1 string, arg2 ...client.ImageAttestationsOption) (client.ImageAttestationsResult, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ImageAttestations", varargs...)
+	ret0, _ := ret[0].(client.ImageAttestationsResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ImageAttestations indicates an expected call of ImageAttestations.
+func (mr *MockAPIClientMockRecorder) ImageAttestations(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageAttestations", reflect.TypeOf((*MockAPIClient)(nil).ImageAttestations), varargs...)
+}
+
 // ImageBuild mocks base method.
 func (m *MockAPIClient) ImageBuild(arg0 context.Context, arg1 io.Reader, arg2 client.ImageBuildOptions) (client.ImageBuildResult, error) {
 	m.ctrl.T.Helper()

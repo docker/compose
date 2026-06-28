@@ -48,9 +48,15 @@ const (
 	ErrorType                 = "error"
 	InfoType                  = "info"
 	SetEnvType                = "setenv"
+	RawSetEnvType             = "rawsetenv"
 	DebugType                 = "debug"
 	providerMetadataDirectory = "compose/providers"
 )
+
+type pluginVariables struct {
+	prefixed types.Mapping
+	raw      types.Mapping
+}
 
 var mux sync.Mutex
 
@@ -84,8 +90,14 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	for name, s := range project.Services {
 		if _, ok := s.DependsOn[service.Name]; ok {
 			prefix := strings.ToUpper(service.Name) + "_"
-			for key, val := range variables {
+			for key, val := range variables.prefixed {
 				s.Environment[prefix+key] = &val
+			}
+			for key, val := range variables.raw {
+				if existing, ok := s.Environment[key]; ok && (existing == nil || *existing != val) {
+					logrus.Warnf("provider %q overrides environment variable %q in service %q", service.Name, key, name)
+				}
+				s.Environment[key] = &val
 			}
 			project.Services[name] = s
 		}
@@ -93,7 +105,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	return nil
 }
 
-func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (types.Mapping, error) { //nolint:gocyclo
+func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) { //nolint:gocyclo
 	var action string
 	switch command {
 	case "up":
@@ -106,23 +118,26 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		s.events.On(stoppingEvent(service.Name))
 		action = "stop"
 	default:
-		return nil, fmt.Errorf("unsupported plugin command: %s", command)
+		return pluginVariables{}, fmt.Errorf("unsupported plugin command: %s", command)
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return pluginVariables{}, err
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		return nil, err
+		return pluginVariables{}, err
 	}
 
 	decoder := json.NewDecoder(stdout)
 	defer func() { _ = stdout.Close() }()
 
-	variables := types.Mapping{}
+	variables := pluginVariables{
+		prefixed: types.Mapping{},
+		raw:      types.Mapping{},
+	}
 
 	for {
 		var msg JsonMessage
@@ -131,31 +146,37 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 			break
 		}
 		if err != nil {
-			return nil, err
+			return pluginVariables{}, err
 		}
 		switch msg.Type {
 		case ErrorType:
 			s.events.On(newEvent(service.Name, api.Error, firstLine(msg.Message)))
-			return nil, errors.New(msg.Message)
+			return pluginVariables{}, errors.New(msg.Message)
 		case InfoType:
 			s.events.On(newEvent(service.Name, api.Working, firstLine(msg.Message)))
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
-				return nil, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
 			}
-			variables[key] = val
+			variables.prefixed[key] = val
+		case RawSetEnvType:
+			key, val, found := strings.Cut(msg.Message, "=")
+			if !found {
+				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+			}
+			variables.raw[key] = val
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
-			return nil, fmt.Errorf("invalid response from plugin: %s", msg.Type)
+			return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Type)
 		}
 	}
 
 	err = cmd.Wait()
 	if err != nil {
 		s.events.On(errorEvent(service.Name, err.Error()))
-		return nil, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
+		return pluginVariables{}, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
 	}
 	switch command {
 	case "up":

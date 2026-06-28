@@ -1,7 +1,7 @@
 name: PR Review - Trigger
 on:
   pull_request:
-    types: [ready_for_review, opened]
+    types: [ready_for_review, opened, review_requested]
   pull_request_review_comment:
     types: [created]
 

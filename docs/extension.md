@@ -56,7 +56,8 @@ JSON messages MUST include a `type` and a `message` attribute.
 `type` can be either:
 - `info`: Reports status updates to the user. Compose will render message as the service state in the progress UI
 - `error`: Lets the user know something went wrong with details about the error. Compose will render the message as the reason for the service failure.
-- `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. See next section for further details.
+- `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. The variable is automatically prefixed with the service name. See next section for further details.
+- `rawsetenv`: Same as `setenv`, but the variable is injected as-is without the service name prefix. Useful when applications require exact variable names that cannot be altered.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
 
 ```mermaid
@@ -71,6 +72,8 @@ sequenceDiagram
     Compose-)Shell: pulling 75%
     Provider--)Compose: json { "setenv": "URL=http://cloud.com/abcd:1234" }
     Compose-)Compose: set DATABASE_URL
+    Provider--)Compose: json { "rawsetenv": "SECRET_KEY=xxx" }
+    Compose-)Compose: set SECRET_KEY (as-is)
     Provider-)Compose: EOF (command complete) exit 0
     Compose-)Shell: service started
 ```
@@ -99,6 +102,21 @@ automatically prefixing it with the service name. For example, if `awesomecloud 
 Then the `app` service, which depends on the service managed by the provider, will receive a `DATABASE_URL` environment variable injected
 into its runtime environment.
 
+When the provider command sends a `rawsetenv` JSON message, Compose injects the variable as-is without any prefix:
+```json
+{"type": "rawsetenv", "message": "SECRET_KEY=xxx"}
+```
+The `app` service will receive `SECRET_KEY` exactly as specified, regardless of the provider service name.
+This is useful when injecting secrets or configuration values that must match exact variable names expected by
+applications or frameworks.
+
+Unlike `setenv`, which avoids collisions through automatic prefixing, `rawsetenv` keys are the provider's
+responsibility to keep unique. If a `rawsetenv` key collides with a variable already set on the dependent service,
+the existing value is overwritten and Compose logs a warning. This includes variables declared by the user in the
+service `environment` section as well as values emitted by other providers. Providers that are not linked by a
+`depends_on` relationship may run concurrently, so when several of them emit the same `rawsetenv` key the resulting
+value is not deterministic.
+
 > __Note:__  The `compose up` provider command _MUST_ be idempotent. If resource is already running, the command _MUST_ set
 > the same environment variables to ensure consistent configuration of dependent services.
 
@@ -112,7 +130,7 @@ The provider is responsible for releasing all resources associated with the serv
 When the user runs `docker compose stop`, Compose invokes `<provider> compose --project-name <NAME> stop <SERVICE>` for each
 provider-backed service in reverse dependency order. The provider should pause the resource without releasing it, so a later
 `docker compose up` can resume it (note that `docker compose start` only restarts existing containers and does not invoke
-provider hooks). Any `setenv` JSON message returned during `stop` is ignored, since dependent services are also stopping.
+provider hooks). Any `setenv` or `rawsetenv` JSON message returned during `stop` is ignored, since dependent services are also stopping.
 
 The `stop` hook is opt-in: Compose invokes it only when the provider declares a `stop` block in its `metadata` subcommand
 output. Providers that do not advertise `stop` in metadata (or do not implement the `metadata` subcommand at all) are

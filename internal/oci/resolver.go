@@ -38,23 +38,28 @@ import (
 
 // NewResolver sets up an OCI Resolver based on docker/cli config to provide
 // registry credentials. When transport is non-nil it is used as the HTTP
-// transport for all registry calls (e.g. to route through Docker Desktop's
-// PAC-aware proxy); nil falls back to containerd's default transport.
+// transport for both registry calls and the authorizer's token fetches
+// (e.g. to route both through Docker Desktop's PAC-aware proxy); nil falls
+// back to containerd's default transport.
 func NewResolver(config *configfile.ConfigFile, transport http.RoundTripper, insecureRegistries ...string) remotes.Resolver {
+	authOpts := []docker.AuthorizerOpt{
+		docker.WithAuthCreds(func(host string) (string, string, error) {
+			host = registry.GetAuthConfigKey(host)
+			auth, err := config.GetAuthConfig(host)
+			if err != nil {
+				return "", "", err
+			}
+			if auth.IdentityToken != "" {
+				return "", auth.IdentityToken, nil
+			}
+			return auth.Username, auth.Password, nil
+		}),
+	}
+	if transport != nil {
+		authOpts = append(authOpts, docker.WithAuthClient(&http.Client{Transport: transport}))
+	}
 	opts := []docker.RegistryOpt{
-		docker.WithAuthorizer(docker.NewDockerAuthorizer(
-			docker.WithAuthCreds(func(host string) (string, string, error) {
-				host = registry.GetAuthConfigKey(host)
-				auth, err := config.GetAuthConfig(host)
-				if err != nil {
-					return "", "", err
-				}
-				if auth.IdentityToken != "" {
-					return "", auth.IdentityToken, nil
-				}
-				return auth.Username, auth.Password, nil
-			}),
-		)),
+		docker.WithAuthorizer(docker.NewDockerAuthorizer(authOpts...)),
 		docker.WithPlainHTTP(func(domain string) (bool, error) {
 			// Should be used for testing **only**
 			return slices.Contains(insecureRegistries, domain), nil

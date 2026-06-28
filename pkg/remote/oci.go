@@ -45,7 +45,7 @@ const (
 )
 
 // validatePathInBase ensures a file path is contained within the base directory,
-// as OCI artifacts resources must all live within the same folder.
+// as OCI artifact resources must all live within the same folder.
 func validatePathInBase(base, unsafePath string) error {
 	// Reject paths with path separators regardless of OS
 	if strings.ContainsAny(unsafePath, "\\/") {
@@ -149,7 +149,7 @@ func (g *ociRemoteLoader) Load(ctx context.Context, path string) (string, error)
 		local = filepath.Join(cache, descriptor.Digest.Hex())
 		if _, err = os.Stat(local); os.IsNotExist(err) {
 
-			// a Compose application bundle is published as image index
+			// a Compose application bundle is published as an image index
 			if images.IsIndexType(descriptor.MediaType) {
 				var index spec.Index
 				err = json.Unmarshal(content, &index)
@@ -184,7 +184,7 @@ func (g *ociRemoteLoader) Load(ctx context.Context, path string) (string, error)
 
 			err = g.pullComposeFiles(ctx, local, manifest, ref, resolver)
 			if err != nil {
-				// we need to clean up the directory to be sure we won't let empty files present
+				// we need to clean up the directory to be sure we won't leave empty files behind
 				_ = os.RemoveAll(local)
 				return "", err
 			}

@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,18 +29,13 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
 	"github.com/moby/moby/api/types/container"
-	mmount "github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/utils"
 )
 
 const (
@@ -56,208 +49,6 @@ const (
 // re-creating container, adding or removing replicas, or starting stopped containers.
 // Cross services dependencies are managed by creating services in expected order and updating `service:xx` reference
 // when a service has converged, so dependent ones can be managed with resolved containers references.
-type convergence struct {
-	compose    *composeService
-	services   map[string]Containers
-	networks   map[string]string
-	volumes    map[string]string
-	stateMutex sync.Mutex
-}
-
-func (c *convergence) getObservedState(serviceName string) Containers {
-	c.stateMutex.Lock()
-	defer c.stateMutex.Unlock()
-	return c.services[serviceName]
-}
-
-func (c *convergence) setObservedState(serviceName string, containers Containers) {
-	c.stateMutex.Lock()
-	defer c.stateMutex.Unlock()
-	c.services[serviceName] = containers
-}
-
-func newConvergence(services []string, state Containers, networks map[string]string, volumes map[string]string, s *composeService) *convergence {
-	observedState := map[string]Containers{}
-	for _, s := range services {
-		observedState[s] = Containers{}
-	}
-	for _, c := range state.filter(isNotOneOff) {
-		service := c.Labels[api.ServiceLabel]
-		observedState[service] = append(observedState[service], c)
-	}
-	return &convergence{
-		compose:  s,
-		services: observedState,
-		networks: networks,
-		volumes:  volumes,
-	}
-}
-
-func (c *convergence) apply(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	return InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-
-		// Skip provider services when the caller opted out (e.g. watch rebuild),
-		// since providers were already set up during initial "up".
-		if service.Provider != nil && options.SkipProviders {
-			return nil
-		}
-
-		return tracing.SpanWrapFunc("service/apply", tracing.ServiceOptions(service), func(ctx context.Context) error {
-			strategy := options.RecreateDependencies
-			if slices.Contains(options.Services, name) {
-				strategy = options.Recreate
-			}
-			return c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
-		})(ctx)
-	})
-}
-
-func (c *convergence) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error { //nolint:gocyclo
-	if service.Provider != nil {
-		return c.compose.runPlugin(ctx, project, service, "up")
-	}
-	expected, err := getScale(service)
-	if err != nil {
-		return err
-	}
-	containers := c.getObservedState(service.Name)
-	actual := len(containers)
-	updated := make(Containers, expected)
-
-	eg, ctx := errgroup.WithContext(ctx)
-
-	err = c.resolveServiceReferences(&service)
-	if err != nil {
-		return err
-	}
-
-	sort.Slice(containers, func(i, j int) bool {
-		// select obsolete containers first, so they get removed as we scale down
-		if obsolete, _ := c.mustRecreate(service, containers[i], recreate); obsolete {
-			// i is obsolete, so must be first in the list
-			return true
-		}
-		if obsolete, _ := c.mustRecreate(service, containers[j], recreate); obsolete {
-			// j is obsolete, so must be first in the list
-			return false
-		}
-
-		// For up-to-date containers, sort by container number to preserve low-values in container numbers
-		ni, erri := strconv.Atoi(containers[i].Labels[api.ContainerNumberLabel])
-		nj, errj := strconv.Atoi(containers[j].Labels[api.ContainerNumberLabel])
-		if erri == nil && errj == nil {
-			return ni > nj
-		}
-
-		// If we don't get a container number (?) just sort by creation date
-		return containers[i].Created < containers[j].Created
-	})
-
-	slices.Reverse(containers)
-	for i, ctr := range containers {
-		if i >= expected {
-			// Scale Down
-			// As we sorted containers, obsolete ones and/or highest number will be removed
-			ctr := ctr
-			traceOpts := append(tracing.ServiceOptions(service), tracing.ContainerOptions(ctr)...)
-			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "service/scale/down", traceOpts, func(ctx context.Context) error {
-				return c.compose.stopAndRemoveContainer(ctx, ctr, &service, timeout, false)
-			}))
-			continue
-		}
-
-		mustRecreate, err := c.mustRecreate(service, ctr, recreate)
-		if err != nil {
-			return err
-		}
-		if mustRecreate {
-			err := c.stopDependentContainers(ctx, project, service)
-			if err != nil {
-				return err
-			}
-
-			i, ctr := i, ctr
-			eg.Go(tracing.SpanWrapFuncForErrGroup(ctx, "container/recreate", tracing.ContainerOptions(ctr), func(ctx context.Context) error {
-				recreated, err := c.compose.recreateContainer(ctx, project, service, ctr, inherit, timeout)
-				updated[i] = recreated
-				return err
-			}))
-			continue
-		}
-
-		// Enforce non-diverged containers are running
-		name := getContainerProgressName(ctr)
-		switch ctr.State {
-		case container.StateRunning:
-			c.compose.events.On(newEvent(name, api.Done, api.StatusRunning))
-		case container.StateCreated:
-		case container.StateRestarting:
-		case container.StateExited:
-		default:
-			ctr := ctr
-			eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/start", tracing.ContainerOptions(ctr), func(ctx context.Context) error {
-				return c.compose.startContainer(ctx, ctr)
-			}))
-		}
-		updated[i] = ctr
-	}
-
-	next := nextContainerNumber(containers)
-	for i := 0; i < expected-actual; i++ {
-		// Scale UP
-		number := next + i
-		name := getContainerName(project.Name, service, number)
-		eventOpts := tracing.SpanOptions{trace.WithAttributes(attribute.String("container.name", name))}
-		eg.Go(tracing.EventWrapFuncForErrGroup(ctx, "service/scale/up", eventOpts, func(ctx context.Context) error {
-			opts := createOptions{
-				AutoRemove:        false,
-				AttachStdin:       false,
-				UseNetworkAliases: true,
-				Labels:            mergeLabels(service.Labels, service.CustomLabels),
-			}
-			ctr, err := c.compose.createContainer(ctx, project, service, name, number, opts)
-			updated[actual+i] = ctr
-			return err
-		}))
-		continue
-	}
-
-	err = eg.Wait()
-	c.setObservedState(service.Name, updated)
-	return err
-}
-
-func (c *convergence) stopDependentContainers(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	// Stop dependent containers, so they will be restarted after service is re-created
-	dependents := project.GetDependentsForService(service, func(dependency types.ServiceDependency) bool {
-		return dependency.Restart
-	})
-	if len(dependents) == 0 {
-		return nil
-	}
-	err := c.compose.stop(ctx, project.Name, api.StopOptions{
-		Services: dependents,
-		Project:  project,
-	}, nil)
-	if err != nil {
-		return err
-	}
-
-	for _, name := range dependents {
-		dependentStates := c.getObservedState(name)
-		for i, dependent := range dependentStates {
-			dependent.State = container.StateExited
-			dependentStates[i] = dependent
-		}
-		c.setObservedState(name, dependentStates)
-	}
-	return nil
-}
-
 func getScale(config types.ServiceConfig) (int, error) {
 	scale := config.GetScale()
 	if scale > 1 && config.ContainerName != "" {
@@ -268,21 +59,18 @@ func getScale(config types.ServiceConfig) (int, error) {
 	return scale, nil
 }
 
-// resolveServiceReferences replaces reference to another service with reference to an actual container
-func (c *convergence) resolveServiceReferences(service *types.ServiceConfig) error {
-	err := c.resolveVolumeFrom(service)
-	if err != nil {
+// resolveServiceReferences replaces references to other services with references
+// to actual container IDs. It resolves VolumesFrom, NetworkMode, IPC and PID
+// shared namespaces. The containersByService map provides the observed containers
+// grouped by service name.
+func resolveServiceReferences(service *types.ServiceConfig, containersByService map[string]Containers) error {
+	if err := resolveVolumeFrom(service, containersByService); err != nil {
 		return err
 	}
-
-	err = c.resolveSharedNamespaces(service)
-	if err != nil {
-		return err
-	}
-	return nil
+	return resolveSharedNamespaces(service, containersByService)
 }
 
-func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
+func resolveVolumeFrom(service *types.ServiceConfig, containersByService map[string]Containers) error {
 	for i, vol := range service.VolumesFrom {
 		spec := strings.Split(vol, ":")
 		if len(spec) == 0 {
@@ -293,7 +81,7 @@ func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
 			continue
 		}
 		name := spec[0]
-		dependencies := c.getObservedState(name)
+		dependencies := containersByService[name]
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share volume with service %s: container missing", name)
 		}
@@ -302,108 +90,32 @@ func (c *convergence) resolveVolumeFrom(service *types.ServiceConfig) error {
 	return nil
 }
 
-func (c *convergence) resolveSharedNamespaces(service *types.ServiceConfig) error {
-	resolve := func(field *string, noun string) error {
-		if name := getDependentServiceFromMode(*field); name != "" {
-			dependencies := c.getObservedState(name)
-			if len(dependencies) == 0 {
-				return fmt.Errorf("cannot share %s namespace with service %s: container missing", noun, name)
-			}
-			*field = types.ContainerPrefix + dependencies.sorted()[0].ID
+func resolveSharedNamespaces(service *types.ServiceConfig, containersByService map[string]Containers) error {
+	if name := getDependentServiceFromMode(service.NetworkMode); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
 		}
-		return nil
+		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	if err := resolve(&service.NetworkMode, "network"); err != nil {
-		return err
-	}
-	if err := resolve(&service.Ipc, "IPC"); err != nil {
-		return err
-	}
-	return resolve(&service.Pid, "PID")
-}
-
-func (c *convergence) mustRecreate(expected types.ServiceConfig, actual container.Summary, policy string) (bool, error) {
-	if policy == api.RecreateNever {
-		return false, nil
-	}
-	if policy == api.RecreateForce {
-		return true, nil
-	}
-	configHash, err := ServiceHash(expected)
-	if err != nil {
-		return false, err
-	}
-	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
-	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
-	if configChanged || imageUpdated {
-		return true, nil
+	if name := getDependentServiceFromMode(service.Ipc); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
+		}
+		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	if c.networks != nil && actual.State == "running" {
-		if checkExpectedNetworks(expected, actual, c.networks) {
-			return true, nil
+	if name := getDependentServiceFromMode(service.Pid); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
 		}
+		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
 	}
 
-	if c.volumes != nil {
-		if checkExpectedVolumes(expected, actual, c.volumes) {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func checkExpectedNetworks(expected types.ServiceConfig, actual container.Summary, networks map[string]string) bool {
-	// check the networks container is connected to are the expected ones
-	for net := range expected.Networks {
-		id := networks[net]
-		if id == "swarm" {
-			// corner-case : swarm overlay network isn't visible until a container is attached
-			continue
-		}
-		found := false
-		for _, settings := range actual.NetworkSettings.Networks {
-			if settings.NetworkID == id {
-				found = true
-				break
-			}
-		}
-		if !found {
-			// config is up-to-date but container is not connected to network
-			return true
-		}
-	}
-	return false
-}
-
-func checkExpectedVolumes(expected types.ServiceConfig, actual container.Summary, volumes map[string]string) bool {
-	// check container's volume mounts and search for the expected ones
-	for _, vol := range expected.Volumes {
-		if vol.Type != string(mmount.TypeVolume) {
-			continue
-		}
-		if vol.Source == "" {
-			continue
-		}
-		id := volumes[vol.Source]
-		found := false
-		for _, mount := range actual.Mounts {
-			if mount.Type != mmount.TypeVolume {
-				continue
-			}
-			if mount.Name == id {
-				found = true
-				break
-			}
-		}
-		if !found {
-			// config is up-to-date but container doesn't have volume mounted
-			return true
-		}
-	}
-	return false
+	return nil
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
@@ -611,84 +323,8 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	return ctr, nil
 }
 
-func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	replaced container.Summary, inherit bool, timeout *time.Duration,
-) (created container.Summary, err error) {
-	eventName := getContainerProgressName(replaced)
-	s.events.On(newEvent(eventName, api.Working, "Recreate"))
-	defer func() {
-		if err != nil && ctx.Err() == nil {
-			s.events.On(api.Resource{
-				ID:     eventName,
-				Status: api.Error,
-				Text:   err.Error(),
-			})
-		}
-	}()
-
-	number, err := strconv.Atoi(replaced.Labels[api.ContainerNumberLabel])
-	if err != nil {
-		return created, err
-	}
-
-	var inherited *container.Summary
-	if inherit {
-		inherited = &replaced
-	}
-
-	replacedContainerName := service.ContainerName
-	if replacedContainerName == "" {
-		replacedContainerName = service.Name + api.Separator + strconv.Itoa(number)
-	}
-	name := getContainerName(project.Name, service, number)
-	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
-	opts := createOptions{
-		AutoRemove:        false,
-		AttachStdin:       false,
-		UseNetworkAliases: true,
-		Labels:            mergeLabels(service.Labels, service.CustomLabels).Add(api.ContainerReplaceLabel, replacedContainerName),
-	}
-	created, err = s.createMobyContainer(ctx, project, service, tmpName, number, inherited, opts)
-	if err != nil {
-		return created, err
-	}
-
-	timeoutInSecond := utils.DurationSecondToInt(timeout)
-	_, err = s.apiClient().ContainerStop(ctx, replaced.ID, client.ContainerStopOptions{Timeout: timeoutInSecond})
-	if err != nil {
-		return created, err
-	}
-
-	_, err = s.apiClient().ContainerRemove(ctx, replaced.ID, client.ContainerRemoveOptions{})
-	if err != nil {
-		return created, err
-	}
-
-	_, err = s.apiClient().ContainerRename(ctx, tmpName, client.ContainerRenameOptions{
-		NewName: name,
-	})
-	if err != nil {
-		return created, err
-	}
-
-	s.events.On(newEvent(eventName, api.Done, "Recreated"))
-	return created, err
-}
-
 // force sequential calls to ContainerStart to prevent race condition in engine assigning ports from ranges
 var startMx sync.Mutex
-
-func (s *composeService) startContainer(ctx context.Context, ctr container.Summary) error {
-	s.events.On(newEvent(getContainerProgressName(ctr), api.Working, "Restart"))
-	startMx.Lock()
-	defer startMx.Unlock()
-	_, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
-	if err != nil {
-		return err
-	}
-	s.events.On(newEvent(getContainerProgressName(ctr), api.Done, "Restarted"))
-	return nil
-}
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
 	name string, number int, inherit *container.Summary, opts createOptions,

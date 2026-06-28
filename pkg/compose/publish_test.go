@@ -17,7 +17,9 @@
 package compose
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -134,6 +136,135 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	accept, err := svc.preChecks(t.Context(), project, api.PublishOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, accept, false)
+}
+
+func Test_processFile_optional_env_file_missing(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	composeContent := `name: test
+services:
+  web:
+    image: nginx
+    env_file:
+      - path: missing.env
+        required: false
+`
+	assert.NilError(t, os.WriteFile(composePath, []byte(composeContent), 0o600))
+
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir:  dir,
+		Environment: types.Mapping{},
+		ConfigFiles: []types.ConfigFile{{Filename: composePath}},
+	})
+	assert.NilError(t, err)
+
+	extFiles := map[string]string{}
+	envFiles := map[string]string{}
+	data, err := processFile(t.Context(), composePath, project, extFiles, envFiles)
+	assert.NilError(t, err, "optional missing env file should not cause error")
+
+	// The file is absent so nothing is registered for upload, but its path is still
+	// rewritten to the opaque <hash>.env placeholder so the published artifact never leaks
+	// the publisher's local path and stays consistent with the file-present case. The hash
+	// derives from the path string alone, so it is deterministic regardless of existence.
+	assert.Equal(t, len(envFiles), 0, "missing optional env file is not registered for upload")
+	envPath := project.Services["web"].EnvFiles[0].Path
+	hash := fmt.Sprintf("%x.env", sha256.Sum256([]byte(envPath)))
+	assert.Assert(t, strings.Contains(string(data), hash), "published YAML should reference the hash placeholder")
+	assert.Assert(t, !strings.Contains(string(data), "path: missing.env"), "published YAML must not leak the local path")
+	assert.Assert(t, strings.Contains(string(data), "required: false"), "optional flag must be preserved")
+}
+
+func Test_processFile_optional_env_file_present(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, "app.env")
+	assert.NilError(t, os.WriteFile(envPath, []byte("FOO=bar\n"), 0o600))
+
+	composePath := filepath.Join(dir, "compose.yaml")
+	composeContent := `name: test
+services:
+  web:
+    image: nginx
+    env_file:
+      - path: app.env
+        required: false
+`
+	assert.NilError(t, os.WriteFile(composePath, []byte(composeContent), 0o600))
+
+	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
+		WorkingDir:  dir,
+		Environment: types.Mapping{},
+		ConfigFiles: []types.ConfigFile{{Filename: composePath}},
+	})
+	assert.NilError(t, err)
+
+	extFiles := map[string]string{}
+	envFiles := map[string]string{}
+	_, err = processFile(t.Context(), composePath, project, extFiles, envFiles)
+	assert.NilError(t, err)
+	assert.Equal(t, len(envFiles), 1, "present optional env file should be added")
+}
+
+func Test_checkForSensitiveData_optional_env_file_missing(t *testing.T) {
+	dir := t.TempDir()
+	project := &types.Project{
+		Services: types.Services{
+			"web": {
+				Name:  "web",
+				Image: "nginx",
+				EnvFiles: []types.EnvFile{
+					{Path: filepath.Join(dir, "missing.env"), Required: false},
+				},
+			},
+		},
+	}
+
+	svc := &composeService{}
+	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	assert.NilError(t, err, "optional missing env file should not cause error during scan")
+	assert.Equal(t, len(findings), 0)
+}
+
+func Test_checkForSensitiveData_optional_env_file_present(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, "secrets.env")
+	assert.NilError(t, os.WriteFile(envPath, []byte(`AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"`), 0o600))
+
+	project := &types.Project{
+		Services: types.Services{
+			"web": {
+				Name:  "web",
+				Image: "nginx",
+				EnvFiles: []types.EnvFile{
+					{Path: envPath, Required: false},
+				},
+			},
+		},
+	}
+
+	svc := &composeService{}
+	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Assert(t, len(findings) > 0, "present optional env file should still be scanned for secrets")
+}
+
+func Test_checkForSensitiveData_required_env_file_missing(t *testing.T) {
+	dir := t.TempDir()
+	project := &types.Project{
+		Services: types.Services{
+			"web": {
+				Name:  "web",
+				Image: "nginx",
+				EnvFiles: []types.EnvFile{
+					{Path: filepath.Join(dir, "missing.env"), Required: true},
+				},
+			},
+		},
+	}
+
+	svc := &composeService{}
+	_, err := svc.checkForSensitiveData(t.Context(), project)
+	assert.ErrorContains(t, err, "not found", "required missing env file should fail")
 }
 
 // --- collectEnvCheckFindings: pure detection logic ---

@@ -268,16 +268,17 @@ func (w *ttyWriter) childrenTasks(parent string) iter.Seq[*task] {
 
 // lineData holds pre-computed formatting for a task line
 type lineData struct {
-	spinner     string // rendered spinner with color
-	prefix      string // dry-run prefix if any
-	taskID      string // possibly abbreviated
-	progress    string // progress bar and size info
-	status      string // rendered status with color
-	details     string // possibly abbreviated
-	timer       string // rendered timer with color
-	statusPad   int    // padding before status to align
-	timerPad    int    // padding before timer to align
-	statusColor colorFunc
+	spinner           string // rendered spinner with color
+	prefix            string // dry-run prefix if any
+	taskID            string // possibly abbreviated
+	progress          string // progress bar and (optionally) size info appended
+	progressSizeBytes int    // byte length of the trailing size suffix in progress, 0 if none
+	status            string // rendered status with color
+	details           string // possibly abbreviated
+	timer             string // rendered timer with color
+	statusPad         int    // padding before status to align
+	timerPad          int    // padding before timer to align
+	statusColor       colorFunc
 }
 
 func (w *ttyWriter) print() {
@@ -424,8 +425,8 @@ func (w *ttyWriter) adjustLineWidth(lines []lineData, timerLen int, terminalWidt
 			break
 		}
 
-		// First try to truncate details, then taskID
-		if !truncateDetails(lines, overflow) && !truncateLongestTaskID(lines, overflow, minIDLen) {
+		// Drop ancillary content (details, progress size info) before touching the taskID.
+		if !truncateDetails(lines, overflow) && !truncateProgressSize(lines) && !truncateLongestTaskID(lines, overflow, minIDLen) {
 			break // Can't truncate further
 		}
 	}
@@ -448,7 +449,7 @@ func maxBeforeStatusWidth(lines []lineData) int {
 	var maxWidth int
 	for i := range lines {
 		l := &lines[i]
-		width := 3 + lenAnsi(l.prefix) + len(l.taskID) + lenAnsi(l.progress)
+		width := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
 		if width > maxWidth {
 			maxWidth = width
 		}
@@ -476,6 +477,32 @@ func computeOverflow(lines []lineData, maxBeforeStatus, maxStatusLen, timerLen, 
 	return maxOverflow
 }
 
+// truncateProgressSize drops the trailing "X.XMB / Y.YMB" size info from the
+// line currently driving maxBeforeStatusWidth — only that line's shrink can
+// reduce overflow. Returns true if any line was modified.
+func truncateProgressSize(lines []lineData) bool {
+	maxIdx := -1
+	var maxWidth int
+	for i := range lines {
+		l := &lines[i]
+		if l.progressSizeBytes == 0 {
+			continue
+		}
+		w := lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
+		if maxIdx < 0 || w > maxWidth {
+			maxWidth = w
+			maxIdx = i
+		}
+	}
+	if maxIdx < 0 {
+		return false
+	}
+	l := &lines[maxIdx]
+	l.progress = l.progress[:len(l.progress)-l.progressSizeBytes]
+	l.progressSizeBytes = 0
+	return true
+}
+
 // truncateDetails tries to truncate the first line's details to reduce overflow.
 // Returns true if any truncation was performed.
 func truncateDetails(lines []lineData, overflow int) bool {
@@ -494,13 +521,14 @@ func truncateDetails(lines []lineData, overflow int) bool {
 }
 
 // truncateLongestTaskID truncates the longest taskID to reduce overflow.
-// Returns true if truncation was performed.
+// Returns true if truncation was performed. Lengths and slicing are in runes
+// to avoid emitting invalid UTF-8 when taskID contains multi-byte chars.
 func truncateLongestTaskID(lines []lineData, overflow, minIDLen int) bool {
 	longestIdx := -1
 	longestLen := minIDLen
 	for i := range lines {
-		if len(lines[i].taskID) > longestLen {
-			longestLen = len(lines[i].taskID)
+		if utf8.RuneCountInString(lines[i].taskID) > longestLen {
+			longestLen = utf8.RuneCountInString(lines[i].taskID)
 			longestIdx = i
 		}
 	}
@@ -511,10 +539,9 @@ func truncateLongestTaskID(lines []lineData, overflow, minIDLen int) bool {
 
 	l := &lines[longestIdx]
 	reduction := overflow + 3 // account for "..."
-	newLen := max(len(l.taskID)-reduction, minIDLen-3)
-	if newLen > 0 {
-		l.taskID = l.taskID[:newLen] + "..."
-	}
+	newLen := max(longestLen-reduction, minIDLen-3)
+	runes := []rune(l.taskID)
+	l.taskID = string(runes[:newLen]) + "..."
 	return true
 }
 
@@ -560,22 +587,26 @@ func (w *ttyWriter) prepareLineData(t *task) lineData {
 	}
 
 	var progress string
+	var progressSizeBytes int
 	if len(completion) > 0 {
 		progress = " [" + SuccessColor(strings.Join(completion, "")) + "]"
 		if !hideDetails {
-			progress += fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
+			sizeInfo := fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
+			progress += sizeInfo
+			progressSizeBytes = len(sizeInfo)
 		}
 	}
 
 	return lineData{
-		spinner:     spinner(t),
-		prefix:      prefix,
-		taskID:      t.ID,
-		progress:    progress,
-		status:      t.text,
-		statusColor: colorFn(t.status),
-		details:     t.details,
-		timer:       fmt.Sprintf("%.1fs", elapsed),
+		spinner:           spinner(t),
+		prefix:            prefix,
+		taskID:            t.ID,
+		progress:          progress,
+		progressSizeBytes: progressSizeBytes,
+		status:            t.text,
+		statusColor:       colorFn(t.status),
+		details:           t.details,
+		timer:             fmt.Sprintf("%.1fs", elapsed),
 	}
 }
 

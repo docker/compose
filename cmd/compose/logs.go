@@ -62,15 +62,18 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	}
 	flags := logsCmd.Flags()
 	flags.BoolVarP(&opts.follow, "follow", "f", false, "Follow log output")
+	flags.SetAnnotation("follow", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/#follow"}) //nolint:errcheck
 	flags.IntVar(&opts.index, "index", 0, "index of the container if service has multiple replicas")
 	flags.StringVar(&opts.since, "since", "", "Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
-	flags.SetAnnotation("since", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/"}) //nolint:errcheck
+	flags.SetAnnotation("since", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/#since"}) //nolint:errcheck
 	flags.StringVar(&opts.until, "until", "", "Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
 	flags.SetAnnotation("until", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/#until"}) //nolint:errcheck
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output")
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs")
 	flags.BoolVarP(&opts.timestamps, "timestamps", "t", false, "Show timestamps")
+	flags.SetAnnotation("timestamps", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/#timestamps"}) //nolint:errcheck
 	flags.StringVarP(&opts.tail, "tail", "n", "all", "Number of lines to show from the end of the logs for each container")
+	flags.SetAnnotation("tail", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/#tail"}) //nolint:errcheck
 	return logsCmd
 }
 

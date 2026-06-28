@@ -19,6 +19,7 @@ package display
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -269,6 +270,69 @@ func TestAdjustLineWidth_TaskIDCorrectlyTruncated(t *testing.T) {
 	assert.Assert(t, strings.HasSuffix(lines[0].taskID, "..."), "truncated taskID should end with ...")
 }
 
+// TestAdjustLineWidth_MultiByteTaskIDFits guards against drift between
+// applyPadding (rune-based) and maxBeforeStatusWidth (formerly byte-based):
+// a byte-based measurement falsely flags overflow for multi-byte taskIDs.
+func TestAdjustLineWidth_MultiByteTaskIDFits(t *testing.T) {
+	w := &ttyWriter{}
+	taskID := "Image 测试测试" // 10 runes, 18 bytes
+	lines := []lineData{{
+		taskID: taskID,
+		status: "Pulling",
+	}}
+
+	// terminalWidth=30 fits in runes (3+10+1+7+1+4 = 26) but not in bytes
+	// (3+18+1+7+1+4 = 34), so a byte-based measurement would truncate.
+	w.adjustLineWidth(lines, 4, 30)
+
+	assert.Equal(t, taskID, lines[0].taskID,
+		"taskID should not be modified when it fits terminal width in runes")
+}
+
+// TestTruncateLongestTaskID_PreservesValidUTF8 verifies that when truncation
+// of a multi-byte UTF-8 taskID is genuinely required, the resulting string
+// remains valid UTF-8. Byte-indexed slicing can land mid-rune and emit
+// replacement characters (�) into the rendered output.
+func TestTruncateLongestTaskID_PreservesValidUTF8(t *testing.T) {
+	taskID := "Image 测试测试测试测试" // 14 runes, 30 bytes
+	lines := []lineData{{taskID: taskID}}
+
+	truncateLongestTaskID(lines, 8, 10)
+
+	assert.Assert(t, utf8.ValidString(lines[0].taskID),
+		"truncated taskID must remain valid UTF-8, got %q", lines[0].taskID)
+	assert.Assert(t, strings.HasSuffix(lines[0].taskID, "..."),
+		"truncated taskID should end with ..., got %q", lines[0].taskID)
+}
+
+// TestTruncateProgressSize_PicksWidestLine verifies that dropping the size
+// suffix targets the line currently driving maxBeforeStatusWidth (the only
+// line whose shrink can reduce overflow), preserving size info on narrower
+// lines that are not the bottleneck.
+func TestTruncateProgressSize_PicksWidestLine(t *testing.T) {
+	narrowSuffix := " 5MB / 10MB"
+	wideSuffix := " 50MB / 100MB"
+	lines := []lineData{
+		{
+			taskID:            "Image short",
+			progress:          " [⣿⣿]" + narrowSuffix,
+			progressSizeBytes: len(narrowSuffix),
+		},
+		{
+			taskID:            "Image very-long-named-task",
+			progress:          " [⣿⣿⣿⣿⣿⣿⣿⣿]" + wideSuffix,
+			progressSizeBytes: len(wideSuffix),
+		},
+	}
+
+	truncateProgressSize(lines)
+
+	assert.Equal(t, 0, lines[1].progressSizeBytes,
+		"widest line should lose its size suffix first")
+	assert.Equal(t, len(narrowSuffix), lines[0].progressSizeBytes,
+		"narrower line should retain its size suffix")
+}
+
 func TestAdjustLineWidth_NoTruncationNeeded(t *testing.T) {
 	w := &ttyWriter{}
 	originalDetails := "short"
@@ -502,5 +566,105 @@ func TestDoneDeadlockFix(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Deadlock detected: Done() did not complete within 5 seconds")
+	}
+}
+
+// TestAdjustLineWidth_WideProgressForcesSizeInfoDrop is the unit-level
+// regression test for docker/compose#13595. When progress contains the
+// " X.XMB / Y.YMB" size suffix and the bar makes beforeStatus large enough
+// to overflow terminalWidth, taskID truncation alone cannot make the line
+// fit: applyPadding's max(timerPad, 1) floor adds one char back, and the
+// "..."-padding minimum (10 chars) on taskID puts a lower bound on
+// beforeStatus. The size info portion of progress must therefore be
+// droppable when overflow can't be eliminated otherwise.
+func TestAdjustLineWidth_WideProgressForcesSizeInfoDrop(t *testing.T) {
+	w := &ttyWriter{}
+	// Mirror prepareLineData's layout: " [bar]" + " %7s / %-7s".
+	sizeSuffix := "    50MB / 100MB  "
+	progress := " [" + strings.Repeat("⣿", 30) + "]" + sizeSuffix
+	lines := []lineData{{
+		taskID:            "Image mariadb:11",
+		progress:          progress,
+		progressSizeBytes: len(sizeSuffix),
+		status:            "Pulling",
+		statusColor:       nocolor,
+		spinner:           " ",
+		timer:             "5.4s",
+	}}
+
+	terminalWidth := 60
+	timerLen := 4
+	w.adjustLineWidth(lines, timerLen, terminalWidth)
+	w.applyPadding(lines, terminalWidth, timerLen)
+
+	rendered := strings.TrimRight(lineText(lines[0]), "\n")
+	assert.Assert(t, lenAnsi(rendered) <= terminalWidth,
+		"line length %d should not exceed terminal width %d: %q",
+		lenAnsi(rendered), terminalWidth, rendered)
+}
+
+// addParentWithDownloadingChildren wires a parent task with N children whose
+// non-zero totals trigger the " X.XMB / Y.YMB" suffix in prepareLineData's
+// progress field. Used by the multi-render regression test below.
+func addParentWithDownloadingChildren(w *ttyWriter, parentID string, children int, totalBytes int64) {
+	parent := &task{
+		ID:        parentID,
+		parents:   make(map[string]struct{}),
+		startTime: time.Now(),
+		text:      "Pulling",
+		status:    api.Working,
+		spinner:   NewSpinner(),
+	}
+	w.tasks[parent.ID] = parent
+	w.ids = append(w.ids, parent.ID)
+	for i := range children {
+		c := &task{
+			ID:        fmt.Sprintf("%s/layer%d", parentID, i),
+			parents:   map[string]struct{}{parent.ID: {}},
+			startTime: time.Now(),
+			text:      "Downloading",
+			status:    api.Working,
+			total:     totalBytes / int64(children),
+			current:   totalBytes / int64(children) / 2,
+			percent:   50,
+			spinner:   NewSpinner(),
+		}
+		w.tasks[c.ID] = c
+		w.ids = append(w.ids, c.ID)
+	}
+}
+
+// TestPrintWithDimensions_MultipleRendersFit verifies the cross-render aspect
+// of docker/compose#13595: even a single overflowing line desyncs the cursor
+// on the following tick because aec.Up(numLines) counts logical lines while
+// the terminal wraps visual lines. Use many concurrent parent tasks with
+// wide progress bars in a narrow terminal so adjustLineWidth's truncation
+// loop can't bring every line under terminalWidth without dropping size
+// info from progress.
+func TestPrintWithDimensions_MultipleRendersFit(t *testing.T) {
+	w, buf := newTestWriter()
+	// Two parents so the truncation loop must walk multiple lines; 30 children
+	// per parent makes each progress bar wide enough that taskID truncation
+	// alone can't bring the line under terminalWidth.
+	for i := range 2 {
+		addParentWithDownloadingChildren(w,
+			"Image very-long-name-image-"+string(rune('a'+i))+":v1.2.3",
+			30, 100_000_000)
+	}
+
+	terminalWidth := 60
+	for tick := range 10 {
+		for _, t := range w.tasks {
+			if t.status == api.Working && t.total > 0 {
+				t.current = min(t.current+t.total/10, t.total)
+			}
+		}
+		buf.Reset()
+		w.printWithDimensions(terminalWidth, 24)
+		for i, line := range extractLines(buf) {
+			assert.Assert(t, lenAnsi(line) <= terminalWidth,
+				"tick %d line %d has length %d > terminalWidth %d: %q",
+				tick, i, lenAnsi(line), terminalWidth, line)
+		}
 	}
 }

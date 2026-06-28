@@ -271,6 +271,77 @@ services:
 		"\nExpected:\n%s\nGot:\n%s", expected, actualOutput)
 }
 
+func TestExtractInterpolationVariablesFromModelAllowsTemplatedPortFields(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cli := mocks.NewMockCli(ctrl)
+
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	assert.NilError(t, os.WriteFile(composePath, []byte(`
+name: remote-defaults
+services:
+  web:
+    image: nginx
+    ports:
+      - host_ip: "${LXKNS_ADDRESS:-127.0.0.1}"
+        published: "${LXKNS_PORT:-5010}"
+        target: 80
+        protocol: tcp
+`), 0o600))
+
+	projectOptions := &ProjectOptions{
+		ConfigPaths: []string{composePath},
+		ProjectDir:  dir,
+	}
+	info, noVariables, err := extractInterpolationVariablesFromModel(t.Context(), cli, projectOptions, []string{})
+	assert.NilError(t, err)
+	assert.Assert(t, noVariables == false)
+
+	values := map[string]string{}
+	for _, variable := range info {
+		values[variable.name] = variable.defaultValue
+	}
+	assert.Equal(t, values["LXKNS_ADDRESS"], "127.0.0.1")
+	assert.Equal(t, values["LXKNS_PORT"], "5010")
+}
+
+func TestRunVariablesAllowsTemplatedPortFields(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	assert.NilError(t, os.WriteFile(composePath, []byte(`
+name: remote-defaults
+services:
+  web:
+    image: nginx
+    ports:
+      - host_ip: "${LXKNS_ADDRESS:-127.0.0.1}"
+        published: "${LXKNS_PORT:-5010}"
+        target: 80
+        protocol: tcp
+`), 0o600))
+
+	buf := new(bytes.Buffer)
+	cli := mocks.NewMockCli(ctrl)
+	cli.EXPECT().Out().Return(streams.NewOut(buf)).AnyTimes()
+
+	opts := configOptions{
+		Format: "json",
+		ProjectOptions: &ProjectOptions{
+			ConfigPaths: []string{composePath},
+			ProjectDir:  dir,
+		},
+	}
+	assert.NilError(t, runVariables(t.Context(), cli, opts, nil))
+
+	output := buf.String()
+	assert.Assert(t, strings.Contains(output, `"LXKNS_ADDRESS"`), output)
+	assert.Assert(t, strings.Contains(output, `"LXKNS_PORT"`), output)
+}
+
 func TestConfirmRemoteIncludes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

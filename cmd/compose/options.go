@@ -27,6 +27,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
@@ -165,7 +166,7 @@ func extractInterpolationVariablesFromModel(ctx context.Context, dockerCli comma
 		ProjectOptions: projectOptions,
 	}
 
-	model, err := opts.ToModel(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
+	model, err := opts.ToModel(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution, cli.WithLoadOptions(loader.WithSkipValidation))
 	if err != nil {
 		return nil, false, err
 	}

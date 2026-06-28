@@ -57,6 +57,20 @@ func (s *composeService) getContainers(ctx context.Context, project string, oneO
 	return containers, nil
 }
 
+// getContainersByService returns all non-oneoff containers for the project, grouped by service name.
+func (s *composeService) getContainersByService(ctx context.Context, projectName string) (map[string]Containers, error) {
+	all, err := s.getContainers(ctx, projectName, oneOffExclude, true)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]Containers{}
+	for _, c := range all.filter(isNotOneOff) {
+		svc := c.Labels[api.ServiceLabel]
+		result[svc] = append(result[svc], c)
+	}
+	return result, nil
+}
+
 func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...string) client.Filters {
 	f := projectFilter(projectName)
 	if len(selectedServices) == 1 {
@@ -157,14 +171,6 @@ func (containers Containers) filter(predicates ...containerPredicate) Containers
 		}
 	}
 	return filtered
-}
-
-func (containers Containers) names() []string {
-	var names []string
-	for _, c := range containers {
-		names = append(names, getCanonicalContainerName(c))
-	}
-	return names
 }
 
 // forEachContainerConcurrent runs fn for every container concurrently and waits for all goroutines.
