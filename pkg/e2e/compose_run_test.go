@@ -272,13 +272,13 @@ func TestLocalComposeRun(t *testing.T) {
 		})
 	})
 
-	t.Run("compose run piped input with --no-TTY=false should fail", func(t *testing.T) {
+	t.Run("compose run piped input with --no-tty=false should fail", func(t *testing.T) {
 		if composeStandaloneMode {
 			t.Skip("Skipping test compose with piped input detection in standalone mode")
 		}
-		// Test that explicitly disabling --no-TTY (i.e., requesting TTY) with piped input fails
+		// Test that explicitly disabling --no-tty (i.e., requesting TTY) with piped input fails
 		// This should also trigger the "input device is not a TTY" error
-		cmd := c.NewCmd("sh", "-c", "echo 'test' | docker compose -f ./fixtures/run-test/piped-test.yaml run --rm --no-TTY=false piped-test")
+		cmd := c.NewCmd("sh", "-c", "echo 'test' | docker compose -f ./fixtures/run-test/piped-test.yaml run --rm --no-tty=false piped-test")
 		res := icmd.RunCmd(cmd)
 
 		res.Assert(t, icmd.Expected{
