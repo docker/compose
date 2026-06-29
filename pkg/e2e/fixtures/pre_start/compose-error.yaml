@@ -1,0 +1,7 @@
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    pre_start:
+      - image: alpine
+        command: sh -c 'exit 17'

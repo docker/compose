@@ -537,37 +537,52 @@ func (s *composeService) startService(ctx context.Context,
 		return fmt.Errorf("service %q has no container to start", service.Name)
 	}
 
-	for _, ctr := range containers.filter(isService(service.Name)) {
-		if ctr.State == container.StateRunning {
-			continue
-		}
-
-		err = s.injectSecrets(ctx, project, service, ctr.ID)
-		if err != nil {
-			return err
-		}
-
-		err = s.injectConfigs(ctx, project, service, ctr.ID)
-		if err != nil {
-			return err
-		}
-
-		eventName := getContainerProgressName(ctr)
-		s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
-		_, err = s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
-		if err != nil {
-			return err
-		}
-
-		for _, hook := range service.PostStart {
-			err = s.runHook(ctx, ctr, service, hook, listener)
-			if err != nil {
-				return err
-			}
-		}
-
-		s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
+	serviceContainers := containers.filter(isService(service.Name), isNotOneOff)
+	toStart := serviceContainers.filter(isNotRunning)
+	if len(toStart) == 0 {
+		return nil
 	}
+
+	// pre_start runs once per service, only when no replica is already running
+	// (e.g. initial up, force-recreate, or spec change). per_replica: false is
+	// the only currently supported mode. Pick the replica with the lowest
+	// container-number so the choice is deterministic regardless of the order
+	// the daemon returns containers in.
+	if len(service.PreStart) > 0 && len(serviceContainers) == len(toStart) {
+		if err := s.runPreStart(ctx, project, service, lowestNumberedContainer(toStart), listener); err != nil {
+			return err
+		}
+	}
+
+	for _, ctr := range toStart {
+		if err := s.startServiceContainer(ctx, project, service, ctr, listener); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *composeService) startServiceContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, ctr container.Summary, listener api.ContainerEventListener) error {
+	if err := s.injectSecrets(ctx, project, service, ctr.ID); err != nil {
+		return err
+	}
+	if err := s.injectConfigs(ctx, project, service, ctr.ID); err != nil {
+		return err
+	}
+
+	eventName := getContainerProgressName(ctr)
+	s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
+	if _, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{}); err != nil {
+		return err
+	}
+
+	for _, hook := range service.PostStart {
+		if err := s.runHook(ctx, ctr, service, hook, listener); err != nil {
+			return err
+		}
+	}
+
+	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
 	return nil
 }
 

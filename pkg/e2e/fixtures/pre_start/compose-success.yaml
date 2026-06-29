@@ -1,0 +1,11 @@
+services:
+  sample:
+    image: alpine
+    command: sh -c 'cat /shared/init.txt && sleep 5'
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo "initialized" > /shared/init.txt'
+volumes:
+  data:

@@ -1,0 +1,12 @@
+services:
+  sample:
+    build:
+      context: .
+    command: sh -c 'cat /shared/marker.txt && sleep 5'
+    volumes:
+      - data:/shared
+    pre_start:
+      # No image specified - must fall back to the service's built image.
+      - command: sh -c 'built-marker > /shared/marker.txt'
+volumes:
+  data:
