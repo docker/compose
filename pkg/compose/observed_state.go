@@ -213,8 +213,11 @@ func (s *ObservedState) setResolvedVolumes(volumes map[string]string) {
 // emitRunningEvents emits "Running" progress events for containers that are already
 // running and have no operations planned for them. This matches the previous behavior
 // where convergence.ensureService emitted runningEvent for up-to-date containers.
-func emitRunningEvents(observed *ObservedState, plan *Plan, events api.EventProcessor) {
-	// Collect all container IDs that appear in the plan
+//
+// Iterates project.Services (not observed.Containers) so that containers of
+// disabled services (e.g. dependencies untouched by `compose run --no-deps`)
+// are not falsely reported as Running — see issue 13882.
+func emitRunningEvents(project *types.Project, observed *ObservedState, plan *Plan, events api.EventProcessor) {
 	planned := map[string]bool{}
 	for _, node := range plan.Nodes {
 		if node.Operation.Container != nil {
@@ -222,8 +225,8 @@ func emitRunningEvents(observed *ObservedState, plan *Plan, events api.EventProc
 		}
 	}
 
-	for _, containers := range observed.Containers {
-		for _, oc := range containers {
+	for _, svc := range project.Services {
+		for _, oc := range observed.Containers[svc.Name] {
 			if oc.State == container.StateRunning && !planned[oc.ID] {
 				events.On(newEvent("Container "+oc.Name, api.Done, api.StatusRunning))
 			}
