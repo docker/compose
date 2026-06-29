@@ -694,11 +694,232 @@ func TestReconcileOrphans(t *testing.T) {
 `)+"\n")
 }
 
+// --- Service-reference resolution tests (issue #13878) ---
+//
+// When a service uses network_mode/ipc/pid: service:X or volumes_from: serviceName,
+// the executor mutates the resolved field to "container:<id>" (or bare ID for
+// volumes_from) before computing and persisting the config-hash. The reconciler
+// must hash the same resolved form so that an unchanged config does not appear
+// as a divergence on the next `up`.
+
+// parentDependentObserved builds an ObservedState containing a "parent" container
+// (running, with its own raw hash) and a "dependent" container whose hash was
+// computed on the resolved form of its service.
+func parentDependentObserved(t *testing.T, parent, dependent types.ServiceConfig) *ObservedState {
+	t.Helper()
+	const parentID = "parent_container_abc123"
+	parentSummary := container.Summary{
+		ID: parentID, State: container.StateRunning,
+		Labels: map[string]string{
+			api.ServiceLabel:         "parent",
+			api.ContainerNumberLabel: "1",
+			api.ConfigHashLabel:      mustServiceHash(t, parent),
+		},
+	}
+	parentObserved := []ObservedContainer{{
+		ID: parentID, Number: 1, State: container.StateRunning,
+		ConfigHash: mustServiceHash(t, parent),
+		Summary:    parentSummary,
+	}}
+	containersByService := map[string]Containers{"parent": {parentSummary}}
+	dependentHash := mustResolvedServiceHash(t, dependent, containersByService)
+	return &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"parent": parentObserved,
+			"dependent": {{
+				ID: "dependent_container_xyz", Number: 1, State: container.StateRunning,
+				ConfigHash: dependentHash,
+				Summary: container.Summary{
+					ID: "dependent_container_xyz", State: container.StateRunning,
+					Labels: map[string]string{
+						api.ServiceLabel:         "dependent",
+						api.ContainerNumberLabel: "1",
+						api.ConfigHashLabel:      dependentHash,
+					},
+				},
+			}},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{},
+	}
+}
+
+// TestReconcileContainers_ServiceReference_NoRecreate covers every reference
+// form mutated by resolveServiceReferences. The volumes_from "container:X"
+// form is included because resolveVolumeFrom strips the prefix — the persisted
+// hash differs from the raw user form even though no service reference is
+// involved.
+func TestReconcileContainers_ServiceReference_NoRecreate(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*types.ServiceConfig)
+	}{
+		{"network_mode_service", func(s *types.ServiceConfig) { s.NetworkMode = "service:parent" }},
+		{"ipc_service", func(s *types.ServiceConfig) { s.Ipc = "service:parent" }},
+		{"pid_service", func(s *types.ServiceConfig) { s.Pid = "service:parent" }},
+		{"volumes_from_service", func(s *types.ServiceConfig) { s.VolumesFrom = []string{"parent"} }},
+		{"volumes_from_container", func(s *types.ServiceConfig) { s.VolumesFrom = []string{"container:some_external"} }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := types.ServiceConfig{Name: "parent", Image: "alpine", Scale: intPtr(1)}
+			dependent := types.ServiceConfig{Name: "dependent", Image: "alpine", Scale: intPtr(1)}
+			tc.mutate(&dependent)
+			project := &types.Project{
+				Name:     "myproject",
+				Services: types.Services{"parent": parent, "dependent": dependent},
+			}
+			plan, err := reconcile(t.Context(), project, parentDependentObserved(t, parent, dependent), defaultReconcileOptions(), noPrompt)
+			assert.NilError(t, err)
+			assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+		})
+	}
+}
+
+// TestReconcileContainers_NamespaceParentRecreated_CascadesToDependent verifies
+// that when a parent service is scheduled for recreation, dependents sharing
+// its namespace (network_mode: service:X) are also recreated. Otherwise the
+// dependent would keep a stale "container:<old_id>" reference at runtime.
+// The implicit depends_on {restart: true} matches what compose-go's normalizer
+// produces for namespace-sharing services, so planStopDependents fires too —
+// the test also asserts the resulting Stop is not duplicated.
+func TestReconcileContainers_NamespaceParentRecreated_CascadesToDependent(t *testing.T) {
+	parent := types.ServiceConfig{Name: "parent", Image: "alpine", Scale: intPtr(1)}
+	dependent := types.ServiceConfig{
+		Name: "dependent", Image: "alpine", Scale: intPtr(1), NetworkMode: "service:parent",
+		DependsOn: types.DependsOnConfig{"parent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"parent": parent, "dependent": dependent},
+	}
+	observed := parentDependentObserved(t, parent, dependent)
+	observed.Containers["parent"][0].ConfigHash = "stale_parent_hash"
+	observed.Containers["parent"][0].Summary.Labels[api.ConfigHashLabel] = "stale_parent_hash"
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	planStr := plan.String()
+	assert.Assert(t, strings.Contains(planStr, "service:parent:1, CreateContainer"), "parent must be recreated:\n%s", planStr)
+	assert.Assert(t, strings.Contains(planStr, "service:dependent:1, CreateContainer"), "dependent must cascade-recreate:\n%s", planStr)
+	// One Stop per container — planStopDependents must not duplicate the Stop
+	// emitted by planRecreateContainer for the dependent.
+	assert.Equal(t, strings.Count(planStr, "service:dependent:1, StopContainer"), 1, "duplicate Stop for dependent:\n%s", planStr)
+}
+
+// TestReconcileContainers_MultipleParents_EitherTriggersCascade guards
+// parentNamespaceRecreated against a future refactor that early-returns on a
+// non-matching parent: a dependent sharing namespace with two parents must
+// cascade-recreate when either parent is scheduled for recreation.
+func TestReconcileContainers_MultipleParents_EitherTriggersCascade(t *testing.T) {
+	netParent := types.ServiceConfig{Name: "netparent", Image: "alpine", Scale: intPtr(1)}
+	volParent := types.ServiceConfig{Name: "volparent", Image: "alpine", Scale: intPtr(1)}
+	dependent := types.ServiceConfig{
+		Name: "dependent", Image: "alpine", Scale: intPtr(1),
+		NetworkMode: "service:netparent",
+		VolumesFrom: []string{"volparent"},
+		// Mirrors what compose-go's normalizer injects for namespace-sharing
+		// references, so the dependency graph orders parents before dependent.
+		DependsOn: types.DependsOnConfig{
+			"netparent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
+			"volparent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
+		},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"netparent": netParent, "volparent": volParent, "dependent": dependent},
+	}
+
+	// Build a containersByService map containing both parents so the
+	// dependent's resolved hash can be computed.
+	parents := map[string]Containers{
+		"netparent": {container.Summary{ID: "netparent_id", Labels: map[string]string{api.ServiceLabel: "netparent"}}},
+		"volparent": {container.Summary{ID: "volparent_id", Labels: map[string]string{api.ServiceLabel: "volparent"}}},
+	}
+	dependentHash := mustResolvedServiceHash(t, dependent, parents)
+
+	makeObserved := func(staleService string) *ObservedState {
+		obs := &ObservedState{
+			ProjectName: "myproject",
+			Containers:  map[string][]ObservedContainer{},
+			Networks:    map[string]ObservedNetwork{},
+			Volumes:     map[string]ObservedVolume{},
+		}
+		for name, svc := range map[string]types.ServiceConfig{"netparent": netParent, "volparent": volParent} {
+			hash := mustServiceHash(t, svc)
+			if name == staleService {
+				hash = "stale"
+			}
+			obs.Containers[name] = []ObservedContainer{{
+				ID: name + "_id", Number: 1, State: container.StateRunning, ConfigHash: hash,
+				Summary: container.Summary{
+					ID: name + "_id", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+				},
+			}}
+		}
+		obs.Containers["dependent"] = []ObservedContainer{{
+			ID: "dependent_id", Number: 1, State: container.StateRunning, ConfigHash: dependentHash,
+			Summary: container.Summary{
+				ID: "dependent_id", State: container.StateRunning,
+				Labels: map[string]string{api.ServiceLabel: "dependent", api.ContainerNumberLabel: "1", api.ConfigHashLabel: dependentHash},
+			},
+		}}
+		return obs
+	}
+
+	for _, staleParent := range []string{"netparent", "volparent"} {
+		t.Run("stale_"+staleParent, func(t *testing.T) {
+			plan, err := reconcile(t.Context(), project, makeObserved(staleParent), defaultReconcileOptions(), noPrompt)
+			assert.NilError(t, err)
+			planStr := plan.String()
+			assert.Assert(t, strings.Contains(planStr, "service:dependent:1, CreateContainer"), "dependent must cascade-recreate when %s is recreated:\n%s", staleParent, planStr)
+		})
+	}
+}
+
+// TestReconcileContainers_RegularDependsOn_NoCascade ensures the cascade fires
+// only for namespace/volume-sharing dependencies, not for plain depends_on.
+func TestReconcileContainers_RegularDependsOn_NoCascade(t *testing.T) {
+	parent := types.ServiceConfig{Name: "parent", Image: "alpine", Scale: intPtr(1)}
+	dependent := types.ServiceConfig{
+		Name: "dependent", Image: "alpine", Scale: intPtr(1),
+		DependsOn: types.DependsOnConfig{"parent": {Condition: types.ServiceConditionStarted, Restart: true}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"parent": parent, "dependent": dependent},
+	}
+	observed := parentDependentObserved(t, parent, dependent)
+	observed.Containers["parent"][0].ConfigHash = "stale_parent_hash"
+	observed.Containers["parent"][0].Summary.Labels[api.ConfigHashLabel] = "stale_parent_hash"
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	planStr := plan.String()
+	assert.Assert(t, strings.Contains(planStr, "service:parent:1, CreateContainer"), "parent must be recreated:\n%s", planStr)
+	assert.Assert(t, !strings.Contains(planStr, "service:dependent:1, CreateContainer"), "dependent must NOT recreate without namespace sharing:\n%s", planStr)
+}
+
 // --- Helpers ---
 
 func mustServiceHash(t *testing.T, svc types.ServiceConfig) string {
 	t.Helper()
 	h, err := ServiceHash(svc)
+	assert.NilError(t, err)
+	return h
+}
+
+// mustResolvedServiceHash mirrors what the executor persists at create time:
+// the service references are resolved before hashing. Use it to seed
+// ObservedContainer.ConfigHash in tests involving network_mode/ipc/pid:
+// service:X or volumes_from: serviceName.
+func mustResolvedServiceHash(t *testing.T, svc types.ServiceConfig, containers map[string]Containers) string {
+	t.Helper()
+	h, err := serviceHashWithResolvedRefs(svc, containers)
 	assert.NilError(t, err)
 	return h
 }
