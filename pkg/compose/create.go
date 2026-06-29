@@ -124,7 +124,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	// Emit "Running" events for containers that are already up-to-date,
 	// matching the previous convergence behavior for progress display.
-	emitRunningEvents(observed, plan, s.events)
+	emitRunningEvents(project, observed, plan, s.events)
 
 	return s.executePlan(ctx, project, observed, plan)
 }
