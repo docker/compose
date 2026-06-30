@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -193,4 +194,58 @@ func newFakeSyncer() *fakeSyncer {
 func (f *fakeSyncer) Sync(ctx context.Context, service string, paths []*sync.PathMapping) error {
 	f.synced <- paths
 	return nil
+}
+
+func TestWatchRule_Matches_SymlinkPath(t *testing.T) {
+	// Regression test: when the trigger path is resolved via filepath.EvalSymlinks
+	// during config loading, events from inotify (Linux) may come in through a
+	// symlink path. The event path must be resolved to its real path before
+	// comparison with the trigger path.
+	//
+	// NOTE: On macOS this test cannot reproduce the original case-sensitivity
+	// bug (Issue #13743) because macOS filesystem is case-insensitive. The test
+	// below validates the symlink resolution behavior, which is the same
+	// mechanism that fixes the case-sensitivity bug on Linux.
+	tmpDir := t.TempDir()
+	realDir := tmpDir + "/MyProject/src"
+	err := os.MkdirAll(realDir, 0o755)
+	assert.NilError(t, err)
+
+	err = os.WriteFile(realDir+"/app.js", []byte("console.log('hello')"), 0o644)
+	assert.NilError(t, err)
+
+	// Symlink: link_to_src -> MyProject/src
+	symlinkPath := tmpDir + "/link_to_src"
+	err = os.Symlink(realDir, symlinkPath)
+	assert.NilError(t, err)
+
+	// Resolve the symlink to get the real path — this mirrors what
+	// loadDevelopmentConfig does for the trigger path.
+	resolvedRulePath, err := filepath.EvalSymlinks(symlinkPath)
+	assert.NilError(t, err)
+	resolvedRulePath = filepath.Clean(resolvedRulePath)
+
+	rule := watchRule{
+		Trigger: types.Trigger{
+			Path:   resolvedRulePath,
+			Target: "/app/src",
+			Action: "sync",
+		},
+		include: watch.AnyMatcher{},
+		ignore:  watch.EmptyMatcher{},
+		service: "test",
+	}
+
+	// Event path goes through the symlink; the Matches function should
+	// resolve it to the same real path as the trigger path.
+	eventPathViaSymlink := symlinkPath + "/app.js"
+
+	event := watch.NewFileEvent(eventPathViaSymlink)
+	result := rule.Matches(event)
+	assert.Check(t, result != nil,
+		"event via symlink %s should match resolved rule path %s", eventPathViaSymlink, resolvedRulePath)
+	assert.Check(t, result.HostPath == eventPathViaSymlink,
+		"HostPath should be original event path %s, got %s", eventPathViaSymlink, result.HostPath)
+	assert.Check(t, result.ContainerPath == "/app/src/app.js",
+		"ContainerPath should be /app/src/app.js, got %s", result.ContainerPath)
 }
