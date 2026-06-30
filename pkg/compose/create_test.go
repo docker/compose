@@ -393,7 +393,7 @@ services:
   test:
     volumes:
       - type: bind
-        source: ./data
+        source: .
         target: /data
         bind:
           create_host_path: false
@@ -402,7 +402,7 @@ services:
 			mounts: []mountTypes.Mount{
 				{
 					Type:        "bind",
-					Source:      filepath.Join(pwd, "data"),
+					Source:      pwd,
 					Target:      "/data",
 					BindOptions: &mountTypes.BindOptions{CreateMountpoint: false},
 				},
@@ -483,4 +483,32 @@ volumes:
 			assert.DeepEqual(t, tt.mounts, mounts)
 		})
 	}
+}
+
+func TestBuildContainerVolumesReturnsErrorWhenBindSourceMissingAndCreateHostPathFalse(t *testing.T) {
+	p, err := composeloader.LoadWithContext(t.Context(), composetypes.ConfigDetails{
+		ConfigFiles: []composetypes.ConfigFile{
+			{
+				Filename: "test",
+				Content: []byte(`
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./missing-data
+        target: /data
+        bind:
+          create_host_path: false
+`),
+			},
+		},
+	}, func(options *composeloader.Options) {
+		options.SkipValidation = true
+		options.SkipConsistencyCheck = true
+	})
+	assert.NilError(t, err)
+
+	s := &composeService{}
+	_, _, err = s.buildContainerVolumes(t.Context(), *p, p.Services["test"], nil)
+	assert.ErrorContains(t, err, "bind source path does not exist")
 }

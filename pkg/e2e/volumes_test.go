@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -118,6 +119,38 @@ func TestProjectVolumeBind(t *testing.T) {
 		ret := c.RunDockerOrExitError(t, "exec", "frontend", "bash", "-c", "cat /data/resultfile").Assert(t, icmd.Success)
 		assert.Assert(t, strings.Contains(ret.Stdout(), "SUCCESS"))
 	})
+}
+
+func TestRunDoesNotCreateMissingBindSourceWhenCreateHostPathIsFalse(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "compose-e2e-bind-create-host-path-false"
+
+	projectDir := t.TempDir()
+	missingSource := filepath.Join(projectDir, "tmp", "missing-dir")
+	assert.NilError(t, os.MkdirAll(filepath.Dir(missingSource), 0o755))
+
+	composeFile := filepath.Join(projectDir, "compose.yaml")
+	assert.NilError(t, os.WriteFile(composeFile, []byte(`
+services:
+  should_fail:
+    image: alpine:3.21
+    command: ["true"]
+    volumes:
+      - type: bind
+        source: ./tmp/missing-dir
+        target: /mnt/missing
+        bind:
+          create_host_path: false
+`), 0o600))
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmdNoCheck(t, "-f", composeFile, "--project-name", projectName, "down", "--remove-orphans", "-v", "--timeout=0")
+	})
+
+	res := c.RunDockerComposeCmdNoCheck(t, "-f", composeFile, "--project-name", projectName, "run", "--rm", "should_fail")
+	res.Assert(t, icmd.Expected{ExitCode: 1})
+	assert.Assert(t, strings.Contains(res.Combined(), "bind source path does not exist"), res.Combined())
+	assert.Assert(t, !checkExists(missingSource), "missing bind source %q should not be created", missingSource)
 }
 
 func TestUpSwitchVolumes(t *testing.T) {

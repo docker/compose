@@ -876,22 +876,13 @@ func (s *composeService) buildContainerVolumes(
 	for _, m := range mountOptions {
 		switch m.Type {
 		case mount.TypeBind:
-			// `Mount` is preferred but does not offer option to created host path if missing
-			// so `Bind` API is used here with raw volume string
-			// see https://github.com/moby/moby/issues/43483
-			v := findVolumeByTarget(service.Volumes, m.Target)
-			if v != nil {
-				if v.Type != types.VolumeTypeBind {
-					v.Source = m.Source
-				}
-				if !bindRequiresMountAPI(v.Bind) {
-					source := m.Source
-					if vol := findVolumeByName(p.Volumes, m.Source); vol != nil {
-						source = m.Source
-					}
-					binds = append(binds, toBindString(source, v))
-					continue
-				}
+			bind, ok, err := buildContainerBindMount(p, service, m)
+			if err != nil {
+				return nil, nil, err
+			}
+			if ok {
+				binds = append(binds, bind)
+				continue
 			}
 		case mount.TypeVolume:
 			v := findVolumeByTarget(service.Volumes, m.Target)
@@ -937,6 +928,31 @@ func toBindString(name string, v *types.ServiceVolumeConfig) string {
 	return fmt.Sprintf("%s:%s:%s", name, v.Target, strings.Join(options, ","))
 }
 
+func buildContainerBindMount(p types.Project, service types.ServiceConfig, m mount.Mount) (string, bool, error) {
+	// `Mount` is preferred but does not offer option to created host path if missing
+	// so `Bind` API is used here with raw volume string
+	// see https://github.com/moby/moby/issues/43483
+	v := findVolumeByTarget(service.Volumes, m.Target)
+	if v == nil {
+		return "", false, nil
+	}
+	if v.Type != types.VolumeTypeBind {
+		v.Source = m.Source
+	}
+	if err := validateBindSource(v, m.Source); err != nil {
+		return "", false, err
+	}
+	if bindRequiresMountAPI(v.Bind) {
+		return "", false, nil
+	}
+
+	source := m.Source
+	if vol := findVolumeByName(p.Volumes, m.Source); vol != nil {
+		source = m.Source
+	}
+	return toBindString(source, v), true, nil
+}
+
 func findVolumeByName(volumes types.Volumes, name string) *types.VolumeConfig {
 	for _, vol := range volumes {
 		if vol.Name == name {
@@ -951,6 +967,23 @@ func findVolumeByTarget(volumes []types.ServiceVolumeConfig, target string) *typ
 		if v.Target == target {
 			return &v
 		}
+	}
+	return nil
+}
+
+func validateBindSource(volume *types.ServiceVolumeConfig, source string) error {
+	if volume.Type != types.VolumeTypeBind || volume.Bind == nil || bool(volume.Bind.CreateHostPath) {
+		return nil
+	}
+	return validateBindSourceExists(source)
+}
+
+func validateBindSourceExists(source string) error {
+	if _, err := os.Stat(source); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("invalid mount config for type \"bind\": bind source path does not exist: %s", source)
+		}
+		return fmt.Errorf("failed to stat bind source path %s: %w", source, err)
 	}
 	return nil
 }
