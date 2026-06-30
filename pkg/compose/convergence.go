@@ -154,7 +154,7 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 //nolint:gocyclo
-func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
+func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependent string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
 	if timeout > 0 {
 		withTimeout, cancelFunc := context.WithTimeout(ctx, timeout)
 		defer cancelFunc()
@@ -172,9 +172,9 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		s.events.On(containerEvents(waitingFor, waiting)...)
 		if len(waitingFor) == 0 {
 			if config.Required {
-				return fmt.Errorf("%s is missing dependency %s", dependant, dep)
+				return fmt.Errorf("%s is missing dependency %s", dependent, dep)
 			}
-			logrus.Warnf("%s is missing dependency %s", dependant, dep)
+			logrus.Warnf("%s is missing dependency %s", dependent, dep)
 			continue
 		}
 
