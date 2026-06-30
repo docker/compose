@@ -1,0 +1,21 @@
+networks:
+  default: {}
+  external-net:
+    external: true
+    name: ${EXTERNAL_NETWORK}
+
+services:
+  web:
+    image: busybox
+    command: sleep infinity
+    networks:
+      - default
+      - external-net
+  db:
+    image: busybox
+    command: sleep infinity
+    networks:
+      default: {}
+      external-net:
+        aliases:
+          - db
