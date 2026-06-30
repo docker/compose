@@ -7,8 +7,18 @@ on:
 
 permissions: {}
 
+# Deduplicate simultaneous pull_request events for the same fork PR.
+# When reviewers are requested at the same time, GitHub fires multiple
+# review_requested events. Without this group each event triggers a
+# separate review via workflow_run, producing duplicate reviews.
+concurrency:
+  group: pr-review-trigger-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   save-context:
+    # Only run on fork PRs; skip GitHub App bot accounts (Dependabot, Renovate, etc.) early.
+    if: github.event.pull_request.head.repo.fork && github.event.sender.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
       - name: Save event context
