@@ -39,3 +39,15 @@ func greatestExistingAncestor(path string) (string, error) {
 
 	return path, nil
 }
+
+func greatestExistingAncestors(paths []string) ([]string, error) {
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		newP, err := greatestExistingAncestor(path)
+		if err != nil {
+			return nil, fmt.Errorf("finding ancestor of %s: %w", path, err)
+		}
+		result = append(result, newP)
+	}
+	return result, nil
+}
