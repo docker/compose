@@ -496,6 +496,8 @@ type PublishOptions struct {
 	OCIVersion          OCIVersion
 	// Use plain HTTP to access registry. Should only be used for testing purpose
 	InsecureRegistry bool
+	// Annotations are custom key/value pairs added to the published manifest
+	Annotations map[string]string
 }
 
 func (e Event) String() string {

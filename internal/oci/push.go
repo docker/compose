@@ -94,7 +94,7 @@ func DescriptorForEnvFile(path string, content []byte) v1.Descriptor {
 	}
 }
 
-func PushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion) (v1.Descriptor, error) {
+func PushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion, extraAnnotations map[string]string) (v1.Descriptor, error) {
 	// Check if we need an extra empty layer for the manifest config
 	if ociVersion == api.OCIVersion1_1 || ociVersion == "" {
 		err := push(ctx, resolver, named, v1.DescriptorEmptyJSON)
@@ -113,17 +113,17 @@ func PushManifest(ctx context.Context, resolver remotes.Resolver, named referenc
 
 	if ociVersion != "" {
 		// if a version was explicitly specified, use it
-		return createAndPushManifest(ctx, resolver, named, layerDescriptors, ociVersion)
+		return createAndPushManifest(ctx, resolver, named, layerDescriptors, ociVersion, extraAnnotations)
 	}
 
 	// try to push in the OCI 1.1 format but fallback to OCI 1.0 on 4xx errors
 	// (other than auth) since it's most likely the result of the registry not
 	// having support
-	descriptor, err := createAndPushManifest(ctx, resolver, named, layerDescriptors, api.OCIVersion1_1)
+	descriptor, err := createAndPushManifest(ctx, resolver, named, layerDescriptors, api.OCIVersion1_1, extraAnnotations)
 	var pushErr pusherrors.ErrUnexpectedStatus
 	if errors.As(err, &pushErr) && isNonAuthClientError(pushErr.StatusCode) {
 		// TODO(milas): show a warning here (won't work with logrus)
-		return createAndPushManifest(ctx, resolver, named, layerDescriptors, api.OCIVersion1_0)
+		return createAndPushManifest(ctx, resolver, named, layerDescriptors, api.OCIVersion1_0, extraAnnotations)
 	}
 	return descriptor, err
 }
@@ -137,8 +137,8 @@ func push(ctx context.Context, resolver remotes.Resolver, ref reference.Named, d
 	return Push(ctx, resolver, fullRef, descriptor)
 }
 
-func createAndPushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion) (v1.Descriptor, error) {
-	descriptor, toPush, err := generateManifest(layers, ociVersion)
+func createAndPushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion, extraAnnotations map[string]string) (v1.Descriptor, error) {
+	descriptor, toPush, err := generateManifest(layers, ociVersion, extraAnnotations)
 	if err != nil {
 		return v1.Descriptor{}, err
 	}
@@ -159,7 +159,7 @@ func isNonAuthClientError(statusCode int) bool {
 	return !slices.Contains(clientAuthStatusCodes, statusCode)
 }
 
-func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) (v1.Descriptor, []v1.Descriptor, error) {
+func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion, extraAnnotations map[string]string) (v1.Descriptor, []v1.Descriptor, error) {
 	var toPush []v1.Descriptor
 	var config v1.Descriptor
 	var artifactType string
@@ -194,15 +194,21 @@ func generateManifest(layers []v1.Descriptor, ociCompat api.OCIVersion) (v1.Desc
 		return v1.Descriptor{}, nil, fmt.Errorf("unsupported OCI version: %s", ociCompat)
 	}
 
+	annotations := map[string]string{
+	"org.opencontainers.image.created": time.Now().Format(time.RFC3339),
+	}
+	for k, v := range extraAnnotations {
+		annotations[k] = v
+	}
+
 	manifest, err := json.Marshal(v1.Manifest{
 		Versioned:    specs.Versioned{SchemaVersion: 2},
 		MediaType:    v1.MediaTypeImageManifest,
 		ArtifactType: artifactType,
 		Config:       config,
 		Layers:       layers,
-		Annotations: map[string]string{
-			"org.opencontainers.image.created": time.Now().Format(time.RFC3339),
-		},
+		Annotations:  annotations,
+
 	})
 	if err != nil {
 		return v1.Descriptor{}, nil, err

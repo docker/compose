@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 	"errors"
+	"strings"
+	"fmt"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -38,6 +40,7 @@ type publishOptions struct {
 	assumeYes           bool
 	app                 bool
 	insecureRegistry    bool
+	annotations         []string
 }
 
 func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -59,6 +62,7 @@ func publishCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 	flags.BoolVarP(&opts.assumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts`)
 	flags.BoolVar(&opts.app, "app", false, "Published compose application (includes referenced images)")
 	flags.BoolVar(&opts.insecureRegistry, "insecure-registry", false, "Use insecure registry")
+	flags.StringArrayVar(&opts.annotations, "annotation", nil, "Add custom metadata to the published OCI artifact (format: key=value)")
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		// assumeYes was introduced by mistake as `--y`
 		if name == "y" {
@@ -92,11 +96,33 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		return errors.New("cannot publish compose file with local includes")
 	}
 
+	annotations, err := parseAnnotations(opts.annotations)
+	if err != nil {
+		return err
+	}
+
 	return backend.Publish(ctx, project, repository, api.PublishOptions{
 		ResolveImageDigests: opts.resolveImageDigests || opts.app,
 		Application:         opts.app,
 		OCIVersion:          api.OCIVersion(opts.ociVersion),
 		WithEnvironment:     opts.withEnvironment,
 		InsecureRegistry:    opts.insecureRegistry,
+		Annotations:         annotations,
 	})
+}
+
+//helper function
+func parseAnnotations(raw []string) (map[string]string, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	annotations := make(map[string]string, len(raw))
+	for _, a := range raw {
+		key, value, ok := strings.Cut(a, "=")
+		if !ok || key == "" {
+			return nil, fmt.Errorf("invalid annotation %q: expected format key=value", a)
+		}
+		annotations[key] = value
+	}
+	return annotations, nil
 }
