@@ -60,12 +60,13 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	eg.SetLimit(s.maxConcurrency)
 
 	var (
-		mustBuild         []string
-		pullErrors        = make([]error, len(project.Services))
-		imagesBeingPulled = map[string]string{}
+		mustBuild  []string
+		pullErrors = make([]error, len(project.Services))
 	)
 
-	i := 0
+	targets := collectPullTargets(project)
+
+	// Emit skip events for services that have no image to pull.
 	for name, service := range project.Services {
 		if service.Image == "" {
 			s.events.On(api.Resource{
@@ -73,6 +74,38 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				Status:  api.Done,
 				Text:    "Skipped",
 				Details: "No image to be pulled",
+			})
+		}
+	}
+
+	i := 0
+	for imageRef, target := range targets {
+		service := target.service
+
+		if target.isVolume {
+			if opts.IgnoreBuildable && isServiceImageToBuild(service, project.Services) {
+				s.events.On(api.Resource{
+					ID:      "Image " + imageRef,
+					Status:  api.Done,
+					Text:    "Skipped",
+					Details: "Image can be built",
+				})
+				continue
+			}
+
+			eg.Go(func() error {
+				_, err := s.pullServiceImage(ctx, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				if err != nil {
+					if isServiceImageToBuild(service, project.Services) {
+						mustBuild = append(mustBuild, imageRef)
+						return nil
+					}
+					s.events.On(errorEvent("Image "+imageRef, getUnwrappedErrorMessage(err)))
+					if !opts.IgnoreFailures {
+						return err
+					}
+				}
+				return nil
 			})
 			continue
 		}
@@ -106,12 +139,6 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			})
 			continue
 		}
-
-		if _, ok := imagesBeingPulled[service.Image]; ok {
-			continue
-		}
-
-		imagesBeingPulled[service.Image] = service.Name
 
 		idx := i
 		eg.Go(func() error {
@@ -148,6 +175,44 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		return nil
 	}
 	return errors.Join(pullErrors...)
+}
+
+// pullTarget is an image to be pulled, either from a service definition or a type=image volume source.
+type pullTarget struct {
+	service  types.ServiceConfig
+	isVolume bool
+}
+
+func collectPullTargets(project *types.Project) map[string]pullTarget {
+	targets := map[string]pullTarget{}
+
+	for name, service := range project.Services {
+		for j, vol := range service.Volumes {
+			if vol.Type != types.VolumeTypeImage {
+				continue
+			}
+			if _, exists := targets[vol.Source]; exists {
+				continue
+			}
+			targets[vol.Source] = pullTarget{
+				service: types.ServiceConfig{
+					Name:  fmt.Sprintf("%s:volume %d", name, j),
+					Image: vol.Source,
+				},
+				isVolume: true,
+			}
+		}
+
+		// Service entry overwrites any volume-only entry for the same ref.
+		if service.Image != "" {
+			targets[service.Image] = pullTarget{
+				service:  service,
+				isVolume: false,
+			}
+		}
+	}
+
+	return targets
 }
 
 func imageAlreadyPresent(serviceImage string, localImages map[string]api.ImageSummary) bool {
@@ -292,28 +357,22 @@ func encodedAuth(ref reference.Named, configFile authProvider) (string, error) {
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
 	needPull := map[string]types.ServiceConfig{}
-	for name, service := range project.Services {
-		pull, err := mustPull(service, images)
+	for imageRef, target := range collectPullTargets(project) {
+		if target.isVolume {
+			if _, ok := images[imageRef]; !ok {
+				needPull[target.service.Name] = target.service
+			}
+			continue
+		}
+		pull, err := mustPull(target.service, images)
 		if err != nil {
 			return err
 		}
 		if pull {
-			needPull[name] = service
+			needPull[target.service.Name] = target.service
 		}
-		for i, vol := range service.Volumes {
-			if vol.Type == types.VolumeTypeImage {
-				if _, ok := images[vol.Source]; !ok {
-					// Hack: create a fake ServiceConfig so we pull missing volume image
-					n := fmt.Sprintf("%s:volume %d", name, i)
-					needPull[n] = types.ServiceConfig{
-						Name:  n,
-						Image: vol.Source,
-					}
-				}
-			}
-		}
-
 	}
+
 	if len(needPull) == 0 {
 		return nil
 	}
