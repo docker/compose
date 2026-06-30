@@ -1,0 +1,10 @@
+services:
+  web:
+    build: .
+    env_file:
+      - ./watch.env
+    command: tail -f /dev/null
+    develop:
+      watch:
+        - path: test
+          action: rebuild

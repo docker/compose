@@ -128,5 +128,15 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 		LogTo:    consumer,
 		Prune:    watchOpts.prune,
 		Services: services,
+		ReloadProject: func(ctx context.Context) (*types.Project, error) {
+			project, _, err := watchOpts.ToProject(ctx, dockerCli, backend, services)
+			if err != nil {
+				return nil, err
+			}
+			if err := applyPlatforms(project, true); err != nil {
+				return nil, err
+			}
+			return project, nil
+		},
 	})
 }

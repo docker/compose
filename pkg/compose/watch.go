@@ -66,8 +66,9 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, cons
 			return &Watcher{
 				project: project,
 				options: api.WatchOptions{
-					LogTo: consumer,
-					Build: build,
+					LogTo:         consumer,
+					Build:         build,
+					ReloadProject: options.ReloadProject,
 				},
 				watchFn: w,
 				errCh:   make(chan error),
@@ -632,8 +633,51 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 	return nil
 }
 
+func projectForRebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) (*types.Project, error) {
+	var err error
+	if options.ReloadProject != nil {
+		project, err = options.ReloadProject(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("reload compose project: %w", err)
+		}
+	}
+	project, err = project.WithSelectedServices(services)
+	if err != nil {
+		return nil, err
+	}
+	for serviceName, service := range project.Services {
+		if !slices.Contains(services, serviceName) {
+			continue
+		}
+		config := service.Develop
+		if config == nil {
+			config, err = loadDevelopmentConfig(service, project)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if config == nil {
+			continue
+		}
+		for _, trigger := range config.Watch {
+			if trigger.Action == types.WatchActionRebuild {
+				service.PullPolicy = types.PullPolicyBuild
+				project.Services[serviceName] = service
+				break
+			}
+		}
+	}
+	return project, nil
+}
+
 func (s *composeService) rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
+	var err error
+	project, err = projectForRebuild(ctx, project, services, options)
+	if err != nil {
+		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to reload compose project after update. Error: %v", err))
+		return err
+	}
 	// Work on a copy so concurrent watch events don't race on the shared
 	// BuildOptions pointer carried by WatchOptions.
 	buildOpts := *options.Build
@@ -648,10 +692,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 		options.LogTo.Log(api.WatchLogger, line)
 	})
 
-	var (
-		imageNameToIdMap map[string]string
-		err              error
-	)
+	var imageNameToIdMap map[string]string
 	err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 		func(ctx context.Context) error {
 			imageNameToIdMap, err = s.build(ctx, project, buildOpts, nil)
