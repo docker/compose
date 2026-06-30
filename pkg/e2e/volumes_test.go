@@ -172,6 +172,38 @@ func TestUpRecreateVolumes_IgnoreBinds(t *testing.T) {
 	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
 }
 
+func TestUpRecreateVolumes_RecreateLabel(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "compose-e2e-recreate-volumes-recreate-label"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/label-old.yml", "--project-name", projectName, "up", "-d")
+
+	checkVol := func(volumeName string, label string, expected string) {
+		res := c.RunDockerCmd(t, "volume", "inspect",
+			fmt.Sprintf("%s_%s", projectName, volumeName),
+			"-f", fmt.Sprintf("{{ index .Labels \"%s\" }}", label))
+		res.Assert(t, icmd.Expected{Out: expected})
+	}
+
+	checkVol("my_vol", "foo", "bar")
+	checkVol("no_recreate_label", "foo", "bar")
+
+	_ = c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/label-new.yml", "--project-name", projectName, "up", "-d")
+
+	checkVol("my_vol", "foo", "zot")
+	// The no_recreate_label volume should not be recreated, so its label should remain unchanged
+	checkVol("no_recreate_label", "foo", "bar")
+
+	// --yes should recreate the no_recreate_label volume
+	_ = c.RunDockerComposeCmd(t, "-f", "./fixtures/recreate-volumes/label-new.yml", "--project-name", projectName, "up", "--yes", "-d")
+
+	checkVol("my_vol", "foo", "zot")
+	checkVol("no_recreate_label", "foo", "zot")
+}
+
 func TestImageVolume(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "compose-e2e-image-volume"
