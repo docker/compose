@@ -162,6 +162,10 @@ func isNotOneOff(c container.Summary) bool {
 	return !ok || v == "False"
 }
 
+func isNotRunning(c container.Summary) bool {
+	return c.State != container.StateRunning
+}
+
 // filter return Containers with elements to match predicate
 func (containers Containers) filter(predicates ...containerPredicate) Containers {
 	var filtered Containers

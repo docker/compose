@@ -158,21 +158,21 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
-    - option: no-TTY
-      shorthand: T
+    - option: no-deps
       value_type: bool
-      default_value: "true"
-      description: 'Disable pseudo-TTY allocation (default: auto-detected)'
+      default_value: "false"
+      description: Don't start linked services
       deprecated: false
       hidden: false
       experimental: false
       experimentalcli: false
       kubernetes: false
       swarm: false
-    - option: no-deps
+    - option: no-tty
+      shorthand: T
       value_type: bool
-      default_value: "false"
-      description: Don't start linked services
+      default_value: "true"
+      description: 'Disable pseudo-TTY allocation (default: auto-detected)'
       deprecated: false
       hidden: false
       experimental: false

@@ -70,8 +70,8 @@ specified in the service configuration.
 | `-i`, `--interactive`   | `bool`        | `true`   | Keep STDIN open even if not attached                                             |
 | `-l`, `--label`         | `stringArray` |          | Add or override a label                                                          |
 | `--name`                | `string`      |          | Assign a name to the container                                                   |
-| `-T`, `--no-TTY`        | `bool`        | `true`   | Disable pseudo-TTY allocation (default: auto-detected)                           |
 | `--no-deps`             | `bool`        |          | Don't start linked services                                                      |
+| `-T`, `--no-tty`        | `bool`        | `true`   | Disable pseudo-TTY allocation (default: auto-detected)                           |
 | `-p`, `--publish`       | `stringArray` |          | Publish a container's port(s) to the host                                        |
 | `--pull`                | `string`      | `policy` | Pull image before running ("always"\|"missing"\|"never")                         |
 | `-q`, `--quiet`         | `bool`        |          | Don't print anything to STDOUT                                                   |

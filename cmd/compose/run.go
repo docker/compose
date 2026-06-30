@@ -178,12 +178,12 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				options.entrypointCmd = command
 			}
 			if cmd.Flags().Changed("tty") {
-				if cmd.Flags().Changed("no-TTY") {
-					return fmt.Errorf("--tty and --no-TTY can't be used together")
+				if cmd.Flags().Changed("no-tty") {
+					return fmt.Errorf("--tty and --no-tty can't be used together")
 				} else {
 					options.noTty = !ttyFlag
 				}
-			} else if !cmd.Flags().Changed("no-TTY") && !cmd.Flags().Changed("interactive") && !dockerCli.In().IsTerminal() {
+			} else if !cmd.Flags().Changed("no-tty") && !cmd.Flags().Changed("interactive") && !dockerCli.In().IsTerminal() {
 				// while `docker run` requires explicit `-it` flags, Compose enables interactive mode and TTY by default
 				// but when compose is used from a script that has stdin piped from another command, we just can't
 				// Here, we detect we run "by default" (user didn't passed explicit flags) and disable TTY allocation if
@@ -229,7 +229,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 	flags.StringArrayVar(&options.envFiles, "env-from-file", []string{}, "Set environment variables from file")
 	flags.StringArrayVarP(&options.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&options.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&options.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected)")
+	flags.BoolVarP(&options.noTty, "no-tty", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected)")
 	flags.StringVar(&options.name, "name", "", "Assign a name to the container")
 	flags.StringVarP(&options.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&options.workdir, "workdir", "w", "", "Working directory inside the container")
@@ -263,6 +263,8 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		name = "volume"
 	case "labels":
 		name = "label"
+	case "no-TTY":
+		name = "no-tty"
 	}
 	return pflag.NormalizedName(name)
 }
