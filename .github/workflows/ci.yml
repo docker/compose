@@ -304,6 +304,7 @@ jobs:
           files: ./coverage.txt
 
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write # to create a release (ncipollo/release-action)
     runs-on: ubuntu-latest
@@ -329,7 +330,6 @@ jobs:
           find bin/release -type f -exec file -e ascii -- {} +
       -
         name: GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           artifacts: ./bin/release/*
