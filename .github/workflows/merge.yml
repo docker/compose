@@ -39,7 +39,7 @@ jobs:
       cache: true
       cache-scope: bin-image
       output: image
-      push: ${{ github.event_name != 'pull_request' }}
+      push: true # this workflow only triggers on push (main and tags)
       sbom: true
       set-meta-labels: true
       meta-images: |
