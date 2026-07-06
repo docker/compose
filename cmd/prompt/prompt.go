@@ -129,7 +129,14 @@ type Pipe struct {
 // Confirm asks for yes or no input
 func (u Pipe) Confirm(message string, defaultValue bool) (bool, error) {
 	_, _ = fmt.Fprint(u.stdout, message)
-	var answer string
-	_, _ = fmt.Fscanln(u.stdin, &answer)
+	answer, err := bufio.NewReader(u.stdin).ReadString('\n')
+	if err != nil && err != io.EOF {
+		return false, err
+	}
+
+	answer = strings.TrimSpace(answer)
+	if answer == "" {
+		return defaultValue, nil
+	}
 	return utils.StringToBool(answer), nil
 }
