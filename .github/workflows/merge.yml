@@ -1,5 +1,8 @@
 name: merge
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -10,9 +13,6 @@ on:
       - 'main'
     tags:
       - 'v*'
-
-permissions:
-  contents: read # to fetch code (actions/checkout)
 
 env:
   REPO_SLUG: "docker/compose-bin"

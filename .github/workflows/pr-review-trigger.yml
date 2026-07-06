@@ -1,9 +1,4 @@
 name: PR Review - Trigger
-on:
-  pull_request:
-    types: [ready_for_review, opened, review_requested]
-  pull_request_review_comment:
-    types: [created]
 
 permissions: {}
 
@@ -14,6 +9,12 @@ permissions: {}
 concurrency:
   group: pr-review-trigger-${{ github.event.pull_request.number }}
   cancel-in-progress: true
+
+on:
+  pull_request:
+    types: [ready_for_review, opened, review_requested]
+  pull_request_review_comment:
+    types: [created]
 
 jobs:
   save-context:

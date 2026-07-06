@@ -1,17 +1,12 @@
 name: 'Close stale issues'
 
-# Default to 'contents: read', which grants actions to read commits.
-#
-# If any permission is set, any permission not included in the list is
-# implicitly set to "none".
-#
-# see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions
 permissions:
   contents: read
 
 on:
   schedule:
     - cron: '0 0 * * 0,3' # at midnight UTC every Sunday and Wednesday
+
 jobs:
   stale:
     runs-on: ubuntu-latest
@@ -19,7 +14,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # v10
+      - uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # v10.2.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           stale-issue-message: >
@@ -30,4 +25,3 @@ jobs:
           days-before-issue-close: 30 # closes 1 month after being marked with no action
           stale-issue-label: "stale"
           exempt-issue-labels: "kind/feature,kind/enhancement"
-          
