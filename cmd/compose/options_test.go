@@ -403,7 +403,7 @@ func TestConfirmRemoteIncludes(t *testing.T) {
 				"  - oci://registry.example.com/stack:latest\n" +
 				"  - git://github.com/user/repo.git\n" +
 				"\nRemote includes could potentially be malicious. Make sure you trust the source.\n" +
-				"Do you want to continue? [y/N]: ",
+				"Do you want to continue?",
 		},
 		{
 			name: "user rejects remote includes",
@@ -422,7 +422,7 @@ func TestConfirmRemoteIncludes(t *testing.T) {
 			wantOutput: "\nWarning: This Compose project includes files from remote sources:\n" +
 				"  - oci://registry.example.com/stack:latest\n" +
 				"\nRemote includes could potentially be malicious. Make sure you trust the source.\n" +
-				"Do you want to continue? [y/N]: ",
+				"Do you want to continue?",
 		},
 	}
 
