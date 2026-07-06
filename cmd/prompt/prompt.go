@@ -22,7 +22,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/docker/cli/cli/streams"
 
 	"github.com/docker/compose/v5/pkg/utils"
@@ -76,17 +75,7 @@ func (s streamsFileReader) Fd() uintptr {
 
 // Confirm asks for yes or no input
 func (u User) Confirm(message string, defaultValue bool) (bool, error) {
-	qs := &survey.Confirm{
-		Message: message,
-		Default: defaultValue,
-	}
-	var b bool
-	err := survey.AskOne(qs, &b, func(options *survey.AskOptions) error {
-		options.Stdio.In = u.stdin
-		options.Stdio.Out = u.stdout
-		return nil
-	})
-	return b, err
+	return confirm(u.stdin, u.stdout, message, defaultValue)
 }
 
 // Pipe - aggregates prompt methods
@@ -97,8 +86,12 @@ type Pipe struct {
 
 // Confirm asks for yes or no input
 func (u Pipe) Confirm(message string, defaultValue bool) (bool, error) {
-	_, _ = fmt.Fprint(u.stdout, message)
-	answer, err := bufio.NewReader(u.stdin).ReadString('\n')
+	return confirm(u.stdin, u.stdout, message, defaultValue)
+}
+
+func confirm(stdin io.Reader, stdout io.Writer, message string, defaultValue bool) (bool, error) {
+	_, _ = fmt.Fprint(stdout, message)
+	answer, err := bufio.NewReader(stdin).ReadString('\n')
 	if err != nil && err != io.EOF {
 		return false, err
 	}
