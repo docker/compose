@@ -38,7 +38,7 @@ jobs:
           retention-days: 1
 
   validate:
-    uses: docker/docs/.github/workflows/validate-upstream.yml@00aefd5eae73898c4d3bcd7a6fe95a039293706b # main 2026-03-24
+    uses: docker/docs/.github/workflows/validate-upstream.yml@0673854ed9b397cc29b38a9524d2f68b75ec2381 # main 2026-03-24
     needs:
       - docs-yaml
     with:
