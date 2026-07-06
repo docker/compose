@@ -25,3 +25,10 @@ updates:
       - dependency-name: go.opentelemetry.io/*
     schedule:
       interval: daily
+  - package-ecosystem: github-actions
+    open-pull-requests-limit: 10
+    directory: "/"
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 7
