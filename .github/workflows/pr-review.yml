@@ -1,13 +1,17 @@
 name: PR Review
-on:
+
+permissions:
+  contents: read # Required at top-level to give `issue_comment` events access to the secrets below.
+
+# workflow_run is used deliberately here: the unprivileged "PR Review - Trigger"
+# workflow runs on the fork PR and this privileged one only consumes its
+# artifacts, never checks out or executes fork code.
+on: # zizmor: ignore[dangerous-triggers]
   issue_comment:
     types: [ created ]
   workflow_run:
     workflows: [ "PR Review - Trigger" ]
     types: [ completed ]
-
-permissions:
-  contents: read # Required at top-level to give `issue_comment` events access to the secrets below.
 
 jobs:
   review:
