@@ -102,6 +102,14 @@ jobs:
             fi
           done
       -
+        name: List artifacts
+        run: |
+          tree -nh ./bin/release
+      -
+        name: Check artifacts
+        run: |
+          find bin/release -type f -exec file -e ascii -- {} +
+      -
         name: Upload artifacts
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
@@ -306,7 +314,7 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
-      contents: write # to create a release (ncipollo/release-action)
+      contents: write # to create a release (softprops/action-gh-release)
     runs-on: ubuntu-latest
     needs:
       - binary-finalize
@@ -321,6 +329,8 @@ jobs:
           path: ./bin/release
           name: release
       -
+        # inspect what was actually downloaded from the artifact store —
+        # this is what gets attached to the release
         name: List artifacts
         run: |
           tree -nh ./bin/release
@@ -330,9 +340,12 @@ jobs:
           find bin/release -type f -exec file -e ascii -- {} +
       -
         name: GitHub Release
-        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
-          artifacts: ./bin/release/*
-          generateReleaseNotes: true
+          files: ./bin/release/*
+          generate_release_notes: true
           draft: true
+          # never replace assets already uploaded to an existing release
+          # (softprops updates an existing release for the tag instead of failing)
+          overwrite_files: false
           token: ${{ secrets.GITHUB_TOKEN }}
