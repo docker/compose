@@ -33,7 +33,7 @@ FROM crazymax/osxcross:15.5-alpine AS osxcross
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
 FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
 
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine3.22 AS base
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine3.23 AS base
 COPY --from=xx / /
 RUN apk add --no-cache \
       clang \
