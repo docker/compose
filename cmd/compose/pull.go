@@ -88,7 +88,7 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 
 	if opts.policy != "" {
 		for i, service := range project.Services {
-			if service.Image == "" {
+			if service.Image == "" && !hasPreStartHookImage(service) {
 				continue
 			}
 			service.PullPolicy = opts.policy
@@ -96,6 +96,15 @@ func (opts pullOptions) apply(project *types.Project, services []string) (*types
 		}
 	}
 	return project, nil
+}
+
+func hasPreStartHookImage(service types.ServiceConfig) bool {
+	for _, hook := range service.PreStart {
+		if hook.Image != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func runPull(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts pullOptions, services []string) error {

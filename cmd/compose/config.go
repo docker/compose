@@ -513,7 +513,9 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 	}
 
 	for _, s := range project.Services {
-		_, _ = fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
+		for _, imageName := range api.GetImageNamesForService(s, project.Name) {
+			_, _ = fmt.Fprintln(dockerCli.Out(), imageName)
+		}
 	}
 	return nil
 }

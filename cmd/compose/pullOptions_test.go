@@ -44,6 +44,13 @@ func TestApplyPullOptions(t *testing.T) {
 				Name:  "must-pull",
 				Image: "registry.example.com/another-service",
 			},
+			"hook-only": {
+				Name: "hook-only",
+				Build: &types.BuildConfig{
+					Context: ".",
+				},
+				PreStart: []types.ServiceHook{{Image: "registry.example.com/hook"}},
+			},
 		},
 	}
 	project, err := pullOptions{
@@ -54,4 +61,5 @@ func TestApplyPullOptions(t *testing.T) {
 	assert.Equal(t, project.Services["must-build"].PullPolicy, "") // still default
 	assert.Equal(t, project.Services["has-build"].PullPolicy, types.PullPolicyMissing)
 	assert.Equal(t, project.Services["must-pull"].PullPolicy, types.PullPolicyMissing)
+	assert.Equal(t, project.Services["hook-only"].PullPolicy, types.PullPolicyMissing)
 }
