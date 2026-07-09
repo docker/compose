@@ -16,7 +16,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.35.0
-	github.com/docker/cli v29.6.0+incompatible
+	github.com/docker/cli v29.6.1+incompatible
 	github.com/docker/cli-docs-tool v0.11.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
@@ -28,7 +28,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/moby/buildkit v0.31.0
+	github.com/moby/buildkit v0.31.1
 	github.com/moby/go-archive v0.2.0
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.0
@@ -52,7 +52,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.6.0
-	go.yaml.in/yaml/v4 v4.0.0-rc.4
+	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/sync v0.21.0
 	golang.org/x/sys v0.46.0
 	google.golang.org/grpc v1.81.1
@@ -103,7 +103,7 @@ require (
 	github.com/moby/sys/sequential v0.7.0 // indirect
 	github.com/moby/sys/signal v0.7.1 // indirect
 	github.com/moby/sys/symlink v0.3.0 // indirect
-	github.com/moby/sys/user v0.4.0 // indirect
+	github.com/moby/sys/user v0.4.1 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect

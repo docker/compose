@@ -2,12 +2,6 @@
 # to check if yaml reference docs used in this repo are valid
 name: docs-upstream
 
-# Default to 'contents: read', which grants actions to read commits.
-#
-# If any permission is set, any permission not included in the list is
-# implicitly set to "none".
-#
-# see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions
 permissions:
   contents: read
 
@@ -34,17 +28,17 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       -
         name: Upload reference YAML docs
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: docs-yaml
           path: docs/reference
           retention-days: 1
 
   validate:
-    uses: docker/docs/.github/workflows/validate-upstream.yml@00aefd5eae73898c4d3bcd7a6fe95a039293706b # main 2026-03-24
+    uses: docker/docs/.github/workflows/validate-upstream.yml@main # zizmor: ignore[unpinned-uses] needs to validate against latest docs changes
     needs:
       - docs-yaml
     with:
