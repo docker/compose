@@ -242,6 +242,31 @@ func TestWaitDependencies(t *testing.T) {
 		}
 		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil, 0))
 	})
+	t.Run("should skip zero-replica dependencies after service hashing", func(t *testing.T) {
+		replicas := 0
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"app": {
+				Name: "app",
+				DependsOn: types.DependsOnConfig{
+					"disabled": {
+						Condition: ServiceConditionRunningOrHealthy,
+						Required:  true,
+					},
+				},
+			},
+			"disabled": {
+				Name:   "disabled",
+				Deploy: &types.DeployConfig{Replicas: &replicas},
+			},
+		}}
+
+		_, err := ServiceHash(project.Services["disabled"])
+		assert.NilError(t, err)
+
+		assert.NilError(t, tested.(*composeService).waitDependencies(
+			t.Context(), &project, "app", project.Services["app"].DependsOn, nil, 0,
+		))
+	})
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(1)}
 		redisService := types.ServiceConfig{Name: "redis", Scale: intPtr(1)}
