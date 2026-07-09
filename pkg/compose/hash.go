@@ -30,7 +30,9 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	o.PullPolicy = ""
 	o.Scale = nil
 	if o.Deploy != nil {
-		o.Deploy.Replicas = nil
+		deploy := *o.Deploy
+		deploy.Replicas = nil
+		o.Deploy = &deploy
 	}
 	o.DependsOn = nil
 	o.Profiles = nil
