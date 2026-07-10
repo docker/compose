@@ -303,7 +303,98 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 		api.Separator = "_"
 	}
 
-	return options.LoadModel(ctx)
+	model, err := options.LoadModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// LoadModel returns the raw (partially resolved) model for every service in
+	// the compose files. When the user selected specific services on the command
+	// line, restrict the model to those services and their dependencies, mirroring
+	// how ToProject applies WithSelectedServices on the fully typed project.
+	if err := filterModelServices(model, services); err != nil {
+		return nil, err
+	}
+
+	return model, nil
+}
+
+// filterModelServices restricts a raw compose model (as returned by LoadModel)
+// to the named services and their transitive dependencies, mutating the model
+// in place. It is a no-op when no service is selected.
+//
+// The `config --no-interpolate` and `config --variables` code paths render a
+// raw model map rather than a fully typed project, because unresolved
+// interpolation variables may prevent a complete project load. That model
+// isn't otherwise filtered by the [SERVICE...] argument, so this restores
+// parity with the interpolated path by reusing compose-go's typed dependency
+// logic (Project.WithSelectedServices) to compute the reachable set.
+func filterModelServices(model map[string]any, services []string) error {
+	if len(services) == 0 {
+		return nil
+	}
+
+	rawServices, ok := model["services"].(map[string]any)
+	if !ok {
+		// No services mapping to select from: surface the same "no such
+		// service" error the typed path would raise for the first request.
+		return fmt.Errorf("no such service: %s", services[0])
+	}
+
+	// Build a minimal typed project carrying only service names and their
+	// depends_on edges, so dependency traversal (and the "no such service"
+	// validation) is delegated to compose-go rather than reimplemented here.
+	project := &types.Project{Services: types.Services{}}
+	for name, raw := range rawServices {
+		svc, _ := raw.(map[string]any)
+		project.Services[name] = types.ServiceConfig{
+			Name:      name,
+			DependsOn: dependsOnFromModel(svc["depends_on"]),
+		}
+	}
+
+	selected, err := project.WithSelectedServices(services)
+	if err != nil {
+		return err
+	}
+
+	for name := range rawServices {
+		if _, keep := selected.Services[name]; !keep {
+			delete(rawServices, name)
+		}
+	}
+	return nil
+}
+
+// dependsOnFromModel extracts the depends_on edges of a raw service model entry.
+// It handles both the short list syntax (`depends_on: [a, b]`) and the long map
+// syntax (`depends_on: {a: {condition: ...}}`), since the model may contain
+// either form depending on whether normalization ran.
+func dependsOnFromModel(v any) types.DependsOnConfig {
+	switch d := v.(type) {
+	case []any:
+		deps := types.DependsOnConfig{}
+		for _, e := range d {
+			if name, ok := e.(string); ok {
+				deps[name] = types.ServiceDependency{Required: true}
+			}
+		}
+		return deps
+	case map[string]any:
+		deps := types.DependsOnConfig{}
+		for name, raw := range d {
+			dep := types.ServiceDependency{Required: true}
+			if m, ok := raw.(map[string]any); ok {
+				if required, ok := m["required"].(bool); ok {
+					dep.Required = required
+				}
+			}
+			deps[name] = dep
+		}
+		return deps
+	default:
+		return nil
+	}
 }
 
 // ToProject loads a Compose project using the LoadProject API.
