@@ -1410,12 +1410,16 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		EnableIPv4: n.EnableIPv4,
 	}
 
-	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
+	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 || len(n.Ipam.Options) > 0 {
 		createOpts.IPAM = &network.IPAM{}
 	}
 
 	if n.Ipam.Driver != "" {
 		createOpts.IPAM.Driver = n.Ipam.Driver
+	}
+
+	if len(n.Ipam.Options) > 0 {
+		createOpts.IPAM.Options = n.Ipam.Options
 	}
 
 	for _, ipamConfig := range n.Ipam.Config {
