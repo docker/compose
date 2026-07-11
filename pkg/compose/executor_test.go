@@ -23,6 +23,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -37,6 +38,15 @@ type noopEventProcessor struct{}
 func (noopEventProcessor) Start(_ context.Context, _ string) {}
 func (noopEventProcessor) On(_ ...api.Resource)              {}
 func (noopEventProcessor) Done(_ string, _ bool)             {}
+
+const (
+	ipamOptionsProjectName  = "test"
+	ipamOptionsNetworkKey   = "default"
+	ipamOptionsNetworkName  = "test_default"
+	ipamOptionsKey          = "test"
+	ipamOptionsValue        = "1"
+	ipamOptionsCreatedNetID = "net1"
+)
 
 func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
 	t.Helper()
@@ -83,6 +93,49 @@ func TestExecutePlanCreateNetwork(t *testing.T) {
 	}, "")
 
 	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
+	assert.NilError(t, err)
+}
+
+func TestExecutePlanCreateNetworkWithIPAMOptions(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	nw := types.NetworkConfig{
+		Name: ipamOptionsNetworkName,
+		Ipam: types.IPAMConfig{
+			Options: types.Options{
+				ipamOptionsKey: ipamOptionsValue,
+			},
+		},
+	}
+	project := &types.Project{
+		Name:     ipamOptionsProjectName,
+		Networks: types.Networks{ipamOptionsNetworkKey: nw},
+	}
+
+	apiClient.EXPECT().NetworkInspect(gomock.Any(), ipamOptionsNetworkName, gomock.Any()).
+		Return(client.NetworkInspectResult{}, notFoundError{})
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).
+		Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), ipamOptionsNetworkName, gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, opts client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+			assert.DeepEqual(t, opts.IPAM, &network.IPAM{
+				Options: map[string]string{
+					ipamOptionsKey: ipamOptionsValue,
+				},
+			})
+			return client.NetworkCreateResult{ID: ipamOptionsCreatedNetID}, nil
+		})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:" + ipamOptionsNetworkKey,
+		Cause:      "not found",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState(ipamOptionsProjectName), plan)
 	assert.NilError(t, err)
 }
 
