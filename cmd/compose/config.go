@@ -31,13 +31,24 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
+	"github.com/opencontainers/go-digest"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
+)
+
+const (
+	configModelServicesKey = "services"
+	configModelImageKey    = "image"
+	configModelVolumesKey  = "volumes"
+	configModelTypeKey     = "type"
+	configModelSourceKey   = "source"
+	configImageVolumeType  = "image"
 )
 
 type configOptions struct {
@@ -214,7 +225,12 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 	}
 
 	if opts.resolveImageDigests {
-		project, err = project.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+		resolveDigest := compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client())
+		project, err = project.WithImagesResolved(resolveDigest)
+		if err != nil {
+			return nil, err
+		}
+		err = resolveProjectImageVolumeDigests(project, resolveDigest)
 		if err != nil {
 			return nil, err
 		}
@@ -253,13 +269,19 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 	return content, nil
 }
 
-// imagesOnly return project with all attributes removed but service.images
+// imagesOnly return project with all attributes removed but service images and image volumes.
 func imagesOnly(project *types.Project) *types.Project {
 	digests := types.Services{}
 	for name, config := range project.Services {
-		digests[name] = types.ServiceConfig{
+		service := types.ServiceConfig{
 			Image: config.Image,
 		}
+		for _, volume := range config.Volumes {
+			if volume.Type == types.VolumeTypeImage {
+				service.Volumes = append(service.Volumes, volume)
+			}
+		}
+		digests[name] = service
 	}
 	project = &types.Project{Services: digests}
 	return project
@@ -280,41 +302,68 @@ func runConfigNoInterpolate(ctx context.Context, dockerCli command.Cli, opts con
 	}
 
 	if opts.lockImageDigests {
-		for key, e := range model {
-			if key != "services" {
-				delete(model, key)
-			} else {
-				for _, s := range e.(map[string]any) {
-					service := s.(map[string]any)
-					for key := range service {
-						if key != "image" {
-							delete(service, key)
-						}
-					}
-				}
-			}
-		}
+		lockModelOnly(model)
 	}
 
 	return formatModel(model, opts.Format)
 }
 
+func lockModelOnly(model map[string]any) {
+	for key, e := range model {
+		if key != configModelServicesKey {
+			delete(model, key)
+			continue
+		}
+		services := e.(map[string]any)
+		for _, s := range services {
+			service := s.(map[string]any)
+			for key := range service {
+				if key != configModelImageKey && key != configModelVolumesKey {
+					delete(service, key)
+				}
+			}
+			volumes, ok := service[configModelVolumesKey].([]any)
+			if !ok {
+				continue
+			}
+			imageVolumes := []any{}
+			for _, v := range volumes {
+				volume, ok := v.(map[string]any)
+				if ok && volume[configModelTypeKey] == configImageVolumeType {
+					imageVolumes = append(imageVolumes, volume)
+				}
+			}
+			if len(imageVolumes) == 0 {
+				delete(service, configModelVolumesKey)
+			} else {
+				service[configModelVolumesKey] = imageVolumes
+			}
+		}
+	}
+}
+
 func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) (err error) {
+	resolveDigest := compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client())
+
 	// create a pseudo-project so we can rely on WithImagesResolved to resolve images
 	p := &types.Project{
 		Services: types.Services{},
 	}
-	services := model["services"].(map[string]any)
+	services := model[configModelServicesKey].(map[string]any)
 	for name, s := range services {
 		service := s.(map[string]any)
-		if image, ok := service["image"]; ok {
+		if image, ok := service[configModelImageKey]; ok {
 			p.Services[name] = types.ServiceConfig{
 				Image: image.(string),
 			}
 		}
 	}
 
-	p, err = p.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+	p, err = p.WithImagesResolved(resolveDigest)
+	if err != nil {
+		return err
+	}
+	err = resolveModelImageVolumeDigests(services, resolveDigest)
 	if err != nil {
 		return err
 	}
@@ -324,12 +373,71 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 		service := s.(map[string]any)
 		config := p.Services[name]
 		if config.Image != "" {
-			service["image"] = config.Image
+			service[configModelImageKey] = config.Image
 		}
 		services[name] = service
 	}
-	model["services"] = services
+	model[configModelServicesKey] = services
 	return nil
+}
+
+func resolveProjectImageVolumeDigests(project *types.Project, resolveDigest func(reference.Named) (digest.Digest, error)) error {
+	for serviceName, service := range project.Services {
+		for index, volume := range service.Volumes {
+			if volume.Type != types.VolumeTypeImage || volume.Source == "" {
+				continue
+			}
+			resolved, err := resolveImageRefWithDigest(volume.Source, resolveDigest)
+			if err != nil {
+				return err
+			}
+			service.Volumes[index].Source = resolved
+		}
+		project.Services[serviceName] = service
+	}
+	return nil
+}
+
+func resolveModelImageVolumeDigests(services map[string]any, resolveDigest func(reference.Named) (digest.Digest, error)) error {
+	for _, s := range services {
+		service := s.(map[string]any)
+		volumes, ok := service[configModelVolumesKey].([]any)
+		if !ok {
+			continue
+		}
+		for _, v := range volumes {
+			volume, ok := v.(map[string]any)
+			if !ok || volume[configModelTypeKey] != configImageVolumeType {
+				continue
+			}
+			source, ok := volume[configModelSourceKey].(string)
+			if !ok || source == "" {
+				continue
+			}
+			resolved, err := resolveImageRefWithDigest(source, resolveDigest)
+			if err != nil {
+				return err
+			}
+			volume[configModelSourceKey] = resolved
+		}
+	}
+	return nil
+}
+
+func resolveImageRefWithDigest(image string, resolveDigest func(reference.Named) (digest.Digest, error)) (string, error) {
+	named, err := reference.ParseNormalizedNamed(image)
+	if err != nil {
+		return "", err
+	}
+	d, err := resolveDigest(named)
+	if err != nil {
+		return "", err
+	}
+	canonical, err := reference.WithDigest(reference.TagNameOnly(named), d)
+	if err != nil {
+		return "", err
+	}
+	return canonical.String(), nil
 }
 
 func formatModel(model map[string]any, format string) (content []byte, err error) {
