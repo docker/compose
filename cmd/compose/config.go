@@ -514,6 +514,9 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 
 	for _, s := range project.Services {
 		_, _ = fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
+		for _, img := range api.GetDependentImages(s) {
+			_, _ = fmt.Fprintln(dockerCli.Out(), img)
+		}
 	}
 	return nil
 }
