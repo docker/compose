@@ -135,6 +135,42 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		i++
 	}
 
+	// pre_start hook images run as ephemeral init containers with their own
+	// image, so they must be pulled too. They have no pull policy of their own,
+	// so we inherit the parent service's policy for skip decisions.
+	for name, service := range project.Services {
+		if service.PullPolicy == types.PullPolicyNever || service.PullPolicy == types.PullPolicyBuild {
+			continue
+		}
+		for _, img := range api.GetDependentImages(service) {
+			switch service.PullPolicy {
+			case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
+				if imageAlreadyPresent(img, images) {
+					s.events.On(api.Resource{
+						ID:      "Image " + img,
+						Status:  api.Done,
+						Text:    "Skipped",
+						Details: "Image is already present locally",
+					})
+					continue
+				}
+			}
+			if _, ok := imagesBeingPulled[img]; ok {
+				continue
+			}
+			imagesBeingPulled[img] = name
+			hookService := types.ServiceConfig{Name: name, Image: img}
+			eg.Go(func() error {
+				_, err := s.pullServiceImage(ctx, hookService, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				if err != nil && !opts.IgnoreFailures {
+					// fail fast: a hook image can't be built as a fallback
+					return err
+				}
+				return nil
+			})
+		}
+	}
+
 	err = eg.Wait()
 
 	if len(mustBuild) > 0 {
@@ -313,6 +349,16 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			}
 		}
 
+		for i, img := range api.GetDependentImages(service) {
+			if _, ok := images[img]; !ok {
+				// Hack: create a fake ServiceConfig so we pull missing pre_start hook image
+				n := fmt.Sprintf("%s:pre_start %d", name, i)
+				needPull[n] = types.ServiceConfig{
+					Name:  n,
+					Image: img,
+				}
+			}
+		}
 	}
 	if len(needPull) == 0 {
 		return nil

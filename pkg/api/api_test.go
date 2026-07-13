@@ -36,3 +36,52 @@ func TestRunOptionsEnvironmentMap(t *testing.T) {
 	assert.Equal(t, *env["ZOT"], "")
 	assert.Check(t, env["QIX"] == nil)
 }
+
+func TestGetDependentImages(t *testing.T) {
+	tests := []struct {
+		name     string
+		service  types.ServiceConfig
+		expected []string
+	}{
+		{
+			name:     "no hooks",
+			service:  types.ServiceConfig{Image: "alpine:3.20"},
+			expected: nil,
+		},
+		{
+			name: "pre_start hook with explicit image",
+			service: types.ServiceConfig{
+				Image: "alpine:3.20",
+				PreStart: []types.ServiceHook{
+					{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "init"}},
+				},
+			},
+			expected: []string{"alpine:3.19"},
+		},
+		{
+			name: "pre_start hook without image is ignored",
+			service: types.ServiceConfig{
+				Image: "alpine:3.20",
+				PreStart: []types.ServiceHook{
+					{Image: "busybox", Command: types.ShellCommand{"echo", "a"}},
+					{Command: types.ShellCommand{"echo", "b"}},
+				},
+			},
+			expected: []string{"busybox"},
+		},
+		{
+			name: "post_start and pre_stop hooks are not collected",
+			service: types.ServiceConfig{
+				Image:     "alpine:3.20",
+				PostStart: []types.ServiceHook{{Image: "ignored:post", Command: types.ShellCommand{"echo"}}},
+				PreStop:   []types.ServiceHook{{Image: "ignored:stop", Command: types.ShellCommand{"echo"}}},
+			},
+			expected: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.DeepEqual(t, GetDependentImages(tt.service), tt.expected)
+		})
+	}
+}
