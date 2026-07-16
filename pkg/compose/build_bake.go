@@ -404,6 +404,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	results := map[string]string{}
+	var builtImages []string
 	for name := range serviceToBeBuild {
 		image := expectedImages[name]
 		target := targets[name]
@@ -412,8 +413,28 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
 		results[image] = built.Digest
+		builtImages = append(builtImages, image)
 		s.events.On(builtEvent(image))
 	}
+
+	// Bake's "containerimage.digest" metadata is the top-level attested
+	// image/index digest. When BuildKit provenance attestations are enabled
+	// (the default), that digest also covers the attestation manifest and
+	// changes on every build even when the runnable image content is
+	// unchanged, causing compose to recreate containers unnecessarily (see
+	// https://github.com/docker/compose/issues/13636). Images that were
+	// loaded into the local engine (the common non-push case) are inspected
+	// to substitute a digest that only reflects the actual image content.
+	// Images that only exist in a registry (push/multi-platform builds)
+	// keep the Bake-reported digest.
+	summaries, err := s.getImageSummaries(ctx, builtImages)
+	if err != nil {
+		return nil, err
+	}
+	for image, summary := range summaries {
+		results[image] = summary.ID
+	}
+
 	return results, nil
 }
 

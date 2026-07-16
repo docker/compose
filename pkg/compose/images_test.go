@@ -100,6 +100,61 @@ func imageInspect(id string, imageReference string, size int64, created string) 
 	}
 }
 
+func TestContentDigest(t *testing.T) {
+	t.Run("no manifests falls back to the plain ID", func(t *testing.T) {
+		inspect := image.InspectResponse{ID: "sha256:top"}
+		assert.Equal(t, contentDigest(inspect), "sha256:top")
+	})
+
+	t.Run("attested image picks the image kind manifest, not the index digest", func(t *testing.T) {
+		inspect := image.InspectResponse{
+			ID: "sha256:index", // top-level digest, changes on every build due to attestation churn
+			Manifests: []image.ManifestSummary{
+				{ID: "sha256:image", Kind: image.ManifestKindImage},
+				{ID: "sha256:attestation", Kind: image.ManifestKindAttestation},
+			},
+		}
+		assert.Equal(t, contentDigest(inspect), "sha256:image")
+	})
+
+	t.Run("only attestation manifests present falls back to the plain ID", func(t *testing.T) {
+		inspect := image.InspectResponse{
+			ID: "sha256:top",
+			Manifests: []image.ManifestSummary{
+				{ID: "sha256:attestation", Kind: image.ManifestKindAttestation},
+			},
+		}
+		assert.Equal(t, contentDigest(inspect), "sha256:top")
+	})
+}
+
+func TestGetImageSummariesUsesContentDigestNotAttestedIndexDigest(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	api.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{APIVersion: "1.48"}, nil).AnyTimes()
+	api.EXPECT().ClientVersion().Return("1.48").AnyTimes()
+
+	inspect := image.InspectResponse{
+		ID: "sha256:index",
+		Manifests: []image.ManifestSummary{
+			{ID: "sha256:image", Kind: image.ManifestKindImage},
+			{ID: "sha256:attestation", Kind: image.ManifestKindAttestation},
+		},
+	}
+	api.EXPECT().
+		ImageInspect(anyCancellableContext(), "foo:1", gomock.Any()).
+		Return(client.ImageInspectResult{InspectResponse: inspect}, nil)
+
+	summaries, err := tested.(*composeService).getImageSummaries(t.Context(), []string{"foo:1"})
+	assert.NilError(t, err)
+	assert.Equal(t, summaries["foo:1"].ID, "sha256:image")
+}
+
 func containerDetail(service string, id string, status container.ContainerState, imageName string) container.Summary {
 	return container.Summary{
 		ID:     id,

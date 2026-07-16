@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
 	"golang.org/x/sync/errgroup"
@@ -69,14 +70,14 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range containers {
 		eg.Go(func() error {
-			image, err := s.apiClient().ImageInspect(ctx, c.Image)
+			img, err := s.apiClient().ImageInspect(ctx, c.Image)
 			if err != nil {
 				return err
 			}
-			id := image.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
+			id := img.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
 
 			if withPlatform && c.ImageManifestDescriptor != nil && c.ImageManifestDescriptor.Platform != nil {
-				image, err = s.apiClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
+				img, err = s.apiClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
 				if err != nil {
 					return err
 				}
@@ -93,8 +94,8 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 			}
 
 			var created *time.Time
-			if image.Created != "" {
-				t, err := time.Parse(time.RFC3339Nano, image.Created)
+			if img.Created != "" {
+				t, err := time.Parse(time.RFC3339Nano, img.Created)
 				if err != nil {
 					return err
 				}
@@ -108,14 +109,14 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 				Repository: repository,
 				Tag:        tag,
 				Platform: platforms.Platform{
-					Architecture: image.Architecture,
-					OS:           image.Os,
-					OSVersion:    image.OsVersion,
-					Variant:      image.Variant,
+					Architecture: img.Architecture,
+					OS:           img.Os,
+					OSVersion:    img.OsVersion,
+					Variant:      img.Variant,
 				},
-				Size:        image.Size,
+				Size:        img.Size,
 				Created:     created,
-				LastTagTime: image.Metadata.LastTagTime,
+				LastTagTime: img.Metadata.LastTagTime,
 			}
 			return nil
 		})
@@ -128,10 +129,21 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 func (s *composeService) getImageSummaries(ctx context.Context, repoTags []string) (map[string]api.ImageSummary, error) {
 	summary := map[string]api.ImageSummary{}
 	l := sync.Mutex{}
+
+	version, err := s.RuntimeAPIVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	withManifests := versions.GreaterThanOrEqualTo(version, apiVersion148)
+
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, repoTag := range repoTags {
 		eg.Go(func() error {
-			inspect, err := s.apiClient().ImageInspect(ctx, repoTag)
+			var opts []client.ImageInspectOption
+			if withManifests {
+				opts = append(opts, client.ImageInspectWithManifests(true))
+			}
+			inspect, err := s.apiClient().ImageInspect(ctx, repoTag, opts...)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					return nil
@@ -150,7 +162,7 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 			}
 			l.Lock()
 			summary[repoTag] = api.ImageSummary{
-				ID:          inspect.ID,
+				ID:          contentDigest(inspect.InspectResponse),
 				Repository:  repository,
 				Tag:         tag,
 				Size:        inspect.Size,
@@ -161,4 +173,20 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 		})
 	}
 	return summary, eg.Wait()
+}
+
+// contentDigest returns the digest identifying an image's actual content
+// (config + layers). When BuildKit provenance attestations are enabled, the
+// image is stored as a multi-manifest index whose top-level digest
+// (inspect.ID) also covers the attestation manifest and therefore changes on
+// every build even when the runnable image itself is unchanged. Reading the
+// "image" kind manifest instead gives a digest that only reflects the image
+// content, matching what compose actually needs to detect staleness.
+func contentDigest(inspect image.InspectResponse) string {
+	for _, m := range inspect.Manifests {
+		if m.Kind == image.ManifestKindImage {
+			return m.ID
+		}
+	}
+	return inspect.ID
 }
