@@ -1406,7 +1406,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	}
 
 	var ipam *network.IPAM
-	if n.Ipam.Config != nil {
+	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 || len(n.Ipam.Options) > 0 {
 		var config []network.IPAMConfig
 		for _, pool := range n.Ipam.Config {
 			c, err := parseIPAMPool(pool)
@@ -1416,8 +1416,9 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 			config = append(config, c)
 		}
 		ipam = &network.IPAM{
-			Driver: n.Ipam.Driver,
-			Config: config,
+			Driver:  n.Ipam.Driver,
+			Config:  config,
+			Options: n.Ipam.Options,
 		}
 	}
 	hash, err := NetworkHash(n)
@@ -1434,26 +1435,6 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 		IPAM:       ipam,
 		EnableIPv6: n.EnableIPv6,
 		EnableIPv4: n.EnableIPv4,
-	}
-
-	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 || len(n.Ipam.Options) > 0 {
-		createOpts.IPAM = &network.IPAM{}
-	}
-
-	if n.Ipam.Driver != "" {
-		createOpts.IPAM.Driver = n.Ipam.Driver
-	}
-
-	if len(n.Ipam.Options) > 0 {
-		createOpts.IPAM.Options = n.Ipam.Options
-	}
-
-	for _, ipamConfig := range n.Ipam.Config {
-		c, err := parseIPAMPool(ipamConfig)
-		if err != nil {
-			return "", err
-		}
-		createOpts.IPAM.Config = append(createOpts.IPAM.Config, c)
 	}
 
 	networkEventName := fmt.Sprintf("Network %s", n.Name)

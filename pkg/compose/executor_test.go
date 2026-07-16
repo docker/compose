@@ -40,12 +40,14 @@ func (noopEventProcessor) On(_ ...api.Resource)              {}
 func (noopEventProcessor) Done(_ string, _ bool)             {}
 
 const (
-	ipamOptionsProjectName  = "test"
-	ipamOptionsNetworkKey   = "default"
-	ipamOptionsNetworkName  = "test_default"
-	ipamOptionsKey          = "test"
-	ipamOptionsValue        = "1"
-	ipamOptionsCreatedNetID = "net1"
+	executorTestProjectName      = "test"
+	executorTestNetworkKey       = "default"
+	executorTestNetworkName      = "test_default"
+	executorTestNetworkResource  = "network:" + executorTestNetworkKey
+	executorTestNotFoundCause    = "not found"
+	executorTestCreatedNetworkID = "net1"
+	ipamOptionsKey               = "test"
+	ipamOptionsValue             = "1"
 )
 
 func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
@@ -62,37 +64,37 @@ func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
 
 func TestExecutePlanEmpty(t *testing.T) {
 	svc, _ := newTestService(t)
-	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), &Plan{})
+	err := svc.executePlan(t.Context(), &types.Project{Name: executorTestProjectName}, emptyObservedState(executorTestProjectName), &Plan{})
 	assert.NilError(t, err)
 }
 
 func TestExecutePlanCreateNetwork(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
-	nw := types.NetworkConfig{Name: "test_default"}
+	nw := types.NetworkConfig{Name: executorTestNetworkName}
 	project := &types.Project{
-		Name:     "test",
-		Networks: types.Networks{"default": nw},
+		Name:     executorTestProjectName,
+		Networks: types.Networks{executorTestNetworkKey: nw},
 	}
 
 	// ensureNetwork: inspect → not found, list → empty, create
-	apiClient.EXPECT().NetworkInspect(gomock.Any(), "test_default", gomock.Any()).
+	apiClient.EXPECT().NetworkInspect(gomock.Any(), executorTestNetworkName, gomock.Any()).
 		Return(client.NetworkInspectResult{}, notFoundError{})
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).
 		Return(client.NetworkListResult{}, nil)
-	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
-		Return(client.NetworkCreateResult{ID: "net1"}, nil)
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), executorTestNetworkName, gomock.Any()).
+		Return(client.NetworkCreateResult{ID: executorTestCreatedNetworkID}, nil)
 
 	plan := &Plan{}
 	plan.addNode(Operation{
 		Type:       OpCreateNetwork,
-		ResourceID: "network:default",
-		Cause:      "not found",
+		ResourceID: executorTestNetworkResource,
+		Cause:      executorTestNotFoundCause,
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "")
 
-	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
+	err := svc.executePlan(t.Context(), project, emptyObservedState(executorTestProjectName), plan)
 	assert.NilError(t, err)
 }
 
@@ -100,7 +102,7 @@ func TestExecutePlanCreateNetworkWithIPAMOptions(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
 	nw := types.NetworkConfig{
-		Name: ipamOptionsNetworkName,
+		Name: executorTestNetworkName,
 		Ipam: types.IPAMConfig{
 			Options: types.Options{
 				ipamOptionsKey: ipamOptionsValue,
@@ -108,34 +110,34 @@ func TestExecutePlanCreateNetworkWithIPAMOptions(t *testing.T) {
 		},
 	}
 	project := &types.Project{
-		Name:     ipamOptionsProjectName,
-		Networks: types.Networks{ipamOptionsNetworkKey: nw},
+		Name:     executorTestProjectName,
+		Networks: types.Networks{executorTestNetworkKey: nw},
 	}
 
-	apiClient.EXPECT().NetworkInspect(gomock.Any(), ipamOptionsNetworkName, gomock.Any()).
+	apiClient.EXPECT().NetworkInspect(gomock.Any(), executorTestNetworkName, gomock.Any()).
 		Return(client.NetworkInspectResult{}, notFoundError{})
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).
 		Return(client.NetworkListResult{}, nil)
-	apiClient.EXPECT().NetworkCreate(gomock.Any(), ipamOptionsNetworkName, gomock.Any()).
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), executorTestNetworkName, gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ string, opts client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
 			assert.DeepEqual(t, opts.IPAM, &network.IPAM{
 				Options: map[string]string{
 					ipamOptionsKey: ipamOptionsValue,
 				},
 			})
-			return client.NetworkCreateResult{ID: ipamOptionsCreatedNetID}, nil
+			return client.NetworkCreateResult{ID: executorTestCreatedNetworkID}, nil
 		})
 
 	plan := &Plan{}
 	plan.addNode(Operation{
 		Type:       OpCreateNetwork,
-		ResourceID: "network:" + ipamOptionsNetworkKey,
-		Cause:      "not found",
+		ResourceID: executorTestNetworkResource,
+		Cause:      executorTestNotFoundCause,
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "")
 
-	err := svc.executePlan(t.Context(), project, emptyObservedState(ipamOptionsProjectName), plan)
+	err := svc.executePlan(t.Context(), project, emptyObservedState(executorTestProjectName), plan)
 	assert.NilError(t, err)
 }
 
