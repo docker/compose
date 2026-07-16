@@ -136,15 +136,17 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	}
 
 	// pre_start hook images run as ephemeral init containers with their own
-	// image, so they must be pulled too. They have no pull policy of their own,
-	// so we inherit the parent service's policy for skip decisions.
+	// registry image. They have no pull policy of their own, so we inherit the
+	// parent service's policy for skip decisions. Unlike the service image, a
+	// hook image can't be built, so `build` does not exempt it from pulling —
+	// only `never` does (consistent with the `up`/create path).
 	for name, service := range project.Services {
-		if service.PullPolicy == types.PullPolicyNever || service.PullPolicy == types.PullPolicyBuild {
+		if service.PullPolicy == types.PullPolicyNever {
 			continue
 		}
-		for _, img := range api.GetDependentImages(service) {
+		for _, img := range api.GetDependentImages(service, project.Name) {
 			switch service.PullPolicy {
-			case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
+			case types.PullPolicyMissing, types.PullPolicyIfNotPresent, types.PullPolicyBuild:
 				if imageAlreadyPresent(img, images) {
 					s.events.On(api.Resource{
 						ID:      "Image " + img,
@@ -328,6 +330,9 @@ func encodedAuth(ref reference.Named, configFile authProvider) (string, error) {
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
 	needPull := map[string]types.ServiceConfig{}
+	// track image references already scheduled for pull so dependent images
+	// (volume/hook images shared across services) aren't pulled more than once
+	scheduled := map[string]bool{}
 	for name, service := range project.Services {
 		pull, err := mustPull(service, images)
 		if err != nil {
@@ -335,6 +340,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		if pull {
 			needPull[name] = service
+			scheduled[service.Image] = true
 		}
 		for i, vol := range service.Volumes {
 			if vol.Type == types.VolumeTypeImage {
@@ -345,21 +351,14 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 						Name:  n,
 						Image: vol.Source,
 					}
-				}
-			}
-		}
-
-		for i, img := range api.GetDependentImages(service) {
-			if _, ok := images[img]; !ok {
-				// Hack: create a fake ServiceConfig so we pull missing pre_start hook image
-				n := fmt.Sprintf("%s:pre_start %d", name, i)
-				needPull[n] = types.ServiceConfig{
-					Name:  n,
-					Image: img,
+					scheduled[vol.Source] = true
 				}
 			}
 		}
 	}
+
+	addPreStartHookPulls(project, images, needPull, scheduled)
+
 	if len(needPull) == 0 {
 		return nil
 	}
@@ -392,6 +391,35 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 	}
 	return err
+}
+
+// addPreStartHookPulls schedules pulls for missing pre_start hook images.
+// pre_start hooks run as ephemeral init containers with their own registry
+// image, which can't be built, so we pull them unless the parent service pull
+// policy explicitly forbids any pull (never). Running as a second pass over the
+// services keeps the dedup against service/volume images (via scheduled)
+// independent of service iteration order.
+func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig, scheduled map[string]bool) {
+	for name, service := range project.Services {
+		if service.PullPolicy == types.PullPolicyNever {
+			continue
+		}
+		for i, img := range api.GetDependentImages(service, project.Name) {
+			if _, ok := images[img]; ok {
+				continue
+			}
+			if scheduled[img] {
+				continue
+			}
+			scheduled[img] = true
+			// Hack: create a fake ServiceConfig so we pull missing pre_start hook image
+			n := fmt.Sprintf("%s:pre_start %d", name, i)
+			needPull[n] = types.ServiceConfig{
+				Name:  n,
+				Image: img,
+			}
+		}
+	}
 }
 
 func mustPull(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, error) {

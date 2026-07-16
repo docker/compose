@@ -198,7 +198,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 				imageNames.Add(volume.Source)
 			}
 		}
-		for _, img := range api.GetDependentImages(s) {
+		for _, img := range api.GetDependentImages(s, project.Name) {
 			imageNames.Add(img)
 		}
 	}
