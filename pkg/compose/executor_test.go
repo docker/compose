@@ -46,8 +46,8 @@ const (
 	executorTestNetworkResource  = "network:" + executorTestNetworkKey
 	executorTestNotFoundCause    = "not found"
 	executorTestCreatedNetworkID = "net1"
-	ipamOptionsKey               = "test"
-	ipamOptionsValue             = "1"
+	ipamOptionsKey               = "ipam-option"
+	ipamOptionsValue             = "enabled"
 )
 
 func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
