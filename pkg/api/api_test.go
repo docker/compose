@@ -38,6 +38,7 @@ func TestRunOptionsEnvironmentMap(t *testing.T) {
 }
 
 func TestGetDependentImages(t *testing.T) {
+	const projectName = "demo"
 	tests := []struct {
 		name     string
 		service  types.ServiceConfig
@@ -70,6 +71,28 @@ func TestGetDependentImages(t *testing.T) {
 			expected: []string{"busybox"},
 		},
 		{
+			name: "pre_start hook reusing the service image is ignored",
+			service: types.ServiceConfig{
+				Image: "alpine:3.20",
+				PreStart: []types.ServiceHook{
+					{Image: "alpine:3.20", Command: types.ShellCommand{"echo", "same"}},
+					{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "other"}},
+				},
+			},
+			expected: []string{"alpine:3.19"},
+		},
+		{
+			name: "pre_start hook reusing the default (build) image name is ignored",
+			service: types.ServiceConfig{
+				Name:  "web",
+				Build: &types.BuildConfig{Context: "."},
+				PreStart: []types.ServiceHook{
+					{Image: "demo-web", Command: types.ShellCommand{"echo", "same"}},
+				},
+			},
+			expected: nil,
+		},
+		{
 			name: "post_start and pre_stop hooks are not collected",
 			service: types.ServiceConfig{
 				Image:     "alpine:3.20",
@@ -81,7 +104,7 @@ func TestGetDependentImages(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.DeepEqual(t, GetDependentImages(tt.service), tt.expected)
+			assert.DeepEqual(t, GetDependentImages(tt.service, projectName), tt.expected)
 		})
 	}
 }
