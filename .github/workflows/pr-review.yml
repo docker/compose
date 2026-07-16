@@ -18,7 +18,7 @@ jobs:
     if: |
       github.event_name == 'issue_comment' ||
       github.event.workflow_run.conclusion == 'success'
-    uses: docker/docker-agent-action/.github/workflows/review-pr.yml@e96a4bb40cac114f64358621e1d08346c8eadc8c # v2.0.1
+    uses: docker/docker-agent-action/.github/workflows/review-pr.yml@774b6e0e60d6c648b0f2dc43bd5221377a0a7420 # v2.0.2
     # Scoped to the job so other jobs in this workflow aren't over-permissioned
     permissions:
       contents: read # Read repository files and PR diffs
