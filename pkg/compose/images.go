@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
 	"golang.org/x/sync/errgroup"
@@ -69,14 +70,14 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range containers {
 		eg.Go(func() error {
-			image, err := s.apiClient().ImageInspect(ctx, c.Image)
+			img, err := s.apiClient().ImageInspect(ctx, c.Image)
 			if err != nil {
 				return err
 			}
-			id := image.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
+			id := img.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
 
 			if withPlatform && c.ImageManifestDescriptor != nil && c.ImageManifestDescriptor.Platform != nil {
-				image, err = s.apiClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
+				img, err = s.apiClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
 				if err != nil {
 					return err
 				}
@@ -93,8 +94,8 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 			}
 
 			var created *time.Time
-			if image.Created != "" {
-				t, err := time.Parse(time.RFC3339Nano, image.Created)
+			if img.Created != "" {
+				t, err := time.Parse(time.RFC3339Nano, img.Created)
 				if err != nil {
 					return err
 				}
@@ -108,14 +109,14 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 				Repository: repository,
 				Tag:        tag,
 				Platform: platforms.Platform{
-					Architecture: image.Architecture,
-					OS:           image.Os,
-					OSVersion:    image.OsVersion,
-					Variant:      image.Variant,
+					Architecture: img.Architecture,
+					OS:           img.Os,
+					OSVersion:    img.OsVersion,
+					Variant:      img.Variant,
 				},
-				Size:        image.Size,
+				Size:        img.Size,
 				Created:     created,
-				LastTagTime: image.Metadata.LastTagTime,
+				LastTagTime: img.Metadata.LastTagTime,
 			}
 			return nil
 		})
@@ -128,10 +129,20 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 func (s *composeService) getImageSummaries(ctx context.Context, repoTags []string) (map[string]api.ImageSummary, error) {
 	summary := map[string]api.ImageSummary{}
 	l := sync.Mutex{}
+
+	withManifests, err := s.manifestsSupported(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, repoTag := range repoTags {
 		eg.Go(func() error {
-			inspect, err := s.apiClient().ImageInspect(ctx, repoTag)
+			var opts []client.ImageInspectOption
+			if withManifests {
+				opts = append(opts, client.ImageInspectWithManifests(true))
+			}
+			inspect, err := s.apiClient().ImageInspect(ctx, repoTag, opts...)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					return nil
@@ -150,7 +161,7 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 			}
 			l.Lock()
 			summary[repoTag] = api.ImageSummary{
-				ID:          inspect.ID,
+				ID:          contentDigest(inspect.InspectResponse, platforms.Default()),
 				Repository:  repository,
 				Tag:         tag,
 				Size:        inspect.Size,
@@ -161,4 +172,50 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 		})
 	}
 	return summary, eg.Wait()
+}
+
+// manifestsSupported reports whether the engine can return per-manifest data on
+// image inspect (Engine >= 28.0 / API >= 1.48). Older engines fall back to the
+// plain image ID.
+func (s *composeService) manifestsSupported(ctx context.Context) (bool, error) {
+	version, err := s.RuntimeAPIVersion(ctx)
+	if err != nil {
+		return false, err
+	}
+	return versions.GreaterThanOrEqualTo(version, apiVersion148), nil
+}
+
+// contentDigest returns the digest identifying an image's runnable content
+// (config + layers) for the given platform. With BuildKit provenance
+// attestations enabled (the default since recent Buildx/BuildKit), the image is
+// stored as an index whose top-level digest (inspect.ID) also covers the
+// attestation manifest, so it changes on every build even when the runnable
+// image is unchanged — making compose recreate containers needlessly (see
+// https://github.com/docker/compose/issues/13636). The digest of the "image"
+// kind manifest reflects only the image content, which is what compose needs to
+// detect staleness.
+//
+// Selection is platform-aware and deterministic so the same image always maps
+// to the same digest across rebuilds: the available manifest matching the
+// requested platform wins; a lone available image manifest is used as-is
+// (single-platform images, whatever their platform); otherwise we fall back to
+// inspect.ID (engines that don't report manifests — where inspect.ID is already
+// the config digest — or a multi-platform image whose requested platform isn't
+// available locally, which the caller then treats as a platform miss).
+func contentDigest(inspect image.InspectResponse, platform platforms.MatchComparer) string {
+	var available []image.ManifestSummary
+	for _, m := range inspect.Manifests {
+		if m.Kind == image.ManifestKindImage && m.Available {
+			available = append(available, m)
+		}
+	}
+	for _, m := range available {
+		if m.ImageData != nil && platform.Match(m.ImageData.Platform) {
+			return m.ID
+		}
+	}
+	if len(available) == 1 {
+		return available[0].ID
+	}
+	return inspect.ID
 }
