@@ -26,7 +26,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/jonboulle/clockwork v0.5.0
-	github.com/mattn/go-shellwords v1.0.13
+	github.com/mattn/go-shellwords v1.0.14
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.31.1
 	github.com/moby/go-archive v0.2.0
