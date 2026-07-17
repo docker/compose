@@ -215,7 +215,10 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 			if err != nil {
 				return nil, err
 			}
-			inspect, err := s.apiClient().ImageInspect(ctx, img.ID)
+			// inspect by name, not img.ID: img.ID now holds a content-manifest
+			// digest (see contentDigest) which is not necessarily inspectable,
+			// whereas the image name always resolves.
+			inspect, err := s.apiClient().ImageInspect(ctx, imgName)
 			if err != nil {
 				return nil, err
 			}
