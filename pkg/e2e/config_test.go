@@ -47,6 +47,14 @@ func TestLocalComposeConfig(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `- ${PORT:-8080}:80`})
 	})
 
+	t.Run("--no-interpolate with service selection", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--no-interpolate", "test")
+		res.Assert(t, icmd.Expected{
+			Err: "service filtering is not applied when --no-interpolate is set",
+			Out: `- ${PORT:-8080}:80`,
+		})
+	})
+
 	t.Run("--variables --format json", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--variables", "--format", "json")
 		res.Assert(t, icmd.Expected{Out: `{
@@ -66,5 +74,13 @@ func TestLocalComposeConfig(t *testing.T) {
     defaultvalue: "8080"
     presencevalue: ""
     required: false`})
+	})
+
+	t.Run("--variables with service selection", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--variables", "test")
+		res.Assert(t, icmd.Expected{
+			Err: "service filtering is not applied when --variables is set",
+			Out: `PORT`,
+		})
 	})
 }
