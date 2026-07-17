@@ -32,6 +32,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 
@@ -266,6 +267,9 @@ func imagesOnly(project *types.Project) *types.Project {
 }
 
 func runConfigNoInterpolate(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) ([]byte, error) {
+	if len(services) > 0 {
+		logrus.Warn("service filtering is not applied when --no-interpolate is set, the full model will be rendered")
+	}
 	// we can't use ToProject, so the model we render here is only partially resolved
 	model, err := opts.ToModel(ctx, dockerCli, services)
 	if err != nil {
@@ -519,6 +523,9 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 }
 
 func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
+	if len(services) > 0 {
+		logrus.Warn("service filtering is not applied when --variables is set, variables from the full model will be rendered")
+	}
 	opts.noInterpolate = true
 	model, err := opts.ToModel(ctx, dockerCli, services, cli.WithoutEnvironmentResolution, cli.WithLoadOptions(loader.WithSkipValidation))
 	if err != nil {
