@@ -24,17 +24,17 @@ import (
 
 var _ io.ReadCloser = ContainerStdout{}
 
-// ContainerStdout implement ReadCloser for moby.HijackedResponse
+// ContainerStdout implements io.ReadCloser for moby.HijackedResponse
 type ContainerStdout struct {
 	client.HijackedResponse
 }
 
-// Read implement io.ReadCloser
+// Read implements io.Reader
 func (l ContainerStdout) Read(p []byte) (n int, err error) {
 	return l.Reader.Read(p)
 }
 
-// Close implement io.ReadCloser
+// Close implements io.Closer
 func (l ContainerStdout) Close() error {
 	l.HijackedResponse.Close()
 	return nil
@@ -42,17 +42,17 @@ func (l ContainerStdout) Close() error {
 
 var _ io.WriteCloser = ContainerStdin{}
 
-// ContainerStdin implement WriteCloser for moby.HijackedResponse
+// ContainerStdin implements io.WriteCloser for moby.HijackedResponse
 type ContainerStdin struct {
 	client.HijackedResponse
 }
 
-// Write implement io.WriteCloser
+// Write implements io.Writer
 func (c ContainerStdin) Write(p []byte) (n int, err error) {
 	return c.Conn.Write(p)
 }
 
-// Close implement io.WriteCloser
+// Close implements io.Closer
 func (c ContainerStdin) Close() error {
 	return c.CloseWrite()
 }
