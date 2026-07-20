@@ -54,7 +54,7 @@ require (
 	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/sync v0.22.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.47.0
 	google.golang.org/grpc v1.81.1
 	gotest.tools/v3 v3.5.2
 	tags.cncf.io/container-device-interface v1.1.0
