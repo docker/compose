@@ -152,3 +152,5 @@ exclude (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
+
+replace github.com/compose-spec/compose-go/v2 v2.13.0 => github.com/AmariahAK/compose-go/v2 v2.13.0-patched
