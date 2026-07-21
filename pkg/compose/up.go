@@ -43,6 +43,15 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
+		// When the current Docker context opts into the project-config push, send
+		// the project configuration to the coordinator before any other Docker API
+		// call. Failures are non-fatal: warn and continue bringing the project up.
+		if !s.dryRun && s.projectConfigPushEnabled() {
+			if err := s.pushProjectConfig(ctx, project); err != nil {
+				logrus.Warnf("project config push to coordinator failed, continuing: %v", err)
+			}
+		}
+
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
 			return err
