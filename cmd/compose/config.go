@@ -236,6 +236,7 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 	}
 
 	if opts.lockImageDigests {
+		warnHooksNotLockable(project)
 		project = imagesOnly(project)
 	}
 
@@ -254,13 +255,19 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 	return content, nil
 }
 
-// imagesOnly return project with all attributes removed but service.images
+// imagesOnly return project with all attributes removed but service.images and `type: image` volumes
 func imagesOnly(project *types.Project) *types.Project {
 	digests := types.Services{}
 	for name, config := range project.Services {
-		digests[name] = types.ServiceConfig{
+		service := types.ServiceConfig{
 			Image: config.Image,
 		}
+		for _, vol := range config.Volumes {
+			if vol.Type == types.VolumeTypeImage {
+				service.Volumes = append(service.Volumes, vol)
+			}
+		}
+		digests[name] = service
 	}
 	project = &types.Project{Services: digests}
 	return project
@@ -284,56 +291,167 @@ func runConfigNoInterpolate(ctx context.Context, dockerCli command.Cli, opts con
 	}
 
 	if opts.lockImageDigests {
-		for key, e := range model {
-			if key != "services" {
-				delete(model, key)
-			} else {
-				for _, s := range e.(map[string]any) {
-					service := s.(map[string]any)
-					for key := range service {
-						if key != "image" {
-							delete(service, key)
-						}
-					}
-				}
-			}
-		}
+		warnModelHooksNotLockable(model)
+		lockModel(model)
 	}
 
 	return formatModel(model, opts.Format)
 }
 
-func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) (err error) {
-	// create a pseudo-project so we can rely on WithImagesResolved to resolve images
-	p := &types.Project{
-		Services: types.Services{},
-	}
-	services := model["services"].(map[string]any)
-	for name, s := range services {
-		service := s.(map[string]any)
-		if image, ok := service["image"]; ok {
-			p.Services[name] = types.ServiceConfig{
-				Image: image.(string),
+// hook sequences are appended when compose files are merged, so a lock override
+// cannot pin a hook image without duplicating the hook: the lock file leaves
+// pre_start hooks out, and their images stay unpinned once merged
+const hooksNotLockableWarning = "service %q: pre_start hook images are not pinned in the override file produced by --lock-image-digests, use the full --resolve-image-digests output to pin them"
+
+func warnHooksNotLockable(project *types.Project) {
+	for name, service := range project.Services {
+		for _, hook := range service.PreStart {
+			if hook.Image != "" {
+				logrus.Warnf(hooksNotLockableWarning, name)
+				break
 			}
 		}
 	}
+}
 
-	p, err = p.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+func warnModelHooksNotLockable(model map[string]any) {
+	services, ok := model["services"].(map[string]any)
+	if !ok {
+		return
+	}
+	for name, s := range services {
+		service, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, hook := range preStartHooks(service) {
+			if image, ok := hook["image"].(string); ok && image != "" {
+				logrus.Warnf(hooksNotLockableWarning, name)
+				break
+			}
+		}
+	}
+}
+
+// lockModel removes from model all attributes but service images and `type: image` volumes
+func lockModel(model map[string]any) {
+	for key, e := range model {
+		if key != "services" {
+			delete(model, key)
+			continue
+		}
+		for _, s := range e.(map[string]any) {
+			service := s.(map[string]any)
+			for key := range service {
+				switch key {
+				case "image":
+				case "volumes":
+					if volumes := imageVolumes(service); len(volumes) > 0 {
+						// write back as []any to keep the raw-model volumes type unchanged
+						filtered := make([]any, len(volumes))
+						for i, volume := range volumes {
+							filtered[i] = volume
+						}
+						service["volumes"] = filtered
+					} else {
+						delete(service, "volumes")
+					}
+				default:
+					delete(service, key)
+				}
+			}
+		}
+	}
+}
+
+func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) error {
+	// create a pseudo-project so we can rely on WithImagesResolved to resolve images,
+	// pre_start hook images and `type: image` volume sources, keyed by actual service
+	// names so sources referencing another service are detected as such and kept unresolved
+	p := &types.Project{
+		Services: types.Services{},
+	}
+	services, ok := model["services"].(map[string]any)
+	if !ok {
+		// services is optional at the top level of the compose model
+		return nil
+	}
+	for name, s := range services {
+		service := s.(map[string]any)
+		config := types.ServiceConfig{}
+		if image, ok := service["image"].(string); ok {
+			config.Image = image
+		}
+		for _, hook := range preStartHooks(service) {
+			image, _ := hook["image"].(string)
+			config.PreStart = append(config.PreStart, types.ServiceHook{Image: image})
+		}
+		for _, volume := range imageVolumes(service) {
+			source, _ := volume["source"].(string)
+			config.Volumes = append(config.Volumes, types.ServiceVolumeConfig{
+				Type:   types.VolumeTypeImage,
+				Source: source,
+			})
+		}
+		p.Services[name] = config
+	}
+
+	p, err := p.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
 	if err != nil {
 		return err
 	}
 
-	// Collect image resolved with digest and update model accordingly
+	// update model with image and volume-source references resolved with digest;
+	// fields absent from the resolved pseudo-project (empty Image / Source) are left untouched
 	for name, s := range services {
 		service := s.(map[string]any)
 		config := p.Services[name]
 		if config.Image != "" {
 			service["image"] = config.Image
 		}
-		services[name] = service
+		for i, hook := range preStartHooks(service) {
+			if image := config.PreStart[i].Image; image != "" {
+				hook["image"] = image
+			}
+		}
+		for i, volume := range imageVolumes(service) {
+			if source := config.Volumes[i].Source; source != "" {
+				volume["source"] = source
+			}
+		}
 	}
-	model["services"] = services
 	return nil
+}
+
+// preStartHooks returns the pre_start hook declarations of a service raw model
+func preStartHooks(service map[string]any) []map[string]any {
+	hooks, ok := service["pre_start"].([]any)
+	if !ok {
+		return nil
+	}
+	var result []map[string]any
+	for _, h := range hooks {
+		if hook, ok := h.(map[string]any); ok {
+			result = append(result, hook)
+		}
+	}
+	return result
+}
+
+// imageVolumes returns the `type: image` volume declarations of a service raw model
+func imageVolumes(service map[string]any) []map[string]any {
+	volumes, ok := service["volumes"].([]any)
+	if !ok {
+		return nil
+	}
+	var images []map[string]any
+	for _, v := range volumes {
+		volume, ok := v.(map[string]any)
+		if ok && volume["type"] == types.VolumeTypeImage {
+			images = append(images, volume)
+		}
+	}
+	return images
 }
 
 func formatModel(model map[string]any, format string) (content []byte, err error) {
