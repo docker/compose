@@ -28,8 +28,12 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/google/go-cmp/cmp"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal"
@@ -723,4 +727,53 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	err := svc.publish(t.Context(), project, "docker.io/myorg/myapp:latest", api.PublishOptions{})
 	assert.Assert(t, errors.Is(err, api.ErrCanceled),
 		"expected api.ErrCanceled when user declines, got: %v", err)
+}
+
+func Test_generateImageDigestsOverride_resolvesDependentImages(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
+	tested := &composeService{dockerCli: cli}
+
+	// distinct digests per resolved reference, so attaching a digest to the wrong image would fail
+	const (
+		serviceDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		hookDigest    = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		volumeDigest  = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	)
+	project := &types.Project{
+		Name: "test",
+		Services: types.Services{
+			"app": types.ServiceConfig{
+				Name:     "app",
+				Image:    "nginx:latest",
+				PreStart: []types.ServiceHook{{Image: "hookimage:latest"}},
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeImage, Source: "someimage:latest", Target: "/data"},
+				},
+			},
+		},
+	}
+
+	// compose-go resolves dependent images (pre_start hooks, type: image volume sources)
+	// in WithImagesResolved, so publish now resolves them too: expect one registry call
+	// per dependent image
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/nginx:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: serviceDigest}},
+		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/hookimage:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: hookDigest}},
+		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/someimage:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: volumeDigest}},
+		}, nil)
+
+	override, err := tested.generateImageDigestsOverride(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Assert(t, strings.Contains(string(override), "docker.io/library/nginx:latest@"+serviceDigest))
 }
