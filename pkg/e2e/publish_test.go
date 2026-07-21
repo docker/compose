@@ -205,4 +205,25 @@ networks:
   default:
     name: oci_default
 `)
+
+	// `up` loads the project twice: once through ToProject, then again through
+	// ToModel (checksForRemoteStack -> promptForInterpolatedVariables) to list
+	// the interpolation variables when --yes is not passed. That second load
+	// builds its own OCI loader, which used to drop --insecure-registry and so
+	// talked HTTPS to a plain-HTTP registry. See docker/compose#13824.
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/oci/compose-interpolated.yaml",
+		"-p", projectName, "publish", "--with-env", "--yes", "--insecure-registry", registry+"/test:interpolated")
+	res.Assert(t, icmd.Expected{ExitCode: 0})
+
+	// Declining the prompt keeps the test hermetic: nothing is created, but the
+	// re-load has already happened by then, which is what we want to cover.
+	cmd = c.NewDockerComposeCmd(t, "--project-name=oci-reload",
+		"--insecure-registry", registry,
+		"-f", fmt.Sprintf("oci://%s/test:interpolated", registry), "up")
+	cmd.Stdin = strings.NewReader("n\n")
+	res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+		cmd.Env = append(cmd.Env, "XDG_CACHE_HOME="+t.TempDir())
+	})
+	assert.Assert(t, !strings.Contains(res.Combined(), "server gave HTTP response to HTTPS client"), res.Combined())
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "operation cancelled by user"})
 }
