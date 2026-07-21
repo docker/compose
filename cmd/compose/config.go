@@ -29,7 +29,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
-	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/sirupsen/logrus"
@@ -532,7 +531,7 @@ func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions
 		return err
 	}
 
-	variables := template.ExtractVariables(model, template.DefaultPattern)
+	variables := compose.ExtractVariables(model)
 
 	if opts.Format == "yaml" {
 		result, err := yaml.Marshal(variables)

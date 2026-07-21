@@ -28,6 +28,25 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+const (
+	requiredVariablesProjectName = "required-vars"
+	requiredVariablesExpectedErr = "required variable TIMEZONE is missing a value"
+	requiredVariablesComposeYAML = `
+services:
+  traefik:
+    image: traefik:v3.6.11
+    environment:
+      - TZ=${TIMEZONE:?}
+    volumes:
+      - type: bind
+        source: ${TRAEFIK_ACME_PATH:?}
+        target: /acme/
+      - type: bind
+        source: ${TRAEFIK_LOGS_PATH:?}
+        target: /logs
+`
+)
+
 func TestLoadProject_Basic(t *testing.T) {
 	// Create a temporary compose file
 	tmpDir := t.TempDir()
@@ -66,6 +85,24 @@ services:
 	webService := project.Services["web"]
 	assert.Equal(t, "test-project", webService.CustomLabels[api.ProjectLabel])
 	assert.Equal(t, "web", webService.CustomLabels[api.ServiceLabel])
+}
+
+func TestLoadProjectReportsRequiredVariablesDeterministically(t *testing.T) {
+	tmpDir := t.TempDir()
+	composeFile := filepath.Join(tmpDir, "compose.yaml")
+	err := os.WriteFile(composeFile, []byte(requiredVariablesComposeYAML), 0o644)
+	assert.NilError(t, err)
+
+	service, err := NewComposeService(nil)
+	assert.NilError(t, err)
+
+	for range 100 {
+		_, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{
+			ProjectName: requiredVariablesProjectName,
+			ConfigPaths: []string{composeFile},
+		})
+		assert.ErrorContains(t, err, requiredVariablesExpectedErr)
+	}
 }
 
 func TestLoadProject_WithEnvironmentResolution(t *testing.T) {
