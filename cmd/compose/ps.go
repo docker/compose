@@ -156,9 +156,13 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 		opts.Format = dockerCli.ConfigFile().PsFormat
 	}
 
+	showEngine := slices.ContainsFunc(containers, func(c api.ContainerSummary) bool {
+		return c.Labels[api.ContainerEngineLabel] != ""
+	})
+
 	containerCtx := cliformatter.Context{
 		Output: dockerCli.Out(),
-		Format: formatter.NewContainerFormat(opts.Format, opts.Quiet, false),
+		Format: formatter.NewContainerFormat(opts.Format, opts.Quiet, false, showEngine),
 		Trunc:  !opts.noTrunc,
 	}
 	return formatter.ContainerWrite(containerCtx, containers)
