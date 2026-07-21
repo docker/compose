@@ -348,9 +348,7 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		Compatibility:     o.Compatibility,
 		ProjectOptionsFns: po,
 		LoadListeners:     []api.LoadListener{metricsListener},
-		OCI: api.OCIOptions{
-			InsecureRegistries: o.insecureRegistries,
-		},
+		OCI:               o.ociOptions(),
 	}
 
 	project, err := backend.LoadProject(ctx, loadOpts)
@@ -369,8 +367,19 @@ func (o *ProjectOptions) remoteLoaders(dockerCli command.Cli) []loader.ResourceL
 		return nil
 	}
 	git := remote.NewGitRemoteLoader(dockerCli, o.Offline)
-	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline, api.OCIOptions{})
+	oci := remote.NewOCIRemoteLoader(dockerCli, o.Offline, o.ociOptions())
 	return []loader.ResourceLoader{git, oci}
+}
+
+// ociOptions builds the OCI loader configuration from the project options.
+// Both the primary project load and the loaders returned by remoteLoaders
+// must use this so the --insecure-registry flag is honored on every path
+// that pulls an OCI compose artifact (e.g. the interpolation-variable
+// re-load that `up` runs via ToModel). See docker/compose#13824.
+func (o *ProjectOptions) ociOptions() api.OCIOptions {
+	return api.OCIOptions{
+		InsecureRegistries: o.insecureRegistries,
+	}
 }
 
 func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
