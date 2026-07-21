@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/internal/coordinator"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -156,9 +157,14 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 		opts.Format = dockerCli.ConfigFile().PsFormat
 	}
 
+	// Show the ENGINE column when the current Docker context is coordinator-
+	// enabled, so the column's presence is stable across `ps` and `ps <subset>`
+	// rather than gated on which containers happen to carry the engine label.
+	showEngine := coordinator.PushEnabled(dockerCli)
+
 	containerCtx := cliformatter.Context{
 		Output: dockerCli.Out(),
-		Format: formatter.NewContainerFormat(opts.Format, opts.Quiet, false),
+		Format: formatter.NewContainerFormat(opts.Format, opts.Quiet, false, showEngine),
 		Trunc:  !opts.noTrunc,
 	}
 	return formatter.ContainerWrite(containerCtx, containers)
