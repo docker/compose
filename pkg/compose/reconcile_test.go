@@ -17,6 +17,8 @@
 package compose
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -30,6 +32,27 @@ import (
 // noPrompt is a Prompt that should never be called in tests that don't expect it.
 func noPrompt(msg string, _ bool) (bool, error) {
 	panic("unexpected prompt call: " + msg)
+}
+
+// yesPrompt confirms every prompt (equivalent to `--yes`).
+func yesPrompt(_ string, _ bool) (bool, error) {
+	return true, nil
+}
+
+// declinePrompt rejects every prompt (the default answer for a non-interactive
+// session with no input).
+func declinePrompt(_ string, _ bool) (bool, error) {
+	return false, nil
+}
+
+// recordingPrompt confirms every prompt and captures the messages shown.
+type recordingPrompt struct {
+	messages []string
+}
+
+func (p *recordingPrompt) confirm(msg string, _ bool) (bool, error) {
+	p.messages = append(p.messages, msg)
+	return true, nil
 }
 
 func defaultReconcileOptions() ReconcileOptions {
@@ -279,53 +302,354 @@ func TestReconcileVolumes_ExternalSkipped(t *testing.T) {
 	assert.Assert(t, plan.IsEmpty())
 }
 
-// TestReconcileVolumes_DivergedIsIgnored verifies that a diverged volume
-// produces no plan operations: recreation of diverged volumes is owned by
-// ensureProjectVolumes (which prompts the user) and runs before reconcile,
-// so the reconciler must not duplicate that decision.
-func TestReconcileVolumes_DivergedIsIgnored(t *testing.T) {
+// divergedVolumeProject builds a project with `count` services (db0, db1, ...),
+// each scaled to `scale` and mounting the shared "data" volume, plus a matching
+// observed state whose volume config-hash is stale ("oldhash"). Service and
+// container config-hashes match, so the only divergence is the volume.
+func divergedVolumeProject(t *testing.T, count, scale int) (*types.Project, *ObservedState) {
+	t.Helper()
 	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
-
 	project := &types.Project{
-		Name:    "myproject",
-		Volumes: types.Volumes{"data": {Name: "myproject_data", Driver: "local"}},
-		Services: types.Services{
-			"db": {
-				Name:  "db",
-				Scale: intPtr(1),
-				Volumes: []types.ServiceVolumeConfig{
-					{Source: "data", Type: "volume"},
+		Name:     "myproject",
+		Volumes:  types.Volumes{"data": vol},
+		Services: types.Services{},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+	}
+	for s := 0; s < count; s++ {
+		name := fmt.Sprintf("db%d", s)
+		svc := types.ServiceConfig{
+			Name:    name,
+			Scale:   intPtr(scale),
+			Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+		}
+		project.Services[name] = svc
+		hash := mustServiceHash(t, svc)
+		for n := 1; n <= scale; n++ {
+			id := fmt.Sprintf("%s-%d", name, n)
+			observed.Containers[name] = append(observed.Containers[name], ObservedContainer{
+				ID: id, Number: n, State: container.StateRunning, ConfigHash: hash,
+				Summary: container.Summary{
+					ID: id, State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: name, api.ContainerNumberLabel: strconv.Itoa(n), api.ConfigHashLabel: hash},
+					Mounts: []container.MountPoint{{Type: "volume", Name: vol.Name}},
 				},
-			},
+			})
+		}
+	}
+	return project, observed
+}
+
+// TestReconcileVolumes_DivergedConfirmed asserts the full recreation sequence for
+// a diverged volume mounted by a single service: the container is stopped and
+// removed, the volume is removed then recreated, and finally a fresh container is
+// scheduled that depends on the new volume.
+func TestReconcileVolumes_DivergedConfirmed(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db0:1, StopContainer, mounted volume config changed
+[1] -> #2 service:db0:1, RemoveContainer, mounted volume config changed
+[2] -> #3 volume:data, RemoveVolume, config hash diverged
+[3] -> #4 volume:data, CreateVolume, recreate after config change
+[4] -> #5 service:db0:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// TestReconcileVolumes_DivergedDeclined verifies that declining the prompt leaves
+// the volume (and the service that mounts it) untouched.
+func TestReconcileVolumes_DivergedDeclined(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), declinePrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+}
+
+// TestReconcileVolumes_DivergedNoRecordedHash verifies that a volume with no
+// persisted config-hash (e.g. created by an older Compose) is left untouched and
+// never prompts — matching the previous ensureVolume behavior.
+func TestReconcileVolumes_DivergedNoRecordedHash(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+	obs := observed.Volumes["data"]
+	obs.ConfigHash = ""
+	observed.Volumes["data"] = obs
+
+	// noPrompt panics if consulted, proving the empty-hash guard short-circuits.
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+}
+
+// TestReconcileVolumes_DivergedPromptMessage asserts the confirmation message
+// names the volume and warns about data loss.
+func TestReconcileVolumes_DivergedPromptMessage(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+
+	rec := &recordingPrompt{}
+	_, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), rec.confirm)
+	assert.NilError(t, err)
+	assert.Equal(t, len(rec.messages), 1)
+	assert.Equal(t, rec.messages[0], `Volume "myproject_data" exists but doesn't match configuration in compose file. Recreate (data will be lost)?`)
+}
+
+// TestReconcileVolumes_DivergedPromptError propagates a prompt failure.
+func TestReconcileVolumes_DivergedPromptError(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+
+	boom := func(_ string, _ bool) (bool, error) { return false, fmt.Errorf("boom") }
+	_, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), boom)
+	assert.ErrorContains(t, err, "boom")
+}
+
+// TestReconcileVolumes_DivergedConfirmedScaleN verifies every replica of a
+// service mounting the diverged volume is removed, and the same number of fresh
+// replicas is recreated after the volume.
+func TestReconcileVolumes_DivergedConfirmedScaleN(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 2)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db0:1, StopContainer, mounted volume config changed
+[1] -> #2 service:db0:1, RemoveContainer, mounted volume config changed
+[] -> #3 service:db0:2, StopContainer, mounted volume config changed
+[3] -> #4 service:db0:2, RemoveContainer, mounted volume config changed
+[2,4] -> #5 volume:data, RemoveVolume, config hash diverged
+[5] -> #6 volume:data, CreateVolume, recreate after config change
+[6] -> #7 service:db0:1, CreateContainer, no existing container
+[6] -> #8 service:db0:2, CreateContainer, no existing container
+`)+"\n")
+}
+
+// TestReconcileVolumes_DivergedConfirmedMultipleServices verifies that two
+// services mounting the same diverged volume are both recreated, the volume is
+// removed only after both services' containers are gone, and both fresh
+// containers depend on the single CreateVolume node.
+func TestReconcileVolumes_DivergedConfirmedMultipleServices(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 2, 1)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db0:1, StopContainer, mounted volume config changed
+[1] -> #2 service:db0:1, RemoveContainer, mounted volume config changed
+[] -> #3 service:db1:1, StopContainer, mounted volume config changed
+[3] -> #4 service:db1:1, RemoveContainer, mounted volume config changed
+[2,4] -> #5 volume:data, RemoveVolume, config hash diverged
+[5] -> #6 volume:data, CreateVolume, recreate after config change
+[6] -> #7 service:db0:1, CreateContainer, no existing container
+[6] -> #8 service:db1:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// TestReconcileVolumes_DivergedConfirmedSharedContainer verifies that a service
+// mounting two diverged volumes has its container stopped/removed only once, both
+// volumes are recreated, and the fresh container depends on both CreateVolume
+// nodes.
+func TestReconcileVolumes_DivergedConfirmedSharedContainer(t *testing.T) {
+	vol1 := types.VolumeConfig{Name: "myproject_data1", Driver: "local"}
+	vol2 := types.VolumeConfig{Name: "myproject_data2", Driver: "local"}
+	svc := types.ServiceConfig{
+		Name:  "db",
+		Scale: intPtr(1),
+		Volumes: []types.ServiceVolumeConfig{
+			{Source: "data1", Type: "volume"},
+			{Source: "data2", Type: "volume"},
 		},
 	}
+	project := &types.Project{
+		Name:     "myproject",
+		Volumes:  types.Volumes{"data1": vol1, "data2": vol2},
+		Services: types.Services{"db": svc},
+	}
+	hash := mustServiceHash(t, svc)
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers: map[string][]ObservedContainer{
 			"db": {{
-				ID: "c1", Number: 1, State: container.StateRunning,
-				ConfigHash: mustServiceHash(t, project.Services["db"]),
+				ID: "c1", Number: 1, State: container.StateRunning, ConfigHash: hash,
 				Summary: container.Summary{
-					ID:    "c1",
-					State: container.StateRunning,
-					Labels: map[string]string{
-						api.ServiceLabel:         "db",
-						api.ContainerNumberLabel: "1",
-						api.ConfigHashLabel:      mustServiceHash(t, project.Services["db"]),
-					},
-					Mounts: []container.MountPoint{{Type: "volume", Name: vol.Name}},
+					ID: "c1", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "db", api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+					Mounts: []container.MountPoint{{Type: "volume", Name: vol1.Name}, {Type: "volume", Name: vol2.Name}},
 				},
 			}},
 		},
 		Networks: map[string]ObservedNetwork{},
 		Volumes: map[string]ObservedVolume{
-			"data": {Name: vol.Name, ConfigHash: "oldhash"},
+			"data1": {Name: vol1.Name, ConfigHash: "oldhash"},
+			"data2": {Name: vol2.Name, ConfigHash: "oldhash"},
 		},
 	}
 
-	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
 	assert.NilError(t, err)
-	assert.Assert(t, plan.IsEmpty())
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, StopContainer, mounted volume config changed
+[1] -> #2 service:db:1, RemoveContainer, mounted volume config changed
+[2] -> #3 volume:data1, RemoveVolume, config hash diverged
+[3] -> #4 volume:data1, CreateVolume, recreate after config change
+[2] -> #5 volume:data2, RemoveVolume, config hash diverged
+[5] -> #6 volume:data2, CreateVolume, recreate after config change
+[4,6] -> #7 service:db:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// TestReconcileVolumes_DivergedPartialConfirm verifies that when several volumes
+// diverge but the user confirms only one, only the confirmed volume (and the
+// services mounting it) is recreated.
+func TestReconcileVolumes_DivergedPartialConfirm(t *testing.T) {
+	vol1 := types.VolumeConfig{Name: "myproject_data1", Driver: "local"}
+	vol2 := types.VolumeConfig{Name: "myproject_data2", Driver: "local"}
+	svc1 := types.ServiceConfig{Name: "db1", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data1", Type: "volume"}}}
+	svc2 := types.ServiceConfig{Name: "db2", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data2", Type: "volume"}}}
+	project := &types.Project{
+		Name:     "myproject",
+		Volumes:  types.Volumes{"data1": vol1, "data2": vol2},
+		Services: types.Services{"db1": svc1, "db2": svc2},
+	}
+	h1, h2 := mustServiceHash(t, svc1), mustServiceHash(t, svc2)
+	mountedContainer := func(id, service, hash, volName string) ObservedContainer {
+		return ObservedContainer{
+			ID: id, Number: 1, State: container.StateRunning, ConfigHash: hash,
+			Summary: container.Summary{
+				ID: id, State: container.StateRunning,
+				Labels: map[string]string{api.ServiceLabel: service, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+				Mounts: []container.MountPoint{{Type: "volume", Name: volName}},
+			},
+		}
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"db1": {mountedContainer("c1", "db1", h1, vol1.Name)},
+			"db2": {mountedContainer("c2", "db2", h2, vol2.Name)},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data1": {Name: vol1.Name, ConfigHash: "oldhash"},
+			"data2": {Name: vol2.Name, ConfigHash: "oldhash"},
+		},
+	}
+
+	// Confirm data1 only (sorted order: data1 prompted first).
+	first := true
+	prompt := func(_ string, _ bool) (bool, error) {
+		if first {
+			first = false
+			return true, nil
+		}
+		return false, nil
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), prompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db1:1, StopContainer, mounted volume config changed
+[1] -> #2 service:db1:1, RemoveContainer, mounted volume config changed
+[2] -> #3 volume:data1, RemoveVolume, config hash diverged
+[3] -> #4 volume:data1, CreateVolume, recreate after config change
+[4] -> #5 service:db1:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// TestReconcileVolumes_DivergedCascadesToDependent verifies that recreating a
+// volume cascades to a dependent that shares the mounting service's mounts via
+// volumes_from: the dependent keeps a "container:<id>" reference at runtime, so
+// it must be recreated even though its own config is unchanged.
+func TestReconcileVolumes_DivergedCascadesToDependent(t *testing.T) {
+	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
+	owner := types.ServiceConfig{
+		Name:    "owner",
+		Image:   "alpine",
+		Scale:   intPtr(1),
+		Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+	}
+	dependent := types.ServiceConfig{
+		Name:        "dependent",
+		Image:       "alpine",
+		Scale:       intPtr(1),
+		VolumesFrom: []string{"owner"},
+		DependsOn:   types.DependsOnConfig{"owner": {Condition: types.ServiceConditionStarted, Restart: true, Required: true}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Volumes:  types.Volumes{"data": vol},
+		Services: types.Services{"owner": owner, "dependent": dependent},
+	}
+
+	ownerHash := mustServiceHash(t, owner)
+	ownerSummary := container.Summary{
+		ID: "owner-1", State: container.StateRunning,
+		Labels: map[string]string{api.ServiceLabel: "owner", api.ContainerNumberLabel: "1", api.ConfigHashLabel: ownerHash},
+		Mounts: []container.MountPoint{{Type: "volume", Name: vol.Name}},
+	}
+	dependentHash := mustResolvedServiceHash(t, dependent, map[string]Containers{"owner": {ownerSummary}})
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"owner": {{ID: "owner-1", Number: 1, State: container.StateRunning, ConfigHash: ownerHash, Summary: ownerSummary}},
+			"dependent": {{
+				ID: "dependent-1", Number: 1, State: container.StateRunning, ConfigHash: dependentHash,
+				Summary: container.Summary{
+					ID: "dependent-1", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "dependent", api.ContainerNumberLabel: "1", api.ConfigHashLabel: dependentHash},
+				},
+			}},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+
+	planStr := plan.String()
+	// Volume recreate sequence for the owner.
+	assert.Assert(t, strings.Contains(planStr, "service:owner:1, RemoveContainer, mounted volume config changed"), planStr)
+	assert.Assert(t, strings.Contains(planStr, "volume:data, RemoveVolume, config hash diverged"), planStr)
+	assert.Assert(t, strings.Contains(planStr, "volume:data, CreateVolume, recreate after config change"), planStr)
+	assert.Assert(t, strings.Contains(planStr, "service:owner:1, CreateContainer"), planStr)
+	// Cascade: the dependent must be recreated too.
+	assert.Assert(t, strings.Contains(planStr, "service:dependent:1, CreateContainer"), "dependent must cascade-recreate:\n%s", planStr)
+}
+
+// TestReconcileVolumes_DivergedUnmountedVolume verifies that a diverged volume
+// declared by the project but mounted by no running container is still recreated
+// (no container operations, just remove + create).
+func TestReconcileVolumes_DivergedUnmountedVolume(t *testing.T) {
+	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
+	project := &types.Project{
+		Name:     "myproject",
+		Volumes:  types.Volumes{"data": vol},
+		Services: types.Services{},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string]ObservedNetwork{},
+		Volumes:     map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 volume:data, RemoveVolume, config hash diverged
+[1] -> #2 volume:data, CreateVolume, recreate after config change
+`)+"\n")
 }
 
 // --- Container tests ---

@@ -253,6 +253,69 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 		"all removed containers should be dropped from the live view")
 }
 
+// TestExecutePlanRecreateVolume drives the destructive core of a volume
+// recreation — stop container → remove container → remove volume → create
+// volume — end to end through the executor, asserting each Docker API call
+// fires. The dependency edges force the destructive order: the volume can only
+// be removed once the container referencing it is gone.
+func TestExecutePlanRecreateVolume(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	ctr := container.Summary{
+		ID:    "c1",
+		Names: []string{"/test-db-1"},
+		Labels: map[string]string{
+			api.ServiceLabel:         "db",
+			api.ContainerNumberLabel: "1",
+		},
+	}
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+	apiClient.EXPECT().ContainerRemove(gomock.Any(), "c1", gomock.Any()).
+		Return(client.ContainerRemoveResult{}, nil)
+	apiClient.EXPECT().VolumeRemove(gomock.Any(), "recreate_data", gomock.Any()).
+		Return(client.VolumeRemoveResult{}, nil)
+	apiClient.EXPECT().VolumeCreate(gomock.Any(), gomock.Any()).
+		Return(client.VolumeCreateResult{}, nil)
+
+	vol := types.VolumeConfig{Name: "recreate_data", Driver: "local"}
+	project := &types.Project{
+		Name:    "recreate",
+		Volumes: types.Volumes{"data": vol},
+	}
+
+	plan := &Plan{}
+	stopNode := plan.addNode(Operation{
+		Type:       OpStopContainer,
+		ResourceID: "service:db:1",
+		Cause:      "mounted volume config changed",
+		Container:  &ctr,
+	}, "")
+	removeNode := plan.addNode(Operation{
+		Type:       OpRemoveContainer,
+		ResourceID: "service:db:1",
+		Cause:      "mounted volume config changed",
+		Container:  &ctr,
+	}, "", stopNode)
+	removeVolNode := plan.addNode(Operation{
+		Type:       OpRemoveVolume,
+		ResourceID: "volume:data",
+		Cause:      "config hash diverged",
+		Name:       vol.Name,
+	}, "", removeNode)
+	plan.addNode(Operation{
+		Type:       OpCreateVolume,
+		ResourceID: "volume:data",
+		Cause:      "recreate after config change",
+		Name:       vol.Name,
+		Volume:     &vol,
+	}, "", removeVolNode)
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("recreate"), plan)
+	assert.NilError(t, err)
+}
+
 // notFoundError implements the errdefs.ErrNotFound interface for test mocks.
 type notFoundError struct{}
 

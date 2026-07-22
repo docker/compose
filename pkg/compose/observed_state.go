@@ -197,8 +197,9 @@ func (s *ObservedState) setResolvedNetworks(networks map[string]string, project 
 	}
 }
 
-// setResolvedVolumes injects volume names already resolved by ensureProjectVolumes
-// into the observed state.
+// setResolvedVolumes injects volume names already resolved by checkVolumes
+// (external volumes) into the observed state. Managed volumes are discovered
+// directly by collectObservedState, so only external ones need injecting.
 func (s *ObservedState) setResolvedVolumes(volumes map[string]string) {
 	for key, id := range volumes {
 		if obs, exists := s.Volumes[key]; exists {

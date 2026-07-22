@@ -61,21 +61,11 @@ type reconciler struct {
 	project  *types.Project
 	observed *ObservedState
 	options  ReconcileOptions
-	// Seam-consolidation infrastructure.
-	//
-	// Today, divergence detection and recreation for volumes/networks live in
-	// ensureProjectVolumes/ensureNetworks (called before reconcile). The plan
-	// is to migrate that responsibility into the reconciler. The hooks below
-	// are kept so the migration can land in one commit instead of touching
-	// every caller:
-	//
-	//   - prompt (this field)               — user interaction
-	//   - planRecreateVolume (below)        — the volume recreate sequence
-	//   - servicesUsingVolume (below)       — its only caller today
-	//
-	// When the migration lands, remove all three together if it ends up
-	// shaped differently. The //nolint:unused markers on the helpers point
-	// here for context.
+	// prompt interacts with the user to confirm destructive decisions taken
+	// while building the plan. Today its only consumer is reconcileVolumes,
+	// which asks for confirmation before scheduling the recreation of a volume
+	// whose configuration has diverged (an operation that loses the volume's
+	// data). Network recreation is not gated: it is not destructive.
 	prompt Prompt
 	plan   *Plan
 
@@ -107,8 +97,8 @@ type reconciler struct {
 }
 
 // reconcile is the main entry point: it builds a Plan from desired vs observed state.
-// The prompt function is reserved for future interactive decisions (see the
-// reconciler.prompt field).
+// The prompt function is consulted while planning to confirm destructive
+// decisions (see the reconciler.prompt field).
 func reconcile(_ context.Context, project *types.Project, observed *ObservedState, options ReconcileOptions, prompt Prompt) (*Plan, error) {
 	r := &reconciler{
 		project:                     project,
@@ -128,7 +118,9 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 		return nil, err
 	}
 
-	r.reconcileVolumes()
+	if err := r.reconcileVolumes(); err != nil {
+		return nil, err
+	}
 
 	if err := r.reconcileContainers(); err != nil {
 		return nil, err
@@ -238,20 +230,45 @@ func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) er
 	return nil
 }
 
-// reconcileVolumes adds plan nodes for volume creation. Recreation of a
-// diverged volume is handled by ensureProjectVolumes (which already prompts
-// the user) before reconcile runs, so the reconciler does not duplicate that
-// decision here.
-func (r *reconciler) reconcileVolumes() {
+// reconcileVolumes plans the volume lifecycle: creation of missing volumes and,
+// for volumes whose configuration has diverged from the live resource,
+// recreation — gated on user confirmation because it destroys the volume's data.
+//
+// Divergence is detected by comparing VolumeHash(desired) with the config-hash
+// persisted on the live volume (observed.ConfigHash). A volume with no recorded
+// hash (e.g. created by an older Compose) is left untouched, matching the
+// previous ensureVolume behavior.
+func (r *reconciler) reconcileVolumes() error {
+	var diverged []string
 	for _, key := range sortedKeys(r.project.Volumes) {
 		desired := r.project.Volumes[key]
 		if desired.External {
 			continue
 		}
-		if _, exists := r.observed.Volumes[key]; !exists {
+		observed, exists := r.observed.Volumes[key]
+		if !exists {
 			r.planCreateVolume(key, &desired)
+			continue
+		}
+		expected, err := VolumeHash(desired)
+		if err != nil {
+			return err
+		}
+		if observed.ConfigHash == "" || observed.ConfigHash == expected {
+			continue
+		}
+		confirmed, err := r.prompt(
+			fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", desired.Name),
+			false)
+		if err != nil {
+			return err
+		}
+		if confirmed {
+			diverged = append(diverged, key)
 		}
 	}
+	r.planRecreateVolumes(diverged)
+	return nil
 }
 
 // planCreateVolume adds a single CreateVolume node and records it for dependency tracking.
@@ -267,59 +284,92 @@ func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig) *Plan
 	return node
 }
 
-// planRecreateVolume adds the full sequence for a diverged volume:
-// stop affected containers → remove containers → remove volume → create volume.
-// Containers must be removed (not just stopped) because Docker does not allow
-// removing a volume that is referenced by any container, even a stopped one.
+// planRecreateVolumes schedules the recreation of the given (confirmed) diverged
+// volumes and hands the re-creation of the impacted service containers to
+// reconcileContainers. The resulting plan, for each affected container/volume, is:
 //
-//nolint:unused // see reconciler.prompt field doc — seam consolidation.
-func (r *reconciler) planRecreateVolume(key string, vol *types.VolumeConfig) {
-	observed := r.observed.Volumes[key]
-	affectedServices := r.servicesUsingVolume(key)
-	affectedContainers := r.containersForServices(affectedServices)
-
-	// Stop all affected containers
-	var stopNodes []*PlanNode
-	for i := range affectedContainers {
-		oc := &affectedContainers[i]
-		node := r.plan.addNode(Operation{
-			Type:       OpStopContainer,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
-			Cause:      fmt.Sprintf("volume %s config changed", key),
-			Container:  &oc.Summary,
-		}, "")
-		stopNodes = append(stopNodes, node)
+//	stop containers → remove containers → remove volume → create volume → create containers
+//
+// Containers must be *removed* (not merely stopped) before a volume can be
+// removed: Docker refuses to remove a volume still referenced by any container,
+// even a stopped one. They are then recreated once the fresh volume exists.
+//
+// Rather than re-implementing container creation here, the affected services are
+// cleared from the observed snapshot: reconcileContainers (which runs next) then
+// sees them as absent and schedules fresh containers that depend on the
+// CreateVolume node via infrastructureDeps. Marking those services as recreated
+// propagates the cascade to namespace/volume-sharing dependents.
+//
+// Container stops/removes are planned once per container even when a container
+// mounts several diverged volumes, and every RemoveVolume waits for all affected
+// container removals, so the ordering holds regardless of which service mounts
+// which volume.
+func (r *reconciler) planRecreateVolumes(keys []string) {
+	if len(keys) == 0 {
+		return
 	}
 
-	// Remove all affected containers (each depends on its own stop)
+	// Collect the services (and their containers) mounting any diverged volume.
+	serviceSet := map[string]bool{}
+	for _, key := range keys {
+		for _, svc := range r.servicesUsingVolume(key) {
+			serviceSet[svc] = true
+		}
+	}
+	services := sortedKeys(serviceSet)
+	containers := r.containersForServices(services)
+
+	// Stop then remove every affected container.
 	var removeNodes []*PlanNode
-	for i, oc := range affectedContainers {
-		node := r.plan.addNode(Operation{
+	for i := range containers {
+		oc := &containers[i]
+		resID := fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number)
+		stopNode, alreadyStopped := r.stoppedByPlan[oc.ID]
+		if !alreadyStopped {
+			stopNode = r.plan.addNode(Operation{
+				Type:       OpStopContainer,
+				ResourceID: resID,
+				Cause:      "mounted volume config changed",
+				Container:  &oc.Summary,
+				Timeout:    r.options.Timeout,
+			}, "")
+			r.stoppedByPlan[oc.ID] = stopNode
+		}
+		removeNode := r.plan.addNode(Operation{
 			Type:       OpRemoveContainer,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
-			Cause:      fmt.Sprintf("volume %s config changed", key),
-			Container:  &affectedContainers[i].Summary,
-		}, "", stopNodes[i])
-		removeNodes = append(removeNodes, node)
+			ResourceID: resID,
+			Cause:      "mounted volume config changed",
+			Container:  &oc.Summary,
+		}, "", stopNode)
+		removeNodes = append(removeNodes, removeNode)
 	}
 
-	// Remove the *observed* volume (depends on all container removals)
-	removeVolNode := r.plan.addNode(Operation{
-		Type:       OpRemoveVolume,
-		ResourceID: fmt.Sprintf("volume:%s", key),
-		Cause:      "config hash diverged",
-		Name:       observed.Name,
-	}, "", removeNodes...)
+	// Remove then recreate each diverged volume once all affected containers are
+	// gone. Record the CreateVolume node so the fresh containers scheduled by
+	// reconcileContainers depend on it (via infrastructureDeps).
+	for _, key := range keys {
+		desired := r.project.Volumes[key]
+		removeVolNode := r.plan.addNode(Operation{
+			Type:       OpRemoveVolume,
+			ResourceID: fmt.Sprintf("volume:%s", key),
+			Cause:      "config hash diverged",
+			Name:       r.observed.Volumes[key].Name,
+		}, "", removeNodes...)
+		createVolNode := r.plan.addNode(Operation{
+			Type:       OpCreateVolume,
+			ResourceID: fmt.Sprintf("volume:%s", key),
+			Cause:      "recreate after config change",
+			Name:       desired.Name,
+			Volume:     &desired,
+		}, "", removeVolNode)
+		r.volumeNodes[key] = createVolNode
+	}
 
-	// Create volume (depends on remove)
-	createNode := r.plan.addNode(Operation{
-		Type:       OpCreateVolume,
-		ResourceID: fmt.Sprintf("volume:%s", key),
-		Cause:      "recreate after config change",
-		Name:       vol.Name,
-		Volume:     vol,
-	}, "", removeVolNode)
-	r.volumeNodes[key] = createNode
+	// Hand container re-creation to reconcileContainers.
+	for _, svc := range services {
+		r.recreatedServices[svc] = true
+		r.observed.Containers[svc] = nil
+	}
 }
 
 // servicesUsingNetwork returns the names of services that reference the given
@@ -337,8 +387,6 @@ func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 
 // servicesUsingVolume returns the names of services that mount the given
 // compose volume key, sorted for deterministic plan output.
-//
-//nolint:unused // see reconciler.prompt field doc — seam consolidation.
 func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	var names []string
 	for _, key := range sortedKeys(r.project.Services) {
