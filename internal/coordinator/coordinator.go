@@ -146,6 +146,10 @@ func (c *Client) PushProjectConfig(ctx context.Context, apiVersion string, proje
 	}
 	defer func() {
 		_ = resp.Body.Close()
+		// The transport is discarded after this call; tear down its idle
+		// persistConn goroutines eagerly instead of waiting out
+		// IdleConnTimeout, which matters when "up" is invoked in a loop.
+		httpClient.CloseIdleConnections()
 	}()
 
 	if resp.StatusCode >= http.StatusBadRequest {
