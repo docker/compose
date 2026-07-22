@@ -14,35 +14,36 @@
    limitations under the License.
 */
 
-package compose
+package coordinator
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/store"
-	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
-var testProjectConfigStoreCfg = store.NewConfig(
+var testStoreCfg = store.NewConfig(
 	func() any {
 		return &map[string]any{}
 	},
 )
 
-func newProjectConfigStore(t *testing.T, meta any) store.Store {
+func newContextStore(t *testing.T, meta any) store.Store {
 	t.Helper()
-	st := store.New(t.TempDir(), testProjectConfigStoreCfg)
+	st := store.New(t.TempDir(), testStoreCfg)
 	err := st.CreateOrUpdate(store.Metadata{
 		Name:      "test",
 		Metadata:  meta,
@@ -52,7 +53,7 @@ func newProjectConfigStore(t *testing.T, meta any) store.Store {
 	return st
 }
 
-func TestProjectConfigPushEnabled(t *testing.T) {
+func TestPushEnabled(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Requires filesystem access")
 	}
@@ -68,27 +69,27 @@ func TestProjectConfigPushEnabled(t *testing.T) {
 	}{
 		{
 			name: "boolean true",
-			meta: dockerContext(map[string]any{projectConfigMetadataKey: true}),
+			meta: dockerContext(map[string]any{MetadataKey: true}),
 			want: true,
 		},
 		{
 			name: "string true",
-			meta: dockerContext(map[string]any{projectConfigMetadataKey: "true"}),
+			meta: dockerContext(map[string]any{MetadataKey: "true"}),
 			want: true,
 		},
 		{
 			name: "string TRUE case-insensitive",
-			meta: dockerContext(map[string]any{projectConfigMetadataKey: "TRUE"}),
+			meta: dockerContext(map[string]any{MetadataKey: "TRUE"}),
 			want: true,
 		},
 		{
 			name: "boolean false",
-			meta: dockerContext(map[string]any{projectConfigMetadataKey: false}),
+			meta: dockerContext(map[string]any{MetadataKey: false}),
 			want: false,
 		},
 		{
 			name: "string other",
-			meta: dockerContext(map[string]any{projectConfigMetadataKey: "yes"}),
+			meta: dockerContext(map[string]any{MetadataKey: "yes"}),
 			want: false,
 		},
 		{
@@ -98,7 +99,7 @@ func TestProjectConfigPushEnabled(t *testing.T) {
 		},
 		{
 			name: "raw map form",
-			meta: map[string]any{projectConfigMetadataKey: true},
+			meta: map[string]any{MetadataKey: true},
 			want: true,
 		},
 	}
@@ -107,40 +108,23 @@ func TestProjectConfigPushEnabled(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			cli := mocks.NewMockCli(mockCtrl)
-			cli.EXPECT().ContextStore().Return(newProjectConfigStore(t, tt.meta)).AnyTimes()
+			cli.EXPECT().ContextStore().Return(newContextStore(t, tt.meta)).AnyTimes()
 			cli.EXPECT().CurrentContext().Return("test").AnyTimes()
 
-			s := &composeService{dockerCli: cli}
-			assert.Equal(t, s.projectConfigPushEnabled(), tt.want)
+			assert.Equal(t, PushEnabled(cli), tt.want)
 		})
 	}
 }
 
-func TestProjectConfigPushEnabledMetadataError(t *testing.T) {
+func TestPushEnabledMetadataError(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)
 	// An empty store returns an error for an unknown context; that must be
 	// treated as "not enabled" rather than blocking up.
-	cli.EXPECT().ContextStore().Return(store.New(t.TempDir(), testProjectConfigStoreCfg)).AnyTimes()
+	cli.EXPECT().ContextStore().Return(store.New(t.TempDir(), testStoreCfg)).AnyTimes()
 	cli.EXPECT().CurrentContext().Return("missing").AnyTimes()
 
-	s := &composeService{dockerCli: cli}
-	assert.Equal(t, s.projectConfigPushEnabled(), false)
-}
-
-func newPushTestService(t *testing.T, version string) (*composeService, *mocks.MockAPIClient) {
-	t.Helper()
-	mockCtrl := gomock.NewController(t)
-	t.Cleanup(mockCtrl.Finish)
-	apiClient := mocks.NewMockAPIClient(mockCtrl)
-	cli := mocks.NewMockCli(mockCtrl)
-	cli.EXPECT().Client().Return(apiClient).AnyTimes()
-	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
-		Return(client.PingResult{APIVersion: version}, nil).AnyTimes()
-	apiClient.EXPECT().ClientVersion().Return(version).AnyTimes()
-	tested, err := NewComposeService(cli)
-	assert.NilError(t, err)
-	return tested.(*composeService), apiClient
+	assert.Equal(t, PushEnabled(cli), false)
 }
 
 func newTestProject() *types.Project {
@@ -173,13 +157,11 @@ func TestPushProjectConfig(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s, apiClient := newPushTestService(t, apiVersionComposeProjectConfig)
-	apiClient.EXPECT().Dialer().Return(dialerFor(srv.Listener.Addr().String())).AnyTimes()
-
-	err := s.pushProjectConfig(t.Context(), newTestProject())
+	c := NewClient(dialerFor(srv.Listener.Addr().String()))
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
 	assert.NilError(t, err)
 	assert.Equal(t, gotMethod, http.MethodPost)
-	assert.Equal(t, gotPath, "/v"+apiVersionComposeProjectConfig+"/compose/project")
+	assert.Equal(t, gotPath, "/v"+MinAPIVersion+"/compose/project")
 	assert.Assert(t, len(gotBody) > 0)
 }
 
@@ -189,19 +171,59 @@ func TestPushProjectConfigServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s, apiClient := newPushTestService(t, apiVersionComposeProjectConfig)
-	apiClient.EXPECT().Dialer().Return(dialerFor(srv.Listener.Addr().String())).AnyTimes()
-
-	err := s.pushProjectConfig(t.Context(), newTestProject())
+	c := NewClient(dialerFor(srv.Listener.Addr().String()))
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
 	assert.ErrorContains(t, err, "500")
 	assert.ErrorContains(t, err, "placement failed")
 }
 
-func TestPushProjectConfigVersionTooLow(t *testing.T) {
-	s, apiClient := newPushTestService(t, "1.44")
-	// Dialer must never be reached: the version gate rejects first.
-	apiClient.EXPECT().Dialer().Times(0)
+func TestPushProjectConfigDialerError(t *testing.T) {
+	// A dialer that never connects surfaces as a request error, which callers
+	// treat as non-fatal.
+	dialer := func(context.Context) (net.Conn, error) {
+		return nil, errors.New("boom: no engine socket")
+	}
+	c := NewClient(dialer)
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	assert.ErrorContains(t, err, "boom: no engine socket")
+}
 
-	err := s.pushProjectConfig(t.Context(), newTestProject())
+func TestPushProjectConfigErrorEmptyBody(t *testing.T) {
+	// A non-2xx status with no body still yields a useful error.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	c := NewClient(dialerFor(srv.Listener.Addr().String()))
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	assert.ErrorContains(t, err, "coordinator returned status 503")
+}
+
+func TestPushProjectConfigVersionTooLow(t *testing.T) {
+	// The dialer must never be reached: the version gate rejects first.
+	dialer := func(context.Context) (net.Conn, error) {
+		t.Fatal("dialer should not be called when the API version is too low")
+		return nil, nil
+	}
+	c := NewClient(dialer)
+	err := c.PushProjectConfig(t.Context(), "1.44", newTestProject())
 	assert.ErrorContains(t, err, "does not support the project-config push")
+}
+
+func TestPushProjectConfigTimeout(t *testing.T) {
+	// A coordinator that accepts the connection but never responds must not
+	// hang the push: the client timeout bounds the request.
+	block := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-block
+	}))
+	defer srv.Close()
+	defer close(block)
+
+	c := NewClient(dialerFor(srv.Listener.Addr().String()))
+	c.timeout = 50 * time.Millisecond
+
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	assert.ErrorContains(t, err, "context deadline exceeded")
 }

@@ -36,6 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/internal/coordinator"
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
@@ -46,7 +47,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		// When the current Docker context opts into the project-config push, send
 		// the project configuration to the coordinator before any other Docker API
 		// call. Failures are non-fatal: warn and continue bringing the project up.
-		if !s.dryRun && s.projectConfigPushEnabled() {
+		if !s.dryRun && coordinator.PushEnabled(s.dockerCli) {
 			if err := s.pushProjectConfig(ctx, project); err != nil {
 				logrus.Warnf("project config push to coordinator failed, continuing: %v", err)
 			}
@@ -309,6 +310,17 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
+}
+
+// pushProjectConfig negotiates the engine API version and hands the project
+// off to the coordinator client, which owns the coordinator-specific transport
+// and outcome handling (see internal/coordinator).
+func (s *composeService) pushProjectConfig(ctx context.Context, project *types.Project) error {
+	version, err := s.RuntimeAPIVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("negotiating API version: %w", err)
+	}
+	return coordinator.NewClient(s.apiClient().Dialer()).PushProjectConfig(ctx, version, project)
 }
 
 func shouldFollowStartEvent(event api.ContainerEvent, attached []string, attachTo []string) bool {

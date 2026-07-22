@@ -48,15 +48,6 @@ const (
 	//  - interface_name was not configurable
 	//  - ImageList didn't support platform filtering
 	apiVersion149 = "1.49"
-
-	// apiVersionComposeProjectConfig is the Engine/coordinator API version that
-	// introduced POST /v{version}/compose/project for the Compose
-	// project-config push (see projectConfigPushEnabled / pushProjectConfig).
-	//
-	// Detection of the push is driven by the projectConfigMetadataKey context
-	// metadata key; this constant documents the minimum coordinator version and
-	// provides a single place to gate on should that become necessary.
-	apiVersionComposeProjectConfig = "1.51"
 )
 
 // Docker Engine version strings for user-facing error messages.
