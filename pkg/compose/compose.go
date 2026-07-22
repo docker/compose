@@ -37,6 +37,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
 )
@@ -217,6 +218,7 @@ type composeService struct {
 	dryRun         bool
 
 	runtimeAPIVersion runtimeVersionCache
+	serviceClients    serviceClientCache
 }
 
 // Close releases any connections/resources held by the underlying clients.
@@ -225,6 +227,7 @@ type composeService struct {
 // will get cleaned up at about the same time regardless even if not invoked.
 func (s *composeService) Close() error {
 	var errs []error
+	errs = append(errs, s.serviceClients.Close())
 	if s.dockerCli != nil {
 		errs = append(errs, s.apiClient().Close())
 	}
@@ -233,6 +236,104 @@ func (s *composeService) Close() error {
 
 func (s *composeService) apiClient() client.APIClient {
 	return s.dockerCli.Client()
+}
+
+// Compose tags the Docker API requests it makes on behalf of a specific service
+// with these headers, so the daemon can attribute the request to the project
+// and service it originates from.
+const (
+	composeProjectHeader = "X-Docker-Compose-Project"
+	composeServiceHeader = "X-Docker-Compose-Service"
+)
+
+type serviceClientKey struct {
+	project string
+	service string
+}
+
+// serviceClientCache memoizes one API client per project/service. Each client
+// tags its requests with headers identifying the service it acts on, so a
+// separate client is required per service (the Docker client applies custom
+// headers per instance, not per request). Clients are closed by
+// composeService.Close().
+type serviceClientCache struct {
+	mu      sync.Mutex
+	clients map[serviceClientKey]client.APIClient
+}
+
+// Close closes every cached client and empties the cache.
+func (c *serviceClientCache) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var errs []error
+	for _, cli := range c.clients {
+		errs = append(errs, cli.Close())
+	}
+	c.clients = nil
+	return errors.Join(errs...)
+}
+
+// serviceClient returns an API client whose requests are tagged with headers
+// identifying projectName/serviceName. Clients are cached and reused; the
+// returned client is owned and closed by the composeService, so callers must
+// not close it themselves. Use it for Docker API calls scoped to a single
+// service; project-wide calls (networks, volumes, events, project-wide
+// container listings, …) should keep using apiClient.
+func (s *composeService) serviceClient(projectName, serviceName string) (client.APIClient, error) {
+	key := serviceClientKey{project: projectName, service: serviceName}
+
+	s.serviceClients.mu.Lock()
+	defer s.serviceClients.mu.Unlock()
+	if c, ok := s.serviceClients.clients[key]; ok {
+		return c, nil
+	}
+
+	c, err := s.newServiceClient(projectName, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	if s.serviceClients.clients == nil {
+		s.serviceClients.clients = make(map[serviceClientKey]client.APIClient)
+	}
+	s.serviceClients.clients[key] = c
+	return c, nil
+}
+
+// newServiceClient builds an API client that mirrors the CLI-provided client
+// (same endpoint, TLS and negotiated API version) and tags every request with
+// headers identifying the project and service on whose behalf it acts.
+func (s *composeService) newServiceClient(projectName, serviceName string) (client.APIClient, error) {
+	endpoint := s.dockerCli.DockerEndpoint()
+	opts, err := endpoint.ClientOpts()
+	if err != nil {
+		return nil, err
+	}
+
+	headers := map[string]string{}
+	for k, v := range s.configFile().HTTPHeaders {
+		headers[k] = v
+	}
+	headers[composeProjectHeader] = projectName
+	headers[composeServiceHeader] = serviceName
+
+	opts = append(opts,
+		client.WithAPIVersion(s.apiClient().ClientVersion()),
+		client.WithUserAgent("compose/"+internal.Version),
+		client.WithHTTPHeaders(headers),
+	)
+	apiClient, err := client.New(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// In dry-run mode the shared client is a DryRunClient that intercepts
+	// mutating calls (e.g. ImagePull returns a fake stream without contacting
+	// the daemon). A freshly-built client would bypass that and hit the daemon,
+	// so wrap the scoped client to preserve dry-run semantics.
+	if s.dryRun {
+		return dryrun.NewDryRunClient(apiClient, s.dockerCli)
+	}
+	return apiClient, nil
 }
 
 func (s *composeService) configFile() *configfile.ConfigFile {
