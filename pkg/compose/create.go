@@ -92,7 +92,8 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	volumes, err := s.ensureProjectVolumes(ctx, project)
+	prepareVolumes(project)
+	externalVolumes, err := s.checkVolumes(ctx, project)
 	if err != nil {
 		return err
 	}
@@ -108,7 +109,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 	observed.setResolvedNetworks(networks, project)
-	observed.setResolvedVolumes(volumes)
+	observed.setResolvedVolumes(externalVolumes)
 
 	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
 		logrus.Warnf("Found orphan containers (%s) for this project. If "+
@@ -152,20 +153,56 @@ func (s *composeService) ensureNetworks(ctx context.Context, project *types.Proj
 	return networks, nil
 }
 
-func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
-	ids := map[string]string{}
+// prepareVolumes injects the compose-managed labels onto every project volume so
+// that createVolume (executed later as a plan operation) persists them and the
+// volume can be matched back to the project on the next run. It mirrors
+// prepareNetworks and performs no I/O.
+func prepareVolumes(project *types.Project) {
 	for k, volume := range project.Volumes {
-		volume.CustomLabels = volume.CustomLabels.Add(api.VolumeLabel, k)
-		volume.CustomLabels = volume.CustomLabels.Add(api.ProjectLabel, project.Name)
-		volume.CustomLabels = volume.CustomLabels.Add(api.VersionLabel, api.ComposeVersion)
-		id, err := s.ensureVolume(ctx, k, volume, project)
+		volume.CustomLabels = volume.CustomLabels.
+			Add(api.VolumeLabel, k).
+			Add(api.ProjectLabel, project.Name).
+			Add(api.VersionLabel, api.ComposeVersion)
+		project.Volumes[k] = volume
+	}
+}
+
+// checkVolumes validates that external volumes exist and warns about non-external
+// volumes whose name collides with a volume not managed by this project. Creation
+// and recreation of managed volumes is owned by the reconciliation plan, so this
+// function performs no mutation.
+//
+// It returns the resolved names of external volumes: those are not labelled by
+// Compose and are therefore absent from the observed state, so the reconciler
+// needs them injected via setResolvedVolumes.
+func (s *composeService) checkVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
+	external := map[string]string{}
+	for k, volume := range project.Volumes {
+		if volume.External {
+			if _, err := s.apiClient().VolumeInspect(ctx, volume.Name, client.VolumeInspectOptions{}); err != nil {
+				if errdefs.IsNotFound(err) {
+					return nil, fmt.Errorf("external volume %q not found", volume.Name)
+				}
+				return nil, err
+			}
+			external[k] = volume.Name
+			continue
+		}
+
+		inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name, client.VolumeInspectOptions{})
 		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue // absent: it will be created by the reconciliation plan
+			}
 			return nil, err
 		}
-		ids[k] = id
+		if p, ok := inspected.Volume.Labels[api.ProjectLabel]; !ok {
+			logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
+		} else if p != project.Name {
+			logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, p, project.Name)
+		}
 	}
-
-	return ids, nil
+	return external, nil
 }
 
 //nolint:gocyclo
@@ -1592,97 +1629,6 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	default:
 		return "", fmt.Errorf("multiple networks with name %q were found. Use network ID as `name` to avoid ambiguity", n.Name)
 	}
-}
-
-func (s *composeService) ensureVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) (string, error) {
-	inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name, client.VolumeInspectOptions{})
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return "", err
-		}
-		if volume.External {
-			return "", fmt.Errorf("external volume %q not found", volume.Name)
-		}
-		err = s.createVolume(ctx, volume)
-		return volume.Name, err
-	}
-
-	if volume.External {
-		return volume.Name, nil
-	}
-
-	// Volume exists with name, but let's double-check this is the expected one
-	p, ok := inspected.Volume.Labels[api.ProjectLabel]
-	if !ok {
-		logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
-	}
-	if ok && p != project.Name {
-		logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, p, project.Name)
-	}
-
-	expected, err := VolumeHash(volume)
-	if err != nil {
-		return "", err
-	}
-	actual, ok := inspected.Volume.Labels[api.ConfigHashLabel]
-	if ok && actual != expected {
-		msg := fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", volume.Name)
-		confirm, err := s.prompt(msg, false)
-		if err != nil {
-			return "", err
-		}
-		if confirm {
-			err = s.removeDivergedVolume(ctx, name, volume, project)
-			if err != nil {
-				return "", err
-			}
-			return volume.Name, s.createVolume(ctx, volume)
-		}
-	}
-	return inspected.Volume.Name, nil
-}
-
-func (s *composeService) removeDivergedVolume(ctx context.Context, name string, volume types.VolumeConfig, project *types.Project) error {
-	// Remove services mounting divergent volume
-	var services []string
-	for _, service := range project.Services.Filter(func(config types.ServiceConfig) bool {
-		for _, cfg := range config.Volumes {
-			if cfg.Source == name {
-				return true
-			}
-		}
-		return false
-	}) {
-		services = append(services, service.Name)
-	}
-
-	err := s.stop(ctx, project.Name, api.StopOptions{
-		Services: services,
-		Project:  project,
-	}, nil)
-	if err != nil {
-		return err
-	}
-
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, services...)
-	if err != nil {
-		return err
-	}
-
-	// FIXME (ndeloof) we have to remove container so we can recreate volume
-	// but doing so we can't inherit anonymous volumes from previous instance
-	err = s.remove(ctx, containers, api.RemoveOptions{
-		Services: services,
-		Project:  project,
-	})
-	if err != nil {
-		return err
-	}
-
-	_, err = s.apiClient().VolumeRemove(ctx, volume.Name, client.VolumeRemoveOptions{
-		Force: true,
-	})
-	return err
 }
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
