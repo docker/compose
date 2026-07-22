@@ -365,7 +365,17 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 		r.volumeNodes[key] = createVolNode
 	}
 
-	// Hand container re-creation to reconcileContainers.
+	// Hand container re-creation to reconcileContainers: cleared services are
+	// seen as absent and scheduled fresh (gated on their CreateVolume node via
+	// infrastructureDeps), and marking them recreated cascades to
+	// namespace/volume-sharing dependents.
+	//
+	// Only observed.Containers is cleared, not the observedContainersByService
+	// snapshot memoized at reconciler init: that snapshot backs config-hash
+	// resolution (serviceHashWithResolvedRefs), which must mirror the state the
+	// executor hashed against at create time, whereas clearing here is purely a
+	// scheduling concern carried by the plan's dependency edges. The two
+	// intentionally diverge; do not "fix" one to match the other.
 	for _, svc := range services {
 		r.recreatedServices[svc] = true
 		r.observed.Containers[svc] = nil
@@ -385,20 +395,56 @@ func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 	return names
 }
 
-// servicesUsingVolume returns the names of services that mount the given
-// compose volume key, sorted for deterministic plan output.
+// servicesUsingVolume returns the names of services whose containers reference
+// the given compose volume — either by mounting it directly (service.Volumes) or
+// by inheriting the mount transitively through volumes_from. Every such service's
+// containers must be removed before the volume can be removed: Docker refuses to
+// remove a volume still referenced by any container, and volumes_from
+// materializes the source's mounts on the target container. Sorted for
+// deterministic plan output.
+//
+// Only volumes_from propagates a *mount* (and therefore a volume reference);
+// network_mode/ipc/pid: service:x share namespaces, not mounts, so they do not
+// keep a volume in use and are intentionally excluded here.
 func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
-	var names []string
+	inSet := map[string]bool{}
+	// Seed with services that mount the volume directly.
 	for _, key := range sortedKeys(r.project.Services) {
 		svc := r.project.Services[key]
 		for _, v := range svc.Volumes {
 			if v.Source == volumeKey {
-				names = append(names, svc.Name)
+				inSet[svc.Name] = true
 				break
 			}
 		}
 	}
-	return names
+	// Grow the set by transitive volumes_from closure until it stabilizes: a
+	// service inherits the mount when it draws volumes from a service already in
+	// the set (references to external containers carry no compose dependency).
+	for {
+		added := false
+		for _, key := range sortedKeys(r.project.Services) {
+			svc := r.project.Services[key]
+			if inSet[svc.Name] {
+				continue
+			}
+			for _, vf := range svc.VolumesFrom {
+				if strings.HasPrefix(vf, types.ContainerPrefix) {
+					continue
+				}
+				name, _, _ := strings.Cut(vf, ":")
+				if inSet[name] {
+					inSet[svc.Name] = true
+					added = true
+					break
+				}
+			}
+		}
+		if !added {
+			break
+		}
+	}
+	return sortedKeys(inSet)
 }
 
 // containersForServices returns all observed containers belonging to the given

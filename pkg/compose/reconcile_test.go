@@ -616,14 +616,103 @@ func TestReconcileVolumes_DivergedCascadesToDependent(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
 	assert.NilError(t, err)
 
+	// The dependent inherits the volume mount via volumes_from, so its container
+	// must be stopped and removed before RemoveVolume (#5 depends on both #2 and
+	// #4) — otherwise the removal would fail with "volume in use". Both fresh
+	// containers are then gated on the new volume: owner (#7) depends on
+	// CreateVolume (#6), and the dependent (#8) depends on owner (#7).
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:dependent:1, StopContainer, mounted volume config changed
+[1] -> #2 service:dependent:1, RemoveContainer, mounted volume config changed
+[] -> #3 service:owner:1, StopContainer, mounted volume config changed
+[3] -> #4 service:owner:1, RemoveContainer, mounted volume config changed
+[2,4] -> #5 volume:data, RemoveVolume, config hash diverged
+[5] -> #6 volume:data, CreateVolume, recreate after config change
+[6] -> #7 service:owner:1, CreateContainer, no existing container
+[7] -> #8 service:dependent:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// TestReconcileVolumes_DivergedVolumesFromRemovedBeforeVolume specifically guards
+// against a "volume in use" failure: a service reaching the diverged volume only
+// through volumes_from (never mounting it directly) must still have its container
+// removed before the volume is removed.
+func TestReconcileVolumes_DivergedVolumesFromRemovedBeforeVolume(t *testing.T) {
+	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
+	owner := types.ServiceConfig{
+		Name:    "owner",
+		Image:   "alpine",
+		Scale:   intPtr(1),
+		Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+	}
+	// consumer inherits owner's mounts (including data) but never declares the
+	// volume itself.
+	consumer := types.ServiceConfig{
+		Name:        "consumer",
+		Image:       "alpine",
+		Scale:       intPtr(1),
+		VolumesFrom: []string{"owner"},
+		DependsOn:   types.DependsOnConfig{"owner": {Condition: types.ServiceConditionStarted, Required: true}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Volumes:  types.Volumes{"data": vol},
+		Services: types.Services{"owner": owner, "consumer": consumer},
+	}
+	ownerHash := mustServiceHash(t, owner)
+	ownerSummary := container.Summary{
+		ID: "owner-1", State: container.StateRunning,
+		Labels: map[string]string{api.ServiceLabel: "owner", api.ContainerNumberLabel: "1", api.ConfigHashLabel: ownerHash},
+		Mounts: []container.MountPoint{{Type: "volume", Name: vol.Name}},
+	}
+	consumerHash := mustResolvedServiceHash(t, consumer, map[string]Containers{"owner": {ownerSummary}})
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"owner": {{ID: "owner-1", Number: 1, State: container.StateRunning, ConfigHash: ownerHash, Summary: ownerSummary}},
+			"consumer": {{
+				ID: "consumer-1", Number: 1, State: container.StateRunning, ConfigHash: consumerHash,
+				Summary: container.Summary{
+					ID: "consumer-1", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "consumer", api.ContainerNumberLabel: "1", api.ConfigHashLabel: consumerHash},
+					// Docker materializes the inherited mount on the consumer.
+					Mounts: []container.MountPoint{{Type: "volume", Name: vol.Name}},
+				},
+			}},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes:  map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+
 	planStr := plan.String()
-	// Volume recreate sequence for the owner.
-	assert.Assert(t, strings.Contains(planStr, "service:owner:1, RemoveContainer, mounted volume config changed"), planStr)
-	assert.Assert(t, strings.Contains(planStr, "volume:data, RemoveVolume, config hash diverged"), planStr)
-	assert.Assert(t, strings.Contains(planStr, "volume:data, CreateVolume, recreate after config change"), planStr)
-	assert.Assert(t, strings.Contains(planStr, "service:owner:1, CreateContainer"), planStr)
-	// Cascade: the dependent must be recreated too.
-	assert.Assert(t, strings.Contains(planStr, "service:dependent:1, CreateContainer"), "dependent must cascade-recreate:\n%s", planStr)
+	// The volumes_from consumer is stopped and removed as part of the volume
+	// recreation batch, even though it never declares the volume.
+	assert.Assert(t, strings.Contains(planStr, "service:consumer:1, RemoveContainer, mounted volume config changed"),
+		"volumes_from consumer must be removed before RemoveVolume:\n%s", planStr)
+
+	// RemoveVolume must depend on the consumer's RemoveContainer node.
+	var removeConsumer, removeVolume *PlanNode
+	for _, n := range plan.Nodes {
+		if n.Operation.Type == OpRemoveContainer && n.Operation.ResourceID == "service:consumer:1" {
+			removeConsumer = n
+		}
+		if n.Operation.Type == OpRemoveVolume {
+			removeVolume = n
+		}
+	}
+	assert.Assert(t, removeConsumer != nil, "no RemoveContainer for consumer:\n%s", planStr)
+	assert.Assert(t, removeVolume != nil, "no RemoveVolume:\n%s", planStr)
+	found := false
+	for _, dep := range removeVolume.DependsOn {
+		if dep == removeConsumer {
+			found = true
+			break
+		}
+	}
+	assert.Assert(t, found, "RemoveVolume must depend on the consumer's RemoveContainer:\n%s", planStr)
 }
 
 // TestReconcileVolumes_DivergedUnmountedVolume verifies that a diverged volume

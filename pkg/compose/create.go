@@ -1638,7 +1638,7 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 	if err != nil {
 		return err
 	}
-	volume.CustomLabels.Add(api.ConfigHashLabel, hash)
+	volume.CustomLabels = volume.CustomLabels.Add(api.ConfigHashLabel, hash)
 	_, err = s.apiClient().VolumeCreate(ctx, client.VolumeCreateOptions{
 		Labels:     mergeLabels(volume.Labels, volume.CustomLabels),
 		Name:       volume.Name,
