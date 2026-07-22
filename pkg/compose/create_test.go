@@ -17,11 +17,13 @@
 package compose
 
 import (
+	"io"
 	"net"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
@@ -35,6 +37,8 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
+	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -481,6 +485,98 @@ volumes:
 			assert.NilError(t, err)
 			assert.DeepEqual(t, tt.binds, binds)
 			assert.DeepEqual(t, tt.mounts, mounts)
+		})
+	}
+}
+
+func Test_composeService_confirmVolumeRecreate(t *testing.T) {
+	tests := []struct {
+		name    string
+		labels  map[string]string
+		input   string
+		want    bool
+		wantErr bool
+	}{
+		{
+			name:    "no labels no input",
+			labels:  nil,
+			input:   "",
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name:    "no labels and input is y",
+			labels:  nil,
+			input:   "y",
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "no labels and input is true",
+			labels:  nil,
+			input:   "true",
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "no labels and input is no",
+			labels:  nil,
+			input:   "no",
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name:    "no input, has labels recreate true",
+			labels:  map[string]string{api.VolumeRecreateWhenSpecUpdatedLabel: "true"},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "no input, has labels recreate TRUE",
+			labels:  map[string]string{api.VolumeRecreateWhenSpecUpdatedLabel: "TRUE"},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "no input, has labels recreate false",
+			labels:  map[string]string{api.VolumeRecreateWhenSpecUpdatedLabel: "false"},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name:    "input true, has labels recreate false",
+			labels:  map[string]string{api.VolumeRecreateWhenSpecUpdatedLabel: "false"},
+			input:   "true",
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name:    "input false, has labels recreate false",
+			labels:  map[string]string{api.VolumeRecreateWhenSpecUpdatedLabel: "false"},
+			input:   "false",
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt := prompt.NewPrompt(
+				streams.NewIn(io.NopCloser(strings.NewReader(tt.input))),
+				streams.NewOut(t.Output())).Confirm
+
+			got, gotErr := confirmVolumeRecreate(tt.labels, prompt, "volumeName")
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("confirmVolumeRecreate() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("confirmVolumeRecreate() succeeded unexpectedly")
+			}
+			if tt.want != got {
+				t.Errorf("confirmVolumeRecreate() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

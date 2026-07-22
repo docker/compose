@@ -1,0 +1,14 @@
+services:
+  app:
+    image: alpine
+    volumes:
+      - my_vol:/my_vol
+      - no_recreate_label:/no_recreate_label
+
+volumes:
+  my_vol:
+    labels:
+      foo: bar
+  no_recreate_label:
+    labels:
+      foo: bar
