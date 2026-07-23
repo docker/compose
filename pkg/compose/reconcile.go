@@ -82,6 +82,12 @@ type reconciler struct {
 	// one against an already-stopped container.
 	stoppedByPlan map[string]*PlanNode // container ID → existing Stop node
 
+	// connectNodes records the OpConnectNetwork nodes emitted for a container by
+	// planRecreateNetworks (reconnecting it to a freshly recreated network). If
+	// reconcileContainers later recreates the same container, its RemoveContainer
+	// must wait for these reconnects so they don't race the removal.
+	connectNodes map[string][]*PlanNode // container ID → reconnect nodes
+
 	// recreatedServices is the set of services with at least one container
 	// scheduled for recreation in the current plan. Services iterate in
 	// dependency order, so by the time a dependent is evaluated, all its
@@ -110,6 +116,7 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 		volumeNodes:                 map[string]*PlanNode{},
 		serviceNodes:                map[string]*PlanNode{},
 		stoppedByPlan:               map[string]*PlanNode{},
+		connectNodes:                map[string][]*PlanNode{},
 		recreatedServices:           map[string]bool{},
 		observedContainersByService: observed.containersByService(),
 	}
@@ -133,8 +140,17 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 	return r.plan, nil
 }
 
-// reconcileNetworks adds plan nodes for network creation or recreation.
+// reconcileNetworks plans the network lifecycle: creation of missing networks
+// and, for networks whose configuration has diverged from the live resource,
+// recreation. Unlike volumes, recreating a network is not destructive, so no
+// user confirmation is required.
+//
+// Divergence is detected by comparing NetworkHash(desired) with the config-hash
+// persisted on the live network (observed.ConfigHash). A network with no
+// recorded hash (e.g. created by an older Compose or manually) is left
+// untouched, matching the previous ensureNetwork behavior.
 func (r *reconciler) reconcileNetworks() error {
+	var diverged []string
 	for _, key := range sortedKeys(r.project.Networks) {
 		desired := r.project.Networks[key]
 		if desired.External {
@@ -142,92 +158,115 @@ func (r *reconciler) reconcileNetworks() error {
 		}
 		observed, exists := r.observed.Networks[key]
 		if !exists {
-			r.planCreateNetwork(key, &desired)
+			r.planCreateNetwork(key, &desired, "not found")
 			continue
 		}
-
-		expectedHash, err := NetworkHash(&desired)
+		expected, err := NetworkHash(&desired)
 		if err != nil {
 			return err
 		}
-		if observed.ConfigHash != "" && observed.ConfigHash != expectedHash {
-			if err := r.planRecreateNetwork(key, &desired); err != nil {
-				return err
-			}
+		if observed.ConfigHash == "" || observed.ConfigHash == expected {
+			continue
 		}
-		// else: network exists and config matches, nothing to do
+		if observed.Name != desired.Name {
+			// The network was renamed: the live network matched by label carries
+			// a different name, i.e. a distinct Docker resource. Create the new
+			// network and leave the old one untouched, matching the historical
+			// additive ensureNetwork behavior.
+			r.planCreateNetwork(key, &desired, "renamed")
+			continue
+		}
+		diverged = append(diverged, key)
 	}
+	r.planRecreateNetworks(diverged)
 	return nil
 }
 
 // planCreateNetwork adds a single CreateNetwork node and records it for dependency tracking.
-func (r *reconciler) planCreateNetwork(key string, nw *types.NetworkConfig) *PlanNode {
-	node := r.plan.addNode(Operation{
+func (r *reconciler) planCreateNetwork(key string, nw *types.NetworkConfig, cause string) {
+	r.networkNodes[key] = r.plan.addNode(Operation{
 		Type:       OpCreateNetwork,
 		ResourceID: fmt.Sprintf("network:%s", key),
-		Cause:      "not found",
+		Cause:      cause,
 		Name:       nw.Name,
 		Network:    nw,
 	}, "")
-	r.networkNodes[key] = node
-	return node
 }
 
-// planRecreateNetwork adds the full sequence for a diverged network:
-// stop affected containers → disconnect → remove network → create network.
-func (r *reconciler) planRecreateNetwork(key string, nw *types.NetworkConfig) error {
-	observed := r.observed.Networks[key]
-	affectedServices := r.servicesUsingNetwork(key)
-	affectedContainers := r.containersForServices(affectedServices)
+// planRecreateNetworks adds, for each diverged network, the sequence:
+//
+//	stop containers → disconnect containers → remove network → create network → connect containers
+//
+// Attached containers must be disconnected before the network can be removed
+// (Docker refuses to remove a network with active endpoints) and are reconnected
+// to the fresh network afterwards — they keep their identity and are not
+// recreated, matching the previous ensureNetwork/removeDivergedNetwork behavior.
+//
+// Stops are deduplicated through stoppedByPlan so a container attached to several
+// diverged networks (or later recreated by reconcileContainers) is stopped once.
+// Each reconnect is recorded in connectNodes so that, should reconcileContainers
+// recreate the container for an unrelated reason, its removal is ordered after
+// the reconnect instead of racing it.
+func (r *reconciler) planRecreateNetworks(keys []string) {
+	for _, key := range keys {
+		observed := r.observed.Networks[key]
+		desired := r.project.Networks[key]
+		containers := r.containersForServices(r.servicesUsingNetwork(key))
 
-	// Stop all affected containers, recording each Stop node so that a later
-	// recreate of the same container does not emit a second Stop against a
-	// container that is already stopped.
-	var stopNodes []*PlanNode
-	for i := range affectedContainers {
-		oc := &affectedContainers[i]
-		node := r.plan.addNode(Operation{
-			Type:       OpStopContainer,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
-			Cause:      fmt.Sprintf("network %s config changed", key),
-			Container:  &oc.Summary,
-		}, "")
-		stopNodes = append(stopNodes, node)
-		r.stoppedByPlan[oc.ID] = node
-	}
+		// Stop then disconnect every attached container.
+		var disconnectNodes []*PlanNode
+		for i := range containers {
+			oc := &containers[i]
+			resID := fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number)
+			stopNode, alreadyStopped := r.stoppedByPlan[oc.ID]
+			if !alreadyStopped {
+				stopNode = r.plan.addNode(Operation{
+					Type:       OpStopContainer,
+					ResourceID: resID,
+					Cause:      fmt.Sprintf("network %s config changed", key),
+					Container:  &oc.Summary,
+					Timeout:    r.options.Timeout,
+				}, "")
+				r.stoppedByPlan[oc.ID] = stopNode
+			}
+			disconnectNodes = append(disconnectNodes, r.plan.addNode(Operation{
+				Type:       OpDisconnectNetwork,
+				ResourceID: resID,
+				Cause:      fmt.Sprintf("network %s recreate", key),
+				Container:  &oc.Summary,
+				Name:       observed.Name,
+			}, "", stopNode))
+		}
 
-	// Disconnect all affected containers from the *observed* network (each depends on its own stop)
-	var disconnectNodes []*PlanNode
-	for i, oc := range affectedContainers {
-		node := r.plan.addNode(Operation{
-			Type:       OpDisconnectNetwork,
-			ResourceID: fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number),
-			Cause:      fmt.Sprintf("network %s recreate", key),
-			Container:  &affectedContainers[i].Summary,
+		removeNode := r.plan.addNode(Operation{
+			Type:       OpRemoveNetwork,
+			ResourceID: fmt.Sprintf("network:%s", key),
+			Cause:      "config hash diverged",
 			Name:       observed.Name,
-		}, "", stopNodes[i])
-		disconnectNodes = append(disconnectNodes, node)
+		}, "", disconnectNodes...)
+		createNode := r.plan.addNode(Operation{
+			Type:       OpCreateNetwork,
+			ResourceID: fmt.Sprintf("network:%s", key),
+			Cause:      "recreate after config change",
+			Name:       desired.Name,
+			Network:    &desired,
+		}, "", removeNode)
+		r.networkNodes[key] = createNode
+
+		// Reconnect every attached container to the fresh network.
+		for i := range containers {
+			oc := &containers[i]
+			resID := fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number)
+			connectNode := r.plan.addNode(Operation{
+				Type:       OpConnectNetwork,
+				ResourceID: resID,
+				Cause:      fmt.Sprintf("network %s recreate", key),
+				Container:  &oc.Summary,
+				Name:       desired.Name,
+			}, "", createNode)
+			r.connectNodes[oc.ID] = append(r.connectNodes[oc.ID], connectNode)
+		}
 	}
-
-	// Remove the *observed* network (depends on all disconnects)
-	removeNode := r.plan.addNode(Operation{
-		Type:       OpRemoveNetwork,
-		ResourceID: fmt.Sprintf("network:%s", key),
-		Cause:      "config hash diverged",
-		Name:       observed.Name,
-	}, "", disconnectNodes...)
-
-	// Create network (depends on remove)
-	createNode := r.plan.addNode(Operation{
-		Type:       OpCreateNetwork,
-		ResourceID: fmt.Sprintf("network:%s", key),
-		Cause:      "recreate after config change",
-		Name:       nw.Name,
-		Network:    nw,
-	}, "", removeNode)
-	r.networkNodes[key] = createNode
-
-	return nil
 }
 
 // reconcileVolumes plans the volume lifecycle: creation of missing volumes and,
@@ -818,6 +857,10 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	if alreadyStopped {
 		removeDeps = append(removeDeps, createNode)
 	}
+	// If planRecreateNetworks scheduled reconnects for this container (network
+	// recreation), let them complete before the old container is removed so the
+	// reconnect does not race the removal.
+	removeDeps = append(removeDeps, r.connectNodes[oc.ID]...)
 	removeNode := r.plan.addNode(Operation{
 		Type:       OpRemoveContainer,
 		ResourceID: resID,

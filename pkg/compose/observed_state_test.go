@@ -205,9 +205,9 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, vol.ConfigHash, "volhash1")
 }
 
-// collectVolumesOnly mocks empty container/network/volume lists so that only the
-// legacy by-name volume discovery is exercised.
-func collectVolumesOnly(t *testing.T, project *types.Project, inspect func(apiClient *mocks.MockAPIClient)) (*ObservedState, error) {
+// collectByNameDiscovery mocks empty container/network/volume lists so that only
+// the legacy by-name network/volume discovery is exercised.
+func collectByNameDiscovery(t *testing.T, project *types.Project, inspect func(apiClient *mocks.MockAPIClient)) (*ObservedState, error) {
 	t.Helper()
 	svc, apiClient := newTestService(t)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
@@ -217,13 +217,109 @@ func collectVolumesOnly(t *testing.T, project *types.Project, inspect func(apiCl
 	return svc.collectObservedState(t.Context(), project)
 }
 
+// TestCollectObservedState_LegacyNetworkMatchedByName verifies that a network
+// matching a declared network by name but carrying no compose label is recorded
+// as an unmanaged match with an empty ConfigHash, so the reconciler reuses it.
+func TestCollectObservedState_LegacyNetworkMatchedByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Networks: types.Networks{"frontend": {Name: "myproject_frontend"}}}
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().NetworkInspect(gomock.Any(), "myproject_frontend", gomock.Any()).Return(client.NetworkInspectResult{
+			Network: network.Inspect{Network: network.Network{ID: "net1", Name: "myproject_frontend"}},
+		}, nil)
+	})
+	assert.NilError(t, err)
+	obs, ok := state.Networks["frontend"]
+	assert.Assert(t, ok, "legacy network must be discovered by name")
+	assert.Equal(t, obs.ID, "net1")
+	assert.Equal(t, obs.Name, "myproject_frontend")
+	assert.Equal(t, obs.ProjectName, "")
+	assert.Equal(t, obs.ConfigHash, "", "unmanaged match must have an empty config hash")
+}
+
+// TestCollectObservedState_ForeignProjectNetworkMatchedByName verifies that a
+// network owned by another project but matching the declared name is recorded
+// with an empty ConfigHash (reused untouched) and keeps the foreign project name.
+func TestCollectObservedState_ForeignProjectNetworkMatchedByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Networks: types.Networks{"frontend": {Name: "shared_net"}}}
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().NetworkInspect(gomock.Any(), "shared_net", gomock.Any()).Return(client.NetworkInspectResult{
+			Network: network.Inspect{Network: network.Network{ID: "net9", Name: "shared_net", Labels: map[string]string{
+				api.ProjectLabel:    "otherproject",
+				api.ConfigHashLabel: "foreignhash",
+			}}},
+		}, nil)
+	})
+	assert.NilError(t, err)
+	obs := state.Networks["frontend"]
+	assert.Equal(t, obs.ProjectName, "otherproject")
+	assert.Equal(t, obs.ConfigHash, "", "foreign network must not be treated as diverged")
+}
+
+// TestCollectObservedState_NetworkNotFoundByName verifies a declared network with
+// no live counterpart is left absent so the reconciler schedules a create.
+func TestCollectObservedState_NetworkNotFoundByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Networks: types.Networks{"frontend": {Name: "myproject_frontend"}}}
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().NetworkInspect(gomock.Any(), "myproject_frontend", gomock.Any()).Return(client.NetworkInspectResult{}, notFoundError{})
+	})
+	assert.NilError(t, err)
+	_, ok := state.Networks["frontend"]
+	assert.Assert(t, !ok, "absent network must not be in observed state")
+}
+
+// TestCollectObservedState_ExternalNetworkNotInspectedByName verifies external
+// networks are excluded from the legacy by-name discovery (no NetworkInspect).
+func TestCollectObservedState_ExternalNetworkNotInspectedByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Networks: types.Networks{"frontend": {Name: "ext_net", External: true}}}
+	state, err := collectByNameDiscovery(t, project, func(_ *mocks.MockAPIClient) {})
+	assert.NilError(t, err)
+	_, ok := state.Networks["frontend"]
+	assert.Assert(t, !ok)
+}
+
+// TestWarnUnmanagedNetworks verifies the legacy ownership warnings for networks
+// reused by name, and silence for managed/external/absent networks.
+func TestWarnUnmanagedNetworks(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Networks: types.Networks{
+			"managed":  {Name: "myproject_managed"},
+			"unlabel":  {Name: "unlabel_net"},
+			"foreign":  {Name: "foreign_net"},
+			"external": {Name: "ext_net", External: true},
+			"tocreate": {Name: "myproject_tocreate"},
+		},
+	}
+	observed := &ObservedState{
+		Networks: map[string]ObservedNetwork{
+			"managed":  {Name: "myproject_managed", ProjectName: "myproject", ConfigHash: "h"},
+			"unlabel":  {Name: "unlabel_net", ProjectName: ""},
+			"foreign":  {Name: "foreign_net", ProjectName: "otherproject"},
+			"external": {Name: "ext_net"},
+		},
+	}
+
+	hook := logrustest.NewGlobal()
+	warnUnmanagedNetworks(project, observed)
+
+	var msgs []string
+	for _, e := range hook.AllEntries() {
+		assert.Equal(t, e.Level, logrus.WarnLevel)
+		msgs = append(msgs, e.Message)
+	}
+	assert.Equal(t, len(msgs), 2, "expected exactly two warnings, got: %v", msgs)
+	joined := strings.Join(msgs, "\n")
+	assert.Assert(t, strings.Contains(joined, "a network with name unlabel_net exists but was not created by compose"), joined)
+	assert.Assert(t, strings.Contains(joined, `a network with name foreign_net exists but was not created for project "myproject"`), joined)
+}
+
 // TestCollectObservedState_LegacyVolumeMatchedByName verifies that a volume that
 // matches a declared volume by name but carries no compose label (pre-label
 // Compose or manually created) is recorded as an unmanaged match with an empty
 // ConfigHash, so the reconciler reuses it untouched.
 func TestCollectObservedState_LegacyVolumeMatchedByName(t *testing.T) {
 	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "myproject_data"}}}
-	state, err := collectVolumesOnly(t, project, func(apiClient *mocks.MockAPIClient) {
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
 		apiClient.EXPECT().VolumeInspect(gomock.Any(), "myproject_data", gomock.Any()).Return(client.VolumeInspectResult{
 			Volume: volume.Volume{Name: "myproject_data", Driver: "local"},
 		}, nil)
@@ -242,7 +338,7 @@ func TestCollectObservedState_LegacyVolumeMatchedByName(t *testing.T) {
 // foreign project name for the warning.
 func TestCollectObservedState_ForeignProjectVolumeMatchedByName(t *testing.T) {
 	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "shared_data"}}}
-	state, err := collectVolumesOnly(t, project, func(apiClient *mocks.MockAPIClient) {
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
 		apiClient.EXPECT().VolumeInspect(gomock.Any(), "shared_data", gomock.Any()).Return(client.VolumeInspectResult{
 			Volume: volume.Volume{Name: "shared_data", Driver: "local", Labels: map[string]string{
 				api.ProjectLabel:    "otherproject",
@@ -260,7 +356,7 @@ func TestCollectObservedState_ForeignProjectVolumeMatchedByName(t *testing.T) {
 // with no live counterpart is left absent so the reconciler schedules a create.
 func TestCollectObservedState_VolumeNotFoundByName(t *testing.T) {
 	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "myproject_data"}}}
-	state, err := collectVolumesOnly(t, project, func(apiClient *mocks.MockAPIClient) {
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
 		apiClient.EXPECT().VolumeInspect(gomock.Any(), "myproject_data", gomock.Any()).Return(client.VolumeInspectResult{}, notFoundError{})
 	})
 	assert.NilError(t, err)
@@ -273,7 +369,7 @@ func TestCollectObservedState_VolumeNotFoundByName(t *testing.T) {
 // gomock would fail on an unexpected call).
 func TestCollectObservedState_ExternalVolumeNotInspectedByName(t *testing.T) {
 	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "ext_data", External: true}}}
-	state, err := collectVolumesOnly(t, project, func(_ *mocks.MockAPIClient) {})
+	state, err := collectByNameDiscovery(t, project, func(_ *mocks.MockAPIClient) {})
 	assert.NilError(t, err)
 	_, ok := state.Volumes["data"]
 	assert.Assert(t, !ok)

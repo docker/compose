@@ -156,11 +156,53 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		}
 	}
 
+	if err := s.discoverUnmanagedNetworks(ctx, project, state); err != nil {
+		return nil, err
+	}
+
 	if err := s.discoverUnmanagedVolumes(ctx, project, state); err != nil {
 		return nil, err
 	}
 
 	return state, nil
+}
+
+// discoverUnmanagedNetworks augments the observed state with networks that match
+// a declared network by name but carry no compose label — pre-label Compose or
+// manually created networks, missed by the label-filtered NetworkList. Each is
+// recorded as an unmanaged match with an empty ConfigHash: the reconciler then
+// reuses it untouched instead of scheduling a CreateNetwork. See
+// warnUnmanagedNetworks for the accompanying user warning.
+func (s *composeService) discoverUnmanagedNetworks(ctx context.Context, project *types.Project, state *ObservedState) error {
+	for _, key := range project.NetworkNames() {
+		nw := project.Networks[key]
+		if nw.External {
+			continue
+		}
+		if _, ok := state.Networks[key]; ok {
+			continue
+		}
+		inspected, err := s.apiClient().NetworkInspect(ctx, nw.Name, client.NetworkInspectOptions{})
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue // absent: it will be created by the reconciliation plan
+			}
+			return err
+		}
+		// NetworkInspect matches on ID prefix, so guard against a partial match
+		// (e.g. a network whose ID starts with the requested name).
+		if inspected.Network.Name != nw.Name && inspected.Network.ID != nw.Name {
+			continue
+		}
+		state.Networks[key] = ObservedNetwork{
+			ID:          inspected.Network.ID,
+			Name:        inspected.Network.Name,
+			ProjectName: inspected.Network.Labels[api.ProjectLabel],
+			// ConfigHash intentionally left empty: the network is not owned by
+			// this project, so we must not treat it as diverged and recreate it.
+		}
+	}
+	return nil
 }
 
 // discoverUnmanagedVolumes augments the observed state with volumes that match a

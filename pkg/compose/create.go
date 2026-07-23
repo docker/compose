@@ -86,8 +86,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	}
 
 	prepareNetworks(project)
-
-	networks, err := s.ensureNetworks(ctx, project)
+	externalNetworks, err := s.checkExternalNetworks(ctx, project)
 	if err != nil {
 		return err
 	}
@@ -108,8 +107,9 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	if err != nil {
 		return err
 	}
-	observed.setResolvedNetworks(networks, project)
+	observed.setResolvedNetworks(externalNetworks, project)
 	observed.setResolvedVolumes(externalVolumes)
+	warnUnmanagedNetworks(project, observed)
 	warnUnmanagedVolumes(project, observed)
 
 	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
@@ -141,17 +141,51 @@ func prepareNetworks(project *types.Project) {
 	}
 }
 
-func (s *composeService) ensureNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
-	networks := map[string]string{}
-	for name, nw := range project.Networks {
-		id, err := s.ensureNetwork(ctx, project, name, &nw)
+// checkExternalNetworks validates that every external network exists and returns
+// their resolved IDs. External networks carry no compose label and are therefore
+// absent from the label-scoped observed state, so the reconciler needs them
+// injected via setResolvedNetworks.
+//
+// Managed and legacy (unlabeled, name-matched) networks are discovered by
+// collectObservedState; their lifecycle is owned by the reconciliation plan, so
+// this function performs no mutation on them.
+func (s *composeService) checkExternalNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
+	external := map[string]string{}
+	for k, nw := range project.Networks {
+		if !nw.External {
+			continue
+		}
+		id, err := s.resolveExternalNetwork(ctx, &nw)
 		if err != nil {
 			return nil, err
 		}
-		networks[name] = id
-		project.Networks[name] = nw
+		external[k] = id
 	}
-	return networks, nil
+	return external, nil
+}
+
+// warnUnmanagedNetworks warns about declared networks backed by a live network
+// this project does not own — either created outside Compose (no project label)
+// or by another project. Such networks are matched by name and reused untouched
+// (see discoverUnmanagedNetworks); the warning tells the user to set
+// `external: true` to make the intent explicit.
+func warnUnmanagedNetworks(project *types.Project, observed *ObservedState) {
+	for k, nw := range project.Networks {
+		if nw.External {
+			continue
+		}
+		obs, ok := observed.Networks[k]
+		if !ok || obs.ProjectName == project.Name {
+			continue
+		}
+		if obs.ProjectName == "" {
+			logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
+				"Set `external: true` to use an existing network", nw.Name)
+		} else {
+			logrus.Warnf("a network with name %s exists but was not created for project %q.\n"+
+				"Set `external: true` to use an existing network", nw.Name, project.Name)
+		}
+	}
 }
 
 // prepareVolumes injects the compose-managed labels onto every project volume so
@@ -1363,102 +1397,18 @@ func buildImageOptions(image *types.ServiceVolumeImage) *mount.ImageOptions {
 	}
 }
 
-func (s *composeService) ensureNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (string, error) {
-	if n.External {
-		return s.resolveExternalNetwork(ctx, n)
-	}
-
-	id, err := s.resolveOrCreateNetwork(ctx, project, name, n)
-	if errdefs.IsConflict(err) {
-		// Maybe another execution of `docker compose up|run` created same network
-		// let's retry once
-		return s.resolveOrCreateNetwork(ctx, project, name, n)
-	}
-	return id, err
-}
-
-func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (string, error) { //nolint:gocyclo
-	// This is containers that could be left after a diverged network was removed
-	var dangledContainers Containers
-
-	// First, try to find a unique network matching by name or ID
-	res, err := s.apiClient().NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{})
-	if err == nil {
-		inspect := res.Network
-		// NetworkInspect will match on ID prefix, so double check we get the expected one
-		// as looking for network named `db` we could erroneously match network ID `db9086999caf`
-		if inspect.Name == n.Name || inspect.ID == n.Name {
-			p, ok := inspect.Labels[api.ProjectLabel]
-			if !ok {
-				logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
-					"Set `external: true` to use an existing network", n.Name)
-			} else if p != project.Name {
-				logrus.Warnf("a network with name %s exists but was not created for project %q.\n"+
-					"Set `external: true` to use an existing network", n.Name, project.Name)
-			}
-			if inspect.Labels[api.NetworkLabel] != name {
-				return "", fmt.Errorf(
-					"network %s was found but has incorrect label %s set to %q (expected: %q)",
-					n.Name,
-					api.NetworkLabel,
-					inspect.Labels[api.NetworkLabel],
-					name,
-				)
-			}
-
-			hash := inspect.Labels[api.ConfigHashLabel]
-			expected, err := NetworkHash(n)
-			if err != nil {
-				return "", err
-			}
-			if hash == "" || hash == expected {
-				return inspect.ID, nil
-			}
-
-			dangledContainers, err = s.removeDivergedNetwork(ctx, project, name, n)
-			if err != nil {
-				return "", err
-			}
-		}
-	}
-	// ignore other errors. Typically, an ambiguous request by name results in some generic `invalidParameter` error
-
-	// Either not found, or name is ambiguous - use NetworkList to list by name
-	nwList, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: make(client.Filters).Add("name", n.Name),
-	})
-	if err != nil {
-		return "", err
-	}
-
-	// NetworkList Matches all or part of a network name, so we have to filter for a strict match
-	networks := slices.DeleteFunc(nwList.Items, func(net network.Summary) bool {
-		return net.Name != n.Name
-	})
-
-	for _, nw := range networks {
-		if nw.Labels[api.ProjectLabel] == project.Name &&
-			nw.Labels[api.NetworkLabel] == name {
-			return nw.ID, nil
-		}
-	}
-
-	// we could have set NetworkList with a projectFilter and networkFilter but not doing so allows to catch this
-	// scenario were a network with same name exists but doesn't have label, and use of `CheckDuplicate: true`
-	// prevents to create another one.
-	if len(networks) > 0 {
-		logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
-			"Set `external: true` to use an existing network", n.Name)
-		return networks[0].ID, nil
-	}
-
+// createNetwork creates the given (managed) network with its compose labels and
+// config-hash. It is executed as a plan operation (OpCreateNetwork); resolution
+// of external networks lives in resolveExternalNetwork, and reuse of legacy
+// name-matched networks is decided by the reconciler from the observed state.
+func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConfig) error {
 	var ipam *network.IPAM
 	if n.Ipam.Config != nil {
 		var config []network.IPAMConfig
 		for _, pool := range n.Ipam.Config {
 			c, err := parseIPAMPool(pool)
 			if err != nil {
-				return "", err
+				return err
 			}
 			config = append(config, c)
 		}
@@ -1469,7 +1419,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	}
 	hash, err := NetworkHash(n)
 	if err != nil {
-		return "", err
+		return err
 	}
 	n.CustomLabels = n.CustomLabels.Add(api.ConfigHashLabel, hash)
 	createOpts := client.NetworkCreateOptions{
@@ -1494,7 +1444,7 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	for _, ipamConfig := range n.Ipam.Config {
 		c, err := parseIPAMPool(ipamConfig)
 		if err != nil {
-			return "", err
+			return err
 		}
 		createOpts.IPAM.Config = append(createOpts.IPAM.Config, c)
 	}
@@ -1502,91 +1452,11 @@ func (s *composeService) resolveOrCreateNetwork(ctx context.Context, project *ty
 	networkEventName := fmt.Sprintf("Network %s", n.Name)
 	s.events.On(creatingEvent(networkEventName))
 
-	resp, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts)
-	if err != nil {
+	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts); err != nil {
 		s.events.On(errorEvent(networkEventName, err.Error()))
-		return "", fmt.Errorf("failed to create network %s: %w", n.Name, err)
+		return fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
 	s.events.On(createdEvent(networkEventName))
-
-	err = s.connectNetwork(ctx, n.Name, dangledContainers, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return resp.ID, nil
-}
-
-func (s *composeService) removeDivergedNetwork(ctx context.Context, project *types.Project, name string, n *types.NetworkConfig) (Containers, error) {
-	// Remove services attached to this network to force recreation
-	var services []string
-	for _, service := range project.Services.Filter(func(config types.ServiceConfig) bool {
-		_, ok := config.Networks[name]
-		return ok
-	}) {
-		services = append(services, service.Name)
-	}
-
-	// Stop containers so we can remove network
-	// They will be restarted (actually: recreated) with the updated network
-	err := s.stop(ctx, project.Name, api.StopOptions{
-		Services: services,
-		Project:  project,
-	}, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, services...)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.disconnectNetwork(ctx, n.Name, containers)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.apiClient().NetworkRemove(ctx, n.Name, client.NetworkRemoveOptions{})
-	eventName := fmt.Sprintf("Network %s", n.Name)
-	s.events.On(removedEvent(eventName))
-	return containers, err
-}
-
-func (s *composeService) disconnectNetwork(
-	ctx context.Context,
-	nwName string,
-	containers Containers,
-) error {
-	for _, c := range containers {
-		_, err := s.apiClient().NetworkDisconnect(ctx, nwName, client.NetworkDisconnectOptions{
-			Container: c.ID,
-			Force:     true,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *composeService) connectNetwork(
-	ctx context.Context,
-	nwName string,
-	containers Containers,
-	config *network.EndpointSettings,
-) error {
-	for _, c := range containers {
-		_, err := s.apiClient().NetworkConnect(ctx, nwName, client.NetworkConnectOptions{
-			Container:      c.ID,
-			EndpointConfig: config,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
