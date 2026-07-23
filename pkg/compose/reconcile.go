@@ -264,6 +264,13 @@ func (r *reconciler) reconcileVolumes() error {
 			// old one (and its data) untouched — instead of prompting to delete
 			// data under a name that does not exist yet.
 			r.planCreateVolume(key, &desired, "renamed")
+			// Rewrite the observed name to the desired one so reconcileContainers
+			// detects the mount mismatch and migrates existing containers onto
+			// the new volume within the same up (as the pre-reconcile ensureVolume
+			// path did), and so later runs match deterministically on the new
+			// name rather than split-braining between the two.
+			observed.Name = desired.Name
+			r.observed.Volumes[key] = observed
 			continue
 		}
 		confirmed, err := r.prompt(

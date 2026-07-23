@@ -776,6 +776,53 @@ func TestReconcileVolumes_RenamedIsAdditive(t *testing.T) {
 `)+"\n")
 }
 
+// TestReconcileVolumes_RenamedMigratesContainers verifies that a rename migrates
+// the containers mounting the volume onto the freshly created one within the same
+// up (matching the pre-reconcile ensureVolume behavior): the new volume is
+// created additively (no RemoveVolume), and the container is recreated because
+// its mount no longer matches the desired volume name.
+func TestReconcileVolumes_RenamedMigratesContainers(t *testing.T) {
+	project := &types.Project{
+		Name:    "myproject",
+		Volumes: types.Volumes{"data": {Name: "myproject_data_v2", Driver: "local"}},
+		Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}},
+		},
+	}
+	dbHash := mustServiceHash(t, project.Services["db"])
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"db": {{
+				ID: "c1aabbccddee", Number: 1, State: container.StateRunning, ConfigHash: dbHash,
+				Summary: container.Summary{
+					ID: "c1aabbccddee", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "db", api.ContainerNumberLabel: "1", api.ConfigHashLabel: dbHash},
+					// The existing container is still mounted on the old volume.
+					Mounts: []container.MountPoint{{Type: "volume", Name: "myproject_data"}},
+				},
+			}},
+		},
+		Networks: map[string]ObservedNetwork{},
+		Volumes: map[string]ObservedVolume{
+			"data": {Name: "myproject_data", ConfigHash: mustVolumeHash(t, types.VolumeConfig{Name: "myproject_data", Driver: "local"})},
+		},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	// New volume created additively (no RemoveVolume), and the container is
+	// recreated to migrate onto it.
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 volume:data, CreateVolume, renamed
+[1] -> #2 service:db:1, CreateContainer, config changed (tmpName) [recreate:db:1]
+[2] -> #3 service:db:1, StopContainer, replaced by #2 [recreate:db:1]
+[3] -> #4 service:db:1, RemoveContainer, replaced by #2 [recreate:db:1]
+[4] -> #5 service:db:1, RenameContainer, finalize recreate [recreate:db:1]
+`)+"\n")
+}
+
 // TestReconcileVolumes_DivergedUnmountedVolume verifies that a diverged volume
 // declared by the project but mounted by no running container is still recreated
 // (no container operations, just remove + create).
