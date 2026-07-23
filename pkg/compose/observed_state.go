@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
@@ -155,7 +156,44 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		}
 	}
 
+	if err := s.discoverUnmanagedVolumes(ctx, project, state); err != nil {
+		return nil, err
+	}
+
 	return state, nil
+}
+
+// discoverUnmanagedVolumes augments the observed state with volumes that match a
+// declared volume by name but carry no compose label — pre-label Compose or
+// manually created volumes, missed by the label-filtered VolumeList. Each is
+// recorded as an unmanaged match with an empty ConfigHash: the reconciler then
+// reuses it untouched instead of scheduling a (possibly failing) VolumeCreate.
+// See warnUnmanagedVolumes for the accompanying user warning.
+func (s *composeService) discoverUnmanagedVolumes(ctx context.Context, project *types.Project, state *ObservedState) error {
+	for _, key := range project.VolumeNames() {
+		vol := project.Volumes[key]
+		if vol.External {
+			continue
+		}
+		if _, ok := state.Volumes[key]; ok {
+			continue
+		}
+		inspected, err := s.apiClient().VolumeInspect(ctx, vol.Name, client.VolumeInspectOptions{})
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue // absent: it will be created by the reconciliation plan
+			}
+			return err
+		}
+		state.Volumes[key] = ObservedVolume{
+			Name:        inspected.Volume.Name,
+			ProjectName: inspected.Volume.Labels[api.ProjectLabel],
+			Driver:      inspected.Volume.Driver,
+			// ConfigHash intentionally left empty: the volume is not owned by
+			// this project, so we must not treat it as diverged and recreate it.
+		}
+	}
+	return nil
 }
 
 // toObservedContainer extracts the relevant fields from a container.Summary,

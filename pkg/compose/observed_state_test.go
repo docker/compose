@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -24,6 +25,8 @@ import (
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -200,6 +203,117 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, vol.Name, "myproject_data")
 	assert.Equal(t, vol.Driver, "local")
 	assert.Equal(t, vol.ConfigHash, "volhash1")
+}
+
+// collectVolumesOnly mocks empty container/network/volume lists so that only the
+// legacy by-name volume discovery is exercised.
+func collectVolumesOnly(t *testing.T, project *types.Project, inspect func(apiClient *mocks.MockAPIClient)) (*ObservedState, error) {
+	t.Helper()
+	svc, apiClient := newTestService(t)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
+	inspect(apiClient)
+	return svc.collectObservedState(t.Context(), project)
+}
+
+// TestCollectObservedState_LegacyVolumeMatchedByName verifies that a volume that
+// matches a declared volume by name but carries no compose label (pre-label
+// Compose or manually created) is recorded as an unmanaged match with an empty
+// ConfigHash, so the reconciler reuses it untouched.
+func TestCollectObservedState_LegacyVolumeMatchedByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "myproject_data"}}}
+	state, err := collectVolumesOnly(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().VolumeInspect(gomock.Any(), "myproject_data", gomock.Any()).Return(client.VolumeInspectResult{
+			Volume: volume.Volume{Name: "myproject_data", Driver: "local"},
+		}, nil)
+	})
+	assert.NilError(t, err)
+	obs, ok := state.Volumes["data"]
+	assert.Assert(t, ok, "legacy volume must be discovered by name")
+	assert.Equal(t, obs.Name, "myproject_data")
+	assert.Equal(t, obs.ProjectName, "")
+	assert.Equal(t, obs.ConfigHash, "", "unmanaged match must have an empty config hash")
+}
+
+// TestCollectObservedState_ForeignProjectVolumeMatchedByName verifies that a
+// volume owned by another project but matching the declared name is recorded
+// with an empty ConfigHash (reused untouched, never recreated) and keeps the
+// foreign project name for the warning.
+func TestCollectObservedState_ForeignProjectVolumeMatchedByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "shared_data"}}}
+	state, err := collectVolumesOnly(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().VolumeInspect(gomock.Any(), "shared_data", gomock.Any()).Return(client.VolumeInspectResult{
+			Volume: volume.Volume{Name: "shared_data", Driver: "local", Labels: map[string]string{
+				api.ProjectLabel:    "otherproject",
+				api.ConfigHashLabel: "foreignhash",
+			}},
+		}, nil)
+	})
+	assert.NilError(t, err)
+	obs := state.Volumes["data"]
+	assert.Equal(t, obs.ProjectName, "otherproject")
+	assert.Equal(t, obs.ConfigHash, "", "foreign volume must not be treated as diverged")
+}
+
+// TestCollectObservedState_VolumeNotFoundByName verifies that a declared volume
+// with no live counterpart is left absent so the reconciler schedules a create.
+func TestCollectObservedState_VolumeNotFoundByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "myproject_data"}}}
+	state, err := collectVolumesOnly(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().VolumeInspect(gomock.Any(), "myproject_data", gomock.Any()).Return(client.VolumeInspectResult{}, notFoundError{})
+	})
+	assert.NilError(t, err)
+	_, ok := state.Volumes["data"]
+	assert.Assert(t, !ok, "absent volume must not be in observed state")
+}
+
+// TestCollectObservedState_ExternalVolumeNotInspectedByName verifies external
+// volumes are not part of the legacy by-name discovery (no VolumeInspect call:
+// gomock would fail on an unexpected call).
+func TestCollectObservedState_ExternalVolumeNotInspectedByName(t *testing.T) {
+	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "ext_data", External: true}}}
+	state, err := collectVolumesOnly(t, project, func(_ *mocks.MockAPIClient) {})
+	assert.NilError(t, err)
+	_, ok := state.Volumes["data"]
+	assert.Assert(t, !ok)
+}
+
+// TestWarnUnmanagedVolumes verifies the legacy ownership warnings are preserved
+// for volumes reused by name, and not emitted for managed or external volumes.
+func TestWarnUnmanagedVolumes(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Volumes: types.Volumes{
+			"managed":  {Name: "myproject_managed"},
+			"unlabel":  {Name: "unlabel_data"},
+			"foreign":  {Name: "foreign_data"},
+			"external": {Name: "ext_data", External: true},
+			"tocreate": {Name: "myproject_tocreate"},
+		},
+	}
+	observed := &ObservedState{
+		Volumes: map[string]ObservedVolume{
+			"managed":  {Name: "myproject_managed", ProjectName: "myproject", ConfigHash: "h"},
+			"unlabel":  {Name: "unlabel_data", ProjectName: ""},
+			"foreign":  {Name: "foreign_data", ProjectName: "otherproject"},
+			"external": {Name: "ext_data"},
+			// "tocreate" absent: will be created, no warning.
+		},
+	}
+
+	hook := logrustest.NewGlobal()
+	warnUnmanagedVolumes(project, observed)
+
+	var msgs []string
+	for _, e := range hook.AllEntries() {
+		assert.Equal(t, e.Level, logrus.WarnLevel)
+		msgs = append(msgs, e.Message)
+	}
+	assert.Equal(t, len(msgs), 2, "expected exactly two warnings, got: %v", msgs)
+	joined := strings.Join(msgs, "\n")
+	assert.Assert(t, strings.Contains(joined, `volume "unlabel_data" already exists but was not created by Docker Compose`), joined)
+	assert.Assert(t, strings.Contains(joined, `volume "foreign_data" already exists but was created for project "otherproject"`), joined)
 }
 
 type capturingEvents struct {
