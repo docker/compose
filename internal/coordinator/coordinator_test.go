@@ -111,7 +111,7 @@ func TestPushEnabled(t *testing.T) {
 			cli.EXPECT().ContextStore().Return(newContextStore(t, tt.meta)).AnyTimes()
 			cli.EXPECT().CurrentContext().Return("test").AnyTimes()
 
-			assert.Equal(t, PushEnabled(cli), tt.want)
+			assert.Equal(t, Enabled(cli), tt.want)
 		})
 	}
 }
@@ -124,7 +124,7 @@ func TestPushEnabledMetadataError(t *testing.T) {
 	cli.EXPECT().ContextStore().Return(store.New(t.TempDir(), testStoreCfg)).AnyTimes()
 	cli.EXPECT().CurrentContext().Return("missing").AnyTimes()
 
-	assert.Equal(t, PushEnabled(cli), false)
+	assert.Equal(t, Enabled(cli), false)
 }
 
 func newTestProject() *types.Project {

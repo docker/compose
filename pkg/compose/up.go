@@ -47,7 +47,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		// When the current Docker context opts into the project-config push, send
 		// the project configuration to the coordinator before any other Docker API
 		// call. Failures are non-fatal: warn and continue bringing the project up.
-		if !s.dryRun && coordinator.PushEnabled(s.dockerCli) {
+		if !s.dryRun && coordinator.Enabled(s.dockerCli) {
 			// The push is complete only when "up" resolved the whole project:
 			// an empty service selection AND no profiles applied. A non-empty
 			// selection narrows the project to a subset (+ dependency closure),

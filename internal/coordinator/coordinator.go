@@ -37,13 +37,13 @@ import (
 	"github.com/moby/moby/client/pkg/versions"
 )
 
-// MetadataKey is the Docker context metadata key that opts a socket into the
-// Compose project-config push. When the current context's metadata carries
-// this key set to a truthy value, the socket is assumed to accept
-// POST /v{version}/compose/project (see MinAPIVersion), and Compose sends the
+// MetadataKey is the Docker context metadata key that identifies a coordinator
+// behind a Docker API socket. When the current context's metadata carries this
+// key set to a truthy value, the socket is assumed to accept POST
+// /v{version}/compose/project (see MinAPIVersion), and Compose sends the
 // project configuration to the coordinator at the start of "compose up" before
 // any other Docker API call.
-const MetadataKey = "com.docker.compose.project.config"
+const MetadataKey = "com.docker.compose.coordinator"
 
 // MinAPIVersion is the Engine/coordinator API version that introduced
 // POST /v{version}/compose/project for the Compose project-config push. It
@@ -71,14 +71,13 @@ const responseBodyLimit = 2048
 // coordinator must never prune on their behalf.
 const CompleteHeader = "X-Compose-Project-Complete"
 
-// PushEnabled reports whether the current Docker context opts into the
-// project-config push via the MetadataKey metadata key. A metadata read
-// failure is treated as "not enabled" so that "compose up" is never blocked on
-// context inspection. The value is accepted as either a JSON boolean true or
-// the string "true" (case-insensitive), mirroring how custom context metadata
-// may be decoded (see ConfigFromDockerContext in
-// internal/tracing/docker_context.go).
-func PushEnabled(dockerCli command.Cli) bool {
+// Enabled reports whether the current Docker context represents a compose
+// coordinator via the MetadataKey metadata key. A metadata read failure is
+// treated as "not enabled" so that "compose up" is never blocked on context
+// inspection. The value is accepted as either a JSON boolean true or the string
+// "true" (case-insensitive), mirroring how custom context metadata may be
+// decoded (see ConfigFromDockerContext in internal/tracing/docker_context.go).
+func Enabled(dockerCli command.Cli) bool {
 	meta, err := dockerCli.ContextStore().GetMetadata(dockerCli.CurrentContext())
 	if err != nil {
 		return false
