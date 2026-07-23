@@ -80,7 +80,7 @@ func TestPushProjectConfigGlue(t *testing.T) {
 	apiClient.EXPECT().Dialer().Return(dialerFor(srv.Listener.Addr().String())).AnyTimes()
 	s := newPushTestService(t, apiClient, coordinator.MinAPIVersion)
 
-	err := s.pushProjectConfig(t.Context(), newUpTestProject())
+	err := s.pushProjectConfig(t.Context(), newUpTestProject(), true)
 	assert.NilError(t, err)
 	assert.Equal(t, gotPath, "/v"+coordinator.MinAPIVersion+"/compose/project")
 }
@@ -102,9 +102,28 @@ func TestPushProjectConfigGlueVersionError(t *testing.T) {
 	assert.NilError(t, err)
 	s := tested.(*composeService)
 
-	err = s.pushProjectConfig(t.Context(), newUpTestProject())
+	err = s.pushProjectConfig(t.Context(), newUpTestProject(), true)
 	assert.ErrorContains(t, err, "negotiating API version")
 	assert.ErrorContains(t, err, "engine unreachable")
+}
+
+func TestHasActiveProfiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		profiles []string
+		want     bool
+	}{
+		{name: "nil", profiles: nil, want: false},
+		{name: "empty slice", profiles: []string{}, want: false},
+		{name: "single blank (default, no profile)", profiles: []string{""}, want: false},
+		{name: "named profile", profiles: []string{"debug"}, want: true},
+		{name: "blank plus named", profiles: []string{"", "debug"}, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, hasActiveProfiles(tt.profiles), tt.want)
+		})
+	}
 }
 
 func TestShouldFollowStartEvent(t *testing.T) {

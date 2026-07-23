@@ -145,24 +145,43 @@ func dialerFor(addr string) func(context.Context) (net.Conn, error) {
 
 func TestPushProjectConfig(t *testing.T) {
 	var (
-		gotMethod string
-		gotPath   string
-		gotBody   []byte
+		gotMethod   string
+		gotPath     string
+		gotBody     []byte
+		gotComplete string
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod = r.Method
 		gotPath = r.URL.Path
 		gotBody, _ = io.ReadAll(r.Body)
+		gotComplete = r.Header.Get(CompleteHeader)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
 	c := NewClient(dialerFor(srv.Listener.Addr().String()))
-	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), true)
 	assert.NilError(t, err)
 	assert.Equal(t, gotMethod, http.MethodPost)
 	assert.Equal(t, gotPath, "/v"+MinAPIVersion+"/compose/project")
 	assert.Assert(t, len(gotBody) > 0)
+	assert.Equal(t, gotComplete, "true")
+}
+
+func TestPushProjectConfigSubsetHeader(t *testing.T) {
+	// A subset push (empty-selection == false) must advertise itself so the
+	// coordinator merges rather than prunes.
+	var gotComplete string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotComplete = r.Header.Get(CompleteHeader)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := NewClient(dialerFor(srv.Listener.Addr().String()))
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), false)
+	assert.NilError(t, err)
+	assert.Equal(t, gotComplete, "false")
 }
 
 func TestPushProjectConfigServerError(t *testing.T) {
@@ -172,7 +191,7 @@ func TestPushProjectConfigServerError(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(dialerFor(srv.Listener.Addr().String()))
-	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), true)
 	assert.ErrorContains(t, err, "500")
 	assert.ErrorContains(t, err, "placement failed")
 }
@@ -184,7 +203,7 @@ func TestPushProjectConfigDialerError(t *testing.T) {
 		return nil, errors.New("boom: no engine socket")
 	}
 	c := NewClient(dialer)
-	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), true)
 	assert.ErrorContains(t, err, "boom: no engine socket")
 }
 
@@ -196,7 +215,7 @@ func TestPushProjectConfigErrorEmptyBody(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(dialerFor(srv.Listener.Addr().String()))
-	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), true)
 	assert.ErrorContains(t, err, "coordinator returned status 503")
 }
 
@@ -207,7 +226,7 @@ func TestPushProjectConfigVersionTooLow(t *testing.T) {
 		return nil, nil
 	}
 	c := NewClient(dialer)
-	err := c.PushProjectConfig(t.Context(), "1.44", newTestProject())
+	err := c.PushProjectConfig(t.Context(), "1.44", newTestProject(), true)
 	assert.ErrorContains(t, err, "does not support the project-config push")
 }
 
@@ -224,6 +243,6 @@ func TestPushProjectConfigTimeout(t *testing.T) {
 	c := NewClient(dialerFor(srv.Listener.Addr().String()))
 	c.timeout = 50 * time.Millisecond
 
-	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject())
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), true)
 	assert.ErrorContains(t, err, "context deadline exceeded")
 }

@@ -28,6 +28,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,6 +60,16 @@ const defaultTimeout = 10 * time.Second
 // responseBodyLimit bounds how much of an error response body is read back
 // into the returned error message.
 const responseBodyLimit = 2048
+
+// CompleteHeader signals whether the pushed project is the whole project or a
+// subset. "compose up" with no service arguments resolves the entire project
+// and sends "true"; "compose up <service...>" narrows the project to the named
+// services plus their dependency closure and sends "false", telling the
+// coordinator to merge the payload with previously pushed config rather than
+// treat it as authoritative. An absent header (older Compose clients) must be
+// read as "false": those clients may also have pushed a subset, so the
+// coordinator must never prune on their behalf.
+const CompleteHeader = "X-Compose-Project-Complete"
 
 // PushEnabled reports whether the current Docker context opts into the
 // project-config push via the MetadataKey metadata key. A metadata read
@@ -111,7 +122,11 @@ func NewClient(dialer func(ctx context.Context) (net.Conn, error)) *Client {
 // call when it predates MinAPIVersion. A non-2xx response is returned as an
 // error; callers warn and continue. The request is bounded by a timeout so a
 // coordinator that never responds cannot hang "compose up".
-func (c *Client) PushProjectConfig(ctx context.Context, apiVersion string, project *types.Project) error {
+//
+// complete reports whether project is the whole project (true) or a subset
+// that the coordinator should merge with what it already holds (false); it is
+// conveyed via CompleteHeader.
+func (c *Client) PushProjectConfig(ctx context.Context, apiVersion string, project *types.Project, complete bool) error {
 	if versions.LessThan(apiVersion, MinAPIVersion) {
 		return fmt.Errorf("coordinator API version %s does not support the project-config push (requires %s or later)",
 			apiVersion, MinAPIVersion)
@@ -139,6 +154,9 @@ func (c *Client) PushProjectConfig(ctx context.Context, apiVersion string, proje
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	// Always set the header explicitly (not omit-on-false) so the value is
+	// unambiguous on the wire; only absence means "older client".
+	req.Header.Set(CompleteHeader, strconv.FormatBool(complete))
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
