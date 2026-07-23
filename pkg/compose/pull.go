@@ -405,8 +405,13 @@ func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSum
 			continue
 		}
 		for i, img := range api.GetDependentImages(service, project.Name) {
-			if _, ok := images[img]; ok {
-				continue
+			// Honor `pull_policy: always` for hook images the same way mustPull
+			// does for the service image: force a re-pull even when the image is
+			// already present locally. Other policies only pull when missing.
+			if service.PullPolicy != types.PullPolicyAlways {
+				if _, ok := images[img]; ok {
+					continue
+				}
 			}
 			if scheduled[img] {
 				continue
