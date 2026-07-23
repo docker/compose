@@ -65,11 +65,8 @@ func TestExecutePlanCreateNetwork(t *testing.T) {
 		Networks: types.Networks{"default": nw},
 	}
 
-	// ensureNetwork: inspect → not found, list → empty, create
-	apiClient.EXPECT().NetworkInspect(gomock.Any(), "test_default", gomock.Any()).
-		Return(client.NetworkInspectResult{}, notFoundError{})
-	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).
-		Return(client.NetworkListResult{}, nil)
+	// createNetwork issues a plain NetworkCreate (divergence/reuse decisions are
+	// made by the reconciler from the observed state, not here).
 	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
 		Return(client.NetworkCreateResult{ID: "net1"}, nil)
 
@@ -311,6 +308,78 @@ func TestExecutePlanRecreateVolume(t *testing.T) {
 		Name:       vol.Name,
 		Volume:     &vol,
 	}, "", removeVolNode)
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("recreate"), plan)
+	assert.NilError(t, err)
+}
+
+// TestExecutePlanRecreateNetwork drives a network recreation — stop container →
+// disconnect → remove network → create network → connect — end to end through
+// the executor, asserting each Docker API call fires. The container keeps its
+// identity (it is reconnected, not recreated).
+func TestExecutePlanRecreateNetwork(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	ctr := container.Summary{
+		ID:    "c1",
+		Names: []string{"/recreate-web-1"},
+		Labels: map[string]string{
+			api.ServiceLabel:         "web",
+			api.ContainerNumberLabel: "1",
+		},
+	}
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+	apiClient.EXPECT().NetworkDisconnect(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkDisconnectResult{}, nil)
+	apiClient.EXPECT().NetworkRemove(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkRemoveResult{}, nil)
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkCreateResult{ID: "net2"}, nil)
+	apiClient.EXPECT().NetworkConnect(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkConnectResult{}, nil)
+
+	nw := types.NetworkConfig{Name: "recreate_frontend", Driver: "overlay"}
+	project := &types.Project{
+		Name:     "recreate",
+		Networks: types.Networks{"frontend": nw},
+	}
+
+	plan := &Plan{}
+	stopNode := plan.addNode(Operation{
+		Type:       OpStopContainer,
+		ResourceID: "service:web:1",
+		Cause:      "network frontend config changed",
+		Container:  &ctr,
+	}, "")
+	disconnectNode := plan.addNode(Operation{
+		Type:       OpDisconnectNetwork,
+		ResourceID: "service:web:1",
+		Cause:      "network frontend recreate",
+		Container:  &ctr,
+		Name:       nw.Name,
+	}, "", stopNode)
+	removeNode := plan.addNode(Operation{
+		Type:       OpRemoveNetwork,
+		ResourceID: "network:frontend",
+		Cause:      "config hash diverged",
+		Name:       nw.Name,
+	}, "", disconnectNode)
+	createNode := plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:frontend",
+		Cause:      "recreate after config change",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "", removeNode)
+	plan.addNode(Operation{
+		Type:       OpConnectNetwork,
+		ResourceID: "service:web:1",
+		Cause:      "network frontend recreate",
+		Container:  &ctr,
+		Name:       nw.Name,
+	}, "", createNode)
 
 	err := svc.executePlan(t.Context(), project, emptyObservedState("recreate"), plan)
 	assert.NilError(t, err)

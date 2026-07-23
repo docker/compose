@@ -132,34 +132,36 @@ func TestReconcileNetworks_ExternalSkipped(t *testing.T) {
 	assert.Assert(t, plan.IsEmpty())
 }
 
+// networkAttachedContainer builds an observed container of `service` connected
+// to `netID` and up to date (its config-hash matches), so a network divergence
+// reconnects it rather than recreating it.
+func networkAttachedContainer(t *testing.T, svc types.ServiceConfig, id string) ObservedContainer {
+	t.Helper()
+	hash := mustServiceHash(t, svc)
+	return ObservedContainer{
+		ID: id, Number: 1, State: container.StateRunning, ConfigHash: hash,
+		ConnectedNetworks: map[string]string{"frontend": "net1"},
+		Summary: container.Summary{
+			ID: id, State: container.StateRunning,
+			Labels: map[string]string{api.ServiceLabel: svc.Name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+		},
+	}
+}
+
+// TestReconcileNetworks_Diverged asserts the Option-A recreation sequence for a
+// diverged network: attached containers are stopped and disconnected, the
+// network is removed then recreated, and the same containers are reconnected —
+// not recreated.
 func TestReconcileNetworks_Diverged(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
 	project := &types.Project{
-		Name: "myproject",
-		Networks: types.Networks{
-			"frontend": {Name: "myproject_frontend", Driver: "overlay"},
-		},
-		Services: types.Services{
-			"web": {
-				Name:     "web",
-				Scale:    intPtr(1),
-				Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}},
-			},
-		},
+		Name:     "myproject",
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+		Services: types.Services{"web": web},
 	}
 	observed := &ObservedState{
 		ProjectName: "myproject",
-		Containers: map[string][]ObservedContainer{
-			"web": {{
-				ID: "c1aabbccddee", Number: 1, State: container.StateRunning,
-				Summary: container.Summary{
-					ID: "c1aabbccddee",
-					Labels: map[string]string{
-						api.ServiceLabel:         "web",
-						api.ContainerNumberLabel: "1",
-					},
-				},
-			}},
-		},
+		Containers:  map[string][]ObservedContainer{"web": {networkAttachedContainer(t, web, "c1aabbccddee")}},
 		Networks: map[string]ObservedNetwork{
 			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"},
 		},
@@ -169,16 +171,53 @@ func TestReconcileNetworks_Diverged(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	// The recreate phase reuses the Stop from the network-recreate phase
-	// instead of emitting a second one against an already-stopped container.
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
 [] -> #1 service:web:1, StopContainer, network frontend config changed
 [1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
 [2] -> #3 network:frontend, RemoveNetwork, config hash diverged
 [3] -> #4 network:frontend, CreateNetwork, recreate after config change
-[4] -> #5 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
-[1,5] -> #6 service:web:1, RemoveContainer, replaced by #5 [recreate:web:1]
-[6] -> #7 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+[4] -> #5 service:web:1, ConnectNetwork, network frontend recreate
+`)+"\n")
+}
+
+// TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer verifies the
+// entangled case: when a container attached to a diverged network also has its
+// own config changed, it is both reconnected (by the network recreate) and
+// recreated (by reconcileContainers), with the reconnect ordered before the old
+// container's removal so they don't race.
+func TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
+	project := &types.Project{
+		Name:     "myproject",
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+		Services: types.Services{"web": web},
+	}
+	oc := networkAttachedContainer(t, web, "c1aabbccddee")
+	oc.ConfigHash = "stale" // service config changed too -> reconcileContainers recreates
+	oc.Summary.Labels[api.ConfigHashLabel] = "stale"
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"web": {oc}},
+		Networks: map[string]ObservedNetwork{
+			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"},
+		},
+		Volumes: map[string]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	// #5 is the reconnect of the old container; the recreate's RemoveContainer
+	// (#7) depends on it (in addition to Stop #1 and Create #6).
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, StopContainer, network frontend config changed
+[1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
+[2] -> #3 network:frontend, RemoveNetwork, config hash diverged
+[3] -> #4 network:frontend, CreateNetwork, recreate after config change
+[4] -> #5 service:web:1, ConnectNetwork, network frontend recreate
+[4] -> #6 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
+[1,5,6] -> #7 service:web:1, RemoveContainer, replaced by #6 [recreate:web:1]
+[7] -> #8 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
 `)+"\n")
 }
 
@@ -201,17 +240,13 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 			},
 		},
 	}
+	apiSvc := project.Services["api"]
+	web := project.Services["web"]
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers: map[string][]ObservedContainer{
-			"web": {{
-				ID: "c1aabbccddee", Number: 1, State: container.StateRunning,
-				Summary: container.Summary{ID: "c1aabbccddee", Labels: map[string]string{api.ServiceLabel: "web", api.ContainerNumberLabel: "1"}},
-			}},
-			"api": {{
-				ID: "c2aabbccddee", Number: 1, State: container.StateRunning,
-				Summary: container.Summary{ID: "c2aabbccddee", Labels: map[string]string{api.ServiceLabel: "api", api.ContainerNumberLabel: "1"}},
-			}},
+			"web": {networkAttachedContainer(t, web, "c1aabbccddee")},
+			"api": {networkAttachedContainer(t, apiSvc, "c2aabbccddee")},
 		},
 		Networks: map[string]ObservedNetwork{
 			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"},
@@ -222,22 +257,65 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	// Services sorted alphabetically: api before web. Each service's recreate
-	// reuses the Stop from the network-recreate phase (no second Stop).
+	// Services sorted alphabetically: api before web. Each attached container is
+	// stopped, disconnected and reconnected — not recreated (config unchanged).
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
 [] -> #1 service:api:1, StopContainer, network frontend config changed
-[] -> #2 service:web:1, StopContainer, network frontend config changed
-[1] -> #3 service:api:1, DisconnectNetwork, network frontend recreate
-[2] -> #4 service:web:1, DisconnectNetwork, network frontend recreate
-[3,4] -> #5 network:frontend, RemoveNetwork, config hash diverged
+[1] -> #2 service:api:1, DisconnectNetwork, network frontend recreate
+[] -> #3 service:web:1, StopContainer, network frontend config changed
+[3] -> #4 service:web:1, DisconnectNetwork, network frontend recreate
+[2,4] -> #5 network:frontend, RemoveNetwork, config hash diverged
 [5] -> #6 network:frontend, CreateNetwork, recreate after config change
-[6] -> #7 service:api:1, CreateContainer, config changed (tmpName) [recreate:api:1]
-[1,7] -> #8 service:api:1, RemoveContainer, replaced by #7 [recreate:api:1]
-[8] -> #9 service:api:1, RenameContainer, finalize recreate [recreate:api:1]
-[6] -> #10 service:web:1, CreateContainer, config changed (tmpName) [recreate:web:1]
-[2,10] -> #11 service:web:1, RemoveContainer, replaced by #10 [recreate:web:1]
-[11] -> #12 service:web:1, RenameContainer, finalize recreate [recreate:web:1]
+[6] -> #7 service:api:1, ConnectNetwork, network frontend recreate
+[6] -> #8 service:web:1, ConnectNetwork, network frontend recreate
 `)+"\n")
+}
+
+// TestReconcileNetworks_Renamed verifies that renaming a network creates the new
+// one additively and leaves the old (label-matched) network untouched, without
+// prompting.
+func TestReconcileNetworks_Renamed(t *testing.T) {
+	project := &types.Project{
+		Name:     "myproject",
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend_v2", Driver: "overlay"}},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks: map[string]ObservedNetwork{
+			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: mustNetworkHash(t, types.NetworkConfig{Name: "myproject_frontend", Driver: "overlay"})},
+		},
+		Volumes: map[string]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 network:frontend, CreateNetwork, renamed
+`)+"\n")
+}
+
+// TestReconcileNetworks_UnmanagedMatchReused verifies that a network discovered
+// by name but not owned by the project (empty ConfigHash — see
+// collectObservedState) is reused untouched: no create, no recreation.
+func TestReconcileNetworks_UnmanagedMatchReused(t *testing.T) {
+	project := &types.Project{
+		Name:     "myproject",
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks: map[string]ObservedNetwork{
+			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: ""},
+		},
+		Volumes: map[string]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unmanaged network must be reused untouched:\n%s", plan.String())
 }
 
 // --- Volume tests ---
@@ -1437,6 +1515,13 @@ func mustServiceHash(t *testing.T, svc types.ServiceConfig) string {
 func mustVolumeHash(t *testing.T, vol types.VolumeConfig) string {
 	t.Helper()
 	h, err := VolumeHash(vol)
+	assert.NilError(t, err)
+	return h
+}
+
+func mustNetworkHash(t *testing.T, nw types.NetworkConfig) string {
+	t.Helper()
+	h, err := NetworkHash(&nw)
 	assert.NilError(t, err)
 	return h
 }

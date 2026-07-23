@@ -31,8 +31,7 @@ import (
 // --- Network operations ---
 
 func (exec *planExecutor) execCreateNetwork(ctx context.Context, op Operation) error {
-	_, err := exec.compose.ensureNetwork(ctx, exec.project, op.Name, op.Network)
-	return err
+	return exec.compose.createNetwork(ctx, op.Network)
 }
 
 func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op Operation) error {
