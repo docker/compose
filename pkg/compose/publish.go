@@ -38,6 +38,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/oci"
@@ -746,11 +747,24 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 }
 
 func composeFileAsByteReader(ctx context.Context, filePath string, project *types.Project) (io.Reader, error) {
-	base, err := loadUnresolvedFile(ctx, project, filePath)
+	model, err := loader.LoadModelWithContext(ctx, types.ConfigDetails{
+		WorkingDir:  project.WorkingDir,
+		Environment: project.Environment,
+		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
+	}, func(options *loader.Options) {
+		options.SkipValidation = true
+		options.SkipExtends = true
+		options.SkipConsistencyCheck = true
+		options.ResolvePaths = true
+		options.SkipInclude = true
+		options.SkipInterpolation = true
+		options.SkipResolveEnvironment = true
+		options.Profiles = project.Profiles
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to load compose file %s: %w", filePath, err)
 	}
-	in, err := base.MarshalYAML()
+	in, err := yaml.Marshal(model)
 	if err != nil {
 		return nil, err
 	}
