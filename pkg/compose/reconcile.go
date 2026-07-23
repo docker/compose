@@ -247,7 +247,7 @@ func (r *reconciler) reconcileVolumes() error {
 		}
 		observed, exists := r.observed.Volumes[key]
 		if !exists {
-			r.planCreateVolume(key, &desired)
+			r.planCreateVolume(key, &desired, "not found")
 			continue
 		}
 		expected, err := VolumeHash(desired)
@@ -255,6 +255,15 @@ func (r *reconciler) reconcileVolumes() error {
 			return err
 		}
 		if observed.ConfigHash == "" || observed.ConfigHash == expected {
+			continue
+		}
+		if observed.Name != desired.Name {
+			// The volume was renamed: the live volume matched by label carries a
+			// different name, i.e. a distinct Docker resource. Match the
+			// historical additive behavior — create the new volume and leave the
+			// old one (and its data) untouched — instead of prompting to delete
+			// data under a name that does not exist yet.
+			r.planCreateVolume(key, &desired, "renamed")
 			continue
 		}
 		confirmed, err := r.prompt(
@@ -272,16 +281,14 @@ func (r *reconciler) reconcileVolumes() error {
 }
 
 // planCreateVolume adds a single CreateVolume node and records it for dependency tracking.
-func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig) *PlanNode {
-	node := r.plan.addNode(Operation{
+func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig, cause string) {
+	r.volumeNodes[key] = r.plan.addNode(Operation{
 		Type:       OpCreateVolume,
 		ResourceID: fmt.Sprintf("volume:%s", key),
-		Cause:      "not found",
+		Cause:      cause,
 		Name:       vol.Name,
 		Volume:     vol,
 	}, "")
-	r.volumeNodes[key] = node
-	return node
 }
 
 // planRecreateVolumes schedules the recreation of the given (confirmed) diverged

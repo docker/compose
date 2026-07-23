@@ -715,6 +715,67 @@ func TestReconcileVolumes_DivergedVolumesFromRemovedBeforeVolume(t *testing.T) {
 	assert.Assert(t, found, "RemoveVolume must depend on the consumer's RemoveContainer:\n%s", planStr)
 }
 
+// TestReconcileVolumes_UnmanagedMatchReused verifies that a volume discovered by
+// name but not owned by the project (empty ConfigHash — see collectObservedState)
+// is reused untouched: no create, no recreation, and no prompt.
+func TestReconcileVolumes_UnmanagedMatchReused(t *testing.T) {
+	project := &types.Project{
+		Name:    "myproject",
+		Volumes: types.Volumes{"data": {Name: "myproject_data", Driver: "local"}},
+		Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}},
+		},
+	}
+	dbHash := mustServiceHash(t, project.Services["db"])
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"db": {{
+				ID: "c1", Number: 1, State: container.StateRunning, ConfigHash: dbHash,
+				Summary: container.Summary{
+					ID: "c1", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "db", api.ContainerNumberLabel: "1", api.ConfigHashLabel: dbHash},
+					Mounts: []container.MountPoint{{Type: "volume", Name: "myproject_data"}},
+				},
+			}},
+		},
+		Networks: map[string]ObservedNetwork{},
+		// Unmanaged match: name resolved, but no config hash recorded.
+		Volumes: map[string]ObservedVolume{"data": {Name: "myproject_data", ConfigHash: ""}},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unmanaged volume must be reused untouched:\n%s", plan.String())
+}
+
+// TestReconcileVolumes_RenamedIsAdditive verifies that renaming a volume (the
+// label-matched live volume carries a different name) creates the new volume and
+// leaves the old one — and its data — untouched, without prompting.
+func TestReconcileVolumes_RenamedIsAdditive(t *testing.T) {
+	project := &types.Project{
+		Name:    "myproject",
+		Volumes: types.Volumes{"data": {Name: "myproject_data_v2", Driver: "local"}},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string]ObservedNetwork{},
+		// Same compose key "data", but the live volume still has the old name.
+		Volumes: map[string]ObservedVolume{
+			"data": {Name: "myproject_data", ConfigHash: mustVolumeHash(t, types.VolumeConfig{Name: "myproject_data", Driver: "local"})},
+		},
+	}
+
+	// noPrompt: a rename must not prompt for destructive recreation.
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 volume:data, CreateVolume, renamed
+`)+"\n")
+}
+
 // TestReconcileVolumes_DivergedUnmountedVolume verifies that a diverged volume
 // declared by the project but mounted by no running container is still recreated
 // (no container operations, just remove + create).
@@ -1322,6 +1383,13 @@ func TestReconcileContainers_RegularDependsOn_NoCascade(t *testing.T) {
 func mustServiceHash(t *testing.T, svc types.ServiceConfig) string {
 	t.Helper()
 	h, err := ServiceHash(svc)
+	assert.NilError(t, err)
+	return h
+}
+
+func mustVolumeHash(t *testing.T, vol types.VolumeConfig) string {
+	t.Helper()
+	h, err := VolumeHash(vol)
 	assert.NilError(t, err)
 	return h
 }

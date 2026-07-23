@@ -93,7 +93,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	}
 
 	prepareVolumes(project)
-	externalVolumes, err := s.checkVolumes(ctx, project)
+	externalVolumes, err := s.checkExternalVolumes(ctx, project)
 	if err != nil {
 		return err
 	}
@@ -110,6 +110,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	}
 	observed.setResolvedNetworks(networks, project)
 	observed.setResolvedVolumes(externalVolumes)
+	warnUnmanagedVolumes(project, observed)
 
 	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
 		logrus.Warnf("Found orphan containers (%s) for this project. If "+
@@ -167,42 +168,51 @@ func prepareVolumes(project *types.Project) {
 	}
 }
 
-// checkVolumes validates that external volumes exist and warns about non-external
-// volumes whose name collides with a volume not managed by this project. Creation
-// and recreation of managed volumes is owned by the reconciliation plan, so this
-// function performs no mutation.
+// checkExternalVolumes validates that every external volume exists and returns
+// their resolved names. External volumes carry no compose label and are
+// therefore absent from the label-scoped observed state, so the reconciler needs
+// them injected via setResolvedVolumes.
 //
-// It returns the resolved names of external volumes: those are not labelled by
-// Compose and are therefore absent from the observed state, so the reconciler
-// needs them injected via setResolvedVolumes.
-func (s *composeService) checkVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
+// Managed and legacy (unlabeled, name-matched) volumes are discovered by
+// collectObservedState; their lifecycle is owned by the reconciliation plan, so
+// this function performs no mutation on them.
+func (s *composeService) checkExternalVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
 	external := map[string]string{}
 	for k, volume := range project.Volumes {
-		if volume.External {
-			if _, err := s.apiClient().VolumeInspect(ctx, volume.Name, client.VolumeInspectOptions{}); err != nil {
-				if errdefs.IsNotFound(err) {
-					return nil, fmt.Errorf("external volume %q not found", volume.Name)
-				}
-				return nil, err
-			}
-			external[k] = volume.Name
+		if !volume.External {
 			continue
 		}
-
-		inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name, client.VolumeInspectOptions{})
-		if err != nil {
+		if _, err := s.apiClient().VolumeInspect(ctx, volume.Name, client.VolumeInspectOptions{}); err != nil {
 			if errdefs.IsNotFound(err) {
-				continue // absent: it will be created by the reconciliation plan
+				return nil, fmt.Errorf("external volume %q not found", volume.Name)
 			}
 			return nil, err
 		}
-		if p, ok := inspected.Volume.Labels[api.ProjectLabel]; !ok {
-			logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
-		} else if p != project.Name {
-			logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, p, project.Name)
-		}
+		external[k] = volume.Name
 	}
 	return external, nil
+}
+
+// warnUnmanagedVolumes warns about declared volumes backed by a live volume that
+// this project does not own — either created outside Compose (no project label)
+// or by another project. Such volumes are matched by name and reused untouched
+// (see collectObservedState); the warning tells the user to set `external: true`
+// to make the intent explicit.
+func warnUnmanagedVolumes(project *types.Project, observed *ObservedState) {
+	for k, volume := range project.Volumes {
+		if volume.External {
+			continue
+		}
+		obs, ok := observed.Volumes[k]
+		if !ok || obs.ProjectName == project.Name {
+			continue
+		}
+		if obs.ProjectName == "" {
+			logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
+		} else {
+			logrus.Warnf("volume %q already exists but was created for project %q (expected %q). Use `external: true` to use an existing volume", volume.Name, obs.ProjectName, project.Name)
+		}
+	}
 }
 
 //nolint:gocyclo
