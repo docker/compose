@@ -49,7 +49,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		// call. Failures are non-fatal: warn and continue bringing the project up.
 		if !s.dryRun && coordinator.PushEnabled(s.dockerCli) {
 			if err := s.pushProjectConfig(ctx, project); err != nil {
-				logrus.Warnf("project config push to coordinator failed, continuing: %v", err)
+				 s.events.On(newEvent(api.ResourceCompose, api.Warning, "project config push to coordinator failed, continuing", err.Error()))
 			}
 		}
 

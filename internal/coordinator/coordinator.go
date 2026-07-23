@@ -54,7 +54,7 @@ const MinAPIVersion = "1.51"
 // other Docker API call in "compose up", so without a deadline a coordinator
 // that accepts the connection but never responds would hang "up" indefinitely,
 // defeating the non-fatal "warn and continue" guarantee.
-const defaultTimeout = 30 * time.Second
+const defaultTimeout = 10 * time.Second
 
 // responseBodyLimit bounds how much of an error response body is read back
 // into the returned error message.
