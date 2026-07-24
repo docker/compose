@@ -149,6 +149,12 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 // persisted on the live network (observed.ConfigHash). A network with no
 // recorded hash (e.g. created by an older Compose or manually) is left
 // untouched, matching the previous ensureNetwork behavior.
+//
+// A rename (observed.Name != desired.Name) also diverges the hash — NetworkHash
+// includes the name — and is handled by the same recreation path: the old
+// network is removed and the new one created, migrating attached containers onto
+// it. Networks carry no data, so removing the previous network (rather than
+// leaving it dangling) is safe and keeps subsequent runs deterministic.
 func (r *reconciler) reconcileNetworks() error {
 	var diverged []string
 	for _, key := range sortedKeys(r.project.Networks) {
@@ -166,14 +172,6 @@ func (r *reconciler) reconcileNetworks() error {
 			return err
 		}
 		if observed.ConfigHash == "" || observed.ConfigHash == expected {
-			continue
-		}
-		if observed.Name != desired.Name {
-			// The network was renamed: the live network matched by label carries
-			// a different name, i.e. a distinct Docker resource. Create the new
-			// network and leave the old one untouched, matching the historical
-			// additive ensureNetwork behavior.
-			r.planCreateNetwork(key, &desired, "renamed")
 			continue
 		}
 		diverged = append(diverged, key)
