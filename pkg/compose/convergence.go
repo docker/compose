@@ -348,7 +348,12 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		plat = &p
 	}
 
-	response, err := s.apiClient().ContainerCreate(ctx, client.ContainerCreateOptions{
+	apiClient, err := s.serviceClient(project.Name, service.Name)
+	if err != nil {
+		return created, err
+	}
+
+	response, err := apiClient.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Name:             name,
 		Platform:         plat,
 		Config:           cfgs.Container,
@@ -383,20 +388,20 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			}
 			epSettings, err := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
 			if err != nil {
-				_, _ = s.apiClient().ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
+				_, _ = apiClient.ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
 				return created, err
 			}
-			if _, err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, client.NetworkConnectOptions{
+			if _, err := apiClient.NetworkConnect(ctx, mobyNetworkName, client.NetworkConnectOptions{
 				Container:      response.ID,
 				EndpointConfig: epSettings,
 			}); err != nil {
-				_, _ = s.apiClient().ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
+				_, _ = apiClient.ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
 				return created, err
 			}
 		}
 	}
 
-	res, err := s.apiClient().ContainerInspect(ctx, response.ID, client.ContainerInspectOptions{})
+	res, err := apiClient.ContainerInspect(ctx, response.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return created, err
 	}
@@ -570,9 +575,14 @@ func (s *composeService) startServiceContainer(ctx context.Context, project *typ
 		return err
 	}
 
+	apiClient, err := s.serviceClient(project.Name, service.Name)
+	if err != nil {
+		return err
+	}
+
 	eventName := getContainerProgressName(ctr)
 	s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
-	if _, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{}); err != nil {
+	if _, err := apiClient.ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{}); err != nil {
 		return err
 	}
 

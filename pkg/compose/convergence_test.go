@@ -424,6 +424,15 @@ func TestIsServiceHealthy(t *testing.T) {
 	})
 }
 
+// seedServiceClient pre-populates the per-service client cache so that
+// service-scoped calls (ContainerCreate, ContainerStart, …) resolve to the
+// given mock instead of building a real client from the Docker endpoint.
+func seedServiceClient(s *composeService, project, service string, c client.APIClient) {
+	s.serviceClients.clients = map[serviceClientKey]client.APIClient{
+		{project: project, service: service}: c,
+	}
+}
+
 func TestCreateMobyContainer(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -435,6 +444,7 @@ func TestCreateMobyContainer(t *testing.T) {
 	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 	apiClient.EXPECT().DaemonHost().Return("").AnyTimes()
 	apiClient.EXPECT().ImageInspect(anyCancellableContext(), gomock.Any()).Return(client.ImageInspectResult{}, nil).AnyTimes()
+	seedServiceClient(tested.(*composeService), "bork", "test", apiClient)
 
 	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{
 		APIVersion: "1.44",
@@ -539,6 +549,7 @@ func TestCreateMobyContainerLegacyAPI(t *testing.T) {
 	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
 		Return(client.PingResult{APIVersion: "1.43"}, nil).AnyTimes()
 	apiClient.EXPECT().ClientVersion().Return("1.43").AnyTimes()
+	seedServiceClient(tested.(*composeService), "bork", "test", apiClient)
 
 	service := types.ServiceConfig{
 		Name: "test",
@@ -628,6 +639,7 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
 		Return(client.PingResult{APIVersion: "1.43"}, nil).AnyTimes()
 	apiClient.EXPECT().ClientVersion().Return("1.43").AnyTimes()
+	seedServiceClient(tested.(*composeService), "bork", "test", apiClient)
 
 	service := types.ServiceConfig{
 		Name: "test",

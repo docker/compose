@@ -115,7 +115,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		idx := i
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			_, err := s.pullServiceImage(ctx, project.Name, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[idx] = err
 				if service.Build != nil {
@@ -173,7 +173,24 @@ func getUnwrappedErrorMessage(err error) string {
 	return err.Error()
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, quietPull bool, defaultPlatform string) (string, error) {
+// resolvePullPlatforms returns the OCI platforms to request for an image pull,
+// falling back to defaultPlatform when the service declares none.
+func resolvePullPlatforms(servicePlatform, defaultPlatform string) ([]ocispec.Platform, error) {
+	platform := servicePlatform
+	if platform == "" {
+		platform = defaultPlatform
+	}
+	if platform == "" {
+		return nil, nil
+	}
+	p, err := platforms.Parse(platform)
+	if err != nil {
+		return nil, err
+	}
+	return []ocispec.Platform{p}, nil
+}
+
+func (s *composeService) pullServiceImage(ctx context.Context, projectName string, service types.ServiceConfig, quietPull bool, defaultPlatform string) (string, error) {
 	resource := "Image " + service.Image
 	s.events.On(newEvent(resource, api.Working, api.StatusPulling))
 	ref, err := reference.ParseNormalizedNamed(service.Image)
@@ -186,21 +203,17 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 
-	platform := service.Platform
-	if platform == "" {
-		platform = defaultPlatform
+	ociPlatforms, err := resolvePullPlatforms(service.Platform, defaultPlatform)
+	if err != nil {
+		return "", err
 	}
 
-	var ociPlatforms []ocispec.Platform
-	if platform != "" {
-		p, err := platforms.Parse(platform)
-		if err != nil {
-			return "", err
-		}
-		ociPlatforms = append(ociPlatforms, p)
+	apiClient, err := s.serviceClient(projectName, service.Name)
+	if err != nil {
+		return "", err
 	}
 
-	stream, err := s.apiClient().ImagePull(ctx, service.Image, client.ImagePullOptions{
+	stream, err := apiClient.ImagePull(ctx, service.Image, client.ImagePullOptions{
 		RegistryAuth: encodedAuth,
 		Platforms:    ociPlatforms,
 	})
@@ -324,7 +337,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 	var mutex sync.Mutex
 	for name, service := range needPull {
 		eg.Go(func() error {
-			id, err := s.pullServiceImage(ctx, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			id, err := s.pullServiceImage(ctx, project.Name, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			mutex.Lock()
 			defer mutex.Unlock()
 			pulledImages[name] = api.ImageSummary{
