@@ -271,17 +271,21 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 `)+"\n")
 }
 
-// TestReconcileNetworks_Renamed verifies that renaming a network creates the new
-// one additively and leaves the old (label-matched) network untouched, without
-// prompting.
+// TestReconcileNetworks_Renamed verifies that renaming a network (the label
+// matched live network carries a different name) is handled as a recreation: the
+// old network is removed, the new one is created, and the attached container is
+// migrated onto it (reconnected). Networks carry no data, so removing the old one
+// is safe and keeps subsequent runs deterministic.
 func TestReconcileNetworks_Renamed(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
 	project := &types.Project{
 		Name:     "myproject",
 		Networks: types.Networks{"frontend": {Name: "myproject_frontend_v2", Driver: "overlay"}},
+		Services: types.Services{"web": web},
 	}
 	observed := &ObservedState{
 		ProjectName: "myproject",
-		Containers:  map[string][]ObservedContainer{},
+		Containers:  map[string][]ObservedContainer{"web": {networkAttachedContainer(t, web, "c1aabbccddee")}},
 		Networks: map[string]ObservedNetwork{
 			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: mustNetworkHash(t, types.NetworkConfig{Name: "myproject_frontend", Driver: "overlay"})},
 		},
@@ -292,8 +296,26 @@ func TestReconcileNetworks_Renamed(t *testing.T) {
 	assert.NilError(t, err)
 
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
-[] -> #1 network:frontend, CreateNetwork, renamed
+[] -> #1 service:web:1, StopContainer, network frontend config changed
+[1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
+[2] -> #3 network:frontend, RemoveNetwork, config hash diverged
+[3] -> #4 network:frontend, CreateNetwork, recreate after config change
+[4] -> #5 service:web:1, ConnectNetwork, network frontend recreate
 `)+"\n")
+
+	// The old network is removed by name and the new name is created — proving
+	// the rename migrates rather than leaving the old network dangling.
+	var removed, created string
+	for _, n := range plan.Nodes {
+		switch n.Operation.Type {
+		case OpRemoveNetwork:
+			removed = n.Operation.Name
+		case OpCreateNetwork:
+			created = n.Operation.Name
+		}
+	}
+	assert.Equal(t, removed, "myproject_frontend")
+	assert.Equal(t, created, "myproject_frontend_v2")
 }
 
 // TestReconcileNetworks_UnmanagedMatchReused verifies that a network discovered
