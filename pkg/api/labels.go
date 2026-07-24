@@ -55,6 +55,8 @@ const (
 	ImageBuilderLabel = "com.docker.compose.image.builder"
 	// ContainerReplaceLabel is set when container is created to replace another container (recreated)
 	ContainerReplaceLabel = "com.docker.compose.replace"
+	// ContainerEngineLabel stores the name of the engine that runs the container
+	ContainerEngineLabel = "com.docker.compose.engine"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel
