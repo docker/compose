@@ -1453,6 +1453,14 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 	s.events.On(creatingEvent(networkEventName))
 
 	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts); err != nil {
+		// A concurrent `docker compose up|run` may have created the same network
+		// between the observed-state snapshot and now. Treat the resulting
+		// conflict as success rather than failing hard, mirroring the retry the
+		// previous ensureNetwork performed.
+		if errdefs.IsConflict(err) {
+			s.events.On(createdEvent(networkEventName))
+			return nil
+		}
 		s.events.On(errorEvent(networkEventName, err.Error()))
 		return fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}

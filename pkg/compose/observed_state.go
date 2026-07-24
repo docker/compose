@@ -198,11 +198,25 @@ func (s *composeService) discoverUnmanagedNetworks(ctx context.Context, project 
 			ID:          inspected.Network.ID,
 			Name:        inspected.Network.Name,
 			ProjectName: inspected.Network.Labels[api.ProjectLabel],
-			// ConfigHash intentionally left empty: the network is not owned by
-			// this project, so we must not treat it as diverged and recreate it.
+			// Preserve the config-hash only when the network belongs to this
+			// project (e.g. an older Compose wrote the project label but not the
+			// network-key label): the reconciler then still detects genuine
+			// divergence. For a network we don't own the hash is left empty so we
+			// reuse it untouched rather than recreate it.
+			ConfigHash: ownedConfigHash(inspected.Network.Labels, project.Name),
 		}
 	}
 	return nil
+}
+
+// ownedConfigHash returns the config-hash label only when the resource belongs
+// to the given project; otherwise it returns "" so the reconciler treats the
+// resource as an unmanaged match to be reused untouched.
+func ownedConfigHash(labels map[string]string, projectName string) string {
+	if labels[api.ProjectLabel] != projectName {
+		return ""
+	}
+	return labels[api.ConfigHashLabel]
 }
 
 // discoverUnmanagedVolumes augments the observed state with volumes that match a
@@ -231,8 +245,12 @@ func (s *composeService) discoverUnmanagedVolumes(ctx context.Context, project *
 			Name:        inspected.Volume.Name,
 			ProjectName: inspected.Volume.Labels[api.ProjectLabel],
 			Driver:      inspected.Volume.Driver,
-			// ConfigHash intentionally left empty: the volume is not owned by
-			// this project, so we must not treat it as diverged and recreate it.
+			// Preserve the config-hash only when the volume belongs to this
+			// project (older Compose wrote the project label but not the
+			// volume-key label): the reconciler then still detects divergence.
+			// For a volume we don't own the hash is left empty so we reuse it
+			// untouched rather than recreate it.
+			ConfigHash: ownedConfigHash(inspected.Volume.Labels, project.Name),
 		}
 	}
 	return nil
