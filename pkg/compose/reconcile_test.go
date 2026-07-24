@@ -272,10 +272,11 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 }
 
 // TestReconcileNetworks_Renamed verifies that renaming a network (the label
-// matched live network carries a different name) is handled as a recreation: the
-// old network is removed, the new one is created, and the attached container is
-// migrated onto it (reconnected). Networks carry no data, so removing the old one
-// is safe and keeps subsequent runs deterministic.
+// matched live network carries a different name) migrates the attached container
+// onto the new network. The new network is created independently of the old one,
+// and the old network's removal is best-effort cleanup (it does not gate the
+// migration), so a network still in use by non-Compose containers cannot block a
+// rename.
 func TestReconcileNetworks_Renamed(t *testing.T) {
 	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
 	project := &types.Project{
@@ -295,21 +296,25 @@ func TestReconcileNetworks_Renamed(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
+	// CreateNetwork (#4) does not depend on RemoveNetwork (#3): the new network
+	// has a different name, so it is created independently and the old removal is
+	// best-effort. The reconnect (#5) waits for the new network and for the
+	// container to leave the old one.
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
 [] -> #1 service:web:1, StopContainer, network frontend config changed
 [1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
-[2] -> #3 network:frontend, RemoveNetwork, config hash diverged
-[3] -> #4 network:frontend, CreateNetwork, recreate after config change
-[4] -> #5 service:web:1, ConnectNetwork, network frontend recreate
+[2] -> #3 network:frontend, RemoveNetwork, renamed (best-effort cleanup)
+[] -> #4 network:frontend, CreateNetwork, renamed
+[2,4] -> #5 service:web:1, ConnectNetwork, network frontend recreate
 `)+"\n")
 
-	// The old network is removed by name and the new name is created — proving
-	// the rename migrates rather than leaving the old network dangling.
+	// The old-network removal is best-effort; the new name is created.
 	var removed, created string
 	for _, n := range plan.Nodes {
 		switch n.Operation.Type {
 		case OpRemoveNetwork:
 			removed = n.Operation.Name
+			assert.Assert(t, n.Operation.BestEffort, "rename removal must be best-effort")
 		case OpCreateNetwork:
 			created = n.Operation.Name
 		}

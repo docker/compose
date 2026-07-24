@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -36,6 +38,13 @@ func (exec *planExecutor) execCreateNetwork(ctx context.Context, op Operation) e
 
 func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op Operation) error {
 	_, err := exec.compose.apiClient().NetworkRemove(ctx, op.Name, client.NetworkRemoveOptions{})
+	// A best-effort removal (old network on a rename) tolerates the network
+	// still being in use — Docker reports that as a conflict. Any other error
+	// (transport failure, Moby API error, ...) is still propagated.
+	if err != nil && op.BestEffort && errdefs.IsConflict(err) {
+		logrus.Warnf("network %s is still in use and was left in place; remove it manually once no container is attached", op.Name)
+		return nil
+	}
 	return err
 }
 
