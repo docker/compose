@@ -41,3 +41,25 @@ func TestGreatestExistingAncestor(t *testing.T) {
 	_, err = greatestExistingAncestor(missingTopLevel)
 	assert.ErrorContains(t, err, "cannot watch root directory")
 }
+
+func TestGreatestExistingAncestorsMovesIgnoreToAncestor(t *testing.T) {
+	f := NewTempDirFixture(t)
+
+	missing := f.JoinPath("missing", "child", "file.txt")
+
+	paths, err := greatestExistingAncestors([]string{missing})
+	assert.NilError(t, err)
+	assert.Equal(t, 1, len(paths))
+	assert.Equal(t, f.Path(), paths[0])
+}
+
+func TestGreatestExistingAncestorsIntersectsIgnoreOnAncestor(t *testing.T) {
+	f := NewTempDirFixture(t)
+
+	missing := f.JoinPath("missing", "child", "file.txt")
+
+	paths, err := greatestExistingAncestors([]string{missing})
+	assert.NilError(t, err)
+	assert.Equal(t, 1, len(paths))
+	assert.Equal(t, f.Path(), paths[0])
+}

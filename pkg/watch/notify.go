@@ -80,8 +80,8 @@ func (EmptyMatcher) MatchesEntireDir(f string) (bool, error) { return false, nil
 
 var _ PathMatcher = EmptyMatcher{}
 
-func NewWatcher(paths []string) (Notify, error) {
-	return newWatcher(paths)
+func NewWatcher(paths []string, ignore map[string]PathMatcher) (Notify, error) {
+	return newWatcher(paths, ignore)
 }
 
 const WindowsBufferSizeEnvVar = "COMPOSE_WATCH_WINDOWS_BUFFER_SIZE"
@@ -134,3 +134,48 @@ func (c CompositePathMatcher) MatchesEntireDir(f string) (bool, error) {
 }
 
 var _ PathMatcher = CompositePathMatcher{}
+
+// intersectPathMatcher matches iff every matcher matches. With several develop.watch
+// triggers on one watch root, skip/filter a path only when every trigger's ignores agree.
+type intersectPathMatcher struct {
+	Matchers []PathMatcher
+}
+
+// NewIntersectMatcher returns a PathMatcher that matches iff every matcher matches.
+func NewIntersectMatcher(matchers ...PathMatcher) PathMatcher {
+	if len(matchers) == 0 {
+		return EmptyMatcher{}
+	}
+	if len(matchers) == 1 {
+		return matchers[0]
+	}
+	return intersectPathMatcher{Matchers: matchers}
+}
+
+func (i intersectPathMatcher) Matches(f string) (bool, error) {
+	for _, t := range i.Matchers {
+		ret, err := t.Matches(f)
+		if err != nil {
+			return false, err
+		}
+		if !ret {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (i intersectPathMatcher) MatchesEntireDir(f string) (bool, error) {
+	for _, t := range i.Matchers {
+		ret, err := t.MatchesEntireDir(f)
+		if err != nil {
+			return false, err
+		}
+		if !ret {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+var _ PathMatcher = intersectPathMatcher{}
