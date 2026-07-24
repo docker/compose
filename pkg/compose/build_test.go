@@ -21,6 +21,9 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 
@@ -106,4 +109,33 @@ func Test_addBuildDependencies(t *testing.T) {
 	slices.Sort(services)
 	slices.Sort(expected)
 	assert.DeepEqual(t, services, expected)
+}
+
+// TestGetLocalImagesDigests_PreStartHook ensures pre_start hook images are
+// inspected alongside the service image so they get resolved (see issue #13924).
+func TestGetLocalImagesDigests_PreStartHook(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"web": types.ServiceConfig{
+				Name:  "web",
+				Image: "alpine:3.20",
+				PreStart: []types.ServiceHook{
+					{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "init"}},
+				},
+			},
+		},
+	}
+
+	apiClient.EXPECT().ImageInspect(gomock.Any(), "alpine:3.20").
+		Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:service"}}, nil)
+	apiClient.EXPECT().ImageInspect(gomock.Any(), "alpine:3.19").
+		Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:hook"}}, nil)
+
+	images, err := tested.getLocalImagesDigests(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Equal(t, images["alpine:3.20"].ID, "sha256:service")
+	assert.Equal(t, images["alpine:3.19"].ID, "sha256:hook")
 }
