@@ -19,7 +19,9 @@ package compose
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -53,6 +55,10 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 		api.Separator = "_"
 	}
 
+	if err := s.validateRequiredVariables(ctx, options, remoteLoaders); err != nil {
+		return nil, err
+	}
+
 	project, err := projectOptions.LoadProject(ctx)
 	if err != nil {
 		return nil, err
@@ -65,6 +71,42 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 	}
 
 	return project, nil
+}
+
+func (s *composeService) validateRequiredVariables(ctx context.Context, options api.ProjectLoadOptions, remoteLoaders []loader.ResourceLoader) error {
+	precheckOptions := options
+	precheckOptions.ProjectOptionsFns = append([]cli.ProjectOptionsFn{}, options.ProjectOptionsFns...)
+	precheckOptions.ProjectOptionsFns = append(precheckOptions.ProjectOptionsFns,
+		cli.WithInterpolation(false),
+		cli.WithLoadOptions(loader.WithSkipValidation),
+		cli.WithoutEnvironmentResolution,
+	)
+
+	projectOptions, err := s.buildProjectOptions(precheckOptions, remoteLoaders)
+	if err != nil {
+		return err
+	}
+
+	model, err := projectOptions.LoadModel(ctx)
+	if err != nil {
+		return err
+	}
+
+	var missing []string
+	variables := ExtractVariables(model)
+	for name, variable := range variables {
+		value, ok := projectOptions.Environment.Resolve(name)
+		if variable.Required && (!ok || value == "") {
+			missing = append(missing, name)
+		}
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	sort.Strings(missing)
+	return fmt.Errorf("required variable %s is missing a value", missing[0])
 }
 
 // createRemoteLoaders creates Git and OCI remote loaders if not in offline mode
