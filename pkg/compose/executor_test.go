@@ -124,8 +124,8 @@ func emptyObservedState(project string) *ObservedState {
 	return &ObservedState{
 		ProjectName: project,
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 }
 
@@ -159,8 +159,8 @@ func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 		Containers: map[string][]ObservedContainer{
 			"web": {{ID: "old-id", Summary: oldCtr}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan := &Plan{}
@@ -221,8 +221,8 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "test",
 		Containers:  map[string][]ObservedContainer{"web": webContainers},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	// Build N independent Stop→Remove chains. The errgroup will fan them out

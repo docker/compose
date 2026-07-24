@@ -24,6 +24,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -76,8 +78,8 @@ func TestReconcileNetworks_CreateMissing(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -102,10 +104,10 @@ func TestReconcileNetworks_ExistingMatch(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks: map[string]ObservedNetwork{
-			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: hash},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: hash}},
 		},
-		Volumes: map[string]ObservedVolume{},
+		Volumes: map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -123,8 +125,8 @@ func TestReconcileNetworks_ExternalSkipped(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -162,10 +164,10 @@ func TestReconcileNetworks_Diverged(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{"web": {networkAttachedContainer(t, web, "c1aabbccddee")}},
-		Networks: map[string]ObservedNetwork{
-			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}},
 		},
-		Volumes: map[string]ObservedVolume{},
+		Volumes: map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -198,10 +200,10 @@ func TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{"web": {oc}},
-		Networks: map[string]ObservedNetwork{
-			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}},
 		},
-		Volumes: map[string]ObservedVolume{},
+		Volumes: map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -248,10 +250,10 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 			"web": {networkAttachedContainer(t, web, "c1aabbccddee")},
 			"api": {networkAttachedContainer(t, apiSvc, "c2aabbccddee")},
 		},
-		Networks: map[string]ObservedNetwork{
-			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}},
 		},
-		Volumes: map[string]ObservedVolume{},
+		Volumes: map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -286,10 +288,10 @@ func TestReconcileNetworks_Renamed(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{"web": {networkAttachedContainer(t, web, "c1aabbccddee")}},
-		Networks: map[string]ObservedNetwork{
-			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: mustNetworkHash(t, types.NetworkConfig{Name: "myproject_frontend", Driver: "overlay"})},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: mustNetworkHash(t, types.NetworkConfig{Name: "myproject_frontend", Driver: "overlay"})}},
 		},
-		Volumes: map[string]ObservedVolume{},
+		Volumes: map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -329,10 +331,10 @@ func TestReconcileNetworks_UnmanagedMatchReused(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks: map[string]ObservedNetwork{
-			"frontend": {ID: "net1", Name: "myproject_frontend", ConfigHash: ""},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: ""}},
 		},
-		Volumes: map[string]ObservedVolume{},
+		Volumes: map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -350,8 +352,8 @@ func TestReconcileVolumes_CreateMissing(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -374,9 +376,9 @@ func TestReconcileVolumes_ExistingMatch(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes: map[string]ObservedVolume{
-			"data": {Name: "myproject_data", ConfigHash: hash},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes: map[string][]ObservedVolume{
+			"data": {{Name: "myproject_data", ConfigHash: hash}},
 		},
 	}
 
@@ -393,8 +395,8 @@ func TestReconcileVolumes_ExternalSkipped(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -417,8 +419,8 @@ func divergedVolumeProject(t *testing.T, count, scale int) (*types.Project, *Obs
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{"data": {{Name: vol.Name, ConfigHash: "oldhash"}}},
 	}
 	for s := 0; s < count; s++ {
 		name := fmt.Sprintf("db%d", s)
@@ -478,9 +480,9 @@ func TestReconcileVolumes_DivergedDeclined(t *testing.T) {
 // never prompts — matching the previous ensureVolume behavior.
 func TestReconcileVolumes_DivergedNoRecordedHash(t *testing.T) {
 	project, observed := divergedVolumeProject(t, 1, 1)
-	obs := observed.Volumes["data"]
+	obs := observed.Volumes["data"][0]
 	obs.ConfigHash = ""
-	observed.Volumes["data"] = obs
+	observed.Volumes["data"] = []ObservedVolume{obs}
 
 	// noPrompt panics if consulted, proving the empty-hash guard short-circuits.
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -585,10 +587,10 @@ func TestReconcileVolumes_DivergedConfirmedSharedContainer(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes: map[string]ObservedVolume{
-			"data1": {Name: vol1.Name, ConfigHash: "oldhash"},
-			"data2": {Name: vol2.Name, ConfigHash: "oldhash"},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes: map[string][]ObservedVolume{
+			"data1": {{Name: vol1.Name, ConfigHash: "oldhash"}},
+			"data2": {{Name: vol2.Name, ConfigHash: "oldhash"}},
 		},
 	}
 
@@ -636,10 +638,10 @@ func TestReconcileVolumes_DivergedPartialConfirm(t *testing.T) {
 			"db1": {mountedContainer("c1", "db1", h1, vol1.Name)},
 			"db2": {mountedContainer("c2", "db2", h2, vol2.Name)},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes: map[string]ObservedVolume{
-			"data1": {Name: vol1.Name, ConfigHash: "oldhash"},
-			"data2": {Name: vol2.Name, ConfigHash: "oldhash"},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes: map[string][]ObservedVolume{
+			"data1": {{Name: vol1.Name, ConfigHash: "oldhash"}},
+			"data2": {{Name: vol2.Name, ConfigHash: "oldhash"}},
 		},
 	}
 
@@ -709,8 +711,8 @@ func TestReconcileVolumes_DivergedCascadesToDependent(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{"data": {{Name: vol.Name, ConfigHash: "oldhash"}}},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
@@ -780,8 +782,8 @@ func TestReconcileVolumes_DivergedVolumesFromRemovedBeforeVolume(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{"data": {{Name: vol.Name, ConfigHash: "oldhash"}}},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
@@ -839,9 +841,9 @@ func TestReconcileVolumes_UnmanagedMatchReused(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
+		Networks: map[string][]ObservedNetwork{},
 		// Unmanaged match: name resolved, but no config hash recorded.
-		Volumes: map[string]ObservedVolume{"data": {Name: "myproject_data", ConfigHash: ""}},
+		Volumes: map[string][]ObservedVolume{"data": {{Name: "myproject_data", ConfigHash: ""}}},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -860,10 +862,10 @@ func TestReconcileVolumes_RenamedIsAdditive(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
+		Networks:    map[string][]ObservedNetwork{},
 		// Same compose key "data", but the live volume still has the old name.
-		Volumes: map[string]ObservedVolume{
-			"data": {Name: "myproject_data", ConfigHash: mustVolumeHash(t, types.VolumeConfig{Name: "myproject_data", Driver: "local"})},
+		Volumes: map[string][]ObservedVolume{
+			"data": {{Name: "myproject_data", ConfigHash: mustVolumeHash(t, types.VolumeConfig{Name: "myproject_data", Driver: "local"})}},
 		},
 	}
 
@@ -903,9 +905,9 @@ func TestReconcileVolumes_RenamedMigratesContainers(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes: map[string]ObservedVolume{
-			"data": {Name: "myproject_data", ConfigHash: mustVolumeHash(t, types.VolumeConfig{Name: "myproject_data", Driver: "local"})},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes: map[string][]ObservedVolume{
+			"data": {{Name: "myproject_data", ConfigHash: mustVolumeHash(t, types.VolumeConfig{Name: "myproject_data", Driver: "local"})}},
 		},
 	}
 
@@ -936,8 +938,8 @@ func TestReconcileVolumes_DivergedUnmountedVolume(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{"data": {Name: vol.Name, ConfigHash: "oldhash"}},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{"data": {{Name: vol.Name, ConfigHash: "oldhash"}}},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
@@ -947,6 +949,42 @@ func TestReconcileVolumes_DivergedUnmountedVolume(t *testing.T) {
 [] -> #1 volume:data, RemoveVolume, config hash diverged
 [1] -> #2 volume:data, CreateVolume, recreate after config change
 `)+"\n")
+}
+
+// TestReconcileVolumes_DuplicateLabelSelectsDesired verifies that when two live
+// volumes share the compose label (e.g. a leftover after a rename), the
+// reconciler deterministically selects the one matching the desired name — so a
+// no-op `up` stays a no-op regardless of the daemon's list order — and warns
+// about the orphan rather than acting on it.
+func TestReconcileVolumes_DuplicateLabelSelectsDesired(t *testing.T) {
+	desired := types.VolumeConfig{Name: "pgdata_v2", Driver: "local"}
+	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": desired}}
+
+	// Both orders must yield the same outcome (deterministic selection).
+	current := ObservedVolume{Name: "pgdata_v2", ConfigHash: mustVolumeHash(t, desired)}
+	orphan := ObservedVolume{Name: "pgdata_v1", ConfigHash: "old"}
+
+	for _, order := range [][]ObservedVolume{{orphan, current}, {current, orphan}} {
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers:  map[string][]ObservedContainer{},
+			Networks:    map[string][]ObservedNetwork{},
+			Volumes:     map[string][]ObservedVolume{"data": order},
+		}
+
+		hook := logrustest.NewGlobal()
+		plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+		assert.NilError(t, err)
+		assert.Assert(t, plan.IsEmpty(), "matching volume selected -> no-op, got:\n%s", plan.String())
+
+		var warned bool
+		for _, e := range hook.AllEntries() {
+			if e.Level == logrus.WarnLevel && strings.Contains(e.Message, "pgdata_v1") {
+				warned = true
+			}
+		}
+		assert.Assert(t, warned, "orphan pgdata_v1 must be reported")
+	}
 }
 
 // --- Container tests ---
@@ -961,8 +999,8 @@ func TestReconcileContainers_NewProject(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{"web": {}},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -992,8 +1030,8 @@ func TestReconcileContainers_AlreadyRunning(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -1019,8 +1057,8 @@ func TestReconcileContainers_ConfigChanged(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -1053,8 +1091,8 @@ func TestReconcileContainers_ScaleUp(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -1094,8 +1132,8 @@ func TestReconcileContainers_ScaleDown(t *testing.T) {
 				},
 			},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -1126,8 +1164,8 @@ func TestReconcileContainers_ForceRecreate(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	opts := defaultReconcileOptions()
@@ -1162,8 +1200,8 @@ func TestReconcileContainers_NeverRecreate(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	opts := defaultReconcileOptions()
@@ -1193,8 +1231,8 @@ func TestReconcileContainers_ExitedIsNoop(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -1224,8 +1262,8 @@ func TestReconcileContainers_DependsOnChain(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -1270,8 +1308,8 @@ func TestReconcileContainers_DependsOnScaleDown(t *testing.T) {
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
@@ -1299,8 +1337,8 @@ func TestReconcileOrphans(t *testing.T) {
 			ID: "orphan1", Number: 1, Name: "myproject-old-1",
 			Summary: container.Summary{ID: "orphan1"},
 		}},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	opts := defaultReconcileOptions()
@@ -1361,8 +1399,8 @@ func parentDependentObserved(t *testing.T, parent, dependent types.ServiceConfig
 				},
 			}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 }
 
@@ -1465,8 +1503,8 @@ func TestReconcileContainers_MultipleParents_EitherTriggersCascade(t *testing.T)
 		obs := &ObservedState{
 			ProjectName: "myproject",
 			Containers:  map[string][]ObservedContainer{},
-			Networks:    map[string]ObservedNetwork{},
-			Volumes:     map[string]ObservedVolume{},
+			Networks:    map[string][]ObservedNetwork{},
+			Volumes:     map[string][]ObservedVolume{},
 		}
 		for name, svc := range map[string]types.ServiceConfig{"netparent": netParent, "volparent": volParent} {
 			hash := mustServiceHash(t, svc)

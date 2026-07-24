@@ -174,7 +174,7 @@ func warnUnmanagedNetworks(project *types.Project, observed *ObservedState) {
 		if nw.External {
 			continue
 		}
-		obs, ok := observed.Networks[k]
+		obs, _, ok := observed.selectNetwork(k, nw.Name)
 		if !ok || obs.ProjectName == project.Name {
 			continue
 		}
@@ -237,7 +237,7 @@ func warnUnmanagedVolumes(project *types.Project, observed *ObservedState) {
 		if volume.External {
 			continue
 		}
-		obs, ok := observed.Volumes[k]
+		obs, _, ok := observed.selectVolume(k, volume.Name)
 		if !ok || obs.ProjectName == project.Name {
 			continue
 		}

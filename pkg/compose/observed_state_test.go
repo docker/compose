@@ -192,17 +192,88 @@ func TestCollectObservedState(t *testing.T) {
 
 	// Networks
 	assert.Equal(t, len(state.Networks), 1)
-	nw := state.Networks["frontend"]
+	nw := state.Networks["frontend"][0]
 	assert.Equal(t, nw.ID, "net1")
 	assert.Equal(t, nw.Name, "myproject_frontend")
 	assert.Equal(t, nw.ConfigHash, "nethash1")
 
 	// Volumes
 	assert.Equal(t, len(state.Volumes), 1)
-	vol := state.Volumes["data"]
+	vol := state.Volumes["data"][0]
 	assert.Equal(t, vol.Name, "myproject_data")
 	assert.Equal(t, vol.Driver, "local")
 	assert.Equal(t, vol.ConfigHash, "volhash1")
+}
+
+// TestCollectObservedState_AggregatesDuplicateLabels verifies that two live
+// volumes (or networks) sharing the same compose label are both recorded, with
+// no premature choice — the reconciler resolves the conflict later.
+func TestCollectObservedState_AggregatesDuplicateLabels(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "pgdata_v2"}}}
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{
+		Items: []volume.Volume{
+			{Name: "pgdata_v1", Labels: map[string]string{api.VolumeLabel: "data", api.ProjectLabel: "myproject", api.ConfigHashLabel: "old"}},
+			{Name: "pgdata_v2", Labels: map[string]string{api.VolumeLabel: "data", api.ProjectLabel: "myproject", api.ConfigHashLabel: "new"}},
+		},
+	}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Equal(t, len(state.Volumes["data"]), 2, "both label-sharing volumes must be recorded")
+}
+
+func TestSelectVolume(t *testing.T) {
+	v1 := ObservedVolume{Name: "pgdata_v1", ConfigHash: "old"}
+	v2 := ObservedVolume{Name: "pgdata_v2", ConfigHash: "new"}
+
+	t.Run("empty", func(t *testing.T) {
+		s := &ObservedState{Volumes: map[string][]ObservedVolume{}}
+		_, _, ok := s.selectVolume("data", "pgdata_v2")
+		assert.Assert(t, !ok)
+	})
+	t.Run("single", func(t *testing.T) {
+		s := &ObservedState{Volumes: map[string][]ObservedVolume{"data": {v1}}}
+		sel, orphans, ok := s.selectVolume("data", "pgdata_v2")
+		assert.Assert(t, ok)
+		assert.Equal(t, sel.Name, "pgdata_v1")
+		assert.Equal(t, len(orphans), 0)
+	})
+	t.Run("prefers exact name match regardless of order", func(t *testing.T) {
+		for _, order := range [][]ObservedVolume{{v1, v2}, {v2, v1}} {
+			s := &ObservedState{Volumes: map[string][]ObservedVolume{"data": order}}
+			sel, orphans, ok := s.selectVolume("data", "pgdata_v2")
+			assert.Assert(t, ok)
+			assert.Equal(t, sel.Name, "pgdata_v2")
+			assert.Equal(t, len(orphans), 1)
+			assert.Equal(t, orphans[0].Name, "pgdata_v1")
+		}
+	})
+	t.Run("no name match picks lexicographically smallest, deterministically", func(t *testing.T) {
+		for _, order := range [][]ObservedVolume{{v1, v2}, {v2, v1}} {
+			s := &ObservedState{Volumes: map[string][]ObservedVolume{"data": order}}
+			sel, orphans, ok := s.selectVolume("data", "pgdata_v3")
+			assert.Assert(t, ok)
+			assert.Equal(t, sel.Name, "pgdata_v1", "smallest name wins")
+			assert.Equal(t, len(orphans), 1)
+			assert.Equal(t, orphans[0].Name, "pgdata_v2")
+		}
+	})
+}
+
+func TestSelectNetwork(t *testing.T) {
+	n1 := ObservedNetwork{ID: "net1", Name: "front_v1"}
+	n2 := ObservedNetwork{ID: "net2", Name: "front_v2"}
+
+	s := &ObservedState{Networks: map[string][]ObservedNetwork{"frontend": {n2, n1}}}
+	sel, orphans, ok := s.selectNetwork("frontend", "front_v2")
+	assert.Assert(t, ok)
+	assert.Equal(t, sel.Name, "front_v2")
+	assert.Equal(t, len(orphans), 1)
+	assert.Equal(t, orphans[0].Name, "front_v1")
 }
 
 // collectByNameDiscovery mocks empty container/network/volume lists so that only
@@ -228,8 +299,9 @@ func TestCollectObservedState_LegacyNetworkMatchedByName(t *testing.T) {
 		}, nil)
 	})
 	assert.NilError(t, err)
-	obs, ok := state.Networks["frontend"]
-	assert.Assert(t, ok, "legacy network must be discovered by name")
+	matches, ok := state.Networks["frontend"]
+	assert.Assert(t, ok && len(matches) == 1, "legacy network must be discovered by name")
+	obs := matches[0]
 	assert.Equal(t, obs.ID, "net1")
 	assert.Equal(t, obs.Name, "myproject_frontend")
 	assert.Equal(t, obs.ProjectName, "")
@@ -250,7 +322,7 @@ func TestCollectObservedState_ForeignProjectNetworkMatchedByName(t *testing.T) {
 		}, nil)
 	})
 	assert.NilError(t, err)
-	obs := state.Networks["frontend"]
+	obs := state.Networks["frontend"][0]
 	assert.Equal(t, obs.ProjectName, "otherproject")
 	assert.Equal(t, obs.ConfigHash, "", "foreign network must not be treated as diverged")
 }
@@ -291,11 +363,11 @@ func TestWarnUnmanagedNetworks(t *testing.T) {
 		},
 	}
 	observed := &ObservedState{
-		Networks: map[string]ObservedNetwork{
-			"managed":  {Name: "myproject_managed", ProjectName: "myproject", ConfigHash: "h"},
-			"unlabel":  {Name: "unlabel_net", ProjectName: ""},
-			"foreign":  {Name: "foreign_net", ProjectName: "otherproject"},
-			"external": {Name: "ext_net"},
+		Networks: map[string][]ObservedNetwork{
+			"managed":  {{Name: "myproject_managed", ProjectName: "myproject", ConfigHash: "h"}},
+			"unlabel":  {{Name: "unlabel_net", ProjectName: ""}},
+			"foreign":  {{Name: "foreign_net", ProjectName: "otherproject"}},
+			"external": {{Name: "ext_net"}},
 		},
 	}
 
@@ -325,8 +397,9 @@ func TestCollectObservedState_LegacyVolumeMatchedByName(t *testing.T) {
 		}, nil)
 	})
 	assert.NilError(t, err)
-	obs, ok := state.Volumes["data"]
-	assert.Assert(t, ok, "legacy volume must be discovered by name")
+	matches, ok := state.Volumes["data"]
+	assert.Assert(t, ok && len(matches) == 1, "legacy volume must be discovered by name")
+	obs := matches[0]
 	assert.Equal(t, obs.Name, "myproject_data")
 	assert.Equal(t, obs.ProjectName, "")
 	assert.Equal(t, obs.ConfigHash, "", "unmanaged match must have an empty config hash")
@@ -347,7 +420,7 @@ func TestCollectObservedState_ForeignProjectVolumeMatchedByName(t *testing.T) {
 		}, nil)
 	})
 	assert.NilError(t, err)
-	obs := state.Volumes["data"]
+	obs := state.Volumes["data"][0]
 	assert.Equal(t, obs.ProjectName, "otherproject")
 	assert.Equal(t, obs.ConfigHash, "", "foreign volume must not be treated as diverged")
 }
@@ -389,11 +462,11 @@ func TestWarnUnmanagedVolumes(t *testing.T) {
 		},
 	}
 	observed := &ObservedState{
-		Volumes: map[string]ObservedVolume{
-			"managed":  {Name: "myproject_managed", ProjectName: "myproject", ConfigHash: "h"},
-			"unlabel":  {Name: "unlabel_data", ProjectName: ""},
-			"foreign":  {Name: "foreign_data", ProjectName: "otherproject"},
-			"external": {Name: "ext_data"},
+		Volumes: map[string][]ObservedVolume{
+			"managed":  {{Name: "myproject_managed", ProjectName: "myproject", ConfigHash: "h"}},
+			"unlabel":  {{Name: "unlabel_data", ProjectName: ""}},
+			"foreign":  {{Name: "foreign_data", ProjectName: "otherproject"}},
+			"external": {{Name: "ext_data"}},
 			// "tocreate" absent: will be created, no warning.
 		},
 	}
