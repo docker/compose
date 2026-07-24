@@ -27,6 +27,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	mmount "github.com/moby/moby/api/types/mount"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -100,6 +101,13 @@ type reconciler struct {
 	// (an O(services * containers) build) for expectedConfigHash, which is
 	// called once per service.
 	observedContainersByService map[string]Containers
+
+	// resolvedNetworks/resolvedVolumes hold the single live resource selected per
+	// compose key from the (possibly multi-valued) observed state — see
+	// resolveObserved. All reconcile logic reads these, never observed.Networks/
+	// observed.Volumes directly, so selection happens exactly once.
+	resolvedNetworks map[string]ObservedNetwork
+	resolvedVolumes  map[string]ObservedVolume
 }
 
 // reconcile is the main entry point: it builds a Plan from desired vs observed state.
@@ -121,6 +129,8 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 		observedContainersByService: observed.containersByService(),
 	}
 
+	r.resolveObserved()
+
 	if err := r.reconcileNetworks(); err != nil {
 		return nil, err
 	}
@@ -138,6 +148,40 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 	}
 
 	return r.plan, nil
+}
+
+// resolveObserved selects, for every declared network and volume, the single
+// live resource that matches it best (see selectNetwork/selectVolume) and stores
+// it in resolvedNetworks/resolvedVolumes — the only observed views the rest of
+// the reconciler reads. Extra live resources sharing a compose key (typically a
+// leftover after a rename) are reported as orphans: they are left untouched —
+// removing them could drop data or break unrelated workloads — but the user is
+// warned so they can clean up, and selection stays deterministic across runs.
+func (r *reconciler) resolveObserved() {
+	r.resolvedNetworks = make(map[string]ObservedNetwork, len(r.project.Networks))
+	for _, key := range sortedKeys(r.project.Networks) {
+		selected, orphans, ok := r.observed.selectNetwork(key, r.project.Networks[key].Name)
+		if !ok {
+			continue
+		}
+		r.resolvedNetworks[key] = selected
+		for _, o := range orphans {
+			logrus.Warnf("network %q (id %s) carries the compose label %q but does not match the compose file (using %q); "+
+				"it is left untouched — remove it manually if it is no longer needed", o.Name, o.ID, key, selected.Name)
+		}
+	}
+	r.resolvedVolumes = make(map[string]ObservedVolume, len(r.project.Volumes))
+	for _, key := range sortedKeys(r.project.Volumes) {
+		selected, orphans, ok := r.observed.selectVolume(key, r.project.Volumes[key].Name)
+		if !ok {
+			continue
+		}
+		r.resolvedVolumes[key] = selected
+		for _, o := range orphans {
+			logrus.Warnf("volume %q carries the compose label %q but does not match the compose file (using %q); "+
+				"it is left untouched — remove it manually if it is no longer needed", o.Name, key, selected.Name)
+		}
+	}
 }
 
 // reconcileNetworks plans the network lifecycle: creation of missing networks
@@ -162,7 +206,7 @@ func (r *reconciler) reconcileNetworks() error {
 		if desired.External {
 			continue
 		}
-		observed, exists := r.observed.Networks[key]
+		observed, exists := r.resolvedNetworks[key]
 		if !exists {
 			r.planCreateNetwork(key, &desired, "not found")
 			continue
@@ -207,7 +251,7 @@ func (r *reconciler) planCreateNetwork(key string, nw *types.NetworkConfig, caus
 // the reconnect instead of racing it.
 func (r *reconciler) planRecreateNetworks(keys []string) {
 	for _, key := range keys {
-		observed := r.observed.Networks[key]
+		observed := r.resolvedNetworks[key]
 		desired := r.project.Networks[key]
 		containers := r.containersForServices(r.servicesUsingNetwork(key))
 
@@ -310,7 +354,7 @@ func (r *reconciler) reconcileVolumes() error {
 		if desired.External {
 			continue
 		}
-		observed, exists := r.observed.Volumes[key]
+		observed, exists := r.resolvedVolumes[key]
 		if !exists {
 			r.planCreateVolume(key, &desired, "not found")
 			continue
@@ -335,7 +379,7 @@ func (r *reconciler) reconcileVolumes() error {
 			// path did), and so later runs match deterministically on the new
 			// name rather than split-braining between the two.
 			observed.Name = desired.Name
-			r.observed.Volumes[key] = observed
+			r.resolvedVolumes[key] = observed
 			continue
 		}
 		confirmed, err := r.prompt(
@@ -432,7 +476,7 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 			Type:       OpRemoveVolume,
 			ResourceID: fmt.Sprintf("volume:%s", key),
 			Cause:      "config hash diverged",
-			Name:       r.observed.Volumes[key].Name,
+			Name:       r.resolvedVolumes[key].Name,
 		}, "", removeNodes...)
 		createVolNode := r.plan.addNode(Operation{
 			Type:       OpCreateVolume,
@@ -775,7 +819,7 @@ func serviceHashWithResolvedRefs(svc types.ServiceConfig, containers map[string]
 func (r *reconciler) hasNetworkMismatch(expected types.ServiceConfig, oc ObservedContainer) bool {
 	for _, net := range sortedKeys(expected.Networks) {
 		expectedID := ""
-		if obs, ok := r.observed.Networks[net]; ok {
+		if obs, ok := r.resolvedNetworks[net]; ok {
 			expectedID = obs.ID
 		}
 		if expectedID == "" || expectedID == "swarm" {
@@ -802,7 +846,7 @@ func (r *reconciler) hasVolumeMismatch(expected types.ServiceConfig, oc Observed
 			continue
 		}
 		expectedName := ""
-		if obs, ok := r.observed.Volumes[vol.Source]; ok {
+		if obs, ok := r.resolvedVolumes[vol.Source]; ok {
 			expectedName = obs.Name
 		}
 		if expectedName == "" {
