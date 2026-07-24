@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -407,6 +408,35 @@ func TestExecutePlanCreateNetworkConflictIsSuccess(t *testing.T) {
 	}, "")
 
 	assert.NilError(t, svc.executePlan(t.Context(), project, emptyObservedState("test"), plan))
+}
+
+// TestExecRemoveNetworkBestEffort verifies that a best-effort network removal
+// (old network on a rename) tolerates a conflict (still in use) but propagates
+// any other error, while a mandatory removal propagates conflicts too.
+func TestExecRemoveNetworkBestEffort(t *testing.T) {
+	newExec := func(t *testing.T) (*planExecutor, *mocks.MockAPIClient) {
+		svc, apiClient := newTestService(t)
+		return svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")), apiClient
+	}
+
+	t.Run("best-effort ignores conflict", func(t *testing.T) {
+		exec, apiClient := newExec(t)
+		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, conflictError{})
+		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: true})
+		assert.NilError(t, err)
+	})
+	t.Run("best-effort propagates non-conflict", func(t *testing.T) {
+		exec, apiClient := newExec(t)
+		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, errors.New("transport failure"))
+		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: true})
+		assert.ErrorContains(t, err, "transport failure")
+	})
+	t.Run("mandatory removal propagates conflict", func(t *testing.T) {
+		exec, apiClient := newExec(t)
+		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, conflictError{})
+		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: false})
+		assert.Assert(t, err != nil, "mandatory removal must propagate conflict")
+	})
 }
 
 // notFoundError implements the errdefs.ErrNotFound interface for test mocks.

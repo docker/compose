@@ -236,32 +236,60 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 			}, "", stopNode))
 		}
 
+		// A rename (the live network has a different name than desired) does not
+		// require removing the old network: the new one has a distinct name, so
+		// it is created independently and the old removal becomes best-effort
+		// cleanup — skipped with a warning if the network is still in use by
+		// non-Compose containers, instead of blocking the whole operation. A
+		// same-name divergence, on the other hand, must remove the old network
+		// before the new one can be created.
+		rename := observed.Name != desired.Name
+		removeCause := "config hash diverged"
+		createCause := "recreate after config change"
+		if rename {
+			removeCause = "renamed (best-effort cleanup)"
+			createCause = "renamed"
+		}
+
 		removeNode := r.plan.addNode(Operation{
 			Type:       OpRemoveNetwork,
 			ResourceID: fmt.Sprintf("network:%s", key),
-			Cause:      "config hash diverged",
+			Cause:      removeCause,
 			Name:       observed.Name,
+			BestEffort: rename,
 		}, "", disconnectNodes...)
+
+		var createDeps []*PlanNode
+		if !rename {
+			createDeps = []*PlanNode{removeNode}
+		}
 		createNode := r.plan.addNode(Operation{
 			Type:       OpCreateNetwork,
 			ResourceID: fmt.Sprintf("network:%s", key),
-			Cause:      "recreate after config change",
+			Cause:      createCause,
 			Name:       desired.Name,
 			Network:    &desired,
-		}, "", removeNode)
+		}, "", createDeps...)
 		r.networkNodes[key] = createNode
 
-		// Reconnect every attached container to the fresh network.
+		// Reconnect every attached container to the fresh network. On a rename the
+		// reconnect also waits for the container to be disconnected from the old
+		// network first (on a same-name recreate that ordering already holds
+		// transitively through remove → create).
 		for i := range containers {
 			oc := &containers[i]
 			resID := fmt.Sprintf("service:%s:%d", oc.Summary.Labels[api.ServiceLabel], oc.Number)
+			deps := []*PlanNode{createNode}
+			if rename {
+				deps = append(deps, disconnectNodes[i])
+			}
 			connectNode := r.plan.addNode(Operation{
 				Type:       OpConnectNetwork,
 				ResourceID: resID,
 				Cause:      fmt.Sprintf("network %s recreate", key),
 				Container:  &oc.Summary,
 				Name:       desired.Name,
-			}, "", createNode)
+			}, "", deps...)
 			r.connectNodes[oc.ID] = append(r.connectNodes[oc.ID], connectNode)
 		}
 	}
