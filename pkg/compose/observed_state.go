@@ -18,6 +18,8 @@ package compose
 
 import (
 	"context"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -37,8 +39,65 @@ type ObservedState struct {
 	ProjectName string
 	Containers  map[string][]ObservedContainer // service name → containers
 	Orphans     []ObservedContainer            // containers with no matching service
-	Networks    map[string]ObservedNetwork     // compose network key → observed
-	Volumes     map[string]ObservedVolume      // compose volume key → observed
+	// Networks/Volumes map a compose key to *all* live resources bearing that
+	// compose label. Collection makes no premature choice: when several
+	// resources share a key (e.g. a leftover after a rename), they are all
+	// recorded here and the reconciler selects the right one and reports the
+	// others as orphans (see selectNetwork/selectVolume).
+	Networks map[string][]ObservedNetwork // compose network key → observed
+	Volumes  map[string][]ObservedVolume  // compose volume key → observed
+}
+
+// selectNetwork picks, among the live networks recorded for a compose key, the
+// one that best matches the desired name, and returns the remaining ones as
+// orphans. Selection is deterministic: an exact name match wins; otherwise the
+// lexicographically smallest name is chosen so repeated runs are stable
+// regardless of the daemon's list order.
+func (s *ObservedState) selectNetwork(key, desiredName string) (ObservedNetwork, []ObservedNetwork, bool) {
+	matches := s.Networks[key]
+	if len(matches) == 0 {
+		return ObservedNetwork{}, nil, false
+	}
+	sorted := slices.Clone(matches)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+	selected := sorted[0]
+	for _, m := range sorted {
+		if m.Name == desiredName {
+			selected = m
+			break
+		}
+	}
+	var orphans []ObservedNetwork
+	for _, m := range sorted {
+		if m.Name != selected.Name {
+			orphans = append(orphans, m)
+		}
+	}
+	return selected, orphans, true
+}
+
+// selectVolume is the volume counterpart of selectNetwork.
+func (s *ObservedState) selectVolume(key, desiredName string) (ObservedVolume, []ObservedVolume, bool) {
+	matches := s.Volumes[key]
+	if len(matches) == 0 {
+		return ObservedVolume{}, nil, false
+	}
+	sorted := slices.Clone(matches)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+	selected := sorted[0]
+	for _, m := range sorted {
+		if m.Name == desiredName {
+			selected = m
+			break
+		}
+	}
+	var orphans []ObservedVolume
+	for _, m := range sorted {
+		if m.Name != selected.Name {
+			orphans = append(orphans, m)
+		}
+	}
+	return selected, orphans, true
 }
 
 // ObservedContainer holds the relevant state extracted from a running or stopped
@@ -86,8 +145,8 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	state := &ObservedState{
 		ProjectName: project.Name,
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	// --- Containers ---
@@ -128,12 +187,12 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		if key == "" {
 			continue
 		}
-		state.Networks[key] = ObservedNetwork{
+		state.Networks[key] = append(state.Networks[key], ObservedNetwork{
 			ID:          nw.ID,
 			Name:        nw.Name,
 			ConfigHash:  nw.Labels[api.ConfigHashLabel],
 			ProjectName: nw.Labels[api.ProjectLabel],
-		}
+		})
 	}
 
 	// --- Volumes ---
@@ -148,12 +207,16 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		if key == "" {
 			continue
 		}
-		state.Volumes[key] = ObservedVolume{
+		state.Volumes[key] = append(state.Volumes[key], ObservedVolume{
 			Name:        vol.Name,
 			ConfigHash:  vol.Labels[api.ConfigHashLabel],
 			ProjectName: vol.Labels[api.ProjectLabel],
 			Driver:      vol.Driver,
-		}
+		})
+	}
+
+	if err := s.discoverUnmanagedNetworks(ctx, project, state); err != nil {
+		return nil, err
 	}
 
 	if err := s.discoverUnmanagedVolumes(ctx, project, state); err != nil {
@@ -161,6 +224,58 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	}
 
 	return state, nil
+}
+
+// discoverUnmanagedNetworks augments the observed state with networks that match
+// a declared network by name but carry no compose label — pre-label Compose or
+// manually created networks, missed by the label-filtered NetworkList. Each is
+// recorded as an unmanaged match with an empty ConfigHash: the reconciler then
+// reuses it untouched instead of scheduling a CreateNetwork. See
+// warnUnmanagedNetworks for the accompanying user warning.
+func (s *composeService) discoverUnmanagedNetworks(ctx context.Context, project *types.Project, state *ObservedState) error {
+	for _, key := range project.NetworkNames() {
+		nw := project.Networks[key]
+		if nw.External {
+			continue
+		}
+		if len(state.Networks[key]) > 0 {
+			continue
+		}
+		inspected, err := s.apiClient().NetworkInspect(ctx, nw.Name, client.NetworkInspectOptions{})
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue // absent: it will be created by the reconciliation plan
+			}
+			return err
+		}
+		// NetworkInspect matches on ID prefix, so guard against a partial match
+		// (e.g. a network whose ID starts with the requested name).
+		if inspected.Network.Name != nw.Name && inspected.Network.ID != nw.Name {
+			continue
+		}
+		state.Networks[key] = append(state.Networks[key], ObservedNetwork{
+			ID:          inspected.Network.ID,
+			Name:        inspected.Network.Name,
+			ProjectName: inspected.Network.Labels[api.ProjectLabel],
+			// Preserve the config-hash only when the network belongs to this
+			// project (e.g. an older Compose wrote the project label but not the
+			// network-key label): the reconciler then still detects genuine
+			// divergence. For a network we don't own the hash is left empty so we
+			// reuse it untouched rather than recreate it.
+			ConfigHash: ownedConfigHash(inspected.Network.Labels, project.Name),
+		})
+	}
+	return nil
+}
+
+// ownedConfigHash returns the config-hash label only when the resource belongs
+// to the given project; otherwise it returns "" so the reconciler treats the
+// resource as an unmanaged match to be reused untouched.
+func ownedConfigHash(labels map[string]string, projectName string) string {
+	if labels[api.ProjectLabel] != projectName {
+		return ""
+	}
+	return labels[api.ConfigHashLabel]
 }
 
 // discoverUnmanagedVolumes augments the observed state with volumes that match a
@@ -175,7 +290,7 @@ func (s *composeService) discoverUnmanagedVolumes(ctx context.Context, project *
 		if vol.External {
 			continue
 		}
-		if _, ok := state.Volumes[key]; ok {
+		if len(state.Volumes[key]) > 0 {
 			continue
 		}
 		inspected, err := s.apiClient().VolumeInspect(ctx, vol.Name, client.VolumeInspectOptions{})
@@ -185,13 +300,17 @@ func (s *composeService) discoverUnmanagedVolumes(ctx context.Context, project *
 			}
 			return err
 		}
-		state.Volumes[key] = ObservedVolume{
+		state.Volumes[key] = append(state.Volumes[key], ObservedVolume{
 			Name:        inspected.Volume.Name,
 			ProjectName: inspected.Volume.Labels[api.ProjectLabel],
 			Driver:      inspected.Volume.Driver,
-			// ConfigHash intentionally left empty: the volume is not owned by
-			// this project, so we must not treat it as diverged and recreate it.
-		}
+			// Preserve the config-hash only when the volume belongs to this
+			// project (older Compose wrote the project label but not the
+			// volume-key label): the reconciler then still detects divergence.
+			// For a volume we don't own the hash is left empty so we reuse it
+			// untouched rather than recreate it.
+			ConfigHash: ownedConfigHash(inspected.Volume.Labels, project.Name),
+		})
 	}
 	return nil
 }
@@ -224,14 +343,11 @@ func toObservedContainer(c container.Summary) ObservedContainer {
 // into the observed state, so the reconciler can compare container connections
 // against actual network IDs.
 func (s *ObservedState) setResolvedNetworks(networks map[string]string, project *types.Project) {
+	// Only external networks are passed here; they carry no compose label and so
+	// are absent from the collected state, hence a plain append.
 	for key, id := range networks {
-		if obs, exists := s.Networks[key]; exists {
-			obs.ID = id
-			s.Networks[key] = obs
-		} else {
-			nw := project.Networks[key]
-			s.Networks[key] = ObservedNetwork{ID: id, Name: nw.Name}
-		}
+		nw := project.Networks[key]
+		s.Networks[key] = append(s.Networks[key], ObservedNetwork{ID: id, Name: nw.Name})
 	}
 }
 
@@ -239,13 +355,10 @@ func (s *ObservedState) setResolvedNetworks(networks map[string]string, project 
 // (external volumes) into the observed state. Managed volumes are discovered
 // directly by collectObservedState, so only external ones need injecting.
 func (s *ObservedState) setResolvedVolumes(volumes map[string]string) {
+	// Only external volumes are passed here; they carry no compose label and so
+	// are absent from the collected state, hence a plain append.
 	for key, id := range volumes {
-		if obs, exists := s.Volumes[key]; exists {
-			obs.Name = id
-			s.Volumes[key] = obs
-		} else {
-			s.Volumes[key] = ObservedVolume{Name: id}
-		}
+		s.Volumes[key] = append(s.Volumes[key], ObservedVolume{Name: id})
 	}
 }
 

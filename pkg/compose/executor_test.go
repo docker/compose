@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -65,11 +66,8 @@ func TestExecutePlanCreateNetwork(t *testing.T) {
 		Networks: types.Networks{"default": nw},
 	}
 
-	// ensureNetwork: inspect → not found, list → empty, create
-	apiClient.EXPECT().NetworkInspect(gomock.Any(), "test_default", gomock.Any()).
-		Return(client.NetworkInspectResult{}, notFoundError{})
-	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).
-		Return(client.NetworkListResult{}, nil)
+	// createNetwork issues a plain NetworkCreate (divergence/reuse decisions are
+	// made by the reconciler from the observed state, not here).
 	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
 		Return(client.NetworkCreateResult{ID: "net1"}, nil)
 
@@ -127,8 +125,8 @@ func emptyObservedState(project string) *ObservedState {
 	return &ObservedState{
 		ProjectName: project,
 		Containers:  map[string][]ObservedContainer{},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 }
 
@@ -162,8 +160,8 @@ func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 		Containers: map[string][]ObservedContainer{
 			"web": {{ID: "old-id", Summary: oldCtr}},
 		},
-		Networks: map[string]ObservedNetwork{},
-		Volumes:  map[string]ObservedVolume{},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
 	}
 
 	plan := &Plan{}
@@ -224,8 +222,8 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 	observed := &ObservedState{
 		ProjectName: "test",
 		Containers:  map[string][]ObservedContainer{"web": webContainers},
-		Networks:    map[string]ObservedNetwork{},
-		Volumes:     map[string]ObservedVolume{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
 	}
 
 	// Build N independent Stop→Remove chains. The errgroup will fan them out
@@ -316,8 +314,139 @@ func TestExecutePlanRecreateVolume(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// TestExecutePlanRecreateNetwork drives a network recreation — stop container →
+// disconnect → remove network → create network → connect — end to end through
+// the executor, asserting each Docker API call fires. The container keeps its
+// identity (it is reconnected, not recreated).
+func TestExecutePlanRecreateNetwork(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	ctr := container.Summary{
+		ID:    "c1",
+		Names: []string{"/recreate-web-1"},
+		Labels: map[string]string{
+			api.ServiceLabel:         "web",
+			api.ContainerNumberLabel: "1",
+		},
+	}
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+	apiClient.EXPECT().NetworkDisconnect(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkDisconnectResult{}, nil)
+	apiClient.EXPECT().NetworkRemove(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkRemoveResult{}, nil)
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkCreateResult{ID: "net2"}, nil)
+	apiClient.EXPECT().NetworkConnect(gomock.Any(), "recreate_frontend", gomock.Any()).
+		Return(client.NetworkConnectResult{}, nil)
+
+	nw := types.NetworkConfig{Name: "recreate_frontend", Driver: "overlay"}
+	project := &types.Project{
+		Name:     "recreate",
+		Networks: types.Networks{"frontend": nw},
+	}
+
+	plan := &Plan{}
+	stopNode := plan.addNode(Operation{
+		Type:       OpStopContainer,
+		ResourceID: "service:web:1",
+		Cause:      "network frontend config changed",
+		Container:  &ctr,
+	}, "")
+	disconnectNode := plan.addNode(Operation{
+		Type:       OpDisconnectNetwork,
+		ResourceID: "service:web:1",
+		Cause:      "network frontend recreate",
+		Container:  &ctr,
+		Name:       nw.Name,
+	}, "", stopNode)
+	removeNode := plan.addNode(Operation{
+		Type:       OpRemoveNetwork,
+		ResourceID: "network:frontend",
+		Cause:      "config hash diverged",
+		Name:       nw.Name,
+	}, "", disconnectNode)
+	createNode := plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:frontend",
+		Cause:      "recreate after config change",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "", removeNode)
+	plan.addNode(Operation{
+		Type:       OpConnectNetwork,
+		ResourceID: "service:web:1",
+		Cause:      "network frontend recreate",
+		Container:  &ctr,
+		Name:       nw.Name,
+	}, "", createNode)
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("recreate"), plan)
+	assert.NilError(t, err)
+}
+
+// TestExecutePlanCreateNetworkConflictIsSuccess verifies that a NetworkCreate
+// conflict (a concurrent up/run created the same network) is treated as success
+// rather than surfacing as a hard failure.
+func TestExecutePlanCreateNetworkConflictIsSuccess(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	nw := types.NetworkConfig{Name: "test_default"}
+	project := &types.Project{Name: "test", Networks: types.Networks{"default": nw}}
+
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		Return(client.NetworkCreateResult{}, conflictError{})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:default",
+		Cause:      "not found",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+
+	assert.NilError(t, svc.executePlan(t.Context(), project, emptyObservedState("test"), plan))
+}
+
+// TestExecRemoveNetworkBestEffort verifies that a best-effort network removal
+// (old network on a rename) tolerates a conflict (still in use) but propagates
+// any other error, while a mandatory removal propagates conflicts too.
+func TestExecRemoveNetworkBestEffort(t *testing.T) {
+	newExec := func(t *testing.T) (*planExecutor, *mocks.MockAPIClient) {
+		svc, apiClient := newTestService(t)
+		return svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")), apiClient
+	}
+
+	t.Run("best-effort ignores conflict", func(t *testing.T) {
+		exec, apiClient := newExec(t)
+		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, conflictError{})
+		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: true})
+		assert.NilError(t, err)
+	})
+	t.Run("best-effort propagates non-conflict", func(t *testing.T) {
+		exec, apiClient := newExec(t)
+		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, errors.New("transport failure"))
+		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: true})
+		assert.ErrorContains(t, err, "transport failure")
+	})
+	t.Run("mandatory removal propagates conflict", func(t *testing.T) {
+		exec, apiClient := newExec(t)
+		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, conflictError{})
+		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: false})
+		assert.Assert(t, err != nil, "mandatory removal must propagate conflict")
+	})
+}
+
 // notFoundError implements the errdefs.ErrNotFound interface for test mocks.
 type notFoundError struct{}
 
 func (notFoundError) Error() string { return "not found" }
 func (notFoundError) NotFound()     {}
+
+// conflictError implements the errdefs.ErrConflict interface for test mocks.
+type conflictError struct{}
+
+func (conflictError) Error() string { return "conflict" }
+func (conflictError) Conflict()     {}
