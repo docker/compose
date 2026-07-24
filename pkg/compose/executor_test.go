@@ -385,8 +385,38 @@ func TestExecutePlanRecreateNetwork(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// TestExecutePlanCreateNetworkConflictIsSuccess verifies that a NetworkCreate
+// conflict (a concurrent up/run created the same network) is treated as success
+// rather than surfacing as a hard failure.
+func TestExecutePlanCreateNetworkConflictIsSuccess(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	nw := types.NetworkConfig{Name: "test_default"}
+	project := &types.Project{Name: "test", Networks: types.Networks{"default": nw}}
+
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		Return(client.NetworkCreateResult{}, conflictError{})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:default",
+		Cause:      "not found",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+
+	assert.NilError(t, svc.executePlan(t.Context(), project, emptyObservedState("test"), plan))
+}
+
 // notFoundError implements the errdefs.ErrNotFound interface for test mocks.
 type notFoundError struct{}
 
 func (notFoundError) Error() string { return "not found" }
 func (notFoundError) NotFound()     {}
+
+// conflictError implements the errdefs.ErrConflict interface for test mocks.
+type conflictError struct{}
+
+func (conflictError) Error() string { return "conflict" }
+func (conflictError) Conflict()     {}

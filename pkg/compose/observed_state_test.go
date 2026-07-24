@@ -236,6 +236,40 @@ func TestCollectObservedState_LegacyNetworkMatchedByName(t *testing.T) {
 	assert.Equal(t, obs.ConfigHash, "", "unmanaged match must have an empty config hash")
 }
 
+// TestCollectObservedState_OwnedNetworkMissingKeyLabelKeepsHash verifies that a
+// network owned by this project but missing the network-key label (e.g. written
+// by an older Compose) keeps its config-hash, so genuine divergence is still
+// detected rather than silently skipped.
+func TestCollectObservedState_OwnedNetworkMissingKeyLabelKeepsHash(t *testing.T) {
+	project := &types.Project{Name: "myproject", Networks: types.Networks{"frontend": {Name: "myproject_frontend"}}}
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().NetworkInspect(gomock.Any(), "myproject_frontend", gomock.Any()).Return(client.NetworkInspectResult{
+			Network: network.Inspect{Network: network.Network{ID: "net1", Name: "myproject_frontend", Labels: map[string]string{
+				api.ProjectLabel:    "myproject", // owned, but no NetworkLabel
+				api.ConfigHashLabel: "realhash",
+			}}},
+		}, nil)
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, state.Networks["frontend"].ConfigHash, "realhash")
+}
+
+// TestCollectObservedState_OwnedVolumeMissingKeyLabelKeepsHash is the volume
+// counterpart of the network case above.
+func TestCollectObservedState_OwnedVolumeMissingKeyLabelKeepsHash(t *testing.T) {
+	project := &types.Project{Name: "myproject", Volumes: types.Volumes{"data": {Name: "myproject_data"}}}
+	state, err := collectByNameDiscovery(t, project, func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().VolumeInspect(gomock.Any(), "myproject_data", gomock.Any()).Return(client.VolumeInspectResult{
+			Volume: volume.Volume{Name: "myproject_data", Labels: map[string]string{
+				api.ProjectLabel:    "myproject", // owned, but no VolumeLabel
+				api.ConfigHashLabel: "realhash",
+			}},
+		}, nil)
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, state.Volumes["data"].ConfigHash, "realhash")
+}
+
 // TestCollectObservedState_ForeignProjectNetworkMatchedByName verifies that a
 // network owned by another project but matching the declared name is recorded
 // with an empty ConfigHash (reused untouched) and keeps the foreign project name.
