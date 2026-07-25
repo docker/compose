@@ -193,7 +193,7 @@ indicate acceptance.
 A change requires at least 2 LGTMs from the maintainers of each
 component affected.
 
-For more details, see the [MAINTAINERS](MAINTAINERS) page.
+For more details, see the [MAINTAINERS](https://github.com/docker/opensource/blob/main/MAINTAINERS) page.
 
 ### Sign your work
 
