@@ -85,3 +85,18 @@ func TestUpReturnsDockerConnectionErrorBeforeConfigPathFallback(t *testing.T) {
 	assert.ErrorContains(t, err, "permission denied while trying to connect to the docker API")
 	assert.Assert(t, !strings.Contains(err.Error(), "is a directory"), err.Error())
 }
+
+func TestUpValidatesFlagConflictsBeforeDockerConnection(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cli := mocks.NewMockCli(ctrl)
+
+	cmd := upCommand(&ProjectOptions{}, cli, &BackendOptions{})
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{"--attach", "web", "--attach-dependencies"})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err, "cannot combine --attach and --attach-dependencies")
+}

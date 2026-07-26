@@ -135,9 +135,6 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 			if create.ignoreOrphans && create.removeOrphans {
 				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
 			}
-			if len(up.attach) != 0 && up.attachDependencies {
-				return errors.New("cannot combine --attach and --attach-dependencies")
-			}
 
 			up.validateNavigationMenu(dockerCli)
 
@@ -211,6 +208,9 @@ func validateFlags(up *upOptions, create *createOptions) error {
 			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
 		}
 		up.Detach = true
+	}
+	if len(up.attach) != 0 && up.attachDependencies {
+		return errors.New("cannot combine --attach and --attach-dependencies")
 	}
 	if create.Build && create.noBuild {
 		return fmt.Errorf("--build and --no-build are incompatible")
