@@ -42,6 +42,25 @@ func TestUnusedMissingEnvFile(t *testing.T) {
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "ps")
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "logs")
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "exec", "serviceA", "echo", "hello")
+
+	// scale should work even with missing env file on a service not being scaled
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "scale", "serviceA=2")
+
+	// but scaling the service with the missing env file must still fail
+	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/env_file/compose.yaml", "scale", "serviceB=1")
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "env file /doesnotexist/.env not found"})
+
+	// shell completion should list services even with missing env file.
+	// ComposeStandalonePath fails the test outside standalone mode, so only the
+	// plugin form can be the default here.
+	completeCmd := []string{DockerExecutableName, "__complete", "compose"}
+	if composeStandaloneMode {
+		completeCmd = []string{ComposeStandalonePath(t), "__complete"}
+	}
+	res = c.RunCmd(t, append(completeCmd, "-f", "./fixtures/env_file/compose.yaml", "exec", "")...)
+	res.Assert(t, icmd.Expected{Out: "serviceA"})
+	res.Assert(t, icmd.Expected{Out: "serviceB"})
+
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "down")
 }
 
