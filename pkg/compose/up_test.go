@@ -107,23 +107,30 @@ func TestPushProjectConfigGlueVersionError(t *testing.T) {
 	assert.ErrorContains(t, err, "engine unreachable")
 }
 
-func TestHasActiveProfiles(t *testing.T) {
-	tests := []struct {
-		name     string
-		profiles []string
-		want     bool
-	}{
-		{name: "nil", profiles: nil, want: false},
-		{name: "empty slice", profiles: []string{}, want: false},
-		{name: "single blank (default, no profile)", profiles: []string{""}, want: false},
-		{name: "named profile", profiles: []string{"debug"}, want: true},
-		{name: "blank plus named", profiles: []string{"", "debug"}, want: true},
+// TestPushProjectConfigCompleteHeaderDisabledServices verifies that a project
+// with disabled services (e.g. from a profile: [debug] with no active profile)
+// sends complete=false so the coordinator merges rather than prunes.
+func TestPushProjectConfigCompleteHeaderDisabledServices(t *testing.T) {
+	var gotComplete string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotComplete = r.Header.Get(coordinator.CompleteHeader)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	mockCtrl := gomock.NewController(t)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	apiClient.EXPECT().Dialer().Return(dialerFor(srv.Listener.Addr().String())).AnyTimes()
+	s := newPushTestService(t, apiClient, coordinator.MinAPIVersion)
+
+	project := newUpTestProject()
+	project.DisabledServices = types.Services{
+		"debug": {Name: "debug", Image: "alpine"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, hasActiveProfiles(tt.profiles), tt.want)
-		})
-	}
+
+	err := s.pushProjectConfig(t.Context(), project, len(project.DisabledServices) == 0)
+	assert.NilError(t, err)
+	assert.Equal(t, gotComplete, "false")
 }
 
 func TestShouldFollowStartEvent(t *testing.T) {

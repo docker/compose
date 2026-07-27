@@ -48,15 +48,15 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		// the project configuration to the coordinator before any other Docker API
 		// call. Failures are non-fatal: warn and continue bringing the project up.
 		if !s.dryRun && coordinator.Enabled(s.dockerCli) {
-			// The push is complete only when "up" resolved the whole project:
-			// an empty service selection AND no profiles applied. A non-empty
-			// selection narrows the project to a subset (+ dependency closure),
-			// and an applied profile disables the services outside it; either
-			// way the payload is partial and the coordinator must merge it
-			// rather than treat it as the authoritative project.
-			complete := len(options.Start.Services) == 0 && !hasActiveProfiles(project.Profiles)
+			// Any narrowing ("up <svc...>", profiles) moves excluded services
+			// to DisabledServices, which MarshalJSON omits. A non-empty
+			// DisabledServices means the payload is partial and the coordinator
+			// must merge it rather than treat it as authoritative.
+			complete := len(project.DisabledServices) == 0
 			if err := s.pushProjectConfig(ctx, project, complete); err != nil {
-				s.events.On(newEvent(api.ResourceCompose, api.Warning, "project config push to coordinator failed, continuing", err.Error()))
+				if !errors.Is(err, coordinator.ErrNotSupported) {
+					s.events.On(newEvent(api.ResourceCompose, api.Warning, "project config push to coordinator failed, continuing", err.Error()))
+				}
 			}
 		}
 
@@ -317,23 +317,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
-}
-
-// pushProjectConfig negotiates the engine API version and hands the project
-// off to the coordinator client, which owns the coordinator-specific transport
-// and outcome handling (see internal/coordinator). complete reports whether
-// project is the whole project or a subset the coordinator should merge.
-// hasActiveProfiles reports whether any profile is applied to the project.
-// project.Profiles carries a single empty-string entry when no profile is
-// selected (see compose-go WithDefaultProfiles splitting an unset
-// COMPOSE_PROFILES), so blank entries are ignored.
-func hasActiveProfiles(profiles []string) bool {
-	for _, p := range profiles {
-		if p != "" {
-			return true
-		}
-	}
-	return false
 }
 
 func (s *composeService) pushProjectConfig(ctx context.Context, project *types.Project, complete bool) error {

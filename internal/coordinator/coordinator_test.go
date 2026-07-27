@@ -230,6 +230,31 @@ func TestPushProjectConfigVersionTooLow(t *testing.T) {
 	assert.ErrorContains(t, err, "does not support the project-config push")
 }
 
+func TestPushProjectConfigNotFound(t *testing.T) {
+	// 404 means the engine does not expose the coordinator endpoint; must
+	// return ErrNotSupported so callers can silently skip rather than warn.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := NewClient(dialerFor(srv.Listener.Addr().String()))
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), true)
+	assert.Assert(t, errors.Is(err, ErrNotSupported))
+}
+
+func TestPushProjectConfigNotImplemented(t *testing.T) {
+	// 501 similarly means the endpoint is not implemented; ErrNotSupported.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotImplemented)
+	}))
+	defer srv.Close()
+
+	c := NewClient(dialerFor(srv.Listener.Addr().String()))
+	err := c.PushProjectConfig(t.Context(), MinAPIVersion, newTestProject(), true)
+	assert.Assert(t, errors.Is(err, ErrNotSupported))
+}
+
 func TestPushProjectConfigTimeout(t *testing.T) {
 	// A coordinator that accepts the connection but never responds must not
 	// hang the push: the client timeout bounds the request.

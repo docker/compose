@@ -24,6 +24,7 @@ package coordinator
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -60,6 +61,13 @@ const defaultTimeout = 10 * time.Second
 // responseBodyLimit bounds how much of an error response body is read back
 // into the returned error message.
 const responseBodyLimit = 2048
+
+// ErrNotSupported is returned by PushProjectConfig when the coordinator
+// endpoint responds with 404 or 501, meaning the engine accepted the
+// connection but does not expose the compose/project route (e.g. a plain
+// moby daemon behind a context that carries the coordinator metadata flag).
+// Callers should treat this as "feature absent" rather than as a real error.
+var ErrNotSupported = errors.New("coordinator endpoint not supported")
 
 // CompleteHeader signals whether the pushed project is the whole project or a
 // subset. "compose up" with no service arguments resolves the entire project
@@ -169,7 +177,14 @@ func (c *Client) PushProjectConfig(ctx context.Context, apiVersion string, proje
 		httpClient.CloseIdleConnections()
 	}()
 
-	if resp.StatusCode >= http.StatusBadRequest {
+	switch {
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNotImplemented:
+		// The engine answered but does not expose the coordinator endpoint
+		// (e.g. a plain moby daemon behind a context that carries the
+		// metadata flag). Callers treat this as "feature unsupported"
+		// rather than as an error worth surfacing.
+		return fmt.Errorf("%w (status %d)", ErrNotSupported, resp.StatusCode)
+	case resp.StatusCode >= http.StatusBadRequest:
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, responseBodyLimit))
 		msg := strings.TrimSpace(string(body))
 		if msg == "" {
