@@ -1,0 +1,87 @@
+name: Bump version
+description: Compute and apply a semver bump to service.yaml, commit, push, and report on the PR.
+
+inputs:
+  bump:
+    description: Version component to bump (major, minor, or patch)
+    required: true
+  base:
+    description: Base branch name
+    required: true
+  head:
+    description: Head branch name
+    required: true
+  pr:
+    description: Pull request number
+    required: true
+  github-token:
+    description: GitHub token
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check out PR branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.head }}
+        fetch-depth: 0
+        token: ${{ inputs.github-token }}
+
+    - name: Compute and apply version bump
+      id: bump
+      shell: bash
+      env:
+        BUMP: ${{ inputs.bump }}
+        BASE: ${{ inputs.base }}
+      run: |
+        git fetch origin "$BASE" --depth=1
+        base_version=$(git show "origin/$BASE:service.yaml" | grep '^version:' | awk '{print $2}')
+        echo "Base ($BASE) version: $base_version"
+
+        IFS='.' read -r major minor patch <<< "$base_version"
+        case "$BUMP" in
+          major) major=$((major + 1)); minor=0; patch=0 ;;
+          minor) minor=$((minor + 1)); patch=0 ;;
+          patch) patch=$((patch + 1)) ;;
+        esac
+        new_version="${major}.${minor}.${patch}"
+        echo "New version: $new_version"
+        echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+        echo "base_version=$base_version" >> "$GITHUB_OUTPUT"
+
+        # Reset to base version first, then apply bump — result depends only on
+        # base branch, never on a previous bump.
+        sed -i "s/^version:.*/version: $new_version/" service.yaml
+
+        if git diff --quiet -- service.yaml; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Commit and push
+      if: steps.bump.outputs.changed == 'true'
+      shell: bash
+      env:
+        NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        HEAD: ${{ inputs.head }}
+      run: |
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git add service.yaml
+        git commit -m "ci: bump version to ${NEW_VERSION}"
+        git push origin "HEAD:${HEAD}"
+
+    - name: Report result
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR: ${{ inputs.pr }}
+      run: |
+        if [ '${{ steps.bump.outputs.changed }}' = 'true' ]; then
+          body="✅ Bumped version to \`${{ steps.bump.outputs.new_version }}\` (\`${{ inputs.bump }}\` from \`${{ steps.bump.outputs.base_version }}\` on \`${{ inputs.base }}\`)."
+        else
+          body="ℹ️ Version is already \`${{ steps.bump.outputs.new_version }}\` (\`${{ inputs.bump }}\` from \`${{ steps.bump.outputs.base_version }}\` on \`${{ inputs.base }}\`). Nothing to do."
+        fi
+        gh pr comment "$PR" --repo "${{ github.repository }}" --body "$body"

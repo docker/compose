@@ -1,0 +1,37 @@
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+registries:
+  docker-registry:
+    type: docker-registry
+    url: https://registry.hub.docker.com
+    username: ${{ secrets.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+multi-ecosystem-groups:
+  docker-weekly:
+    schedule:
+      interval: "weekly"
+
+updates:
+  - package-ecosystem: "docker"
+    directory: "/"
+    registries: "*"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependabot"
+      - "review-required"
+      - "docker"
+    multi-ecosystem-group: "docker-weekly"
+    patterns:
+      - "*"
+    ignore:
+      - dependency-name: "octopusdeploy/dhi-debian-base"
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "docker/compose-bin"
+        update-types:
+          - version-update:semver-major

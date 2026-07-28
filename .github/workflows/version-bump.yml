@@ -1,0 +1,81 @@
+name: Bump version on comment
+
+# Bumps the "version" field in service.yaml when a maintainer comments
+# "/bump major", "/bump minor" or "/bump patch" on a pull request.
+#
+# The new version is always computed relative to the PR's target (base) branch,
+# so commenting several times only ever produces a single bump from the base —
+# it never stacks on top of a previous comment.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    # Only run on PR comments, only for users that can write to the repo, and
+    # only when the comment is one of the supported /bump commands.
+    if: >
+      github.event.issue.pull_request &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association) &&
+      (startsWith(github.event.comment.body, '/bump major') ||
+       startsWith(github.event.comment.body, '/bump minor') ||
+       startsWith(github.event.comment.body, '/bump patch'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Acknowledge command
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='eyes'
+
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # Pass the comment via env (never interpolated into the script) to
+          # avoid shell injection from untrusted comment content.
+          # Only parse the first line: integrations (e.g. Linear) may append
+          # extra lines such as "<!-- linear:isThreadRoot -->".
+          bump=$(printf '%s' "$COMMENT_BODY" | awk 'NR==1{print $2}')
+          case "$bump" in
+            major|minor|patch)
+              echo "bump=$bump" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unsupported version command: '$bump'"
+              exit 1
+              ;;
+          esac
+
+      - name: Resolve PR branches
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr view "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --json headRefName,baseRefName \
+            > pr.json
+          echo "head=$(jq -r .headRefName pr.json)" >> "$GITHUB_OUTPUT"
+          echo "base=$(jq -r .baseRefName pr.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Bump version
+        uses: ./.github/actions/bump-version
+        with:
+          bump: ${{ steps.parse.outputs.bump }}
+          base: ${{ steps.pr.outputs.base }}
+          head: ${{ steps.pr.outputs.head }}
+          pr: ${{ github.event.issue.number }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,4 @@
-# CI relies on this ARG. Don't remove or rename it
-ARG COMPOSE_VERSION=v5.2.0
-FROM docker/compose-bin:${COMPOSE_VERSION} AS compose-bin
+FROM docker/compose-bin:v5.2.0@sha256:54c280c16d23289af63a9391626e3d09ddcd1253d4a5eef1f6ed52a531168e91 AS compose-bin
 
 
 # DHI source: https://hub.docker.com/repository/docker/octopusdeploy/dhi-debian-base
