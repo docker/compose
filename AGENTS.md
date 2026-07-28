@@ -34,7 +34,10 @@
 
 - Never create an issue or pull request without the user's explicit instruction.
 - If a user asks you to create a pull request on their behalf, add a file named
-  `AI_AGENT_DISCLOSURE.md` to the change containing the text:
+  `AI_AGENT_DISCLOSURE.md` to the change containing the text below followed by
+  the current date (`YYYY-MM-DD`). If the file is already present in the
+  repository, update its date to the current date so the disclosure is always
+  part of the change:
 
   > *"This contribution was prepared by an AI agent acting on a human's behalf.
   > The human submitter may not have independently reviewed or tested the change."*
