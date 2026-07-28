@@ -18,6 +18,7 @@ package oci
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -93,6 +94,40 @@ func Get(ctx context.Context, resolver remotes.Resolver, ref reference.Named) (s
 		return spec.Descriptor{}, nil, err
 	}
 	return descriptor, content, nil
+}
+
+// GetBlob retrieves the content of a blob descriptor (e.g. an artifact layer)
+// from the repository ref belongs to. Unlike Get it doesn't Resolve the
+// digest, as the registry manifests endpoint only serves actual manifests;
+// blob content must be fetched directly from the blobs endpoint.
+func GetBlob(ctx context.Context, resolver remotes.Resolver, ref reference.Named, descriptor spec.Descriptor) ([]byte, error) {
+	fetcher, err := resolver.Fetcher(ctx, ref.String())
+	if err != nil {
+		return nil, fmt.Errorf("creating fetcher for %s: %w", ref, err)
+	}
+	fetch, err := fetcher.Fetch(ctx, descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("fetching blob %s: %w", descriptor.Digest, err)
+	}
+	defer func() { _ = fetch.Close() }()
+	// bound the read by the declared size so a rogue registry can't cause
+	// unbounded allocation; the extra byte detects oversized responses.
+	content, err := io.ReadAll(io.LimitReader(fetch, descriptor.Size+1))
+	if err != nil {
+		return nil, fmt.Errorf("reading blob %s: %w", descriptor.Digest, err)
+	}
+	if int64(len(content)) != descriptor.Size {
+		return nil, fmt.Errorf("blob %s size mismatch: expected %d bytes, got %d", descriptor.Digest, descriptor.Size, len(content))
+	}
+	// GetBlob bypasses containerd's content store, so integrity must be
+	// checked here before callers write the bytes to disk.
+	if err := descriptor.Digest.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid digest %s: %w", descriptor.Digest, err)
+	}
+	if actual := descriptor.Digest.Algorithm().FromBytes(content); actual != descriptor.Digest {
+		return nil, fmt.Errorf("blob digest mismatch: expected %s, got %s", descriptor.Digest, actual)
+	}
+	return content, nil
 }
 
 func Copy(ctx context.Context, resolver remotes.Resolver, image reference.Named, named reference.Named) (spec.Descriptor, error) {

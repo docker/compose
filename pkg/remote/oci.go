@@ -209,12 +209,7 @@ func (g *ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, ma
 	}
 
 	for i, layer := range manifest.Layers {
-		digested, err := reference.WithDigest(ref, layer.Digest)
-		if err != nil {
-			return err
-		}
-
-		_, content, err := oci.Get(ctx, resolver, digested)
+		content, err := oci.GetBlob(ctx, resolver, ref, layer)
 		if err != nil {
 			return err
 		}
