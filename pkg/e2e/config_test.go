@@ -83,4 +83,34 @@ func TestLocalComposeConfig(t *testing.T) {
 			Out: `PORT`,
 		})
 	})
+
+	t.Run("--no-consistency --services", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--services")
+		res.Assert(t, icmd.Expected{Out: `incomplete`})
+	})
+
+	t.Run("--no-consistency --volumes", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--volumes")
+		res.Assert(t, icmd.Expected{Out: `data`})
+	})
+
+	t.Run("--no-consistency --networks", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--networks")
+		res.Assert(t, icmd.Expected{Out: `internal`})
+	})
+
+	t.Run("--no-consistency --models", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--models")
+		res.Assert(t, icmd.Expected{Out: `ai/example`})
+	})
+
+	t.Run("--no-consistency --hash", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--hash", "*")
+		res.Assert(t, icmd.Expected{Out: `incomplete `})
+	})
+
+	t.Run("--profile --no-consistency --services", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "--profile", "extra", "config", "--no-consistency", "--services")
+		res.Assert(t, icmd.Expected{Out: `gated`})
+	})
 }
