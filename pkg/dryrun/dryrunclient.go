@@ -191,7 +191,9 @@ func (d *DryRunClient) CopyFromContainer(ctx context.Context, container string, 
 	if _, err := d.ContainerStatPath(ctx, container, client.ContainerStatPathOptions{Path: options.SourcePath}); err != nil {
 		return client.CopyFromContainerResult{}, fmt.Errorf("could not find the file %s in container %s", options.SourcePath, container)
 	}
-	return client.CopyFromContainerResult{}, nil
+	return client.CopyFromContainerResult{
+		Content: io.NopCloser(bytes.NewReader(nil)),
+	}, nil
 }
 
 func (d *DryRunClient) CopyToContainer(ctx context.Context, container string, options client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
