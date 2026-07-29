@@ -760,3 +760,27 @@ func GetImageNameOrDefault(service types.ServiceConfig, projectName string) stri
 	}
 	return imageName
 }
+
+// GetImageNamesForService returns the image names required by a service.
+//
+// This includes the service image (or its default build image name), plus any
+// distinct image explicitly referenced by pre_start lifecycle hooks. post_start
+// and pre_stop hooks are intentionally excluded because Compose executes those
+// hooks inside the service container instead of creating a container from the
+// hook image field.
+func GetImageNamesForService(service types.ServiceConfig, projectName string) []string {
+	imageNames := []string{GetImageNameOrDefault(service, projectName)}
+	seen := map[string]struct{}{imageNames[0]: {}}
+
+	for _, hook := range service.PreStart {
+		if hook.Image == "" {
+			continue
+		}
+		if _, ok := seen[hook.Image]; ok {
+			continue
+		}
+		imageNames = append(imageNames, hook.Image)
+		seen[hook.Image] = struct{}{}
+	}
+	return imageNames
+}

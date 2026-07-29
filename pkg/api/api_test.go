@@ -36,3 +36,20 @@ func TestRunOptionsEnvironmentMap(t *testing.T) {
 	assert.Equal(t, *env["ZOT"], "")
 	assert.Check(t, env["QIX"] == nil)
 }
+
+func TestGetImageNamesForServiceIncludesPreStartHooks(t *testing.T) {
+	service := types.ServiceConfig{
+		Name:  "demo",
+		Image: "alpine:3.20",
+		PreStart: []types.ServiceHook{
+			{Image: "alpine:3.20"},
+			{Image: "alpine:3.19"},
+			{Image: "alpine:3.19"},
+			{},
+		},
+		PostStart: []types.ServiceHook{{Image: "unused-post-start"}},
+		PreStop:   []types.ServiceHook{{Image: "unused-pre-stop"}},
+	}
+
+	assert.DeepEqual(t, GetImageNamesForService(service, "hooktest"), []string{"alpine:3.20", "alpine:3.19"})
+}

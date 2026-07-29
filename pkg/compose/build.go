@@ -192,7 +192,9 @@ func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.Ima
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]api.ImageSummary, error) {
 	imageNames := utils.Set[string]{}
 	for _, s := range project.Services {
-		imageNames.Add(api.GetImageNameOrDefault(s, project.Name))
+		for _, imageName := range api.GetImageNamesForService(s, project.Name) {
+			imageNames.Add(imageName)
+		}
 		for _, volume := range s.Volumes {
 			if volume.Type == types.VolumeTypeImage {
 				imageNames.Add(volume.Source)

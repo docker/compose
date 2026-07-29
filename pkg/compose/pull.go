@@ -56,27 +56,21 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		return err
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(s.maxConcurrency)
-
 	var (
 		mustBuild         []string
-		pullErrors        = make([]error, len(project.Services))
 		imagesBeingPulled = map[string]string{}
+		targets           []types.ServiceConfig
 	)
 
-	i := 0
-	for name, service := range project.Services {
-		if service.Image == "" {
-			s.events.On(api.Resource{
-				ID:      name,
-				Status:  api.Done,
-				Text:    "Skipped",
-				Details: "No image to be pulled",
-			})
-			continue
+	queuePull := func(service types.ServiceConfig) {
+		if _, ok := imagesBeingPulled[service.Image]; ok {
+			return
 		}
+		imagesBeingPulled[service.Image] = service.Name
+		targets = append(targets, service)
+	}
 
+	maybePull := func(service types.ServiceConfig) {
 		switch service.PullPolicy {
 		case types.PullPolicyNever, types.PullPolicyBuild:
 			s.events.On(api.Resource{
@@ -84,7 +78,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				Status: api.Done,
 				Text:   "Skipped",
 			})
-			continue
+			return
 		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
 			if imageAlreadyPresent(service.Image, images) {
 				s.events.On(api.Resource{
@@ -93,7 +87,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 					Text:    "Skipped",
 					Details: "Image is already present locally",
 				})
-				continue
+				return
 			}
 		}
 
@@ -104,16 +98,44 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				Text:    "Skipped",
 				Details: "Image can be built",
 			})
-			continue
+			return
 		}
 
-		if _, ok := imagesBeingPulled[service.Image]; ok {
-			continue
+		queuePull(service)
+	}
+
+	for name, service := range project.Services {
+		if service.Image == "" {
+			s.events.On(api.Resource{
+				ID:      name,
+				Status:  api.Done,
+				Text:    "Skipped",
+				Details: "No image to be pulled",
+			})
+		} else {
+			maybePull(service)
 		}
 
-		imagesBeingPulled[service.Image] = service.Name
+		preStartImages := map[string]struct{}{}
+		for i, hook := range service.PreStart {
+			hookService, ok := preStartHookImageService(service, i, hook)
+			if !ok || hookService.Image == service.Image {
+				continue
+			}
+			if _, ok := preStartImages[hookService.Image]; ok {
+				continue
+			}
+			preStartImages[hookService.Image] = struct{}{}
+			maybePull(hookService)
+		}
+	}
 
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(s.maxConcurrency)
+	pullErrors := make([]error, len(targets))
+	for i, service := range targets {
 		idx := i
+		service := service
 		eg.Go(func() error {
 			_, err := s.pullServiceImage(ctx, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
@@ -132,11 +154,9 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			}
 			return nil
 		})
-		i++
 	}
 
 	err = eg.Wait()
-
 	if len(mustBuild) > 0 {
 		logrus.Warnf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(mustBuild, " "))
 	}
@@ -313,6 +333,24 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			}
 		}
 
+		preStartImages := map[string]struct{}{}
+		for i, hook := range service.PreStart {
+			hookService, ok := preStartHookImageService(service, i, hook)
+			if !ok || hookService.Image == service.Image {
+				continue
+			}
+			if _, ok := preStartImages[hookService.Image]; ok || pullTargetForImageExists(needPull, hookService.Image) {
+				continue
+			}
+			preStartImages[hookService.Image] = struct{}{}
+			pull, err := mustPull(hookService, images)
+			if err != nil {
+				return err
+			}
+			if pull {
+				needPull[hookService.Name] = hookService
+			}
+		}
 	}
 	if len(needPull) == 0 {
 		return nil
@@ -346,6 +384,28 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 	}
 	return err
+}
+
+func preStartHookImageService(service types.ServiceConfig, index int, hook types.ServiceHook) (types.ServiceConfig, bool) {
+	if hook.Image == "" {
+		return types.ServiceConfig{}, false
+	}
+	hookName := fmt.Sprintf("%s:pre_start %d", service.Name, index)
+	return types.ServiceConfig{
+		Name:       hookName,
+		Image:      hook.Image,
+		PullPolicy: service.PullPolicy,
+		Platform:   service.Platform,
+	}, true
+}
+
+func pullTargetForImageExists(targets map[string]types.ServiceConfig, imageName string) bool {
+	for _, target := range targets {
+		if target.Image == imageName {
+			return true
+		}
+	}
+	return false
 }
 
 func mustPull(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, error) {
