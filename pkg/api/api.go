@@ -762,16 +762,20 @@ func GetImageNameOrDefault(service types.ServiceConfig, projectName string) stri
 }
 
 // GetDependentImages returns the additional images a service depends on beyond
-// its main image. Currently this is the set of pre_start hook images, which run
-// as ephemeral init containers with their own image. A hook without an explicit
-// image, or one reusing the service image, is skipped as that image is already
-// accounted for as the service image.
+// its main image. This includes pre_start hook images and type=image volume
+// sources. Images that match the service image are skipped as they are already
+// accounted for.
 func GetDependentImages(service types.ServiceConfig, projectName string) []string {
 	serviceImage := GetImageNameOrDefault(service, projectName)
 	var images []string
 	for _, hook := range service.PreStart {
 		if hook.Image != "" && hook.Image != serviceImage {
 			images = append(images, hook.Image)
+		}
+	}
+	for _, vol := range service.Volumes {
+		if vol.Type == types.VolumeTypeImage && vol.Source != serviceImage {
+			images = append(images, vol.Source)
 		}
 	}
 	return images
