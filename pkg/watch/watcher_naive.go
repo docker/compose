@@ -113,6 +113,12 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 
 	return filepath.WalkDir(dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
+			// A directory we are not allowed to read is not a reason to abandon the
+			// whole watch: we simply cannot see inside it, so skip it and carry on.
+			if os.IsPermission(err) {
+				logrus.Debugf("Not watching %s: %v", path, err)
+				return filepath.SkipDir
+			}
 			return err
 		}
 
@@ -129,6 +135,10 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil
+			}
+			if os.IsPermission(err) {
+				logrus.Debugf("Not watching %s: %v", path, err)
+				return filepath.SkipDir
 			}
 			return fmt.Errorf("watcher.Add(%q): %w", path, err)
 		}
@@ -180,6 +190,10 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
 		err := filepath.WalkDir(e.Name, func(path string, info fs.DirEntry, err error) error {
 			if err != nil {
+				if os.IsPermission(err) {
+					logrus.Debugf("Not watching %s: %v", path, err)
+					return filepath.SkipDir
+				}
 				return err
 			}
 
