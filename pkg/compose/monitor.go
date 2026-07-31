@@ -159,6 +159,10 @@ func (c *monitor) Start(ctx context.Context) error {
 					}
 					containers.Remove(ctr.ID)
 				}
+			case events.ActionDestroy:
+				logrus.Debugf("container %s destroyed", ctr.Name)
+				restarting.Remove(ctr.ID)
+				containers.Remove(ctr.ID)
 			}
 		}
 	}
