@@ -159,6 +159,13 @@ func (c *monitor) Start(ctx context.Context) error {
 				c.onContainerStart(event, ctr, containers, restarting)
 			case events.ActionRestart:
 				c.onContainerRestart(event, ctr)
+			case events.ActionStop:
+				err := c.onContainerStop(ctx, event, ctr, containers, restarting)
+				if err != nil {
+					return err
+				}
+			case events.ActionDestroy:
+				c.onContainerDestroy(ctr, containers, restarting)
 			case events.ActionDie:
 				err := c.onContainerDie(ctx, event, ctr, containers, restarting)
 				if err != nil {
@@ -238,17 +245,11 @@ func (c *monitor) onContainerRestart(event events.Message, ctr *api.ContainerSum
 
 func (c *monitor) onContainerDie(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
 	logrus.Debugf("container %s exited with code %d", ctr.Name, ctr.ExitCode)
-	inspect, err := c.apiClient.ContainerInspect(ctx, event.Actor.ID, client.ContainerInspectOptions{})
-	if errdefs.IsNotFound(err) {
-		// Source is already removed
-	} else if err != nil {
+	willRestart, _, _, err := c.isRestarting(ctx, ctr.ID)
+	if err != nil {
 		return err
 	}
-
-	if inspect.Container.State != nil && (inspect.Container.State.Restarting || inspect.Container.State.Running) {
-		// State.Restarting is set by engine when container is configured to restart on exit
-		// on ContainerRestart it doesn't (see https://github.com/moby/moby/issues/45538)
-		// container state still is reported as "running"
+	if willRestart {
 		logrus.Debugf("container %s is restarting", ctr.Name)
 		restarting.Add(ctr.ID)
 		c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventExited, func(e *api.ContainerEvent) {
@@ -258,8 +259,80 @@ func (c *monitor) onContainerDie(ctx context.Context, event events.Message, ctr 
 	}
 
 	c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventExited))
+	restarting.Remove(ctr.ID)
 	containers.Remove(ctr.ID)
 	return nil
+}
+
+// onContainerStop handles a stop event with no following start: the container won't
+// come back, either because it has no restart policy, or because an external
+// `stop`/`down` canceled the restart loop of a container in backoff
+// (https://github.com/docker/compose/issues/13985). The event alone can't tell us:
+// during a ContainerRestart (watch sync+restart, https://github.com/docker/compose/issues/13161)
+// the engine also emits `stop` before `start`. For a plain stop on a running
+// container, stop and die are not ordered relative to each other (see the
+// Start doc): evicting here on a still-pending die would let the loop
+// terminate before that die is drained, losing the exit code it carries. A
+// container reaching a stop event has necessarily run, so it always gets a
+// die (see the Start doc's event catalogue); only restarting.Has(ctr.ID)
+// proves that die was already processed here, so it's the sole eviction
+// signal — even a NotFound inspect (the container's removal outran this
+// inspect, racing the still-unread die right behind this stop) defers to
+// that pending die rather than evicting on `!found` alone.
+func (c *monitor) onContainerStop(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
+	willRestart, found, exitCode, err := c.isRestarting(ctx, ctr.ID)
+	if err != nil {
+		return err
+	}
+	switch {
+	case willRestart:
+		logrus.Debugf("container %s stopped, restart in progress", ctr.Name)
+		restarting.Add(ctr.ID)
+	case restarting.Has(ctr.ID):
+		// definitive stop, cancelling a restart backoff: correct the
+		// optimistic Restarting: true the earlier die reported, an external
+		// stop just cancelled that restart for good. Skip the correction
+		// when the container is also already gone (found is false): there's
+		// no exit code left to report.
+		logrus.Debugf("container %s stopped", ctr.Name)
+		if found {
+			ctr.ExitCode = exitCode
+			c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventExited))
+		}
+		restarting.Remove(ctr.ID)
+		containers.Remove(ctr.ID)
+	}
+	// otherwise, a die for this stop is still pending: let onContainerDie
+	// report the exit and evict the container itself
+	return nil
+}
+
+// onContainerDestroy handles a container removed by an external `docker compose down`:
+// terminal state, there is nothing left to inspect.
+func (c *monitor) onContainerDestroy(ctr *api.ContainerSummary, containers, restarting utils.Set[string]) {
+	logrus.Debugf("container %s destroyed", ctr.Name)
+	restarting.Remove(ctr.ID)
+	containers.Remove(ctr.ID)
+}
+
+// isRestarting tells whether a container which just stopped is expected to come back.
+// State.Restarting is set by the engine when the container is configured to restart on
+// exit, but not on a ContainerRestart, where state still is reported as "running"
+// (see https://github.com/moby/moby/issues/45538). A container already removed won't
+// come back, which found reports; exitCode is only meaningful when found is true.
+func (c *monitor) isRestarting(ctx context.Context, containerID string) (willRestart, found bool, exitCode int, err error) {
+	inspect, err := c.apiClient.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if errdefs.IsNotFound(err) {
+		return false, false, 0, nil
+	}
+	if err != nil {
+		return false, false, 0, err
+	}
+	state := inspect.Container.State
+	if state == nil {
+		return false, true, 0, nil
+	}
+	return state.Restarting || state.Running, true, state.ExitCode, nil
 }
 
 func newContainerEvent(timeNano int64, ctr *api.ContainerSummary, eventType int, opts ...func(e *api.ContainerEvent)) api.ContainerEvent {
