@@ -160,6 +160,9 @@ func TestDontRecurseWhenWatchingParentsOfNonExistentFiles(t *testing.T) {
 
 // A directory the current user cannot read costs us visibility into that
 // subtree, but it must not prevent the rest of the tree from being watched.
+//
+// Uses a real unreadable directory, so it is skipped as root and covers
+// nothing in CI. See watcher_naive_walk_test.go for the unit tests.
 func TestWatchRecursivelySkipsUnreadableDir(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission semantics differ on windows")
