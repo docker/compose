@@ -23,7 +23,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/opencontainers/go-digest"
+	spec "github.com/opencontainers/image-spec/specs-go/v1"
 	"gotest.tools/v3/assert"
 )
 
@@ -105,4 +108,108 @@ func TestNewResolver_AuthorizerUsesProvidedTransport(t *testing.T) {
 func TestNewResolver_NilTransportIsValid(t *testing.T) {
 	resolver := NewResolver(&configfile.ConfigFile{}, nil)
 	assert.Assert(t, resolver != nil, "NewResolver must return a non-nil resolver when transport is nil")
+}
+
+// TestGetBlob_FetchesFromBlobsEndpoint guards that layer content is fetched
+// straight from the blobs endpoint. Registries answer HEAD/GET on
+// manifests/<digest> with a 500 when the digest points to a non-manifest blob
+// (they try to JSON-parse it), and containerd >= 2.3 no longer falls back to
+// blobs unless the manifests endpoint returned 404 — so resolving a layer
+// digest through Resolve() breaks the pull.
+func TestGetBlob_FetchesFromBlobsEndpoint(t *testing.T) {
+	content := []byte("services:\n  test:\n    image: alpine\n")
+	dgst := digest.FromBytes(content)
+
+	var manifestHits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/":
+			w.WriteHeader(http.StatusOK)
+		case r.URL.Path == "/v2/test/artifact/manifests/"+dgst.String():
+			// mimic distribution: the blob exists but is not a manifest
+			manifestHits.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+		case r.URL.Path == "/v2/test/artifact/blobs/"+dgst.String():
+			w.Header().Set("Content-Type", "application/octet-stream")
+			_, _ = w.Write(content)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	host := server.Listener.Addr().String()
+	resolver := NewResolver(&configfile.ConfigFile{}, &http.Transport{}, host)
+
+	ref, err := reference.ParseDockerRef(host + "/test/artifact:latest")
+	assert.NilError(t, err)
+
+	got, err := GetBlob(t.Context(), resolver, ref, spec.Descriptor{
+		MediaType: ComposeYAMLMediaType,
+		Digest:    dgst,
+		Size:      int64(len(content)),
+	})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, got, content)
+	assert.Equal(t, manifestHits.Load(), int32(0),
+		"layer fetch must not go through the manifests endpoint")
+}
+
+// blobServer serves fixed bytes on the blobs endpoint for the given digest.
+func blobServer(t *testing.T, dgst digest.Digest, served []byte) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/":
+			w.WriteHeader(http.StatusOK)
+		case "/v2/test/artifact/blobs/" + dgst.String():
+			_, _ = w.Write(served)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server.Listener.Addr().String()
+}
+
+// TestGetBlob_RejectsDigestMismatch guards that content served by the
+// registry is verified against the descriptor digest: GetBlob bypasses
+// containerd's content store, so nothing else checks integrity before the
+// bytes are written to disk as a Compose file.
+func TestGetBlob_RejectsDigestMismatch(t *testing.T) {
+	declared := []byte("services:\n  test:\n    image: alpine\n")
+	tampered := []byte("services:\n  test:\n    image: evil/image\n")
+	dgst := digest.FromBytes(declared)
+
+	host := blobServer(t, dgst, tampered)
+	resolver := NewResolver(&configfile.ConfigFile{}, &http.Transport{}, host)
+	ref, err := reference.ParseDockerRef(host + "/test/artifact:latest")
+	assert.NilError(t, err)
+
+	_, err = GetBlob(t.Context(), resolver, ref, spec.Descriptor{
+		MediaType: ComposeYAMLMediaType,
+		Digest:    dgst,
+		Size:      int64(len(tampered)),
+	})
+	assert.ErrorContains(t, err, "digest mismatch")
+}
+
+// TestGetBlob_RejectsSizeMismatch guards that GetBlob never reads more than
+// the declared descriptor size, so a rogue registry cannot cause unbounded
+// memory allocation.
+func TestGetBlob_RejectsSizeMismatch(t *testing.T) {
+	content := []byte("services:\n  test:\n    image: alpine\n")
+	dgst := digest.FromBytes(content)
+
+	host := blobServer(t, dgst, content)
+	resolver := NewResolver(&configfile.ConfigFile{}, &http.Transport{}, host)
+	ref, err := reference.ParseDockerRef(host + "/test/artifact:latest")
+	assert.NilError(t, err)
+
+	_, err = GetBlob(t.Context(), resolver, ref, spec.Descriptor{
+		MediaType: ComposeYAMLMediaType,
+		Digest:    dgst,
+		Size:      int64(len(content)) - 1, // registry serves more than declared
+	})
+	assert.ErrorContains(t, err, "size mismatch")
 }
