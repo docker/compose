@@ -17,10 +17,18 @@
 package compose
 
 import (
+	"context"
+	"io"
+	"iter"
 	"sort"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/client"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -100,6 +108,59 @@ func TestAddPreStartHookPulls_NeverSkips(t *testing.T) {
 	}
 
 	assert.Equal(t, len(scheduledHookImages(t, project, map[string]api.ImageSummary{})), 0)
+}
+
+// fakePullResponse is an empty, already-complete pull stream.
+type fakePullResponse struct{}
+
+func (fakePullResponse) Read([]byte) (int, error) { return 0, io.EOF }
+func (fakePullResponse) Close() error             { return nil }
+func (fakePullResponse) Wait(context.Context) error {
+	return nil
+}
+
+func (fakePullResponse) JSONMessages(context.Context) iter.Seq2[jsonstream.Message, error] {
+	return func(func(jsonstream.Message, error) bool) {}
+}
+
+// TestPullServiceImageUsesContentDigest verifies the pull path resolves the
+// pulled image's identity with the same contentDigest scheme
+// getImageSummaries uses for already-local images. Both values feed the
+// com.docker.compose.image label that detects stale containers, so when the
+// pull path returned the raw inspect ID instead (the index digest, under the
+// containerd store with a tag@digest ref), the first up after the pulling up
+// saw a phantom image change and recreated every container once.
+func TestPullServiceImageUsesContentDigest(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockAPI, cli := prepareMocks(mockCtrl)
+	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	mockAPI.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: "1.48"}, nil).AnyTimes()
+	mockAPI.EXPECT().ClientVersion().Return("1.48").AnyTimes()
+
+	ref := "foo:1@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), ref, gomock.Any()).
+		Return(fakePullResponse{}, nil)
+	inspect := image.InspectResponse{
+		ID: "sha256:index",
+		Manifests: []image.ManifestSummary{
+			imageManifest("sha256:image", "amd64", true),
+			attestationManifest(),
+		},
+	}
+	mockAPI.EXPECT().
+		ImageInspect(anyCancellableContext(), ref, gomock.Any()).
+		Return(client.ImageInspectResult{InspectResponse: inspect}, nil)
+
+	id, err := tested.(*composeService).
+		pullServiceImage(t.Context(), types.ServiceConfig{Name: "web", Image: ref}, true, "")
+	assert.NilError(t, err)
+	assert.Equal(t, id, "sha256:image")
 }
 
 // TestAddPreStartHookPulls_DedupsSharedHookImage verifies a hook image shared by

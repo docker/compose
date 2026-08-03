@@ -286,11 +286,26 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	}
 	s.events.On(newEvent(resource, api.Done, api.StatusPulled))
 
-	inspected, err := s.apiClient().ImageInspect(ctx, service.Image)
+	// Resolve the pulled image's identity exactly the way getImageSummaries
+	// does for already-local images: both values feed the
+	// com.docker.compose.image label used to detect stale containers, so they
+	// must be computed identically. Returning the raw inspect ID here (the
+	// index digest, under the containerd store with a tag@digest ref) while
+	// later ups resolve the platform manifest digest via contentDigest made
+	// the first up after a pull recreate every container despite no change.
+	withManifests, err := s.manifestsSupported(ctx)
 	if err != nil {
 		return "", err
 	}
-	return inspected.ID, nil
+	var opts []client.ImageInspectOption
+	if withManifests {
+		opts = append(opts, client.ImageInspectWithManifests(true))
+	}
+	inspected, err := s.apiClient().ImageInspect(ctx, service.Image, opts...)
+	if err != nil {
+		return "", err
+	}
+	return contentDigest(inspected.InspectResponse, platforms.Default()), nil
 }
 
 // ImageDigestResolver creates a func able to resolve image digest from a docker ref,
