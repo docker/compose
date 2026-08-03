@@ -48,11 +48,10 @@ jobs:
         type=ref,event=tag
         type=edge
       meta-bake-target: meta-helper
-    secrets:
-      registry-auths: |
-        - registry: docker.io
-          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
-          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
+      registry-identities: |
+        - type: dockerhub
+          username: docker
+          connection_id: a295c8b7-54ab-4507-ac88-5c43003c73a5
 
   module-image:
     uses: docker/github-builder/.github/workflows/bake.yml@27ade872c1e2296e62ef15ab3b10d37665e57cf7 # v1.15.0
@@ -74,10 +73,9 @@ jobs:
         type=ref,event=branch
         type=ref,event=tag
       meta-bake-target: meta-helper
-    secrets:
-      registry-auths: |
-        - registry: docker.io
-          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
-          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
+      registry-identities: |
+        - type: dockerhub
+          username: docker
+          connection_id: a295c8b7-54ab-4507-ac88-5c43003c73a5
 
  
