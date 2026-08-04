@@ -14,11 +14,12 @@ or [restart_policy](https://github.com/compose-spec/compose-spec/blob/main/deplo
 
 ### Options
 
-| Name              | Type   | Default | Description                           |
-|:------------------|:-------|:--------|:--------------------------------------|
-| `--dry-run`       | `bool` |         | Execute command in dry run mode       |
-| `--no-deps`       | `bool` |         | Don't restart dependent services      |
-| `-t`, `--timeout` | `int`  | `0`     | Specify a shutdown timeout in seconds |
+| Name              | Type   | Default | Description                                                                                                   |
+|:------------------|:-------|:--------|:--------------------------------------------------------------------------------------------------------------|
+| `--dry-run`       | `bool` |         | Execute command in dry run mode                                                                               |
+| `--no-deps`       | `bool` |         | Don't restart dependent services                                                                              |
+| `--profiles-only` | `bool` |         | Only restart services enabled by a profile, leaving other services untouched (all profiles if none is active) |
+| `-t`, `--timeout` | `int`  | `0`     | Specify a shutdown timeout in seconds                                                                         |
 
 
 <!---MARKER_GEN_END-->

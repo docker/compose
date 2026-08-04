@@ -25,6 +25,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: profiles-only
+      value_type: bool
+      default_value: "false"
+      description: |
+        Only restart services enabled by a profile, leaving other services untouched (all profiles if none is active)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: timeout
       shorthand: t
       value_type: int

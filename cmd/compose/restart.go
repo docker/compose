@@ -27,9 +27,10 @@ import (
 
 type restartOptions struct {
 	*ProjectOptions
-	timeChanged bool
-	timeout     int
-	noDeps      bool
+	timeChanged  bool
+	timeout      int
+	noDeps       bool
+	profilesOnly bool
 }
 
 func restartCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -50,6 +51,7 @@ func restartCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 	flags := restartCmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
 	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't restart dependent services")
+	flags.BoolVar(&opts.profilesOnly, "profiles-only", false, "Only restart services enabled by a profile, leaving other services untouched (all profiles if none is active)")
 
 	return restartCmd
 }
@@ -58,6 +60,16 @@ func runRestart(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 	project, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
 		return err
+	}
+
+	if opts.profilesOnly {
+		project, services, err = profilesOnlyServices(project, services, "Restarting", dockerCli.Err())
+		if err != nil {
+			return err
+		}
+		if len(services) == 0 {
+			return nil
+		}
 	}
 
 	if project != nil && len(services) > 0 {

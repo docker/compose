@@ -27,8 +27,9 @@ import (
 
 type stopOptions struct {
 	*ProjectOptions
-	timeChanged bool
-	timeout     int
+	timeChanged  bool
+	timeout      int
+	profilesOnly bool
 }
 
 func stopCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -48,6 +49,7 @@ func stopCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	}
 	flags := cmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
+	flags.BoolVar(&opts.profilesOnly, "profiles-only", false, "Only stop services enabled by a profile, leaving other services running (all profiles if none is active)")
 
 	return cmd
 }
@@ -56,6 +58,15 @@ func runStop(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
+	}
+	if opts.profilesOnly {
+		project, services, err = profilesOnlyServices(project, services, "Stopping", dockerCli.Err())
+		if err != nil {
+			return err
+		}
+		if len(services) == 0 {
+			return nil
+		}
 	}
 	return withBackend(dockerCli, backendOptions, func(backend api.Compose) error {
 		return backend.Stop(ctx, name, api.StopOptions{

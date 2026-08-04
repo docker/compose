@@ -205,3 +205,63 @@ func TestDotEnvProfileUsage(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: profiledService})
 	})
 }
+
+func TestProfilesOnlyFlag(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "compose-e2e-profiles-only"
+	const profileName = "test-profile"
+
+	t.Cleanup(func() {
+		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	assertOnlyRegularRunning := func(t *testing.T) {
+		t.Helper()
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
+		res.Assert(t, icmd.Expected{Out: regularService})
+		assert.Assert(t, !strings.Contains(res.Combined(), profiledService))
+	}
+
+	t.Run("compose up with profile", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
+			"-p", projectName, "--profile", profileName, "up", "-d")
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+	})
+
+	t.Run("stop --profiles-only stops only profiled services", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
+			"-p", projectName, "--profile", profileName, "stop", "--profiles-only")
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+		assert.Assert(t, strings.Contains(res.Combined(), "Stopping services in profiles [test-profile]"), res.Combined())
+		assertOnlyRegularRunning(t)
+	})
+
+	t.Run("restart --profiles-only restarts only profiled services", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
+			"-p", projectName, "--profile", profileName, "restart", "--profiles-only")
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+		assert.Assert(t, strings.Contains(res.Combined(), "Restarting services in profiles [test-profile]"), res.Combined())
+		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
+		res.Assert(t, icmd.Expected{Out: regularService})
+		res.Assert(t, icmd.Expected{Out: profiledService})
+	})
+
+	t.Run("stop --profiles-only without active profile targets all profiles", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
+			"-p", projectName, "stop", "--profiles-only")
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+		assert.Assert(t, strings.Contains(res.Combined(), "Stopping services from all profiles [test-profile] as none is active"), res.Combined())
+		assertOnlyRegularRunning(t)
+	})
+
+	t.Run("stop --profiles-only rejects service names", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/profiles/compose.yaml",
+			"-p", projectName, "stop", "--profiles-only", profiledService)
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot be combined with service names"})
+	})
+
+	t.Run("stop --profiles-only requires the compose files", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "stop", "--profiles-only")
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "requires the project's compose file(s)"})
+	})
+}
