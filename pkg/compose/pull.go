@@ -293,19 +293,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	// index digest, under the containerd store with a tag@digest ref) while
 	// later ups resolve the platform manifest digest via contentDigest made
 	// the first up after a pull recreate every container despite no change.
-	withManifests, err := s.manifestsSupported(ctx)
-	if err != nil {
-		return "", err
-	}
-	var opts []client.ImageInspectOption
-	if withManifests {
-		opts = append(opts, client.ImageInspectWithManifests(true))
-	}
-	inspected, err := s.apiClient().ImageInspect(ctx, service.Image, opts...)
-	if err != nil {
-		return "", err
-	}
-	return contentDigest(inspected.InspectResponse, platforms.Default()), nil
+	return s.inspectContentDigest(ctx, service.Image)
 }
 
 // ImageDigestResolver creates a func able to resolve image digest from a docker ref,

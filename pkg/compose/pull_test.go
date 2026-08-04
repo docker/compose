@@ -54,10 +54,10 @@ func scheduledHookImages(t *testing.T, project *types.Project, present map[strin
 	return images
 }
 
-func serviceWithHook(name, image, policy string) types.ServiceConfig {
+func serviceWithHook(name, img, policy string) types.ServiceConfig {
 	return types.ServiceConfig{
 		Name:       name,
-		Image:      image,
+		Image:      img,
 		PullPolicy: policy,
 		PreStart:   []types.ServiceHook{{Image: "init:latest"}},
 	}
