@@ -26,7 +26,7 @@ jobs:
       issues: write # Create security incident issues if secrets detected
       checks: write # (Optional) Show review progress as a check run
       id-token: write # Required for OIDC authentication to AWS Secrets Manager
-      actions: read # Download artifacts from trigger workflow
+      actions: write # Download artifacts from trigger workflow; cache delete for review-lock release (required since docker-agent-action v2.0.3)
     with:
       trigger-run-id: ${{ github.event_name == 'workflow_run' && format('{0}',
         github.event.workflow_run.id) || '' }}
