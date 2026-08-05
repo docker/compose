@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -167,25 +168,36 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 }
 
 func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.ImageSummary, projectName string) {
+	var digests []string
 	for i, vol := range service.Volumes {
-		if vol.Type == types.VolumeTypeImage {
-			imgName := vol.Source
-			if _, ok := images[vol.Source]; !ok {
-				// check if source is another service in the project
-				imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: vol.Source}, projectName)
-				// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
-				if _, ok := images[imgName]; !ok {
-					continue
-				}
-			}
-			if img, ok := images[imgName]; ok {
-				// Use Image ID directly as source.
-				// Using name@digest format (via reference.WithDigest) fails for local-only images
-				// that don't have RepoDigests (e.g. built locally in CI).
-				// Image ID (sha256:...) is always valid and ensures ServiceHash changes on rebuild.
-				service.Volumes[i].Source = img.ID
+		if vol.Type != types.VolumeTypeImage {
+			continue
+		}
+		imgName := vol.Source
+		if _, ok := images[vol.Source]; !ok {
+			// check if source is another service in the project
+			imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: vol.Source}, projectName)
+			// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
+			if _, ok := images[imgName]; !ok {
+				continue
 			}
 		}
+		img, ok := images[imgName]
+		if !ok {
+			continue
+		}
+		// The daemon only resolves a `type=image` mount Source that is a name/tag
+		// or a top-level image ID, not a per-platform manifest digest (which is
+		// what ImageSummary.ID holds to stay stable across attested rebuilds, see
+		// contentDigest()). Keep Source as the resolved name so mounting always
+		// works, and track the digest separately so mustRecreate can still detect
+		// a changed source image.
+		service.Volumes[i].Source = imgName
+		digests = append(digests, vol.Target+"="+img.ID)
+	}
+	if len(digests) > 0 {
+		sort.Strings(digests)
+		service.CustomLabels.Add(api.ImageVolumeDigestLabel, strings.Join(digests, ","))
 	}
 }
 

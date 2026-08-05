@@ -47,6 +47,11 @@ const (
 	SlugLabel = "com.docker.compose.slug"
 	// ImageDigestLabel stores digest of the container image used to run service
 	ImageDigestLabel = "com.docker.compose.image"
+	// ImageVolumeDigestLabel stores the content digest of each `type: image`
+	// volume's source image, as "target=digest" pairs joined by ",", so
+	// mustRecreate can detect a rebuilt/updated source image independently of
+	// the mount Source (which must stay a resolvable name, not a digest).
+	ImageVolumeDigestLabel = "com.docker.compose.image-volume-digest"
 	// DependenciesLabel stores service dependencies
 	DependenciesLabel = "com.docker.compose.depends_on"
 	// VersionLabel stores the compose tool version used to build/run application
