@@ -1,0 +1,17 @@
+services:
+  with-env-file:
+    image: alpine
+    command: ["sleep", "infinity"]
+    env_file:
+      - app.env
+
+  optional-env:
+    image: alpine
+    command: ["sleep", "infinity"]
+    env_file:
+      - path: missing-optional.env
+        required: false
+
+  plain:
+    image: alpine
+    command: ["sleep", "infinity"]
