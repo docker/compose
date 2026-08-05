@@ -17,8 +17,11 @@
 package e2e
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
 
@@ -113,4 +116,30 @@ func TestLocalComposeConfig(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "--profile", "extra", "config", "--no-consistency", "--services")
 		res.Assert(t, icmd.Expected{Out: `gated`})
 	})
+}
+
+func TestConfigHashMatchesContainerLabel(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	const projectName = "compose-e2e-config-hash"
+	defer c.cleanupWithDown(t, projectName)
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/config_hash/compose.yaml", "--project-name", projectName, "up", "-d", "--force-recreate")
+
+	containerHashes := map[string]string{}
+	for _, service := range []string{"with-env-file", "optional-env", "plain"} {
+		res := c.RunDockerCmd(t, "inspect", "-f", `{{index .Config.Labels "com.docker.compose.config-hash"}}`,
+			fmt.Sprintf("%s-%s-1", projectName, service))
+		containerHashes[service] = strings.TrimSpace(res.Stdout())
+
+		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/config_hash/compose.yaml", "--project-name", projectName, "config", "--hash", service)
+		fields := strings.Fields(res.Stdout())
+		assert.Equal(t, len(fields), 2)
+		assert.Equal(t, fields[1], containerHashes[service], "config --hash %s must match the container config-hash label", service)
+	}
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config_hash/compose.yaml", "--project-name", projectName, "config", "--hash", "*")
+	expected := fmt.Sprintf("optional-env %s\nplain %s\nwith-env-file %s",
+		containerHashes["optional-env"], containerHashes["plain"], containerHashes["with-env-file"])
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), expected)
 }
