@@ -77,24 +77,20 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			continue
 		}
 
-		switch service.PullPolicy {
-		case types.PullPolicyNever, types.PullPolicyBuild:
+		pullRequired, skipReason, err := shouldPullImage(service, images)
+		if err != nil {
+			// join already-scheduled pulls before returning: bailing out with
+			// goroutines still in flight would leak them past pull()'s return
+			return errors.Join(err, eg.Wait())
+		}
+		if !pullRequired {
 			s.events.On(api.Resource{
-				ID:     "Image " + service.Image,
-				Status: api.Done,
-				Text:   "Skipped",
+				ID:      "Image " + service.Image,
+				Status:  api.Done,
+				Text:    "Skipped",
+				Details: skipReason,
 			})
 			continue
-		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
-			if imageAlreadyPresent(service.Image, images) {
-				s.events.On(api.Resource{
-					ID:      "Image " + service.Image,
-					Status:  api.Done,
-					Text:    "Skipped",
-					Details: "Image is already present locally",
-				})
-				continue
-			}
 		}
 
 		if service.Build != nil && opts.IgnoreBuildable {
@@ -137,25 +133,31 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 	// pre_start hook images run as ephemeral init containers with their own
 	// registry image. They have no pull policy of their own, so we inherit the
-	// parent service's policy for skip decisions. Unlike the service image, a
-	// hook image can't be built, so `build` does not exempt it from pulling —
-	// only `never` does (consistent with the `up`/create path).
+	// parent service's policy for skip decisions — through the same
+	// shouldPullImage decision as the service image. Unlike the service
+	// image, a hook image can't be built, so `build` falls back to
+	// pull-if-missing instead of exempting it from pulling.
 	for name, service := range project.Services {
-		if service.PullPolicy == types.PullPolicyNever {
-			continue
+		hookPolicy := service.PullPolicy
+		if hookPolicy == types.PullPolicyBuild {
+			hookPolicy = types.PullPolicyMissing
 		}
 		for _, img := range api.GetDependentImages(service, project.Name) {
-			switch service.PullPolicy {
-			case types.PullPolicyMissing, types.PullPolicyIfNotPresent, types.PullPolicyBuild:
-				if imageAlreadyPresent(img, images) {
+			pullRequired, skipReason, err := shouldPullImage(types.ServiceConfig{Name: name, Image: img, PullPolicy: hookPolicy}, images)
+			if err != nil {
+				// same as the service loop: never leave scheduled pulls unjoined
+				return errors.Join(err, eg.Wait())
+			}
+			if !pullRequired {
+				if skipReason != "" {
 					s.events.On(api.Resource{
 						ID:      "Image " + img,
 						Status:  api.Done,
 						Text:    "Skipped",
-						Details: "Image is already present locally",
+						Details: skipReason,
 					})
-					continue
 				}
+				continue
 			}
 			if _, ok := imagesBeingPulled[img]; ok {
 				continue
@@ -188,19 +190,49 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	return errors.Join(pullErrors...)
 }
 
-func imageAlreadyPresent(serviceImage string, localImages map[string]api.ImageSummary) bool {
-	normalizedImage, err := reference.ParseDockerRef(serviceImage)
+// shouldPullImage decides whether `compose pull` refreshes a service's image,
+// delegating to the exact pull_policy interpreter the up path uses (mustPull)
+// so both commands honor never/build, skip-if-present and the
+// daily/weekly/every_N refresh window identically. The command keeps two
+// deliberate differences:
+//   - a service without an explicit pull_policy is always refreshed — an
+//     unset policy resolves to "missing" for `up`, but skipping it would turn
+//     an explicit `compose pull` into a no-op once images exist;
+//   - a present `latest` tag is still refreshed under missing/if_not_present:
+//     the tag is expected to move, and triggering the pull lets the daemon
+//     negotiate with the registry — a manifest check, no download, when the
+//     local image is already up to date.
+func shouldPullImage(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, string, error) {
+	if service.PullPolicy == "" {
+		return true, "", nil
+	}
+	pull, err := mustPull(service, images)
+	if err != nil || pull {
+		return pull, "", err
+	}
+	policy, _, _ := service.GetPullPolicy()
+	switch policy {
+	case types.PullPolicyRefresh:
+		return false, "Image is not due for refresh", nil
+	case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
+		if isLatestTag(service.Image) {
+			return true, "", nil
+		}
+		return false, "Image is already present locally", nil
+	default: // never, build — and provider services short-circuited by mustPull
+		return false, "", nil
+	}
+}
+
+// isLatestTag reports whether ref points at a `latest` tag, including bare
+// references that normalize to it.
+func isLatestTag(ref string) bool {
+	named, err := reference.ParseDockerRef(ref)
 	if err != nil {
 		return false
 	}
-	switch refType := normalizedImage.(type) {
-	case reference.NamedTagged:
-		_, ok := localImages[serviceImage]
-		return ok && refType.Tag() != "latest"
-	default:
-		_, ok := localImages[serviceImage]
-		return ok
-	}
+	tagged, ok := named.(reference.Tagged)
+	return ok && tagged.Tag() == "latest"
 }
 
 func getUnwrappedErrorMessage(err error) string {
@@ -286,7 +318,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	}
 	s.events.On(newEvent(resource, api.Done, api.StatusPulled))
 
-	// Resolve the pulled image's identity exactly the way getImageSummaries
+	// Resolve the pulled image's identity exactly the way getLocalImagesDigests
 	// does for already-local images: both values feed the
 	// com.docker.compose.image label used to detect stale containers, so they
 	// must be computed identically. Returning the raw inspect ID here (the
