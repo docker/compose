@@ -169,8 +169,11 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 		var inspect image.InspectResponse
 		if service.Build != nil && service.Image == "" {
 			result, err := dockerCLI.Client().ImageInspect(ctx, imageName)
-			if err != nil && !errdefs.IsNotFound(err) {
-				return nil, err
+			if err != nil {
+				if !errdefs.IsNotFound(err) {
+					return nil, err
+				}
+				logrus.Warnf("image %s for service %s not found locally; Dockerfile-exposed ports will not be included — run `docker compose build` first to include them", imageName, name)
 			}
 			inspect = result.InspectResponse
 		} else {
