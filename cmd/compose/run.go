@@ -204,12 +204,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				return err
 			}
 
-			project, _, err := p.ToProject(ctx, dockerCli, backend, []string{options.Service}, composecli.WithoutEnvironmentResolution)
-			if err != nil {
-				return err
-			}
-
-			project, err = project.WithServicesEnvironmentResolved(true)
+			project, err := runProject(ctx, dockerCli, backend, p, options.Service)
 			if err != nil {
 				return err
 			}
@@ -267,6 +262,27 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		name = "no-tty"
 	}
 	return pflag.NormalizedName(name)
+}
+
+// runProject loads and prepares the project for a one-off run: environment
+// resolved after service selection (so env_file of unrelated services doesn't
+// need to exist) and DOCKER_DEFAULT_PLATFORM resolved into service.Platform
+// exactly like `up`/`create` do — Platform feeds the config-hash of the
+// dependencies started by run, so hashing a different value would recreate
+// their containers.
+func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, p *ProjectOptions, service string) (*types.Project, error) {
+	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, composecli.WithoutEnvironmentResolution)
+	if err != nil {
+		return nil, err
+	}
+	project, err = project.WithServicesEnvironmentResolved(true)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyPlatforms(project, true); err != nil {
+		return nil, err
+	}
+	return project, nil
 }
 
 func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
