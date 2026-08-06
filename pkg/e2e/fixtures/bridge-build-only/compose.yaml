@@ -1,0 +1,5 @@
+services:
+  app:
+    build: .
+    expose:
+      - "8080"
