@@ -185,6 +185,27 @@ func (s *composeService) manifestsSupported(ctx context.Context) (bool, error) {
 	return versions.GreaterThanOrEqualTo(version, apiVersion148), nil
 }
 
+// inspectContentDigest inspects ref, requesting per-manifest data on engines
+// that support it, and returns the digest identifying the image's runnable
+// content for the default platform. Callers that record an image identity
+// compose later compares for staleness must go through this, so every such
+// identity is computed the same way — see contentDigest.
+func (s *composeService) inspectContentDigest(ctx context.Context, ref string) (string, error) {
+	withManifests, err := s.manifestsSupported(ctx)
+	if err != nil {
+		return "", err
+	}
+	var opts []client.ImageInspectOption
+	if withManifests {
+		opts = append(opts, client.ImageInspectWithManifests(true))
+	}
+	inspected, err := s.apiClient().ImageInspect(ctx, ref, opts...)
+	if err != nil {
+		return "", err
+	}
+	return contentDigest(inspected.InspectResponse, platforms.Default()), nil
+}
+
 // contentDigest returns the digest identifying an image's runnable content
 // (config + layers) for the given platform. With BuildKit provenance
 // attestations enabled (the default since recent Buildx/BuildKit), the image is
