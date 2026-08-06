@@ -165,7 +165,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }})
+    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}${{ matrix.store && format(', {0}', matrix.store) || '' }})
     strategy:
       fail-fast: false
       matrix:
@@ -185,12 +185,23 @@ jobs:
           - mode: standalone
             engine: 28
             channel: oldstable
+
+          # containerd image store (non-graphdriver digest behavior)
+          - mode: plugin
+            engine: 29
+            channel: stable
+            store: containerd
     steps:
       - name: Prepare
         run: |
           mode=${{ matrix.mode }}
           engine=${{ matrix.engine }}
-          echo "MODE_ENGINE_PAIR=${mode}-${engine}" >> $GITHUB_ENV
+          store=${{ matrix.store }}
+          pair="${mode}-${engine}"
+          if [ -n "$store" ]; then
+            pair="${pair}-${store}"
+          fi
+          echo "MODE_ENGINE_PAIR=${pair}" >> $GITHUB_ENV
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -205,6 +216,20 @@ jobs:
 
       - name: Check Docker Version
         run: docker --version
+
+      - name: Enable containerd image store
+        if: ${{ matrix.store == 'containerd' }}
+        run: |
+          sudo mkdir -p /etc/docker
+          if [ -s /etc/docker/daemon.json ]; then
+            jq -s '.[0] * .[1]' /etc/docker/daemon.json <(echo '{"features": {"containerd-snapshotter": true}}') \
+              | sudo tee /etc/docker/daemon.json.new > /dev/null
+            sudo mv /etc/docker/daemon.json.new /etc/docker/daemon.json
+          else
+            echo '{"features": {"containerd-snapshotter": true}}' | sudo tee /etc/docker/daemon.json > /dev/null
+          fi
+          sudo systemctl restart docker.service
+          docker info -f '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
