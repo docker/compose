@@ -194,3 +194,29 @@ func (f *fakeSyncer) Sync(ctx context.Context, service string, paths []*sync.Pat
 	f.synced <- paths
 	return nil
 }
+
+// TestPruneDanglingImagesOnRebuild verifies the post-rebuild prune only
+// removes superseded dangling images: a dangling image whose ID matches one
+// of the freshly built images must be spared. The lookup used to probe the
+// name-keyed map with an image ID, matching nothing — every dangling image
+// of the project was removed on each rebuild.
+func TestPruneDanglingImagesOnRebuild(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	apiMock.EXPECT().ImageList(gomock.Any(), gomock.Any()).
+		Return(client.ImageListResult{Items: []image.Summary{
+			{ID: "sha256:justbuilt"},
+			{ID: "sha256:superseded"},
+		}}, nil)
+	// only the superseded image may be removed; removing the just-built one
+	// would be an unexpected call and fail the test
+	apiMock.EXPECT().ImageRemove(gomock.Any(), "sha256:superseded", gomock.Any()).
+		Return(client.ImageRemoveResult{}, nil)
+
+	tested.(*composeService).pruneDanglingImagesOnRebuild(t.Context(), "proj",
+		map[string]string{"app-image:latest": "sha256:justbuilt"})
+}

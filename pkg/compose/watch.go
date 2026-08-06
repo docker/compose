@@ -726,8 +726,14 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 		return
 	}
 
+	// imageNameToIdMap is keyed by image name; the freshly built images to
+	// spare are its VALUES (image IDs), matched against the dangling IDs
+	builtIDs := make(map[string]struct{}, len(imageNameToIdMap))
+	for _, id := range imageNameToIdMap {
+		builtIDs[id] = struct{}{}
+	}
 	for _, img := range images.Items {
-		if _, ok := imageNameToIdMap[img.ID]; !ok {
+		if _, ok := builtIDs[img.ID]; !ok {
 			_, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{})
 			if err != nil {
 				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
