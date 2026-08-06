@@ -26,11 +26,12 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+const bridgeImageVersion = "v0.0.3"
+
 func TestConvertAndTransformList(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	const projectName = "bridge"
-	const bridgeImageVersion = "v0.0.3"
 	tmpDir := t.TempDir()
 
 	t.Run("kubernetes manifests", func(t *testing.T) {
@@ -66,7 +67,7 @@ func TestConvertBuildOnlyService(t *testing.T) {
 	outDir := t.TempDir()
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge-build-only/compose.yaml", "--project-name", "bridge-build-only", "bridge", "convert",
-		"--output", outDir, "--transformation", "docker/compose-bridge-kubernetes:v0.0.3")
+		"--output", outDir, "--transformation", fmt.Sprintf("docker/compose-bridge-kubernetes:%s", bridgeImageVersion))
 	assert.NilError(t, res.Error)
 	assert.Equal(t, res.ExitCode, 0)
 
