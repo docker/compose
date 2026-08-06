@@ -22,9 +22,9 @@ import (
 	"iter"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
@@ -133,14 +133,7 @@ func (fakePullResponse) JSONMessages(context.Context) iter.Seq2[jsonstream.Messa
 func TestPullServiceImageUsesContentDigest(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
-
-	mockAPI, cli := prepareMocks(mockCtrl)
-	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
-	tested, err := NewComposeService(cli)
-	assert.NilError(t, err)
-	mockAPI.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
-		Return(client.PingResult{APIVersion: "1.48"}, nil).AnyTimes()
-	mockAPI.EXPECT().ClientVersion().Return("1.48").AnyTimes()
+	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
 
 	ref := "foo:1@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	mockAPI.EXPECT().
@@ -157,8 +150,7 @@ func TestPullServiceImageUsesContentDigest(t *testing.T) {
 		ImageInspect(anyCancellableContext(), ref, gomock.Any()).
 		Return(client.ImageInspectResult{InspectResponse: inspect}, nil)
 
-	id, err := tested.(*composeService).
-		pullServiceImage(t.Context(), types.ServiceConfig{Name: "web", Image: ref}, true, "")
+	id, err := tested.pullServiceImage(t.Context(), types.ServiceConfig{Name: "web", Image: ref}, true, "")
 	assert.NilError(t, err)
 	assert.Equal(t, id, "sha256:image")
 }
@@ -175,4 +167,71 @@ func TestAddPreStartHookPulls_DedupsSharedHookImage(t *testing.T) {
 	}
 
 	assert.DeepEqual(t, scheduledHookImages(t, project, map[string]api.ImageSummary{}), []string{"init:latest"})
+}
+
+func TestShouldPullImage(t *testing.T) {
+	present := map[string]api.ImageSummary{
+		"web:1":      {LastTagTime: time.Now()},
+		"web:latest": {LastTagTime: time.Now()},
+		"old:1":      {LastTagTime: time.Now().Add(-48 * time.Hour)},
+	}
+	svc := func(image, policy string) types.ServiceConfig {
+		return types.ServiceConfig{Name: "web", Image: image, PullPolicy: policy}
+	}
+
+	t.Run("no explicit policy always refreshes", func(t *testing.T) {
+		pull, _, err := shouldPullImage(svc("web:1", ""), present)
+		assert.NilError(t, err)
+		assert.Assert(t, pull)
+	})
+
+	t.Run("never and build skip", func(t *testing.T) {
+		for _, policy := range []string{types.PullPolicyNever, types.PullPolicyBuild} {
+			pull, _, err := shouldPullImage(svc("web:1", policy), present)
+			assert.NilError(t, err)
+			assert.Assert(t, !pull)
+		}
+	})
+
+	t.Run("missing skips a present image", func(t *testing.T) {
+		pull, _, err := shouldPullImage(svc("web:1", types.PullPolicyMissing), present)
+		assert.NilError(t, err)
+		assert.Assert(t, !pull)
+
+		pull, _, err = shouldPullImage(svc("absent:1", types.PullPolicyMissing), present)
+		assert.NilError(t, err)
+		assert.Assert(t, pull)
+	})
+
+	t.Run("missing still refreshes a present latest tag", func(t *testing.T) {
+		// deliberate exception: `latest` is expected to move, so the pull is
+		// triggered anyway and the daemon's registry negotiation decides
+		// (a no-op when the local image is already up to date)
+		for _, image := range []string{"web:latest", "web"} {
+			pull, _, err := shouldPullImage(svc(image, types.PullPolicyMissing), map[string]api.ImageSummary{
+				image: {LastTagTime: time.Now()},
+			})
+			assert.NilError(t, err)
+			assert.Assert(t, pull, "present %s must still be refreshed", image)
+		}
+	})
+
+	t.Run("refresh policies honor the same window as up", func(t *testing.T) {
+		pull, _, err := shouldPullImage(svc("web:1", "daily"), present)
+		assert.NilError(t, err)
+		assert.Assert(t, !pull, "recently tagged image is not due for refresh")
+
+		pull, _, err = shouldPullImage(svc("old:1", "daily"), present)
+		assert.NilError(t, err)
+		assert.Assert(t, pull, "image older than the window must be refreshed")
+
+		pull, _, err = shouldPullImage(svc("absent:1", "weekly"), present)
+		assert.NilError(t, err)
+		assert.Assert(t, pull, "absent image must be pulled")
+	})
+
+	t.Run("invalid refresh spec errors", func(t *testing.T) {
+		_, _, err := shouldPullImage(svc("web:1", "every_bogus"), present)
+		assert.Assert(t, err != nil)
+	})
 }
