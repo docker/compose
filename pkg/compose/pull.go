@@ -51,7 +51,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 }
 
 func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
-	images, err := s.getLocalImagesDigests(ctx, project)
+	images, _, err := s.getLocalImagesDigests(ctx, project)
 	if err != nil {
 		return err
 	}
@@ -293,7 +293,8 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	// index digest, under the containerd store with a tag@digest ref) while
 	// later ups resolve the platform manifest digest via contentDigest made
 	// the first up after a pull recreate every container despite no change.
-	return s.inspectContentDigest(ctx, service.Image)
+	id, _, err := s.inspectLocalContent(ctx, service.Image, platform)
+	return id, err
 }
 
 // ImageDigestResolver creates a func able to resolve image digest from a docker ref,

@@ -125,7 +125,7 @@ func (fakePullResponse) JSONMessages(context.Context) iter.Seq2[jsonstream.Messa
 
 // TestPullServiceImageUsesContentDigest verifies the pull path resolves the
 // pulled image's identity with the same contentDigest scheme
-// getImageSummaries uses for already-local images. Both values feed the
+// getLocalImagesDigests uses for already-local images. Both values feed the
 // com.docker.compose.image label that detects stale containers, so when the
 // pull path returned the raw inspect ID instead (the index digest, under the
 // containerd store with a tag@digest ref), the first up after the pulling up
