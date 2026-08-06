@@ -94,7 +94,11 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 			return err
 		}
 		s.events.On(builtEvent(image))
-		builtDigests[getServiceIndex(name)] = id
+		// the classic builder reports the raw image ID from the build stream;
+		// resolve the canonical content digest instead so the recorded
+		// identity matches what later runs compute for the same local image
+		// (resolved here to inherit the build traversal's concurrency)
+		builtDigests[getServiceIndex(name)] = s.canonicalBuiltDigest(ctx, image, service.Platform, id)
 
 		if options.Push {
 			return s.push(ctx, project, api.PushOptions{})

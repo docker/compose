@@ -25,6 +25,8 @@ import (
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func Test_dockerFilePath(t *testing.T) {
@@ -134,8 +136,79 @@ func TestGetLocalImagesDigests_PreStartHook(t *testing.T) {
 	apiClient.EXPECT().ImageInspect(gomock.Any(), "alpine:3.19").
 		Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:hook"}}, nil)
 
-	images, err := tested.getLocalImagesDigests(t.Context(), project)
+	images, _, err := tested.getLocalImagesDigests(t.Context(), project)
 	assert.NilError(t, err)
 	assert.Equal(t, images["alpine:3.20"].ID, "sha256:service")
 	assert.Equal(t, images["alpine:3.19"].ID, "sha256:hook")
+}
+
+func TestResolveImageVolumes(t *testing.T) {
+	images := map[string]api.ImageSummary{
+		"content:1": {ID: "sha256:content"},
+		"p-source":  {ID: "sha256:built"},
+		"assets:2":  {ID: "sha256:assets"},
+		"p-web":     {ID: "sha256:web"},
+	}
+	imageVolume := func(source, target string) types.ServiceVolumeConfig {
+		return types.ServiceVolumeConfig{Type: types.VolumeTypeImage, Source: source, Target: target}
+	}
+
+	t.Run("source is an image name", func(t *testing.T) {
+		service := types.ServiceConfig{
+			Name:         "web",
+			CustomLabels: types.Labels{},
+			Volumes:      []types.ServiceVolumeConfig{imageVolume("content:1", "/data")},
+		}
+		resolveImageVolumes(&service, images, "p")
+		assert.Equal(t, service.Volumes[0].Source, "content:1")
+		assert.Equal(t, service.CustomLabels[api.ImageVolumeDigestLabel], "/data=sha256:content")
+	})
+
+	t.Run("source is another service resolves to its image name", func(t *testing.T) {
+		service := types.ServiceConfig{
+			Name:         "web",
+			CustomLabels: types.Labels{},
+			Volumes:      []types.ServiceVolumeConfig{imageVolume("source", "/data")},
+		}
+		resolveImageVolumes(&service, images, "p")
+		// the mount Source must stay a daemon-resolvable name, never a digest
+		assert.Equal(t, service.Volumes[0].Source, "p-source")
+		assert.Equal(t, service.CustomLabels[api.ImageVolumeDigestLabel], "/data=sha256:built")
+	})
+
+	t.Run("unresolvable source is left untouched and unlabelled", func(t *testing.T) {
+		service := types.ServiceConfig{
+			Name:         "web",
+			CustomLabels: types.Labels{},
+			Volumes:      []types.ServiceVolumeConfig{imageVolume("ghost:1", "/data")},
+		}
+		resolveImageVolumes(&service, images, "p")
+		assert.Equal(t, service.Volumes[0].Source, "ghost:1")
+		_, labelled := service.CustomLabels[api.ImageVolumeDigestLabel]
+		assert.Assert(t, !labelled)
+	})
+
+	t.Run("several volumes produce a deterministic sorted label", func(t *testing.T) {
+		service := types.ServiceConfig{
+			Name:         "web",
+			CustomLabels: types.Labels{},
+			Volumes: []types.ServiceVolumeConfig{
+				imageVolume("assets:2", "/b"),
+				imageVolume("content:1", "/a"),
+			},
+		}
+		resolveImageVolumes(&service, images, "p")
+		assert.Equal(t, service.CustomLabels[api.ImageVolumeDigestLabel], "/a=sha256:content,/b=sha256:assets")
+	})
+
+	t.Run("no image volumes writes no label", func(t *testing.T) {
+		service := types.ServiceConfig{
+			Name:         "web",
+			CustomLabels: types.Labels{},
+			Volumes:      []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Source: "vol", Target: "/data"}},
+		}
+		resolveImageVolumes(&service, images, "p")
+		_, labelled := service.CustomLabels[api.ImageVolumeDigestLabel]
+		assert.Assert(t, !labelled)
+	})
 }

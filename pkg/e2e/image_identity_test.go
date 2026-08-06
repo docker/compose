@@ -37,11 +37,6 @@ import (
 // `up` MUST be idempotent: running it twice in a row without any change
 // must not recreate any container.
 func TestUpIdempotentContainerdStore(t *testing.T) {
-	// TODO(image-identity): temporary skip — this test is red by design until
-	// the canonical content-digest producer lands (next commit of this PR).
-	// Remove this skip in that commit; the test is the acceptance criterion.
-	t.Skip("skipped until the canonical image content-digest producer lands (see PR commits)")
-
 	c := NewCLI(t)
 	requireContainerdStore(t, c)
 

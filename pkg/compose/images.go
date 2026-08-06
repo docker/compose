@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
@@ -31,6 +32,8 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -126,22 +129,19 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	return summary, err
 }
 
-func (s *composeService) getImageSummaries(ctx context.Context, repoTags []string) (map[string]api.ImageSummary, error) {
-	summary := map[string]api.ImageSummary{}
-	l := sync.Mutex{}
-
-	withManifests, err := s.manifestsSupported(ctx)
+// inspectLocalImages inspects the given references in parallel, requesting
+// per-manifest data on engines that support it. References not found locally
+// are simply absent from the result.
+func (s *composeService) inspectLocalImages(ctx context.Context, repoTags []string) (map[string]client.ImageInspectResult, error) {
+	opts, err := s.imageInspectOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	inspections := map[string]client.ImageInspectResult{}
+	l := sync.Mutex{}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, repoTag := range repoTags {
 		eg.Go(func() error {
-			var opts []client.ImageInspectOption
-			if withManifests {
-				opts = append(opts, client.ImageInspectWithManifests(true))
-			}
 			inspect, err := s.apiClient().ImageInspect(ctx, repoTag, opts...)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
@@ -149,29 +149,47 @@ func (s *composeService) getImageSummaries(ctx context.Context, repoTags []strin
 				}
 				return fmt.Errorf("unable to get image '%s': %w", repoTag, err)
 			}
-			tag := ""
-			repository := ""
-			ref, err := reference.ParseDockerRef(repoTag)
-			if err == nil {
-				// ParseDockerRef will reject a local image ID
-				repository = reference.FamiliarName(ref)
-				if tagged, ok := ref.(reference.Tagged); ok {
-					tag = tagged.Tag()
-				}
-			}
 			l.Lock()
-			summary[repoTag] = api.ImageSummary{
-				ID:          contentDigest(inspect.InspectResponse, platforms.Default()),
-				Repository:  repository,
-				Tag:         tag,
-				Size:        inspect.Size,
-				LastTagTime: inspect.Metadata.LastTagTime,
-			}
+			inspections[repoTag] = inspect
 			l.Unlock()
 			return nil
 		})
 	}
-	return summary, eg.Wait()
+	return inspections, eg.Wait()
+}
+
+// imageInspectOptions requests per-manifest data when the engine supports it
+// (see manifestsSupported).
+func (s *composeService) imageInspectOptions(ctx context.Context) ([]client.ImageInspectOption, error) {
+	withManifests, err := s.manifestsSupported(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !withManifests {
+		return nil, nil
+	}
+	return []client.ImageInspectOption{client.ImageInspectWithManifests(true)}, nil
+}
+
+func imageSummary(repoTag string, inspect client.ImageInspectResult) api.ImageSummary {
+	tag := ""
+	repository := ""
+	ref, err := reference.ParseDockerRef(repoTag)
+	if err == nil {
+		// ParseDockerRef will reject a local image ID
+		repository = reference.FamiliarName(ref)
+		if tagged, ok := ref.(reference.Tagged); ok {
+			tag = tagged.Tag()
+		}
+	}
+	id, _, _ := localContentDigest(inspect, "")
+	return api.ImageSummary{
+		ID:          id,
+		Repository:  repository,
+		Tag:         tag,
+		Size:        inspect.Size,
+		LastTagTime: inspect.Metadata.LastTagTime,
+	}
 }
 
 // manifestsSupported reports whether the engine can return per-manifest data on
@@ -185,45 +203,107 @@ func (s *composeService) manifestsSupported(ctx context.Context) (bool, error) {
 	return versions.GreaterThanOrEqualTo(version, apiVersion148), nil
 }
 
-// inspectContentDigest inspects ref, requesting per-manifest data on engines
-// that support it, and returns the digest identifying the image's runnable
-// content for the default platform. Callers that record an image identity
-// compose later compares for staleness must go through this, so every such
-// identity is computed the same way — see contentDigest.
-func (s *composeService) inspectContentDigest(ctx context.Context, ref string) (string, error) {
-	withManifests, err := s.manifestsSupported(ctx)
-	if err != nil {
-		return "", err
+// serviceImageDigest returns the digest to record in a service's
+// com.docker.compose.image label. A platform-pinned service uses the digest
+// resolved in-process from the pre-pull inspect while it is still current;
+// once the shared summary entry was refreshed by a pull or build during the
+// run, that resolution is stale AND the refreshed digest was resolved for the
+// platform of whichever service triggered the refresh — services sharing the
+// image with a different pinned platform re-resolve theirs with one extra
+// inspect (only in that refresh case; steady-state runs never get here). Best
+// effort: the shared digest is kept when the pinned platform can't be
+// satisfied or inspected.
+func (s *composeService) serviceImageDigest(ctx context.Context, service types.ServiceConfig, imgName string, img api.ImageSummary, pinnedDigests map[string]pinnedImageDigest) string {
+	if service.Platform == "" {
+		return img.ID
 	}
-	var opts []client.ImageInspectOption
-	if withManifests {
-		opts = append(opts, client.ImageInspectWithManifests(true))
+	if pinned, ok := pinnedDigests[service.Name]; ok && pinned.from == img.ID {
+		return pinned.digest
 	}
-	inspected, err := s.apiClient().ImageInspect(ctx, ref, opts...)
-	if err != nil {
-		return "", err
+	digest, satisfied, err := s.inspectLocalContent(ctx, imgName, service.Platform)
+	if err != nil || !satisfied {
+		logrus.Debugf("unable to resolve %s for pinned platform %s, keeping shared digest: satisfied=%v err=%v", imgName, service.Platform, satisfied, err)
+		return img.ID
 	}
-	return contentDigest(inspected.InspectResponse, platforms.Default()), nil
+	return digest
 }
 
-// contentDigest returns the digest identifying an image's runnable content
-// (config + layers) for the given platform. With BuildKit provenance
-// attestations enabled (the default since recent Buildx/BuildKit), the image is
-// stored as an index whose top-level digest (inspect.ID) also covers the
-// attestation manifest, so it changes on every build even when the runnable
-// image is unchanged — making compose recreate containers needlessly (see
-// https://github.com/docker/compose/issues/13636). The digest of the "image"
-// kind manifest reflects only the image content, which is what compose needs to
-// detect staleness.
+// canonicalBuiltDigest resolves the canonical content digest of a just-built
+// image so the recorded identity matches what later runs compute for the same
+// local image. Registry-only builds (push-only, multi-platform without load)
+// are not locally inspectable and keep the builder-reported digest: a volatile
+// but honest value — an actual rebuild is still detected — preferred over a
+// stable marker that would hide real image changes. Best effort: never fails
+// an already-successful build.
+func (s *composeService) canonicalBuiltDigest(ctx context.Context, imageRef, platform, builderDigest string) string {
+	id, _, err := s.inspectLocalContent(ctx, imageRef, platform)
+	if err != nil {
+		logrus.Debugf("unable to resolve content digest for built image %s, keeping builder-reported digest: %v", imageRef, err)
+		return builderDigest
+	}
+	return id
+}
+
+// localContentDigest returns the digest identifying an inspected image's
+// runnable content (config + layers) for the requested platform (empty means
+// the host default), plus whether the local image satisfies that platform.
+// Note the satisfied bool is only meaningful for an explicitly requested
+// platform: with platform empty, the manifests path reports host-default
+// satisfaction while the manifest-less path always reports true.
 //
-// Selection is platform-aware and deterministic so the same image always maps
-// to the same digest across rebuilds: the available manifest matching the
-// requested platform wins; a lone available image manifest is used as-is
-// (single-platform images, whatever their platform); otherwise we fall back to
-// inspect.ID (engines that don't report manifests — where inspect.ID is already
-// the config digest — or a multi-platform image whose requested platform isn't
-// available locally, which the caller then treats as a platform miss).
-func contentDigest(inspect image.InspectResponse, platform platforms.MatchComparer) string {
+// With BuildKit provenance attestations enabled (the default since recent
+// Buildx/BuildKit), the image is stored as an index whose top-level digest
+// (inspect.ID) also covers the attestation manifest, so it changes on every
+// build even when the runnable image is unchanged — making compose recreate
+// containers needlessly (see
+// https://github.com/docker/compose/issues/13636). The digest of the "image"
+// kind manifest reflects only the image content, which is what compose needs
+// to detect staleness. Images inspected without manifest data (engines that
+// can't report them) keep the plain image ID — already the config digest —
+// with platform satisfaction from the inspect's flat platform fields, the
+// pre-manifest behavior. Every image identity compose records for staleness
+// comparison must be computed through here, whatever the image's provenance
+// (pulled, built, already local), so any two runs produce comparable values.
+func localContentDigest(inspect client.ImageInspectResult, platform string) (string, bool, error) {
+	var matcher platforms.Matcher = platforms.Default()
+	pinned := platform != ""
+	if pinned {
+		p, err := platforms.Parse(platform)
+		if err != nil {
+			return "", false, err
+		}
+		matcher = platforms.NewMatcher(p)
+	}
+	if len(inspect.Manifests) > 0 {
+		id, ok := matchLocalManifest(inspect.InspectResponse, matcher)
+		return id, ok, nil
+	}
+	ok := true
+	if pinned {
+		ok = matcher.Match(specs.Platform{
+			Architecture: inspect.Architecture,
+			OS:           inspect.Os,
+			Variant:      inspect.Variant,
+		})
+	}
+	return inspect.ID, ok, nil
+}
+
+// matchLocalManifest selects, among the locally available image manifests of
+// inspect, the digest identifying the runnable content for the requested
+// platform, and reports whether the local content actually satisfies that
+// platform. Selection is platform-aware and deterministic so the same image
+// always maps to the same digest across rebuilds: the available manifest
+// matching the requested platform wins (satisfied); a lone available image
+// manifest keeps its digest — single-platform images stay identifiable
+// whatever their platform — without satisfying a different requested
+// platform; otherwise fall back to inspect.ID, which never satisfies the
+// request.
+//
+// Both the digest producers and the platform checks must go through this
+// single selection so the digest recorded and the platform validated always
+// refer to the same manifest.
+func matchLocalManifest(inspect image.InspectResponse, platform platforms.Matcher) (string, bool) {
 	var available []image.ManifestSummary
 	for _, m := range inspect.Manifests {
 		if m.Kind == image.ManifestKindImage && m.Available {
@@ -232,11 +312,26 @@ func contentDigest(inspect image.InspectResponse, platform platforms.MatchCompar
 	}
 	for _, m := range available {
 		if m.ImageData != nil && platform.Match(m.ImageData.Platform) {
-			return m.ID
+			return m.ID, true
 		}
 	}
 	if len(available) == 1 {
-		return available[0].ID
+		return available[0].ID, false
 	}
-	return inspect.ID
+	return inspect.ID, false
+}
+
+// inspectLocalContent inspects ref and returns its canonical content digest
+// for the requested platform (empty means the host default), plus whether the
+// local image satisfies that platform — see localContentDigest.
+func (s *composeService) inspectLocalContent(ctx context.Context, ref string, platform string) (string, bool, error) {
+	opts, err := s.imageInspectOptions(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	inspected, err := s.apiClient().ImageInspect(ctx, ref, opts...)
+	if err != nil {
+		return "", false, err
+	}
+	return localContentDigest(inspected, platform)
 }
