@@ -166,19 +166,34 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 	for name, service := range project.Services {
 		imageName := api.GetImageNameOrDefault(service, project.Name)
 
-		inspect, err := inspectWithPull(ctx, dockerCLI, imageName)
-		if err != nil {
-			return nil, err
+		var inspect image.InspectResponse
+		if service.Build != nil && service.Image == "" {
+			result, err := dockerCLI.Client().ImageInspect(ctx, imageName)
+			if err != nil {
+				if !errdefs.IsNotFound(err) {
+					return nil, err
+				}
+				logrus.Warnf("image %s for service %s not found locally; Dockerfile-exposed ports will not be included — run `docker compose build` first to include them", imageName, name)
+			}
+			inspect = result.InspectResponse
+		} else {
+			var err error
+			inspect, err = inspectWithPull(ctx, dockerCLI, imageName)
+			if err != nil {
+				return nil, err
+			}
 		}
 		service.Image = imageName
 		exposed := utils.Set[string]{}
 		exposed.AddAll(service.Expose...)
-		for port := range inspect.Config.ExposedPorts {
-			p, err := network.ParsePort(port)
-			if err != nil {
-				return nil, err
+		if inspect.Config != nil {
+			for port := range inspect.Config.ExposedPorts {
+				p, err := network.ParsePort(port)
+				if err != nil {
+					return nil, err
+				}
+				exposed.Add(strconv.Itoa(int(p.Num())))
 			}
-			exposed.Add(strconv.Itoa(int(p.Num())))
 		}
 		for _, port := range service.Ports {
 			exposed.Add(strconv.Itoa(int(port.Target)))
