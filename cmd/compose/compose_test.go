@@ -17,9 +17,11 @@
 package compose
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -75,4 +77,29 @@ func TestUpLoadsConfigBeforeDockerConnection(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.ErrorContains(t, err, "is a directory")
+}
+
+func TestUpChecksDockerConnectionBeforeDefaultConfigDiscovery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	wd := t.TempDir()
+	t.Chdir(wd)
+
+	socketErr := errors.New("permission denied while trying to connect to the docker API at unix:///var/run/docker.sock")
+	apiClient := mocks.NewMockAPIClient(ctrl)
+	apiClient.EXPECT().
+		Ping(gomock.Any(), client.PingOptions{}).
+		Return(client.PingResult{}, socketErr)
+
+	cli := mocks.NewMockCli(ctrl)
+	cli.EXPECT().Client().Return(apiClient)
+
+	cmd := upCommand(&ProjectOptions{}, cli, &BackendOptions{})
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{"-d"})
+
+	err := cmd.Execute()
+
+	assert.ErrorIs(t, err, socketErr)
 }

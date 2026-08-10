@@ -21,12 +21,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	composecli "github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/consts"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -124,7 +128,10 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 			if !cmd.Flags().Changed("remove-orphans") {
 				create.removeOrphans = utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
 			}
-			return validateFlags(&up, &create)
+			if err := validateFlags(&up, &create); err != nil {
+				return err
+			}
+			return checkDockerConnectionBeforeDefaultConfigDiscovery(ctx, p, dockerCli)
 		}),
 		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
 			create.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
@@ -184,6 +191,76 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 		return pflag.NormalizedName(name)
 	})
 	return upCmd
+}
+
+func checkDockerConnectionBeforeDefaultConfigDiscovery(ctx context.Context, projectOptions *ProjectOptions, dockerCli command.Cli) error {
+	if len(projectOptions.ConfigPaths) > 0 {
+		return nil
+	}
+	if _, ok := os.LookupEnv(consts.ComposeFilePath); ok {
+		return nil
+	}
+	if len(projectOptions.EnvFiles) > 0 {
+		return nil
+	}
+	if implicitDotEnvDefinesComposeFile(projectOptions.ProjectDir) {
+		return nil
+	}
+	if hasDefaultConfigPath(projectOptions.ProjectDir) {
+		return nil
+	}
+
+	_, err := dockerCli.Client().Ping(ctx, client.PingOptions{})
+	return err
+}
+
+func implicitDotEnvDefinesComposeFile(projectDir string) bool {
+	projectDir, ok := implicitProjectDir(projectDir)
+	if !ok {
+		return false
+	}
+	file, err := os.Open(filepath.Join(projectDir, ".env"))
+	if err != nil {
+		return false
+	}
+	defer func() { _ = file.Close() }()
+
+	vars := map[string]string{}
+	if err := rawEnv(file, ".env", vars, os.LookupEnv); err != nil {
+		return true
+	}
+	_, ok = vars[consts.ComposeFilePath]
+	return ok
+}
+
+func hasDefaultConfigPath(projectDir string) bool {
+	projectDir, ok := implicitProjectDir(projectDir)
+	if !ok {
+		return false
+	}
+	for {
+		for _, name := range composecli.DefaultFileNames {
+			if _, err := os.Stat(filepath.Join(projectDir, name)); err == nil {
+				return true
+			}
+		}
+		parent := filepath.Dir(projectDir)
+		if parent == projectDir {
+			return false
+		}
+		projectDir = parent
+	}
+}
+
+func implicitProjectDir(projectDir string) (string, bool) {
+	if projectDir != "" {
+		return projectDir, true
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", false
+	}
+	return wd, true
 }
 
 //nolint:gocyclo
