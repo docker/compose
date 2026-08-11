@@ -21,8 +21,11 @@ package e2e
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 )
 
 func TestCascadeStop(t *testing.T) {
@@ -37,6 +40,32 @@ func TestCascadeStop(t *testing.T) {
 	assert.Assert(t, strings.Contains(res.Combined(), "exit-1 exited with code 0"), res.Combined())
 	// no --exit-code-from, so this is not an error
 	assert.Equal(t, res.ExitCode, 0)
+}
+
+func TestCascadeIgnoresOneOffContainer(t *testing.T) {
+	const projectName = "compose-e2e-cascade-oneoff"
+	c := NewCLI(t, WithEnv("COMPOSE_PROJECT_NAME="+projectName))
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "down")
+	})
+
+	cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/cascade/compose.yaml",
+		"up", "--abort-on-container-exit", "--menu=false", "running")
+	res := icmd.StartCmd(cmd)
+	t.Cleanup(func() {
+		_ = res.Cmd.Process.Kill()
+	})
+
+	poll.WaitOn(t, expectOutput(res, "Attaching to running-1"),
+		poll.WithDelay(100*time.Millisecond), poll.WithTimeout(30*time.Second))
+
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/cascade/compose.yaml",
+		"run", "--rm", "--no-deps", "running", "/bin/true")
+
+	time.Sleep(3 * time.Second)
+
+	assert.Assert(t, !strings.Contains(res.Combined(), "Aborting on container exit"), res.Combined())
+	RequireServiceState(t, c, "running", "running")
 }
 
 func TestCascadeFail(t *testing.T) {
