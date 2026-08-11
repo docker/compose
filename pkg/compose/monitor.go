@@ -52,6 +52,76 @@ func (c *monitor) withServices(services []string) {
 }
 
 // Start runs monitor to detect application events and return after termination
+//
+// The monitor consumes the engine's event stream, filtered on this project's
+// containers, and has to interpret event sequences that depend on how a
+// container terminates or comes back. The sequences below were mapped from
+// moby's daemon sources and verified against a live engine (v29.x);
+// meaningful event attributes are in parentheses:
+//
+//	container process exits on its own, whatever the exit code:
+//	    die (exitCode) — and nothing else: no stop event is emitted
+//
+//	restart policy in action, the daemon restarts the container after exit:
+//	    die (exitCode) → start → die → start → ...
+//	    No restart event is ever emitted for policy-driven restarts, and no
+//	    event at all while the container waits in restart backoff (status
+//	    "restarting", no process running); ContainerInspect reports
+//	    State.Restarting=true in that window.
+//
+//	docker stop (or compose stop) on a running container:
+//	    kill (signal=stop signal, SIGTERM by default)
+//	    [→ kill (signal=9, i.e. SIGKILL) when the grace period expires]
+//	    → stop + die (exitCode)
+//	    The relative order of stop and die is not guaranteed: stop is emitted
+//	    by the ContainerStop call completing, die by the asynchronous exit
+//	    notification from containerd. A manual stop cancels the restart policy.
+//
+//	docker stop on a container in restart backoff (see #13985):
+//	    stop — and nothing else: with no process to signal, the daemon skips
+//	    the kill event, no die is ever produced, and the pending restart is
+//	    cancelled.
+//
+//	docker restart, and the ContainerRestart API in general (also used by
+//	compose watch sync+restart, see #13161):
+//	    kill → stop + die → start → restart
+//	    A transient stop/die pair is emitted even though the container is
+//	    coming back. State.Restarting is never set on this path — the only
+//	    daemon code setting it is the restart-policy one — so the container is
+//	    briefly reported as "exited" between die and start, then "running"
+//	    again (https://github.com/moby/moby/issues/45538); an inspection
+//	    triggered by the die event usually, but not reliably, lands after the
+//	    new start. The restart action fires last, after start.
+//
+//	docker kill:
+//	    kill (signal=9, i.e. SIGKILL) → die (exitCode) — no stop event
+//	    A non-fatal signal (docker kill -s HUP) emits kill alone, with no die
+//	    unless the process exits.
+//
+//	OOM-killed container:
+//	    oom → die (exitCode, typically 137)
+//	    The die event carries no OOM-specific attribute, and a restart policy
+//	    applies as for any other exit (start follows). An oom can also occur
+//	    with no die at all, when the kernel kills a child process and the
+//	    container's main process survives.
+//
+//	docker rm -f on a running container:
+//	    kill → die → destroy
+//
+//	docker rm on a stopped container, docker rm -f on a restarting one:
+//	    destroy — and nothing else
+//
+// Other actions (pause, unpause, attach, exec_*, health_status: *, ...) may
+// show up in the stream but don't affect container tracking. Note that
+// exec_create, exec_start and health_status actions embed variable data in
+// the action name itself (e.g. "health_status: healthy"), which would break
+// exact matching. On daemon shutdown containers are stopped (kill/die/stop)
+// and the event stream usually delivers those events before it breaks, so a
+// daemon restart is typically observed as a per-container kill/die/stop
+// sequence followed by Events returning an error. A container that dies
+// while the daemon itself is down never gets a die event at all: on daemon
+// restore it is just recorded as exited, and containers the restore restarts
+// per policy only emit start.
 func (c *monitor) Start(ctx context.Context) error {
 	// containers is the set of container IDs the application is based on
 	containers, err := c.initialContainers(ctx)
