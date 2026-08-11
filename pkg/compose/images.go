@@ -32,6 +32,7 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
+	godigest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -73,60 +74,84 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range containers {
 		eg.Go(func() error {
-			img, err := s.apiClient().ImageInspect(ctx, c.Image)
+			img, err := s.containerImageSummary(ctx, c, withPlatform)
 			if err != nil {
 				return err
 			}
-			id := img.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
-
-			if withPlatform && c.ImageManifestDescriptor != nil && c.ImageManifestDescriptor.Platform != nil {
-				img, err = s.apiClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
-				if err != nil {
-					return err
-				}
-			}
-
-			var repository, tag string
-			ref, err := reference.ParseDockerRef(c.Image)
-			if err == nil {
-				// ParseDockerRef will reject a local image ID
-				repository = reference.FamiliarName(ref)
-				if tagged, ok := ref.(reference.Tagged); ok {
-					tag = tagged.Tag()
-				}
-			}
-
-			var created *time.Time
-			if img.Created != "" {
-				t, err := time.Parse(time.RFC3339Nano, img.Created)
-				if err != nil {
-					return err
-				}
-				created = &t
-			}
-
 			mux.Lock()
 			defer mux.Unlock()
-			summary[getCanonicalContainerName(c)] = api.ImageSummary{
-				ID:         id,
-				Repository: repository,
-				Tag:        tag,
-				Platform: platforms.Platform{
-					Architecture: img.Architecture,
-					OS:           img.Os,
-					OSVersion:    img.OsVersion,
-					Variant:      img.Variant,
-				},
-				Size:        img.Size,
-				Created:     created,
-				LastTagTime: img.Metadata.LastTagTime,
-			}
+			summary[getCanonicalContainerName(c)] = img
 			return nil
 		})
 	}
 
 	err = eg.Wait()
 	return summary, err
+}
+
+// containerImageSummary describes the image a container was created from. The
+// image record may not exist anymore: under the containerd image store the
+// daemon drops the dangling old index when a rebuild with identical content
+// moves the tag — without compose recreating the container (see #13636) — and
+// `docker rmi -f` may remove the image of a running container. In that case
+// report what the container itself knows rather than failing the whole
+// listing (#14014).
+func (s *composeService) containerImageSummary(ctx context.Context, c container.Summary, withPlatform bool) (api.ImageSummary, error) {
+	var repository, tag string
+	if _, err := godigest.Parse(c.Image); err != nil {
+		// c.Image is a reference, not the raw image ID the engine reports
+		// when the image record is gone or its tag was moved
+		if ref, err := reference.ParseDockerRef(c.Image); err == nil {
+			repository = reference.FamiliarName(ref)
+			if tagged, ok := ref.(reference.Tagged); ok {
+				tag = tagged.Tag()
+			}
+		}
+	}
+
+	img, err := s.apiClient().ImageInspect(ctx, c.Image)
+	if errdefs.IsNotFound(err) {
+		return api.ImageSummary{
+			ID:         c.ImageID,
+			Repository: repository,
+			Tag:        tag,
+		}, nil
+	}
+	if err != nil {
+		return api.ImageSummary{}, err
+	}
+	id := img.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
+
+	if withPlatform && c.ImageManifestDescriptor != nil && c.ImageManifestDescriptor.Platform != nil {
+		img, err = s.apiClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
+		if err != nil {
+			return api.ImageSummary{}, err
+		}
+	}
+
+	var created *time.Time
+	if img.Created != "" {
+		t, err := time.Parse(time.RFC3339Nano, img.Created)
+		if err != nil {
+			return api.ImageSummary{}, err
+		}
+		created = &t
+	}
+
+	return api.ImageSummary{
+		ID:         id,
+		Repository: repository,
+		Tag:        tag,
+		Platform: platforms.Platform{
+			Architecture: img.Architecture,
+			OS:           img.Os,
+			OSVersion:    img.OsVersion,
+			Variant:      img.Variant,
+		},
+		Size:        img.Size,
+		Created:     created,
+		LastTagTime: img.Metadata.LastTagTime,
+	}, nil
 }
 
 // inspectLocalImages inspects the given references in parallel, requesting

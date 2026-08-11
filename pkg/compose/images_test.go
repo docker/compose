@@ -94,6 +94,42 @@ func TestImages(t *testing.T) {
 	assert.DeepEqual(t, images, expected)
 }
 
+func TestImagesMissingImageRecord(t *testing.T) {
+	// A container may reference an image record that no longer exists: under
+	// the containerd image store, a rebuild with identical content moves the
+	// tag and the daemon drops the old index the running container was created
+	// from (https://github.com/docker/compose/issues/14014), and `docker rmi
+	// -f` may remove the image of a running container. The listing must
+	// degrade to what the container itself knows instead of failing.
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	args := projectFilter(strings.ToLower(testProject))
+	listOpts := client.ContainerListOptions{All: true, Filters: args}
+	api.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{APIVersion: "1.96"}, nil).AnyTimes()
+	api.EXPECT().ClientVersion().Return("1.96").AnyTimes()
+
+	// the raw image ID the engine reports once the image record is gone
+	const goneID = "sha256:52c159e21b703f2c750d0bfd8d0af93324b46c0df0859331fb9489b7ec033d0c"
+	gone := containerDetail("service1", "123", container.StateRunning, goneID)
+	gone.ImageID = goneID
+	api.EXPECT().ImageInspect(anyCancellableContext(), goneID).
+		Return(client.ImageInspectResult{}, errdefs.ErrNotFound)
+	api.EXPECT().ContainerList(t.Context(), listOpts).Return(client.ContainerListResult{
+		Items: []container.Summary{gone},
+	}, nil)
+
+	images, err := tested.Images(t.Context(), strings.ToLower(testProject), compose.ImagesOptions{})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, images, map[string]compose.ImageSummary{
+		"123": {ID: goneID},
+	})
+}
+
 func imageInspect(id string, imageReference string, size int64, created string) image.InspectResponse {
 	return image.InspectResponse{
 		ID: id,
