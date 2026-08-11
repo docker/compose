@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -60,6 +61,17 @@ func (t testWatcher) Errors() chan error {
 }
 
 type stdLogger struct{}
+
+const (
+	initialSyncTestFile       = "test.txt"
+	initialSyncTestContent    = "hello"
+	initialSyncTestService    = "test"
+	initialSyncTestDirTarget  = "/app/src"
+	initialSyncTestFileTarget = "/app/test.txt"
+	initialSyncTestBindTarget = "/app/bind"
+	initialSyncTestFileMode   = 0o600
+	initialSyncTestFileAge    = time.Hour
+)
 
 func (s stdLogger) Log(containerName, message string) {
 	fmt.Printf("%s: %s\n", containerName, message)
@@ -193,6 +205,85 @@ func newFakeSyncer() *fakeSyncer {
 func (f *fakeSyncer) Sync(ctx context.Context, service string, paths []*sync.PathMapping) error {
 	f.synced <- paths
 	return nil
+}
+
+func TestInitialSyncFilesIncludesFilesOlderThanImage(t *testing.T) {
+	hostDir := t.TempDir()
+	hostFile := filepath.Join(hostDir, initialSyncTestFile)
+	assert.NilError(t, os.WriteFile(hostFile, []byte(initialSyncTestContent), initialSyncTestFileMode))
+	oldTime := time.Now().Add(-initialSyncTestFileAge)
+	assert.NilError(t, os.Chtimes(hostFile, oldTime, oldTime))
+
+	paths, err := (&composeService{}).initialSyncFiles(types.ServiceConfig{Name: initialSyncTestService}, types.Trigger{
+		Path:   hostDir,
+		Target: initialSyncTestDirTarget,
+	}, watch.EmptyMatcher{})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: filepath.Join(initialSyncTestDirTarget, initialSyncTestFile),
+	}})
+}
+
+func TestInitialSyncIncludesSingleFileOlderThanImage(t *testing.T) {
+	hostDir := t.TempDir()
+	hostFile := filepath.Join(hostDir, initialSyncTestFile)
+	assert.NilError(t, os.WriteFile(hostFile, []byte(initialSyncTestContent), initialSyncTestFileMode))
+	oldTime := time.Now().Add(-initialSyncTestFileAge)
+	assert.NilError(t, os.Chtimes(hostFile, oldTime, oldTime))
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+		Name:  initialSyncTestService,
+		Build: &types.BuildConfig{Context: hostDir},
+	}, types.Trigger{
+		Path:   hostFile,
+		Target: initialSyncTestFileTarget,
+	}, syncer)
+	assert.NilError(t, err)
+
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: initialSyncTestFileTarget,
+	}})
+}
+
+// TestWatchTriggerPathsRunsInitialSyncAndSkipsBindMounts covers the wiring
+// between a sync trigger requesting an initial sync and initialSync itself: a
+// bind-mounted watch path is dropped from the monitored paths and never
+// synced, while a regular one is monitored and synced up front.
+func TestWatchTriggerPathsRunsInitialSyncAndSkipsBindMounts(t *testing.T) {
+	hostDir := t.TempDir()
+	hostFile := filepath.Join(hostDir, initialSyncTestFile)
+	assert.NilError(t, os.WriteFile(hostFile, []byte(initialSyncTestContent), initialSyncTestFileMode))
+	oldTime := time.Now().Add(-initialSyncTestFileAge)
+	assert.NilError(t, os.Chtimes(hostFile, oldTime, oldTime))
+
+	bindMounted := t.TempDir()
+	service := types.ServiceConfig{
+		Name:  initialSyncTestService,
+		Build: &types.BuildConfig{Context: hostDir},
+		Volumes: []types.ServiceVolumeConfig{{
+			Type:   types.VolumeTypeBind,
+			Source: bindMounted,
+			Target: initialSyncTestBindTarget,
+			Bind:   &types.ServiceVolumeBind{},
+		}},
+	}
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+
+	paths, err := (&composeService{}).watchTriggerPaths(t.Context(), service, &types.DevelopConfig{
+		Watch: []types.Trigger{
+			{Path: bindMounted, Action: types.WatchActionSync, Target: initialSyncTestBindTarget, InitialSync: true},
+			{Path: hostDir, Action: types.WatchActionSync, Target: initialSyncTestDirTarget, InitialSync: true},
+		},
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []string{hostDir})
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: filepath.Join(initialSyncTestDirTarget, initialSyncTestFile),
+	}})
 }
 
 // TestPruneDanglingImagesOnRebuild verifies the post-rebuild prune only
