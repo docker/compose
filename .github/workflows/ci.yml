@@ -165,43 +165,46 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}${{ matrix.store && format(', {0}', matrix.store) || '' }})
+    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}, ${{ matrix.store }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          # current stable
+          # current stable, both image store backends: several digest-identity
+          # bugs only manifest on one of them (graphdriver vs containerd)
           - mode: plugin
             engine: 29
             channel: stable
+            store: graphdriver
+          - mode: plugin
+            engine: 29
+            channel: stable
+            store: containerd
           - mode: standalone
             engine: 29
             channel: stable
+            store: graphdriver
+          - mode: standalone
+            engine: 29
+            channel: stable
+            store: containerd
 
           # old stable (latest major - 1)
           - mode: plugin
             engine: 28
             channel: oldstable
+            store: graphdriver
           - mode: standalone
             engine: 28
             channel: oldstable
-
-          # containerd image store (non-graphdriver digest behavior)
-          - mode: plugin
-            engine: 29
-            channel: stable
-            store: containerd
+            store: graphdriver
     steps:
       - name: Prepare
         run: |
           mode=${{ matrix.mode }}
           engine=${{ matrix.engine }}
           store=${{ matrix.store }}
-          pair="${mode}-${engine}"
-          if [ -n "$store" ]; then
-            pair="${pair}-${store}"
-          fi
-          echo "MODE_ENGINE_PAIR=${pair}" >> $GITHUB_ENV
+          echo "MODE_ENGINE_PAIR=${mode}-${engine}-${store}" >> $GITHUB_ENV
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
