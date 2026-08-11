@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsevents"
+	"github.com/sirupsen/logrus"
 
 	pathutil "github.com/docker/compose/v5/internal/paths"
 )
@@ -38,8 +39,13 @@ type fseventNotify struct {
 	errors chan error
 	stop   chan struct{}
 
-	pathsWereWatching map[string]any
-	closeOnce         sync.Once
+	// watchPaths are the paths registered with the FSEvents stream.
+	watchPaths []string
+	// notifyList holds the original trigger paths.
+	notifyList map[string]bool
+	// ignore maps each trigger path (from notifyList) to its own isolated PathMatcher
+	ignore    map[string]PathMatcher
+	closeOnce sync.Once
 }
 
 func (d *fseventNotify) loop() {
@@ -55,10 +61,14 @@ func (d *fseventNotify) loop() {
 			for _, e := range events {
 				e.Path = filepath.Join(string(os.PathSeparator), e.Path)
 
-				_, isPathWereWatching := d.pathsWereWatching[e.Path]
-				if e.Flags&fsevents.ItemIsDir == fsevents.ItemIsDir && e.Flags&fsevents.ItemCreated == fsevents.ItemCreated && isPathWereWatching {
+				isTriggerRoot := d.notifyList[e.Path]
+				if e.Flags&fsevents.ItemIsDir == fsevents.ItemIsDir && e.Flags&fsevents.ItemCreated == fsevents.ItemCreated && isTriggerRoot {
 					// This is the first create for the path that we're watching. We always get exactly one of these
 					// even after we get the HistoryDone event. Skip it.
+					continue
+				}
+
+				if !d.shouldNotify(e.Path) {
 					continue
 				}
 
@@ -68,26 +78,32 @@ func (d *fseventNotify) loop() {
 	}
 }
 
-// Add a path to be watched. Should only be called during initialization.
-func (d *fseventNotify) initAdd(name string) {
+// addStreamPath registers an existing ancestor path with the FSEvents stream.
+func (d *fseventNotify) addStreamPath(name string) {
 	d.stream.Paths = append(d.stream.Paths, name)
-
-	if d.pathsWereWatching == nil {
-		d.pathsWereWatching = make(map[string]any)
-	}
-	d.pathsWereWatching[name] = struct{}{}
 }
 
 func (d *fseventNotify) Start() error {
-	if len(d.stream.Paths) == 0 {
+	if len(d.watchPaths) == 0 {
 		return nil
+	}
+
+	watchPaths, err := greatestExistingAncestors(d.watchPaths)
+	if err != nil {
+		return err
+	}
+	watchPaths = pathutil.EncompassingPaths(watchPaths)
+
+	d.stream.Paths = nil
+	for _, path := range watchPaths {
+		d.addStreamPath(path)
 	}
 
 	d.closeOnce = sync.Once{}
 
 	numberOfWatches.Add(int64(len(d.stream.Paths)))
 
-	err := d.stream.Start()
+	err = d.stream.Start()
 	if err != nil {
 		return err
 	}
@@ -115,7 +131,40 @@ func (d *fseventNotify) Errors() chan error {
 	return d.errors
 }
 
-func newWatcher(paths []string) (Notify, error) {
+func (d *fseventNotify) shouldNotify(path string) bool {
+	if d.notifyList[path] {
+		stat, err := os.Lstat(path)
+		isDir := err == nil && stat.IsDir()
+		return !isDir
+	}
+
+	for root := range d.notifyList {
+		if pathutil.IsChild(root, path) {
+			if !d.shouldIgnore(root, path) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (d *fseventNotify) shouldIgnore(dir, path string) bool {
+	if len(d.ignore) == 0 {
+		return false
+	}
+
+	if ignore, exists := d.ignore[dir]; exists && ignore != nil {
+		matches, err := ignore.Matches(path)
+		if err != nil {
+			logrus.Debugf("error checking ignored path %q: %v", path, err)
+			return false
+		}
+		return matches
+	}
+	return false
+}
+
+func newWatcher(paths []string, ignore map[string]PathMatcher) (Notify, error) {
 	dw := &fseventNotify{
 		stream: &fsevents.EventStream{
 			Latency: 50 * time.Millisecond,
@@ -129,14 +178,20 @@ func newWatcher(paths []string) (Notify, error) {
 		stop:   make(chan struct{}),
 	}
 
-	paths = pathutil.EncompassingPaths(paths)
+	watchPaths := pathutil.EncompassingPaths(paths)
+
+	notifyList := make(map[string]bool, len(paths))
 	for _, path := range paths {
-		path, err := filepath.Abs(path)
+		abs, err := filepath.Abs(path)
 		if err != nil {
 			return nil, fmt.Errorf("newWatcher: %w", err)
 		}
-		dw.initAdd(path)
+		notifyList[abs] = true
 	}
+
+	dw.ignore = ignore
+	dw.notifyList = notifyList
+	dw.watchPaths = watchPaths
 
 	return dw, nil
 }
