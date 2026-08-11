@@ -77,7 +77,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	restarting := utils.Set[string]{}
 
 	res := c.apiClient.Events(ctx, client.EventsListOptions{
-		Filters: projectFilter(c.project).Add("type", "container"),
+		Filters: projectFilter(c.project).Add("type", "container").Add("label", oneOffFilter(false)),
 	})
 	for {
 		if len(containers) == 0 {
