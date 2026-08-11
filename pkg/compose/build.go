@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
+	"github.com/moby/moby/client/pkg/stringid"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
@@ -179,11 +180,13 @@ func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.Ima
 				}
 			}
 			if img, ok := images[imgName]; ok {
-				// Use Image ID directly as source.
+				// Use the short image ID as source.
 				// Using name@digest format (via reference.WithDigest) fails for local-only images
 				// that don't have RepoDigests (e.g. built locally in CI).
-				// Image ID (sha256:...) is always valid and ensures ServiceHash changes on rebuild.
-				service.Volumes[i].Source = img.ID
+				// The full "sha256:<digest>" reference form is rejected by the engine as an image
+				// mount source (see issue #14005), so the ID is truncated to the short form the
+				// daemon resolves; it still changes on rebuild, keeping ServiceHash accurate.
+				service.Volumes[i].Source = stringid.TruncateID(img.ID)
 			}
 		}
 	}

@@ -18,13 +18,17 @@ package compose
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/stringid"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func Test_dockerFilePath(t *testing.T) {
@@ -138,4 +142,29 @@ func TestGetLocalImagesDigests_PreStartHook(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, images["alpine:3.20"].ID, "sha256:service")
 	assert.Equal(t, images["alpine:3.19"].ID, "sha256:hook")
+}
+
+func TestResolveImageVolumes(t *testing.T) {
+	// Full config-digest form of a locally-built image ID.
+	const imageID = "sha256:26a04b05e50737f5d07b282e87da9c7b6eb061fc7b955243916e6792d007d353"
+
+	service := &types.ServiceConfig{
+		Name: "consumer",
+		Volumes: []types.ServiceVolumeConfig{
+			{Type: types.VolumeTypeImage, Source: "imgvol-source", Target: "/data"},
+		},
+	}
+	images := map[string]api.ImageSummary{
+		"imgvol-source": {ID: imageID},
+	}
+
+	resolveImageVolumes(service, images, "proj")
+
+	source := service.Volumes[0].Source
+	// The engine rejects the full "sha256:<digest>" reference form as an image
+	// mount source (see #14005), so we must resolve it to a plain short image ID
+	// that the daemon accepts while still changing whenever the image is rebuilt.
+	assert.Assert(t, !strings.HasPrefix(source, "sha256:"),
+		"image volume source %q must not use the sha256: reference form rejected by the engine", source)
+	assert.Equal(t, source, stringid.TruncateID(imageID))
 }
