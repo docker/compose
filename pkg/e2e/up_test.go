@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -221,4 +222,84 @@ func TestUpStopWithLogsMixed(t *testing.T) {
 	})
 	// assert we get stop hook logs
 	res.Assert(t, icmd.Expected{Out: "service2-1 ->  | stop hook running...\nservice2-1     | 64 bytes"})
+}
+
+func TestUpExitsOnExternalStopOfRestartingContainer(t *testing.T) {
+	// Regression test for https://github.com/docker/compose/issues/13985
+	// A container stopped while in restart backoff emits no `die` event, only
+	// `stop`, so an attached `up` waiting for `die` hangs forever. Up to
+	// v2.39.2 the attached `up` exited a few seconds after an external stop:
+	// containers only need to be stopped, not removed (no `destroy` event).
+	c := NewParallelCLI(t)
+	const projectName = "e2e-restart-backoff-stop"
+
+	up := startRestartBackoffProject(t, c, projectName)
+
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "stop", "-t", "5")
+
+	assertUpExits(t, up, "external stop")
+}
+
+func TestUpExitsOnExternalDownOfRestartingContainer(t *testing.T) {
+	// `down` variant of TestUpExitsOnExternalStopOfRestartingContainer: the
+	// container in restart backoff emits `stop` then `destroy`, still no `die`.
+	c := NewParallelCLI(t)
+	const projectName = "e2e-restart-backoff-down"
+
+	up := startRestartBackoffProject(t, c, projectName)
+
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "stop", "-t", "5")
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-t", "5")
+
+	assertUpExits(t, up, "external stop+down")
+}
+
+// startRestartBackoffProject starts an attached `up` on the restart-backoff
+// fixture and waits until the crasher container is in restart backoff, so an
+// external stop reliably lands while no process is running (no `die` emitted).
+func startRestartBackoffProject(t *testing.T, c *CLI, projectName string) *icmd.Result {
+	t.Helper()
+	cleanup := func() {
+		c.RunDockerComposeCmdNoCheck(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
+	}
+	t.Cleanup(cleanup)
+	cleanup()
+
+	cmd := c.NewDockerComposeCmd(t, "--ansi=never", "-f", "./fixtures/restart-backoff/compose.yaml",
+		"--project-name", projectName, "up", "--menu=false")
+	up := icmd.StartCmd(cmd)
+	assert.NilError(t, up.Error)
+	t.Cleanup(func() {
+		if up.Cmd.Process != nil {
+			_ = up.Cmd.Process.Kill()
+		}
+	})
+
+	// wait for enough crash/restart cycles that the backoff window is several
+	// seconds wide, so the external stop below reliably lands while the
+	// container is in restart backoff
+	c.WaitForCondition(t, func() (bool, string) {
+		res := c.RunDockerOrExitError(t, "inspect", "--format", "{{.State.Status}} {{.RestartCount}}",
+			projectName+"-crasher-1")
+		out := strings.TrimSpace(res.Stdout())
+		status, count, _ := strings.Cut(out, " ")
+		restarts, err := strconv.Atoi(count)
+		return err == nil && status == "restarting" && restarts >= 5, fmt.Sprintf("crasher not in restart backoff yet: %q", out)
+	}, 2*time.Minute, 500*time.Millisecond)
+	return up
+}
+
+func assertUpExits(t *testing.T, up *icmd.Result, scenario string) {
+	t.Helper()
+	finished := make(chan struct{})
+	go func() {
+		_ = up.Cmd.Wait()
+		close(finished)
+	}()
+	select {
+	case <-finished:
+		// attached up detected project termination and exited
+	case <-time.After(30 * time.Second):
+		t.Fatalf("attached up did not exit after %s:\n%s", scenario, up.Combined())
+	}
 }
