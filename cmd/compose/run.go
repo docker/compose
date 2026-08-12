@@ -279,9 +279,8 @@ func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose,
 	if err != nil {
 		return nil, err
 	}
-	if err := applyPlatforms(project, true); err != nil {
-		return nil, err
-	}
+	// platform resolution and validation happen later through
+	// createOptions.Apply, which runRun always invokes
 	return project, nil
 }
 

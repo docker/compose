@@ -192,6 +192,16 @@ func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.Ima
 		// localContentDigest). Keep Source as the resolved name so mounting always
 		// works, and track the digest separately so mustRecreate can still detect
 		// a changed source image.
+		//
+		// Two accepted tradeoffs: (1) Source feeds ServiceHash, so containers
+		// created by a previous release (hashed with Source=<image ID>) are
+		// recreated once on upgrade — see the release note; (2) the mount is
+		// created from the mutable tag while the digest label comes from a
+		// separate inspect, so a retag racing between the two leaves the
+		// container mounting the new content under the old recorded digest
+		// until the next up recreates it. Pinning Source to a digest would
+		// close the race but reintroduce either the mount failure (#14005) or
+		// the attestation-churn recreates (#13636).
 		service.Volumes[i].Source = imgName
 		digests = append(digests, vol.Target+"="+img.ID)
 	}

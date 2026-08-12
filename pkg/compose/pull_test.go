@@ -45,7 +45,9 @@ func scheduledHookImages(t *testing.T, project *types.Project, present map[strin
 	for _, service := range project.Services {
 		scheduled[service.Image] = true
 	}
-	addPreStartHookPulls(project, present, needPull, scheduled)
+	if err := addPreStartHookPulls(project, present, needPull, scheduled); err != nil {
+		t.Fatal(err)
+	}
 	var images []string
 	for _, s := range needPull {
 		images = append(images, s.Image)
@@ -130,15 +132,19 @@ func (fakePullResponse) JSONMessages(context.Context) iter.Seq2[jsonstream.Messa
 // pull path returned the raw inspect ID instead (the index digest, under the
 // containerd store with a tag@digest ref), the first up after the pulling up
 // saw a phantom image change and recreated every container once.
-func TestPullServiceImageUsesContentDigest(t *testing.T) {
+func TestPullRequiredImagesUsesContentDigest(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
 
 	ref := "foo:1@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	// two services pull the same image (e.g. for different platforms): the
+	// shared summary digest is resolved once, after all pulls completed, so
+	// it cannot depend on pull completion order
 	mockAPI.EXPECT().
 		ImagePull(anyCancellableContext(), ref, gomock.Any()).
-		Return(fakePullResponse{}, nil)
+		Return(fakePullResponse{}, nil).
+		Times(2)
 	inspect := image.InspectResponse{
 		ID: "sha256:index",
 		Manifests: []image.ManifestSummary{
@@ -148,11 +154,20 @@ func TestPullServiceImageUsesContentDigest(t *testing.T) {
 	}
 	mockAPI.EXPECT().
 		ImageInspect(anyCancellableContext(), ref, gomock.Any()).
-		Return(client.ImageInspectResult{InspectResponse: inspect}, nil)
+		Return(client.ImageInspectResult{InspectResponse: inspect}, nil).
+		Times(1)
 
-	id, err := tested.pullServiceImage(t.Context(), types.ServiceConfig{Name: "web", Image: ref}, true, "")
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"web":    {Name: "web", Image: ref},
+			"pinned": {Name: "pinned", Image: ref, Platform: "linux/amd64"},
+		},
+	}
+	images := map[string]api.ImageSummary{}
+	err := tested.pullRequiredImages(t.Context(), project, images, true)
 	assert.NilError(t, err)
-	assert.Equal(t, id, "sha256:image")
+	assert.Equal(t, images[ref].ID, "sha256:image")
 }
 
 // TestAddPreStartHookPulls_DedupsSharedHookImage verifies a hook image shared by
@@ -216,10 +231,12 @@ func TestShouldPullImage(t *testing.T) {
 		}
 	})
 
-	t.Run("refresh policies honor the same window as up", func(t *testing.T) {
+	t.Run("refresh policies are due on explicit pull", func(t *testing.T) {
+		// an explicit `compose pull` is the only way to force a refresh ahead
+		// of the daily/weekly/every_N window, so the window is treated as due
 		pull, _, err := shouldPullImage(svc("web:1", "daily"), present)
 		assert.NilError(t, err)
-		assert.Assert(t, !pull, "recently tagged image is not due for refresh")
+		assert.Assert(t, pull, "explicit pull refreshes ahead of the window")
 
 		pull, _, err = shouldPullImage(svc("old:1", "daily"), present)
 		assert.NilError(t, err)
@@ -234,4 +251,46 @@ func TestShouldPullImage(t *testing.T) {
 		_, _, err := shouldPullImage(svc("web:1", "every_bogus"), present)
 		assert.Assert(t, err != nil)
 	})
+}
+
+// TestAddPreStartHookPulls_RefreshWindow: hook images inherit the parent
+// service's daily/weekly/every_N policy through the same mustPull interpreter
+// as the service image, so `up` honors the refresh window for them too.
+func TestAddPreStartHookPulls_RefreshWindow(t *testing.T) {
+	project := &types.Project{
+		Name:     "demo",
+		Services: types.Services{"web": serviceWithHook("web", "web:latest", "daily")},
+	}
+
+	fresh := map[string]api.ImageSummary{
+		"init:latest": {ID: "sha256:present", LastTagTime: time.Now()},
+	}
+	assert.DeepEqual(t, scheduledHookImages(t, project, fresh), []string(nil))
+
+	stale := map[string]api.ImageSummary{
+		"init:latest": {ID: "sha256:present", LastTagTime: time.Now().Add(-48 * time.Hour)},
+	}
+	assert.DeepEqual(t, scheduledHookImages(t, project, stale), []string{"init:latest"})
+}
+
+// TestShouldPullImageProvider: a service declaring both provider: and image:
+// still gets its image refreshed by an explicit pull, while a provider-only
+// service is skipped.
+func TestShouldPullImageProvider(t *testing.T) {
+	images := map[string]api.ImageSummary{}
+
+	pull, _, err := shouldPullImage(types.ServiceConfig{
+		Name:     "db",
+		Image:    "db:1",
+		Provider: &types.ServiceProviderConfig{Type: "acme"},
+	}, images)
+	assert.NilError(t, err)
+	assert.Assert(t, pull, "provider service with a declared image must be pulled")
+
+	pull, _, err = shouldPullImage(types.ServiceConfig{
+		Name:     "db",
+		Provider: &types.ServiceProviderConfig{Type: "acme"},
+	}, images)
+	assert.NilError(t, err)
+	assert.Assert(t, !pull, "provider service without image has nothing to pull")
 }

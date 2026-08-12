@@ -37,6 +37,25 @@ import (
 	"github.com/docker/compose/v5/internal/tracing"
 )
 
+// resolvePlatforms resolves DOCKER_DEFAULT_PLATFORM into service.Platform
+// exactly like applyPlatforms does for build-capable commands, but without
+// validating build.platforms: commands that never build (scale) only need
+// Platform resolved for config-hash parity with up, and a build.platforms
+// conflict on a service that isn't being built must not abort them.
+func resolvePlatforms(project *types.Project) {
+	defaultPlatform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	if defaultPlatform == "" {
+		return
+	}
+	for name, service := range project.Services {
+		if service.Build == nil || service.Platform != "" {
+			continue
+		}
+		service.Platform = defaultPlatform
+		project.Services[name] = service
+	}
+}
+
 func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {
 	defaultPlatform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
 	for name, service := range project.Services {
