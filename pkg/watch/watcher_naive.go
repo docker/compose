@@ -52,6 +52,10 @@ type naiveNotify struct {
 	wrappedEvents      chan FileEvent
 	errors             chan error
 	numWatches         int64
+
+	// addWatch registers a path with the watcher. A field so tests can inject
+	// a permission error, which a process running as root cannot produce.
+	addWatch func(path string) error
 }
 
 func (d *naiveNotify) Start() error {
@@ -90,7 +94,7 @@ func (d *naiveNotify) Start() error {
 				return fmt.Errorf("notify.Add(%q): %w", name, err)
 			}
 		} else {
-			err = d.add(filepath.Dir(name))
+			err = d.addWatch(filepath.Dir(name))
 			if err != nil {
 				return fmt.Errorf("notify.Add(%q): %w", filepath.Dir(name), err)
 			}
@@ -104,36 +108,49 @@ func (d *naiveNotify) Start() error {
 
 func (d *naiveNotify) watchRecursively(dir string) error {
 	if d.isWatcherRecursive {
-		err := d.add(dir)
+		err := d.addWatch(dir)
 		if err == nil || os.IsNotExist(err) {
 			return nil
 		}
 		return fmt.Errorf("watcher.Add(%q): %w", dir, err)
 	}
 
-	return filepath.WalkDir(dir, func(path string, info fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
+	return filepath.WalkDir(dir, d.walkAndAdd)
+}
 
-		if !info.IsDir() {
-			return nil
-		}
-
-		if d.shouldSkipDir(path) {
-			logrus.Debugf("Ignoring directory and its contents (recursively): %s", path)
+// walkAndAdd puts a watch on every directory of the tree being walked.
+func (d *naiveNotify) walkAndAdd(path string, info fs.DirEntry, err error) error {
+	if err != nil {
+		// A directory we are not allowed to read is not a reason to abandon the
+		// whole watch: we simply cannot see inside it, so skip it and carry on.
+		if os.IsPermission(err) {
+			logrus.Debugf("Not watching %s: %v", path, err)
 			return filepath.SkipDir
 		}
+		return err
+	}
 
-		err = d.add(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
-			}
-			return fmt.Errorf("watcher.Add(%q): %w", path, err)
-		}
+	if !info.IsDir() {
 		return nil
-	})
+	}
+
+	if d.shouldSkipDir(path) {
+		logrus.Debugf("Ignoring directory and its contents (recursively): %s", path)
+		return filepath.SkipDir
+	}
+
+	err = d.addWatch(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if os.IsPermission(err) {
+			logrus.Debugf("Not watching %s: %v", path, err)
+			return filepath.SkipDir
+		}
+		return fmt.Errorf("watcher.Add(%q): %w", path, err)
+	}
+	return nil
 }
 
 func (d *naiveNotify) Close() error {
@@ -150,7 +167,7 @@ func (d *naiveNotify) Errors() chan error {
 	return d.errors
 }
 
-func (d *naiveNotify) loop() { //nolint:gocyclo
+func (d *naiveNotify) loop() {
 	defer close(d.wrappedEvents)
 	for e := range d.events {
 		// The Windows fsnotify event stream sometimes gets events with empty names
@@ -178,43 +195,53 @@ func (d *naiveNotify) loop() { //nolint:gocyclo
 		// because it's a bit more elegant that way.
 		//
 		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
-		err := filepath.WalkDir(e.Name, func(path string, info fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if d.shouldNotify(path) {
-				d.wrappedEvents <- FileEvent(path)
-			}
-
-			// TODO(dmiller): symlinks 😭
-
-			shouldWatch := false
-			if info.IsDir() {
-				// watch directories unless we can skip them entirely
-				if d.shouldSkipDir(path) {
-					return filepath.SkipDir
-				}
-
-				shouldWatch = true
-			} else {
-				// watch files that are explicitly named, but don't watch others
-				_, ok := d.notifyList[path]
-				if ok {
-					shouldWatch = true
-				}
-			}
-			if shouldWatch {
-				err := d.add(path)
-				if err != nil && !os.IsNotExist(err) {
-					logrus.Infof("Error watching path %s: %s", e.Name, err)
-				}
-			}
-			return nil
-		})
+		err := filepath.WalkDir(e.Name, d.walkAndNotify(e.Name))
 		if err != nil && !os.IsNotExist(err) {
 			logrus.Infof("Error walking directory %s: %s", e.Name, err)
 		}
+	}
+}
+
+// walkAndNotify fires an event for every path under name, watching the
+// directories it goes through.
+func (d *naiveNotify) walkAndNotify(name string) fs.WalkDirFunc {
+	return func(path string, info fs.DirEntry, err error) error {
+		if err != nil {
+			if os.IsPermission(err) {
+				logrus.Debugf("Not watching %s: %v", path, err)
+				return filepath.SkipDir
+			}
+			return err
+		}
+
+		if d.shouldNotify(path) {
+			d.wrappedEvents <- FileEvent(path)
+		}
+
+		// TODO(dmiller): symlinks 😭
+
+		shouldWatch := false
+		if info.IsDir() {
+			// watch directories unless we can skip them entirely
+			if d.shouldSkipDir(path) {
+				return filepath.SkipDir
+			}
+
+			shouldWatch = true
+		} else {
+			// watch files that are explicitly named, but don't watch others
+			_, ok := d.notifyList[path]
+			if ok {
+				shouldWatch = true
+			}
+		}
+		if shouldWatch {
+			err := d.addWatch(path)
+			if err != nil && !os.IsNotExist(err) {
+				logrus.Infof("Error watching path %s: %s", name, err)
+			}
+		}
+		return nil
 	}
 }
 
@@ -306,6 +333,7 @@ func newWatcher(paths []string) (Notify, error) {
 		errors:             fsw.Errors,
 		isWatcherRecursive: isWatcherRecursive,
 	}
+	wmw.addWatch = wmw.add
 
 	return wmw, nil
 }

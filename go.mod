@@ -15,7 +15,7 @@ require (
 	github.com/containerd/platforms v1.0.0-rc.4
 	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0
-	github.com/docker/buildx v0.36.0
+	github.com/docker/buildx v0.36.1
 	github.com/docker/cli v29.6.2+incompatible
 	github.com/docker/cli-docs-tool v0.11.0
 	github.com/docker/go-units v0.5.0
@@ -28,7 +28,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-shellwords v1.0.14
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/moby/buildkit v0.32.1
+	github.com/moby/buildkit v0.32.2
 	github.com/moby/go-archive v0.3.2
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.1

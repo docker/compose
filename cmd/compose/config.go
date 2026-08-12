@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 
@@ -570,18 +569,27 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		return err
 	}
 
+	// narrow the project to the services being hashed, so a broken env_file
+	// or platforms on an unrelated service doesn't prevent hashing the requested ones
+	project, err = project.WithSelectedServices(services, types.IgnoreDependencies)
+	if err != nil {
+		return err
+	}
+
 	if err := applyPlatforms(project, true); err != nil {
 		return err
 	}
 
-	if len(services) == 0 {
-		services = project.ServiceNames()
+	if !opts.noResolveEnv {
+		// containers are created from a project with service environment
+		// resolved (env_file merged into environment), so hash the same content
+		project, err = project.WithServicesEnvironmentResolved(true)
+		if err != nil {
+			return err
+		}
 	}
 
-	sorted := services
-	slices.Sort(sorted)
-
-	for _, name := range sorted {
+	for _, name := range project.ServiceNames() {
 		s, err := project.GetService(name)
 		if err != nil {
 			return err

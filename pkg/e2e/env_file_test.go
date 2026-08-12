@@ -50,6 +50,20 @@ func TestUnusedMissingEnvFile(t *testing.T) {
 	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/env_file/compose.yaml", "scale", "serviceB=1")
 	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "env file /doesnotexist/.env not found"})
 
+	// config --hash should work for services not referencing the missing env file
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--hash", "serviceA")
+
+	// but hashing the service with the missing env file must fail, as up would
+	res = c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--hash", "serviceB")
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "env file /doesnotexist/.env not found"})
+
+	// unless env_file resolution is explicitly disabled
+	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--no-env-resolution", "--hash", "serviceB")
+
+	// and so must the wildcard, as it includes serviceB
+	res = c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--hash", "*")
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "env file /doesnotexist/.env not found"})
+
 	// shell completion should list services even with missing env file.
 	// ComposeStandalonePath fails the test outside standalone mode, so only the
 	// plugin form can be the default here.
