@@ -17,14 +17,69 @@
 package compose
 
 import (
+	"context"
+	"io"
+	"iter"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
+	imagetypes "github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/client"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
+
+type testImagePullResponse struct {
+	io.ReadCloser
+}
+
+func (r testImagePullResponse) JSONMessages(context.Context) iter.Seq2[jsonstream.Message, error] {
+	return func(yield func(jsonstream.Message, error) bool) {}
+}
+
+func (r testImagePullResponse) Wait(context.Context) error {
+	return nil
+}
+
+func TestPullServiceImageUsesRunnableContentDigest(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	dockerAPI, cli := prepareMocks(mockCtrl)
+	cli.EXPECT().ConfigFile().Return(configfile.New(""))
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	dockerAPI.EXPECT().ImagePull(gomock.Any(), "foo:1", gomock.Any()).Return(testImagePullResponse{
+		ReadCloser: io.NopCloser(strings.NewReader("")),
+	}, nil)
+	dockerAPI.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: "1.48"}, nil)
+	dockerAPI.EXPECT().ClientVersion().Return("1.48")
+	dockerAPI.EXPECT().ImageInspect(gomock.Any(), "foo:1", gomock.Any()).Return(client.ImageInspectResult{
+		InspectResponse: imagetypes.InspectResponse{
+			ID: "sha256:index",
+			Manifests: []imagetypes.ManifestSummary{{
+				ID:        "sha256:image",
+				Kind:      imagetypes.ManifestKindImage,
+				Available: true,
+				ImageData: &imagetypes.ImageProperties{
+					Platform: specs.Platform{OS: "linux", Architecture: "amd64"},
+				},
+			}},
+		},
+	}, nil)
+
+	id, err := tested.(*composeService).pullServiceImage(t.Context(), types.ServiceConfig{Image: "foo:1"}, true, "")
+	assert.NilError(t, err)
+	assert.Equal(t, id, "sha256:image")
+}
 
 // scheduledHookImages runs addPreStartHookPulls and returns the hook image
 // references it scheduled for pull, sorted for deterministic assertions.

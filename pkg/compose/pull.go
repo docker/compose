@@ -286,11 +286,26 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	}
 	s.events.On(newEvent(resource, api.Done, api.StatusPulled))
 
-	inspected, err := s.apiClient().ImageInspect(ctx, service.Image)
+	return s.pulledImageDigest(ctx, service.Image)
+}
+
+// pulledImageDigest resolves a pulled image through the same runnable-content
+// digest path used to discover images that are already local.
+func (s *composeService) pulledImageDigest(ctx context.Context, imageName string) (string, error) {
+	// Use the same runnable-content digest as the local-image discovery path.
+	// With the containerd image store, inspect.ID can identify the top-level
+	// index while getImageSummaries selects the platform image manifest. Mixing
+	// those digest types makes a container created immediately after a pull look
+	// stale on the next `up`.
+	summaries, err := s.getImageSummaries(ctx, []string{imageName})
 	if err != nil {
 		return "", err
 	}
-	return inspected.ID, nil
+	summary, ok := summaries[imageName]
+	if !ok {
+		return "", fmt.Errorf("unable to inspect image '%s' after pull", imageName)
+	}
+	return summary.ID, nil
 }
 
 // ImageDigestResolver creates a func able to resolve image digest from a docker ref,
