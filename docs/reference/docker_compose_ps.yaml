@@ -45,7 +45,6 @@ options:
       swarm: false
     - option: format
       value_type: string
-      default_value: table
       description: |-
         Format output using a custom template:
         'table':            Print output in table format with column headers (default)

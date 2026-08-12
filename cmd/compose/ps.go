@@ -81,7 +81,10 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := psCmd.Flags()
-	flags.StringVar(&opts.Format, "format", "table", cliflags.FormatHelp)
+	// Default to an empty format so that, when the user does not pass --format,
+	// the psFormat setting from the Docker CLI config is honored (see runPs and
+	// issue #13643), matching the behavior of `docker ps`.
+	flags.StringVar(&opts.Format, "format", "", cliflags.FormatHelp)
 	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property (supported filters: status)")
 	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
@@ -152,6 +155,9 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 		return nil
 	}
 
+	// When no --format flag was provided, fall back to the psFormat setting from
+	// the Docker CLI config. If neither is set, NewContainerFormat renders the
+	// default table layout.
 	if opts.Format == "" {
 		opts.Format = dockerCli.ConfigFile().PsFormat
 	}

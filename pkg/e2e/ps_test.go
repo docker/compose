@@ -18,6 +18,8 @@ package e2e
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -132,4 +134,45 @@ func TestPs(t *testing.T) {
 		res = c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "unknown")
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "no such service: unknown"})
 	})
+}
+
+// TestPsFormatFromConfig verifies that `docker compose ps`, without an explicit
+// --format flag, honors the psFormat setting from the Docker CLI config, just
+// like `docker ps` does. Regression test for issue #13643.
+func TestPsFormatFromConfig(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "e2e-ps-config-format"
+
+	// Set a custom psFormat in the CLI config for this isolated test instance.
+	// "table {{.Name}}" renders a single NAME column, unlike the default layout
+	// which also includes IMAGE/COMMAND/SERVICE/CREATED/STATUS/PORTS columns.
+	configPath := filepath.Join(c.ConfigDir, "config.json")
+	config := map[string]any{}
+	if data, err := os.ReadFile(configPath); err == nil {
+		assert.NilError(t, json.Unmarshal(data, &config), "Failed to parse existing config.json")
+	}
+	config["psFormat"] = "table {{.Name}}"
+	data, err := json.Marshal(config)
+	assert.NilError(t, err)
+	assert.NilError(t, os.WriteFile(configPath, data, 0o644))
+
+	// ensure clean state from any previous failed run
+	c.RunDockerComposeCmdNoCheck(t, "--project-name", projectName, "down", "--remove-orphans")
+
+	// Use a fixture without published host ports so this test can run in
+	// parallel with TestPs without colliding on a host port.
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose-format.yaml", "--project-name", projectName, "up", "-d")
+	assert.NilError(t, res.Error)
+	t.Cleanup(func() {
+		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	})
+
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose-format.yaml", "--project-name", projectName, "ps")
+	out := res.Stdout()
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	assert.Assert(t, len(lines) >= 1, "no ps output:\n"+res.Combined())
+	// With psFormat honored, the header is the single NAME column and none of the
+	// default extra columns are present.
+	assert.Equal(t, "NAME", strings.TrimSpace(lines[0]), "ps did not honor psFormat from config:\n"+res.Combined())
+	assert.Assert(t, !strings.Contains(out, "IMAGE"), "ps output unexpectedly contains default columns:\n"+res.Combined())
 }
