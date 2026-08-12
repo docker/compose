@@ -111,7 +111,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 		idx := i
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			err := s.pullServiceImage(ctx, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				pullErrors[idx] = err
 				if service.Build != nil {
@@ -165,7 +165,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			imagesBeingPulled[img] = name
 			hookService := types.ServiceConfig{Name: name, Image: img}
 			eg.Go(func() error {
-				_, err := s.pullServiceImage(ctx, hookService, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				err := s.pullServiceImage(ctx, hookService, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				if err != nil && !opts.IgnoreFailures {
 					// fail fast: a hook image can't be built as a fallback
 					return err
@@ -192,17 +192,30 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 // shouldPullImage decides whether `compose pull` refreshes a service's image,
 // delegating to the exact pull_policy interpreter the up path uses (mustPull)
-// so both commands honor never/build, skip-if-present and the
-// daily/weekly/every_N refresh window identically. The command keeps two
-// deliberate differences:
+// so both commands honor never/build and skip-if-present identically. The
+// command keeps deliberate differences reflecting that the user explicitly
+// asked for a pull:
 //   - a service without an explicit pull_policy is always refreshed — an
 //     unset policy resolves to "missing" for `up`, but skipping it would turn
 //     an explicit `compose pull` into a no-op once images exist;
+//   - a daily/weekly/every_N refresh window is treated as due — an explicit
+//     `compose pull` is the only way to force a refresh ahead of the window;
 //   - a present `latest` tag is still refreshed under missing/if_not_present:
 //     the tag is expected to move, and triggering the pull lets the daemon
 //     negotiate with the registry — a manifest check, no download, when the
-//     local image is already up to date.
+//     local image is already up to date;
+//   - a service declaring both `provider:` and `image:` still gets its image
+//     refreshed — mustPull leaves provider-managed services alone on the `up`
+//     path, but an explicitly declared image remains pullable.
 func shouldPullImage(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, string, error) {
+	if service.Provider != nil {
+		if service.Image == "" {
+			return false, "", nil
+		}
+		// neutralize the provider so mustPull doesn't short-circuit the
+		// declared image
+		service.Provider = nil
+	}
 	if service.PullPolicy == "" {
 		return true, "", nil
 	}
@@ -213,13 +226,14 @@ func shouldPullImage(service types.ServiceConfig, images map[string]api.ImageSum
 	policy, _, _ := service.GetPullPolicy()
 	switch policy {
 	case types.PullPolicyRefresh:
-		return false, "Image is not due for refresh", nil
+		// the window would skip it on `up`, but an explicit pull is due now
+		return true, "", nil
 	case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
 		if isLatestTag(service.Image) {
 			return true, "", nil
 		}
 		return false, "Image is already present locally", nil
-	default: // never, build — and provider services short-circuited by mustPull
+	default: // never, build
 		return false, "", nil
 	}
 }
@@ -243,17 +257,17 @@ func getUnwrappedErrorMessage(err error) string {
 	return err.Error()
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, quietPull bool, defaultPlatform string) (string, error) {
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, quietPull bool, defaultPlatform string) error {
 	resource := "Image " + service.Image
 	s.events.On(newEvent(resource, api.Working, api.StatusPulling))
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	encodedAuth, err := encodedAuth(ref, s.configFile())
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	platform := service.Platform
@@ -265,7 +279,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	if platform != "" {
 		p, err := platforms.Parse(platform)
 		if err != nil {
-			return "", err
+			return err
 		}
 		ociPlatforms = append(ociPlatforms, p)
 	}
@@ -281,7 +295,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Status: api.Warning,
 			Text:   "Interrupted",
 		})
-		return "", nil
+		return nil
 	}
 
 	// check if it has an error and the service has a build section
@@ -292,12 +306,12 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Status: api.Warning,
 			Text:   getUnwrappedErrorMessage(err),
 		})
-		return "", err
+		return err
 	}
 
 	if err != nil {
 		s.events.On(errorEvent(resource, getUnwrappedErrorMessage(err)))
-		return "", err
+		return err
 	}
 
 	dec := json.NewDecoder(stream)
@@ -307,10 +321,10 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			return "", err
+			return err
 		}
 		if jm.Error != nil {
-			return "", errors.New(jm.Error.Message)
+			return errors.New(jm.Error.Message)
 		}
 		if !quietPull {
 			toPullProgressEvent(resource, jm, s.events)
@@ -318,15 +332,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	}
 	s.events.On(newEvent(resource, api.Done, api.StatusPulled))
 
-	// Resolve the pulled image's identity exactly the way getLocalImagesDigests
-	// does for already-local images: both values feed the
-	// com.docker.compose.image label used to detect stale containers, so they
-	// must be computed identically. Returning the raw inspect ID here (the
-	// index digest, under the containerd store with a tag@digest ref) while
-	// later ups resolve the platform manifest digest via contentDigest made
-	// the first up after a pull recreate every container despite no change.
-	id, _, err := s.inspectLocalContent(ctx, service.Image, platform)
-	return id, err
+	return nil
 }
 
 // ImageDigestResolver creates a func able to resolve image digest from a docker ref,
@@ -393,26 +399,26 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 	}
 
-	addPreStartHookPulls(project, images, needPull, scheduled)
+	if err := addPreStartHookPulls(project, images, needPull, scheduled); err != nil {
+		return err
+	}
 
 	if len(needPull) == 0 {
 		return nil
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	// the errgroup context is canceled as soon as Wait returns; the post-pull
+	// resolution below needs the caller's context
+	eg, pullCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(s.maxConcurrency)
-	pulledImages := map[string]api.ImageSummary{}
+	pulled := map[string]bool{}
 	var mutex sync.Mutex
 	for name, service := range needPull {
 		eg.Go(func() error {
-			id, err := s.pullServiceImage(ctx, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			err := s.pullServiceImage(pullCtx, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			mutex.Lock()
 			defer mutex.Unlock()
-			pulledImages[name] = api.ImageSummary{
-				ID:          id,
-				Repository:  service.Image,
-				LastTagTime: time.Now(),
-			}
+			pulled[name] = err == nil
 			if err != nil && isServiceImageToBuild(service, project.Services) {
 				// image can be built, so we can ignore pull failure
 				return nil
@@ -421,35 +427,70 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		})
 	}
 	err := eg.Wait()
-	for i, service := range needPull {
-		if pulledImages[i].ID != "" {
-			images[service.Image] = pulledImages[i]
-		}
-	}
-	return err
+	return errors.Join(err, s.resolvePulledImages(ctx, needPull, pulled, images))
 }
 
-// addPreStartHookPulls schedules pulls for missing pre_start hook images.
+// resolvePulledImages resolves each distinct successfully pulled image once,
+// the exact way getLocalImagesDigests does for already-local images — both
+// values feed the com.docker.compose.image label used to detect stale
+// containers, so they must be computed identically, for the host default
+// platform. Resolving from each pull's goroutine (or for the pulled platform)
+// let the recorded digest depend on pull completion order when several
+// services pull the same tag for different platforms. Platform-pinned
+// services get the digest of their own platform's manifest from
+// serviceImageDigest when the label is written.
+func (s *composeService) resolvePulledImages(ctx context.Context, needPull map[string]types.ServiceConfig, pulled map[string]bool, images map[string]api.ImageSummary) error {
+	var errs error
+	resolved := map[string]bool{}
+	for name, service := range needPull {
+		if !pulled[name] || resolved[service.Image] {
+			continue
+		}
+		resolved[service.Image] = true
+		id := "dryRunId"
+		if !s.dryRun {
+			// in dry-run the image was never actually pulled, so there is
+			// nothing to inspect locally
+			var ierr error
+			id, _, ierr = s.inspectLocalContent(ctx, service.Image, "")
+			if ierr != nil {
+				errs = errors.Join(errs, ierr)
+				continue
+			}
+		}
+		images[service.Image] = api.ImageSummary{
+			ID:          id,
+			Repository:  service.Image,
+			LastTagTime: time.Now(),
+		}
+	}
+	return errs
+}
+
+// addPreStartHookPulls schedules pulls for pre_start hook images.
 // pre_start hooks run as ephemeral init containers with their own registry
-// image, which can't be built, so we pull them unless the parent service pull
-// policy explicitly forbids any pull (never). Running as a second pass over the
-// services keeps the dedup against service/volume images (via scheduled)
-// independent of service iteration order.
-func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig, scheduled map[string]bool) {
+// image; they have no pull policy of their own, so they inherit the parent
+// service's — interpreted by the same mustPull the service image goes
+// through, so `up` and `compose pull` agree on hook images too. A hook image
+// can't be built, so `build` falls back to pull-if-missing instead of
+// exempting it from pulling; only `never` skips entirely. Running as a second
+// pass over the services keeps the dedup against service/volume images (via
+// scheduled) independent of service iteration order.
+func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig, scheduled map[string]bool) error {
 	for name, service := range project.Services {
 		if service.PullPolicy == types.PullPolicyNever {
 			continue
 		}
+		hookPolicy := service.PullPolicy
+		if hookPolicy == types.PullPolicyBuild {
+			hookPolicy = types.PullPolicyMissing
+		}
 		for i, img := range api.GetDependentImages(service, project.Name) {
-			// Honor `pull_policy: always` for hook images the same way mustPull
-			// does for the service image: force a re-pull even when the image is
-			// already present locally. Other policies only pull when missing.
-			if service.PullPolicy != types.PullPolicyAlways {
-				if _, ok := images[img]; ok {
-					continue
-				}
+			pull, err := mustPull(types.ServiceConfig{Name: name, Image: img, PullPolicy: hookPolicy}, images)
+			if err != nil {
+				return err
 			}
-			if scheduled[img] {
+			if !pull || scheduled[img] {
 				continue
 			}
 			scheduled[img] = true
@@ -461,6 +502,7 @@ func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSum
 			}
 		}
 	}
+	return nil
 }
 
 func mustPull(service types.ServiceConfig, images map[string]api.ImageSummary) (bool, error) {

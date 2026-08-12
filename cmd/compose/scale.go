@@ -82,10 +82,9 @@ func runScale(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 
 	// resolve DOCKER_DEFAULT_PLATFORM into service.Platform exactly like
 	// `up`/`create` do: Platform feeds the service config-hash, so scale
-	// hashing a different value would recreate every container
-	if err := applyPlatforms(project, true); err != nil {
-		return err
-	}
+	// hashing a different value would recreate every container. scale never
+	// builds, so build.platforms conflicts are not validated here.
+	resolvePlatforms(project)
 
 	if opts.noDeps {
 		if project, err = project.WithSelectedServices(services, types.IgnoreDependencies); err != nil {

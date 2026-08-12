@@ -316,7 +316,20 @@ func matchLocalManifest(inspect image.InspectResponse, platform platforms.Matche
 		}
 	}
 	if len(available) == 1 {
-		return available[0].ID, false
+		m := available[0]
+		if m.ImageData == nil {
+			// engines may omit per-manifest image data (seen with locally
+			// built, never-pushed images): fall back to the inspect's flat
+			// platform fields, like the manifest-less path does, instead of
+			// reporting the platform unsatisfied and triggering a pull of a
+			// possibly local-only image
+			return m.ID, platform.Match(specs.Platform{
+				Architecture: inspect.Architecture,
+				OS:           inspect.Os,
+				Variant:      inspect.Variant,
+			})
+		}
+		return m.ID, false
 	}
 	return inspect.ID, false
 }

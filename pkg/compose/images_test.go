@@ -526,3 +526,28 @@ func containerDetail(service string, id string, status container.ContainerState,
 		State:  status,
 	}
 }
+
+func TestMatchLocalManifestWithoutImageData(t *testing.T) {
+	// engines may omit per-manifest image data (seen with locally built,
+	// never-pushed images): the lone available manifest falls back to the
+	// inspect's flat platform fields instead of reporting the platform
+	// unsatisfied — which made up try to pull a local-only image.
+	amd64 := platforms.OnlyStrict(specs.Platform{OS: "linux", Architecture: "amd64"})
+	arm64 := platforms.OnlyStrict(specs.Platform{OS: "linux", Architecture: "arm64"})
+	inspect := image.InspectResponse{
+		ID:           "sha256:index",
+		Os:           "linux",
+		Architecture: "amd64",
+		Manifests: []image.ManifestSummary{
+			{ID: "sha256:lone", Kind: image.ManifestKindImage, Available: true},
+		},
+	}
+
+	id, satisfied := matchLocalManifest(inspect, amd64)
+	assert.Equal(t, id, "sha256:lone")
+	assert.Assert(t, satisfied, "flat platform fields match the requested platform")
+
+	id, satisfied = matchLocalManifest(inspect, arm64)
+	assert.Equal(t, id, "sha256:lone")
+	assert.Assert(t, !satisfied, "flat platform fields don't match the requested platform")
+}
