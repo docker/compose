@@ -264,6 +264,13 @@ func (s *composeService) canonicalBuiltDigest(ctx context.Context, imageRef, pla
 // pre-manifest behavior. Every image identity compose records for staleness
 // comparison must be computed through here, whatever the image's provenance
 // (pulled, built, already local), so any two runs produce comparable values.
+//
+// The converse also holds: this platform-specific digest is ONLY an identity
+// for staleness comparison. Pinning image references in a reproducible
+// compose model (publish / config --resolve-image-digests) must keep using
+// the registry descriptor digest — the multi-platform index — through
+// ImageDigestResolver, or the published file would be bound to the platform
+// of whoever resolved it.
 func localContentDigest(inspect client.ImageInspectResult, platform string) (string, bool, error) {
 	var matcher platforms.Matcher = platforms.Default()
 	pinned := platform != ""

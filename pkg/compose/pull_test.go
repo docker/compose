@@ -25,13 +25,19 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/distribution/reference"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/jsonstream"
+	registrytypes "github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 // scheduledHookImages runs addPreStartHookPulls and returns the hook image
@@ -293,4 +299,32 @@ func TestShouldPullImageProvider(t *testing.T) {
 	}, images)
 	assert.NilError(t, err)
 	assert.Assert(t, !pull, "provider service without image has nothing to pull")
+}
+
+// TestImageDigestResolverUsesDistributionDigest locks the distinction between
+// the two digest kinds compose manipulates: pinning a reference for a
+// reproducible compose model (publish / config --resolve-image-digests) must
+// use the registry descriptor digest — the multi-platform index — and never
+// the local platform-specific content digest used for staleness comparison.
+// The mock declares no ImageInspect expectation, so any attempt to resolve
+// through the local content-digest producer fails the test.
+func TestImageDigestResolverUsesDistributionDigest(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+
+	const indexDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	mockAPI.EXPECT().
+		DistributionInspect(gomock.Any(), "docker.io/library/foo:1", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registrytypes.DistributionInspect{
+				Descriptor: ocispec.Descriptor{Digest: digest.Digest(indexDigest)},
+			},
+		}, nil)
+
+	named, err := reference.ParseDockerRef("foo:1")
+	assert.NilError(t, err)
+	resolved, err := ImageDigestResolver(t.Context(), &configfile.ConfigFile{}, mockAPI)(named)
+	assert.NilError(t, err)
+	assert.Equal(t, resolved.String(), indexDigest)
 }
