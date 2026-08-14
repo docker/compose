@@ -34,34 +34,24 @@ func assertServiceStatus(t *testing.T, projectName, service, status string, ps s
 }
 
 func TestRestart(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-restart"
-
-	t.Run("Up a project", func(t *testing.T) {
-		// This is just to ensure the containers do NOT exist
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose.yaml", "--project-name", projectName, "up", "-d")
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-restart-1 Started"), res.Combined())
-
-		c.WaitForCmdResult(t, c.NewDockerComposeCmd(t, "--project-name", projectName, "ps", "-a", "--format",
-			"json"),
-			StdoutContains(`"State":"exited"`), 10*time.Second, 1*time.Second)
-
-		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps", "-a")
-		assertServiceStatus(t, projectName, "restart", "Exited", res.Stdout())
-
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/restart-test/compose.yaml", "--project-name", projectName, "restart")
-
-		// Give the same time but it must NOT exit
-		time.Sleep(time.Second)
-
-		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps")
-		assertServiceStatus(t, projectName, "restart", "Up", res.Stdout())
-
-		// Clean up
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
+	// the service's first run creates a lock file and exits at once; any
+	// later run of the same container finds the lock and sleeps forever, so
+	// staying up after `restart` proves the same container was restarted
+	NewScenario(t, "restart must bring an exited service back up, restarting the same container").
+		Compose(`
+services:
+  app:
+    image: alpine
+    init: true
+    command: ash -c "if [[ -f /tmp/restart.lock ]] ; then sleep infinity; else touch /tmp/restart.lock; fi"
+`).
+		Step("up starts the service, whose first run exits at once",
+			ComposeCmd("up", "-d"),
+			Eventually(ServiceState("app", "exited"), 10*time.Second)).
+		Step("restart brings the service back up, reusing the container",
+			ComposeCmd("restart"),
+			Eventually(ServiceState("app", "running"), 10*time.Second),
+			NotRecreated("app"))
 }
 
 func TestRestartWithDependencies(t *testing.T) {
