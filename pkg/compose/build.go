@@ -285,10 +285,10 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 //
 // Finally, standard proxy variables based on the Docker client configuration are added, but will not overwrite
 // any values if already present.
-func resolveAndMergeBuildArgs(proxyConfig map[string]string, project *types.Project, service types.ServiceConfig, opts api.BuildOptions) types.MappingWithEquals {
+func resolveAndMergeBuildArgs(proxyConfig map[string]string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) types.MappingWithEquals {
 	result := make(types.MappingWithEquals).
 		OverrideBy(service.Build.Args).
-		OverrideBy(opts.Args).
+		OverrideBy(options.Args).
 		Resolve(envResolver(project.Environment))
 
 	// proxy arguments do NOT override and should NOT have env resolution applied,

@@ -225,13 +225,13 @@ func (r *reconciler) reconcileNetworks() error {
 }
 
 // planCreateNetwork adds a single CreateNetwork node and records it for dependency tracking.
-func (r *reconciler) planCreateNetwork(key string, nw *types.NetworkConfig, cause string) {
+func (r *reconciler) planCreateNetwork(key string, networkConfig *types.NetworkConfig, cause string) {
 	r.networkNodes[key] = r.plan.addNode(Operation{
 		Type:       OpCreateNetwork,
 		ResourceID: fmt.Sprintf("network:%s", key),
 		Cause:      cause,
-		Name:       nw.Name,
-		Network:    nw,
+		Name:       networkConfig.Name,
+		Network:    networkConfig,
 	}, "")
 }
 
@@ -435,8 +435,8 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 	// Collect the services (and their containers) mounting any diverged volume.
 	serviceSet := map[string]bool{}
 	for _, key := range keys {
-		for _, svc := range r.servicesUsingVolume(key) {
-			serviceSet[svc] = true
+		for _, serviceName := range r.servicesUsingVolume(key) {
+			serviceSet[serviceName] = true
 		}
 	}
 	services := sortedKeys(serviceSet)
@@ -499,9 +499,9 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 	// executor hashed against at create time, whereas clearing here is purely a
 	// scheduling concern carried by the plan's dependency edges. The two
 	// intentionally diverge; do not "fix" one to match the other.
-	for _, svc := range services {
-		r.recreatedServices[svc] = true
-		r.observed.Containers[svc] = nil
+	for _, serviceName := range services {
+		r.recreatedServices[serviceName] = true
+		r.observed.Containers[serviceName] = nil
 	}
 }
 
@@ -510,9 +510,9 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 	var names []string
 	for _, key := range sortedKeys(r.project.Services) {
-		svc := r.project.Services[key]
-		if _, ok := svc.Networks[networkKey]; ok {
-			names = append(names, svc.Name)
+		service := r.project.Services[key]
+		if _, ok := service.Networks[networkKey]; ok {
+			names = append(names, service.Name)
 		}
 	}
 	return names
@@ -533,10 +533,10 @@ func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	inSet := map[string]bool{}
 	// Seed with services that mount the volume directly.
 	for _, key := range sortedKeys(r.project.Services) {
-		svc := r.project.Services[key]
-		for _, v := range svc.Volumes {
+		service := r.project.Services[key]
+		for _, v := range service.Volumes {
 			if v.Source == volumeKey {
-				inSet[svc.Name] = true
+				inSet[service.Name] = true
 				break
 			}
 		}
@@ -547,17 +547,17 @@ func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	for {
 		added := false
 		for _, key := range sortedKeys(r.project.Services) {
-			svc := r.project.Services[key]
-			if inSet[svc.Name] {
+			service := r.project.Services[key]
+			if inSet[service.Name] {
 				continue
 			}
-			for _, vf := range svc.VolumesFrom {
+			for _, vf := range service.VolumesFrom {
 				if strings.HasPrefix(vf, types.ContainerPrefix) {
 					continue
 				}
 				name, _, _ := strings.Cut(vf, ":")
 				if inSet[name] {
-					inSet[svc.Name] = true
+					inSet[service.Name] = true
 					added = true
 					break
 				}
@@ -574,8 +574,8 @@ func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 // service names.
 func (r *reconciler) containersForServices(services []string) []ObservedContainer {
 	var result []ObservedContainer
-	for _, svc := range services {
-		result = append(result, r.observed.Containers[svc]...)
+	for _, serviceName := range services {
+		result = append(result, r.observed.Containers[serviceName]...)
 	}
 	return result
 }
@@ -642,13 +642,13 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		return nil
 	}
 	if service.Provider != nil {
-		svc := service
+		serviceCopy := service
 		deps := r.infrastructureDeps(service)
 		node := r.plan.addNode(Operation{
 			Type:       OpRunProvider,
 			ResourceID: fmt.Sprintf("provider:%s", service.Name),
 			Cause:      "provider service",
-			Service:    &svc,
+			Service:    &serviceCopy,
 		}, "", deps...)
 		r.serviceNodes[service.Name] = node
 		return nil
@@ -733,12 +733,12 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	for i := 0; i < expected-actual; i++ {
 		number := nextNum + i
 		name := getContainerName(r.project.Name, service, number)
-		svc := service // copy for pointer stability
+		serviceCopy := service // copy for pointer stability
 		lastNode = r.plan.addNode(Operation{
 			Type:       OpCreateContainer,
 			ResourceID: fmt.Sprintf("service:%s:%d", service.Name, number),
 			Cause:      "no existing container",
-			Service:    &svc,
+			Service:    &serviceCopy,
 			Number:     number,
 			Name:       name,
 		}, "", infraDeps...)
@@ -780,17 +780,17 @@ func (r *reconciler) mustRecreate(expected types.ServiceConfig, expectedHash str
 }
 
 // parentNamespaceRecreated reports whether any namespace- or volume-sharing
-// parent of svc has at least one container scheduled for recreation. The
-// parent set is derived from svc itself (network_mode/ipc/pid and volumes_from)
+// parent of service has at least one container scheduled for recreation. The
+// parent set is derived from service itself (network_mode/ipc/pid and volumes_from)
 // rather than depends_on, so the cascade fires only when a stale
 // "container:<id>" reference would otherwise be left behind.
-func (r *reconciler) parentNamespaceRecreated(svc types.ServiceConfig) bool {
-	for _, mode := range []string{svc.NetworkMode, svc.Ipc, svc.Pid} {
+func (r *reconciler) parentNamespaceRecreated(service types.ServiceConfig) bool {
+	for _, mode := range []string{service.NetworkMode, service.Ipc, service.Pid} {
 		if name := getDependentServiceFromMode(mode); name != "" && r.recreatedServices[name] {
 			return true
 		}
 	}
-	for _, vol := range svc.VolumesFrom {
+	for _, vol := range service.VolumesFrom {
 		if strings.HasPrefix(vol, types.ContainerPrefix) {
 			continue
 		}
@@ -809,11 +809,11 @@ func (r *reconciler) parentNamespaceRecreated(svc types.ServiceConfig) bool {
 // it cannot match the persisted hash either way, so recreation is forced.
 //
 // Only fields mutated by resolveServiceReferences need defensive copying.
-// svc.Networks (a map) is left shared because resolveServiceReferences does
+// service.Networks (a map) is left shared because resolveServiceReferences does
 // not touch it; revisit if that changes.
-func serviceHashWithResolvedRefs(svc types.ServiceConfig, containers map[string]Containers) (string, error) {
-	resolved := svc
-	resolved.VolumesFrom = slices.Clone(svc.VolumesFrom)
+func serviceHashWithResolvedRefs(service types.ServiceConfig, containers map[string]Containers) (string, error) {
+	resolved := service
+	resolved.VolumesFrom = slices.Clone(service.VolumesFrom)
 	_ = resolveServiceReferences(&resolved, containers)
 	return ServiceHash(resolved)
 }
@@ -875,7 +875,7 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	resID := fmt.Sprintf("service:%s:%d", service.Name, oc.Number)
 	group := fmt.Sprintf("recreate:%s:%d", service.Name, oc.Number)
 	tmpName := fmt.Sprintf("%s_%s", oc.ID[:min(12, len(oc.ID))], getContainerName(r.project.Name, service, oc.Number))
-	svc := service // copy for pointer stability
+	serviceCopy := service // copy for pointer stability
 
 	// Stop dependents first
 	depStopNodes := r.planStopDependents(service)
@@ -893,7 +893,7 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 		Type:       OpCreateContainer,
 		ResourceID: resID,
 		Cause:      "config changed (tmpName)",
-		Service:    &svc,
+		Service:    &serviceCopy,
 		Inherited:  inherited,
 		Number:     oc.Number,
 		Name:       tmpName,
@@ -1055,10 +1055,10 @@ func (r *reconciler) reconcileOrphans() {
 // observedSummaries returns the raw container.Summary list for a service,
 // needed by nextContainerNumber which expects []container.Summary.
 func (r *reconciler) observedSummaries(serviceName string) []container.Summary {
-	ocs := r.observed.Containers[serviceName]
-	result := make([]container.Summary, len(ocs))
-	for i, oc := range ocs {
-		result[i] = oc.Summary
+	observedContainers := r.observed.Containers[serviceName]
+	result := make([]container.Summary, len(observedContainers))
+	for i, observedContainer := range observedContainers {
+		result[i] = observedContainer.Summary
 	}
 	return result
 }

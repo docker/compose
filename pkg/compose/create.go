@@ -59,9 +59,9 @@ type createConfigs struct {
 	Links     []string
 }
 
-func (s *composeService) Create(ctx context.Context, project *types.Project, createOpts api.CreateOptions) error {
+func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return Run(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, createOpts)
+		return s.create(ctx, project, options)
 	}, "create", s.events)
 }
 
@@ -132,12 +132,12 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 }
 
 func prepareNetworks(project *types.Project) {
-	for k, nw := range project.Networks {
-		nw.CustomLabels = nw.CustomLabels.
+	for k, networkConfig := range project.Networks {
+		networkConfig.CustomLabels = networkConfig.CustomLabels.
 			Add(api.NetworkLabel, k).
 			Add(api.ProjectLabel, project.Name).
 			Add(api.VersionLabel, api.ComposeVersion)
-		project.Networks[k] = nw
+		project.Networks[k] = networkConfig
 	}
 }
 
@@ -151,11 +151,11 @@ func prepareNetworks(project *types.Project) {
 // this function performs no mutation on them.
 func (s *composeService) checkExternalNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
 	external := map[string]string{}
-	for k, nw := range project.Networks {
-		if !nw.External {
+	for k, networkConfig := range project.Networks {
+		if !networkConfig.External {
 			continue
 		}
-		id, err := s.resolveExternalNetwork(ctx, &nw)
+		id, err := s.resolveExternalNetwork(ctx, &networkConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -170,20 +170,20 @@ func (s *composeService) checkExternalNetworks(ctx context.Context, project *typ
 // (see discoverUnmanagedNetworks); the warning tells the user to set
 // `external: true` to make the intent explicit.
 func warnUnmanagedNetworks(project *types.Project, observed *ObservedState) {
-	for k, nw := range project.Networks {
-		if nw.External {
+	for k, networkConfig := range project.Networks {
+		if networkConfig.External {
 			continue
 		}
-		obs, _, ok := observed.selectNetwork(k, nw.Name)
+		obs, _, ok := observed.selectNetwork(k, networkConfig.Name)
 		if !ok || obs.ProjectName == project.Name {
 			continue
 		}
 		if obs.ProjectName == "" {
 			logrus.Warnf("a network with name %s exists but was not created by compose.\n"+
-				"Set `external: true` to use an existing network", nw.Name)
+				"Set `external: true` to use an existing network", networkConfig.Name)
 		} else {
 			logrus.Warnf("a network with name %s exists but was not created for project %q.\n"+
-				"Set `external: true` to use an existing network", nw.Name, project.Name)
+				"Set `external: true` to use an existing network", networkConfig.Name, project.Name)
 		}
 	}
 }
@@ -254,9 +254,9 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	service types.ServiceConfig,
 	number int,
 	inherit *container.Summary,
-	opts createOptions,
+	options createOptions,
 ) (createConfigs, error) {
-	labels := opts.Labels
+	labels := options.Labels
 	hash, err := ServiceHash(service)
 	if err != nil {
 		return createConfigs{}, err
@@ -316,8 +316,8 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		ExposedPorts:    exposedPorts,
 		Tty:             tty,
 		OpenStdin:       stdinOpen,
-		StdinOnce:       opts.AttachStdin && stdinOpen,
-		AttachStdin:     opts.AttachStdin,
+		StdinOnce:       options.AttachStdin && stdinOpen,
+		AttachStdin:     options.AttachStdin,
 		AttachStderr:    true,
 		AttachStdout:    true,
 		Cmd:             runCmd,
@@ -350,7 +350,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
-	networkMode, networkingConfig, err := defaultNetworkSettings(p, service, number, links, opts.UseNetworkAliases, apiVersion)
+	networkMode, networkingConfig, err := defaultNetworkSettings(p, service, number, links, options.UseNetworkAliases, apiVersion)
 	if err != nil {
 		return createConfigs{}, err
 	}
@@ -383,7 +383,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	}
 
 	hostConfig := container.HostConfig{
-		AutoRemove:     opts.AutoRemove,
+		AutoRemove:     options.AutoRemove,
 		Annotations:    service.Annotations,
 		Binds:          binds,
 		Mounts:         mounts,
@@ -1163,37 +1163,37 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	return values, nil
 }
 
-func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.Mount) (map[string]mount.Mount, error) {
-	for _, v := range s.Volumes {
-		bindMount, err := buildMount(p, v)
+func fillBindMounts(project types.Project, service types.ServiceConfig, mounts map[string]mount.Mount) (map[string]mount.Mount, error) {
+	for _, volume := range service.Volumes {
+		bindMount, err := buildMount(project, volume)
 		if err != nil {
 			return nil, err
 		}
-		m[bindMount.Target] = bindMount
+		mounts[bindMount.Target] = bindMount
 	}
 
-	secrets, err := buildContainerSecretMounts(p, s)
+	secretMounts, err := buildContainerSecretMounts(project, service)
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range secrets {
-		if _, found := m[s.Target]; found {
+	for _, secretMount := range secretMounts {
+		if _, found := mounts[secretMount.Target]; found {
 			continue
 		}
-		m[s.Target] = s
+		mounts[secretMount.Target] = secretMount
 	}
 
-	configs, err := buildContainerConfigMounts(p, s)
+	configMounts, err := buildContainerConfigMounts(project, service)
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range configs {
-		if _, found := m[c.Target]; found {
+	for _, configMount := range configMounts {
+		if _, found := mounts[configMount.Target]; found {
 			continue
 		}
-		m[c.Target] = c
+		mounts[configMount.Target] = configMount
 	}
-	return m, nil
+	return mounts, nil
 }
 
 func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
@@ -1403,19 +1403,19 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 	if bind == nil {
 		return nil
 	}
-	opts := &mount.BindOptions{
+	bindOptions := &mount.BindOptions{
 		Propagation:      mount.Propagation(bind.Propagation),
 		CreateMountpoint: bool(bind.CreateHostPath),
 	}
 	switch bind.Recursive {
 	case "disabled":
-		opts.NonRecursive = true
+		bindOptions.NonRecursive = true
 	case "writable":
-		opts.ReadOnlyNonRecursive = true
+		bindOptions.ReadOnlyNonRecursive = true
 	case "readonly":
-		opts.ReadOnlyForceRecursive = true
+		bindOptions.ReadOnlyForceRecursive = true
 	}
-	return opts
+	return bindOptions
 }
 
 // createNetwork creates the given (managed) network with its compose labels and
@@ -1443,7 +1443,7 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		return err
 	}
 	n.CustomLabels = n.CustomLabels.Add(api.ConfigHashLabel, hash)
-	createOpts := client.NetworkCreateOptions{
+	networkCreateOptions := client.NetworkCreateOptions{
 		Labels:     mergeLabels(n.Labels, n.CustomLabels),
 		Driver:     n.Driver,
 		Options:    n.DriverOpts,
@@ -1455,11 +1455,11 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 	}
 
 	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
-		createOpts.IPAM = &network.IPAM{}
+		networkCreateOptions.IPAM = &network.IPAM{}
 	}
 
 	if n.Ipam.Driver != "" {
-		createOpts.IPAM.Driver = n.Ipam.Driver
+		networkCreateOptions.IPAM.Driver = n.Ipam.Driver
 	}
 
 	for _, ipamConfig := range n.Ipam.Config {
@@ -1467,13 +1467,13 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		if err != nil {
 			return err
 		}
-		createOpts.IPAM.Config = append(createOpts.IPAM.Config, c)
+		networkCreateOptions.IPAM.Config = append(networkCreateOptions.IPAM.Config, c)
 	}
 
 	networkEventName := fmt.Sprintf("Network %s", n.Name)
 	s.events.On(creatingEvent(networkEventName))
 
-	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts); err != nil {
+	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, networkCreateOptions); err != nil {
 		// A concurrent `docker compose up|run` may have created the same network
 		// between the observed-state snapshot and now. Treat the resulting
 		// conflict as success rather than failing hard, mirroring the retry the

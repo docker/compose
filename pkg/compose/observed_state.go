@@ -159,40 +159,40 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	}
 
 	knownServices := map[string]bool{}
-	for _, svc := range project.Services {
-		knownServices[svc.Name] = true
-		state.Containers[svc.Name] = nil // ensure key exists even if empty
+	for _, service := range project.Services {
+		knownServices[service.Name] = true
+		state.Containers[service.Name] = nil // ensure key exists even if empty
 	}
 	for _, ds := range project.DisabledServices {
 		knownServices[ds.Name] = true
 	}
 
-	for _, c := range raw {
-		svcName := c.Labels[api.ServiceLabel]
-		if isNotOneOff(c) && knownServices[svcName] {
-			state.Containers[svcName] = append(state.Containers[svcName], toObservedContainer(c))
-		} else if isOrphaned(project)(c) {
-			state.Orphans = append(state.Orphans, toObservedContainer(c))
+	for _, ctr := range raw {
+		svcName := ctr.Labels[api.ServiceLabel]
+		if isNotOneOff(ctr) && knownServices[svcName] {
+			state.Containers[svcName] = append(state.Containers[svcName], toObservedContainer(ctr))
+		} else if isOrphaned(project)(ctr) {
+			state.Orphans = append(state.Orphans, toObservedContainer(ctr))
 		}
 	}
 
 	// --- Networks ---
-	nwList, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
+	networkList, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
 		Filters: projectFilter(project.Name),
 	})
 	if err != nil {
 		return nil, err
 	}
-	for _, nw := range nwList.Items {
-		key := nw.Labels[api.NetworkLabel]
+	for _, network := range networkList.Items {
+		key := network.Labels[api.NetworkLabel]
 		if key == "" {
 			continue
 		}
 		state.Networks[key] = append(state.Networks[key], ObservedNetwork{
-			ID:          nw.ID,
-			Name:        nw.Name,
-			ConfigHash:  nw.Labels[api.ConfigHashLabel],
-			ProjectName: nw.Labels[api.ProjectLabel],
+			ID:          network.ID,
+			Name:        network.Name,
+			ConfigHash:  network.Labels[api.ConfigHashLabel],
+			ProjectName: network.Labels[api.ProjectLabel],
 		})
 	}
 
@@ -235,14 +235,14 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 // warnUnmanagedNetworks for the accompanying user warning.
 func (s *composeService) discoverUnmanagedNetworks(ctx context.Context, project *types.Project, state *ObservedState) error {
 	for _, key := range project.NetworkNames() {
-		nw := project.Networks[key]
-		if nw.External {
+		networkConfig := project.Networks[key]
+		if networkConfig.External {
 			continue
 		}
 		if len(state.Networks[key]) > 0 {
 			continue
 		}
-		inspected, err := s.apiClient().NetworkInspect(ctx, nw.Name, client.NetworkInspectOptions{})
+		inspected, err := s.apiClient().NetworkInspect(ctx, networkConfig.Name, client.NetworkInspectOptions{})
 		if err != nil {
 			if errdefs.IsNotFound(err) {
 				continue // absent: it will be created by the reconciliation plan
@@ -251,7 +251,7 @@ func (s *composeService) discoverUnmanagedNetworks(ctx context.Context, project 
 		}
 		// NetworkInspect matches on ID prefix, so guard against a partial match
 		// (e.g. a network whose ID starts with the requested name).
-		if inspected.Network.Name != nw.Name && inspected.Network.ID != nw.Name {
+		if inspected.Network.Name != networkConfig.Name && inspected.Network.ID != networkConfig.Name {
 			continue
 		}
 		state.Networks[key] = append(state.Networks[key], ObservedNetwork{
@@ -348,8 +348,8 @@ func (s *ObservedState) setResolvedNetworks(networks map[string]string, project 
 	// Only external networks are passed here; they carry no compose label and so
 	// are absent from the collected state, hence a plain append.
 	for key, id := range networks {
-		nw := project.Networks[key]
-		s.Networks[key] = append(s.Networks[key], ObservedNetwork{ID: id, Name: nw.Name})
+		networkConfig := project.Networks[key]
+		s.Networks[key] = append(s.Networks[key], ObservedNetwork{ID: id, Name: networkConfig.Name})
 	}
 }
 
@@ -379,10 +379,10 @@ func emitRunningEvents(project *types.Project, observed *ObservedState, plan *Pl
 		}
 	}
 
-	for _, svc := range project.Services {
-		for _, oc := range observed.Containers[svc.Name] {
-			if oc.State == container.StateRunning && !planned[oc.ID] {
-				events.On(newEvent("Container "+oc.Name, api.Done, api.StatusRunning))
+	for _, service := range project.Services {
+		for _, observedContainer := range observed.Containers[service.Name] {
+			if observedContainer.State == container.StateRunning && !planned[observedContainer.ID] {
+				events.On(newEvent("Container "+observedContainer.Name, api.Done, api.StatusRunning))
 			}
 		}
 	}
@@ -404,12 +404,12 @@ func (s *ObservedState) containersByService() map[string]Containers {
 		return map[string]Containers{}
 	}
 	result := make(map[string]Containers, len(s.Containers))
-	for svc, ocs := range s.Containers {
-		summaries := make(Containers, len(ocs))
-		for i, oc := range ocs {
-			summaries[i] = oc.Summary
+	for serviceName, observedContainers := range s.Containers {
+		summaries := make(Containers, len(observedContainers))
+		for i, observedContainer := range observedContainers {
+			summaries[i] = observedContainer.Summary
 		}
-		result[svc] = summaries
+		result[serviceName] = summaries
 	}
 	return result
 }

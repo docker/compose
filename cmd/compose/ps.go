@@ -134,16 +134,16 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 	})
 
 	if opts.Quiet {
-		for _, c := range containers {
-			_, _ = fmt.Fprintln(dockerCli.Out(), c.ID)
+		for _, ctr := range containers {
+			_, _ = fmt.Fprintln(dockerCli.Out(), ctr.ID)
 		}
 		return nil
 	}
 
 	if opts.Services {
 		services := []string{}
-		for _, c := range containers {
-			s := c.Service
+		for _, ctr := range containers {
+			s := ctr.Service
 			if !slices.Contains(services, s) {
 				services = append(services, s)
 			}
@@ -170,9 +170,9 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 
 func filterByStatus(containers []api.ContainerSummary, statuses []string) []api.ContainerSummary {
 	var filtered []api.ContainerSummary
-	for _, c := range containers {
-		if slices.Contains(statuses, string(c.State)) {
-			filtered = append(filtered, c)
+	for _, ctr := range containers {
+		if slices.Contains(statuses, string(ctr.State)) {
+			filtered = append(filtered, ctr)
 		}
 	}
 	return filtered

@@ -216,8 +216,8 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		if err != nil {
 			return err
 		}
-		nw := nwInspect.Network
-		if len(nw.Containers) > 0 {
+		inspectedNetwork := nwInspect.Network
+		if len(inspectedNetwork.Containers) > 0 {
 			s.events.On(newEvent(eventName, api.Warning, "Resource is still in use"))
 			found++
 			continue

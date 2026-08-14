@@ -365,17 +365,17 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		return project, fmt.Errorf("no container found for project %q: %w", projectName, api.ErrNotFound)
 	}
 	set := types.Services{}
-	for _, c := range containers {
-		serviceLabel, ok := c.Labels[api.ServiceLabel]
+	for _, ctr := range containers {
+		serviceLabel, ok := ctr.Labels[api.ServiceLabel]
 		if !ok {
-			serviceLabel = getCanonicalContainerName(c)
+			serviceLabel = getCanonicalContainerName(ctr)
 		}
 		service, ok := set[serviceLabel]
 		if !ok {
 			service = types.ServiceConfig{
 				Name:   serviceLabel,
-				Image:  c.Image,
-				Labels: c.Labels,
+				Image:  ctr.Image,
+				Labels: ctr.Labels,
 			}
 		}
 		service.Scale = increment(service.Scale)
@@ -433,10 +433,10 @@ func increment(scale *int) *int {
 }
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
-	opts := client.VolumeListOptions{
+	options := client.VolumeListOptions{
 		Filters: projectFilter(projectName),
 	}
-	volumes, err := s.apiClient().VolumeList(ctx, opts)
+	volumes, err := s.apiClient().VolumeList(ctx, options)
 	if err != nil {
 		return nil, err
 	}

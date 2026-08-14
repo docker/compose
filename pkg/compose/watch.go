@@ -637,7 +637,7 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 	if err != nil {
 		return err
 	}
-	for _, c := range containers {
+	for _, ctr := range containers {
 		eg.Go(func() error {
 			exec := ccli.NewExecOptions()
 			exec.User = x.User
@@ -651,7 +651,7 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 					return err
 				}
 			}
-			return ccli.RunExec(ctx, s.dockerCli, c.ID, exec)
+			return ccli.RunExec(ctx, s.dockerCli, ctr.ID, exec)
 		})
 	}
 	return nil

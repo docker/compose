@@ -76,23 +76,23 @@ func (s *composeService) createProjectFromContainers(containers []container.Summ
 		project.Name = projectName
 	}
 
-	for _, c := range containers {
+	for _, ctr := range containers {
 		// if the container is from a previous Compose application, use the existing service name
-		serviceLabel, ok := c.Labels[api.ServiceLabel]
+		serviceLabel, ok := ctr.Labels[api.ServiceLabel]
 		if !ok {
-			serviceLabel = getCanonicalContainerName(c)
+			serviceLabel = getCanonicalContainerName(ctr)
 		}
 		service, ok := services[serviceLabel]
 		if !ok {
 			service = types.ServiceConfig{
 				Name:   serviceLabel,
-				Image:  c.Image,
-				Labels: c.Labels,
+				Image:  ctr.Image,
+				Labels: ctr.Labels,
 			}
 		}
 		service.Scale = increment(service.Scale)
 
-		inspect, err := s.apiClient().ContainerInspect(context.Background(), c.ID, client.ContainerInspectOptions{})
+		inspect, err := s.apiClient().ContainerInspect(context.Background(), ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			services[serviceLabel] = service
 			continue

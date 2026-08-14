@@ -312,14 +312,14 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 
 func nextContainerNumber(containers []container.Summary) int {
 	maxNumber := 0
-	for _, c := range containers {
-		s, ok := c.Labels[api.ContainerNumberLabel]
+	for _, ctr := range containers {
+		s, ok := ctr.Labels[api.ContainerNumberLabel]
 		if !ok {
-			logrus.Warnf("container %s is missing %s label", c.ID, api.ContainerNumberLabel)
+			logrus.Warnf("container %s is missing %s label", ctr.ID, api.ContainerNumberLabel)
 		}
 		n, err := strconv.Atoi(s)
 		if err != nil {
-			logrus.Warnf("container %s has invalid %s label: %s", c.ID, api.ContainerNumberLabel, s)
+			logrus.Warnf("container %s has invalid %s label: %s", ctr.ID, api.ContainerNumberLabel, s)
 			continue
 		}
 		if n > maxNumber {
@@ -330,11 +330,11 @@ func nextContainerNumber(containers []container.Summary) int {
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, opts createOptions,
+	name string, number int, options createOptions,
 ) (ctr container.Summary, err error) {
 	eventName := "Container " + name
 	s.events.On(creatingEvent(eventName))
-	ctr, err = s.createMobyContainer(ctx, project, service, name, number, nil, opts)
+	ctr, err = s.createMobyContainer(ctx, project, service, name, number, nil, options)
 	if err != nil {
 		if ctx.Err() == nil {
 			s.events.On(api.Resource{
@@ -353,10 +353,10 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 var startMx sync.Mutex
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, inherit *container.Summary, opts createOptions,
+	name string, number int, inherit *container.Summary, options createOptions,
 ) (container.Summary, error) {
 	var created container.Summary
-	cfgs, err := s.getCreateConfigs(ctx, project, service, number, inherit, opts)
+	cfgs, err := s.getCreateConfigs(ctx, project, service, number, inherit, options)
 	if err != nil {
 		return created, err
 	}
@@ -407,7 +407,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 				// primary network already configured as part of ContainerCreate
 				continue
 			}
-			epSettings, err := createEndpointSettings(project, service, number, networkKey, cfgs.Links, opts.UseNetworkAliases)
+			epSettings, err := createEndpointSettings(project, service, number, networkKey, cfgs.Links, options.UseNetworkAliases)
 			if err != nil {
 				_, _ = s.apiClient().ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
 				return created, err
@@ -454,12 +454,12 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 		if !ok {
 			linkName = linkServiceName
 		}
-		cnts, err := getServiceContainers(linkServiceName)
+		serviceContainers, err := getServiceContainers(linkServiceName)
 		if err != nil {
 			return nil, err
 		}
-		for _, c := range cnts {
-			containerName := getCanonicalContainerName(c)
+		for _, ctr := range serviceContainers {
+			containerName := getCanonicalContainerName(ctr)
 			links = append(links,
 				format(containerName, linkName),
 				format(containerName, linkServiceName+api.Separator+strconv.Itoa(number)),
@@ -469,12 +469,12 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 	}
 
 	if service.Labels[api.OneoffLabel] == "True" {
-		cnts, err := getServiceContainers(service.Name)
+		serviceContainers, err := getServiceContainers(service.Name)
 		if err != nil {
 			return nil, err
 		}
-		for _, c := range cnts {
-			containerName := getCanonicalContainerName(c)
+		for _, ctr := range serviceContainers {
+			containerName := getCanonicalContainerName(ctr)
 			links = append(links,
 				format(containerName, service.Name),
 				format(containerName, strings.TrimPrefix(containerName, projectName+api.Separator)),
@@ -494,8 +494,8 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 }
 
 func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool) (bool, error) {
-	for _, c := range containers {
-		res, err := s.apiClient().ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
+	for _, ctr := range containers {
+		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -530,8 +530,8 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 }
 
 func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
-	for _, c := range containers {
-		res, err := s.apiClient().ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
+	for _, ctr := range containers {
+		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return false, 0, err
 		}

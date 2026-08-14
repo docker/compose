@@ -70,8 +70,8 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	}
 
 	var names []string
-	for _, c := range stoppedContainers {
-		names = append(names, getCanonicalContainerName(c))
+	for _, ctr := range stoppedContainers {
+		names = append(names, getCanonicalContainerName(ctr))
 	}
 
 	if len(names) == 0 {

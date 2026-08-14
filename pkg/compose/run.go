@@ -41,8 +41,8 @@ type prepareRunResult struct {
 	created     container.Summary
 }
 
-func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
-	result, err := s.prepareRun(ctx, project, opts)
+func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, options api.RunOptions) (int, error) {
+	result, err := s.prepareRun(ctx, project, options)
 	if err != nil {
 		return 0, err
 	}
@@ -68,8 +68,8 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	}
 
 	err = cmd.RunStart(ctx, s.dockerCli, &cmd.StartOptions{
-		OpenStdin:  !opts.Detach && opts.Interactive,
-		Attach:     !opts.Detach,
+		OpenStdin:  !options.Detach && options.Interactive,
+		Attach:     !options.Detach,
 		Containers: []string{result.containerID},
 		DetachKeys: s.configFile().DetachKeys,
 	})
@@ -119,7 +119,7 @@ func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, container
 	return nil
 }
 
-func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (prepareRunResult, error) {
+func (s *composeService) prepareRun(ctx context.Context, project *types.Project, options api.RunOptions) (prepareRunResult, error) {
 	// Temporary implementation of use_api_socket until we get actual support inside docker engine
 	project, err := s.useAPISocket(project)
 	if err != nil {
@@ -127,20 +127,20 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 
 	err = Run(ctx, func(ctx context.Context) error {
-		return s.startDependencies(ctx, project, opts)
+		return s.startDependencies(ctx, project, options)
 	}, "run", s.events)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
 
-	service, err := project.GetService(opts.Service)
+	service, err := project.GetService(options.Service)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
 
-	applyRunOptions(project, &service, opts)
+	applyRunOptions(project, &service, options)
 
-	if err := s.stdin().CheckTty(opts.Interactive, service.Tty); err != nil {
+	if err := s.stdin().CheckTty(options.Interactive, service.Tty); err != nil {
 		return prepareRunResult{}, err
 	}
 
@@ -159,8 +159,8 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		Add(api.OneoffLabel, "True")
 
 	// Only ensure image exists for the target service, dependencies were already handled by startDependencies
-	buildOpts := prepareBuildOptions(opts)
-	if err := s.ensureImagesExists(ctx, project, buildOpts, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
+	buildOpts := prepareBuildOptions(options)
+	if err := s.ensureImagesExists(ctx, project, buildOpts, options.QuietPull); err != nil { // all dependencies already checked, but might miss service img
 		return prepareRunResult{}, err
 	}
 
@@ -169,15 +169,15 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	if !opts.NoDeps {
+	if !options.NoDeps {
 		if err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, observedState, 0); err != nil {
 			return prepareRunResult{}, err
 		}
 	}
 	createOpts := createOptions{
-		AutoRemove:        opts.AutoRemove,
-		AttachStdin:       opts.Interactive,
-		UseNetworkAliases: opts.UseNetworkAliases,
+		AutoRemove:        options.AutoRemove,
+		AttachStdin:       options.Interactive,
+		UseNetworkAliases: options.UseNetworkAliases,
 		Labels:            mergeLabels(service.Labels, service.CustomLabels),
 	}
 
@@ -185,7 +185,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
-	err = s.ensureModels(ctx, project, opts.QuietPull)
+	err = s.ensureModels(ctx, project, options.QuietPull)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
@@ -213,47 +213,47 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}, err
 }
 
-func prepareBuildOptions(opts api.RunOptions) *api.BuildOptions {
-	if opts.Build == nil {
+func prepareBuildOptions(options api.RunOptions) *api.BuildOptions {
+	if options.Build == nil {
 		return nil
 	}
 	// Create a copy of build options and restrict to only the target service
-	buildOptsCopy := *opts.Build
-	buildOptsCopy.Services = []string{opts.Service}
-	return &buildOptsCopy
+	buildOptionsCopy := *options.Build
+	buildOptionsCopy.Services = []string{options.Service}
+	return &buildOptionsCopy
 }
 
-func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
-	service.Tty = opts.Tty
-	service.StdinOpen = opts.Interactive
-	service.ContainerName = opts.Name
+func applyRunOptions(project *types.Project, service *types.ServiceConfig, options api.RunOptions) {
+	service.Tty = options.Tty
+	service.StdinOpen = options.Interactive
+	service.ContainerName = options.Name
 
-	if len(opts.Command) > 0 {
-		service.Command = opts.Command
+	if len(options.Command) > 0 {
+		service.Command = options.Command
 	}
-	if opts.User != "" {
-		service.User = opts.User
+	if options.User != "" {
+		service.User = options.User
 	}
 
-	if len(opts.CapAdd) > 0 {
-		service.CapAdd = append(service.CapAdd, opts.CapAdd...)
-		service.CapDrop = slices.DeleteFunc(service.CapDrop, func(e string) bool { return slices.Contains(opts.CapAdd, e) })
+	if len(options.CapAdd) > 0 {
+		service.CapAdd = append(service.CapAdd, options.CapAdd...)
+		service.CapDrop = slices.DeleteFunc(service.CapDrop, func(e string) bool { return slices.Contains(options.CapAdd, e) })
 	}
-	if len(opts.CapDrop) > 0 {
-		service.CapDrop = append(service.CapDrop, opts.CapDrop...)
-		service.CapAdd = slices.DeleteFunc(service.CapAdd, func(e string) bool { return slices.Contains(opts.CapDrop, e) })
+	if len(options.CapDrop) > 0 {
+		service.CapDrop = append(service.CapDrop, options.CapDrop...)
+		service.CapAdd = slices.DeleteFunc(service.CapAdd, func(e string) bool { return slices.Contains(options.CapDrop, e) })
 	}
-	if opts.WorkingDir != "" {
-		service.WorkingDir = opts.WorkingDir
+	if options.WorkingDir != "" {
+		service.WorkingDir = options.WorkingDir
 	}
-	if opts.Entrypoint != nil {
-		service.Entrypoint = opts.Entrypoint
-		if len(opts.Command) == 0 {
+	if options.Entrypoint != nil {
+		service.Entrypoint = options.Entrypoint
+		if len(options.Command) == 0 {
 			service.Command = []string{}
 		}
 	}
-	if len(opts.Environment) > 0 {
-		cmdEnv := types.NewMappingWithEquals(opts.Environment)
+	if len(options.Environment) > 0 {
+		cmdEnv := types.NewMappingWithEquals(options.Environment)
 		serviceOverrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
 			v, ok := envResolver(project.Environment)(s)
 			return v, ok
@@ -263,7 +263,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 		}
 		service.Environment.OverrideBy(serviceOverrideEnv)
 	}
-	for k, v := range opts.Labels {
+	for k, v := range options.Labels {
 		service.Labels = service.Labels.Add(k, v)
 	}
 }

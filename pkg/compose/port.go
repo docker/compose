@@ -26,9 +26,9 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Port(ctx context.Context, projectName string, service string, port uint16, options api.PortOptions) (string, int, error) {
+func (s *composeService) Port(ctx context.Context, projectName string, serviceName string, port uint16, options api.PortOptions) (string, int, error) {
 	projectName = strings.ToLower(projectName)
-	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, service, options.Index)
+	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, serviceName, options.Index)
 	if err != nil {
 		return "", 0, err
 	}
