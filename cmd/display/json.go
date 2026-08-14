@@ -49,12 +49,12 @@ type jsonMessage struct {
 	Percent  int    `json:"percent,omitempty"`
 }
 
-func (p *jsonWriter) Start(ctx context.Context, operation string) {
+func (w *jsonWriter) Start(ctx context.Context, operation string) {
 }
 
-func (p *jsonWriter) Event(e api.Resource) {
+func (w *jsonWriter) Event(e api.Resource) {
 	message := &jsonMessage{
-		DryRun:   p.dryRun,
+		DryRun:   w.dryRun,
 		Tail:     false,
 		ID:       e.ID,
 		Status:   e.StatusText(),
@@ -67,15 +67,15 @@ func (p *jsonWriter) Event(e api.Resource) {
 	}
 	marshal, err := json.Marshal(message)
 	if err == nil {
-		_, _ = fmt.Fprintln(p.out, string(marshal))
+		_, _ = fmt.Fprintln(w.out, string(marshal))
 	}
 }
 
-func (p *jsonWriter) On(events ...api.Resource) {
+func (w *jsonWriter) On(events ...api.Resource) {
 	for _, e := range events {
-		p.Event(e)
+		w.Event(e)
 	}
 }
 
-func (p *jsonWriter) Done(_ string, _ bool) {
+func (w *jsonWriter) Done(_ string, _ bool) {
 }

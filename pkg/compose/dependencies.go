@@ -286,10 +286,10 @@ func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, erro
 }
 
 // NewVertex is the constructor function for the Vertex
-func NewVertex(key string, service string, initialStatus ServiceStatus) *Vertex {
+func NewVertex(key string, serviceName string, initialStatus ServiceStatus) *Vertex {
 	return &Vertex{
 		Key:      key,
-		Service:  service,
+		Service:  serviceName,
 		Status:   initialStatus,
 		Parents:  map[string]*Vertex{},
 		Children: map[string]*Vertex{},
@@ -297,11 +297,11 @@ func NewVertex(key string, service string, initialStatus ServiceStatus) *Vertex 
 }
 
 // AddVertex adds a vertex to the Graph
-func (g *Graph) AddVertex(key string, service string, initialStatus ServiceStatus) {
+func (g *Graph) AddVertex(key string, serviceName string, initialStatus ServiceStatus) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	v := NewVertex(key, service, initialStatus)
+	v := NewVertex(key, serviceName, initialStatus)
 	g.Vertices[key] = v
 }
 

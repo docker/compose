@@ -30,14 +30,14 @@ import (
 func RequireServiceState(t testing.TB, cli *CLI, service string, state string) {
 	t.Helper()
 	psRes := cli.RunDockerComposeCmd(t, "ps", "--all", "--format=json", service)
-	var svc map[string]any
-	assert.NilError(t, json.Unmarshal([]byte(psRes.Stdout()), &svc),
+	var serviceState map[string]any
+	assert.NilError(t, json.Unmarshal([]byte(psRes.Stdout()), &serviceState),
 		"Invalid `compose ps` JSON: command output: %s",
 		psRes.Combined())
 
-	assert.Assert(t, is.Equal(service, svc["Service"]), "Found ps output for unexpected service")
-	assert.Assert(t, is.Equal(strings.ToLower(state), strings.ToLower(svc["State"].(string))),
+	assert.Assert(t, is.Equal(service, serviceState["Service"]), "Found ps output for unexpected service")
+	assert.Assert(t, is.Equal(strings.ToLower(state), strings.ToLower(serviceState["State"].(string))),
 		"Service %q (%s) not in expected state",
-		service, svc["Name"],
+		service, serviceState["Name"],
 	)
 }

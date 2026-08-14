@@ -42,9 +42,9 @@ const (
 	oneOffOnly
 )
 
-func (s *composeService) getContainers(ctx context.Context, project string, oneOff oneOff, all bool, selectedServices ...string) (Containers, error) {
+func (s *composeService) getContainers(ctx context.Context, projectName string, oneOff oneOff, all bool, selectedServices ...string) (Containers, error) {
 	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: getDefaultFilters(project, oneOff, selectedServices...),
+		Filters: getDefaultFilters(projectName, oneOff, selectedServices...),
 		All:     all,
 	})
 	if err != nil {
@@ -64,9 +64,9 @@ func (s *composeService) getContainersByService(ctx context.Context, projectName
 		return nil, err
 	}
 	result := map[string]Containers{}
-	for _, c := range all.filter(isNotOneOff) {
-		svc := c.Labels[api.ServiceLabel]
-		result[svc] = append(result[svc], c)
+	for _, ctr := range all.filter(isNotOneOff) {
+		serviceName := ctr.Labels[api.ServiceLabel]
+		result[serviceName] = append(result[serviceName], ctr)
 	}
 	return result, nil
 }
@@ -169,9 +169,9 @@ func isNotRunning(c container.Summary) bool {
 // filter return Containers with elements to match predicate
 func (containers Containers) filter(predicates ...containerPredicate) Containers {
 	var filtered Containers
-	for _, c := range containers {
-		if matches(c, predicates...) {
-			filtered = append(filtered, c)
+	for _, ctr := range containers {
+		if matches(ctr, predicates...) {
+			filtered = append(filtered, ctr)
 		}
 	}
 	return filtered

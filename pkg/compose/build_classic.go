@@ -51,12 +51,12 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	// Not using bake, additional_context: service:xx is implemented by building images in dependency order
 	project, err := project.WithServicesTransform(func(serviceName string, service types.ServiceConfig) (types.ServiceConfig, error) {
 		if service.Build != nil {
-			for _, c := range service.Build.AdditionalContexts {
-				if t, found := strings.CutPrefix(c, types.ServicePrefix); found {
+			for _, additionalContext := range service.Build.AdditionalContexts {
+				if targetService, found := strings.CutPrefix(additionalContext, types.ServicePrefix); found {
 					if service.DependsOn == nil {
 						service.DependsOn = map[string]types.ServiceDependency{}
 					}
-					service.DependsOn[t] = types.ServiceDependency{
+					service.DependsOn[targetService] = types.ServiceDependency{
 						Condition: "build", // non-canonical, but will force dependency graph ordering
 					}
 				}

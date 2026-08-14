@@ -23,7 +23,7 @@ import (
 )
 
 // ReplaceExtendsFile changes value for service.extends.file in input yaml stream, preserving formatting
-func ReplaceExtendsFile(in []byte, service string, value string) ([]byte, error) {
+func ReplaceExtendsFile(in []byte, serviceName string, value string) ([]byte, error) {
 	var doc yaml.Node
 	err := yaml.Unmarshal(in, &doc)
 	if err != nil {
@@ -42,7 +42,7 @@ func ReplaceExtendsFile(in []byte, service string, value string) ([]byte, error)
 		return nil, err
 	}
 
-	target, err := getMapping(services, service)
+	target, err := getMapping(services, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func ReplaceExtendsFile(in []byte, service string, value string) ([]byte, error)
 }
 
 // ReplaceEnvFile changes value for service.extends.env_file in input yaml stream, preserving formatting
-func ReplaceEnvFile(in []byte, service string, i int, value string) ([]byte, error) {
+func ReplaceEnvFile(in []byte, serviceName string, i int, value string) ([]byte, error) {
 	var doc yaml.Node
 	err := yaml.Unmarshal(in, &doc)
 	if err != nil {
@@ -81,7 +81,7 @@ func ReplaceEnvFile(in []byte, service string, i int, value string) ([]byte, err
 		return nil, err
 	}
 
-	target, err := getMapping(services, service)
+	target, err := getMapping(services, serviceName)
 	if err != nil {
 		return nil, err
 	}
