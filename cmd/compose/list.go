@@ -25,6 +25,8 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/command"
+	cliformatter "github.com/docker/cli/cli/command/formatter"
+	cliflags "github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/opts"
 	"github.com/moby/moby/client"
 	"github.com/spf13/cobra"
@@ -52,7 +54,7 @@ func listCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
-	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "table", "Format the output. Values: [table | json]")
+	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "table", cliflags.FormatHelp)
 	lsCmd.Flags().BoolVarP(&lsOpts.Quiet, "quiet", "q", false, "Only display project names")
 	lsCmd.Flags().Var(&lsOpts.Filter, "filter", "Filter output based on conditions provided")
 	lsCmd.Flags().BoolVarP(&lsOpts.All, "all", "a", false, "Show all stopped Compose projects")
@@ -119,6 +121,13 @@ func runList(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	}
 
 	view := viewFromStackList(stackList)
+	if !formatter.IsStandardFormat(lsOpts.Format) {
+		projectCtx := cliformatter.Context{
+			Output: dockerCli.Out(),
+			Format: formatter.NewProjectFormat(lsOpts.Format),
+		}
+		return formatter.ProjectWrite(projectCtx, view)
+	}
 	return formatter.Print(view, lsOpts.Format, dockerCli.Out(), func(w io.Writer) {
 		for _, stack := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", stack.Name, stack.Status, stack.ConfigFiles)
@@ -126,11 +135,7 @@ func runList(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	}, "NAME", "STATUS", "CONFIG FILES")
 }
 
-type stackView struct {
-	Name        string
-	Status      string
-	ConfigFiles string
-}
+type stackView = formatter.Project
 
 func viewFromStackList(stackList []api.Stack) []stackView {
 	retList := make([]stackView, len(stackList))
