@@ -118,6 +118,54 @@ func TestLocalComposeConfig(t *testing.T) {
 	})
 }
 
+func TestConfigServicesFilter(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	const projectName = "compose-e2e-config-filter"
+
+	t.Run("--filter profile activates and selects the profile", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName,
+			"config", "--services", "--filter", "profile=workers")
+		assert.Equal(t, res.Stdout(), "monitor\nworker\n")
+	})
+
+	t.Run("--filter rejects profile wildcard", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName,
+			"config", "--services", "--filter", "profile=*")
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "profiles must be selected explicitly"})
+	})
+
+	t.Run("--filter label", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName,
+			"config", "--services", "--filter", "label=tier=backend")
+		assert.Equal(t, res.Stdout(), "core\n")
+	})
+
+	t.Run("--filter combines criteria", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName,
+			"config", "--services", "--filter", "profile=workers", "--filter", "label=tier=backend")
+		assert.Equal(t, res.Stdout(), "worker\n")
+	})
+
+	t.Run("--filter no match prints nothing", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName,
+			"config", "--services", "--filter", "profile=unknown")
+		assert.Equal(t, res.Stdout(), "")
+	})
+
+	t.Run("--filter requires --services", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName,
+			"config", "--filter", "profile=workers")
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "--filter requires --services"})
+	})
+
+	t.Run("--filter rejects unknown criteria", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/config-filter/compose.yaml", "--project-name", projectName,
+			"config", "--services", "--filter", "state=running")
+		res.Assert(t, icmd.Expected{ExitCode: 1, Err: `unknown criteria "state"`})
+	})
+}
+
 func TestConfigHashMatchesContainerLabel(t *testing.T) {
 	c := NewParallelCLI(t)
 
