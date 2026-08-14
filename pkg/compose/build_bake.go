@@ -586,24 +586,20 @@ func (s *composeService) dryRunBake(cfg bakeConfig) map[string]string {
 	bakeResponse := map[string]string{}
 	for name, target := range cfg.Targets {
 		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-		s.displayDryRunBuildEvent(name, dryRunUUID, target.Tags[0])
+		s.events.On(api.Resource{
+			ID:     name + " ==>",
+			Status: api.Done,
+			Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
+		})
+		s.events.On(api.Resource{
+			ID:     name + " ==> ==>",
+			Status: api.Done,
+			Text:   fmt.Sprintf(`naming to %s`, target.Tags[0]),
+		})
 		bakeResponse[name] = dryRunUUID
 	}
 	for name := range bakeResponse {
 		s.events.On(builtEvent(name))
 	}
 	return bakeResponse
-}
-
-func (s *composeService) displayDryRunBuildEvent(name, dryRunUUID, tag string) {
-	s.events.On(api.Resource{
-		ID:     name + " ==>",
-		Status: api.Done,
-		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
-	})
-	s.events.On(api.Resource{
-		ID:     name + " ==> ==>",
-		Status: api.Done,
-		Text:   fmt.Sprintf(`naming to %s`, tag),
-	})
 }
