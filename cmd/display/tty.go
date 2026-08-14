@@ -120,7 +120,7 @@ func (t *task) update(e api.Resource) {
 			t.stop()
 		}
 	case api.Working:
-		t.hasMore()
+		t.spinner.Restart()
 	}
 	t.status = e.Status
 	t.text = e.Text
@@ -140,10 +140,6 @@ func (t *task) update(e api.Resource) {
 func (t *task) stop() {
 	t.endTime = time.Now()
 	t.spinner.Stop()
-}
-
-func (t *task) hasMore() {
-	t.spinner.Restart()
 }
 
 func (t *task) Completed() bool {

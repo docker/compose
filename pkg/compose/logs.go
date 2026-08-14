@@ -62,7 +62,11 @@ func (s *composeService) Logs(
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, ctr := range containers {
 		eg.Go(func() error {
-			err := s.logContainer(ctx, consumer, ctr, options)
+			res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+			if err != nil {
+				return err
+			}
+			err = s.doLogContainer(ctx, consumer, getContainerNameWithoutProject(ctr), res.Container, options)
 			if errdefs.IsNotImplemented(err) {
 				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
 				return nil
@@ -111,15 +115,6 @@ func (s *composeService) Logs(
 	}
 
 	return eg.Wait()
-}
-
-func (s *composeService) logContainer(ctx context.Context, consumer api.LogConsumer, c container.Summary, options api.LogOptions) error {
-	res, err := s.apiClient().ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
-	if err != nil {
-		return err
-	}
-	name := getContainerNameWithoutProject(c)
-	return s.doLogContainer(ctx, consumer, name, res.Container, options)
 }
 
 func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {

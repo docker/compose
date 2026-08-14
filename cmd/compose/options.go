@@ -23,7 +23,6 @@ import (
 	"os"
 	"slices"
 	"sort"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -177,7 +176,7 @@ func promptForInterpolatedVariables(ctx context.Context, dockerCli command.Cli, 
 }
 
 func extractInterpolationVariablesFromModel(ctx context.Context, dockerCli command.Cli, projectOptions *ProjectOptions, cmdEnvs []string) ([]varInfo, bool, error) {
-	cmdEnvMap := extractEnvCLIDefined(cmdEnvs)
+	cmdEnvMap := types.NewMappingWithEquals(cmdEnvs).ToMapping()
 
 	// Create a model without interpolation to extract variables
 	opts := configOptions{
@@ -227,18 +226,6 @@ func extractInterpolationVariablesFromModel(ctx context.Context, dockerCli comma
 		varsInfo = append(varsInfo, info)
 	}
 	return varsInfo, false, nil
-}
-
-func extractEnvCLIDefined(cmdEnvs []string) map[string]string {
-	// Parse command-line environment variables
-	cmdEnvMap := make(map[string]string)
-	for _, env := range cmdEnvs {
-		key, val, ok := strings.Cut(env, "=")
-		if ok {
-			cmdEnvMap[key] = val
-		}
-	}
-	return cmdEnvMap
 }
 
 func displayInterpolationVariables(writer io.Writer, varsInfo []varInfo) {
