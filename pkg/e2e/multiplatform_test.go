@@ -17,11 +17,7 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
 func TestCreateLocalMultiPlatformImage(t *testing.T) {
@@ -29,49 +25,35 @@ func TestCreateLocalMultiPlatformImage(t *testing.T) {
 	// With the containerd image store, a local multi-platform image holding the
 	// requested non-native variant satisfies the default "missing" pull policy:
 	// compose must use it and not try to pull the (unpublished) tag.
-	c := NewParallelCLI(t)
-
-	driverStatus := c.RunDockerCmd(t, "info", "--format", "{{json .DriverStatus}}").Stdout()
-	if !strings.Contains(driverStatus, "io.containerd.snapshotter.v1") {
-		t.Skip("containerd image store not enabled, can't hold a multi-platform image locally")
-	}
+	s := NewScenario(t, "a local multi-platform image must satisfy the default missing pull policy for a non-native platform").
+		Requires(ContainerdImageStore)
 
 	// request the non-native platform, so the requested variant can't be the
-	// one a platform-less image inspect reports
-	requested := "linux/amd64"
-	if arch := c.RunDockerCmd(t, "info", "--format", "{{.Architecture}}").Stdout(); strings.Contains(arch, "x86_64") {
-		requested = "linux/arm64"
-	}
-
-	// the tag deliberately doesn't exist on any registry: resolving the
-	// requested platform from the local image is the only way to succeed
+	// one a platform-less image inspect reports; the tag deliberately doesn't
+	// exist on any registry: resolving the requested platform from the local
+	// image is the only way to succeed
+	requested := s.NonNativePlatform()
 	const image = "compose-e2e-multiplatform-local-only:v1"
-	const projectName = "e2e-multiplatform-local"
-
-	cleanup := func() {
-		c.RunDockerComposeCmdNoCheck(t, "--project-name", projectName, "down", "--timeout=0")
-		c.RunDockerOrExitError(t, "image", "rm", image)
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	// store both the native and the requested variants under the local-only tag
-	c.RunDockerCmd(t, "pull", "-q", "--platform", "linux/amd64", "alpine:3.22")
-	c.RunDockerCmd(t, "pull", "-q", "--platform", "linux/arm64", "alpine:3.22")
-	c.RunDockerCmd(t, "tag", "alpine:3.22", image)
 
 	// `create` exercises the same image-resolution/pull-policy path as `up`,
 	// without requiring emulation to actually run the non-native binary
-	cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/multiplatform/compose.yaml",
-		"--project-name", projectName, "create")
-	cmd.Env = append(cmd.Env, "REQUESTED_PLATFORM="+requested)
-	res := icmd.RunCmd(cmd)
-	res.Assert(t, icmd.Success)
-	assert.Assert(t, !strings.Contains(res.Combined(), "Pulling"), res.Combined())
-
-	// the created container must be for the requested variant
-	platform := strings.TrimSpace(c.RunDockerCmd(t, "inspect", "--format",
-		"{{.ImageManifestDescriptor.Platform.OS}}/{{.ImageManifestDescriptor.Platform.Architecture}}",
-		projectName+"-repro-1").Stdout())
-	assert.Equal(t, requested, platform)
+	s.Env("REQUESTED_PLATFORM="+requested).
+		Compose(`
+services:
+  repro:
+    image: compose-e2e-multiplatform-local-only:v1
+    platform: ${REQUESTED_PLATFORM}
+    command: ["uname", "-m"]
+`).
+		Defer(DockerCmd("image", "rm", image)).
+		Step("store the amd64 variant in the local store",
+			DockerCmd("pull", "-q", "--platform", "linux/amd64", "alpine:3.22")).
+		Step("store the arm64 variant in the local store",
+			DockerCmd("pull", "-q", "--platform", "linux/arm64", "alpine:3.22")).
+		Step("tag both variants under a tag that exists on no registry",
+			DockerCmd("tag", "alpine:3.22", image)).
+		Step("create uses the local variant for the requested platform without pulling",
+			ComposeCmd("create"),
+			OutputNotContains("Pulling"),
+			RunsOnPlatform("repro", requested))
 }

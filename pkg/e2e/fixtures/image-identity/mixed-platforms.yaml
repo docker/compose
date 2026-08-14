@@ -1,8 +1,0 @@
-services:
-  native:
-    image: alpine:3.19
-    command: ["sleep", "infinity"]
-  pinned:
-    image: alpine:3.19
-    platform: ${PINNED_PLATFORM}
-    command: ["sleep", "infinity"]

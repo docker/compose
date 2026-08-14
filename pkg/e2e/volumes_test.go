@@ -198,28 +198,29 @@ func TestImageVolumeImageAlreadyLocal(t *testing.T) {
 	// digest the daemon can't resolve as a mount source under the containerd
 	// image store ("No such image"). TestImageVolume only covers this path by
 	// accident, when a previous test left the image in the local store.
-	c := NewCLI(t)
-	const projectName = "compose-e2e-image-volume-local"
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-
-	version := c.RunDockerCmd(t, "version", "-f", "{{.Server.Version}}")
-	major, _, found := strings.Cut(version.Combined(), ".")
-	assert.Assert(t, found)
-	if major == "26" || major == "27" {
-		t.Skip("Skipping test due to docker version < 28")
-	}
-
-	// make sure the source image is already in the local store
-	c.RunDockerCmd(t, "pull", "-q", "nginx:alpine")
-
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/volumes/compose.yaml", "--project-name", projectName, "up", "with_image")
-	assert.Check(t, strings.Contains(res.Combined(), "index.html"), res.Combined())
-
-	// the unchanged service must not be recreated by a second up
-	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/volumes/compose.yaml", "--project-name", projectName, "up", "with_image")
-	assert.Check(t, !strings.Contains(res.Combined(), "Recreate"), res.Combined())
+	NewScenario(t, "an image volume whose source image is already local must mount, and stay idempotent", Serial()).
+		Requires(EngineVersionAtLeast(28)).
+		Compose(`
+services:
+  app:
+    image: alpine
+    command: "ls -al /mnt/image"
+    volumes:
+      - type: image
+        source: nginx:alpine
+        target: /mnt/image
+        image:
+          subpath: usr/share/nginx/html/
+`).
+		Step("have the source image already in the local store",
+			DockerCmd("pull", "-q", "nginx:alpine")).
+		Step("up mounts the image volume content",
+			ComposeCmd("up", "app"),
+			OutputContains("index.html")).
+		Step("an unchanged up does not recreate the service",
+			ComposeCmd("up", "app"),
+			OutputNotContains("Recreate"),
+			NotRecreated("app"))
 }
 
 func TestImageVolumeRecreateOnRebuild(t *testing.T) {
