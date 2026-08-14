@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ import (
 	"unicode"
 
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 )
 
 // Scenario is a thin declarative layer over the e2e CLI helpers: a test reads
@@ -65,6 +67,7 @@ type stepRecord struct {
 type containerState struct {
 	ID     string
 	Name   string
+	State  string
 	Labels map[string]string
 }
 
@@ -259,8 +262,11 @@ func (s *Scenario) snapshot() snapshot {
 		return snap
 	}
 	var containers []struct {
-		ID     string `json:"Id"`
-		Name   string `json:"Name"`
+		ID    string `json:"Id"`
+		Name  string `json:"Name"`
+		State struct {
+			Status string `json:"Status"`
+		} `json:"State"`
 		Config struct {
 			Labels map[string]string `json:"Labels"`
 		} `json:"Config"`
@@ -273,6 +279,7 @@ func (s *Scenario) snapshot() snapshot {
 		snap[service] = append(snap[service], containerState{
 			ID:     c.ID,
 			Name:   strings.TrimPrefix(c.Name, "/"),
+			State:  c.State.Status,
 			Labels: c.Config.Labels,
 		})
 	}
@@ -416,6 +423,15 @@ type CheckContext struct {
 	curr     snapshot
 }
 
+// refresh re-observes the project state, so subsequent checks of the same
+// step see the latest state rather than the one captured right after the
+// command returned.
+func (ctx *CheckContext) refresh() {
+	s := ctx.scenario
+	ctx.curr = s.snapshot()
+	s.snaps[len(s.snaps)-1] = ctx.curr
+}
+
 // Check is a named observable expected to hold after a step.
 type Check struct {
 	name string
@@ -444,6 +460,75 @@ func OutputNotContains(sub string) Check {
 		fn: func(ctx *CheckContext) error {
 			if strings.Contains(ctx.result.Combined(), sub) {
 				return fmt.Errorf("found in output")
+			}
+			return nil
+		},
+	}
+}
+
+// Eventually retries a state-based check until it holds or the timeout
+// expires, re-observing the project state between attempts. Output-based
+// checks are not meaningful here: the step's output never changes.
+// Polling is delegated to gotest.tools/v3/poll, the same engine the rest of
+// the e2e framework uses.
+func Eventually(check Check, timeout time.Duration) Check {
+	return Check{
+		name: fmt.Sprintf("%s within %s", check.name, timeout),
+		fn: func(ctx *CheckContext) error {
+			first := true
+			capture := &pollCapture{}
+			done := make(chan struct{})
+			// poll.WaitOn reports timeout through TestingT.Fatalf and relies
+			// on it halting execution; run it in a goroutine so pollCapture
+			// can Goexit and hand the error back to the scenario report
+			// instead of failing the test on the spot.
+			go func() {
+				defer close(done)
+				poll.WaitOn(capture, func(poll.LogT) poll.Result {
+					if !first {
+						ctx.refresh()
+					}
+					first = false
+					if err := check.fn(ctx); err != nil {
+						return poll.Continue("%v", err)
+					}
+					return poll.Success()
+				}, poll.WithDelay(500*time.Millisecond), poll.WithTimeout(timeout))
+			}()
+			<-done
+			return capture.err
+		},
+	}
+}
+
+// pollCapture is a poll.TestingT that records the failure instead of failing
+// the test, so Eventually can feed it to the scenario failure report.
+type pollCapture struct {
+	err error
+}
+
+func (c *pollCapture) Log(args ...any)                 {}
+func (c *pollCapture) Logf(format string, args ...any) {}
+
+func (c *pollCapture) Fatalf(format string, args ...any) {
+	c.err = fmt.Errorf(format, args...)
+	runtime.Goexit()
+}
+
+// ServiceState expects every container of the service to be in the given
+// state (running, exited, restarting, …).
+func ServiceState(service, state string) Check {
+	return Check{
+		name: fmt.Sprintf("service %q is %s", service, state),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr[service]
+			if len(containers) == 0 {
+				return fmt.Errorf("service has no container")
+			}
+			for _, c := range containers {
+				if c.State != state {
+					return fmt.Errorf("container %s is %s", c.Name, c.State)
+				}
 			}
 			return nil
 		},
