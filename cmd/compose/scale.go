@@ -93,15 +93,22 @@ func runScale(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	}
 
 	for key, value := range serviceReplicaTuples {
-		service, err := project.GetService(key)
-		if err != nil {
+		if err := setServiceScale(project, key, value); err != nil {
 			return err
 		}
-		service.SetScale(value)
-		project.Services[key] = service
 	}
 
 	return backend.Scale(ctx, project, api.ScaleOptions{Services: services})
+}
+
+func setServiceScale(project *types.Project, name string, replicas int) error {
+	service, err := project.GetService(name)
+	if err != nil {
+		return err
+	}
+	service.SetScale(replicas)
+	project.Services[name] = service
+	return nil
 }
 
 func parseServicesReplicasArgs(args []string) (map[string]int, error) {
