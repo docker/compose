@@ -116,7 +116,9 @@ func adversarialEvents() []api.Resource {
 }
 
 func TestTerm_NoLineEverExceedsTerminalWidth(t *testing.T) {
-	for _, width := range []int{20, 30, 40, 60, 80, 120} {
+	// 8 and 12 exercise the degenerate widths where even the "[+] op N/M"
+	// header must be clipped rather than allowed to wrap
+	for _, width := range []int{8, 12, 20, 30, 40, 60, 80, 120} {
 		t.Run(fmt.Sprintf("width=%d", width), func(t *testing.T) {
 			w, buf, _ := newTermWriter(width, 40)
 			feed(w, adversarialEvents()...)
