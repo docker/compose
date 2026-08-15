@@ -92,7 +92,7 @@ func TestSelectEventProcessor_AutoMode(t *testing.T) {
 			name:     "stderr TTY, stdout piped -> Full",
 			errIsTTY: true,
 			ansi:     "auto",
-			wantType: "*display.ttyWriter",
+			wantType: "*display.termWriter",
 			wantMode: display.ModeTTY,
 		},
 		{
@@ -107,7 +107,7 @@ func TestSelectEventProcessor_AutoMode(t *testing.T) {
 			outIsTTY: true,
 			errIsTTY: true,
 			ansi:     "auto",
-			wantType: "*display.ttyWriter",
+			wantType: "*display.termWriter",
 			wantMode: display.ModeTTY,
 		},
 		{
@@ -154,7 +154,7 @@ func TestSelectEventProcessor_ExplicitMode(t *testing.T) {
 			progress: display.ModeTTY,
 			ansi:     "auto",
 			wantMode: display.ModeTTY,
-			wantType: "*display.ttyWriter",
+			wantType: "*display.termWriter",
 		},
 		{
 			name:        "progress=tty with ansi=never is rejected",
