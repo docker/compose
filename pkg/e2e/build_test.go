@@ -410,6 +410,15 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 	})
 
 	t.Run("builder does not support multi-arch", func(t *testing.T) {
+		// The docker driver supports multi-platform builds whenever the
+		// daemon uses the containerd image store, so this error won't occur.
+		// Detect the store directly: the buildx `Platforms:` heuristic below
+		// misses it on hosts without binfmt emulation, where only native
+		// platforms are listed even though cross-building works.
+		info := c.RunDockerCmd(t, "info", "-f", "{{json .DriverStatus}}")
+		if strings.Contains(info.Stdout(), "io.containerd.snapshotter.v1") {
+			t.Skip("docker driver supports multi-platform builds (containerd image store enabled)")
+		}
 		// Docker Desktop with containerd image store uses the docker driver
 		// but supports multi-platform builds, so this error won't occur.
 		inspect := c.RunDockerCmd(t, "buildx", "inspect", "--bootstrap")

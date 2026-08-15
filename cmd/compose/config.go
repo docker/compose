@@ -189,7 +189,7 @@ func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, s
 	}
 
 	if !opts.noInterpolate {
-		content = escapeDollarSign(content)
+		content = bytes.ReplaceAll(content, []byte{'$'}, []byte{'$', '$'})
 	}
 
 	if opts.quiet {
@@ -695,10 +695,4 @@ func runEnvironment(ctx context.Context, dockerCli command.Cli, opts configOptio
 		fmt.Println(v)
 	}
 	return nil
-}
-
-func escapeDollarSign(marshal []byte) []byte {
-	dollar := []byte{'$'}
-	escDollar := []byte{'$', '$'}
-	return bytes.ReplaceAll(marshal, dollar, escDollar)
 }

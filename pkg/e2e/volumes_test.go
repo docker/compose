@@ -191,6 +191,37 @@ func TestImageVolume(t *testing.T) {
 	assert.Check(t, strings.Contains(out, "index.html"))
 }
 
+func TestImageVolumeImageAlreadyLocal(t *testing.T) {
+	// Regression test for https://github.com/docker/compose/issues/14005
+	// (pulled-image scenario): when the source image of a `type: image` volume
+	// is already present locally, compose used to rewrite the mount source to a
+	// digest the daemon can't resolve as a mount source under the containerd
+	// image store ("No such image"). TestImageVolume only covers this path by
+	// accident, when a previous test left the image in the local store.
+	c := NewCLI(t)
+	const projectName = "compose-e2e-image-volume-local"
+	t.Cleanup(func() {
+		c.cleanupWithDown(t, projectName)
+	})
+
+	version := c.RunDockerCmd(t, "version", "-f", "{{.Server.Version}}")
+	major, _, found := strings.Cut(version.Combined(), ".")
+	assert.Assert(t, found)
+	if major == "26" || major == "27" {
+		t.Skip("Skipping test due to docker version < 28")
+	}
+
+	// make sure the source image is already in the local store
+	c.RunDockerCmd(t, "pull", "-q", "nginx:alpine")
+
+	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/volumes/compose.yaml", "--project-name", projectName, "up", "with_image")
+	assert.Check(t, strings.Contains(res.Combined(), "index.html"), res.Combined())
+
+	// the unchanged service must not be recreated by a second up
+	res = c.RunDockerComposeCmd(t, "-f", "./fixtures/volumes/compose.yaml", "--project-name", projectName, "up", "with_image")
+	assert.Check(t, !strings.Contains(res.Combined(), "Recreate"), res.Combined())
+}
+
 func TestImageVolumeRecreateOnRebuild(t *testing.T) {
 	c := NewCLI(t)
 	const projectName = "compose-e2e-image-volume-recreate"

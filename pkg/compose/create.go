@@ -257,10 +257,21 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	inherit *container.Summary,
 	opts createOptions,
 ) (createConfigs, error) {
-	labels, err := s.prepareLabels(opts.Labels, service, number)
+	labels := opts.Labels
+	hash, err := ServiceHash(service)
 	if err != nil {
 		return createConfigs{}, err
 	}
+	labels[api.ConfigHashLabel] = hash
+	if number > 0 {
+		// One-off containers are not indexed
+		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+	}
+	var dependencies []string
+	for dep, d := range service.DependsOn {
+		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", dep, d.Condition, d.Restart))
+	}
+	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
 
 	var runCmd, entrypoint []string
 	if service.Command != nil {
@@ -576,26 +587,6 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, bool,
 	}
 
 	return parsed, unconfined, nil
-}
-
-func (s *composeService) prepareLabels(labels types.Labels, service types.ServiceConfig, number int) (map[string]string, error) {
-	hash, err := ServiceHash(service)
-	if err != nil {
-		return nil, err
-	}
-	labels[api.ConfigHashLabel] = hash
-
-	if number > 0 {
-		// One-off containers are not indexed
-		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
-	}
-
-	var dependencies []string
-	for s, d := range service.DependsOn {
-		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", s, d.Condition, d.Restart))
-	}
-	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
-	return labels, nil
 }
 
 // defaultNetworkSettings determines the container.NetworkMode and corresponding network.NetworkingConfig (nil if not applicable).
@@ -1338,11 +1329,28 @@ func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *m
 	case "bind":
 		return buildBindOption(volume.Bind), nil, nil, nil
 	case "volume":
-		return nil, buildVolumeOptions(volume.Volume), nil, nil
+		if volume.Volume == nil {
+			return nil, nil, nil, nil
+		}
+		return nil, &mount.VolumeOptions{
+			NoCopy:  volume.Volume.NoCopy,
+			Subpath: volume.Volume.Subpath,
+			Labels:  volume.Volume.Labels,
+			// DriverConfig: , // FIXME missing from model ?
+		}, nil, nil
 	case "tmpfs":
-		return nil, nil, buildTmpfsOptions(volume.Tmpfs), nil
+		if volume.Tmpfs == nil {
+			return nil, nil, nil, nil
+		}
+		return nil, nil, &mount.TmpfsOptions{
+			SizeBytes: int64(volume.Tmpfs.Size),
+			Mode:      os.FileMode(volume.Tmpfs.Mode),
+		}, nil
 	case "image":
-		return nil, nil, nil, buildImageOptions(volume.Image)
+		if volume.Image == nil {
+			return nil, nil, nil, nil
+		}
+		return nil, nil, nil, &mount.ImageOptions{Subpath: volume.Image.SubPath}
 	}
 	return nil, nil, nil, nil
 }
@@ -1364,37 +1372,6 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 		opts.ReadOnlyForceRecursive = true
 	}
 	return opts
-}
-
-func buildVolumeOptions(vol *types.ServiceVolumeVolume) *mount.VolumeOptions {
-	if vol == nil {
-		return nil
-	}
-	return &mount.VolumeOptions{
-		NoCopy:  vol.NoCopy,
-		Subpath: vol.Subpath,
-		Labels:  vol.Labels,
-		// DriverConfig: , // FIXME missing from model ?
-	}
-}
-
-func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
-	if tmpfs == nil {
-		return nil
-	}
-	return &mount.TmpfsOptions{
-		SizeBytes: int64(tmpfs.Size),
-		Mode:      os.FileMode(tmpfs.Mode),
-	}
-}
-
-func buildImageOptions(image *types.ServiceVolumeImage) *mount.ImageOptions {
-	if image == nil {
-		return nil
-	}
-	return &mount.ImageOptions{
-		Subpath: image.SubPath,
-	}
 }
 
 // createNetwork creates the given (managed) network with its compose labels and

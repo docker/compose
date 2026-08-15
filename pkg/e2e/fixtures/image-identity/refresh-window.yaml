@@ -1,0 +1,5 @@
+services:
+  app:
+    image: alpine:3.18
+    pull_policy: daily
+    command: ["sleep", "infinity"]
