@@ -65,7 +65,8 @@ const (
 // layoutFrame renders the whole progress block, one string per terminal row.
 func layoutFrame(t *taskTree, operation string, o layoutOpts) []string {
 	done, total := t.counts()
-	lines := []string{fmt.Sprintf("[+] %s %d/%d", operation, done, total)}
+	header := fmt.Sprintf("[+] %s %d/%d", operation, done, total)
+	lines := []string{renderSegs([]seg{{text: header}}, o.width)}
 
 	rows := buildRows(t, o)
 	maxRows := max(o.height-2, 1)
