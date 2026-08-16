@@ -31,6 +31,14 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+func TestFull_DryRunWiring(t *testing.T) {
+	var buf bytes.Buffer
+	ep := Full(&buf, &buf, false, true)
+	w, ok := ep.(*ttyWriter)
+	assert.Assert(t, ok)
+	assert.Equal(t, w.dryRun, true)
+}
+
 func newTestWriter() (*ttyWriter, *bytes.Buffer) {
 	var buf bytes.Buffer
 	w := &ttyWriter{
