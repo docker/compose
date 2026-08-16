@@ -110,6 +110,10 @@ func NewScenario(t *testing.T, intent string, opts ...ScenarioOption) *Scenario 
 	// start from — and return to — a clean slate, whatever previous runs left
 	s.cli.RunDockerComposeCmdNoCheck(t, "--project-name", s.project, "down", "-v", "--remove-orphans", "--timeout", "0")
 	t.Cleanup(func() {
+		if t.Failed() && os.Getenv("E2E_KEEP_FAILED") != "" {
+			t.Logf("E2E_KEEP_FAILED set: keeping project %s alive for inspection (docker ps --filter label=com.docker.compose.project=%s)", s.project, s.project)
+			return
+		}
 		s.cli.RunDockerComposeCmdNoCheck(t, "--project-name", s.project, "down", "-v", "--remove-orphans", "--timeout", "0")
 		for _, action := range s.deferred {
 			_ = icmd.RunCmd(s.command(action))
@@ -300,13 +304,30 @@ func (s *Scenario) projectContainerIDs() []string {
 
 // fail reports the scenario failure: intent, step transcript, output of the
 // failing command, then live diagnostics (project state, engine events since
-// the scenario started, container logs).
+// the scenario started, container logs). Inline sections are truncated for
+// readability; the full, untruncated material is written to an artifacts
+// directory whose path opens the report.
 func (s *Scenario) fail(reason error) {
 	t := s.t
 	t.Helper()
+
+	live := s.snapshot()
+	containersOut := s.diag("ps", "-a", "--no-trunc", "--filter", "label=com.docker.compose.project="+s.project)
+	eventsOut := s.diag("events",
+		"--since", s.start.Format(time.RFC3339Nano), "--until", time.Now().Format(time.RFC3339Nano),
+		"--filter", "label=com.docker.compose.project="+s.project)
+	artifacts := s.writeArtifacts(reason, live, containersOut, eventsOut)
+
 	var b strings.Builder
 	fmt.Fprintf(&b, "scenario failed: %s\n", s.intent)
-	fmt.Fprintf(&b, "project: %s\n\ntranscript:\n", s.project)
+	fmt.Fprintf(&b, "project: %s\n", s.project)
+	if artifacts != "" {
+		fmt.Fprintf(&b, "artifacts: %s (compose.yaml, full step outputs, events, logs)\n", artifacts)
+	}
+	if os.Getenv("E2E_KEEP_FAILED") == "" {
+		fmt.Fprintf(&b, "hint: rerun with E2E_KEEP_FAILED=1 to keep the project alive for inspection\n")
+	}
+	fmt.Fprintf(&b, "\ntranscript:\n")
 	for i, step := range s.steps {
 		mark := "✓"
 		if i == len(s.steps)-1 {
@@ -317,16 +338,74 @@ func (s *Scenario) fail(reason error) {
 	last := s.steps[len(s.steps)-1]
 	fmt.Fprintf(&b, "\nfailure: %v\n\n--- output of failing step\n%s\n", reason, truncate(last.result.Combined(), 4000))
 
-	fmt.Fprintf(&b, "\n--- project containers\n%s\n", truncate(s.diag("ps", "-a", "--no-trunc", "--filter", "label=com.docker.compose.project="+s.project), 2000))
-	fmt.Fprintf(&b, "\n--- engine events since scenario start\n%s\n", truncate(s.diag("events",
-		"--since", s.start.Format(time.RFC3339Nano), "--until", time.Now().Format(time.RFC3339Nano),
-		"--filter", "label=com.docker.compose.project="+s.project), 2000))
-	for _, containers := range s.snapshot() {
+	fmt.Fprintf(&b, "\n--- project containers\n%s\n", truncate(containersOut, 2000))
+	fmt.Fprintf(&b, "\n--- engine events since scenario start\n%s\n", truncate(eventsOut, 2000))
+	for _, containers := range live {
 		for _, c := range containers {
 			fmt.Fprintf(&b, "\n--- logs %s\n%s\n", c.Name, truncate(s.diag("logs", "--tail", "30", c.ID), 2000))
 		}
 	}
 	t.Fatal(b.String())
+}
+
+// writeArtifacts dumps the untruncated failure material to a stable directory
+// (one per project, overwritten on each run) so a failure can be diagnosed —
+// by a human or a coding agent — without re-running the scenario: the compose
+// model, each step's full command and output, the project containers, the
+// engine events, every container's full logs and the per-step state
+// snapshots. Returns the directory path, or "" if it could not be written.
+func (s *Scenario) writeArtifacts(reason error, live snapshot, containersOut, eventsOut string) string {
+	dir := filepath.Join(os.TempDir(), "compose-e2e-artifacts", s.project)
+	if err := os.RemoveAll(dir); err != nil {
+		return ""
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return ""
+	}
+	write := func(name, content string) {
+		_ = os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644)
+	}
+
+	if s.file != "" {
+		if data, err := os.ReadFile(s.file); err == nil {
+			write("compose.yaml", string(data))
+		}
+	}
+	write("failure.txt", fmt.Sprintf("scenario: %s\nproject: %s\nfailure: %v\n", s.intent, s.project, reason))
+	for i, step := range s.steps {
+		write(fmt.Sprintf("step-%02d-%s.txt", i+1, slugify(step.name)),
+			fmt.Sprintf("step: %s\ncommand: %s\nexit code: %d\nduration: %s\n\n%s",
+				step.name, step.command, step.result.ExitCode, step.duration.Round(time.Millisecond), step.result.Combined()))
+	}
+	write("containers.txt", containersOut)
+	write("events.txt", eventsOut)
+	for _, containers := range live {
+		for _, c := range containers {
+			write("logs-"+c.Name+".txt", s.diag("logs", c.ID))
+		}
+	}
+	if data, err := json.MarshalIndent(s.snaps, "", "  "); err == nil {
+		write("snapshots.json", string(data))
+	}
+	return dir
+}
+
+// slugify turns a free-form step name into a safe file-name fragment.
+func slugify(name string) string {
+	var b strings.Builder
+	pendingDash := false
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			if pendingDash && b.Len() > 0 {
+				b.WriteRune('-')
+			}
+			pendingDash = false
+			b.WriteRune(r)
+		} else {
+			pendingDash = true
+		}
+	}
+	return b.String()
 }
 
 func (s *Scenario) diag(args ...string) string {
