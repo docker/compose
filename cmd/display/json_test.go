@@ -60,3 +60,14 @@ func TestJsonWriter_Event(t *testing.T) {
 	}
 	assert.DeepEqual(t, expected, actual)
 }
+
+func TestJSON_DryRunWiring(t *testing.T) {
+	var out bytes.Buffer
+	ep := JSON(&out, true)
+	ep.On(api.Resource{ID: "service1", Text: api.StatusCreating})
+
+	var actual jsonMessage
+	err := json.Unmarshal(out.Bytes(), &actual)
+	assert.NilError(t, err)
+	assert.Equal(t, actual.DryRun, true)
+}
