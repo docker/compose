@@ -42,7 +42,23 @@ Rules:
   create is a no-op", not "run create again". The transcript of step names
   should read as the specification.
 - **The compose model is inline.** A scenario is self-contained in the test
-  source; no fixture directories. Interpolate runtime values via `Env`.
+  source; no fixture directories. Interpolate runtime values via `Env`. When
+  the project needs more than a `compose.yaml` (a Dockerfile, an env file, a
+  config file), declare all files with `Files` as a [txtar](https://pkg.go.dev/golang.org/x/tools/txtar)
+  archive — the format Go's own `cmd/go` tests are written in: diff-friendly,
+  and one every human and coding agent already knows by heart:
+
+  ```go
+  s.Files(`
+  -- compose.yaml --
+  services:
+    app:
+      build: .
+  -- Dockerfile --
+  FROM alpine
+  CMD ["sleep", "infinity"]
+  `)
+  ```
 - **Regression tests link the issue** in a comment above the test, with a
   sentence on the failure mode being locked.
 

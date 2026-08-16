@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode"
 
+	"golang.org/x/tools/txtar"
 	"gotest.tools/v3/icmd"
 )
 
@@ -147,6 +148,10 @@ func projectNameFor(testName string) string {
 // declarative layer doesn't cover.
 func (s *Scenario) CLI() *CLI { return s.cli }
 
+// Project returns the compose project name the scenario runs under, e.g. to
+// Defer the removal of an image the project built.
+func (s *Scenario) Project() string { return s.project }
+
 // Compose declares the project's compose model, written to a temporary
 // directory so the whole scenario is self-contained in the test source.
 func (s *Scenario) Compose(yaml string) *Scenario {
@@ -155,6 +160,33 @@ func (s *Scenario) Compose(yaml string) *Scenario {
 	s.file = filepath.Join(dir, "compose.yaml")
 	if err := os.WriteFile(s.file, []byte(yaml), 0o644); err != nil {
 		s.t.Fatalf("failed to write compose.yaml: %v", err)
+	}
+	return s
+}
+
+// Files declares the project's files — compose.yaml plus whatever it needs
+// (Dockerfile, .env, config files) — as a txtar archive: each file introduced
+// by a `-- name --` line, extracted into the project directory. The archive
+// must contain a compose.yaml, which becomes the scenario's compose file.
+// txtar is the format Go's own cmd/go tests are written in: diff-friendly,
+// and trivial to read and write for humans and coding agents alike.
+func (s *Scenario) Files(archive string) *Scenario {
+	s.t.Helper()
+	dir := s.t.TempDir()
+	for _, f := range txtar.Parse([]byte(archive)).Files {
+		path := filepath.Join(dir, f.Name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			s.t.Fatalf("failed to create directory for %s: %v", f.Name, err)
+		}
+		if err := os.WriteFile(path, f.Data, 0o644); err != nil {
+			s.t.Fatalf("failed to write %s: %v", f.Name, err)
+		}
+		if f.Name == "compose.yaml" {
+			s.file = path
+		}
+	}
+	if s.file == "" {
+		s.t.Fatal("Files archive must contain a compose.yaml")
 	}
 	return s
 }
