@@ -8,6 +8,15 @@
 - Test single: `go test ./pkg/compose/ -run TestFunctionName`
 - E2E tests: `go test -tags e2e ./pkg/e2e/ -run TestName`
 
+## E2E tests
+
+- **New e2e tests use the declarative `Scenario` DSL** (`NewScenario` in
+  `pkg/e2e/scenario.go`): intent, inline compose model, steps as
+  `(command → expected observables)`. Read `pkg/e2e/SCENARIO.md` before
+  writing or debugging one — it codifies the rules (state-based checks first,
+  `OutputContains` as last resort, new checks go in `pkg/e2e/checks.go`) and
+  how to exploit failure artifacts and `E2E_KEEP_FAILED=1`.
+
 ## Lint
 
 - Linter: golangci-lint v2 (config in `.golangci.yml`)
