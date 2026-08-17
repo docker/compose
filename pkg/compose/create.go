@@ -124,8 +124,8 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	// Emit "Running" events for containers that are already up-to-date,
-	// matching the previous convergence behavior for progress display.
+	// Emit "Running" events for containers that are already up-to-date, so
+	// the progress display accounts for containers the plan will not touch.
 	emitRunningEvents(project, observed, plan, s.events)
 
 	return s.executePlan(ctx, project, observed, plan)
@@ -1461,8 +1461,8 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, networkCreateOptions); err != nil {
 		// A concurrent `docker compose up|run` may have created the same network
 		// between the observed-state snapshot and now. Treat the resulting
-		// conflict as success rather than failing hard, mirroring the retry the
-		// previous ensureNetwork performed.
+		// conflict as success rather than failing hard: the network we wanted
+		// exists.
 		if errdefs.IsConflict(err) {
 			s.events.On(createdEvent(networkEventName))
 			return nil

@@ -192,7 +192,8 @@ func (r *reconciler) resolveObserved() {
 // Divergence is detected by comparing NetworkHash(desired) with the config-hash
 // persisted on the live network (observed.ConfigHash). A network with no
 // recorded hash (e.g. created by an older Compose or manually) is left
-// untouched, matching the previous ensureNetwork behavior.
+// untouched: without a recorded hash there is no reliable way to tell
+// configuration drift apart from deliberate manual setup.
 //
 // A rename (observed.Name != desired.Name) also diverges the hash — NetworkHash
 // includes the name — and is handled by the same recreation path: the old
@@ -242,7 +243,8 @@ func (r *reconciler) planCreateNetwork(key string, networkConfig *types.NetworkC
 // Attached containers must be disconnected before the network can be removed
 // (Docker refuses to remove a network with active endpoints) and are reconnected
 // to the fresh network afterwards — they keep their identity and are not
-// recreated, matching the previous ensureNetwork/removeDivergedNetwork behavior.
+// recreated: a network definition change alone is not a reason to lose
+// container state.
 //
 // Stops are deduplicated through stoppedByPlan so a container attached to several
 // diverged networks (or later recreated by reconcileContainers) is stopped once.
@@ -345,8 +347,9 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 //
 // Divergence is detected by comparing VolumeHash(desired) with the config-hash
 // persisted on the live volume (observed.ConfigHash). A volume with no recorded
-// hash (e.g. created by an older Compose) is left untouched, matching the
-// previous ensureVolume behavior.
+// hash (e.g. created by an older Compose) is left untouched: without a
+// recorded hash there is no reliable way to tell configuration drift apart
+// from deliberate manual setup, and volumes carry data.
 func (r *reconciler) reconcileVolumes() error {
 	var diverged []string
 	for _, key := range sortedKeys(r.project.Volumes) {
@@ -368,16 +371,16 @@ func (r *reconciler) reconcileVolumes() error {
 		}
 		if observed.Name != desired.Name {
 			// The volume was renamed: the live volume matched by label carries a
-			// different name, i.e. a distinct Docker resource. Match the
-			// historical additive behavior — create the new volume and leave the
-			// old one (and its data) untouched — instead of prompting to delete
-			// data under a name that does not exist yet.
+			// different name, i.e. a distinct Docker resource. A rename is
+			// additive — create the new volume and leave the old one (and its
+			// data) untouched — instead of prompting to delete data under a
+			// name that does not exist yet.
 			r.planCreateVolume(key, &desired, "renamed")
 			// Rewrite the observed name to the desired one so reconcileContainers
 			// detects the mount mismatch and migrates existing containers onto
-			// the new volume within the same up (as the pre-reconcile ensureVolume
-			// path did), and so later runs match deterministically on the new
-			// name rather than split-braining between the two.
+			// the new volume within the same up, and so later runs match
+			// deterministically on the new name rather than split-braining
+			// between the two.
 			observed.Name = desired.Name
 			r.resolvedVolumes[key] = observed
 			continue
@@ -676,8 +679,9 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	}
 	parentRecreated := r.parentNamespaceRecreated(service)
 
-	// Sort containers: obsolete first, then by number descending, then reverse
-	// to get the same ordering as the existing convergence code.
+	// Order containers so that the scale-down below (i >= expected) trims
+	// obsolete containers and the highest replica numbers first — see
+	// sortContainers for the resulting ordering.
 	r.sortContainers(containers, service, expectedHash, parentRecreated, strategy)
 
 	// Collect dependency nodes that container creation should depend on
@@ -716,7 +720,11 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		// Container is up-to-date
 		switch oc.State {
 		case container.StateRunning, container.StateCreated, container.StateRestarting, container.StateExited:
-			// Nothing to do (exited containers are left as-is, matching service_containers.go behavior)
+			// Nothing to plan. Starting created/exited containers is NOT the
+			// plan's job: `up` runs a separate start phase afterwards
+			// (start.go), which lists containers again and starts them in
+			// dependency order. Exited containers are deliberately left as-is
+			// here so that phase (or the user) decides.
 		default:
 			// Any other state (paused, dead, ...): attempt to (re)start
 			lastNode = r.plan.addNode(Operation{
@@ -1009,8 +1017,13 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 	return deps
 }
 
-// sortContainers sorts containers the same way as the start path in service_containers.go:
-// obsolete first, then by container number descending, then reversed.
+// sortContainers orders the slice so that, read from the front, up-to-date
+// containers come first in ascending replica-number order, followed by the
+// containers that must be recreated (the comparator sorts obsolete-first and
+// number-descending, then the slice is reversed). Scale-down trims the tail
+// of this slice (i >= expected in reconcileService), so this ordering is what
+// guarantees that obsolete containers and the highest replica numbers are
+// removed first while low-numbered healthy replicas survive.
 //
 // mustRecreate is evaluated once per container before sorting to avoid
 // quadratic re-evaluation in the comparator.
