@@ -1,0 +1,10 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    network_mode: service:db
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
