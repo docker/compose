@@ -262,15 +262,19 @@ services:
 }
 
 func TestUpStopWithLogsMixed(t *testing.T) {
+	// service2 pings forever so the abort always interrupts it: with a bounded
+	// ping, on a fast machine it can exit on its own before the abort reaches
+	// it, and the pre_stop hook never runs.
 	s := NewScenario(t, "on abort, logs of surviving services must keep flowing while others stop, hooks included")
 	s.Compose(`
 services:
   service1:
     image: alpine
-    command: /bin/true
+    command: sh -c "sleep 2"
   service2:
     image: alpine
-    command: ping -c 2 localhost
+    init: true
+    command: ping localhost
     pre_stop:
       - command: echo "stop hook running..."
 `).
