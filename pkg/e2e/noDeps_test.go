@@ -19,42 +19,68 @@
 package e2e
 
 import (
-	"fmt"
 	"testing"
-
-	"gotest.tools/v3/icmd"
 )
 
 func TestNoDepsVolumeFrom(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-no-deps-volume-from"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	c.RunDockerComposeCmd(t, "-f", "fixtures/no-deps/volume-from.yaml", "--project-name", projectName, "up", "-d")
-
-	c.RunDockerComposeCmd(t, "-f", "fixtures/no-deps/volume-from.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "app")
-
-	c.RunDockerCmd(t, "rm", "-f", fmt.Sprintf("%s-db-1", projectName))
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/no-deps/volume-from.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "app")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot share volume with service db: container missing"})
+	s := NewScenario(t, "up --no-deps must fail when the container providing volumes_from is gone")
+	s.Compose(`
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes_from:
+      - db
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - /var/data
+`).
+		Step("up starts the service and the volume donor",
+			ComposeCmd("up", "-d"),
+			ServiceState("app", "running"),
+			ServiceState("db", "running")).
+		Step("up --no-deps reuses the donor container while it exists",
+			ComposeCmd("up", "--no-deps", "-d", "app"),
+			NotRecreated("app", "db")).
+		Step("the donor container is removed behind compose's back",
+			DockerCmd("rm", "-f", s.Project()+"-db-1"),
+			ServiceNotCreated("db")).
+		Step("up --no-deps without the donor container is rejected",
+			ComposeCmd("up", "--no-deps", "-d", "app").MayFail(),
+			ExitCode(1),
+			OutputContains("cannot share volume with service db: container missing"))
 }
 
 func TestNoDepsNetworkMode(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-no-deps-network-mode"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	c.RunDockerComposeCmd(t, "-f", "fixtures/no-deps/network-mode.yaml", "--project-name", projectName, "up", "-d")
-
-	c.RunDockerComposeCmd(t, "-f", "fixtures/no-deps/network-mode.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "app")
-
-	c.RunDockerCmd(t, "rm", "-f", fmt.Sprintf("%s-db-1", projectName))
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/no-deps/network-mode.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "app")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot share network namespace with service db: container missing"})
+	s := NewScenario(t, "up --no-deps must fail when the container providing the network namespace is gone")
+	s.Compose(`
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    network_mode: service:db
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("up starts the service and the namespace donor",
+			ComposeCmd("up", "-d"),
+			ServiceState("app", "running"),
+			ServiceState("db", "running")).
+		Step("up --no-deps reuses the donor container while it exists",
+			ComposeCmd("up", "--no-deps", "-d", "app"),
+			NotRecreated("app", "db")).
+		Step("the donor container is removed behind compose's back",
+			DockerCmd("rm", "-f", s.Project()+"-db-1"),
+			ServiceNotCreated("db")).
+		Step("up --no-deps without the donor container is rejected",
+			ComposeCmd("up", "--no-deps", "-d", "app").MayFail(),
+			ExitCode(1),
+			OutputContains("cannot share network namespace with service db: container missing"))
 }
