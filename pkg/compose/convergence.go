@@ -187,6 +187,14 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 				select {
 				case <-ticker.C:
 				case <-ctx.Done():
+					// A deadline IS the failure this function must detect:
+					// surface it so --wait/--wait-timeout callers report it
+					// instead of silently succeeding. A plain cancellation
+					// (user interruption) is not a wait failure: return nil
+					// and let the caller's own context handling decide.
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+						return ctx.Err()
+					}
 					return nil
 				}
 				switch config.Condition {
