@@ -450,8 +450,15 @@ type RemoveOptions struct {
 	Services []string
 }
 
-// RunOptions group options of the Run API
+// RunOptions group options of the Run API — and, for historical reasons, of
+// the Exec API, which only honors the exec-relevant subset: Service, Index,
+// Command, Environment, WorkingDir, User, Privileged, Interactive, Tty and
+// Detach.
 type RunOptions struct {
+	// CreateOptions is embedded, but creating the one-off's dependencies
+	// only honors Build, IgnoreOrphans, RemoveOrphans and QuietPull; the
+	// other fields (Recreate, RecreateDependencies, Inherit, Timeout,
+	// Services, SkipProviders) are ignored.
 	CreateOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
@@ -472,7 +479,7 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
-	// used by exec
+	// Index selects the replica to target; only used by Exec.
 	Index int
 }
 
