@@ -22,6 +22,7 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -266,6 +267,49 @@ func TestWaitDependencies(t *testing.T) {
 		assert.NilError(t, tested.(*composeService).waitDependencies(
 			t.Context(), &project, "app", project.Services["app"].DependsOn, nil, 0,
 		))
+	})
+	t.Run("timeout expiry surfaces as an error", func(t *testing.T) {
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+		}}
+		dependencies := types.DependsOnConfig{
+			"db": {Condition: types.ServiceConditionHealthy, Required: true},
+		}
+		containers := Containers{{
+			ID:     "db-container",
+			Labels: map[string]string{api.ServiceLabel: "db"},
+		}}
+		// the dependency never turns healthy: health stays "starting"
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-container", gomock.Any()).Return(client.ContainerInspectResult{
+			Container: container.InspectResponse{
+				ID:   "db-container",
+				Name: "/db-container",
+				State: &container.State{
+					Status: container.StateRunning,
+					Health: &container.Health{Status: container.Starting},
+				},
+				Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+			},
+		}, nil).AnyTimes()
+
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 600*time.Millisecond)
+		assert.ErrorContains(t, err, "timeout waiting for dependencies")
+	})
+	t.Run("user cancellation is not a wait failure", func(t *testing.T) {
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+		}}
+		dependencies := types.DependsOnConfig{
+			"db": {Condition: types.ServiceConditionHealthy, Required: true},
+		}
+		containers := Containers{{
+			ID:     "db-container",
+			Labels: map[string]string{api.ServiceLabel: "db"},
+		}}
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		err := tested.(*composeService).waitDependencies(ctx, &project, "app", dependencies, containers, 0)
+		assert.NilError(t, err)
 	})
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: intPtr(1)}
