@@ -401,13 +401,6 @@ func ComposeStandalonePath(t testing.TB) string {
 	return composeBinary
 }
 
-// StdoutContains returns a predicate on command result expecting a string in stdout
-func StdoutContains(expected string) func(*icmd.Result) bool {
-	return func(res *icmd.Result) bool {
-		return strings.Contains(res.Stdout(), expected)
-	}
-}
-
 func IsHealthy(service string) func(res *icmd.Result) bool {
 	return func(res *icmd.Result) bool {
 		type state struct {

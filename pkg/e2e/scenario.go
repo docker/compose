@@ -177,6 +177,17 @@ func (s *Scenario) CLI() *CLI { return s.cli }
 // Defer the removal of an image the project built.
 func (s *Scenario) Project() string { return s.project }
 
+// Dir returns the project directory holding the files declared by Compose or
+// Files, for actions that exchange files with the host (e.g. cp). It is only
+// valid after the compose model has been declared.
+func (s *Scenario) Dir() string {
+	s.t.Helper()
+	if s.file == "" {
+		s.t.Fatal("Dir() called before Compose or Files")
+	}
+	return filepath.Dir(s.file)
+}
+
 // Compose declares the project's compose model, written to a temporary
 // directory so the whole scenario is self-contained in the test source.
 func (s *Scenario) Compose(yaml string) *Scenario {

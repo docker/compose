@@ -22,100 +22,97 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
 func TestLocalComposeConfig(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "compose-e2e-config"
-
-	t.Run("yaml", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config")
-		res.Assert(t, icmd.Expected{Out: `
+	NewScenario(t, "config must render the resolved model in the requested format, interpolated or not").
+		Compose(`
+services:
+  test:
+    image: test
+    ports:
+      - ${PORT:-8080}:80
+`).
+		Step("the yaml rendering expands the port shorthand",
+			ComposeCmd("config"),
+			OutputContains(`
     ports:
       - mode: ingress
         target: 80
         published: "8080"
-        protocol: tcp`})
-	})
-
-	t.Run("json", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--format", "json")
-		res.Assert(t, icmd.Expected{Out: `"published": "8080"`})
-	})
-
-	t.Run("--no-interpolate", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--no-interpolate")
-		res.Assert(t, icmd.Expected{Out: `- ${PORT:-8080}:80`})
-	})
-
-	t.Run("--no-interpolate with service selection", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--no-interpolate", "test")
-		res.Assert(t, icmd.Expected{
-			Err: "service filtering is not applied when --no-interpolate is set",
-			Out: `- ${PORT:-8080}:80`,
-		})
-	})
-
-	t.Run("--variables --format json", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--variables", "--format", "json")
-		res.Assert(t, icmd.Expected{Out: `{
+        protocol: tcp`)).
+		Step("the json rendering carries the same resolution",
+			ComposeCmd("config", "--format", "json"),
+			OutputContains(`"published": "8080"`)).
+		Step("--no-interpolate keeps the variable expression",
+			ComposeCmd("config", "--no-interpolate"),
+			OutputContains(`- ${PORT:-8080}:80`)).
+		Step("--no-interpolate warns that service selection is ignored",
+			ComposeCmd("config", "--no-interpolate", "test"),
+			OutputContains("service filtering is not applied when --no-interpolate is set"),
+			OutputContains(`- ${PORT:-8080}:80`)).
+		Step("--variables renders the model's variables as json",
+			ComposeCmd("config", "--variables", "--format", "json"),
+			OutputContains(`{
     "PORT": {
         "Name": "PORT",
         "DefaultValue": "8080",
         "PresenceValue": "",
         "Required": false
     }
-}`})
-	})
-
-	t.Run("--variables --format yaml", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--variables", "--format", "yaml")
-		res.Assert(t, icmd.Expected{Out: `PORT:
+}`)).
+		Step("--variables renders the model's variables as yaml",
+			ComposeCmd("config", "--variables", "--format", "yaml"),
+			OutputContains(`PORT:
     name: PORT
     defaultvalue: "8080"
     presencevalue: ""
-    required: false`})
-	})
+    required: false`)).
+		Step("--variables warns that service selection is ignored",
+			ComposeCmd("config", "--variables", "test"),
+			OutputContains("service filtering is not applied when --variables is set"),
+			OutputContains("PORT"))
+}
 
-	t.Run("--variables with service selection", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/compose.yaml", "--project-name", projectName, "config", "--variables", "test")
-		res.Assert(t, icmd.Expected{
-			Err: "service filtering is not applied when --variables is set",
-			Out: `PORT`,
-		})
-	})
-
-	t.Run("--no-consistency --services", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--services")
-		res.Assert(t, icmd.Expected{Out: `incomplete`})
-	})
-
-	t.Run("--no-consistency --volumes", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--volumes")
-		res.Assert(t, icmd.Expected{Out: `data`})
-	})
-
-	t.Run("--no-consistency --networks", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--networks")
-		res.Assert(t, icmd.Expected{Out: `internal`})
-	})
-
-	t.Run("--no-consistency --models", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--models")
-		res.Assert(t, icmd.Expected{Out: `ai/example`})
-	})
-
-	t.Run("--no-consistency --hash", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "config", "--no-consistency", "--hash", "*")
-		res.Assert(t, icmd.Expected{Out: `incomplete `})
-	})
-
-	t.Run("--profile --no-consistency --services", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/config/no-consistency.yaml", "--project-name", projectName, "--profile", "extra", "config", "--no-consistency", "--services")
-		res.Assert(t, icmd.Expected{Out: `gated`})
-	})
+func TestLocalComposeConfigNoConsistency(t *testing.T) {
+	NewScenario(t, "config --no-consistency must list resources of a model that would fail validation").
+		Compose(`
+services:
+  incomplete:
+    volumes:
+      - data:/data
+    networks:
+      - internal
+    models:
+      llm:
+  gated:
+    profiles: ["extra"]
+volumes:
+  data:
+networks:
+  internal:
+models:
+  llm:
+    model: ai/example
+`).
+		Step("--services lists the incomplete service",
+			ComposeCmd("config", "--no-consistency", "--services"),
+			OutputContains("incomplete")).
+		Step("--volumes lists the declared volume",
+			ComposeCmd("config", "--no-consistency", "--volumes"),
+			OutputContains("data")).
+		Step("--networks lists the declared network",
+			ComposeCmd("config", "--no-consistency", "--networks"),
+			OutputContains("internal")).
+		Step("--models lists the declared model",
+			ComposeCmd("config", "--no-consistency", "--models"),
+			OutputContains("ai/example")).
+		Step("--hash still hashes the incomplete service",
+			ComposeCmd("config", "--no-consistency", "--hash", "*"),
+			OutputContains("incomplete ")).
+		Step("--profile exposes the gated service",
+			ComposeCmd("--profile", "extra", "config", "--no-consistency", "--services"),
+			OutputContains("gated"))
 }
 
 func TestConfigHashMatchesContainerLabel(t *testing.T) {

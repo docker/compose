@@ -73,6 +73,21 @@ func OutputContains(sub string) Check {
 	}
 }
 
+// StdoutContains expects the command's stdout to contain a string. Use it
+// instead of OutputContains when the expected text could collide with
+// progress noise on stderr (e.g. asserting a container's printed output).
+func StdoutContains(sub string) Check {
+	return Check{
+		name: fmt.Sprintf("stdout contains %q", sub),
+		fn: func(ctx *CheckContext) error {
+			if !strings.Contains(ctx.result.Stdout(), sub) {
+				return fmt.Errorf("not found in stdout")
+			}
+			return nil
+		},
+	}
+}
+
 // OutputNotContains expects the command output not to contain a string.
 func OutputNotContains(sub string) Check {
 	return Check{
@@ -404,6 +419,24 @@ func FileExists(path string) Check {
 			}
 			if info.Size() == 0 {
 				return fmt.Errorf("file is empty")
+			}
+			return nil
+		},
+	}
+}
+
+// FileContains expects the host file at the given path to contain a string,
+// e.g. a file copied out of a container.
+func FileContains(path, sub string) Check {
+	return Check{
+		name: fmt.Sprintf("file %q contains %q", path, sub),
+		fn: func(ctx *CheckContext) error {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if !strings.Contains(string(data), sub) {
+				return fmt.Errorf("not found in file content: %q", truncate(string(data), 200))
 			}
 			return nil
 		},
