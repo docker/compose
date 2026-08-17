@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -118,6 +119,14 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 			groups.onNodeStart(node, events)
 
 			err := exec.executeNode(ctx, node)
+
+			if err != nil && node.Operation.Optional && ctx.Err() == nil {
+				// A best-effort operation reports its failure as a skip and
+				// does not fail the plan: dependent nodes still run.
+				logrus.Warnf("%s (%s): %v", node.Operation.Cause, node.Operation.ResourceID, err)
+				events.On(skippedEvent(nodeEventName(node), err.Error()))
+				err = nil
+			}
 
 			if err == nil {
 				// Emit group done event if this is the last node of a group
