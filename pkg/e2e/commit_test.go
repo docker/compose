@@ -21,73 +21,34 @@ import (
 )
 
 func TestCommit(t *testing.T) {
-	const projectName = "e2e-commit-service"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/commit/compose.yaml", "--project-name", projectName, "up", "-d", "service")
-
-	c.RunDockerComposeCmd(
-		t,
-		"--project-name",
-		projectName,
-		"commit",
-		"-a",
-		"John Hannibal Smith <hannibal@a-team.com>",
-		"-c",
-		"ENV DEBUG=true",
-		"-m",
-		"sample commit",
-		"service",
-		"service:latest",
-	)
+	s := NewScenario(t, "commit must produce an image from the service's container")
+	image := s.Project() + ":latest"
+	s.Defer(DockerCmd("image", "rm", "-f", image).MayFail()).
+		Step("up starts the service",
+			ComposeCmd("up", "-d", "service"),
+			ServiceState("service", "running")).
+		Step("commit turns the container into a tagged image",
+			ComposeCmd("commit",
+				"-a", "John Hannibal Smith <hannibal@a-team.com>",
+				"-c", "ENV DEBUG=true",
+				"-m", "sample commit",
+				"service", image),
+			ImageExists(image))
 }
 
 func TestCommitWithReplicas(t *testing.T) {
-	const projectName = "e2e-commit-service-with-replicas"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/commit/compose.yaml", "--project-name", projectName, "up", "-d", "service-with-replicas")
-
-	c.RunDockerComposeCmd(
-		t,
-		"--project-name",
-		projectName,
-		"commit",
-		"-a",
-		"John Hannibal Smith <hannibal@a-team.com>",
-		"-c",
-		"ENV DEBUG=true",
-		"-m",
-		"sample commit",
-		"--index=1",
-		"service-with-replicas",
-		"service-with-replicas:1",
-	)
-	c.RunDockerComposeCmd(
-		t,
-		"--project-name",
-		projectName,
-		"commit",
-		"-a",
-		"John Hannibal Smith <hannibal@a-team.com>",
-		"-c",
-		"ENV DEBUG=true",
-		"-m",
-		"sample commit",
-		"--index=2",
-		"service-with-replicas",
-		"service-with-replicas:2",
-	)
+	s := NewScenario(t, "commit --index must pick the requested replica of a scaled service")
+	image1, image2 := s.Project()+":1", s.Project()+":2"
+	s.Defer(
+		DockerCmd("image", "rm", "-f", image1).MayFail(),
+		DockerCmd("image", "rm", "-f", image2).MayFail()).
+		Step("up starts the replicas",
+			ComposeCmd("up", "-d", "service-with-replicas"),
+			ServiceScale("service-with-replicas", 3)).
+		Step("commit --index=1 images the first replica",
+			ComposeCmd("commit", "-m", "sample commit", "--index=1", "service-with-replicas", image1),
+			ImageExists(image1)).
+		Step("commit --index=2 images the second replica",
+			ComposeCmd("commit", "-m", "sample commit", "--index=2", "service-with-replicas", image2),
+			ImageExists(image2))
 }
