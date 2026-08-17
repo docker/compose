@@ -33,6 +33,7 @@ import (
 	"github.com/DefangLabs/secret-detector/pkg/secrets"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
@@ -51,9 +52,6 @@ func (s *composeService) Publish(ctx context.Context, project *types.Project, re
 	}, "publish", s.events)
 }
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	project, err := project.WithProfiles([]string{"*"})
 	if err != nil {
@@ -89,70 +87,9 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		}
 	}
 	if !s.dryRun {
-		named, err := reference.ParseDockerRef(repository)
+		err = s.pushComposeArtifact(ctx, project, repository, layers, options)
 		if err != nil {
 			return err
-		}
-
-		var insecureRegistries []string
-		if options.InsecureRegistry {
-			insecureRegistries = append(insecureRegistries, reference.Domain(named))
-		}
-
-		resolver := oci.NewResolver(s.configFile(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
-
-		descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
-		if err != nil {
-			s.events.On(api.Resource{
-				ID:     repository,
-				Text:   "publishing",
-				Status: api.Error,
-			})
-			return err
-		}
-
-		if options.Application {
-			manifests := []v1.Descriptor{}
-			for _, service := range project.Services {
-				ref, err := reference.ParseDockerRef(service.Image)
-				if err != nil {
-					return err
-				}
-
-				manifest, err := oci.Copy(ctx, resolver, ref, named)
-				if err != nil {
-					return err
-				}
-				manifests = append(manifests, manifest)
-			}
-
-			descriptor.Data = nil
-			index, err := json.Marshal(v1.Index{
-				Versioned: specs.Versioned{SchemaVersion: 2},
-				MediaType: v1.MediaTypeImageIndex,
-				Manifests: manifests,
-				Subject:   &descriptor,
-				Annotations: map[string]string{
-					"com.docker.compose.version": api.ComposeVersion,
-				},
-			})
-			if err != nil {
-				return err
-			}
-			imagesDescriptor := v1.Descriptor{
-				MediaType:    v1.MediaTypeImageIndex,
-				ArtifactType: oci.ComposeProjectArtifactType,
-				Digest:       digest.FromString(string(index)),
-				Size:         int64(len(index)),
-				Annotations: map[string]string{
-					"com.docker.compose.version": api.ComposeVersion,
-				},
-				Data: index,
-			}
-			err = oci.Push(ctx, resolver, reference.TrimNamed(named), imagesDescriptor)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	s.events.On(api.Resource{
@@ -161,6 +98,80 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 		Status: api.Done,
 	})
 	return nil
+}
+
+// pushComposeArtifact pushes the compose artifact manifest to the repository,
+// and the application image index when publishing a full application
+func (s *composeService) pushComposeArtifact(ctx context.Context, project *types.Project, repository string, layers []v1.Descriptor, options api.PublishOptions) error {
+	named, err := reference.ParseDockerRef(repository)
+	if err != nil {
+		return err
+	}
+
+	var insecureRegistries []string
+	if options.InsecureRegistry {
+		insecureRegistries = append(insecureRegistries, reference.Domain(named))
+	}
+
+	resolver := oci.NewResolver(s.configFile(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
+
+	descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
+	if err != nil {
+		s.events.On(api.Resource{
+			ID:     repository,
+			Text:   "publishing",
+			Status: api.Error,
+		})
+		return err
+	}
+
+	if options.Application {
+		return pushApplicationIndex(ctx, resolver, named, descriptor, project)
+	}
+	return nil
+}
+
+// pushApplicationIndex pushes an image index referencing every service image,
+// so the application can be pulled as a single artifact
+func pushApplicationIndex(ctx context.Context, resolver remotes.Resolver, named reference.Named, descriptor v1.Descriptor, project *types.Project) error {
+	manifests := []v1.Descriptor{}
+	for _, service := range project.Services {
+		ref, err := reference.ParseDockerRef(service.Image)
+		if err != nil {
+			return err
+		}
+
+		manifest, err := oci.Copy(ctx, resolver, ref, named)
+		if err != nil {
+			return err
+		}
+		manifests = append(manifests, manifest)
+	}
+
+	descriptor.Data = nil
+	index, err := json.Marshal(v1.Index{
+		Versioned: specs.Versioned{SchemaVersion: 2},
+		MediaType: v1.MediaTypeImageIndex,
+		Manifests: manifests,
+		Subject:   &descriptor,
+		Annotations: map[string]string{
+			"com.docker.compose.version": api.ComposeVersion,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	imagesDescriptor := v1.Descriptor{
+		MediaType:    v1.MediaTypeImageIndex,
+		ArtifactType: oci.ComposeProjectArtifactType,
+		Digest:       digest.FromString(string(index)),
+		Size:         int64(len(index)),
+		Annotations: map[string]string{
+			"com.docker.compose.version": api.ComposeVersion,
+		},
+		Data: index,
+	}
+	return oci.Push(ctx, resolver, reference.TrimNamed(named), imagesDescriptor)
 }
 
 func (s *composeService) createLayers(ctx context.Context, project *types.Project, options api.PublishOptions) ([]v1.Descriptor, error) {
@@ -686,12 +697,10 @@ func (s *composeService) checkForBindMount(project *types.Project) map[string][]
 	return allFindings
 }
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func (s *composeService) checkForSensitiveData(ctx context.Context, project *types.Project) ([]secrets.DetectedSecret, error) {
 	var allFindings []secrets.DetectedSecret
 	scan := scanner.NewDefaultScanner()
+
 	// Check all compose files
 	for _, file := range project.ComposeFiles {
 		in, err := composeFileAsByteReader(ctx, file, project)
@@ -705,48 +714,78 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 		}
 		allFindings = append(allFindings, findings...)
 	}
+
+	// Check env files
 	for _, service := range project.Services {
-		// Check env files
-		for _, envFile := range service.EnvFiles {
-			if _, statErr := os.Stat(envFile.Path); statErr != nil {
-				if !os.IsNotExist(statErr) {
-					return nil, fmt.Errorf("failed to access env file %s: %w", envFile.Path, statErr)
-				}
-				if envFile.Required {
-					return nil, fmt.Errorf("env file %s not found", envFile.Path)
-				}
-				continue
-			}
-			findings, err := scan.ScanFile(envFile.Path)
-			if err != nil {
-				return nil, fmt.Errorf("failed to scan env file %s: %w", envFile.Path, err)
-			}
-			allFindings = append(allFindings, findings...)
+		findings, err := scanEnvFiles(scan, service)
+		if err != nil {
+			return nil, err
 		}
+		allFindings = append(allFindings, findings...)
 	}
 
 	// Check configs defined by files
+	configFiles := make([]string, 0, len(project.Configs))
 	for _, config := range project.Configs {
-		if config.File != "" {
-			findings, err := scan.ScanFile(config.File)
-			if err != nil {
-				return nil, fmt.Errorf("failed to scan config file %s: %w", config.File, err)
-			}
-			allFindings = append(allFindings, findings...)
-		}
+		configFiles = append(configFiles, config.File)
 	}
+	findings, err := scanFiles(scan, "config", configFiles)
+	if err != nil {
+		return nil, err
+	}
+	allFindings = append(allFindings, findings...)
 
 	// Check secrets defined by files
+	secretFiles := make([]string, 0, len(project.Secrets))
 	for _, secret := range project.Secrets {
-		if secret.File != "" {
-			findings, err := scan.ScanFile(secret.File)
-			if err != nil {
-				return nil, fmt.Errorf("failed to scan secret file %s: %w", secret.File, err)
-			}
-			allFindings = append(allFindings, findings...)
-		}
+		secretFiles = append(secretFiles, secret.File)
 	}
+	findings, err = scanFiles(scan, "secret", secretFiles)
+	if err != nil {
+		return nil, err
+	}
+	allFindings = append(allFindings, findings...)
 
+	return allFindings, nil
+}
+
+// scanEnvFiles scans a service's env files for sensitive data; a missing env
+// file is only an error when the service requires it
+func scanEnvFiles(scan secrets.Scanner, service types.ServiceConfig) ([]secrets.DetectedSecret, error) {
+	var allFindings []secrets.DetectedSecret
+	for _, envFile := range service.EnvFiles {
+		if _, statErr := os.Stat(envFile.Path); statErr != nil {
+			if !os.IsNotExist(statErr) {
+				return nil, fmt.Errorf("failed to access env file %s: %w", envFile.Path, statErr)
+			}
+			if envFile.Required {
+				return nil, fmt.Errorf("env file %s not found", envFile.Path)
+			}
+			continue
+		}
+		findings, err := scan.ScanFile(envFile.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan env file %s: %w", envFile.Path, err)
+		}
+		allFindings = append(allFindings, findings...)
+	}
+	return allFindings, nil
+}
+
+// scanFiles scans file-based resources (configs, secrets) for sensitive data,
+// ignoring resources not defined by a file
+func scanFiles(scan secrets.Scanner, kind string, paths []string) ([]secrets.DetectedSecret, error) {
+	var allFindings []secrets.DetectedSecret
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		findings, err := scan.ScanFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan %s file %s: %w", kind, path, err)
+		}
+		allFindings = append(allFindings, findings...)
+	}
 	return allFindings, nil
 }
 
