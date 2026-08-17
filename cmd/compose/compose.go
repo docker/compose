@@ -434,9 +434,6 @@ func (o *BackendOptions) Add(option compose.Option) {
 }
 
 // RootCommand returns the compose command with its child commands
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := ProjectOptions{}
 	var (
@@ -467,48 +464,24 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			parent := cmd.Root()
-			if parent != nil {
-				parentPrerun := parent.PersistentPreRunE
-				if parentPrerun != nil {
-					err := parentPrerun(cmd, args)
-					if err != nil {
-						return err
-					}
-				}
+			err := runParentPreRun(cmd, args)
+			if err != nil {
+				return err
 			}
 
 			if verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 
-			err := setEnvWithDotEnv(opts, dockerCli)
+			err = setEnvWithDotEnv(opts, dockerCli)
 			if err != nil {
 				return err
 			}
-			if noAnsi {
-				if ansi != "auto" {
-					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
-				}
-				ansi = "never"
-				fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
+			ansi, err = resolveAnsiMode(cmd, ansi, noAnsi)
+			if err != nil {
+				return err
 			}
-			if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && !cmd.Flags().Changed("ansi") {
-				ansi = v
-			}
-			formatter.SetANSIMode(dockerCli, ansi)
-
-			if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
-				display.NoColor()
-				formatter.SetANSIMode(dockerCli, formatter.Never)
-			}
-
-			switch ansi {
-			case "never":
-				display.Mode = display.ModePlain
-			case "always":
-				display.Mode = display.ModeTTY
-			}
+			applyDisplayMode(dockerCli, ansi)
 
 			detached, _ := cmd.Flags().GetBool("detach")
 			ep, err := selectEventProcessor(dockerCli, opts.Progress, ansi, detached)
@@ -517,41 +490,14 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 			}
 			backendOptions.Add(compose.WithEventProcessor(ep))
 
-			// (4) options validation / normalization
-			if opts.WorkDir != "" {
-				if opts.ProjectDir != "" {
-					return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
-				}
-				opts.ProjectDir = opts.WorkDir
-				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
-			}
-			for i, file := range opts.EnvFiles {
-				file = composepaths.ExpandUser(file)
-				if !filepath.IsAbs(file) {
-					file, err := filepath.Abs(file)
-					if err != nil {
-						return err
-					}
-					opts.EnvFiles[i] = file
-				} else {
-					opts.EnvFiles[i] = file
-				}
+			err = normalizeProjectOptions(&opts)
+			if err != nil {
+				return err
 			}
 
-			composeCmd := cmd
-			for composeCmd.Name() != PluginName {
-				if !composeCmd.HasParent() {
-					return fmt.Errorf("error parsing command line, expected %q", PluginName)
-				}
-				composeCmd = composeCmd.Parent()
-			}
-
-			if v, ok := os.LookupEnv(ComposeParallelLimit); ok && !composeCmd.Flags().Changed("parallel") {
-				i, err := strconv.Atoi(v)
-				if err != nil {
-					return fmt.Errorf("%s must be an integer (found: %q)", ComposeParallelLimit, v)
-				}
-				parallel = i
+			parallel, err = resolveMaxConcurrency(cmd, parallel)
+			if err != nil {
+				return err
 			}
 			if parallel > 0 {
 				logrus.Debugf("Limiting max concurrency to %d jobs", parallel)
@@ -642,6 +588,98 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	c.Flags().MarkHidden("verbose") //nolint:errcheck
 	return c
+}
+
+// runParentPreRun invokes the docker CLI root command's PersistentPreRunE,
+// which cobra doesn't chain automatically.
+func runParentPreRun(cmd *cobra.Command, args []string) error {
+	parent := cmd.Root()
+	if parent == nil {
+		return nil
+	}
+	if prerun := parent.PersistentPreRunE; prerun != nil {
+		return prerun(cmd, args)
+	}
+	return nil
+}
+
+// resolveAnsiMode reconciles --ansi with the deprecated --no-ansi flag and
+// the COMPOSE_ANSI environment variable (flag wins over environment).
+func resolveAnsiMode(cmd *cobra.Command, ansi string, noAnsi bool) (string, error) {
+	if noAnsi {
+		if ansi != "auto" {
+			return "", errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
+		}
+		ansi = "never"
+		fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
+	}
+	if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && !cmd.Flags().Changed("ansi") {
+		ansi = v
+	}
+	return ansi, nil
+}
+
+// applyDisplayMode configures ANSI output and the progress display mode,
+// honoring the NO_COLOR convention (https://no-color.org).
+func applyDisplayMode(dockerCli command.Cli, ansi string) {
+	formatter.SetANSIMode(dockerCli, ansi)
+
+	if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
+		display.NoColor()
+		formatter.SetANSIMode(dockerCli, formatter.Never)
+	}
+
+	switch ansi {
+	case "never":
+		display.Mode = display.ModePlain
+	case "always":
+		display.Mode = display.ModeTTY
+	}
+}
+
+// normalizeProjectOptions handles the deprecated --workdir flag and makes
+// env-file paths absolute.
+func normalizeProjectOptions(opts *ProjectOptions) error {
+	if opts.WorkDir != "" {
+		if opts.ProjectDir != "" {
+			return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
+		}
+		opts.ProjectDir = opts.WorkDir
+		fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
+	}
+	for i, file := range opts.EnvFiles {
+		file = composepaths.ExpandUser(file)
+		if !filepath.IsAbs(file) {
+			abs, err := filepath.Abs(file)
+			if err != nil {
+				return err
+			}
+			file = abs
+		}
+		opts.EnvFiles[i] = file
+	}
+	return nil
+}
+
+// resolveMaxConcurrency returns the parallelism limit: COMPOSE_PARALLEL_LIMIT
+// applies unless --parallel was set explicitly on the compose command.
+func resolveMaxConcurrency(cmd *cobra.Command, parallel int) (int, error) {
+	composeCmd := cmd
+	for composeCmd.Name() != PluginName {
+		if !composeCmd.HasParent() {
+			return 0, fmt.Errorf("error parsing command line, expected %q", PluginName)
+		}
+		composeCmd = composeCmd.Parent()
+	}
+
+	if v, ok := os.LookupEnv(ComposeParallelLimit); ok && !composeCmd.Flags().Changed("parallel") {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, fmt.Errorf("%s must be an integer (found: %q)", ComposeParallelLimit, v)
+		}
+		parallel = i
+	}
+	return parallel, nil
 }
 
 func stdinfo(dockerCli command.Cli) io.Writer {
