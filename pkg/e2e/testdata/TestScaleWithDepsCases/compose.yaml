@@ -1,0 +1,25 @@
+services:
+  back:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      - db
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+    environment:
+      - MAYBE
+  front:
+    image: alpine
+    init: true
+    command: sleep infinity
+    deploy:
+      replicas: 2
+  dbadmin:
+    image: alpine
+    init: true
+    command: sleep infinity
+    deploy:
+      replicas: 0

@@ -8,3 +8,4 @@ services:
 secrets:
   my-secret:
     environment: 'MY_SECRET'
+
