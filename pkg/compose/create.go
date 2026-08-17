@@ -66,14 +66,14 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, cre
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	return s.converge(ctx, project, options, false)
+	return s.converge(ctx, project, options, nil)
 }
 
 // converge reconciles the project against the observed state and executes the
-// resulting plan. With planStart the plan also carries the start phase
+// resulting plan. With start set the plan also carries the start phase
 // (dependency-condition waits, pre_start hooks, container starts); without it
 // the plan stops at container creation and starting is the caller's business.
-func (s *composeService) converge(ctx context.Context, project *types.Project, options api.CreateOptions, planStart bool) error {
+func (s *composeService) converge(ctx context.Context, project *types.Project, options api.CreateOptions, start *startPhaseOptions) error {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
@@ -128,7 +128,7 @@ func (s *composeService) converge(ctx context.Context, project *types.Project, o
 	}
 
 	reconcileOptions := toReconcileOptions(options)
-	reconcileOptions.PlanStart = planStart
+	reconcileOptions.Start = start
 	plan, err := reconcile(ctx, project, observed, reconcileOptions, s.prompt)
 	if err != nil {
 		return err

@@ -43,14 +43,22 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		err := s.create(ctx, project, options.Create)
-		if err != nil {
-			return err
-		}
 		if options.Start.Attach == nil {
-			return s.start(ctx, project.Name, options.Start, nil)
+			// Detached up: one plan carries creation and the start phase
+			// (see the start-in-plan convergence epic). The --wait barrier
+			// stays a post-plan verification.
+			err := s.converge(ctx, project, options.Create, &startPhaseOptions{
+				WaitTimeout: options.Start.WaitTimeout,
+			})
+			if err != nil {
+				return err
+			}
+			if options.Start.Wait {
+				return s.waitStarted(ctx, project, options.Start.WaitTimeout)
+			}
+			return nil
 		}
-		return nil
+		return s.create(ctx, project, options.Create)
 	}), "up", s.events)
 	if err != nil {
 		return err

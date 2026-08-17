@@ -26,9 +26,9 @@ import (
 
 func (s *composeService) Scale(ctx context.Context, project *types.Project, options api.ScaleOptions) error {
 	return Run(ctx, tracing.SpanWrapFunc("project/scale", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		// Prototype of the start-in-plan convergence (see the tracking epic):
-		// a single plan carries creation AND the start phase, instead of
-		// chaining s.create with the separate s.start engine.
-		return s.converge(ctx, project, api.CreateOptions{Services: options.Services}, true)
+		// Start-in-plan convergence (see the tracking epic): a single plan
+		// carries creation AND the start phase, instead of chaining s.create
+		// with the separate s.start engine.
+		return s.converge(ctx, project, api.CreateOptions{Services: options.Services}, &startPhaseOptions{})
 	}), "scale", s.events)
 }
