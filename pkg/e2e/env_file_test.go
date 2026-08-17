@@ -17,19 +17,28 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 
-	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
 
 func TestRawEnvFile(t *testing.T) {
-	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, "dotenv")
-
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dotenv/raw.yaml", "run", "test")
-	assert.Equal(t, strings.TrimSpace(res.Stdout()), "'{\"key\": \"value\"}'")
+	NewScenario(t, "an env_file in raw format must reach the container without interpolation").
+		Files(`
+-- compose.yaml --
+services:
+  test:
+    image: alpine
+    command: sh -c "echo $$TEST_VAR"
+    env_file:
+      - path: .env.raw
+        format: raw # parse without interpolation
+-- .env.raw --
+TEST_VAR='{"key": "value"}'
+`).
+		Step("the service prints the raw value, quotes included",
+			ComposeCmd("run", "test"),
+			OutputContains(`'{"key": "value"}'`))
 }
 
 func TestUnusedMissingEnvFile(t *testing.T) {
@@ -79,10 +88,18 @@ func TestUnusedMissingEnvFile(t *testing.T) {
 }
 
 func TestRunEnvFile(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "run-dotenv"
-	defer c.cleanupWithDown(t, projectName)
-
-	res := c.RunDockerComposeCmd(t, "-p", projectName, "--project-directory", "./fixtures/env_file", "run", "--rm", "serviceC", "env")
-	res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
+	NewScenario(t, "run must resolve the service's env_file relative to the project directory").
+		Files(`
+-- compose.yaml --
+services:
+  serviceC:
+    profiles: ["test"]
+    image: alpine
+    env_file: test.env
+-- test.env --
+FOO=BAR
+`).
+		Step("the one-off sees the env_file's variables",
+			ComposeCmd("run", "--rm", "serviceC", "env"),
+			OutputContains("FOO=BAR"))
 }

@@ -170,6 +170,49 @@ func ServiceState(service, state string) Check {
 	}
 }
 
+// ServiceScale expects the service to have exactly n long-lived containers.
+func ServiceScale(service string, n int) Check {
+	return Check{
+		name: fmt.Sprintf("service %q has %d containers", service, n),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr.service(service)
+			if len(containers) != n {
+				var names []string
+				for _, c := range containers {
+					names = append(names, c.Name)
+				}
+				return fmt.Errorf("found %d: %s", len(names), strings.Join(names, ", "))
+			}
+			return nil
+		},
+	}
+}
+
+// ReplicaNumbers expects the service's containers to carry exactly the given
+// replica numbers (the com.docker.compose.container-number label), locking
+// which replicas survive a scale up or down.
+func ReplicaNumbers(service string, numbers ...int) Check {
+	return Check{
+		name: fmt.Sprintf("service %q has replicas %v", service, numbers),
+		fn: func(ctx *CheckContext) error {
+			var actual []string
+			for _, c := range ctx.curr.service(service) {
+				actual = append(actual, c.Labels["com.docker.compose.container-number"])
+			}
+			slices.Sort(actual)
+			var expected []string
+			for _, n := range numbers {
+				expected = append(expected, fmt.Sprint(n))
+			}
+			slices.Sort(expected)
+			if !slices.Equal(actual, expected) {
+				return fmt.Errorf("found replicas %v", actual)
+			}
+			return nil
+		},
+	}
+}
+
 // ServiceNotCreated expects the service to have no container at all — one-off
 // containers included — e.g. after an action that must leave unrelated
 // services untouched.
