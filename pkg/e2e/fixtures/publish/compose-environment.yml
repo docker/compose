@@ -1,7 +1,0 @@
-services:
-  serviceA:
-    image: "alpine:3.12"
-    environment:
-        - "MYSQL_ROOT_PASSWORD=bar"
-  serviceB:
-    image: "alpine:3.12"

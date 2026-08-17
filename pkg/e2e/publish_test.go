@@ -28,131 +28,231 @@ import (
 	"gotest.tools/v3/poll"
 )
 
-func TestPublishChecks(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "compose-e2e-explicit-profiles"
+// The publish checks all run with --dry-run: the CLI's decision — prompt,
+// refusal or publication report — is the observable.
 
-	t.Run("publish prompt env_file declined", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-env-file.yml",
-			"-p", projectName, "publish", "test/test", "--dry-run")
-		cmd.Stdin = strings.NewReader("n\n")
-		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 130})
-		out := res.Combined()
-		assert.Assert(t, strings.Contains(out, "you are about to publish env-related declarations within your OCI artifact."), out)
-		assert.Assert(t, strings.Contains(out, `service "serviceA": env_file declared`), out)
-		assert.Assert(t, strings.Contains(out, "Are you ok to publish these env declarations?"), out)
-		assert.Assert(t, !strings.Contains(out, "test/test published"), out)
-	})
+func TestPublishPromptEnvFile(t *testing.T) {
+	NewScenario(t, "publish must prompt on env_file declarations, and --with-env must silence the prompt").
+		Files(`
+-- compose.yaml --
+services:
+  serviceA:
+    image: "alpine:3.12"
+    env_file:
+      - publish.env
+  serviceB:
+    image: "alpine:3.12"
+-- publish.env --
+FOO=bar
+QUIX=
+`).
+		Step("declining the env prompt aborts the publication",
+			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("n\n").MayFail(),
+			ExitCode(130),
+			OutputContains("you are about to publish env-related declarations within your OCI artifact."),
+			OutputContains(`service "serviceA": env_file declared`),
+			OutputContains("Are you ok to publish these env declarations?"),
+			OutputNotContains("test/test published")).
+		Step("--with-env publishes without prompting",
+			ComposeCmd("publish", "test/test", "--with-env", "-y", "--dry-run"),
+			OutputContains("test/test publishing"),
+			OutputContains("test/test published"))
+}
 
-	t.Run("publish prompt suspicious env declined", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-environment.yml",
-			"-p", projectName, "publish", "test/test", "--dry-run")
-		cmd.Stdin = strings.NewReader("n\n")
-		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 130})
-		out := res.Combined()
-		assert.Assert(t, strings.Contains(out, `service "serviceA": literal value for "MYSQL_ROOT_PASSWORD"`), out)
-	})
+func TestPublishPromptSuspiciousEnv(t *testing.T) {
+	NewScenario(t, "publish must prompt on suspicious env literals, and --with-env must override").
+		Compose(`
+services:
+  serviceA:
+    image: "alpine:3.12"
+    environment:
+        - "MYSQL_ROOT_PASSWORD=bar"
+  serviceB:
+    image: "alpine:3.12"
+`).
+		Step("declining the prompt aborts the publication",
+			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("n\n").MayFail(),
+			ExitCode(130),
+			OutputContains(`service "serviceA": literal value for "MYSQL_ROOT_PASSWORD"`)).
+		Step("--with-env publishes without prompting",
+			ComposeCmd("publish", "test/test", "--with-env", "-y", "--dry-run"),
+			OutputContains("test/test publishing"),
+			OutputContains("test/test published"))
+}
 
-	t.Run("publish success interpolated env", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/compose-interpolated-env.yml",
-			"-p", projectName, "publish", "test/test", "-y", "--dry-run")
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test publishing"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
-	})
+func TestPublishInterpolatedEnv(t *testing.T) {
+	NewScenario(t, "interpolated env values must publish without an env prompt").
+		Compose(`
+services:
+  serviceA:
+    image: "alpine:3.12"
+    environment:
+      TEST: "${SOMEVAR}"
+`).
+		Step("publish succeeds with -y only",
+			ComposeCmd("publish", "test/test", "-y", "--dry-run"),
+			OutputContains("test/test publishing"),
+			OutputContains("test/test published"))
+}
 
-	t.Run("publish prompt aggregates env_file and suspicious literals", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-multi-env-config.yml",
-			"-p", projectName, "publish", "test/test", "--dry-run")
-		cmd.Stdin = strings.NewReader("n\n")
-		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 130})
-		out := res.Combined()
-		// Order is non-deterministic between services; assert each line independently.
-		assert.Assert(t, strings.Contains(out, `service "serviceB": env_file declared`), out)
-		assert.Assert(t, strings.Contains(out, `service "serviceA": literal value for "DB_PASSWORD"`), out)
-		assert.Assert(t, strings.Contains(out, `service "serviceB": literal value for "API_KEY"`), out)
-		assert.Assert(t, strings.Contains(out, "Use --with-env to silence this prompt"), out)
-	})
+func TestPublishPromptAggregatesFindings(t *testing.T) {
+	NewScenario(t, "the env prompt must aggregate env_file and suspicious literals across services").
+		Files(`
+-- compose.yaml --
+services:
+  serviceA:
+    image: "alpine:3.12"
+    environment:
+      - "DB_PASSWORD=bar"
+  serviceB:
+    image: "alpine:3.12"
+    env_file:
+      - publish.env
+    environment:
+      - "API_KEY=baz"
+-- publish.env --
+FOO=bar
+QUIX=
+`).
+		Step("every finding is listed before the prompt",
+			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("n\n").MayFail(),
+			ExitCode(130),
+			OutputContains(`service "serviceB": env_file declared`),
+			OutputContains(`service "serviceA": literal value for "DB_PASSWORD"`),
+			OutputContains(`service "serviceB": literal value for "API_KEY"`),
+			OutputContains("Use --with-env to silence this prompt"))
+}
 
-	t.Run("publish success environment", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/compose-environment.yml",
-			"-p", projectName, "publish", "test/test", "--with-env", "-y", "--dry-run")
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test publishing"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
-	})
+func TestPublishWithExtends(t *testing.T) {
+	NewScenario(t, "a model using extends must publish, resolved").
+		Files(`
+-- compose.yaml --
+services:
+  test:
+    extends:
+      file: common.yaml
+      service: foo
+-- common.yaml --
+services:
+  foo:
+    image: bar
+`).
+		Step("publish succeeds",
+			ComposeCmd("publish", "test/test", "--dry-run"),
+			OutputContains("test/test published"))
+}
 
-	t.Run("publish success env_file", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/compose-env-file.yml",
-			"-p", projectName, "publish", "test/test", "--with-env", "-y", "--dry-run")
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test publishing"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
-	})
+func TestPublishBindMount(t *testing.T) {
+	NewScenario(t, "publish must prompt on bind mounts, honoring the answer").
+		Compose(`
+services:
+  serviceA:
+    image: a
+    volumes:
+      - .:/user-data
+`).
+		Step("declining the bind-mount prompt aborts the publication",
+			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("n\n").MayFail(),
+			ExitCode(130),
+			OutputContains("you are about to publish bind mounts declaration within your OCI artifact."),
+			OutputContains(":/user-data"),
+			OutputContains("Are you ok to publish these bind mount declarations?"),
+			OutputNotContains("test/test published")).
+		Step("accepting the prompt publishes",
+			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("y\n"),
+			OutputContains(":/user-data"),
+			OutputContains("test/test published"))
+}
 
-	t.Run("publish with extends", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/compose-with-extends.yml",
-			"-p", projectName, "publish", "test/test", "--dry-run")
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
-	})
+func TestPublishBuildOnly(t *testing.T) {
+	NewScenario(t, "a stack of build-only services must be refused").
+		Files(`
+-- compose.yaml --
+services:
+  serviceA:
+    build:
+      context: .
+      dockerfile: Dockerfile
+  serviceB:
+    build:
+      context: .
+      dockerfile: Dockerfile
+-- Dockerfile --
+FROM alpine:latest
+`).
+		Step("publish is rejected, naming the build-only services",
+			ComposeCmd("publish", "test/test", "--with-env", "-y", "--dry-run").MayFail(),
+			ExitCode(1),
+			OutputContains("your Compose stack cannot be published as it only contains a build section for service(s):"),
+			OutputContains("serviceA"),
+			OutputContains("serviceB"))
+}
 
-	t.Run("refuse to publish with bind mount", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-bind-mount.yml",
-			"-p", projectName, "publish", "test/test", "--dry-run")
-		cmd.Stdin = strings.NewReader("n\n")
-		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 130})
-		out := res.Combined()
-		assert.Assert(t, strings.Contains(out, "you are about to publish bind mounts declaration within your OCI artifact."), out)
-		assert.Assert(t, strings.Contains(out, "e2e/fixtures/publish:/user-data"), out)
-		assert.Assert(t, strings.Contains(out, "Are you ok to publish these bind mount declarations?"), out)
-		assert.Assert(t, !strings.Contains(out, "serviceA published"), out)
-	})
+func TestPublishLocalInclude(t *testing.T) {
+	NewScenario(t, "a model with a local include must be refused").
+		Files(`
+-- compose.yaml --
+include:
+  - common.yaml
 
-	t.Run("publish with bind mount", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-bind-mount.yml",
-			"-p", projectName, "publish", "test/test", "--dry-run")
-		cmd.Stdin = strings.NewReader("y\n")
-		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		assert.Assert(t, strings.Contains(res.Combined(), "you are about to publish bind mounts declaration within your OCI artifact."), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "Are you ok to publish these bind mount declarations?"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e/fixtures/publish:/user-data"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "test/test published"), res.Combined())
-	})
+services:
+  test:
+    image: test
+-- common.yaml --
+services:
+  foo:
+    image: bar
+`).
+		Step("publish is rejected",
+			ComposeCmd("publish", "test/test", "--dry-run").MayFail(),
+			ExitCode(1),
+			OutputContains("cannot publish compose file with local includes"))
+}
 
-	t.Run("refuse to publish with build section only", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-build-only.yml",
-			"-p", projectName, "publish", "test/test", "--with-env", "-y", "--dry-run")
-		res.Assert(t, icmd.Expected{ExitCode: 1})
-		assert.Assert(t, strings.Contains(res.Combined(), "your Compose stack cannot be published as it only contains a build section for service(s):"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "serviceA"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "serviceB"), res.Combined())
-	})
-
-	t.Run("refuse to publish with local include", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/publish/compose-local-include.yml",
-			"-p", projectName, "publish", "test/test", "--dry-run")
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "cannot publish compose file with local includes"})
-	})
-
-	t.Run("detect sensitive data", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/publish/compose-sensitive.yml",
-			"-p", projectName, "publish", "test/test", "--with-env", "--dry-run")
-		cmd.Stdin = strings.NewReader("n\n")
-		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{ExitCode: 130})
-
-		output := res.Combined()
-		assert.Assert(t, strings.Contains(output, "you are about to publish sensitive data within your OCI artifact.\n"), output)
-		assert.Assert(t, strings.Contains(output, "please double check that you are not leaking sensitive data"), output)
-		assert.Assert(t, strings.Contains(output, "AWS Client ID\n\"services.serviceA.environment.AWS_ACCESS_KEY_ID\": A3TX1234567890ABCDEF"), output)
-		assert.Assert(t, strings.Contains(output, "AWS Secret Key\n\"services.serviceA.environment.AWS_SECRET_ACCESS_KEY\": aws\"12345+67890/abcdefghijklm+NOPQRSTUVWXYZ+\""), output)
-		assert.Assert(t, strings.Contains(output, "Github authentication\n\"GITHUB_TOKEN\": ghp_1234567890abcdefghijklmnopqrstuvwxyz"), output)
-		assert.Assert(t, strings.Contains(output, "JSON Web Token\n\"\": eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."+
-			"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw"), output)
-		assert.Assert(t, strings.Contains(output, "Private Key\n\"\": -----BEGIN DSA PRIVATE KEY-----\nwxyz+ABC=\n-----END DSA PRIVATE KEY-----"), output)
-	})
+func TestPublishDetectSensitiveData(t *testing.T) {
+	NewScenario(t, "publish must detect and list sensitive data before prompting").
+		Files(`
+-- compose.yaml --
+services:
+  serviceA:
+    image: "alpine:3.12"
+    environment:
+      - AWS_ACCESS_KEY_ID=A3TX1234567890ABCDEF
+      - AWS_SECRET_ACCESS_KEY=aws"12345+67890/abcdefghijklm+NOPQRSTUVWXYZ+"
+    configs:
+      - myconfig
+  serviceB:
+    image: "alpine:3.12"
+    env_file:
+      - publish-sensitive.env
+    secrets:
+      - mysecret
+configs:
+  myconfig:
+    file: config.txt
+secrets:
+  mysecret:
+    file: secret.txt
+-- publish-sensitive.env --
+GITHUB_TOKEN=ghp_1234567890abcdefghijklmnopqrstuvwxyz
+-- config.txt --
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+-- secret.txt --
+-----BEGIN DSA PRIVATE KEY-----
+wxyz+ABC=
+-----END DSA PRIVATE KEY-----
+`).
+		Step("every category of sensitive data is reported",
+			ComposeCmd("publish", "test/test", "--with-env", "--dry-run").WithStdin("n\n").MayFail(),
+			ExitCode(130),
+			OutputContains("you are about to publish sensitive data within your OCI artifact.\n"),
+			OutputContains("please double check that you are not leaking sensitive data"),
+			OutputContains("AWS Client ID\n\"services.serviceA.environment.AWS_ACCESS_KEY_ID\": A3TX1234567890ABCDEF"),
+			OutputContains("AWS Secret Key\n\"services.serviceA.environment.AWS_SECRET_ACCESS_KEY\": aws\"12345+67890/abcdefghijklm+NOPQRSTUVWXYZ+\""),
+			OutputContains("Github authentication\n\"GITHUB_TOKEN\": ghp_1234567890abcdefghijklmnopqrstuvwxyz"),
+			OutputContains("JSON Web Token\n\"\": eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."+
+				"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw"),
+			OutputContains("Private Key\n\"\": -----BEGIN DSA PRIVATE KEY-----\nwxyz+ABC=\n-----END DSA PRIVATE KEY-----"))
 }
 
 func TestPublish(t *testing.T) {
