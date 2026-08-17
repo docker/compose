@@ -122,9 +122,13 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 
 			if err != nil && node.Operation.Optional && ctx.Err() == nil {
 				// A best-effort operation reports its failure as a skip and
-				// does not fail the plan: dependent nodes still run.
+				// does not fail the plan: dependent nodes still run. Wait
+				// nodes emit their own per-container Skipped events (see
+				// reportWaitFailure), so the generic one is theirs to skip.
 				logrus.Warnf("%s (%s): %v", node.Operation.Cause, node.Operation.ResourceID, err)
-				events.On(skippedEvent(nodeEventName(node), err.Error()))
+				if node.Operation.Type != OpWaitCondition {
+					events.On(skippedEvent(nodeEventName(node), err.Error()))
+				}
 				err = nil
 			}
 

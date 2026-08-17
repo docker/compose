@@ -228,18 +228,36 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 		case <-ticker.C:
 		case <-ctx.Done():
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return fmt.Errorf("timeout waiting for dependencies")
+				return exec.reportWaitFailure(op, waitingFor, fmt.Errorf("timeout waiting for dependencies"))
 			}
 			return ctx.Err()
 		}
 		satisfied, err := exec.checkWaitCondition(ctx, op, waitingFor)
 		if err != nil {
-			return err
+			return exec.reportWaitFailure(op, waitingFor, err)
 		}
 		if satisfied {
 			return nil
 		}
 	}
+}
+
+// reportWaitFailure emits the per-container events a failed dependency wait
+// owes the progress display — Skipped with a reason when the dependency is
+// optional, Error otherwise — and returns the error for the walker (which
+// skips the generic event for wait nodes, see run()).
+func (exec *planExecutor) reportWaitFailure(op Operation, waitingFor Containers, err error) error {
+	s := exec.compose
+	if op.Optional {
+		reason := fmt.Sprintf("optional dependency %q: %v", op.Name, err)
+		s.events.On(containerReasonEvents(waitingFor, skippedEvent, reason)...)
+		logrus.Warnf("%s", reason)
+	} else {
+		s.events.On(containerEvents(waitingFor, func(id string) api.Resource {
+			return errorEventf(id, "dependency %s failed to start", op.Name)
+		})...)
+	}
+	return err
 }
 
 // checkWaitCondition performs one probe of a WaitCondition operation,
