@@ -324,6 +324,9 @@ func (s *Scenario) command(action Action) icmd.Cmd {
 	cmd.Env = append(cmd.Env, s.env...)
 	cmd.Env = append(cmd.Env, action.env...)
 	cmd.Timeout = action.timeout
+	if action.stdin != "" {
+		cmd.Stdin = strings.NewReader(action.stdin)
+	}
 	return cmd
 }
 
@@ -512,6 +515,7 @@ type Action struct {
 	kind    actionKind
 	args    []string
 	env     []string
+	stdin   string
 	mayFail bool
 	timeout time.Duration
 }
@@ -537,6 +541,13 @@ func (a Action) WithEnv(kv ...string) Action {
 // scenario (e.g. removing an image that may not exist).
 func (a Action) MayFail() Action {
 	a.mayFail = true
+	return a
+}
+
+// WithStdin feeds the command's standard input, e.g. to answer an interactive
+// prompt ("n\n").
+func (a Action) WithStdin(input string) Action {
+	a.stdin = input
 	return a
 }
 
