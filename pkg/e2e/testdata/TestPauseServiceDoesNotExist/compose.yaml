@@ -1,0 +1,5 @@
+services:
+  a:
+    image: alpine
+    init: true
+    command: sleep infinity
