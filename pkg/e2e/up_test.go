@@ -168,6 +168,9 @@ func TestUpImageID(t *testing.T) {
 }
 
 func TestUpStopWithLogsMixed(t *testing.T) {
+	// service2 pings forever so the abort always interrupts it: with a bounded
+	// ping, on a fast machine it can exit on its own before the abort reaches
+	// it, and the pre_stop hook never runs.
 	s := NewScenario(t, "on abort, logs of surviving services must keep flowing while others stop, hooks included")
 	s.Step("up aborts on the first exit but still relays service2's logs and stop hook",
 		ComposeCmd("up", "--abort-on-container-exit").Within(60*time.Second),

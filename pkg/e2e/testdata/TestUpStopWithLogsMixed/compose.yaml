@@ -1,9 +1,10 @@
 services:
   service1:
     image: alpine
-    command: /bin/true
+    command: sh -c "sleep 2"
   service2:
     image: alpine
-    command: ping -c 2 localhost
+    init: true
+    command: ping localhost
     pre_stop:
       - command: echo "stop hook running..."
