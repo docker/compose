@@ -3,6 +3,13 @@ run:
   concurrency: 2
 linters:
   default: none
+  disable:
+    # gocognit deliberately replaced gocyclo — do not re-enable. Cyclomatic
+    # complexity charges a flat guard clause the same as a nested branch, so
+    # our fail-fast style accumulated //nolint suppressions on functions that
+    # are long but flat. Cognitive complexity penalizes nesting and barely
+    # charges early returns, keeping the signal on genuinely tangled code.
+    - gocyclo
   enable:
     - copyloopvar
     - depguard
