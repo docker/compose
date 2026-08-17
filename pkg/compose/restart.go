@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/errgroup"
 
@@ -34,27 +35,50 @@ func (s *composeService) Restart(ctx context.Context, projectName string, option
 	}, "restart", s.events)
 }
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
 
+	project, err := s.prepareRestartProject(ctx, containers, projectName, options)
+	if err != nil {
+		return err
+	}
+
+	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
+		config := project.Services[service]
+		err := s.waitDependencies(ctx, project, service, config.DependsOn, containers, 0)
+		if err != nil {
+			return err
+		}
+
+		eg, ctx := errgroup.WithContext(ctx)
+		for _, ctr := range containers.filter(isService(service)) {
+			eg.Go(func() error {
+				return s.restartContainer(ctx, project.Services[service], ctr, options)
+			})
+		}
+		return eg.Wait()
+	})
+}
+
+// prepareRestartProject resolves the project restart applies to, restricted
+// to the requested services and the depends_on relations with restart: true
+func (s *composeService) prepareRestartProject(ctx context.Context, containers Containers, projectName string, options api.RestartOptions) (*types.Project, error) {
 	project := options.Project
+	var err error
 	if project == nil {
 		project, err = s.getProjectWithResources(ctx, containers, projectName)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if options.NoDeps {
 		project, err = project.WithSelectedServices(options.Services, types.IgnoreDependencies)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -68,51 +92,41 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		return s, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(options.Services) != 0 {
 		project, err = project.WithSelectedServices(options.Services, types.IncludeDependents)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
+	return project, nil
+}
 
-	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		config := project.Services[service]
-		err = s.waitDependencies(ctx, project, service, config.DependsOn, containers, 0)
+// restartContainer restarts a container, running its pre_stop and post_start
+// hooks around the restart
+func (s *composeService) restartContainer(ctx context.Context, def types.ServiceConfig, ctr container.Summary, options api.RestartOptions) error {
+	for _, hook := range def.PreStop {
+		err := s.runHook(ctx, ctr, def, hook, nil)
 		if err != nil {
 			return err
 		}
-
-		eg, ctx := errgroup.WithContext(ctx)
-		for _, ctr := range containers.filter(isService(service)) {
-			eg.Go(func() error {
-				def := project.Services[service]
-				for _, hook := range def.PreStop {
-					err = s.runHook(ctx, ctr, def, hook, nil)
-					if err != nil {
-						return err
-					}
-				}
-				eventName := getContainerProgressName(ctr)
-				s.events.On(newEvent(eventName, api.Working, api.StatusRestarting))
-				_, err = s.apiClient().ContainerRestart(ctx, ctr.ID, client.ContainerRestartOptions{
-					Timeout: utils.DurationSecondToInt(options.Timeout),
-				})
-				if err != nil {
-					return err
-				}
-				s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
-				for _, hook := range def.PostStart {
-					err = s.runHook(ctx, ctr, def, hook, nil)
-					if err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-		}
-		return eg.Wait()
+	}
+	eventName := getContainerProgressName(ctr)
+	s.events.On(newEvent(eventName, api.Working, api.StatusRestarting))
+	_, err := s.apiClient().ContainerRestart(ctx, ctr.ID, client.ContainerRestartOptions{
+		Timeout: utils.DurationSecondToInt(options.Timeout),
 	})
+	if err != nil {
+		return err
+	}
+	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
+	for _, hook := range def.PostStart {
+		err := s.runHook(ctx, ctr, def, hook, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
