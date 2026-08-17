@@ -716,7 +716,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		// Container is up-to-date
 		switch oc.State {
 		case container.StateRunning, container.StateCreated, container.StateRestarting, container.StateExited:
-			// Nothing to do (exited containers are left as-is, matching convergence.go behavior)
+			// Nothing to do (exited containers are left as-is, matching service_containers.go behavior)
 		default:
 			// Any other state (paused, dead, ...): attempt to (re)start
 			lastNode = r.plan.addNode(Operation{
@@ -1009,7 +1009,7 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 	return deps
 }
 
-// sortContainers sorts containers the same way as convergence.go:138-160:
+// sortContainers sorts containers the same way as the start path in service_containers.go:
 // obsolete first, then by container number descending, then reversed.
 //
 // mustRecreate is evaluated once per container before sorting to avoid

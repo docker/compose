@@ -659,7 +659,7 @@ func defaultNetworkSettings(project *types.Project,
 	// in the network configuration instead of connecting the container to each extra
 	// network individually after creation.
 	// For older API versions, extra networks are connected via NetworkConnect after
-	// container creation (see createMobyContainer in convergence.go).
+	// container creation (see createMobyContainer in service_containers.go).
 	if !versions.LessThan(version, apiVersion144) {
 		for _, networkKey := range serviceNetworks {
 			epSettings, err := createEndpointSettings(project, service, serviceIndex, networkKey, links, useNetworkAliases)
