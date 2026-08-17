@@ -1,0 +1,12 @@
+services:
+  regular-service:
+    image: alpine
+    init: true
+    command: sleep infinity
+
+  profiled-service:
+    image: alpine
+    init: true
+    command: sleep infinity
+    profiles:
+      - test-profile

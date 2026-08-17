@@ -1,0 +1,19 @@
+services:
+  running:
+    image: alpine
+    command: sleep infinity
+    init: true
+
+  exit:
+    image: alpine
+    command: /bin/true
+    depends_on:
+      running:
+        condition: service_started
+
+  fail:
+    image: alpine
+    command: sh -c "return 111"
+    depends_on:
+      exit:
+        condition: service_completed_successfully

@@ -17,191 +17,86 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
-)
-
-const (
-	profiledService = "profiled-service"
-	regularService  = "regular-service"
 )
 
 func TestExplicitProfileUsage(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "compose-e2e-explicit-profiles"
-	const profileName = "test-profile"
-
-	t.Run("compose up with profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "--profile", profileName, "up", "-d")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: regularService})
-		res.Assert(t, icmd.Expected{Out: profiledService})
-	})
-
-	t.Run("compose stop with profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "--profile", profileName, "stop")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		assert.Assert(t, !strings.Contains(res.Combined(), regularService))
-		assert.Assert(t, !strings.Contains(res.Combined(), profiledService))
-	})
-
-	t.Run("compose start with profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "--profile", profileName, "start")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		res.Assert(t, icmd.Expected{Out: regularService})
-		res.Assert(t, icmd.Expected{Out: profiledService})
-	})
-
-	t.Run("compose restart with profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "--profile", profileName, "restart")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		res.Assert(t, icmd.Expected{Out: regularService})
-		res.Assert(t, icmd.Expected{Out: profiledService})
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	t.Run("check containers after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
-	})
+	NewScenario(t, "with --profile, lifecycle commands must act on profiled and regular services alike").
+		Step("up with the profile starts both services",
+			ComposeCmd("--profile", "test-profile", "up", "-d"),
+			ServiceState("regular-service", "running"),
+			ServiceState("profiled-service", "running")).
+		Step("stop with the profile halts both services",
+			ComposeCmd("--profile", "test-profile", "stop"),
+			ServiceState("regular-service", "exited"),
+			ServiceState("profiled-service", "exited")).
+		Step("start with the profile resumes both services",
+			ComposeCmd("--profile", "test-profile", "start"),
+			ServiceState("regular-service", "running"),
+			ServiceState("profiled-service", "running"),
+			NotRecreated("regular-service", "profiled-service")).
+		Step("restart with the profile restarts both services in place",
+			ComposeCmd("--profile", "test-profile", "restart"),
+			ServiceState("regular-service", "running"),
+			ServiceState("profiled-service", "running"),
+			NotRecreated("regular-service", "profiled-service")).
+		Step("down removes every container",
+			ComposeCmd("--profile", "test-profile", "down"),
+			ServiceNotCreated("regular-service"),
+			ServiceNotCreated("profiled-service"))
 }
 
 func TestNoProfileUsage(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "compose-e2e-no-profiles"
-
-	t.Run("compose up without profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "up", "-d")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: regularService})
-		assert.Assert(t, !strings.Contains(res.Combined(), profiledService))
-	})
-
-	t.Run("compose stop without profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "stop")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		assert.Assert(t, !strings.Contains(res.Combined(), regularService))
-		assert.Assert(t, !strings.Contains(res.Combined(), profiledService))
-	})
-
-	t.Run("compose start without profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "start")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		res.Assert(t, icmd.Expected{Out: regularService})
-		assert.Assert(t, !strings.Contains(res.Combined(), profiledService))
-	})
-
-	t.Run("compose restart without profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "restart")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		res.Assert(t, icmd.Expected{Out: regularService})
-		assert.Assert(t, !strings.Contains(res.Combined(), profiledService))
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	t.Run("check containers after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
-	})
+	NewScenario(t, "without a profile, lifecycle commands must never materialize the profiled service").
+		Step("up starts only the regular service",
+			ComposeCmd("up", "-d"),
+			ServiceState("regular-service", "running"),
+			ServiceNotCreated("profiled-service")).
+		Step("stop halts the regular service",
+			ComposeCmd("stop"),
+			ServiceState("regular-service", "exited"),
+			ServiceNotCreated("profiled-service")).
+		Step("start resumes the regular service only",
+			ComposeCmd("start"),
+			ServiceState("regular-service", "running"),
+			ServiceNotCreated("profiled-service"),
+			NotRecreated("regular-service")).
+		Step("restart touches the regular service only",
+			ComposeCmd("restart"),
+			ServiceState("regular-service", "running"),
+			ServiceNotCreated("profiled-service"),
+			NotRecreated("regular-service")).
+		Step("down removes every container",
+			ComposeCmd("down"),
+			ServiceNotCreated("regular-service"))
 }
 
 func TestActiveProfileViaTargetedService(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "compose-e2e-via-target-service-profiles"
-	const profileName = "test-profile"
-
-	t.Run("compose up with service name", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "up", profiledService, "-d")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		assert.Assert(t, !strings.Contains(res.Combined(), regularService))
-		res.Assert(t, icmd.Expected{Out: profiledService})
-
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "--profile", profileName, "ps")
-		assert.Assert(t, !strings.Contains(res.Combined(), regularService))
-		res.Assert(t, icmd.Expected{Out: profiledService})
-	})
-
-	t.Run("compose stop with service name", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "stop", profiledService)
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		assert.Assert(t, !strings.Contains(res.Combined(), regularService))
-		assert.Assert(t, !strings.Contains(res.Combined(), profiledService))
-	})
-
-	t.Run("compose start with service name", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "start", profiledService)
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		assert.Assert(t, !strings.Contains(res.Combined(), regularService))
-		res.Assert(t, icmd.Expected{Out: profiledService})
-	})
-
-	t.Run("compose restart with service name", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"-p", projectName, "restart")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--status", "running")
-		assert.Assert(t, !strings.Contains(res.Combined(), regularService))
-		res.Assert(t, icmd.Expected{Out: profiledService})
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	t.Run("check containers after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
-	})
+	NewScenario(t, "targeting a profiled service must activate its profile implicitly, and only for it").
+		Step("up on the profiled service starts it without the regular one",
+			ComposeCmd("up", "-d", "profiled-service"),
+			ServiceState("profiled-service", "running"),
+			ServiceNotCreated("regular-service")).
+		Step("stop on the profiled service halts it",
+			ComposeCmd("stop", "profiled-service"),
+			ServiceState("profiled-service", "exited"),
+			ServiceNotCreated("regular-service")).
+		Step("start on the profiled service resumes it",
+			ComposeCmd("start", "profiled-service"),
+			ServiceState("profiled-service", "running"),
+			ServiceNotCreated("regular-service"),
+			NotRecreated("profiled-service")).
+		Step("restart keeps acting on the existing containers only",
+			ComposeCmd("restart"),
+			ServiceState("profiled-service", "running"),
+			ServiceNotCreated("regular-service"),
+			NotRecreated("profiled-service"))
 }
 
 func TestDotEnvProfileUsage(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "compose-e2e-dotenv-profiles"
-	const profileName = "test-profile"
-
-	t.Cleanup(func() {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	t.Run("compose up with profile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/compose.yaml",
-			"--env-file", "./fixtures/profiles/test-profile.env",
-			"-p", projectName, "--profile", profileName, "up", "-d")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		res = c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: regularService})
-		res.Assert(t, icmd.Expected{Out: profiledService})
-	})
+	NewScenario(t, "COMPOSE_PROFILES from the project's .env must activate the profile").
+		Step("up starts both services, the profile coming from .env",
+			ComposeCmd("up", "-d"),
+			ServiceState("regular-service", "running"),
+			ServiceState("profiled-service", "running"))
 }

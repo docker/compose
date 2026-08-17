@@ -29,17 +29,21 @@ import (
 )
 
 func TestCascadeStop(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-cascade-stop"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
+	NewScenario(t, "up --abort-on-container-exit must stop the project on the first exit, and exit 0 without --exit-code-from").
+		Step("up aborts once a container exits, reporting which one",
+			ComposeCmd("up", "--abort-on-container-exit").Within(60*time.Second),
+			OutputContains("exit-1 exited with code 0"),
+			ServiceState("running", "exited"))
+}
 
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/cascade/compose.yaml", "--project-name", projectName,
-		"up", "--abort-on-container-exit")
-	assert.Assert(t, strings.Contains(res.Combined(), "exit-1 exited with code 0"), res.Combined())
-	// no --exit-code-from, so this is not an error
-	assert.Equal(t, res.ExitCode, 0)
+func TestCascadeFail(t *testing.T) {
+	NewScenario(t, "up --abort-on-container-failure must propagate the failing container's exit code").
+		Step("up keeps going on clean exits and aborts on the failure, with its exit code",
+			ComposeCmd("up", "--abort-on-container-failure").MayFail().Within(60*time.Second),
+			ExitCode(111),
+			OutputContains("exit-1 exited with code 0"),
+			OutputContains("fail-1 exited with code 111"),
+			ServiceState("running", "exited"))
 }
 
 func TestCascadeIgnoresOneOffContainer(t *testing.T) {
@@ -66,19 +70,4 @@ func TestCascadeIgnoresOneOffContainer(t *testing.T) {
 
 	assert.Assert(t, !strings.Contains(res.Combined(), "Aborting on container exit"), res.Combined())
 	RequireServiceState(t, c, "running", "running")
-}
-
-func TestCascadeFail(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-cascade-fail"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/cascade/compose.yaml", "--project-name", projectName,
-		"up", "--abort-on-container-failure")
-	assert.Assert(t, strings.Contains(res.Combined(), "exit-1 exited with code 0"), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), "fail-1 exited with code 111"), res.Combined())
-	// failing exit code should be propagated
-	assert.Equal(t, res.ExitCode, 111)
 }
