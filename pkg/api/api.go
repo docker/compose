@@ -137,7 +137,9 @@ type Compose interface {
 	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	// Wait blocks until at least one of the services' container exits
 	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
-	// Scale manages numbers of container instances running per service
+	// Scale sets the number of replicas of the selected services
+	// (ScaleOptions.Replicas) and converges the project to it, creating,
+	// removing and starting containers as needed
 	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
 	// Export a service container's filesystem as a tar archive
 	Export(ctx context.Context, projectName string, options ExportOptions) error
@@ -158,6 +160,13 @@ type VolumesOptions struct {
 type VolumesSummary = volume.Volume
 
 type ScaleOptions struct {
+	// Replicas maps a service name to the number of replicas it must run.
+	// Scale applies these counts to the project model before converging it.
+	Replicas map[string]int
+	// Services selects the services whose containers may be recreated on
+	// configuration divergence while converging (see CreateOptions.Services);
+	// it does not scale anything by itself. When empty, it defaults to the
+	// keys of Replicas.
 	Services []string
 }
 
