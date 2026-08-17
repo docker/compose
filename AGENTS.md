@@ -22,6 +22,58 @@ rules in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
   `OutputContains` as last resort, new checks go in `pkg/e2e/checks.go`) and
   how to exploit failure artifacts and `E2E_KEEP_FAILED=1`.
 
+## Architecture map
+
+Read this before changing lifecycle or CLI code — several of these facts are
+not guessable from local reading.
+
+- **Packages**: `cmd/compose` is the cobra CLI layer; `pkg/api` is the public
+  SDK contract (interface `Compose` + option structs); `pkg/compose` is the
+  backend implementation (`NewComposeService`). Everything else under `pkg/`
+  is exported for historical reasons, not as a stability promise.
+- **Two lifecycle engines coexist.** The plan-based reconciler
+  (`pkg/compose/reconcile.go`) is entered through `reconcile()`, called from
+  `preparePlan` in `create.go` (behind `create`, `up`, `scale`, `watch`
+  rebuilds and the dependencies of `run`) and directly from `start()` in
+  `start.go`. The `run` target itself bypasses the plan: `doPrepareRun`
+  calls `createContainer` directly. `ReconcileScope` selects the phases the
+  plan covers: Create (`create`), Create+Start (`up`, `scale`, `watch`
+  rebuilds) or Start only (`compose start`) — the plan does start
+  containers (`OpStartContainer`);
+  interactive `up` only runs the two phases of its plan separately. `stop`,
+  `restart`, `down` and the classic build still walk
+  `InDependencyOrder`/`InReverseDependencyOrder` (`internal/depgraph`).
+- **Operation convention**: exported `composeService` methods wrap the work
+  in `Run(ctx, …, "opname")`, which drives the `EventProcessor`
+  (`Start`/`On`/`Done`) used for progress display. Unexported methods
+  (`s.create`, `s.start`, …) are building blocks without their own event
+  cycle — calling an exported method from another operation nests event
+  cycles.
+- **Output conventions**: progress/status rendering goes to **stderr**
+  (`dockerCli.Err()`); stdout is reserved for command payload (`ps`,
+  `config`, container logs' stdout stream). TTY detection for the renderer
+  probes stderr, color detection for logs probes stdout.
+- **Environment resolution has two idioms**: `os.Getenv` sees only the
+  process environment; `project.Environment[...]` also sees the project's
+  `.env`. `cmd/compose/compose.go:setEnvWithDotEnv` additionally copies
+  `COMPOSE_*` keys from the project's env-files into the process environment
+  during `PersistentPreRunE` — variables read before that point (e.g. as
+  cobra flag defaults) do not see the `.env`.
+- **Container/project identity is label-based**: container listings
+  (`pkg/compose/containers.go:getDefaultFilters`) filter on the presence of
+  `com.docker.compose.config-hash`, not just the project label. One-off
+  (`compose run`) containers carry `oneoff=True` and no container-number.
+  Lifecycle-hook helper containers are created with `NoConfigHash`
+  (`pre_start.go`), so they have no config-hash label and those listings never
+  see them: they are invisible to `ps` and to the normal teardown path, and
+  `down` removes retained `pre_start` ones through a dedicated sweep
+  (`down.go:removePreStartHookContainers`); that sweep and
+  `getHookContainers` list them by project label plus hook label, bypassing
+  `getDefaultFilters`.
+- **Docker Desktop integrations** (`internal/desktop`, used from `up`,
+  `publish`, the keyboard menu) talk to Desktop over a private socket and are
+  expected to fail silently on non-Desktop engines.
+
 ## Lint
 
 - Linter: golangci-lint v2 (config in `.golangci.yml`)
@@ -34,7 +86,7 @@ rules in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
 - Formatting is enforced by golangci-lint (gofumpt + gci)
 - Import order: stdlib, third-party, local module (enforced by gci)
 - Max line length: 200 chars
-- Max cyclomatic complexity: 16
+- Max cognitive complexity: 30 (gocognit; gocyclo is deliberately disabled)
 - No `io/ioutil`, `github.com/pkg/errors`, `gopkg.in/yaml.v2`, `golang.org/x/exp/maps`, `golang.org/x/exp/slices`
 - Use `github.com/containerd/errdefs` instead of `github.com/docker/docker/errdefs`
 - In tests: use `t.Context()` instead of `context.Background()` or `context.TODO()`
