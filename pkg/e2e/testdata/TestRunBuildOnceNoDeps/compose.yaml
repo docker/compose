@@ -1,5 +1,4 @@
 services:
-  # Simple service with no dependencies
   simple:
     pull_policy: build
     build:
@@ -7,4 +6,3 @@ services:
         FROM alpine
         RUN echo "Simple built at $(date)" > /build.txt
         CMD echo "Simple service"
-

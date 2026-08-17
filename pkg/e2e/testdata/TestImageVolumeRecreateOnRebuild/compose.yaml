@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: image-volume-source
+    image: ${SOURCE_IMAGE}
 
   consumer:
     image: alpine
@@ -12,7 +12,7 @@ services:
     command: ["cat", "/data/content.txt"]
     volumes:
       - type: image
-        source: image-volume-source
+        source: ${SOURCE_IMAGE}
         target: /data
         image:
           subpath: app
