@@ -118,54 +118,48 @@ services:
 }
 
 func TestStartStopWithOneOffs(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-start-stop-with-oneoffs"
-
-	t.Run("Up", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "--project-name", projectName,
-			"up", "-d")
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-oneoffs-foo-1 Started"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-oneoffs-bar-1 Started"), res.Combined())
-	})
-
-	t.Run("run one-off", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "--project-name", projectName, "run", "-d", "bar", "sleep", "infinity")
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "ps", "-a")
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-foo-1"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-1"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-run"), res.Combined())
-	})
-
-	t.Run("stop (not one-off containers)", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "stop")
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-foo-1"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-1"), res.Combined())
-		assert.Assert(t, !strings.Contains(res.Combined(), "e2e_start_stop_with_oneoffs-bar-run"), res.Combined())
-
-		res = c.RunDockerComposeCmd(t, "--project-name", projectName, "ps", "-a", "--status", "running")
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-run"), res.Combined())
-	})
-
-	t.Run("start (not one-off containers)", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "start")
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-foo-1"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-1"), res.Combined())
-		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-run"), res.Combined())
-	})
-
-	t.Run("restart (not one-off containers)", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "restart")
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-foo-1"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-1"), res.Combined())
-		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar-run"), res.Combined())
-	})
-
-	t.Run("down", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
-
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "ps", "-a", "--status", "running")
-		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar"), res.Combined())
-	})
+	NewScenario(t, "stop, start and restart must act on services and leave one-off containers untouched").
+		Compose(`
+services:
+  foo:
+    image: alpine
+    init: true
+    command: sleep infinity
+  bar:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("up starts the services",
+			ComposeCmd("up", "-d"),
+			ServiceState("foo", "running"),
+			ServiceState("bar", "running")).
+		Step("run adds a one-off container alongside the service",
+			ComposeCmd("run", "-d", "bar", "sleep", "infinity"),
+			OneOffState("bar", "running"),
+			NotRecreated("foo", "bar")).
+		Step("stop halts the services but not the one-off",
+			ComposeCmd("stop"),
+			ServiceState("foo", "exited"),
+			ServiceState("bar", "exited"),
+			OneOffState("bar", "running"),
+			OneOffsUntouched("bar")).
+		Step("start resumes the services without touching the one-off",
+			ComposeCmd("start"),
+			ServiceState("foo", "running"),
+			ServiceState("bar", "running"),
+			OneOffsUntouched("bar")).
+		Step("restart restarts the services but not the one-off",
+			ComposeCmd("restart"),
+			ServiceState("foo", "running"),
+			ServiceState("bar", "running"),
+			NotRecreated("foo", "bar"),
+			OneOffsUntouched("bar")).
+		Step("down --remove-orphans removes the one-off as well",
+			ComposeCmd("down", "--remove-orphans"),
+			ServiceNotCreated("foo"),
+			ServiceNotCreated("bar"),
+			OneOffsRemoved("bar"))
 }
 
 func TestStartAlreadyRunning(t *testing.T) {
