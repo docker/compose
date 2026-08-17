@@ -1,7 +1,0 @@
-services:
-  stderr:
-    image: alpine
-    init: true
-    command: /bin/ash /log_to_stderr.sh
-    volumes:
-           - ./log_to_stderr.sh:/log_to_stderr.sh
