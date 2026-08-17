@@ -149,13 +149,14 @@ func (c *pollCapture) Fatalf(format string, args ...any) {
 	runtime.Goexit()
 }
 
-// ServiceState expects every container of the service to be in the given
-// state (running, exited, restarting, …).
+// ServiceState expects every long-lived container of the service to be in
+// the given state (running, exited, restarting, …). One-off (run) containers
+// are not considered; see OneOffState.
 func ServiceState(service, state string) Check {
 	return Check{
 		name: fmt.Sprintf("service %q is %s", service, state),
 		fn: func(ctx *CheckContext) error {
-			containers := ctx.curr[service]
+			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
 				return fmt.Errorf("service has no container")
 			}
@@ -169,8 +170,9 @@ func ServiceState(service, state string) Check {
 	}
 }
 
-// ServiceNotCreated expects the service to have no container at all, e.g.
-// after an action that must leave unrelated services untouched.
+// ServiceNotCreated expects the service to have no container at all — one-off
+// containers included — e.g. after an action that must leave unrelated
+// services untouched.
 func ServiceNotCreated(service string) Check {
 	return Check{
 		name: fmt.Sprintf("service %q has no container", service),
@@ -194,7 +196,7 @@ func NotRecreated(services ...string) Check {
 		name: fmt.Sprintf("services %s not recreated", strings.Join(services, ", ")),
 		fn: func(ctx *CheckContext) error {
 			for _, service := range services {
-				before, after := containerIDs(ctx.prev[service]), containerIDs(ctx.curr[service])
+				before, after := containerIDs(ctx.prev.service(service)), containerIDs(ctx.curr.service(service))
 				if len(before) == 0 {
 					return fmt.Errorf("service %q had no container before the step", service)
 				}
@@ -216,12 +218,80 @@ func containerIDs(containers []containerState) []string {
 	return ids
 }
 
+// OneOffState expects every one-off (run) container of the service to be in
+// the given state.
+func OneOffState(service, state string) Check {
+	return Check{
+		name: fmt.Sprintf("one-off of service %q is %s", service, state),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr.oneOffs(service)
+			if len(containers) == 0 {
+				return fmt.Errorf("service has no one-off container")
+			}
+			for _, c := range containers {
+				if c.State != state {
+					return fmt.Errorf("container %s is %s", c.Name, c.State)
+				}
+			}
+			return nil
+		},
+	}
+}
+
+// OneOffsUntouched expects the service's one-off containers to be exactly the
+// ones from before the step, neither restarted nor removed: same container
+// IDs, same state, same start time.
+func OneOffsUntouched(service string) Check {
+	return Check{
+		name: fmt.Sprintf("one-offs of service %q untouched", service),
+		fn: func(ctx *CheckContext) error {
+			before, after := ctx.prev.oneOffs(service), ctx.curr.oneOffs(service)
+			if len(before) == 0 {
+				return fmt.Errorf("service had no one-off container before the step")
+			}
+			if !slices.Equal(containerIDs(before), containerIDs(after)) {
+				return fmt.Errorf("one-off containers changed: %v -> %v", containerIDs(before), containerIDs(after))
+			}
+			for i, b := range before {
+				a := after[i]
+				if a.State != b.State || a.StartedAt != b.StartedAt {
+					return fmt.Errorf("container %s was touched: %s (started %s) -> %s (started %s)",
+						b.Name, b.State, b.StartedAt, a.State, a.StartedAt)
+				}
+			}
+			return nil
+		},
+	}
+}
+
+// OneOffsRemoved expects the one-off containers the service had before the
+// step to be gone; it errors if the service had none, rather than pass
+// vacuously.
+func OneOffsRemoved(service string) Check {
+	return Check{
+		name: fmt.Sprintf("one-offs of service %q removed", service),
+		fn: func(ctx *CheckContext) error {
+			if len(ctx.prev.oneOffs(service)) == 0 {
+				return fmt.Errorf("service had no one-off container before the step")
+			}
+			var names []string
+			for _, c := range ctx.curr.oneOffs(service) {
+				names = append(names, c.Name)
+			}
+			if len(names) > 0 {
+				return fmt.Errorf("still present: %s", strings.Join(names, ", "))
+			}
+			return nil
+		},
+	}
+}
+
 // LabelSet expects every container of the service to carry a non-empty label.
 func LabelSet(service, key string) Check {
 	return Check{
 		name: fmt.Sprintf("service %q has label %q set", service, key),
 		fn: func(ctx *CheckContext) error {
-			containers := ctx.curr[service]
+			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
 				return fmt.Errorf("service has no container")
 			}
@@ -243,7 +313,7 @@ func LabelsDistinct(key string, services ...string) Check {
 		fn: func(ctx *CheckContext) error {
 			seen := map[string]string{}
 			for _, service := range services {
-				containers := ctx.curr[service]
+				containers := ctx.curr.service(service)
 				if len(containers) == 0 {
 					return fmt.Errorf("service %q has no container", service)
 				}
@@ -264,7 +334,7 @@ func LabelUnchanged(service, key string) Check {
 	return Check{
 		name: fmt.Sprintf("service %q label %q unchanged", service, key),
 		fn: func(ctx *CheckContext) error {
-			before, after := ctx.prev[service], ctx.curr[service]
+			before, after := ctx.prev.service(service), ctx.curr.service(service)
 			if len(before) == 0 || len(after) == 0 {
 				return fmt.Errorf("service has no container to compare")
 			}
@@ -282,7 +352,7 @@ func RunsOnPlatform(service, platform string) Check {
 	return Check{
 		name: fmt.Sprintf("service %q container created for platform %s", service, platform),
 		fn: func(ctx *CheckContext) error {
-			containers := ctx.curr[service]
+			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
 				return fmt.Errorf("service has no container")
 			}
