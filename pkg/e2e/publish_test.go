@@ -178,7 +178,7 @@ func TestPublish(t *testing.T) {
 			return poll.Success()
 		}
 		return poll.Continue("registry not ready, status %d", resp.StatusCode)
-	}, poll.WithTimeout(10*time.Second), poll.WithDelay(100*time.Millisecond))
+	}, poll.WithTimeout(10*time.Second), poll.WithDelay(500*time.Millisecond))
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/publish/oci/compose.yaml", "-f", "./fixtures/publish/oci/compose-override.yaml",
 		"-p", projectName, "publish", "--with-env", "--yes", "--insecure-registry", registry+"/test:test")

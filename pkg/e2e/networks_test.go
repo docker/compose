@@ -43,7 +43,8 @@ func TestNetworks(t *testing.T) {
 	res := c.RunDockerComposeCmd(t, "ps")
 	res.Assert(t, icmd.Expected{Out: `web`})
 
-	endpoint := "http://localhost:80"
+	webPort := c.ServicePublishedPort(t, projectName, "web", 80)
+	endpoint := fmt.Sprintf("http://localhost:%d", webPort)
 	output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
 	assert.Assert(t, strings.Contains(output, `"word":`))
 
@@ -52,7 +53,7 @@ func TestNetworks(t *testing.T) {
 	res.Assert(t, icmd.Expected{Out: "microservices"})
 
 	res = c.RunDockerComposeCmd(t, "port", "words", "8080")
-	res.Assert(t, icmd.Expected{Out: `0.0.0.0:8080`})
+	res.Assert(t, icmd.Expected{Out: `0.0.0.0:`})
 
 	c.RunDockerComposeCmd(t, "down", "-t0", "-v")
 	res = c.RunDockerCmd(t, "network", "ls")

@@ -57,7 +57,7 @@ func TestCascadeIgnoresOneOffContainer(t *testing.T) {
 	})
 
 	poll.WaitOn(t, expectOutput(res, "Attaching to running-1"),
-		poll.WithDelay(100*time.Millisecond), poll.WithTimeout(30*time.Second))
+		poll.WithDelay(500*time.Millisecond), poll.WithTimeout(30*time.Second))
 
 	c.RunDockerComposeCmd(t, "-f", "./fixtures/cascade/compose.yaml",
 		"run", "--rm", "--no-deps", "running", "/bin/true")

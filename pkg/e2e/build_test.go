@@ -105,7 +105,7 @@ func TestLocalComposeBuild(t *testing.T) {
 			res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
 			res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
 
-			output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
+			output := HTTPGetWithRetry(t, fmt.Sprintf("http://localhost:%d", c.ServicePublishedPort(t, "build-test", "nginx", 80)), http.StatusOK, 2*time.Second, 20*time.Second)
 			assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
 
 			c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
@@ -301,13 +301,15 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 	}
 	c := NewParallelCLI(t)
 
-	// declare builder
-	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-platform", "--use", "--bootstrap")
+	// declare a per-test-unique builder to avoid container-name collisions
+	// when tests run in parallel on the same Docker daemon.
+	builderName := BuilderName(t, "build-platform")
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap")
 	assert.NilError(t, result.Error)
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "down")
-		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", "build-platform")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", builderName)
 	})
 
 	t.Run("platform not supported by builder", func(t *testing.T) {
@@ -365,14 +367,16 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 func TestBuildPrivileged(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	// declare builder
-	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-privileged", "--use", "--bootstrap", "--buildkitd-flags",
+	// declare a per-test-unique builder to avoid container-name collisions
+	// when tests run in parallel on the same Docker daemon.
+	builderName := BuilderName(t, "build-privileged")
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap", "--buildkitd-flags",
 		`'--allow-insecure-entitlement=security.insecure'`)
 	assert.NilError(t, result.Error)
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/privileged", "down")
-		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", "build-privileged")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", builderName)
 	})
 
 	t.Run("use build privileged mode to run insecure build command", func(t *testing.T) {
@@ -480,8 +484,9 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 
 func TestBuildBuilder(t *testing.T) {
 	c := NewParallelCLI(t)
-	builderName := "build-with-builder"
-	// declare builder
+	// declare a per-test-unique builder to avoid container-name collisions
+	// when tests run in parallel on the same Docker daemon.
+	builderName := BuilderName(t, "build-with-builder")
 	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap")
 	assert.NilError(t, result.Error)
 
@@ -507,14 +512,16 @@ func TestBuildBuilder(t *testing.T) {
 func TestBuildEntitlements(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	// declare builder
-	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-insecure", "--use", "--bootstrap", "--buildkitd-flags",
+	// declare a per-test-unique builder to avoid container-name collisions
+	// when tests run in parallel on the same Docker daemon.
+	builderName := BuilderName(t, "build-insecure")
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap", "--buildkitd-flags",
 		`'--allow-insecure-entitlement=security.insecure'`)
 	assert.NilError(t, result.Error)
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/entitlements", "down")
-		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", "build-insecure")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", builderName)
 	})
 
 	t.Run("use build privileged mode to run insecure build command", func(t *testing.T) {
@@ -624,7 +631,9 @@ func TestBuildTLS(t *testing.T) {
 	t.Helper()
 
 	c := NewParallelCLI(t)
-	const dindBuilder = "e2e-dind-builder"
+	// Use a per-test-unique name to avoid container/context collisions when
+	// tests run in parallel on the same Docker daemon.
+	dindBuilder := BuilderName(t, "e2e-dind-builder")
 	tmp := t.TempDir()
 
 	t.Cleanup(func() {

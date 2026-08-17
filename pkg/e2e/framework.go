@@ -22,10 +22,12 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -516,4 +518,43 @@ func HTTPGetWithRetry(
 func (c *CLI) cleanupWithDown(t testing.TB, project string, args ...string) {
 	t.Helper()
 	c.RunDockerComposeCmd(t, append([]string{"-p", project, "down", "-v", "--remove-orphans"}, args...)...)
+}
+
+// ServicePublishedPort returns the ephemeral host port mapped to targetPort
+// on the named service in the given compose project. It requires the service
+// to be already running. The test fails immediately if the mapping cannot be
+// resolved.
+func (c *CLI) ServicePublishedPort(t testing.TB, project, service string, targetPort int) int {
+	t.Helper()
+	res := c.RunDockerComposeCmd(t, "-p", project, "port", service, strconv.Itoa(targetPort))
+	addr := strings.TrimSpace(res.Stdout())
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("ServicePublishedPort: cannot parse compose port output %q: %v", addr, err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("ServicePublishedPort: invalid port number %q: %v", portStr, err)
+	}
+	return port
+}
+
+// BuilderName returns a buildx builder name that is unique to the test,
+// preventing container-name collisions when tests run in parallel on the
+// same Docker daemon.
+func BuilderName(t testing.TB, base string) string {
+	t.Helper()
+	safe := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-':
+			return r
+		default:
+			return '-'
+		}
+	}, t.Name())
+	name := base + "-" + safe
+	if len(name) > 60 {
+		name = strings.TrimRight(name[:60], "-")
+	}
+	return name
 }

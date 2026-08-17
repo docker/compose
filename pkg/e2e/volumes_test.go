@@ -44,7 +44,8 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("access bind mount data", func(t *testing.T) {
-		output := HTTPGetWithRetry(t, "http://localhost:8090", http.StatusOK, 2*time.Second, 20*time.Second)
+		port := c.ServicePublishedPort(t, projectName, "nginx", 80)
+		output := HTTPGetWithRetry(t, fmt.Sprintf("http://localhost:%d", port), http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
 	})
 
