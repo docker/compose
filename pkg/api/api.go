@@ -310,13 +310,21 @@ type CreateOptions struct {
 type StartOptions struct {
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project *types.Project
-	// Attach to container and forward logs if not nil
+	// Attach receives the containers' logs during Up's foreground session.
+	// It doubles as the mode switch: when nil, Up returns once containers
+	// are started (detached mode); when set, Up keeps running the
+	// interactive session (log streaming, cascade, keyboard menu).
+	// Ignored by Start.
 	Attach LogConsumer
-	// AttachTo set the services to attach to
+	// AttachTo carries two unrelated meanings: for Start, the service names
+	// used to rebuild a project from container labels when Project is nil;
+	// for Up's foreground session, the services whose logs are streamed.
 	AttachTo []string
-	// OnExit defines behavior when a container stops
+	// OnExit defines behavior when a container stops. Honored by Up's
+	// foreground session only; ignored by Start.
 	OnExit Cascade
-	// ExitCodeFrom return exit code from specified service
+	// ExitCodeFrom reports the exit code of the specified service. Honored
+	// by Up's foreground session only; ignored by Start.
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
 	Wait        bool
@@ -324,8 +332,12 @@ type StartOptions struct {
 	// Services names the services the user explicitly targeted; it only
 	// scopes the log monitor of Up's foreground session. Start ignores it:
 	// narrow the project instead.
-	Services       []string
-	Watch          bool
+	Services []string
+	// Watch enables watch mode during Up's foreground session; ignored by
+	// Start.
+	Watch bool
+	// NavigationMenu enables the keyboard menu of Up's foreground session;
+	// ignored by Start.
 	NavigationMenu bool
 }
 
