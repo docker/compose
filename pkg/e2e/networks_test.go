@@ -24,12 +24,11 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 )
 
 func TestNetworks(t *testing.T) {
-	// fixture is shared with TestNetworkModes and is not safe to run concurrently
+	// fixture is not safe to run concurrently: it binds fixed host ports
 	const projectName = "network-e2e"
 	c := NewCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME="+projectName,
@@ -61,143 +60,169 @@ func TestNetworks(t *testing.T) {
 }
 
 func TestNetworkAliases(t *testing.T) {
-	c := NewParallelCLI(t)
+	NewScenario(t, "a network alias and a link must both resolve to the target service").
+		Compose(`
+services:
+  container1:
+    image: nginx
+    stop_signal: SIGTERM
+    links:
+      - container2:container
 
-	const projectName = "network_alias_e2e"
-	defer c.cleanupWithDown(t, projectName)
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "up",
-			"-d")
-	})
-
-	t.Run("curl alias", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName,
-			"exec", "-T", "container1", "curl", "http://alias-of-container2/")
-		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
-	})
-
-	t.Run("curl links", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName,
-			"exec", "-T", "container1", "curl", "http://container/")
-		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
+  container2:
+    image: nginx
+    stop_signal: SIGTERM
+    networks:
+      default:
+        aliases:
+          - alias-of-container2
+`).
+		Step("up starts both services",
+			ComposeCmd("up", "-d"),
+			ServiceState("container1", "running"),
+			ServiceState("container2", "running")).
+		Step("the network alias resolves",
+			ComposeCmd("exec", "-T", "container1", "curl", "http://alias-of-container2/"),
+			OutputContains("Welcome to nginx!")).
+		Step("the link name resolves",
+			ComposeCmd("exec", "-T", "container1", "curl", "http://container/"),
+			OutputContains("Welcome to nginx!"))
 }
 
 func TestNetworkLinks(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "network_link_e2e"
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName, "up",
-			"-d")
-	})
-
-	t.Run("curl links in default bridge network", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName,
-			"exec", "-T", "container2", "curl", "http://container1/")
-		assert.Assert(t, is.Contains(res.Stdout(), "Welcome to nginx!"))
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
+	NewScenario(t, "links must resolve between services running on the default bridge network").
+		Compose(`
+services:
+  container1:
+    image: nginx
+    stop_signal: SIGTERM
+    network_mode: bridge
+  container2:
+    image: nginx
+    stop_signal: SIGTERM
+    network_mode: bridge
+    links:
+      - container1
+`).
+		Step("up starts both services",
+			ComposeCmd("up", "-d"),
+			ServiceState("container1", "running"),
+			ServiceState("container2", "running")).
+		Step("the linked name resolves over the bridge network",
+			ComposeCmd("exec", "-T", "container2", "curl", "http://container1/"),
+			OutputContains("Welcome to nginx!"))
 }
 
 func TestIPAMConfig(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "ipam_e2e"
-
-	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"_default")
-	})
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/ipam/compose.yaml", "--project-name", projectName, "up", "-d")
-	})
-
-	t.Run("ensure service get fixed IP assigned", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "inspect", projectName+"-foo-1", "-f",
-			fmt.Sprintf(`{{ $network := index .NetworkSettings.Networks "%s_default" }}{{ $network.IPAMConfig.IPv4Address }}`, projectName))
-		res.Assert(t, icmd.Expected{Out: "10.1.0.100"})
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
+	s := NewScenario(t, "a fixed ipv4_address must be assigned to the service's container")
+	s.Compose(`
+services:
+  foo:
+    image: alpine
+    init: true
+    entrypoint: ["sleep", "600"]
+    networks:
+      default:
+        ipv4_address: 10.1.0.100  # <-- Fixed IP address
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.1.0.0/16
+`).
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("foo", "running")).
+		Step("the container got the fixed IP",
+			DockerCmd("inspect", s.Project()+"-foo-1", "-f",
+				fmt.Sprintf(`{{ $network := index .NetworkSettings.Networks "%s_default" }}{{ $network.IPAMConfig.IPv4Address }}`, s.Project())),
+			OutputContains("10.1.0.100"))
 }
 
 func TestNetworkModes(t *testing.T) {
-	// fixture is shared with TestNetworks and is not safe to run concurrently
-	c := NewCLI(t)
-
-	const projectName = "network_mode_service_run"
-	defer c.cleanupWithDown(t, projectName)
-
-	t.Run("run with service mode dependency", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "-T", "mydb", "echo", "success")
-		res.Assert(t, icmd.Expected{Out: "success"})
-	})
+	NewScenario(t, "run must start a service whose network_mode points at another service").
+		Compose(`
+services:
+  mydb:
+    image: alpine
+    network_mode: "service:db"
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("run starts the network provider and shares its namespace",
+			ComposeCmd("run", "-T", "mydb", "echo", "success"),
+			OutputContains("success"),
+			ServiceState("db", "running"))
 }
 
 func TestNetworkConfigChanged(t *testing.T) {
-	// fixture is shared with TestNetworks and is not safe to run concurrently
-	c := NewCLI(t)
-	const projectName = "network_config_change"
+	NewScenario(t, "a network subnet change must recreate the network and re-address the attached containers").
+		Compose(`
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    networks:
+      - test
 
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.subnet.yaml", "--project-name", projectName, "up", "-d")
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	res := c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "hostname", "-i")
-	res.Assert(t, icmd.Expected{Out: "172.99.0."})
-	res.Combined()
-
-	cmd := c.NewCmdWithEnv([]string{"SUBNET=192.168.0.0/16"},
-		"docker", "compose", "-f", "./fixtures/network-test/compose.subnet.yaml", "--project-name", projectName, "up", "-d")
-	res = icmd.RunCmd(cmd)
-	res.Assert(t, icmd.Success)
-	out := res.Combined()
-	fmt.Println(out)
-
-	res = c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "hostname", "-i")
-	res.Assert(t, icmd.Expected{Out: "192.168.0."})
+networks:
+  test:
+    ipam:
+      config:
+        - subnet: ${SUBNET-172.99.0.0/16}
+`).
+		Step("up addresses the service in the default subnet",
+			ComposeCmd("up", "-d"),
+			ServiceState("test", "running")).
+		Step("the container's IP belongs to the default subnet",
+			ComposeCmd("exec", "test", "hostname", "-i"),
+			OutputContains("172.99.0.")).
+		Step("up with a changed subnet replaces the network, reconnecting the same container",
+			ComposeCmd("up", "-d").WithEnv("SUBNET=192.168.0.0/16"),
+			ServiceState("test", "running"),
+			NotRecreated("test")).
+		Step("the container's IP moved to the new subnet",
+			ComposeCmd("exec", "test", "hostname", "-i"),
+			OutputContains("192.168.0."))
 }
 
 func TestMacAddress(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "network_mac_address"
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/mac_address.yaml", "--project-name", projectName, "up", "-d")
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-	res := c.RunDockerCmd(t, "inspect", fmt.Sprintf("%s-test-1", projectName), "-f", "{{ (index .NetworkSettings.Networks \"network_mac_address_default\" ).MacAddress }}")
-	res.Assert(t, icmd.Expected{Out: "00:e0:84:35:d0:e8"})
+	s := NewScenario(t, "a declared mac_address must be applied to the container's network endpoint")
+	s.Compose(`
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    mac_address: 00:e0:84:35:d0:e8
+`).
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("test", "running")).
+		Step("the endpoint carries the declared mac address",
+			DockerCmd("inspect", s.Project()+"-test-1", "-f",
+				fmt.Sprintf(`{{ (index .NetworkSettings.Networks "%s_default" ).MacAddress }}`, s.Project())),
+			OutputContains("00:e0:84:35:d0:e8"))
 }
 
 func TestInterfaceName(t *testing.T) {
-	c := NewCLI(t)
-
-	version := c.RunDockerCmd(t, "version", "-f", "{{.Server.Version}}")
-	major, _, found := strings.Cut(version.Combined(), ".")
-	assert.Assert(t, found)
-	if major == "26" || major == "27" {
-		t.Skip("Skipping test due to docker version < 28")
-	}
-
-	const projectName = "network_interface_name"
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-interface-name/compose.yaml", "--project-name", projectName, "run", "test")
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-	res.Assert(t, icmd.Expected{Out: "foobar@"})
+	NewScenario(t, "a declared interface_name must name the network interface inside the container").
+		Requires(EngineVersionAtLeast(28)).
+		Compose(`
+services:
+  test:
+    image: alpine
+    command: ip link show
+    networks:
+      default:
+        interface_name: foobar
+`).
+		Step("the container sees its interface under the declared name",
+			ComposeCmd("run", "test"),
+			OutputContains("foobar@"))
 }
 
 func TestNetworkRecreate(t *testing.T) {

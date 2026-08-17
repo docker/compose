@@ -17,60 +17,103 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
+// The pull command's report — Pulled vs Skipped — is the CLI's decision, so
+// these scenarios legitimately observe the output.
+
 func TestComposePull(t *testing.T) {
-	c := NewParallelCLI(t)
+	NewScenario(t, "pull must always pull, whether or not the image is present locally").
+		Compose(`
+services:
+  simple:
+    image: alpine:3.14
+    command: top
+  another:
+    image: alpine:3.15
+    command: top
+`).
+		Step("start without the images in the local store",
+			ComposeCmd("down", "--rmi", "all")).
+		Step("pull fetches every service image",
+			ComposeCmd("pull"),
+			OutputContains("Image alpine:3.14 Pulled"),
+			OutputContains("Image alpine:3.15 Pulled")).
+		Step("pull again still pulls: the command's default policy is always",
+			ComposeCmd("pull"),
+			OutputContains("Image alpine:3.14 Pulled"),
+			OutputContains("Image alpine:3.15 Pulled"))
+}
 
-	t.Run("Verify image pulled", func(t *testing.T) {
-		// cleanup existing images
-		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "down", "--rmi", "all")
+func TestPullImagePresentLocally(t *testing.T) {
+	NewScenario(t, "with pull_policy missing, a present image is skipped but a :latest tag is still pulled").
+		Compose(`
+services:
+  simple:
+    image: alpine:3.13.12
+    pull_policy: missing
+    command: top
+  latest:
+    image: alpine:latest
+    pull_policy: missing
+    command: top
+`).
+		Step("warm the local store",
+			ComposeCmd("pull")).
+		Step("a second pull skips the pinned tag and refreshes latest",
+			ComposeCmd("pull"),
+			OutputContains("alpine:3.13.12 Skipped Image is already present locally"),
+			OutputContains("alpine:latest Pulled"))
+}
 
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "pull")
-		output := res.Combined()
+func TestPullNoImageNameGiven(t *testing.T) {
+	NewScenario(t, "pull must skip a build-only service instead of failing").
+		Files(`
+-- compose.yaml --
+services:
+  no-image-service:
+    build: .
+-- Dockerfile --
+FROM alpine:3.15
+`).
+		Step("pull reports there is nothing to pull",
+			ComposeCmd("pull"),
+			OutputContains("Skipped No image to be pulled"))
+}
 
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.14 Pulled"))
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.15 Pulled"))
+const pullUnknownImageCompose = `
+services:
+  fail:
+    image: does_not_exists
+  can_build:
+    image: doesn_t_exists_either
+    build: .
+  valid:
+    image: alpine:3.15
+`
 
-		// verify default policy is 'always' for pull command
-		res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "pull")
-		output = res.Combined()
+func TestPullFailure(t *testing.T) {
+	NewScenario(t, "pull must fail when a service image cannot be pulled").
+		Files(`
+-- compose.yaml --`+pullUnknownImageCompose+`
+-- Dockerfile --
+FROM alpine:3.15
+`).
+		Step("pull reports the denied image and fails",
+			ComposeCmd("pull").MayFail(),
+			ExitCode(1),
+			OutputContains("pull access denied for does_not_exists"))
+}
 
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.14 Pulled"))
-		assert.Assert(t, strings.Contains(output, "Image alpine:3.15 Pulled"))
-	})
-
-	t.Run("Verify skipped pull if image is already present locally", func(t *testing.T) {
-		// make sure the required image is present
-		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/image-present-locally", "pull")
-
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/image-present-locally", "pull")
-		output := res.Combined()
-
-		assert.Assert(t, strings.Contains(output, "alpine:3.13.12 Skipped Image is already present locally"))
-		// image with :latest tag gets pulled regardless if pull_policy: missing or if_not_present
-		assert.Assert(t, strings.Contains(output, "alpine:latest Pulled"))
-	})
-
-	t.Run("Verify skipped no image to be pulled", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/no-image-name-given", "pull")
-		output := res.Combined()
-
-		assert.Assert(t, strings.Contains(output, "Skipped No image to be pulled"))
-	})
-
-	t.Run("Verify pull failure", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/compose-pull/unknown-image", "pull")
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "pull access denied for does_not_exists"})
-	})
-
-	t.Run("Verify ignore pull failure", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/unknown-image", "pull", "--ignore-pull-failures")
-		res.Assert(t, icmd.Expected{Err: "Some service image(s) must be built from source by running:"})
-	})
+func TestPullIgnoreFailures(t *testing.T) {
+	NewScenario(t, "pull --ignore-pull-failures must succeed and point at the services to build").
+		Files(`
+-- compose.yaml --`+pullUnknownImageCompose+`
+-- Dockerfile --
+FROM alpine:3.15
+`).
+		Step("pull succeeds despite the missing image",
+			ComposeCmd("pull", "--ignore-pull-failures"),
+			OutputContains("Some service image(s) must be built from source by running:"))
 }
