@@ -279,6 +279,19 @@ func (exec *planExecutor) checkWaitCondition(ctx context.Context, op Operation, 
 // execRunPreStart runs the service's pre_start hooks on the replica the plan
 // selected (once per service, before any of its containers start).
 func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) error {
+	// The plan scheduled this node because no replica was running at
+	// observation time. Re-check against the daemon at execution time: if a
+	// replica started in the meantime (observe-to-execute drift), the
+	// once-per-service rule says the hooks must not run again.
+	running, err := exec.compose.getContainers(ctx, exec.project.Name, oneOffExclude, false, op.Service.Name)
+	if err != nil {
+		return err
+	}
+	if len(running) > 0 {
+		logrus.Debugf("skipping pre_start hooks of service %s: a replica is already running", op.Service.Name)
+		return nil
+	}
+
 	id, name := exec.resolveContainer(op)
 	if id == "" {
 		return fmt.Errorf("no container to run pre_start hooks for %s", op.ResourceID)
