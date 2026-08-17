@@ -2,6 +2,11 @@ services:
   fluentbit:
     image: fluent/fluent-bit:3.1.7-debug
     ports:
+      # Port 24224 intentionally fixed: the Docker fluentd log driver sets
+      # fluentd-address at service-start time (see compose.yaml and
+      # TestLoggingDriver in compose_up_test.go). Dynamic resolution would
+      # require a two-phase compose up which is unnecessarily invasive.
+      # TestLoggingDriver is serial (no t.Parallel()), so collision risk is nil.
       - "24224:24224"
       - "24224:24224/udp"
     environment:
