@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 )
 
@@ -159,88 +158,87 @@ func TestAttachRestart(t *testing.T) {
 }
 
 func TestInitContainer(t *testing.T) {
-	c := NewParallelCLI(t)
+	NewScenario(t, "a service_completed_successfully dependency must run to completion before its dependent starts").
+		Compose(`
+services:
+  foo:
+    image: alpine
+    command: "echo hello"
 
-	res := c.RunDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/init-container", "up", "--menu=false")
-	defer c.RunDockerComposeCmd(t, "-p", "init-container", "down")
-	assert.Assert(t, is.Regexp("foo-1  | hello(?m:.*)bar-1  | world", res.Stdout()))
+  bar:
+    image: alpine
+    command: "echo world"
+    depends_on:
+      foo:
+        condition: "service_completed_successfully"
+`).
+		Step("up runs the init container first, then the dependent",
+			ComposeCmd("--ansi=never", "up", "--menu=false"),
+			OutputMatches("foo-1  | hello(?m:.*)bar-1  | world"))
 }
 
 func TestRm(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "compose-e2e-rm"
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
-	})
-
-	t.Run("rm --stop --force simple", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm",
-			"--stop", "--force", "simple")
-		res.Assert(t, icmd.Expected{Err: "Removed", ExitCode: 0})
-	})
-
-	t.Run("check containers after rm", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-simple"), res.Combined())
-		assert.Assert(t, strings.Contains(res.Combined(), projectName+"-another"), res.Combined())
-	})
-
-	t.Run("up (again)", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
-	})
-
-	t.Run("rm ---stop --force <none>", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm",
-			"--stop", "--force")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-	})
-
-	t.Run("check containers after rm", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps", "--all")
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-simple"), res.Combined())
-		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"-another"), res.Combined())
-	})
-
-	t.Run("down", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-p", projectName, "down")
-	})
+	NewScenario(t, "rm --stop --force must remove the selected service's containers, or every service's without selection").
+		Compose(`
+services:
+  simple:
+    image: alpine
+    init: true
+    command: top
+  another:
+    image: alpine
+    init: true
+    command: top
+`).
+		Step("up starts both services",
+			ComposeCmd("up", "-d"),
+			ServiceState("simple", "running"),
+			ServiceState("another", "running")).
+		Step("rm on one service removes only its container",
+			ComposeCmd("rm", "--stop", "--force", "simple"),
+			ServiceNotCreated("simple"),
+			ServiceState("another", "running")).
+		Step("up brings the removed service back",
+			ComposeCmd("up", "-d"),
+			ServiceState("simple", "running")).
+		Step("rm without selection removes every container",
+			ComposeCmd("rm", "--stop", "--force"),
+			ServiceNotCreated("simple"),
+			ServiceNotCreated("another"))
 }
 
 func TestCompatibility(t *testing.T) {
-	// this test shares a fixture with TestLocalComposeUp and can't run at the same time
-	c := NewCLI(t)
-
-	const projectName = "compose-e2e-compatibility"
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "--compatibility", "-f", "./fixtures/sentences/compose.yaml", "--project-name",
-			projectName, "up", "-d")
-	})
-
-	t.Run("check container names", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps", "--format", "{{.Names}}")
-		res.Assert(t, icmd.Expected{Out: "compose-e2e-compatibility_web_1"})
-		res.Assert(t, icmd.Expected{Out: "compose-e2e-compatibility_words_1"})
-		res.Assert(t, icmd.Expected{Out: "compose-e2e-compatibility_db_1"})
-	})
-
-	t.Run("down", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-p", projectName, "down")
-	})
+	s := NewScenario(t, "--compatibility must name containers with underscore separators")
+	s.Compose(`
+services:
+  simple:
+    image: alpine
+    init: true
+    command: top
+`).
+		Step("up names the container the v1 way",
+			ComposeCmd("--compatibility", "up", "-d"),
+			ServiceState("simple", "running")).
+		Step("the container name uses underscores",
+			DockerCmd("ps", "--filter", "label=com.docker.compose.project="+s.Project(), "--format", "{{.Names}}"),
+			OutputContains(s.Project()+"_simple_1"))
 }
 
 func TestConfig(t *testing.T) {
-	const projectName = "compose-e2e-config"
-	c := NewParallelCLI(t)
-
-	wd, err := os.Getwd()
-	assert.NilError(t, err)
-
-	t.Run("up", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "config")
-		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
+	s := NewScenario(t, "config must render the canonical model, resolving the build context to an absolute path")
+	s.Files(`
+-- compose.yaml --
+services:
+  nginx:
+    build:
+      context: nginx-build
+      dockerfile: Dockerfile
+-- nginx-build/Dockerfile --
+FROM alpine
+`).
+		Step("the rendering resolves the context and names the default network",
+			ComposeCmd("config"),
+			OutputContains(fmt.Sprintf(`name: %s
 services:
   nginx:
     build:
@@ -250,24 +248,28 @@ services:
       default: null
 networks:
   default:
-    name: compose-e2e-config_default
-`, projectName, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
-	})
+    name: %s_default
+`, s.Project(), filepath.Join(s.Dir(), "nginx-build"), s.Project())))
 }
 
 func TestConfigInterpolate(t *testing.T) {
-	const projectName = "compose-e2e-config-interpolate"
-	c := NewParallelCLI(t)
-
-	wd, err := os.Getwd()
-	assert.NilError(t, err)
-
-	t.Run("config", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose-interpolate.yaml", "-p", projectName, "config", "--no-interpolate")
-		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`name: %s
+	s := NewScenario(t, "config --no-interpolate must keep variable expressions while still resolving paths")
+	s.Files(`
+-- compose.yaml --
+services:
+  nginx:
+    build:
+      context: nginx-build
+      dockerfile: ${MYVAR}
+-- nginx-build/Dockerfile --
+FROM alpine
+`).
+		Step("the rendering keeps the dockerfile variable",
+			ComposeCmd("config", "--no-interpolate"),
+			OutputContains(fmt.Sprintf(`name: %s
 networks:
   default:
-    name: compose-e2e-config-interpolate_default
+    name: %s_default
 services:
   nginx:
     build:
@@ -275,43 +277,55 @@ services:
       dockerfile: ${MYVAR}
     networks:
       default: null
-`, projectName, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
-	})
+`, s.Project(), s.Project(), filepath.Join(s.Dir(), "nginx-build"))))
 }
 
 func TestStopWithDependenciesAttached(t *testing.T) {
-	const projectName = "compose-e2e-stop-with-deps"
-	c := NewParallelCLI(t, WithEnv("COMMAND=echo hello"))
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "-p", projectName, "down", "--remove-orphans", "--timeout=0")
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/compose.yaml", "-p", projectName, "up", "--attach-dependencies", "foo", "--menu=false")
-	res.Assert(t, icmd.Expected{Out: "exited with code 0"})
+	NewScenario(t, "up --attach-dependencies must stop with the target service, reporting its exit").
+		Compose(`
+services:
+  foo:
+    image: alpine
+    command: echo hello
+    depends_on:
+      - bar
+  bar:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("up returns when the attached service exits",
+			ComposeCmd("up", "--attach-dependencies", "foo", "--menu=false").Within(60*time.Second),
+			OutputContains("exited with code 0"))
 }
 
 func TestRemoveOrphaned(t *testing.T) {
-	const projectName = "compose-e2e-remove-orphaned"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "-p", projectName, "down", "--remove-orphans", "--timeout=0")
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	// run stack
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/sentences/compose.yaml", "-p", projectName, "up", "-d")
-
-	// down "web" service with orphaned removed
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/sentences/compose.yaml", "-p", projectName, "down", "--remove-orphans", "web")
-
-	// check "words" service has not been considered orphaned
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/sentences/compose.yaml", "-p", projectName, "ps", "--format", "{{.Name}}")
-	res.Assert(t, icmd.Expected{Out: fmt.Sprintf("%s-words-1", projectName)})
+	NewScenario(t, "down --remove-orphans scoped to a service must not touch the other services").
+		Compose(`
+services:
+  web:
+    image: alpine
+    init: true
+    command: sleep infinity
+  words:
+    image: alpine
+    init: true
+    command: sleep infinity
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("up starts the stack",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running"),
+			ServiceState("words", "running"),
+			ServiceState("db", "running")).
+		Step("down scoped to one service leaves the others alone",
+			ComposeCmd("down", "--remove-orphans", "web"),
+			ServiceNotCreated("web"),
+			ServiceState("words", "running"),
+			ServiceState("db", "running"))
 }
 
 func TestComposeFileSetByDotEnv(t *testing.T) {
@@ -390,16 +404,32 @@ func TestNestedDotEnv(t *testing.T) {
 }
 
 func TestUnnecessaryResources(t *testing.T) {
-	const projectName = "compose-e2e-unnecessary-resources"
-	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, projectName)
+	NewScenario(t, "a missing external network must only fail the services that use it").
+		Compose(`
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
 
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/external/compose.yaml", "-p", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{
-		ExitCode: 1,
-		Err:      "network foo_bar declared as external, but could not be found",
-	})
+  other:
+    image: alpine
+    init: true
+    command: sleep infinity
+    networks:
+      test_network:
+        ipv4_address: 8.8.8.8
 
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/external/compose.yaml", "-p", projectName, "up", "-d", "test")
-	// Should not fail as missing external network is not used
+networks:
+  test_network:
+    external: true
+    name: foo_bar
+`).
+		Step("up with every service is rejected over the missing network",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			OutputContains("network foo_bar declared as external, but could not be found")).
+		Step("up scoped to the unaffected service succeeds",
+			ComposeCmd("up", "-d", "test"),
+			ServiceState("test", "running"))
 }
