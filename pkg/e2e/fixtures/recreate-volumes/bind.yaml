@@ -1,5 +1,0 @@
-services:
-  app:
-    image: alpine
-    volumes:
-      - .:/my_vol
