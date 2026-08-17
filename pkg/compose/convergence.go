@@ -153,9 +153,6 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 // ServiceConditionRunningOrHealthy is a service condition on status running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
 	if timeout > 0 {
 		withTimeout, cancelFunc := context.WithTimeout(ctx, timeout)
@@ -181,79 +178,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		}
 
 		eg.Go(func() error {
-			ticker := time.NewTicker(500 * time.Millisecond)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-				case <-ctx.Done():
-					return nil
-				}
-				switch config.Condition {
-				case ServiceConditionRunningOrHealthy:
-					isHealthy, err := s.isServiceHealthy(ctx, waitingFor, true)
-					if err != nil {
-						if !config.Required {
-							s.events.On(containerReasonEvents(waitingFor, skippedEvent,
-								fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep))...)
-							logrus.Warnf("optional dependency %q is not running or is unhealthy: %s", dep, err.Error())
-							return nil
-						}
-						return err
-					}
-					if isHealthy {
-						s.events.On(containerEvents(waitingFor, healthy)...)
-						return nil
-					}
-				case types.ServiceConditionHealthy:
-					isHealthy, err := s.isServiceHealthy(ctx, waitingFor, false)
-					if err != nil {
-						if !config.Required {
-							s.events.On(containerReasonEvents(waitingFor, skippedEvent,
-								fmt.Sprintf("optional dependency %q failed to start", dep))...)
-							logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
-							return nil
-						}
-						s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
-							return errorEventf(s, "dependency %s failed to start", dep)
-						})...)
-						return fmt.Errorf("dependency failed to start: %w", err)
-					}
-					if isHealthy {
-						s.events.On(containerEvents(waitingFor, healthy)...)
-						return nil
-					}
-				case types.ServiceConditionCompletedSuccessfully:
-					isExited, code, err := s.isServiceCompleted(ctx, waitingFor)
-					if err != nil {
-						return err
-					}
-					if isExited {
-						if code == 0 {
-							s.events.On(containerEvents(waitingFor, exited)...)
-							return nil
-						}
-
-						messageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
-						if !config.Required {
-							// optional -> mark as skipped & don't propagate error
-							s.events.On(containerReasonEvents(waitingFor, skippedEvent,
-								fmt.Sprintf("optional dependency %s", messageSuffix))...)
-							logrus.Warnf("optional dependency %s", messageSuffix)
-							return nil
-						}
-
-						msg := fmt.Sprintf("service %s", messageSuffix)
-						s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
-							return errorEventf(s, "service %s", messageSuffix)
-						})...)
-						return errors.New(msg)
-					}
-				default:
-					logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
-					return nil
-				}
-			}
+			return s.waitDependency(ctx, dep, config, waitingFor)
 		})
 	}
 	err := eg.Wait()
@@ -261,6 +186,105 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		return fmt.Errorf("timeout waiting for dependencies")
 	}
 	return err
+}
+
+// waitDependency polls the dependency's containers until its depends_on
+// condition is satisfied (done), definitively failed (err), or ctx is
+// cancelled. Each check reports (done, err): (false, nil) means keep polling.
+func (s *composeService) waitDependency(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return nil
+		}
+		var (
+			done bool
+			err  error
+		)
+		switch config.Condition {
+		case ServiceConditionRunningOrHealthy:
+			done, err = s.checkDependencyRunningOrHealthy(ctx, dep, config, waitingFor)
+		case types.ServiceConditionHealthy:
+			done, err = s.checkDependencyHealthy(ctx, dep, config, waitingFor)
+		case types.ServiceConditionCompletedSuccessfully:
+			done, err = s.checkDependencyCompleted(ctx, dep, config, waitingFor)
+		default:
+			logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
+			return nil
+		}
+		if done || err != nil {
+			return err
+		}
+	}
+}
+
+func (s *composeService) checkDependencyRunningOrHealthy(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
+	isHealthy, err := s.isServiceHealthy(ctx, waitingFor, true)
+	if err != nil {
+		if !config.Required {
+			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+				fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep))...)
+			logrus.Warnf("optional dependency %q is not running or is unhealthy: %s", dep, err.Error())
+			return true, nil
+		}
+		return false, err
+	}
+	if isHealthy {
+		s.events.On(containerEvents(waitingFor, healthy)...)
+	}
+	return isHealthy, nil
+}
+
+func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
+	isHealthy, err := s.isServiceHealthy(ctx, waitingFor, false)
+	if err != nil {
+		if !config.Required {
+			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+				fmt.Sprintf("optional dependency %q failed to start", dep))...)
+			logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
+			return true, nil
+		}
+		s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
+			return errorEventf(s, "dependency %s failed to start", dep)
+		})...)
+		return false, fmt.Errorf("dependency failed to start: %w", err)
+	}
+	if isHealthy {
+		s.events.On(containerEvents(waitingFor, healthy)...)
+	}
+	return isHealthy, nil
+}
+
+func (s *composeService) checkDependencyCompleted(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
+	isExited, code, err := s.isServiceCompleted(ctx, waitingFor)
+	if err != nil {
+		return false, err
+	}
+	if !isExited {
+		return false, nil
+	}
+	if code == 0 {
+		s.events.On(containerEvents(waitingFor, exited)...)
+		return true, nil
+	}
+
+	messageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
+	if !config.Required {
+		// optional -> mark as skipped & don't propagate error
+		s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+			fmt.Sprintf("optional dependency %s", messageSuffix))...)
+		logrus.Warnf("optional dependency %s", messageSuffix)
+		return true, nil
+	}
+
+	msg := fmt.Sprintf("service %s", messageSuffix)
+	s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
+		return errorEventf(s, "service %s", messageSuffix)
+	})...)
+	return false, errors.New(msg)
 }
 
 func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceDependency, project *types.Project) (bool, error) {
