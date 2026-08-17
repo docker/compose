@@ -18,40 +18,21 @@ package e2e
 
 import (
 	"testing"
-
-	"gotest.tools/v3/icmd"
 )
 
 func TestConfigFromEnv(t *testing.T) {
-	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, "configs")
-
-	t.Run("config from file", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/configs/compose.yaml", "run", "from_file"))
-		res.Assert(t, icmd.Expected{Out: "This is my config file"})
-	})
-
-	t.Run("config from env", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/configs/compose.yaml", "run", "from_env"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "CONFIG=config")
-			})
-		res.Assert(t, icmd.Expected{Out: "config"})
-	})
-
-	t.Run("config inlined", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/configs/compose.yaml", "run", "inlined"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "CONFIG=config")
-			})
-		res.Assert(t, icmd.Expected{Out: "This is my config"})
-	})
-
-	t.Run("custom target", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/configs/compose.yaml", "run", "target"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "CONFIG=config")
-			})
-		res.Assert(t, icmd.Expected{Out: "This is my config"})
-	})
+	NewScenario(t, "each config source — file, environment, inline content — must mount with the right content").
+		Env("CONFIG=config").
+		Step("a file-sourced config mounts its file's content",
+			ComposeCmd("run", "from_file"),
+			OutputContains("This is my config file")).
+		Step("an environment-sourced config mounts the variable's value",
+			ComposeCmd("run", "from_env"),
+			OutputContains("config")).
+		Step("an inline config mounts its interpolated content",
+			ComposeCmd("run", "inlined"),
+			OutputContains("This is my config")).
+		Step("a custom target mounts the config at the requested path",
+			ComposeCmd("run", "target"),
+			OutputContains("This is my config"))
 }
