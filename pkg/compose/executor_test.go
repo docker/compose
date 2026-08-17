@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -487,3 +488,103 @@ type conflictError struct{}
 
 func (conflictError) Error() string { return "conflict" }
 func (conflictError) Conflict()     {}
+
+// recordingEvents captures, per resource ID, the sequence of status texts —
+// the per-resource progression the event contract promises (see
+// api.EventProcessor).
+type recordingEvents struct {
+	mu   sync.Mutex
+	byID map[string][]string
+}
+
+func (r *recordingEvents) Start(_ context.Context, _ string) {}
+func (r *recordingEvents) Done(_ string, _ bool)             {}
+func (r *recordingEvents) On(events ...api.Resource) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, e := range events {
+		r.byID[e.ID] = append(r.byID[e.ID], e.Text)
+	}
+}
+
+func TestExecutePlanStartPhaseEventContract(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+
+	recorder := &recordingEvents{byID: map[string][]string{}}
+	svcAny, err := NewComposeService(cli, WithEventProcessor(recorder))
+	assert.NilError(t, err)
+	svc := svcAny.(*composeService)
+
+	project := &types.Project{
+		Name: "test",
+		Services: types.Services{
+			"db":  {Name: "db"},
+			"app": {Name: "app"},
+		},
+	}
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		State:  container.StateRunning,
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	appSummary := container.Summary{
+		ID:     "app-id",
+		Names:  []string{"/test-app-1"},
+		State:  container.StateCreated,
+		Labels: map[string]string{api.ServiceLabel: "app", api.OneoffLabel: "False"},
+	}
+	observed := &ObservedState{
+		ProjectName: "test",
+		Containers: map[string][]ObservedContainer{
+			"db":  {{ID: "db-id", Name: "test-db-1", Number: 1, State: container.StateRunning, Summary: dbSummary}},
+			"app": {{ID: "app-id", Name: "test-app-1", Number: 1, State: container.StateCreated, Summary: appSummary}},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	// db reports healthy on the first probe
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Healthy},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "app-id", gomock.Any()).Return(client.ContainerStartResult{}, nil)
+
+	appSvc := project.Services["app"]
+	dbSvc := project.Services["db"]
+	plan := &Plan{}
+	wait := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:app:db",
+		Cause:      "app depends on db (service_healthy)",
+		Service:    &dbSvc,
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:app:1",
+		Cause:      "service start",
+		Service:    &appSvc,
+		Container:  &appSummary,
+		Name:       "test-app-1",
+		Number:     1,
+	}, "", wait)
+
+	assert.NilError(t, svc.executePlan(t.Context(), project, observed, plan))
+
+	// per-resource progressions promised by the event contract
+	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting, api.StatusHealthy})
+	assert.DeepEqual(t, recorder.byID["Container test-app-1"], []string{api.StatusStarting, api.StatusStarted})
+}

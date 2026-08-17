@@ -97,6 +97,27 @@ func (e *Resource) StatusText() string {
 }
 
 // EventProcessor is notified about Compose operations and tasks
+//
+// # Event contract
+//
+// The event stream is ordered per resource, not globally: operations run
+// concurrently and events of distinct resources interleave freely, but a
+// given resource's events follow a fixed progression. Consumers must key on
+// Resource.ID and must not rely on global ordering.
+//
+// Typical per-resource progressions (statuses from the Status* constants):
+//
+//	container being created:  Creating → Created
+//	container being started:  Starting → Started
+//	container being replaced: Recreate → Recreated
+//	container stop/removal:   Stopping → Stopped, Removing → Removed
+//	dependency being waited:  Waiting → Healthy | Exited
+//	networks and volumes:     Creating → Created, Removing → Removed
+//
+// Any progression can end early with an Error status, or — for optional
+// outcomes such as a dependency declared with required: false — with a
+// Skipped status carrying the reason. Status texts are stable identifiers:
+// tools may match on them.
 type EventProcessor interface {
 	// Start is triggered as a Compose operation is starting with context
 	Start(ctx context.Context, operation string)
