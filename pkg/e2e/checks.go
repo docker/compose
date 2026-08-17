@@ -169,6 +169,24 @@ func ServiceState(service, state string) Check {
 	}
 }
 
+// ServiceNotCreated expects the service to have no container at all, e.g.
+// after an action that must leave unrelated services untouched.
+func ServiceNotCreated(service string) Check {
+	return Check{
+		name: fmt.Sprintf("service %q has no container", service),
+		fn: func(ctx *CheckContext) error {
+			var names []string
+			for _, c := range ctx.curr[service] {
+				names = append(names, c.Name)
+			}
+			if len(names) > 0 {
+				return fmt.Errorf("found %s", strings.Join(names, ", "))
+			}
+			return nil
+		},
+	}
+}
+
 // NotRecreated expects the services' containers to be exactly the ones that
 // existed before the step (same container IDs).
 func NotRecreated(services ...string) Check {
