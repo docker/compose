@@ -1,6 +1,0 @@
-services:
-
-  test:
-    image: nginx
-    post_start:
-      - command: sh -c 'command in error'

@@ -16,326 +16,388 @@ limitations under the License.
 package e2e
 
 import (
-	"strconv"
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
+	"time"
 )
 
-// wcLineCount parses the leading integer from a `wc -l <file>` stdout, whose
-// shape is "<count> <filename>". Fails the test if the output cannot be parsed.
-func wcLineCount(t *testing.T, stdout string) int {
-	t.Helper()
-	fields := strings.Fields(stdout)
-	assert.Assert(t, len(fields) > 0, "expected wc -l output, got: %q", stdout)
-	n, err := strconv.Atoi(fields[0])
-	assert.NilError(t, err, "expected leading integer in wc -l output, got: %q", stdout)
-	return n
+// probeVolume materializes the "read a file from the project's data volume"
+// action the pre_start scenarios use to observe what the hooks wrote.
+func probeVolume(s *Scenario, args ...string) Action {
+	return DockerCmd(append([]string{"run", "--rm", "-v", s.Project() + "_data:/mnt", "alpine"}, args...)...)
 }
 
 func TestPostStartHookInError(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-post-start-failure"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/hooks/poststart/compose-error.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 1})
-	assert.Assert(t, strings.Contains(res.Combined(), "test hook exited with status 127"), res.Combined())
+	NewScenario(t, "a failing post_start hook must fail up, reporting the hook's exit status").
+		Compose(`
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    post_start:
+      - command: sh -c 'command in error'
+`).
+		Step("up fails on the hook error",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			OutputContains("test hook exited with status 127"))
 }
 
 func TestPostStartHookSuccess(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-post-start-success"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/poststart/compose-success.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
+	NewScenario(t, "a post_start hook must run after the service starts, without failing up").
+		Compose(`
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    post_start:
+      - command: sh -c 'echo env'
+`).
+		Step("up runs the hook and leaves the service running",
+			ComposeCmd("up", "-d"),
+			ServiceState("test", "running"))
 }
 
 func TestPreStopHookSuccess(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-pre-stop-success"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/prestop/compose-success.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/prestop/compose-success.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
-
-	res = c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/prestop/compose-success.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
+	s := NewScenario(t, "a pre_stop hook must run in the container before it is stopped")
+	s.Compose(`
+services:
+  sample:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'echo "In the pre-stop" >> /data/log.txt'
+volumes:
+  data:
+`).
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("sample", "running")).
+		Step("stop runs the hook before halting the container",
+			ComposeCmd("stop"),
+			ServiceState("sample", "exited")).
+		Step("the hook's write is visible in the volume",
+			probeVolume(s, "cat", "/mnt/log.txt"),
+			OutputContains("In the pre-stop"))
 }
 
 func TestPreStopHookInError(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-pre-stop-failure"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/prestop/compose-success.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/hooks/prestop/compose-error.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
-
-	res = c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/hooks/prestop/compose-error.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	res.Assert(t, icmd.Expected{ExitCode: 1})
-	assert.Assert(t, strings.Contains(res.Combined(), "sample hook exited with status 127"))
+	NewScenario(t, "a failing pre_stop hook must fail the down, reporting the hook's exit status").
+		Compose(`
+services:
+  sample:
+    image: alpine
+    init: true
+    command: sleep infinity
+    pre_stop:
+      - command: sh -c 'command in error'
+`).
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("sample", "running")).
+		Step("down fails on the hook error",
+			ComposeCmd("down", "-t", "0").MayFail(),
+			ExitCode(1),
+			OutputContains("sample hook exited with status 127"))
 }
 
 func TestPreStopHookSuccessWithPreviousStop(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-pre-stop-success-with-previous-stop"
-
-	t.Cleanup(func() {
-		res := c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/compose.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/compose.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
-
-	res = c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/compose.yaml", "--project-name", projectName, "stop", "sample")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
+	NewScenario(t, "stopping a single service must run its pre_stop hook and only halt that service").
+		Compose(`
+services:
+  sample:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'echo "In the pre-stop" >> /data/log.txt'
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    post_start:
+      - command: sh -c 'echo env'
+volumes:
+  data:
+`).
+		Step("up starts both services",
+			ComposeCmd("up", "-d"),
+			ServiceState("sample", "running"),
+			ServiceState("test", "running")).
+		Step("stop on the hooked service succeeds",
+			ComposeCmd("stop", "sample"),
+			ServiceState("sample", "exited"),
+			ServiceState("test", "running"))
 }
 
 func TestPostStartAndPreStopHook(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-post-start-and-pre-stop"
-
-	t.Cleanup(func() {
-		res := c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/compose.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/hooks/compose.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
+	NewScenario(t, "post_start and pre_stop hooks in one project must not interfere with up").
+		Compose(`
+services:
+  sample:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'echo "In the pre-stop" >> /data/log.txt'
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    post_start:
+      - command: sh -c 'echo env'
+volumes:
+  data:
+`).
+		Step("up starts both services and runs the post_start hook",
+			ComposeCmd("up", "-d"),
+			ServiceState("sample", "running"),
+			ServiceState("test", "running"))
 }
 
 func TestPreStartHookSuccess(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-pre-start-success"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/pre_start/compose-success.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/pre_start/compose-success.yaml", "--project-name", projectName, "up", "-d", "--wait")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
-
-	// Service should be able to read the file written by the pre_start hook.
-	logs := c.RunDockerComposeCmd(t, "-f", "fixtures/pre_start/compose-success.yaml", "--project-name", projectName, "logs", "sample")
-	assert.Assert(t, strings.Contains(logs.Combined(), "initialized"), logs.Combined())
+	NewScenario(t, "a pre_start hook must run before the service, which reads what the hook prepared").
+		Compose(`
+services:
+  sample:
+    image: alpine
+    command: sh -c 'cat /shared/init.txt && sleep 5'
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo "initialized" > /shared/init.txt'
+volumes:
+  data:
+`).
+		Step("up waits for the service, started after the hook",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("the service saw the file the hook wrote",
+			ComposeCmd("logs", "sample"),
+			OutputContains("initialized"))
 }
 
 func TestPreStartHookInError(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-pre-start-failure"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/pre_start/compose-error.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/pre_start/compose-error.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 1})
-	assert.Assert(t, strings.Contains(res.Combined(), "pre_start"), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), "17"), res.Combined())
-
-	// The service container should exist but not be running.
-	ps := c.RunDockerCmd(t, "ps", "-a", "--filter", "label=com.docker.compose.project="+projectName, "--format", "{{.Names}} {{.State}}")
-	assert.Assert(t, strings.Contains(ps.Combined(), "sample"), ps.Combined())
-	assert.Assert(t, !strings.Contains(ps.Combined(), "running"), ps.Combined())
+	NewScenario(t, "a failing pre_start hook must fail up and leave the service created but not started").
+		Compose(`
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    pre_start:
+      - image: alpine
+        command: sh -c 'exit 17'
+`).
+		Step("up fails, reporting the hook's exit code",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			OutputContains("pre_start"),
+			OutputContains("17"),
+			ServiceState("sample", "created"))
 }
 
 func TestPreStartHookBuildInheritance(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "hooks-pre-start-build"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/pre_start/compose-build.yaml", "--project-name", projectName, "down", "-v", "--remove-orphans", "--rmi", "local", "-t", "0")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/pre_start/compose-build.yaml", "--project-name", projectName, "up", "-d", "--wait")
-	res.Assert(t, icmd.Expected{ExitCode: 0})
-
-	logs := c.RunDockerComposeCmd(t, "-f", "fixtures/pre_start/compose-build.yaml", "--project-name", projectName, "logs", "sample")
-	assert.Assert(t, strings.Contains(logs.Combined(), "built-image-marker"), logs.Combined())
+	s := NewScenario(t, "a pre_start hook without an image must run on the service's built image")
+	s.Files(`
+-- compose.yaml --
+services:
+  sample:
+    build:
+      context: .
+    command: sh -c 'cat /shared/marker.txt && sleep 5'
+    volumes:
+      - data:/shared
+    pre_start:
+      # No image specified - must fall back to the service's built image.
+      - command: sh -c 'built-marker > /shared/marker.txt'
+volumes:
+  data:
+-- Dockerfile --
+FROM alpine
+RUN printf '#!/bin/sh\necho "built-image-marker"\n' > /usr/local/bin/built-marker \
+    && chmod +x /usr/local/bin/built-marker
+`).
+		Defer(DockerCmd("image", "rm", "-f", s.Project()+"-sample")).
+		Step("up builds the image and runs the hook on it",
+			ComposeCmd("up", "-d", "--wait").Within(120*time.Second)).
+		Step("the service saw the marker only the built image could produce",
+			ComposeCmd("logs", "sample"),
+			OutputContains("built-image-marker"))
 }
 
+const preStartIdempotentCompose = `
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo $(cat /proc/sys/kernel/random/uuid) >> /shared/tokens.txt'
+volumes:
+  data:
+`
+
 func TestPreStartHookIdempotentReUp(t *testing.T) {
-	c := NewParallelCLI(t)
-	const (
-		projectName = "hooks-pre-start-idempotent"
-		composeFile = "fixtures/pre_start/idempotent/compose.yaml"
-	)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	// First up: hook writes one unique token.
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--wait")
-
-	// Probe: exactly 1 line in the tokens file.
-	probe := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "wc", "-l", "/mnt/tokens.txt")
-	assert.Equal(t, wcLineCount(t, probe.Stdout()), 1, "expected 1 token line after first up, got: %s", probe.Stdout())
-
-	// Second up with no spec change: service is already running so the hook must NOT re-run.
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--wait")
-
-	// Probe again: still exactly 1 line.
-	probe2 := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "wc", "-l", "/mnt/tokens.txt")
-	assert.Equal(t, wcLineCount(t, probe2.Stdout()), 1, "expected 1 token line after idempotent re-up, got: %s", probe2.Stdout())
+	s := NewScenario(t, "an unchanged up must not re-run pre_start hooks on a running service")
+	s.Compose(preStartIdempotentCompose).
+		Step("first up runs the hook once",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("the hook wrote exactly one token",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("1 /mnt/tokens.txt")).
+		Step("an unchanged up does not re-run the hook",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			NotRecreated("sample")).
+		Step("still exactly one token",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("1 /mnt/tokens.txt"))
 }
 
 func TestPreStartHookReRunOnSpecChange(t *testing.T) {
-	c := NewParallelCLI(t)
-	const (
-		projectName = "hooks-pre-start-spec-change"
-		composeV1   = "fixtures/pre_start/spec-change/compose.v1.yaml"
-		composeV2   = "fixtures/pre_start/spec-change/compose.v2.yaml"
-	)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", composeV2, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	// First up with v1 spec: hook appends "v1".
-	c.RunDockerComposeCmd(t, "-f", composeV1, "--project-name", projectName, "up", "-d", "--wait")
-
-	// Probe: file contains "v1".
-	probe1 := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "cat", "/mnt/versions.txt")
-	assert.Assert(t, strings.Contains(probe1.Stdout(), "v1"), "expected v1 after first up, got: %s", probe1.Stdout())
-	assert.Assert(t, !strings.Contains(probe1.Stdout(), "v2"), "did not expect v2 yet, got: %s", probe1.Stdout())
-
-	// Second up with v2 spec: hook command changed, container recreated, hook runs again and appends "v2".
-	c.RunDockerComposeCmd(t, "-f", composeV2, "--project-name", projectName, "up", "-d", "--wait")
-
-	// Probe: file contains both v1 and v2.
-	probe2 := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "cat", "/mnt/versions.txt")
-	assert.Assert(t, strings.Contains(probe2.Stdout(), "v1"), "expected v1 still present, got: %s", probe2.Stdout())
-	assert.Assert(t, strings.Contains(probe2.Stdout(), "v2"), "expected v2 appended after spec change, got: %s", probe2.Stdout())
+	s := NewScenario(t, "a spec change must recreate the service and re-run its pre_start hooks")
+	s.Compose(`
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo ${HOOK_VERSION} >> /shared/versions.txt'
+volumes:
+  data:
+`).
+		Step("up with the v1 spec runs the v1 hook",
+			ComposeCmd("up", "-d", "--wait").WithEnv("HOOK_VERSION=v1").Within(60*time.Second)).
+		Step("the volume records v1 only",
+			probeVolume(s, "cat", "/mnt/versions.txt"),
+			OutputContains("v1"),
+			OutputNotContains("v2")).
+		Step("up with the v2 spec recreates the service and re-runs the hook",
+			ComposeCmd("up", "-d", "--wait").WithEnv("HOOK_VERSION=v2").Within(60*time.Second),
+			Recreated("sample")).
+		Step("the volume records both versions",
+			probeVolume(s, "cat", "/mnt/versions.txt"),
+			OutputContains("v1"),
+			OutputContains("v2"))
 }
 
 func TestPreStartHookForceRecreate(t *testing.T) {
-	c := NewParallelCLI(t)
-	const (
-		projectName = "hooks-pre-start-force-recreate"
-		composeFile = "fixtures/pre_start/idempotent/compose.yaml"
-	)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	// First up: hook writes one unique token.
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--wait")
-
-	probe1 := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "wc", "-l", "/mnt/tokens.txt")
-	assert.Equal(t, wcLineCount(t, probe1.Stdout()), 1, "expected 1 token line after first up, got: %s", probe1.Stdout())
-
-	// Force-recreate: container is rebuilt so the hook must run again.
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--force-recreate", "--wait")
-
-	// Probe: now 2 lines (one from each up).
-	probe2 := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "wc", "-l", "/mnt/tokens.txt")
-	assert.Equal(t, wcLineCount(t, probe2.Stdout()), 2, "expected 2 token lines after --force-recreate, got: %s", probe2.Stdout())
+	s := NewScenario(t, "up --force-recreate must re-run pre_start hooks")
+	s.Compose(preStartIdempotentCompose).
+		Step("first up runs the hook once",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("one token after the first up",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("1 /mnt/tokens.txt")).
+		Step("force-recreate replaces the container and re-runs the hook",
+			ComposeCmd("up", "-d", "--force-recreate", "--wait").Within(60*time.Second),
+			Recreated("sample")).
+		Step("two tokens after the recreate",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("2 /mnt/tokens.txt"))
 }
 
 func TestPreStartHookMidSequenceFailure(t *testing.T) {
-	c := NewParallelCLI(t)
-	const (
-		projectName = "hooks-pre-start-mid-failure"
-		composeFile = "fixtures/pre_start/mid-failure/compose.yaml"
-	)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	// Hook 0 succeeds; hook 1 exits with code 17. up must fail.
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", composeFile, "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 1})
-
-	// Error must point at hook index 1 (not 0) and report exit code 17.
-	assert.Assert(t, strings.Contains(res.Combined(), "pre_start[1]"), "expected pre_start[1] in output, got: %s", res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), "17"), "expected exit code 17 in output, got: %s", res.Combined())
-
-	// Hook 0 must have run before hook 1 failed: the file must contain "ran-0".
-	probe := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "cat", "/mnt/hooks.txt")
-	assert.Assert(t, strings.Contains(probe.Stdout(), "ran-0"), "expected hook 0 output in volume, got: %s", probe.Stdout())
-
-	// The service container must exist but not be running.
-	ps := c.RunDockerCmd(t, "ps", "-a", "--filter", "label=com.docker.compose.project="+projectName, "--format", "{{.Names}} {{.State}}")
-	assert.Assert(t, strings.Contains(ps.Combined(), "sample"), "expected service container in ps output, got: %s", ps.Combined())
-	assert.Assert(t, !strings.Contains(ps.Combined(), "running"), "service container must not be running, got: %s", ps.Combined())
+	s := NewScenario(t, "a mid-sequence pre_start failure must run earlier hooks, then fail up pointing at the culprit")
+	s.Compose(`
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo ran-0 >> /shared/hooks.txt'
+      - image: alpine
+        command: sh -c 'exit 17'
+volumes:
+  data:
+`).
+		Step("up fails on the second hook, naming its index and exit code",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			OutputContains("pre_start[1]"),
+			OutputContains("17"),
+			ServiceState("sample", "created")).
+		Step("the first hook did run before the failure",
+			probeVolume(s, "cat", "/mnt/hooks.txt"),
+			OutputContains("ran-0"))
 }
 
 func TestPreStartHookSequentialOrder(t *testing.T) {
-	c := NewParallelCLI(t)
-	const (
-		projectName = "hooks-pre-start-sequential"
-		composeFile = "fixtures/pre_start/sequential/compose.yaml"
-	)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--wait")
-
-	// File must contain A then B in that exact order.
-	probe := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "cat", "/mnt/out")
-	assert.Equal(t, probe.Stdout(), "A\nB\n", "expected hooks to run in order A then B")
+	s := NewScenario(t, "pre_start hooks must run sequentially, in declaration order")
+	s.Compose(`
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo A >> /shared/out'
+      - image: alpine
+        command: sh -c 'echo B >> /shared/out'
+volumes:
+  data:
+`).
+		Step("up runs both hooks",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("the volume shows A before B",
+			probeVolume(s, "cat", "/mnt/out"),
+			OutputContains("A\nB"))
 }
 
 func TestPreStartHookNotReRunOnScaleUp(t *testing.T) {
-	c := NewParallelCLI(t)
-	const (
-		projectName = "hooks-pre-start-scale-up"
-		composeFile = "fixtures/pre_start/idempotent/compose.yaml"
-	)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--wait")
-
-	probe1 := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "wc", "-l", "/mnt/tokens.txt")
-	assert.Equal(t, wcLineCount(t, probe1.Stdout()), 1, "expected 1 token after first up, got: %s", probe1.Stdout())
-
-	// Scale up: the new replica must NOT re-run pre_start because another replica is already running.
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--scale", "sample=2", "--wait")
-
-	probe2 := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "wc", "-l", "/mnt/tokens.txt")
-	assert.Equal(t, wcLineCount(t, probe2.Stdout()), 1, "expected still 1 token after scale-up, got: %s", probe2.Stdout())
+	s := NewScenario(t, "scaling up must not re-run pre_start hooks while a replica is already running")
+	s.Compose(preStartIdempotentCompose).
+		Step("first up runs the hook once",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("one token after the first up",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("1 /mnt/tokens.txt")).
+		Step("scaling up adds a replica without re-running the hook",
+			ComposeCmd("up", "-d", "--scale", "sample=2", "--wait").Within(60*time.Second),
+			ServiceScale("sample", 2)).
+		Step("still exactly one token",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("1 /mnt/tokens.txt"))
 }
 
 func TestPreStartHookRunsOnceForScaledService(t *testing.T) {
-	c := NewParallelCLI(t)
-	const (
-		projectName = "hooks-pre-start-scaled"
-		composeFile = "fixtures/pre_start/scaled/compose.yaml"
-	)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "down", "-v", "--remove-orphans", "-t", "0")
-	})
-
-	c.RunDockerComposeCmd(t, "-f", composeFile, "--project-name", projectName, "up", "-d", "--wait")
-
-	// per_replica: false (default) → hook must run ONCE for the whole service,
-	// even with deploy.replicas: 2.
-	probe := c.RunDockerCmd(t, "run", "--rm", "-v", projectName+"_data:/mnt", "alpine", "wc", "-l", "/mnt/log")
-	assert.Assert(t, strings.HasPrefix(strings.TrimSpace(probe.Stdout()), "1 "),
-		"expected hook to run exactly once across replicas, got: %q", probe.Stdout())
+	s := NewScenario(t, "with the default per_replica: false, a pre_start hook must run once for the whole service")
+	s.Compose(`
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    deploy:
+      replicas: 2
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo "ran" >> /shared/log'
+volumes:
+  data:
+`).
+		Step("up starts both replicas",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceScale("sample", 2)).
+		Step("the hook ran exactly once across replicas",
+			probeVolume(s, "wc", "-l", "/mnt/log"),
+			OutputContains("1 /mnt/log"))
 }
