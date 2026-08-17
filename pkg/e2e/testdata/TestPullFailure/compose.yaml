@@ -6,4 +6,3 @@ services:
     build: .
   valid:
     image: alpine:3.15
-
