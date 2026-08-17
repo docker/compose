@@ -1,6 +1,8 @@
 services:
   test:
-    image: nginx:alpine
+    image: alpine
+    init: true
+    command: sleep infinity
     networks:
       - test
 
@@ -9,4 +11,3 @@ networks:
     ipam:
       config:
         - subnet: ${SUBNET-172.99.0.0/16}
-
