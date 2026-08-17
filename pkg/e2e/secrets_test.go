@@ -18,36 +18,22 @@ package e2e
 
 import (
 	"testing"
-
-	"gotest.tools/v3/icmd"
 )
 
 func TestSecretFromEnv(t *testing.T) {
-	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, "env-secret")
-
-	t.Run("compose run", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "foo"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "SECRET=BAR")
-			})
-		res.Assert(t, icmd.Expected{Out: "BAR"})
-	})
-	t.Run("secret uid", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "foo", "ls", "-al", "/var/run/secrets/bar"),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "SECRET=BAR")
-			})
-		res.Assert(t, icmd.Expected{Out: "-r--r-----    1 1005     1005"})
-	})
+	NewScenario(t, "an environment-sourced secret must be mounted with its content, ownership and mode").
+		Env("SECRET=BAR").
+		Step("the service reads the secret's content from the mounted file",
+			ComposeCmd("run", "foo"),
+			OutputContains("BAR")).
+		Step("the mounted secret carries the declared uid, gid and mode",
+			ComposeCmd("run", "foo", "ls", "-al", "/var/run/secrets/bar"),
+			OutputContains("-r--r-----    1 1005     1005"))
 }
 
 func TestSecretFromInclude(t *testing.T) {
-	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, "env-secret-include")
-
-	t.Run("compose run", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "included")
-		res.Assert(t, icmd.Expected{Out: "this-is-secret"})
-	})
+	NewScenario(t, "a secret declared by an included project must resolve from the include's env_file").
+		Step("the included service reads the secret defined by the include's env_file",
+			ComposeCmd("run", "included"),
+			OutputContains("this-is-secret"))
 }

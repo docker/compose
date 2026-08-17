@@ -17,4 +17,3 @@ services:
 secrets:
   secret:
     environment: SECRET
-
