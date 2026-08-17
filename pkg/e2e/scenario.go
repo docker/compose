@@ -177,6 +177,17 @@ func (s *Scenario) CLI() *CLI { return s.cli }
 // Defer the removal of an image the project built.
 func (s *Scenario) Project() string { return s.project }
 
+// Dir returns the project directory the scenario runs from — the temporary
+// copy of testdata/<TestName>/ — for actions that exchange files with the
+// host (e.g. cp). It is only valid for a scenario anchored to testdata.
+func (s *Scenario) Dir() string {
+	s.t.Helper()
+	if s.file == "" {
+		s.t.Fatal("Dir() called on a scenario with no testdata directory")
+	}
+	return filepath.Dir(s.file)
+}
+
 // anchorTestdata resolves the scenario's project files from
 // testdata/<TestName>/ — the conventional anchor tying each test to its
 // standalone, directly-runnable compose files. When the directory exists it

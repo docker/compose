@@ -17,98 +17,44 @@
 package e2e
 
 import (
-	"os"
-	"strings"
+	"path/filepath"
 	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
 func TestCopy(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "copy_e2e"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "--project-name", projectName, "down")
-
-		os.Remove("./fixtures/cp-test/from-default.txt") //nolint:errcheck
-		os.Remove("./fixtures/cp-test/from-indexed.txt") //nolint:errcheck
-		os.RemoveAll("./fixtures/cp-test/cp-folder2")    //nolint:errcheck
-	})
-
-	t.Run("start service", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "--project-name", projectName, "up",
-			"--scale", "nginx=5", "-d")
-	})
-
-	t.Run("make sure service is running", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		assertServiceStatus(t, projectName, "nginx", "Up", res.Stdout())
-	})
-
-	t.Run("copy to container copies the file to the all containers by default", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp",
-			"./fixtures/cp-test/cp-me.txt", "nginx:/tmp/default.txt")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		output := c.RunDockerCmd(t, "exec", projectName+"-nginx-1", "cat", "/tmp/default.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world`), output)
-
-		output = c.RunDockerCmd(t, "exec", projectName+"-nginx-2", "cat", "/tmp/default.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world`), output)
-
-		output = c.RunDockerCmd(t, "exec", projectName+"-nginx-3", "cat", "/tmp/default.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world`), output)
-	})
-
-	t.Run("copy to container with a given index copies the file to the given container", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--index=3",
-			"./fixtures/cp-test/cp-me.txt", "nginx:/tmp/indexed.txt")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		output := c.RunDockerCmd(t, "exec", projectName+"-nginx-3", "cat", "/tmp/indexed.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world`), output)
-
-		res = c.RunDockerOrExitError(t, "exec", projectName+"-nginx-2", "cat", "/tmp/indexed.txt")
-		res.Assert(t, icmd.Expected{ExitCode: 1})
-	})
-
-	t.Run("copy from a container copies the file to the host from the first container by default", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp",
-			"nginx:/tmp/default.txt", "./fixtures/cp-test/from-default.txt")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		data, err := os.ReadFile("./fixtures/cp-test/from-default.txt")
-		assert.NilError(t, err)
-		assert.Equal(t, `hello world`, string(data))
-	})
-
-	t.Run("copy from a container with a given index copies the file to host", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--index=3",
-			"nginx:/tmp/indexed.txt", "./fixtures/cp-test/from-indexed.txt")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		data, err := os.ReadFile("./fixtures/cp-test/from-indexed.txt")
-		assert.NilError(t, err)
-		assert.Equal(t, `hello world`, string(data))
-	})
-
-	t.Run("copy to and from a container also work with folder", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp",
-			"./fixtures/cp-test/cp-folder", "nginx:/tmp")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		output := c.RunDockerCmd(t, "exec", projectName+"-nginx-1", "cat", "/tmp/cp-folder/cp-me.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world from folder`), output)
-
-		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp",
-			"nginx:/tmp/cp-folder", "./fixtures/cp-test/cp-folder2")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		data, err := os.ReadFile("./fixtures/cp-test/cp-folder2/cp-me.txt")
-		assert.NilError(t, err)
-		assert.Equal(t, `hello world from folder`, string(data))
-	})
+	s := NewScenario(t, "cp must target all replicas by default, one replica with --index, and copy both ways")
+	dir := s.Dir()
+	s.Step("up starts five replicas",
+		ComposeCmd("up", "--scale", "nginx=5", "-d"),
+		ServiceScale("nginx", 5)).
+		Step("cp to the service reaches every replica by default",
+			ComposeCmd("cp", filepath.Join(dir, "cp-me.txt"), "nginx:/tmp/default.txt")).
+		Step("replica #1 got the file",
+			DockerCmd("exec", s.Project()+"-nginx-1", "cat", "/tmp/default.txt"),
+			OutputContains("hello world")).
+		Step("replica #3 got the file too",
+			DockerCmd("exec", s.Project()+"-nginx-3", "cat", "/tmp/default.txt"),
+			OutputContains("hello world")).
+		Step("cp --index targets a single replica",
+			ComposeCmd("cp", "--index=3", filepath.Join(dir, "cp-me.txt"), "nginx:/tmp/indexed.txt")).
+		Step("the indexed replica got the file",
+			DockerCmd("exec", s.Project()+"-nginx-3", "cat", "/tmp/indexed.txt"),
+			OutputContains("hello world")).
+		Step("the other replicas did not",
+			DockerCmd("exec", s.Project()+"-nginx-2", "cat", "/tmp/indexed.txt").MayFail(),
+			ExitCode(1)).
+		Step("cp from the service reads from replica #1 by default",
+			ComposeCmd("cp", "nginx:/tmp/default.txt", filepath.Join(dir, "from-default.txt")),
+			FileContains(filepath.Join(dir, "from-default.txt"), "hello world")).
+		Step("cp --index reads from the chosen replica",
+			ComposeCmd("cp", "--index=3", "nginx:/tmp/indexed.txt", filepath.Join(dir, "from-indexed.txt")),
+			FileContains(filepath.Join(dir, "from-indexed.txt"), "hello world")).
+		Step("cp copies a folder into the container",
+			ComposeCmd("cp", filepath.Join(dir, "cp-folder"), "nginx:/tmp")).
+		Step("the folder's content is in the container",
+			DockerCmd("exec", s.Project()+"-nginx-1", "cat", "/tmp/cp-folder/cp-me.txt"),
+			OutputContains("hello world from folder")).
+		Step("cp copies a folder out of the container",
+			ComposeCmd("cp", "nginx:/tmp/cp-folder", filepath.Join(dir, "cp-folder2")),
+			FileContains(filepath.Join(dir, "cp-folder2", "cp-me.txt"), "hello world from folder"))
 }
