@@ -54,6 +54,13 @@ type ReconcileOptions struct {
 	Timeout              *time.Duration // for stop operations
 	RemoveOrphans        bool
 	SkipProviders        bool
+	// PlanStart extends the plan with the start phase: dependency-condition
+	// waits, pre_start hooks and container starts. When false the plan stops
+	// at container creation and starting is left to the caller (the
+	// historical two-engine split).
+	PlanStart bool
+	// WaitTimeout bounds each dependency-condition wait (0 = no deadline).
+	WaitTimeout time.Duration
 }
 
 // reconciler compares a types.Project (desired state) with an ObservedState
@@ -102,6 +109,11 @@ type reconciler struct {
 	// called once per service.
 	observedContainersByService map[string]Containers
 
+	// startNodes tracks, per service, the start-phase nodes emitted when
+	// options.PlanStart is set. Dependents chain their own start phase after
+	// these (a service is "started" once all its replicas are).
+	startNodes map[string][]*PlanNode
+
 	// resolvedNetworks/resolvedVolumes hold the single live resource selected per
 	// compose key from the (possibly multi-valued) observed state — see
 	// resolveObserved. All reconcile logic reads these, never observed.Networks/
@@ -127,6 +139,7 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 		connectNodes:                map[string][]*PlanNode{},
 		recreatedServices:           map[string]bool{},
 		observedContainersByService: observed.containersByService(),
+		startNodes:                  map[string][]*PlanNode{},
 	}
 
 	r.resolveObserved()
@@ -683,9 +696,55 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	// Collect dependency nodes that container creation should depend on
 	infraDeps := r.infrastructureDeps(service)
 
-	var lastNode *PlanNode
+	lastNode, candidates := r.planExistingContainers(service, containers, expected, strategy, expectedHash, parentRecreated, infraDeps)
 
-	// Process existing containers
+	// Scale up: create new containers
+	nextNum := nextContainerNumber(r.observedSummaries(service.Name))
+	for i := 0; i < expected-actual; i++ {
+		number := nextNum + i
+		name := getContainerName(r.project.Name, service, number)
+		svc := service // copy for pointer stability
+		lastNode = r.plan.addNode(Operation{
+			Type:       OpCreateContainer,
+			ResourceID: fmt.Sprintf("service:%s:%d", service.Name, number),
+			Cause:      "no existing container",
+			Service:    &svc,
+			Number:     number,
+			Name:       name,
+		}, "", infraDeps...)
+		candidates = append(candidates, startCandidate{
+			number:       number,
+			after:        []*PlanNode{lastNode},
+			createNodeID: lastNode.ID,
+		})
+	}
+
+	if r.options.PlanStart {
+		node, err := r.planServiceStart(service, candidates)
+		if err != nil {
+			return err
+		}
+		if node != nil {
+			lastNode = node
+		}
+	}
+
+	if lastNode != nil {
+		r.serviceNodes[service.Name] = lastNode
+	}
+	return nil
+}
+
+// planExistingContainers walks the service's observed containers (pre-sorted
+// by sortContainers) and plans scale-downs, recreations and paused/dead
+// restarts. It returns the last node emitted and the start candidates the
+// start phase will act on when options.PlanStart is set.
+func (r *reconciler) planExistingContainers(
+	service types.ServiceConfig, containers []ObservedContainer, expected int,
+	strategy, expectedHash string, parentRecreated bool, infraDeps []*PlanNode,
+) (*PlanNode, []startCandidate) {
+	var lastNode *PlanNode
+	var candidates []startCandidate
 	for i, oc := range containers {
 		if i >= expected {
 			// Scale down: stop + remove excess containers. Track the remove
@@ -708,15 +767,42 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		}
 
 		if r.mustRecreate(service, expectedHash, parentRecreated, oc, strategy) {
-			lastNode = r.planRecreateContainer(service, &containers[i], infraDeps)
+			var createNode *PlanNode
+			lastNode, createNode = r.planRecreateContainer(service, &containers[i], infraDeps)
 			r.recreatedServices[service.Name] = true
+			candidates = append(candidates, startCandidate{
+				number:       oc.Number,
+				after:        []*PlanNode{lastNode},
+				createNodeID: createNode.ID,
+			})
 			continue
 		}
 
 		// Container is up-to-date
 		switch oc.State {
-		case container.StateRunning, container.StateCreated, container.StateRestarting, container.StateExited:
-			// Nothing to do (exited containers are left as-is, matching convergence.go behavior)
+		case container.StateRunning, container.StateRestarting:
+			if stopNode, stopped := r.stoppedByPlan[oc.ID]; stopped {
+				// The plan stops this container (e.g. to recreate a diverged
+				// network): it must be started again once reconnected.
+				after := append([]*PlanNode{stopNode}, r.connectNodes[oc.ID]...)
+				candidates = append(candidates, startCandidate{
+					number:    oc.Number,
+					after:     after,
+					container: &containers[i].Summary,
+				})
+			} else {
+				candidates = append(candidates, startCandidate{number: oc.Number, running: true})
+			}
+		case container.StateCreated, container.StateExited:
+			// Nothing to plan on the create side: starting created/exited
+			// containers is the start phase's job — planned by
+			// planServiceStart when PlanStart is set, left to the caller's
+			// start engine otherwise.
+			candidates = append(candidates, startCandidate{
+				number:    oc.Number,
+				after:     r.connectNodes[oc.ID],
+				container: &containers[i].Summary,
+			})
 		default:
 			// Any other state (paused, dead, ...): attempt to (re)start
 			lastNode = r.plan.addNode(Operation{
@@ -727,27 +813,124 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			}, "", infraDeps...)
 		}
 	}
+	return lastNode, candidates
+}
 
-	// Scale up: create new containers
-	nextNum := nextContainerNumber(r.observedSummaries(service.Name))
-	for i := 0; i < expected-actual; i++ {
-		number := nextNum + i
-		name := getContainerName(r.project.Name, service, number)
-		svc := service // copy for pointer stability
-		lastNode = r.plan.addNode(Operation{
-			Type:       OpCreateContainer,
-			ResourceID: fmt.Sprintf("service:%s:%d", service.Name, number),
-			Cause:      "no existing container",
-			Service:    &svc,
-			Number:     number,
-			Name:       name,
-		}, "", infraDeps...)
+// startCandidate describes one replica the start phase may have to start:
+// either an existing container (container set) or one the plan creates
+// (createNodeID set, resolved by the executor once the create ran).
+type startCandidate struct {
+	number       int
+	after        []*PlanNode        // nodes the start must wait for (create, reconnects, ...)
+	container    *container.Summary // existing container, nil for plan-created ones
+	createNodeID int                // create node whose result carries the container ID
+	running      bool               // already running and left untouched: nothing to start
+}
+
+// planServiceStart extends the plan with the service's start phase:
+// dependency-condition waits, pre_start hooks and one start per non-running
+// replica. Returns the last node emitted, or nil if nothing needed starting.
+func (r *reconciler) planServiceStart(service types.ServiceConfig, candidates []startCandidate) (*PlanNode, error) {
+	svc := service // copy for pointer stability
+
+	var toStart []startCandidate
+	anyRunning := false
+	for _, c := range candidates {
+		if c.running {
+			anyRunning = true
+			continue
+		}
+		toStart = append(toStart, c)
+	}
+	if len(toStart) == 0 {
+		return nil, nil
 	}
 
-	if lastNode != nil {
-		r.serviceNodes[service.Name] = lastNode
+	// Dependency conditions. service_started needs no wait node: the edges on
+	// the dependency's own start nodes express it.
+	var waitNodes []*PlanNode
+	var startDeps []*PlanNode
+	for _, dep := range sortedKeys(service.DependsOn) {
+		config := service.DependsOn[dep]
+		depNodes := r.startNodes[dep]
+		if len(depNodes) == 0 {
+			if node := r.serviceNodes[dep]; node != nil {
+				depNodes = []*PlanNode{node}
+			}
+		}
+		startDeps = append(startDeps, depNodes...)
+
+		shouldWait, err := shouldWaitForDependency(dep, config, r.project)
+		if err != nil {
+			return nil, err
+		}
+		if !shouldWait {
+			continue
+		}
+		depSvc := r.project.Services[dep]
+		waitNodes = append(waitNodes, r.plan.addNode(Operation{
+			Type:       OpWaitCondition,
+			ResourceID: fmt.Sprintf("wait:%s:%s", service.Name, dep),
+			Cause:      fmt.Sprintf("%s depends on %s (%s)", service.Name, dep, config.Condition),
+			Service:    &depSvc,
+			Name:       dep,
+			Condition:  config.Condition,
+			Timeout:    waitTimeout(r.options.WaitTimeout),
+			Optional:   !config.Required,
+		}, "", depNodes...))
 	}
-	return nil
+	startDeps = append(startDeps, waitNodes...)
+
+	// pre_start hooks run once per service, only when no replica is already
+	// running, on the lowest-numbered replica — decided here at plan time
+	// from the observed state, accepting the same observe-to-execute drift
+	// window as the rest of the plan.
+	var preStart *PlanNode
+	if len(service.PreStart) > 0 && !anyRunning {
+		lowest := toStart[0]
+		for _, c := range toStart[1:] {
+			if c.number < lowest.number {
+				lowest = c
+			}
+		}
+		deps := append(slices.Clone(startDeps), lowest.after...)
+		preStart = r.plan.addNode(Operation{
+			Type:         OpRunPreStart,
+			ResourceID:   fmt.Sprintf("prestart:%s", service.Name),
+			Cause:        "pre_start hooks",
+			Service:      &svc,
+			Number:       lowest.number,
+			Container:    lowest.container,
+			CreateNodeID: lowest.createNodeID,
+		}, "", deps...)
+	}
+
+	var last *PlanNode
+	for _, c := range toStart {
+		deps := append(slices.Clone(startDeps), c.after...)
+		if preStart != nil {
+			deps = append(deps, preStart)
+		}
+		last = r.plan.addNode(Operation{
+			Type:         OpStartContainer,
+			ResourceID:   fmt.Sprintf("service:%s:%d", service.Name, c.number),
+			Cause:        "service start",
+			Service:      &svc,
+			Name:         getContainerName(r.project.Name, service, c.number),
+			Number:       c.number,
+			Container:    c.container,
+			CreateNodeID: c.createNodeID,
+		}, "", deps...)
+		r.startNodes[service.Name] = append(r.startNodes[service.Name], last)
+	}
+	return last, nil
+}
+
+func waitTimeout(d time.Duration) *time.Duration {
+	if d <= 0 {
+		return nil
+	}
+	return &d
 }
 
 // mustRecreate decides whether oc must be recreated to match expected. The
@@ -871,7 +1054,10 @@ func (r *reconciler) hasVolumeMismatch(expected types.ServiceConfig, oc Observed
 
 // planRecreateContainer decomposes container recreation into 4 atomic operations:
 // CreateContainer(tmpName) → StopContainer → RemoveContainer → RenameContainer
-func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *ObservedContainer, infraDeps []*PlanNode) *PlanNode {
+// planRecreateContainer returns the final node of the recreate sequence and
+// the create node (whose result carries the new container's ID, needed by the
+// start phase).
+func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *ObservedContainer, infraDeps []*PlanNode) (*PlanNode, *PlanNode) {
 	resID := fmt.Sprintf("service:%s:%d", service.Name, oc.Number)
 	group := fmt.Sprintf("recreate:%s:%d", service.Name, oc.Number)
 	tmpName := fmt.Sprintf("%s_%s", oc.ID[:min(12, len(oc.ID))], getContainerName(r.project.Name, service, oc.Number))
@@ -952,7 +1138,7 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 		CreateNodeID: createNode.ID,
 	}, group, removeNode)
 
-	return renameNode
+	return renameNode, createNode
 }
 
 // planStopDependents plans stop operations for containers of services that

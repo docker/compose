@@ -18,6 +18,7 @@ package compose
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -1600,4 +1601,128 @@ func mustResolvedServiceHash(t *testing.T, svc types.ServiceConfig, containers m
 	h, err := serviceHashWithResolvedRefs(svc, containers)
 	assert.NilError(t, err)
 	return h
+}
+
+// --- Start-phase planning tests ---
+
+func TestReconcilePlanStart(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+			"app": {Name: "app", Scale: intPtr(1), DependsOn: types.DependsOnConfig{
+				"db": {Condition: types.ServiceConditionHealthy, Required: true},
+			}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
+	}
+
+	options := defaultReconcileOptions()
+	options.PlanStart = true
+	plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, CreateContainer, no existing container
+[1] -> #2 service:db:1, StartContainer, service start
+[2] -> #3 service:app:1, CreateContainer, no existing container
+[2] -> #4 wait:app:db, WaitCondition, app depends on db (service_healthy)
+[2,3,4] -> #5 service:app:1, StartContainer, service start
+`)+"\n")
+}
+
+func TestReconcilePlanStartOptionalDependency(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+			"app": {Name: "app", Scale: intPtr(1), DependsOn: types.DependsOnConfig{
+				"db": {Condition: types.ServiceConditionHealthy, Required: false},
+			}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
+	}
+
+	options := defaultReconcileOptions()
+	options.PlanStart = true
+	plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+	assert.NilError(t, err)
+	for _, node := range plan.Nodes {
+		if node.Operation.Type == OpWaitCondition {
+			assert.Assert(t, node.Operation.Optional, "a required:false wait must be Optional")
+			return
+		}
+	}
+	t.Fatal("expected a WaitCondition node in the plan")
+}
+
+func TestReconcilePlanStartPreStart(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"app": {Name: "app", Scale: intPtr(2), PreStart: []types.ServiceHook{
+				{Command: []string{"echo", "init"}},
+			}},
+		},
+	}
+
+	t.Run("hook planned once when no replica is running", func(t *testing.T) {
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers:  map[string][]ObservedContainer{},
+			Networks:    map[string][]ObservedNetwork{},
+			Volumes:     map[string][]ObservedVolume{},
+		}
+		options := defaultReconcileOptions()
+		options.PlanStart = true
+		plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+		assert.NilError(t, err)
+		count := 0
+		for _, node := range plan.Nodes {
+			if node.Operation.Type == OpRunPreStart {
+				count++
+				// every start of the service must wait for the hook
+				for _, other := range plan.Nodes {
+					if other.Operation.Type == OpStartContainer {
+						assert.Assert(t, slices.Contains(other.DependsOn, node),
+							"start %s must depend on the pre_start node", other.Operation.ResourceID)
+					}
+				}
+			}
+		}
+		assert.Equal(t, count, 1, "pre_start must be planned exactly once per service")
+	})
+
+	t.Run("hook not planned while a replica is already running", func(t *testing.T) {
+		hash, err := serviceHashWithResolvedRefs(project.Services["app"], map[string]Containers{})
+		assert.NilError(t, err)
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers: map[string][]ObservedContainer{
+				"app": {{
+					ID: "app1", Name: "myproject-app-1", Number: 1,
+					State: container.StateRunning, ConfigHash: hash,
+				}},
+			},
+			Networks: map[string][]ObservedNetwork{},
+			Volumes:  map[string][]ObservedVolume{},
+		}
+		options := defaultReconcileOptions()
+		options.PlanStart = true
+		plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+		assert.NilError(t, err)
+		for _, node := range plan.Nodes {
+			assert.Assert(t, node.Operation.Type != OpRunPreStart,
+				"scale-up beside a running replica must not re-run pre_start")
+		}
+	})
 }

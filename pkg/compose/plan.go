@@ -51,6 +51,14 @@ const (
 	OpRemoveContainer OperationType = 23
 	OpRenameContainer OperationType = 24
 
+	// OpWaitCondition blocks until a dependency service reaches the condition
+	// its dependent declared (healthy, completed_successfully, ...). The
+	// service_started condition needs no such node: plain DAG edges express it.
+	OpWaitCondition OperationType = 25
+	// OpRunPreStart runs a service's pre_start hooks, once per service,
+	// before its first container start.
+	OpRunPreStart OperationType = 26
+
 	// Provider operations
 	OpRunProvider OperationType = 30
 )
@@ -80,6 +88,10 @@ func (o OperationType) String() string {
 		return "RemoveContainer"
 	case OpRenameContainer:
 		return "RenameContainer"
+	case OpWaitCondition:
+		return "WaitCondition"
+	case OpRunPreStart:
+		return "RunPreStart"
 	case OpRunProvider:
 		return "RunProvider"
 	default:
@@ -101,8 +113,9 @@ type Operation struct {
 	Name         string               // target container/resource name
 	Network      *types.NetworkConfig // for network operations
 	Volume       *types.VolumeConfig  // for volume operations
-	Timeout      *time.Duration       // for stop operations
-	CreateNodeID int                  // for OpRenameContainer: ID of the CreateContainer node whose result to rename
+	Timeout      *time.Duration       // for stop operations, and deadline of OpWaitCondition
+	Condition    string               // for OpWaitCondition: the depends_on condition to wait for
+	CreateNodeID int                  // for OpRenameContainer and OpStartContainer: ID of the CreateContainer node whose result to target (when Container is nil)
 	// BestEffort marks an operation that tolerates one specific, expected
 	// error inside its own execution (today: removing the old network on a
 	// rename skips a conflict when the network is still in use — the new
