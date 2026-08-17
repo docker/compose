@@ -1,3 +1,4 @@
 services:
   foo:
     image: bar
+
