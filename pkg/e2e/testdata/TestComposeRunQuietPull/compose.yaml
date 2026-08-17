@@ -1,0 +1,3 @@
+services:
+  backend:
+    image: hello-world

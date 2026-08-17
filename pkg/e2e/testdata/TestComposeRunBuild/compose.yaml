@@ -1,0 +1,9 @@
+services:
+  build:
+    build:
+      dockerfile_inline: "FROM base"
+      additional_contexts:
+        base: "service:build_base"
+  build_base:
+    build:
+      dockerfile_inline: "FROM alpine"

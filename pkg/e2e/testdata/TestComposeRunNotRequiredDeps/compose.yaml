@@ -7,5 +7,7 @@ services:
         required: false
         condition: service_healthy
   bar:
-    image: nginx:alpine
+    image: alpine
+    init: true
+    command: sleep infinity
     profiles: [not-required]

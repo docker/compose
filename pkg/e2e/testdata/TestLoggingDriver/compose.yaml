@@ -8,7 +8,9 @@ services:
       FOO: ${BAR}
 
   app:
-    image: nginx
+    image: alpine
+    init: true
+    command: sleep infinity
     depends_on:
       fluentbit:
         condition: service_started
