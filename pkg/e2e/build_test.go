@@ -404,7 +404,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit",
+			Err:      "the classic builder doesn't support multi-arch build; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0",
 		})
 	})
 
@@ -472,7 +472,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit",
+			Err:      "the classic builder doesn't support privileged mode; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0",
 		})
 	})
 }

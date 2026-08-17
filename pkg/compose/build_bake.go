@@ -64,7 +64,8 @@ func buildWithBake(dockerCli command.Cli) (bool, error) {
 	_, err = manager.GetPlugin("buildx", dockerCli, &cobra.Command{})
 	if err != nil {
 		if errdefs.IsNotFound(err) {
-			logrus.Warnf("Docker Compose requires buildx plugin to be installed")
+			logrus.Warnf("buildx Docker CLI plugin not found: falling back to the classic builder. " +
+				"BuildKit-only build features (multi-arch, secrets, ssh, additional contexts, ...) will not be available")
 			return false, nil
 		}
 		return false, err
