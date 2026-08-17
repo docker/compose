@@ -1,0 +1,7 @@
+services:
+  sample:
+    image: alpine
+    init: true
+    command: sleep infinity
+    pre_stop:
+      - command: sh -c 'command in error'

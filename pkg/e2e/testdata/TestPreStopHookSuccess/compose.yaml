@@ -1,10 +1,11 @@
 services:
   sample:
-    image: nginx
+    image: alpine
+    init: true
+    command: sleep infinity
     volumes:
       - data:/data
     pre_stop:
       - command: sh -c 'echo "In the pre-stop" >> /data/log.txt'
 volumes:
   data:
-    name: sample-data
