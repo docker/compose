@@ -1,6 +1,6 @@
 services:
   app:
-    image: compose-e2e-images-removed:v1
+    image: ${REMOVED_IMAGE}
     pull_policy: never
     init: true
     command: ["sleep", "infinity"]
