@@ -1,5 +1,0 @@
-services:
-    long-line:
-      build:
-        context: .
-        dockerfile: Dockerfile
