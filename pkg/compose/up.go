@@ -41,9 +41,6 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
@@ -66,7 +63,31 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		_, _ = fmt.Fprintln(s.stdout(), "end of 'compose up' output, interactive run is not supported in dry-run mode")
 		return err
 	}
+	return s.runInteractiveUp(ctx, project, options)
+}
 
+// upSession carries the state shared between the goroutines driving an
+// interactive `compose up` once services are created: the errgroup running
+// them, the collected errors, and the application exit status.
+type upSession struct {
+	*composeService
+	project   *types.Project
+	options   api.UpOptions
+	printer   logPrinter
+	watcher   *Watcher
+	menu      *formatter.LogKeyboard
+	globalCtx context.Context
+	cancel    context.CancelFunc
+
+	signalChan   chan os.Signal
+	isTerminated atomic.Bool
+	eg           errgroup.Group
+	mu           sync.Mutex
+	errs         []error
+	exitCode     int
+}
+
+func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	// if we get a second signal during shutdown, we kill the services
 	// immediately, so the channel needs to have sufficient capacity or
 	// we might miss a signal while setting up the second channel read
@@ -74,29 +95,15 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(signalChan)
-	var isTerminated atomic.Bool
 
-	var (
-		logConsumer    = options.Start.Attach
-		navigationMenu *formatter.LogKeyboard
-		kEvents        <-chan keyboard.KeyEvent
-	)
-	if options.Start.NavigationMenu {
-		kEvents, err = keyboard.GetKeys(100)
-		if err != nil {
-			logrus.Warnf("could not start menu, an error occurred while starting: %v", err)
-			options.Start.NavigationMenu = false
-		} else {
-			defer keyboard.Close() //nolint:errcheck
-			isDockerDesktopActive, err := s.isDesktopIntegrationActive(ctx)
-			if err != nil {
-				return err
-			}
-			isLogsViewEnabled := s.isDesktopFeatureActive(ctx, desktop.FeatureLogsTab)
-			tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isLogsViewEnabled)
-			navigationMenu = formatter.NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled, signalChan)
-			logConsumer = navigationMenu.Decorate(logConsumer)
-		}
+	logConsumer := options.Start.Attach
+	navigationMenu, kEvents, err := s.setupNavigationMenu(ctx, &options, signalChan)
+	if err != nil {
+		return err
+	}
+	if navigationMenu != nil {
+		defer keyboard.Close() //nolint:errcheck
+		logConsumer = navigationMenu.Decorate(logConsumer)
 	}
 
 	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
@@ -108,8 +115,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		navigationMenu.EnableWatch(options.Start.Watch, watcher)
 	}
 
-	printer := newLogPrinter(logConsumer)
-
 	// global context to handle canceling goroutines
 	globalCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -118,79 +123,27 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		navigationMenu.EnableDetach(cancel)
 	}
 
-	var (
-		eg   errgroup.Group
-		mu   sync.Mutex
-		errs []error
-	)
-
-	appendErr := func(err error) {
-		if err != nil {
-			mu.Lock()
-			errs = append(errs, err)
-			mu.Unlock()
-		}
+	u := &upSession{
+		composeService: s,
+		project:        project,
+		options:        options,
+		printer:        newLogPrinter(logConsumer),
+		watcher:        watcher,
+		menu:           navigationMenu,
+		globalCtx:      globalCtx,
+		cancel:         cancel,
+		signalChan:     signalChan,
 	}
 
-	eg.Go(func() error {
-		first := true
-		gracefulTeardown := func() {
-			first = false
-			s.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Gracefully Stopping... press Ctrl+C again to force"))
-			eg.Go(func() error {
-				err = s.stop(context.WithoutCancel(globalCtx), project.Name, api.StopOptions{
-					Services: options.Create.Services,
-					Project:  project,
-				}, printer.HandleEvent)
-				appendErr(err)
-				return nil
-			})
-			isTerminated.Store(true)
-		}
-
-		for {
-			select {
-			case <-globalCtx.Done():
-				if watcher != nil {
-					return watcher.Stop()
-				}
-				return nil
-			case <-ctx.Done():
-				if first {
-					gracefulTeardown()
-				}
-			case <-signalChan:
-				if first {
-					_ = keyboard.Close()
-					gracefulTeardown()
-					break
-				}
-				eg.Go(func() error {
-					err := s.kill(context.WithoutCancel(globalCtx), project.Name, api.KillOptions{
-						Services: options.Create.Services,
-						Project:  project,
-						All:      true,
-					})
-					// Ignore errors indicating that some of the containers were already stopped or removed.
-					if errdefs.IsNotFound(err) || errdefs.IsConflict(err) || errors.Is(err, api.ErrNoResources) {
-						return nil
-					}
-
-					appendErr(err)
-					return nil
-				})
-				return nil
-			case event := <-kEvents:
-				navigationMenu.HandleKeyEvents(globalCtx, event, project, options)
-			}
-		}
+	u.eg.Go(func() error {
+		return u.runEventLoop(ctx, kEvents)
 	})
 
 	if options.Start.Watch && watcher != nil {
 		if err := watcher.Start(globalCtx); err != nil {
 			// cancel the global context to terminate background goroutines
 			cancel()
-			_ = eg.Wait()
+			_ = u.eg.Wait()
 			return err
 		}
 	}
@@ -202,105 +155,214 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		// Start.AttachTo have been already curated with only the services to monitor
 		monitor.withServices(options.Start.AttachTo)
 	}
-	monitor.withListener(printer.HandleEvent)
+	monitor.withListener(u.printer.HandleEvent)
 
-	var exitCode int
 	if options.Start.OnExit != api.CascadeIgnore {
-		once := true
-		// detect first container to exit to trigger application shutdown
-		monitor.withListener(func(event api.ContainerEvent) {
-			if once && event.Type == api.ContainerEventExited {
-				if options.Start.OnExit == api.CascadeFail && event.ExitCode == 0 {
-					return
-				}
-				once = false
-				exitCode = event.ExitCode
-				s.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
-				eg.Go(func() error {
-					err = s.stop(context.WithoutCancel(globalCtx), project.Name, api.StopOptions{
-						Services: options.Create.Services,
-						Project:  project,
-					}, printer.HandleEvent)
-					appendErr(err)
-					return nil
-				})
-			}
-		})
+		monitor.withListener(u.stopOnFirstExit())
 	}
-
 	if options.Start.ExitCodeFrom != "" {
-		once := true
-		// capture exit code from first container to exit with selected service
-		monitor.withListener(func(event api.ContainerEvent) {
-			if once && event.Type == api.ContainerEventExited && event.Service == options.Start.ExitCodeFrom {
-				exitCode = event.ExitCode
-				once = false
-			}
-		})
+		monitor.withListener(u.captureExitCodeFrom())
 	}
 
-	containers, err := s.attach(globalCtx, project, printer.HandleEvent, options.Start.AttachTo)
+	containers, err := s.attach(globalCtx, project, u.printer.HandleEvent, options.Start.AttachTo)
 	if err != nil {
 		cancel()
-		_ = eg.Wait()
+		_ = u.eg.Wait()
 		return err
 	}
 	attached := make([]string, len(containers))
 	for i, ctr := range containers {
 		attached[i] = ctr.ID
 	}
+	monitor.withListener(u.followStartedContainers(attached))
 
-	monitor.withListener(func(event api.ContainerEvent) {
-		if !shouldFollowStartEvent(event, attached, options.Start.AttachTo) {
-			return
-		}
-		eg.Go(func() error {
-			res, err := s.apiClient().ContainerInspect(globalCtx, event.ID, client.ContainerInspectOptions{})
-			if err != nil {
-				appendErr(err)
-				return nil
-			}
-
-			err = s.doLogContainer(globalCtx, options.Start.Attach, event.Source, res.Container, api.LogOptions{
-				Follow: true,
-				Since:  res.Container.State.StartedAt,
-			})
-			if errdefs.IsNotImplemented(err) {
-				// container may be configured with logging_driver: none
-				// as container already started, we might miss the very first logs. But still better than none
-				err := s.doAttachContainer(globalCtx, event.Service, event.ID, event.Source, printer.HandleEvent)
-				appendErr(err)
-				return nil
-			}
-			appendErr(err)
-			return nil
-		})
-	})
-
-	eg.Go(func() error {
+	u.eg.Go(func() error {
 		err := monitor.Start(globalCtx)
 		// cancel the global context to terminate signal-handler goroutines
 		cancel()
-		appendErr(err)
+		u.appendErr(err)
 		return nil
 	})
 
 	// We use the parent context without cancellation as we manage sigterm to stop the stack
-	err = s.start(context.WithoutCancel(ctx), project.Name, options.Start, printer.HandleEvent)
-	if err != nil && !isTerminated.Load() { // Ignore error if the process is terminated
+	err = s.start(context.WithoutCancel(ctx), project.Name, options.Start, u.printer.HandleEvent)
+	if err != nil && !u.isTerminated.Load() { // Ignore error if the process is terminated
 		cancel()
-		_ = eg.Wait()
+		_ = u.eg.Wait()
 		return err
 	}
 
-	_ = eg.Wait()
-	err = errors.Join(errs...)
-	if exitCode != 0 {
+	_ = u.eg.Wait()
+	err = errors.Join(u.errs...)
+	if u.exitCode != 0 {
 		errMsg := ""
 		if err != nil {
 			errMsg = err.Error()
 		}
-		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
+		return cli.StatusError{StatusCode: u.exitCode, Status: errMsg}
+	}
+	return err
+}
+
+// setupNavigationMenu initializes the interactive keyboard menu when enabled.
+// It returns a nil menu when the menu is disabled, or when the keyboard can't
+// be grabbed — then disabling the option.
+func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.UpOptions, signalChan chan os.Signal) (*formatter.LogKeyboard, <-chan keyboard.KeyEvent, error) {
+	if !options.Start.NavigationMenu {
+		return nil, nil, nil
+	}
+	kEvents, err := keyboard.GetKeys(100)
+	if err != nil {
+		logrus.Warnf("could not start menu, an error occurred while starting: %v", err)
+		options.Start.NavigationMenu = false
+		return nil, nil, nil
+	}
+	isDockerDesktopActive, err := s.isDesktopIntegrationActive(ctx)
+	if err != nil {
+		_ = keyboard.Close()
+		return nil, nil, err
+	}
+	isLogsViewEnabled := s.isDesktopFeatureActive(ctx, desktop.FeatureLogsTab)
+	tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isLogsViewEnabled)
+	return formatter.NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled, signalChan), kEvents, nil
+}
+
+func (u *upSession) appendErr(err error) {
+	if err != nil {
+		u.mu.Lock()
+		u.errs = append(u.errs, err)
+		u.mu.Unlock()
+	}
+}
+
+// runEventLoop reacts to cancellation, SIGINT/SIGTERM and keyboard input until
+// the application terminates: a first interruption triggers a graceful stop,
+// a second one kills the services.
+func (u *upSession) runEventLoop(ctx context.Context, kEvents <-chan keyboard.KeyEvent) error {
+	first := true
+	gracefulTeardown := func() {
+		first = false
+		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Gracefully Stopping... press Ctrl+C again to force"))
+		u.stopApplication()
+		u.isTerminated.Store(true)
+	}
+
+	for {
+		select {
+		case <-u.globalCtx.Done():
+			if u.watcher != nil {
+				return u.watcher.Stop()
+			}
+			return nil
+		case <-ctx.Done():
+			if first {
+				gracefulTeardown()
+			}
+		case <-u.signalChan:
+			if first {
+				_ = keyboard.Close()
+				gracefulTeardown()
+				break
+			}
+			u.killApplication()
+			return nil
+		case event := <-kEvents:
+			u.menu.HandleKeyEvents(u.globalCtx, event, u.project, u.options)
+		}
+	}
+}
+
+// stopApplication requests a graceful stop of the application services in
+// background; the error is collected for the final report.
+func (u *upSession) stopApplication() {
+	u.eg.Go(func() error {
+		err := u.stop(context.WithoutCancel(u.globalCtx), u.project.Name, api.StopOptions{
+			Services: u.options.Create.Services,
+			Project:  u.project,
+		}, u.printer.HandleEvent)
+		u.appendErr(err)
+		return nil
+	})
+}
+
+// killApplication kills the application services in background; the error is
+// collected for the final report.
+func (u *upSession) killApplication() {
+	u.eg.Go(func() error {
+		err := u.kill(context.WithoutCancel(u.globalCtx), u.project.Name, api.KillOptions{
+			Services: u.options.Create.Services,
+			Project:  u.project,
+			All:      true,
+		})
+		// Ignore errors indicating that some of the containers were already stopped or removed.
+		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) || errors.Is(err, api.ErrNoResources) {
+			return nil
+		}
+
+		u.appendErr(err)
+		return nil
+	})
+}
+
+// stopOnFirstExit detects the first container to exit — per the on-exit
+// cascade policy — to trigger application shutdown and record the
+// application exit code.
+func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
+	once := true
+	return func(event api.ContainerEvent) {
+		if !once || event.Type != api.ContainerEventExited {
+			return
+		}
+		if u.options.Start.OnExit == api.CascadeFail && event.ExitCode == 0 {
+			return
+		}
+		once = false
+		u.exitCode = event.ExitCode
+		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
+		u.stopApplication()
+	}
+}
+
+// captureExitCodeFrom captures the exit code of the first container to exit
+// for the service selected by --exit-code-from
+func (u *upSession) captureExitCodeFrom() api.ContainerEventListener {
+	once := true
+	return func(event api.ContainerEvent) {
+		if once && event.Type == api.ContainerEventExited && event.Service == u.options.Start.ExitCodeFrom {
+			u.exitCode = event.ExitCode
+			once = false
+		}
+	}
+}
+
+// followStartedContainers streams logs of containers (re)started after `up`,
+// so they are followed like the initially attached ones.
+func (u *upSession) followStartedContainers(attached []string) api.ContainerEventListener {
+	return func(event api.ContainerEvent) {
+		if !shouldFollowStartEvent(event, attached, u.options.Start.AttachTo) {
+			return
+		}
+		u.eg.Go(func() error {
+			u.appendErr(u.streamContainerLogs(event))
+			return nil
+		})
+	}
+}
+
+func (u *upSession) streamContainerLogs(event api.ContainerEvent) error {
+	res, err := u.apiClient().ContainerInspect(u.globalCtx, event.ID, client.ContainerInspectOptions{})
+	if err != nil {
+		return err
+	}
+
+	err = u.doLogContainer(u.globalCtx, u.options.Start.Attach, event.Source, res.Container, api.LogOptions{
+		Follow: true,
+		Since:  res.Container.State.StartedAt,
+	})
+	if errdefs.IsNotImplemented(err) {
+		// container may be configured with logging_driver: none
+		// as container already started, we might miss the very first logs. But still better than none
+		return u.doAttachContainer(u.globalCtx, event.Service, event.ID, event.Source, u.printer.HandleEvent)
 	}
 	return err
 }
