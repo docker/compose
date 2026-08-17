@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -305,18 +306,20 @@ func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBui
 	return bake
 }
 
-// bakeTargetNames produces a unique ID for each service, used as bake target
+// bakeTargetNames produces a unique ID for each service, used as bake target.
+// Replacing dots can make distinct service names collide (`a.b` vs `a_b`), so
+// names are allocated in sorted service order — deterministic — and a
+// colliding name gets `_` appended until unique.
 func bakeTargetNames(project *types.Project) map[string]string {
 	targets := make(map[string]string, len(project.Services))
-	for serviceName := range project.Services {
+	used := make(map[string]bool, len(project.Services))
+	for _, serviceName := range slices.Sorted(maps.Keys(project.Services)) {
 		t := strings.ReplaceAll(serviceName, ".", "_")
-		for {
-			if _, ok := targets[serviceName]; !ok {
-				targets[serviceName] = t
-				break
-			}
+		for used[t] {
 			t += "_"
 		}
+		targets[serviceName] = t
+		used[t] = true
 	}
 	return targets
 }
