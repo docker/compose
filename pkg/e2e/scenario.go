@@ -324,41 +324,48 @@ func (s *Scenario) command(action Action) icmd.Cmd {
 }
 
 // snapshot captures the current state of the project's containers.
+// Containers are inspected one by one: helper containers (e.g. the ones
+// running lifecycle hooks) carry the project label but can vanish between the
+// listing and the inspect, and one gone container must not blank the whole
+// snapshot. Helpers are also excluded from the snapshot itself: a container
+// belongs to a service if it is numbered as a replica or marked one-off.
 func (s *Scenario) snapshot() snapshot {
 	s.t.Helper()
 	snap := snapshot{}
-	ids := s.projectContainerIDs()
-	if len(ids) == 0 {
-		return snap
-	}
-	res := icmd.RunCmd(s.cli.NewDockerCmd(s.t, append([]string{"inspect"}, ids...)...))
-	if res.ExitCode != 0 {
-		return snap
-	}
-	var containers []struct {
-		ID    string `json:"Id"`
-		Name  string `json:"Name"`
-		State struct {
-			Status    string `json:"Status"`
-			StartedAt string `json:"StartedAt"`
-		} `json:"State"`
-		Config struct {
-			Labels map[string]string `json:"Labels"`
-		} `json:"Config"`
-	}
-	if err := json.Unmarshal([]byte(res.Stdout()), &containers); err != nil {
-		return snap
-	}
-	for _, c := range containers {
-		service := c.Config.Labels["com.docker.compose.service"]
-		snap[service] = append(snap[service], containerState{
-			ID:        c.ID,
-			Name:      strings.TrimPrefix(c.Name, "/"),
-			State:     c.State.Status,
-			StartedAt: c.State.StartedAt,
-			OneOff:    c.Config.Labels["com.docker.compose.oneoff"] == "True",
-			Labels:    c.Config.Labels,
-		})
+	for _, id := range s.projectContainerIDs() {
+		res := icmd.RunCmd(s.cli.NewDockerCmd(s.t, "inspect", id))
+		if res.ExitCode != 0 {
+			continue
+		}
+		var containers []struct {
+			ID    string `json:"Id"`
+			Name  string `json:"Name"`
+			State struct {
+				Status    string `json:"Status"`
+				StartedAt string `json:"StartedAt"`
+			} `json:"State"`
+			Config struct {
+				Labels map[string]string `json:"Labels"`
+			} `json:"Config"`
+		}
+		if err := json.Unmarshal([]byte(res.Stdout()), &containers); err != nil {
+			continue
+		}
+		for _, c := range containers {
+			oneOff := c.Config.Labels["com.docker.compose.oneoff"] == "True"
+			if !oneOff && c.Config.Labels["com.docker.compose.container-number"] == "" {
+				continue
+			}
+			service := c.Config.Labels["com.docker.compose.service"]
+			snap[service] = append(snap[service], containerState{
+				ID:        c.ID,
+				Name:      strings.TrimPrefix(c.Name, "/"),
+				State:     c.State.Status,
+				StartedAt: c.State.StartedAt,
+				OneOff:    oneOff,
+				Labels:    c.Config.Labels,
+			})
+		}
 	}
 	for service := range snap {
 		slices.SortFunc(snap[service], func(a, b containerState) int { return strings.Compare(a.Name, b.Name) })
