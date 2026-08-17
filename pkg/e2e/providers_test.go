@@ -38,7 +38,7 @@ func TestProviderStopHook(t *testing.T) {
 
 	markerFile := filepath.Join(t.TempDir(), "example-provider-stop-marker")
 
-	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
 	c := NewParallelCLI(t, WithEnv(
 		"PATH="+path,
 		"PROVIDER_STOP_MARKER="+markerFile,
@@ -64,7 +64,7 @@ func TestDependsOnMultipleProviders(t *testing.T) {
 	provider, err := findExecutable("example-provider")
 	assert.NilError(t, err)
 
-	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
 	c := NewParallelCLI(t, WithEnv("PATH="+path))
 	const projectName = "depends-on-multiple-providers"
 	t.Cleanup(func() {
@@ -82,7 +82,7 @@ func TestProviderRawSetEnv(t *testing.T) {
 	provider, err := findExecutable("example-provider")
 	assert.NilError(t, err)
 
-	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
 	c := NewParallelCLI(t, WithEnv("PATH="+path))
 	const projectName = "rawsetenv"
 	t.Cleanup(func() {
@@ -102,7 +102,7 @@ func TestProviderRawSetEnvOverridesUserEnv(t *testing.T) {
 	provider, err := findExecutable("example-provider")
 	assert.NilError(t, err)
 
-	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
 	c := NewParallelCLI(t, WithEnv("PATH="+path))
 	const projectName = "rawsetenv-override"
 	t.Cleanup(func() {
@@ -123,7 +123,7 @@ func TestProviderRawSetEnvOverridesInheritedEnv(t *testing.T) {
 	provider, err := findExecutable("example-provider")
 	assert.NilError(t, err)
 
-	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
 	c := NewParallelCLI(t, WithEnv("PATH="+path))
 	const projectName = "rawsetenv-inherit"
 	t.Cleanup(func() {
@@ -141,7 +141,7 @@ func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
 	provider, err := findExecutable("example-provider")
 	assert.NilError(t, err)
 
-	path := fmt.Sprintf("%s%s%s", os.Getenv("PATH"), string(os.PathListSeparator), filepath.Dir(provider))
+	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
 	c := NewParallelCLI(t, WithEnv("PATH="+path))
 	const projectName = "rawsetenv-inherit-map"
 	t.Cleanup(func() {
