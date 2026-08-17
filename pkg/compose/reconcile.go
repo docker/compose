@@ -54,13 +54,25 @@ type ReconcileOptions struct {
 	Timeout              *time.Duration // for stop operations
 	RemoveOrphans        bool
 	SkipProviders        bool
-	// PlanStart extends the plan with the start phase: dependency-condition
-	// waits, pre_start hooks and container starts. When false the plan stops
-	// at container creation and starting is left to the caller (the
-	// historical two-engine split).
-	PlanStart bool
+	// Start, when set, extends the plan with the start phase:
+	// dependency-condition waits, pre_start hooks and container starts. When
+	// nil the plan stops at container creation and starting is left to the
+	// caller (the historical two-engine split).
+	Start *startPhaseOptions
+}
+
+// startPhaseOptions configures the start phase of a plan.
+type startPhaseOptions struct {
+	// Services restricts which services get start-phase nodes (nil = all).
+	// Used by watch, which only restarts the rebuilt services and their
+	// dependents.
+	Services []string
 	// WaitTimeout bounds each dependency-condition wait (0 = no deadline).
 	WaitTimeout time.Duration
+	// Only plans the start phase alone — the `compose start` profile: no
+	// network/volume reconciliation, no container creation, recreation or
+	// removal; existing containers are started as they are.
+	Only bool
 }
 
 // reconciler compares a types.Project (desired state) with an ObservedState
@@ -110,9 +122,16 @@ type reconciler struct {
 	observedContainersByService map[string]Containers
 
 	// startNodes tracks, per service, the start-phase nodes emitted when
-	// options.PlanStart is set. Dependents chain their own start phase after
+	// options.Start is set. Dependents chain their own start phase after
 	// these (a service is "started" once all its replicas are).
 	startNodes map[string][]*PlanNode
+
+	// waitConditionNodes dedupes WaitCondition nodes: several dependents
+	// waiting on the same dependency with the same condition and the same
+	// required-ness share one polling node. required stays in the key because
+	// Optional is a node property: a required and an optional edge to the
+	// same dependency do not fail the same way.
+	waitConditionNodes map[string]*PlanNode
 
 	// resolvedNetworks/resolvedVolumes hold the single live resource selected per
 	// compose key from the (possibly multi-valued) observed state — see
@@ -140,6 +159,16 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 		recreatedServices:           map[string]bool{},
 		observedContainersByService: observed.containersByService(),
 		startNodes:                  map[string][]*PlanNode{},
+		waitConditionNodes:          map[string]*PlanNode{},
+	}
+
+	if options.Start != nil && options.Start.Only {
+		// `compose start` profile: only the start phase is planned, resources
+		// and containers are taken as they are.
+		if err := r.reconcileContainers(); err != nil {
+			return nil, err
+		}
+		return r.plan, nil
 	}
 
 	r.resolveObserved()
@@ -651,6 +680,9 @@ func (r *reconciler) visitInDependencyOrder(g *Graph) error {
 // reconcileService handles a single service: scale down, recreate diverged,
 // start stopped, scale up.
 func (r *reconciler) reconcileService(service types.ServiceConfig) error {
+	if r.options.Start != nil && r.options.Start.Only {
+		return r.reconcileServiceStartOnly(service)
+	}
 	if service.Provider != nil && r.options.SkipProviders {
 		return nil
 	}
@@ -719,7 +751,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		})
 	}
 
-	if r.options.PlanStart {
+	if r.options.Start != nil {
 		node, err := r.planServiceStart(service, candidates)
 		if err != nil {
 			return err
@@ -731,6 +763,34 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 
 	if lastNode != nil {
 		r.serviceNodes[service.Name] = lastNode
+	}
+	return nil
+}
+
+// reconcileServiceStartOnly is the `compose start` profile of reconcileService:
+// existing containers are taken as they are — no creation, recreation or
+// removal — and only the start phase (waits, pre_start, starts) is planned.
+func (r *reconciler) reconcileServiceStartOnly(service types.ServiceConfig) error {
+	if service.Provider != nil {
+		return nil
+	}
+	var candidates []startCandidate
+	for i, oc := range r.observed.Containers[service.Name] {
+		if oc.State == container.StateRunning {
+			candidates = append(candidates, startCandidate{number: oc.Number, running: true})
+			continue
+		}
+		candidates = append(candidates, startCandidate{
+			number:    oc.Number,
+			container: &r.observed.Containers[service.Name][i].Summary,
+		})
+	}
+	node, err := r.planServiceStart(service, candidates)
+	if err != nil {
+		return err
+	}
+	if node != nil {
+		r.serviceNodes[service.Name] = node
 	}
 	return nil
 }
@@ -831,6 +891,9 @@ type startCandidate struct {
 // dependency-condition waits, pre_start hooks and one start per non-running
 // replica. Returns the last node emitted, or nil if nothing needed starting.
 func (r *reconciler) planServiceStart(service types.ServiceConfig, candidates []startCandidate) (*PlanNode, error) {
+	if r.options.Start.Services != nil && !slices.Contains(r.options.Start.Services, service.Name) {
+		return nil, nil
+	}
 	svc := service // copy for pointer stability
 
 	var toStart []startCandidate
@@ -846,40 +909,10 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig, candidates []
 		return nil, nil
 	}
 
-	// Dependency conditions. service_started needs no wait node: the edges on
-	// the dependency's own start nodes express it.
-	var waitNodes []*PlanNode
-	var startDeps []*PlanNode
-	for _, dep := range sortedKeys(service.DependsOn) {
-		config := service.DependsOn[dep]
-		depNodes := r.startNodes[dep]
-		if len(depNodes) == 0 {
-			if node := r.serviceNodes[dep]; node != nil {
-				depNodes = []*PlanNode{node}
-			}
-		}
-		startDeps = append(startDeps, depNodes...)
-
-		shouldWait, err := shouldWaitForDependency(dep, config, r.project)
-		if err != nil {
-			return nil, err
-		}
-		if !shouldWait {
-			continue
-		}
-		depSvc := r.project.Services[dep]
-		waitNodes = append(waitNodes, r.plan.addNode(Operation{
-			Type:       OpWaitCondition,
-			ResourceID: fmt.Sprintf("wait:%s:%s", service.Name, dep),
-			Cause:      fmt.Sprintf("%s depends on %s (%s)", service.Name, dep, config.Condition),
-			Service:    &depSvc,
-			Name:       dep,
-			Condition:  config.Condition,
-			Timeout:    waitTimeout(r.options.WaitTimeout),
-			Optional:   !config.Required,
-		}, "", depNodes...))
+	startDeps, err := r.planDependencyWaits(service)
+	if err != nil {
+		return nil, err
 	}
-	startDeps = append(startDeps, waitNodes...)
 
 	// pre_start hooks run once per service, only when no replica is already
 	// running, on the lowest-numbered replica — decided here at plan time
@@ -924,6 +957,52 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig, candidates []
 		r.startNodes[service.Name] = append(r.startNodes[service.Name], last)
 	}
 	return last, nil
+}
+
+// planDependencyWaits returns the nodes a service's start must depend on for
+// its depends_on edges: the dependencies' own start nodes (which alone express
+// the service_started condition) plus one WaitCondition node per conditional
+// edge. Dependents waiting on the same dependency with the same condition and
+// required-ness share one polling node.
+func (r *reconciler) planDependencyWaits(service types.ServiceConfig) ([]*PlanNode, error) {
+	var startDeps []*PlanNode
+	for _, dep := range sortedKeys(service.DependsOn) {
+		config := service.DependsOn[dep]
+		depNodes := r.startNodes[dep]
+		if len(depNodes) == 0 {
+			if node := r.serviceNodes[dep]; node != nil {
+				depNodes = []*PlanNode{node}
+			}
+		}
+		startDeps = append(startDeps, depNodes...)
+
+		shouldWait, err := shouldWaitForDependency(dep, config, r.project)
+		if err != nil {
+			return nil, err
+		}
+		if !shouldWait {
+			continue
+		}
+		key := fmt.Sprintf("%s:%s:%t", dep, config.Condition, config.Required)
+		if node, ok := r.waitConditionNodes[key]; ok {
+			startDeps = append(startDeps, node)
+			continue
+		}
+		depSvc := r.project.Services[dep]
+		node := r.plan.addNode(Operation{
+			Type:       OpWaitCondition,
+			ResourceID: fmt.Sprintf("wait:%s:%s", dep, config.Condition),
+			Cause:      fmt.Sprintf("dependency %s must be %s", dep, config.Condition),
+			Service:    &depSvc,
+			Name:       dep,
+			Condition:  config.Condition,
+			Timeout:    waitTimeout(r.options.Start.WaitTimeout),
+			Optional:   !config.Required,
+		}, "", depNodes...)
+		r.waitConditionNodes[key] = node
+		startDeps = append(startDeps, node)
+	}
+	return startDeps, nil
 }
 
 func waitTimeout(d time.Duration) *time.Duration {

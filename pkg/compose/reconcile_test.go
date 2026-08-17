@@ -1623,14 +1623,14 @@ func TestReconcilePlanStart(t *testing.T) {
 	}
 
 	options := defaultReconcileOptions()
-	options.PlanStart = true
+	options.Start = &startPhaseOptions{}
 	plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
 	assert.NilError(t, err)
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
 [] -> #1 service:db:1, CreateContainer, no existing container
 [1] -> #2 service:db:1, StartContainer, service start
 [2] -> #3 service:app:1, CreateContainer, no existing container
-[2] -> #4 wait:app:db, WaitCondition, app depends on db (service_healthy)
+[2] -> #4 wait:db:service_healthy, WaitCondition, dependency db must be service_healthy
 [2,3,4] -> #5 service:app:1, StartContainer, service start
 `)+"\n")
 }
@@ -1653,7 +1653,7 @@ func TestReconcilePlanStartOptionalDependency(t *testing.T) {
 	}
 
 	options := defaultReconcileOptions()
-	options.PlanStart = true
+	options.Start = &startPhaseOptions{}
 	plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
 	assert.NilError(t, err)
 	for _, node := range plan.Nodes {
@@ -1683,7 +1683,7 @@ func TestReconcilePlanStartPreStart(t *testing.T) {
 			Volumes:     map[string][]ObservedVolume{},
 		}
 		options := defaultReconcileOptions()
-		options.PlanStart = true
+		options.Start = &startPhaseOptions{}
 		plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
 		assert.NilError(t, err)
 		count := 0
@@ -1717,7 +1717,7 @@ func TestReconcilePlanStartPreStart(t *testing.T) {
 			Volumes:  map[string][]ObservedVolume{},
 		}
 		options := defaultReconcileOptions()
-		options.PlanStart = true
+		options.Start = &startPhaseOptions{}
 		plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
 		assert.NilError(t, err)
 		for _, node := range plan.Nodes {
@@ -1725,4 +1725,145 @@ func TestReconcilePlanStartPreStart(t *testing.T) {
 				"scale-up beside a running replica must not re-run pre_start")
 		}
 	})
+}
+
+func TestReconcilePlanStartWaitDedup(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+			"app1": {Name: "app1", Scale: intPtr(1), DependsOn: types.DependsOnConfig{
+				"db": {Condition: types.ServiceConditionHealthy, Required: true},
+			}},
+			"app2": {Name: "app2", Scale: intPtr(1), DependsOn: types.DependsOnConfig{
+				"db": {Condition: types.ServiceConditionHealthy, Required: true},
+			}},
+			"app3": {Name: "app3", Scale: intPtr(1), DependsOn: types.DependsOnConfig{
+				"db": {Condition: types.ServiceConditionHealthy, Required: false},
+			}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
+	}
+	options := defaultReconcileOptions()
+	options.Start = &startPhaseOptions{}
+	plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+	assert.NilError(t, err)
+
+	required, optional := 0, 0
+	for _, node := range plan.Nodes {
+		if node.Operation.Type != OpWaitCondition {
+			continue
+		}
+		if node.Operation.Optional {
+			optional++
+		} else {
+			required++
+		}
+	}
+	assert.Equal(t, required, 1, "same-required waits on the same dependency must share one node")
+	assert.Equal(t, optional, 1, "an optional edge must not share the required edge's node")
+}
+
+func TestReconcileStartOnly(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+			"app": {Name: "app", Scale: intPtr(1), DependsOn: types.DependsOnConfig{
+				"db": {Condition: types.ServiceConditionHealthy, Required: true},
+			}},
+		},
+	}
+
+	t.Run("existing stopped containers are started, nothing is created", func(t *testing.T) {
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers: map[string][]ObservedContainer{
+				"db":  {{ID: "db1", Name: "myproject-db-1", Number: 1, State: container.StateExited}},
+				"app": {{ID: "app1", Name: "myproject-app-1", Number: 1, State: container.StateCreated}},
+			},
+			Networks: map[string][]ObservedNetwork{},
+			Volumes:  map[string][]ObservedVolume{},
+		}
+		options := ReconcileOptions{Start: &startPhaseOptions{Only: true}}
+		plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+		assert.NilError(t, err)
+		assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, StartContainer, service start
+[1] -> #2 wait:db:service_healthy, WaitCondition, dependency db must be service_healthy
+[1,2] -> #3 service:app:1, StartContainer, service start
+`)+"\n")
+	})
+
+	t.Run("running containers produce an empty plan", func(t *testing.T) {
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers: map[string][]ObservedContainer{
+				"db":  {{ID: "db1", Number: 1, State: container.StateRunning}},
+				"app": {{ID: "app1", Number: 1, State: container.StateRunning}},
+			},
+			Networks: map[string][]ObservedNetwork{},
+			Volumes:  map[string][]ObservedVolume{},
+		}
+		options := ReconcileOptions{Start: &startPhaseOptions{Only: true}}
+		plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+		assert.NilError(t, err)
+		assert.Assert(t, plan.IsEmpty())
+	})
+
+	t.Run("diverged containers are not recreated", func(t *testing.T) {
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers: map[string][]ObservedContainer{
+				"db":  {{ID: "db1", Number: 1, State: container.StateExited, ConfigHash: "stale"}},
+				"app": {{ID: "app1", Number: 1, State: container.StateRunning, ConfigHash: "stale"}},
+			},
+			Networks: map[string][]ObservedNetwork{},
+			Volumes:  map[string][]ObservedVolume{},
+		}
+		options := ReconcileOptions{Start: &startPhaseOptions{Only: true}}
+		plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+		assert.NilError(t, err)
+		for _, node := range plan.Nodes {
+			assert.Assert(t, node.Operation.Type == OpStartContainer || node.Operation.Type == OpWaitCondition,
+				"start-only plan must not carry %s operations", node.Operation.Type)
+		}
+	})
+}
+
+func TestReconcilePlanStartScope(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"web":   {Name: "web", Scale: intPtr(1)},
+			"other": {Name: "other", Scale: intPtr(1)},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			// both exist and are stopped; only web is in the start scope
+			"web":   {{ID: "w1", Number: 1, State: container.StateExited}},
+			"other": {{ID: "o1", Number: 1, State: container.StateExited}},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+	options := defaultReconcileOptions()
+	options.Recreate = api.RecreateNever
+	options.RecreateDependencies = api.RecreateNever
+	options.Start = &startPhaseOptions{Services: []string{"web"}}
+	plan, err := reconcile(t.Context(), project, observed, options, declinePrompt)
+	assert.NilError(t, err)
+	for _, node := range plan.Nodes {
+		if node.Operation.Type == OpStartContainer {
+			assert.Equal(t, node.Operation.ResourceID, "service:web:1",
+				"only scoped services may get start nodes")
+		}
+	}
 }
