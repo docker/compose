@@ -19,6 +19,49 @@
   `OutputContains` as last resort, new checks go in `pkg/e2e/checks.go`) and
   how to exploit failure artifacts and `E2E_KEEP_FAILED=1`.
 
+## Architecture map
+
+Read this before changing lifecycle or CLI code — several of these facts are
+not guessable from local reading.
+
+- **Packages**: `cmd/compose` is the cobra CLI layer; `pkg/api` is the public
+  SDK contract (interface `Compose` + option structs); `pkg/compose` is the
+  backend implementation (`NewComposeService`). Everything else under `pkg/`
+  is exported for historical reasons, not as a stability promise.
+- **Two lifecycle engines coexist.** The plan-based reconciler
+  (`pkg/compose/reconcile.go`) has a single entry point: `create()` — so only
+  `create`/`up`/`run`/`scale`/`watch` go through it. `start`, `stop`,
+  `restart` and `down` use the imperative dependency-ordered engine
+  (`pkg/compose/dependencies.go`) with the shared helpers in
+  `service_containers.go`. The plan does **not** start containers: `up` runs
+  a separate start phase (`start.go`) that re-lists containers and starts
+  them in dependency order.
+- **Operation convention**: exported `composeService` methods wrap the work
+  in `Run(ctx, …, "opname")`, which drives the `EventProcessor`
+  (`Start`/`On`/`Done`) used for progress display. Unexported methods
+  (`s.create`, `s.start`, …) are building blocks without their own event
+  cycle — calling an exported method from another operation nests event
+  cycles.
+- **Output conventions**: progress/status rendering goes to **stderr**
+  (`dockerCli.Err()`); stdout is reserved for command payload (`ps`,
+  `config`, container logs' stdout stream). TTY detection for the renderer
+  probes stderr, color detection for logs probes stdout.
+- **Environment resolution has two idioms**: `os.Getenv` sees only the
+  process environment; `project.Environment[...]` also sees the project's
+  `.env`. `cmd/compose/compose.go:setEnvWithDotEnv` additionally copies
+  `COMPOSE_*` keys from the project's env-files into the process environment
+  during `PersistentPreRunE` — variables read before that point (e.g. as
+  cobra flag defaults) do not see the `.env`.
+- **Container/project identity is label-based**: listings filter on the
+  presence of `com.docker.compose.config-hash` (see
+  `pkg/compose/containers.go:getDefaultFilters`), not just the project label.
+  One-off (`compose run`) containers carry `oneoff=True` and no
+  container-number; lifecycle-hook helper containers carry neither and are
+  therefore invisible to `ps`/`down`.
+- **Docker Desktop integrations** (`internal/desktop`, used from `up`,
+  `publish`, the keyboard menu) talk to Desktop over a private socket and are
+  expected to fail silently on non-Desktop engines.
+
 ## Lint
 
 - Linter: golangci-lint v2 (config in `.golangci.yml`)
