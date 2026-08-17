@@ -1,6 +1,8 @@
 services:
   test:
-    image: "nginx"
+    image: alpine
+    init: true
+    command: sleep infinity
     healthcheck:
       interval: 30s
       start_period: 10s
@@ -8,7 +10,9 @@ services:
       test: "/bin/true"
 
   error:
-    image: "nginx"
+    image: alpine
+    init: true
+    command: sleep infinity
     healthcheck:
       interval: 30s
       start_interval: 1s

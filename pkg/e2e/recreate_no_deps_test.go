@@ -18,22 +18,18 @@ package e2e
 
 import (
 	"testing"
-
-	"gotest.tools/v3/icmd"
+	"time"
 )
 
 func TestRecreateWithNoDeps(t *testing.T) {
-	c := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=recreate-no-deps",
-	))
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/dependencies/recreate-no-deps.yaml", "up", "-d")
-	res.Assert(t, icmd.Success)
-
-	res = c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/dependencies/recreate-no-deps.yaml", "up", "-d", "--force-recreate", "--no-deps", "my-service")
-	res.Assert(t, icmd.Success)
-
-	RequireServiceState(t, c, "my-service", "running")
-
-	c.RunDockerComposeCmd(t, "down")
+	NewScenario(t, "up --force-recreate --no-deps must replace the service without touching its healthy dependency").
+		Step("up starts the service once its dependency is healthy",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("my-service", "running"),
+			ServiceHealthy("dep")).
+		Step("force-recreate with --no-deps replaces only the service",
+			ComposeCmd("up", "-d", "--force-recreate", "--no-deps", "my-service"),
+			ServiceState("my-service", "running"),
+			Recreated("my-service"),
+			NotRecreated("dep"))
 }
