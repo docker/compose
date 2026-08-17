@@ -1,0 +1,11 @@
+services:
+  foo:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      - bar
+  bar:
+    image: alpine
+    init: true
+    command: sleep infinity
