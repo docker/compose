@@ -63,14 +63,39 @@ type stepRecord struct {
 // containerState is the per-container state captured after each step, used by
 // cross-step checks such as NotRecreated or LabelUnchanged.
 type containerState struct {
-	ID     string
-	Name   string
-	State  string
-	Labels map[string]string
+	ID        string
+	Name      string
+	State     string
+	StartedAt string
+	OneOff    bool
+	Labels    map[string]string
 }
 
-// snapshot maps a service name to its containers, sorted by name.
+// snapshot maps a service name to its containers — long-lived and one-off
+// (run) alike — sorted by name.
 type snapshot map[string][]containerState
+
+// service returns the service's long-lived containers, one-offs excluded.
+func (s snapshot) service(name string) []containerState {
+	var containers []containerState
+	for _, c := range s[name] {
+		if !c.OneOff {
+			containers = append(containers, c)
+		}
+	}
+	return containers
+}
+
+// oneOffs returns the service's one-off (run) containers.
+func (s snapshot) oneOffs(name string) []containerState {
+	var containers []containerState
+	for _, c := range s[name] {
+		if c.OneOff {
+			containers = append(containers, c)
+		}
+	}
+	return containers
+}
 
 // ScenarioOption customizes a Scenario at creation time.
 type ScenarioOption func(*Scenario)
@@ -306,7 +331,8 @@ func (s *Scenario) snapshot() snapshot {
 		ID    string `json:"Id"`
 		Name  string `json:"Name"`
 		State struct {
-			Status string `json:"Status"`
+			Status    string `json:"Status"`
+			StartedAt string `json:"StartedAt"`
 		} `json:"State"`
 		Config struct {
 			Labels map[string]string `json:"Labels"`
@@ -318,10 +344,12 @@ func (s *Scenario) snapshot() snapshot {
 	for _, c := range containers {
 		service := c.Config.Labels["com.docker.compose.service"]
 		snap[service] = append(snap[service], containerState{
-			ID:     c.ID,
-			Name:   strings.TrimPrefix(c.Name, "/"),
-			State:  c.State.Status,
-			Labels: c.Config.Labels,
+			ID:        c.ID,
+			Name:      strings.TrimPrefix(c.Name, "/"),
+			State:     c.State.Status,
+			StartedAt: c.State.StartedAt,
+			OneOff:    c.Config.Labels["com.docker.compose.oneoff"] == "True",
+			Labels:    c.Config.Labels,
 		})
 	}
 	for service := range snap {
