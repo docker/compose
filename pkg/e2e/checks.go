@@ -89,6 +89,20 @@ func StdoutContains(sub string) Check {
 	}
 }
 
+// OutputMatches expects the regular expression to match the command's stdout,
+// for expectations OutputContains cannot express (e.g. ordering).
+func OutputMatches(pattern string) Check {
+	return Check{
+		name: fmt.Sprintf("output matches %q", pattern),
+		fn: func(ctx *CheckContext) error {
+			if !regexp.MustCompile(pattern).MatchString(ctx.result.Stdout()) {
+				return fmt.Errorf("no match in stdout")
+			}
+			return nil
+		},
+	}
+}
+
 // OutputMatchesCount expects the regular expression to match the command's
 // stdout exactly n times, e.g. counting how many times a service was built.
 func OutputMatchesCount(pattern string, n int) Check {
