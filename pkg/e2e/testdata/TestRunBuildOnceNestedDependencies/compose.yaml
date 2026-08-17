@@ -1,5 +1,4 @@
 services:
-  # Database service with build
   db:
     pull_policy: build
     build:
@@ -8,7 +7,6 @@ services:
         RUN echo "DB built at $(date)" > /db-build.txt
         CMD sleep 3600
 
-  # API service that depends on db
   api:
     pull_policy: build
     build:
@@ -19,7 +17,6 @@ services:
     depends_on:
       - db
 
-  # App service that depends on api (which depends on db)
   app:
     pull_policy: build
     build:
@@ -29,4 +26,3 @@ services:
         CMD echo "App running"
     depends_on:
       - api
-

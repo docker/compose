@@ -25,6 +25,7 @@ package e2e
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -82,6 +83,21 @@ func StdoutContains(sub string) Check {
 		fn: func(ctx *CheckContext) error {
 			if !strings.Contains(ctx.result.Stdout(), sub) {
 				return fmt.Errorf("not found in stdout")
+			}
+			return nil
+		},
+	}
+}
+
+// OutputMatchesCount expects the regular expression to match the command's
+// stdout exactly n times, e.g. counting how many times a service was built.
+func OutputMatchesCount(pattern string, n int) Check {
+	return Check{
+		name: fmt.Sprintf("output matches %q %d time(s)", pattern, n),
+		fn: func(ctx *CheckContext) error {
+			matches := regexp.MustCompile(pattern).FindAllString(ctx.result.Stdout(), -1)
+			if len(matches) != n {
+				return fmt.Errorf("matched %d time(s)", len(matches))
 			}
 			return nil
 		},
