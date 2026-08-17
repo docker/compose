@@ -1,6 +1,6 @@
 services:
   ssh:
-    image: build-test-secret
+    image: ${SECRET_IMAGE}
     build:
       context: .
       secrets:
