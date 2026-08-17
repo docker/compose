@@ -17,24 +17,19 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
 )
 
 func TestRemoveOrphans(t *testing.T) {
-	c := NewCLI(t)
-
-	const projectName = "compose-e2e-orphans"
-	defer c.cleanupWithDown(t, projectName)
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/orphans/compose.yaml", "-p", projectName, "run", "orphan")
-	res := c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--all")
-	assert.Check(t, strings.Contains(res.Combined(), "compose-e2e-orphans-orphan-run-"))
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/orphans/compose.yaml", "-p", projectName, "up", "-d")
-
-	res = c.RunDockerComposeCmd(t, "-p", projectName, "ps", "--all")
-	assert.Check(t, !strings.Contains(res.Combined(), "compose-e2e-orphans-orphan-run-"))
+	// Without COMPOSE_REMOVE_ORPHANS, up only warns about the leftover
+	// one-off; the .env setting must be picked up from the project directory
+	// and turn the warning into a removal.
+	NewScenario(t, "up must honor COMPOSE_REMOVE_ORPHANS declared in the project's .env").
+		Step("run leaves an exited one-off container behind",
+			ComposeCmd("run", "orphan"),
+			OneOffState("orphan", "exited")).
+		Step("up removes the leftover one-off",
+			ComposeCmd("up", "-d"),
+			ServiceState("test", "running"),
+			OneOffsRemoved("orphan"))
 }
