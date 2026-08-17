@@ -202,40 +202,33 @@ func TestBuildSecrets(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skipping test on windows")
 	}
-	c := NewParallelCLI(t)
-
-	t.Run("build with secrets", func(t *testing.T) {
-		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "build-test-secret")
-
-		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/secrets", "build")
-
-		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
-			cmd.Env = append(cmd.Env, "SOME_SECRET=bar")
-		})
-
-		res.Assert(t, icmd.Success)
-	})
+	// the Dockerfile diffs each mounted secret against its expected value, so
+	// a successful build proves file, environment and .env secrets all reached
+	// the build.
+	s := NewScenario(t, "build secrets from a file, the environment and the .env must reach the build")
+	image := s.Project() + "-secret"
+	s.Env("SECRET_IMAGE="+image).
+		Defer(DockerCmd("image", "rm", "-f", image).MayFail()).
+		Step("build verifies each secret's content in-Dockerfile",
+			ComposeCmd("build").WithEnv("SOME_SECRET=bar"),
+			ImageExists(image))
 }
 
 func TestBuildTags(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Run("build with tags", func(t *testing.T) {
-		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "build-test-tags")
-
-		c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/build-test/tags", "build", "--no-cache")
-
-		res := c.RunDockerCmd(t, "image", "inspect", "build-test-tags")
-		expectedOutput := `"RepoTags": [
-            "docker/build-test-tags:1.0.0",
-            "build-test-tags:latest",
-            "other-image-name:v1.0.0"
-        ],
-`
-		res.Assert(t, icmd.Expected{Out: expectedOutput})
-	})
+	s := NewScenario(t, "build must apply every declared tag alongside the service image name")
+	image := s.Project() + "-tags"
+	s.Env("TAG_IMAGE="+image).
+		Defer(
+			DockerCmd("image", "rm", "-f", image).MayFail(),
+			DockerCmd("image", "rm", "-f", "docker/"+image+":1.0.0").MayFail(),
+			DockerCmd("image", "rm", "-f", image+"-other:v1.0.0").MayFail()).
+		Step("build tags the image under every name",
+			ComposeCmd("build", "--no-cache")).
+		Step("the image carries the three tags",
+			DockerCmd("image", "inspect", image),
+			OutputContains("docker/"+image+":1.0.0"),
+			OutputContains(image+":latest"),
+			OutputContains(image+"-other:v1.0.0"))
 }
 
 func TestBuildImageDependencies(t *testing.T) {
@@ -537,87 +530,69 @@ func TestBuildEntitlements(t *testing.T) {
 }
 
 func TestBuildDependsOn(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/build-dependencies/compose-depends_on.yaml", "down", "--rmi=local")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-dependencies/compose-depends_on.yaml", "--progress=plain", "up", "test2")
-	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "test1 Built"))
+	s := NewScenario(t, "up must build a pull_policy: build dependency before starting its dependent")
+	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-test1").MayFail()).
+		Step("up on the dependent reports the dependency's build",
+			ComposeCmd("--progress=plain", "up", "test2"),
+			OutputContains("test1 Built"))
 }
 
 func TestBuildSubset(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/subset/compose.yaml", "down", "--rmi=local")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/subset/compose.yaml", "build", "main")
-	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "main Built"))
+	s := NewScenario(t, "build scoped to a service must build that service")
+	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-main").MayFail()).
+		Step("build main reports it built",
+			ComposeCmd("build", "main"),
+			OutputContains("main Built"))
 }
 
 func TestBuildDependentImage(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "down", "--rmi=local")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "build", "firstbuild")
-	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "firstbuild Built"))
-
-	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/dependencies/compose.yaml", "build", "secondbuild")
-	out = res.Combined()
-	assert.Check(t, strings.Contains(out, "secondbuild Built"))
+	s := NewScenario(t, "each service using another service's image as build context must build on demand")
+	s.Defer(
+		DockerCmd("image", "rm", "-f", s.Project()+"-firstbuild").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-secondbuild").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-dep1").MayFail()).
+		Step("the first dependent builds",
+			ComposeCmd("build", "firstbuild"),
+			OutputContains("firstbuild Built")).
+		Step("the second dependent builds too",
+			ComposeCmd("build", "secondbuild"),
+			OutputContains("secondbuild Built"))
 }
 
 func TestBuildSubDependencies(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "down", "--rmi=local")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "build", "main")
-	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "main Built"))
-
-	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/sub-dependencies/compose.yaml", "up", "--build", "main")
-	out = res.Combined()
-	assert.Check(t, strings.Contains(out, "main Built"))
+	s := NewScenario(t, "a chain of service build contexts must resolve transitively, for build and up --build alike")
+	s.Defer(
+		DockerCmd("image", "rm", "-f", s.Project()+"-main").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-dep1").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-dep2").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-subdep1").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-subdep2").MayFail()).
+		Step("build resolves the whole context chain",
+			ComposeCmd("build", "main"),
+			OutputContains("main Built")).
+		Step("up --build resolves it the same way",
+			ComposeCmd("up", "--build", "main"),
+			OutputContains("main Built"))
 }
 
 func TestBuildLongOutputLine(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "down", "--rmi=local")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "build", "long-line")
-	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "long-line Built"))
-
-	res = c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/long-output-line/compose.yaml", "up", "--build", "long-line")
-	out = res.Combined()
-	assert.Check(t, strings.Contains(out, "long-line Built"))
+	s := NewScenario(t, "a build flooding the progress writer with warnings must still complete and report")
+	s.
+		Defer(DockerCmd("image", "rm", "-f", s.Project()+"-long-line").MayFail()).
+		Step("build survives the warning flood",
+			ComposeCmd("build", "long-line"),
+			OutputContains("long-line Built")).
+		Step("up --build does too",
+			ComposeCmd("up", "--build", "long-line"),
+			OutputContains("long-line Built"))
 }
 
 func TestBuildDependentImageWithProfile(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/profiles/compose.yaml", "down", "--rmi=local")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/profiles/compose.yaml", "build", "secret-build-test")
-	out := res.Combined()
-	assert.Check(t, strings.Contains(out, "secret-build-test Built"))
+	s := NewScenario(t, "build targeting a profiled service must activate its profile and mount its build secret")
+	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-secret-build-test").MayFail()).
+		Step("build reports the profiled service built",
+			ComposeCmd("build", "secret-build-test"),
+			OutputContains("secret-build-test Built"))
 }
 
 func TestBuildTLS(t *testing.T) {
@@ -662,16 +637,18 @@ func TestBuildTLS(t *testing.T) {
 }
 
 func TestBuildEscaped(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	res := c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/build-test/escaped", "build", "--no-cache", "foo")
-	res.Assert(t, icmd.Expected{Out: "foo is ${bar}"})
-
-	res = c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/build-test/escaped", "build", "--no-cache", "echo")
-	res.Assert(t, icmd.Success)
-
-	res = c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/build-test/escaped", "build", "--no-cache", "arg")
-	res.Assert(t, icmd.Success)
+	s := NewScenario(t, "a $$ escape in the model must reach the build literally, in args, heredocs and inline dockerfiles")
+	s.Defer(
+		DockerCmd("image", "rm", "-f", s.Project()+"-foo").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-echo").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-arg").MayFail()).
+		Step("the escaped build arg reaches the Dockerfile literally",
+			ComposeCmd("build", "--no-cache", "foo"),
+			OutputContains("foo is ${bar}")).
+		Step("a heredoc with command substitution builds",
+			ComposeCmd("build", "--no-cache", "echo")).
+		Step("an escaped variable in an inline dockerfile builds",
+			ComposeCmd("build", "--no-cache", "arg"))
 }
 
 // TestUpBuildUnchangedContext locks the invariant that rebuilding an

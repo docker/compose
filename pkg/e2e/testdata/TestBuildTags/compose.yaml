@@ -1,0 +1,8 @@
+services:
+  nginx:
+    image: ${TAG_IMAGE}
+    build:
+      context: .
+      tags:
+        - docker.io/docker/${TAG_IMAGE}:1.0.0
+        - ${TAG_IMAGE}-other:v1.0.0
