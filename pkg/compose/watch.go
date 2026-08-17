@@ -668,28 +668,22 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("service(s) %q successfully built", services))
 
-	err = s.create(ctx, project, api.CreateOptions{
-		Services:      services,
-		Inherit:       true,
-		Recreate:      api.RecreateForce,
-		SkipProviders: true,
-	})
-	if err != nil {
-		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate services after update. Error: %v", err))
-		return err
-	}
-
 	p, err := project.WithSelectedServices(services, types.IncludeDependents)
 	if err != nil {
 		return err
 	}
-	err = s.start(ctx, project.Name, api.StartOptions{
-		Project:  p,
-		Services: services,
-		AttachTo: services,
-	}, nil)
+	// One plan recreates the rebuilt services and starts them (and their
+	// dependents) — see the start-in-plan convergence epic. The start phase
+	// is scoped so services outside the rebuilt subset are left alone.
+	err = s.converge(ctx, project, api.CreateOptions{
+		Services:      services,
+		Inherit:       true,
+		Recreate:      api.RecreateForce,
+		SkipProviders: true,
+	}, &startPhaseOptions{Services: p.ServiceNames()})
 	if err != nil {
-		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Application failed to start after update. Error: %v", err))
+		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate services after update. Error: %v", err))
+		return err
 	}
 	return nil
 }
