@@ -305,6 +305,7 @@ func (s *Scenario) command(action Action) icmd.Cmd {
 	}
 	cmd.Env = append(cmd.Env, s.env...)
 	cmd.Env = append(cmd.Env, action.env...)
+	cmd.Timeout = action.timeout
 	return cmd
 }
 
@@ -494,6 +495,7 @@ type Action struct {
 	args    []string
 	env     []string
 	mayFail bool
+	timeout time.Duration
 }
 
 // ComposeCmd runs `docker compose <args>` against the scenario's compose
@@ -517,6 +519,15 @@ func (a Action) WithEnv(kv ...string) Action {
 // scenario (e.g. removing an image that may not exist).
 func (a Action) MayFail() Action {
 	a.mayFail = true
+	return a
+}
+
+// Within bounds the command's execution time, for blocking commands whose
+// termination is itself the expectation (e.g. `up --wait` on a service that
+// must become healthy). Exceeding the timeout kills the command and fails the
+// step.
+func (a Action) Within(timeout time.Duration) Action {
+	a.timeout = timeout
 	return a
 }
 

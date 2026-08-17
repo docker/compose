@@ -17,39 +17,39 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 	"time"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
 func TestStartInterval(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-start-interval"
+	NewScenario(t, "start_interval must require start_period, and must accelerate the initial health probes").
+		Compose(`
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    healthcheck:
+      interval: 30s
+      start_period: 10s
+      start_interval: 1s
+      test: "/bin/true"
 
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start_interval/compose.yaml", "--project-name", projectName, "up", "--wait", "-d", "error")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "healthcheck.start_interval requires healthcheck.start_period to be set"})
-
-	timeout := time.After(30 * time.Second)
-	done := make(chan bool)
-	go func() {
-		//nolint:nolintlint,testifylint // helper asserts inside goroutine; acceptable in this e2e test
-		res := c.RunDockerComposeCmd(t, "-f", "fixtures/start_interval/compose.yaml", "--project-name", projectName, "up", "--wait", "-d", "test")
-		out := res.Combined()
-		assert.Assert(t, strings.Contains(out, "Healthy"), out)
-		done <- true
-	}()
-
-	select {
-	case <-timeout:
-		t.Fatal("test did not finish in time")
-	case <-done:
-		break
-	}
+  error:
+    image: alpine
+    init: true
+    command: sleep infinity
+    healthcheck:
+      interval: 30s
+      start_interval: 1s
+      test: "/bin/true"
+`).
+		Step("up --wait on a start_interval without start_period is rejected",
+			ComposeCmd("up", "--wait", "-d", "error").MayFail(),
+			ExitCode(1),
+			OutputContains("healthcheck.start_interval requires healthcheck.start_period to be set")).
+		Step("up --wait turns healthy well before the regular 30s interval",
+			ComposeCmd("up", "--wait", "-d", "test").Within(30*time.Second),
+			ServiceState("test", "running"),
+			ServiceHealthy("test"))
 }

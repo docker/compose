@@ -18,22 +18,37 @@ package e2e
 
 import (
 	"testing"
-
-	"gotest.tools/v3/icmd"
+	"time"
 )
 
 func TestRecreateWithNoDeps(t *testing.T) {
-	c := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=recreate-no-deps",
-	))
+	NewScenario(t, "up --force-recreate --no-deps must replace the service without touching its healthy dependency").
+		Compose(`
+services:
+  my-service:
+    image: alpine
+    command: sleep infinity
+    init: true
+    depends_on:
+      dep: {condition: service_healthy}
 
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/dependencies/recreate-no-deps.yaml", "up", "-d")
-	res.Assert(t, icmd.Success)
-
-	res = c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/dependencies/recreate-no-deps.yaml", "up", "-d", "--force-recreate", "--no-deps", "my-service")
-	res.Assert(t, icmd.Success)
-
-	RequireServiceState(t, c, "my-service", "running")
-
-	c.RunDockerComposeCmd(t, "down")
+  dep:
+    image: alpine
+    command: sleep infinity
+    init: true
+    healthcheck:
+      test:     "/bin/true"
+      interval: 2s
+      timeout:  1s
+      retries:  10
+`).
+		Step("up starts the service once its dependency is healthy",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("my-service", "running"),
+			ServiceHealthy("dep")).
+		Step("force-recreate with --no-deps replaces only the service",
+			ComposeCmd("up", "-d", "--force-recreate", "--no-deps", "my-service"),
+			ServiceState("my-service", "running"),
+			Recreated("my-service"),
+			NotRecreated("dep"))
 }

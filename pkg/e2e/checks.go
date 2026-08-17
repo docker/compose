@@ -209,6 +209,28 @@ func NotRecreated(services ...string) Check {
 	}
 }
 
+// Recreated expects the services' containers to have been replaced by the
+// step: none of the containers that existed before survived it.
+func Recreated(services ...string) Check {
+	return Check{
+		name: fmt.Sprintf("services %s recreated", strings.Join(services, ", ")),
+		fn: func(ctx *CheckContext) error {
+			for _, service := range services {
+				before, after := containerIDs(ctx.prev.service(service)), containerIDs(ctx.curr.service(service))
+				if len(before) == 0 {
+					return fmt.Errorf("service %q had no container before the step", service)
+				}
+				for _, id := range after {
+					if slices.Contains(before, id) {
+						return fmt.Errorf("service %q kept container %s", service, id[:12])
+					}
+				}
+			}
+			return nil
+		},
+	}
+}
+
 func containerIDs(containers []containerState) []string {
 	ids := make([]string, 0, len(containers))
 	for _, c := range containers {
@@ -216,6 +238,31 @@ func containerIDs(containers []containerState) []string {
 	}
 	slices.Sort(ids)
 	return ids
+}
+
+// ServiceHealthy expects every container of the service to report a healthy
+// state from its healthcheck.
+func ServiceHealthy(service string) Check {
+	return Check{
+		name: fmt.Sprintf("service %q is healthy", service),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr.service(service)
+			if len(containers) == 0 {
+				return fmt.Errorf("service has no container")
+			}
+			for _, c := range containers {
+				res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t,
+					"inspect", "--format", "{{.State.Health.Status}}", c.ID))
+				if res.ExitCode != 0 {
+					return fmt.Errorf("inspect failed: %s", res.Combined())
+				}
+				if status := strings.TrimSpace(res.Stdout()); status != "healthy" {
+					return fmt.Errorf("container %s is %s", c.Name, status)
+				}
+			}
+			return nil
+		},
+	}
 }
 
 // OneOffState expects every one-off (run) container of the service to be in
