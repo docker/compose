@@ -107,7 +107,7 @@ options allow you to configure I/O streams, concurrency limits, dry-run mode, an
 - `WithDryRun` - Run operations in dry-run mode without actually applying changes
 - `WithContextInfo(api.ContextInfo)` - Set custom Docker context information
 - `WithProxyConfig(map[string]string)` - Configure HTTP proxy settings for builds
-- `WithEventProcessor(progress.EventProcessor)` - Receive progress events and operation notifications
+- `WithEventProcessor(api.EventProcessor)` - Receive progress events and operation notifications
 
 These options provide fine-grained control over the SDK's behavior, making it suitable for various integration
 scenarios including CLI tools, web services, automation scripts, and testing environments.
@@ -145,13 +145,17 @@ Common status text values include: `Creating`, `Created`, `Starting`, `Started`,
 
 ### Built-in `EventProcessor` implementations
 
-The SDK provides three ready-to-use `EventProcessor` implementations:
+The `EventProcessor` interface is defined in `github.com/docker/compose/v5/pkg/api`. When no
+`WithEventProcessor` option is passed, events are silently discarded.
 
-- `progress.NewTTYWriter(io.Writer)` - Renders an interactive terminal UI with progress bars and task lists
-  (similar to the Docker Compose CLI output)
-- `progress.NewPlainWriter(io.Writer)` - Outputs simple text-based progress messages suitable for non-interactive
+The renderers used by the Docker Compose CLI live in the `github.com/docker/compose/v5/cmd/display`
+package and can be reused:
+
+- `display.Full(out, info io.Writer, detached bool)` - Renders the interactive terminal UI with progress bars
+  and task lists (the default Docker Compose CLI output)
+- `display.Plain(out io.Writer)` - Outputs simple text-based progress messages suitable for non-interactive
   environments or log files
-- `progress.NewJSONWriter()` - Render events as JSON objects
-- `progress.NewQuietWriter()` - (Default) Silently processes events without producing any output
+- `display.JSON(out io.Writer)` - Renders each event as a JSON object
+- `display.Quiet()` - Silently discards events (same behavior as the default)
 
 Using `EventProcessor`, a custom UI can be plugged into `docker/compose`.
