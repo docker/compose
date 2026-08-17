@@ -41,7 +41,10 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error { //nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
+func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {

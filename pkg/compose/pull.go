@@ -50,7 +50,10 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 	}, "pull", s.events)
 }
 
-func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
+func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
 	images, _, err := s.getLocalImagesDigests(ctx, project)
 	if err != nil {
 		return err

@@ -186,7 +186,10 @@ func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 	}
 }
 
-func (s *composeService) watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) { //nolint: gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
+func (s *composeService) watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) {
 	var err error
 	if project, err = project.WithSelectedServices(options.Services); err != nil {
 		return nil, err
@@ -529,7 +532,6 @@ func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCl
 	return err
 }
 
-//nolint:gocyclo
 func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, options api.WatchOptions, batch []watch.FileEvent, rules []watchRule, syncer sync.Syncer) error {
 	var (
 		restart   = map[string]bool{}
@@ -776,7 +778,9 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 
 // Syncs files from develop.watch.path if they have been modified after the image has been created
 //
-//nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Project, service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
 	fi, err := os.Stat(trigger.Path)
 	if err != nil {

@@ -113,7 +113,9 @@ func (g *ociRemoteLoader) Accept(path string) bool {
 	return strings.HasPrefix(path, OciPrefix)
 }
 
-//nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (g *ociRemoteLoader) Load(ctx context.Context, path string) (string, error) {
 	enabled, err := ociRemoteLoaderEnabled()
 	if err != nil {

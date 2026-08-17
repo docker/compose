@@ -29,6 +29,9 @@ import (
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func TestViz(t *testing.T) {
 	project := types.Project{
 		Name:       "viz-test",

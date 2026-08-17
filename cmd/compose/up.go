@@ -186,7 +186,6 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	return upCmd
 }
 
-//nolint:gocyclo
 func validateFlags(up *upOptions, create *createOptions) error {
 	if up.waitTimeout < 0 {
 		return fmt.Errorf("--wait-timeout must be a non-negative integer")
@@ -228,7 +227,6 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	return nil
 }
 
-//nolint:gocyclo
 func runUp(
 	ctx context.Context,
 	dockerCli command.Cli,

@@ -434,7 +434,10 @@ func (o *BackendOptions) Add(option compose.Option) {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command { //nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
+func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := ProjectOptions{}
 	var (
 		ansi     string
