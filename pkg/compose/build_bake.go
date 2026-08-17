@@ -403,36 +403,22 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 
+	// Bake reports the top-level attested image/index digest, which changes on
+	// every build when provenance attestations are enabled — even for a fully
+	// cached build (see https://github.com/docker/compose/issues/13636). For
+	// images loaded into the local engine (the common non-push case), resolve
+	// the canonical content digest — with the service's pinned platform when
+	// set — so unchanged rebuilds don't recreate containers.
 	results := map[string]string{}
-	var builtImages []string
-	for name := range serviceToBeBuild {
+	for name, service := range serviceToBeBuild {
 		image := expectedImages[name]
 		target := targets[name]
 		built, ok := md[target]
 		if !ok {
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
-		results[image] = built.Digest
-		builtImages = append(builtImages, image)
+		results[image] = s.canonicalBuiltDigest(ctx, image, service.Platform, built.Digest)
 		s.events.On(builtEvent(image))
-	}
-
-	// Bake reports the top-level attested image/index digest, which changes on
-	// every build when provenance attestations are enabled — even for a fully
-	// cached build (see https://github.com/docker/compose/issues/13636). For
-	// images loaded into the local engine (the common non-push case), substitute
-	// the content digest so unchanged rebuilds don't recreate containers.
-	// Registry-only images (push/multi-platform) aren't inspectable locally, so
-	// they keep the Bake-reported digest.
-	// Best effort: if the built images can't be inspected, keep the
-	// Bake-reported digests rather than failing an already-successful build.
-	summaries, err := s.getImageSummaries(ctx, builtImages)
-	if err != nil {
-		logrus.Debugf("unable to inspect built images for content digest, keeping bake digests: %v", err)
-	} else {
-		for image, summary := range summaries {
-			results[image] = summary.ID
-		}
 	}
 
 	return results, nil
@@ -600,24 +586,20 @@ func (s *composeService) dryRunBake(cfg bakeConfig) map[string]string {
 	bakeResponse := map[string]string{}
 	for name, target := range cfg.Targets {
 		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-		s.displayDryRunBuildEvent(name, dryRunUUID, target.Tags[0])
+		s.events.On(api.Resource{
+			ID:     name + " ==>",
+			Status: api.Done,
+			Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
+		})
+		s.events.On(api.Resource{
+			ID:     name + " ==> ==>",
+			Status: api.Done,
+			Text:   fmt.Sprintf(`naming to %s`, target.Tags[0]),
+		})
 		bakeResponse[name] = dryRunUUID
 	}
 	for name := range bakeResponse {
 		s.events.On(builtEvent(name))
 	}
 	return bakeResponse
-}
-
-func (s *composeService) displayDryRunBuildEvent(name, dryRunUUID, tag string) {
-	s.events.On(api.Resource{
-		ID:     name + " ==>",
-		Status: api.Done,
-		Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
-	})
-	s.events.On(api.Resource{
-		ID:     name + " ==> ==>",
-		Status: api.Done,
-		Text:   fmt.Sprintf(`naming to %s`, tag),
-	})
 }

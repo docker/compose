@@ -61,10 +61,18 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
-	// Check requested services exists in model
-	services, err := checkSelectedServices(options, project)
-	if err != nil {
-		return err
+	// keep only the requested services that exist in the model
+	var services []string
+	for _, service := range options.Services {
+		if _, err := project.GetService(service); err != nil {
+			if options.Project != nil {
+				// ran with an explicit compose.yaml file, so we should not ignore
+				return err
+			}
+			// ran without an explicit compose.yaml file, so can't distinguish typo vs container already removed
+			continue
+		}
+		services = append(services, service)
 	}
 
 	if len(options.Services) > 0 && len(services) == 0 {
@@ -124,23 +132,6 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	return eg.Wait()
 }
 
-func checkSelectedServices(options api.DownOptions, project *types.Project) ([]string, error) {
-	var services []string
-	for _, service := range options.Services {
-		_, err := project.GetService(service)
-		if err != nil {
-			if options.Project != nil {
-				// ran with an explicit compose.yaml file, so we should not ignore
-				return nil, err
-			}
-			// ran without an explicit compose.yaml file, so can't distinguish typo vs container already removed
-		} else {
-			services = append(services, service)
-		}
-	}
-	return services, nil
-}
-
 func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project) []downOp {
 	var ops []downOp
 	for _, vol := range project.Volumes {
@@ -171,7 +162,10 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 	for i := range images {
 		img := images[i]
 		ops = append(ops, func() error {
-			return s.removeImage(ctx, img)
+			return s.removeResource("Image "+img, func() error {
+				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
+				return err
+			})
 		})
 	}
 	return ops, nil
@@ -248,14 +242,6 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		return nil
 	}
 	return nil
-}
-
-func (s *composeService) removeImage(ctx context.Context, image string) error {
-	id := fmt.Sprintf("Image %s", image)
-	return s.removeResource(id, func() error {
-		_, err := s.apiClient().ImageRemove(ctx, image, client.ImageRemoveOptions{})
-		return err
-	})
 }
 
 func (s *composeService) removeVolume(ctx context.Context, id string) error {

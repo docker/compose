@@ -23,7 +23,6 @@ import (
 	"os"
 	"slices"
 	"sort"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -36,6 +35,25 @@ import (
 	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/docker/compose/v5/internal/tracing"
 )
+
+// resolvePlatforms resolves DOCKER_DEFAULT_PLATFORM into service.Platform
+// exactly like applyPlatforms does for build-capable commands, but without
+// validating build.platforms: commands that never build (scale) only need
+// Platform resolved for config-hash parity with up, and a build.platforms
+// conflict on a service that isn't being built must not abort them.
+func resolvePlatforms(project *types.Project) {
+	defaultPlatform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	if defaultPlatform == "" {
+		return
+	}
+	for name, service := range project.Services {
+		if service.Build == nil || service.Platform != "" {
+			continue
+		}
+		service.Platform = defaultPlatform
+		project.Services[name] = service
+	}
+}
 
 func applyPlatforms(project *types.Project, buildForSinglePlatform bool) error {
 	defaultPlatform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
@@ -158,7 +176,7 @@ func promptForInterpolatedVariables(ctx context.Context, dockerCli command.Cli, 
 }
 
 func extractInterpolationVariablesFromModel(ctx context.Context, dockerCli command.Cli, projectOptions *ProjectOptions, cmdEnvs []string) ([]varInfo, bool, error) {
-	cmdEnvMap := extractEnvCLIDefined(cmdEnvs)
+	cmdEnvMap := types.NewMappingWithEquals(cmdEnvs).ToMapping()
 
 	// Create a model without interpolation to extract variables
 	opts := configOptions{
@@ -208,18 +226,6 @@ func extractInterpolationVariablesFromModel(ctx context.Context, dockerCli comma
 		varsInfo = append(varsInfo, info)
 	}
 	return varsInfo, false, nil
-}
-
-func extractEnvCLIDefined(cmdEnvs []string) map[string]string {
-	// Parse command-line environment variables
-	cmdEnvMap := make(map[string]string)
-	for _, env := range cmdEnvs {
-		key, val, ok := strings.Cut(env, "=")
-		if ok {
-			cmdEnvMap[key] = val
-		}
-	}
-	return cmdEnvMap
 }
 
 func displayInterpolationVariables(writer io.Writer, varsInfo []varInfo) {

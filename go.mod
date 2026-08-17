@@ -16,7 +16,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.36.1
-	github.com/docker/cli v29.6.2+incompatible
+	github.com/docker/cli v29.7.2+incompatible
 	github.com/docker/cli-docs-tool v0.11.0
 	github.com/docker/go-units v0.5.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
@@ -29,7 +29,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.14
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.32.2
-	github.com/moby/go-archive v0.3.2
+	github.com/moby/go-archive v0.3.3
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.1
 	github.com/moby/patternmatcher v0.6.1
@@ -55,7 +55,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.0
 	gotest.tools/v3 v3.5.2
 	tags.cncf.io/container-device-interface v1.1.0
 )

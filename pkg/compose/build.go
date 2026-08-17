@@ -19,12 +19,11 @@ package compose
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/containerd/platforms"
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/tracing"
@@ -114,7 +113,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		}
 	}
 
-	images, err := s.getLocalImagesDigests(ctx, project)
+	images, pinnedDigests, err := s.getLocalImagesDigests(ctx, project)
 	if err != nil {
 		return err
 	}
@@ -151,12 +150,17 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		}
 	}
 
-	// set digest as com.docker.compose.image label so we can detect outdated containers
+	// set digest as com.docker.compose.image label so we can detect outdated
+	// containers — the single writer of that label, so the platform-pinned
+	// resolution below can't be overwritten by another code path
 	for name, service := range project.Services {
 		image := api.GetImageNameOrDefault(service, project.Name)
 		img, ok := images[image]
 		if ok {
-			service.CustomLabels.Add(api.ImageDigestLabel, img.ID)
+			// a platform-pinned service is labelled with the digest of ITS
+			// platform's manifest — see serviceImageDigest
+			digest := s.serviceImageDigest(ctx, service, image, img, pinnedDigests)
+			service.CustomLabels = service.CustomLabels.Add(api.ImageDigestLabel, digest)
 		}
 
 		resolveImageVolumes(&service, images, project.Name)
@@ -167,29 +171,58 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 }
 
 func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.ImageSummary, projectName string) {
+	var digests []string
 	for i, vol := range service.Volumes {
-		if vol.Type == types.VolumeTypeImage {
-			imgName := vol.Source
-			if _, ok := images[vol.Source]; !ok {
-				// check if source is another service in the project
-				imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: vol.Source}, projectName)
-				// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
-				if _, ok := images[imgName]; !ok {
-					continue
-				}
-			}
-			if img, ok := images[imgName]; ok {
-				// Use Image ID directly as source.
-				// Using name@digest format (via reference.WithDigest) fails for local-only images
-				// that don't have RepoDigests (e.g. built locally in CI).
-				// Image ID (sha256:...) is always valid and ensures ServiceHash changes on rebuild.
-				service.Volumes[i].Source = img.ID
+		if vol.Type != types.VolumeTypeImage {
+			continue
+		}
+		imgName := vol.Source
+		img, ok := images[imgName]
+		if !ok {
+			// check if source is another service in the project
+			imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: vol.Source}, projectName)
+			// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
+			if img, ok = images[imgName]; !ok {
+				continue
 			}
 		}
+		// The daemon only resolves a `type=image` mount Source that is a name/tag
+		// or a top-level image ID, not a per-platform manifest digest (which is
+		// what ImageSummary.ID holds to stay stable across attested rebuilds, see
+		// localContentDigest). Keep Source as the resolved name so mounting always
+		// works, and track the digest separately so mustRecreate can still detect
+		// a changed source image.
+		//
+		// Two accepted tradeoffs: (1) Source feeds ServiceHash, so containers
+		// created by a previous release (hashed with Source=<image ID>) are
+		// recreated once on upgrade — see the release note; (2) the mount is
+		// created from the mutable tag while the digest label comes from a
+		// separate inspect, so a retag racing between the two leaves the
+		// container mounting the new content under the old recorded digest
+		// until the next up recreates it. Pinning Source to a digest would
+		// close the race but reintroduce either the mount failure (#14005) or
+		// the attestation-churn recreates (#13636).
+		service.Volumes[i].Source = imgName
+		digests = append(digests, vol.Target+"="+img.ID)
+	}
+	if len(digests) > 0 {
+		sort.Strings(digests)
+		service.CustomLabels = service.CustomLabels.Add(api.ImageVolumeDigestLabel, strings.Join(digests, ","))
 	}
 }
 
-func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]api.ImageSummary, error) {
+// pinnedImageDigest is the content digest of a platform-pinned service's
+// image, resolved for the service's platform rather than the host's.
+type pinnedImageDigest struct {
+	digest string
+	// from is the shared summary digest at resolution time: once a pull or
+	// build refreshed the summary, this resolution is stale and
+	// serviceImageDigest re-resolves the pinned platform, keeping the
+	// refreshed shared value only as fallback.
+	from string
+}
+
+func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]api.ImageSummary, map[string]pinnedImageDigest, error) {
 	imageNames := utils.Set[string]{}
 	for _, s := range project.Services {
 		imageNames.Add(api.GetImageNameOrDefault(s, project.Name))
@@ -202,48 +235,45 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 			imageNames.Add(img)
 		}
 	}
-	imgs, err := s.getImageSummaries(ctx, imageNames.Elements())
+	inspections, err := s.inspectLocalImages(ctx, imageNames.Elements())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	imgs := make(map[string]api.ImageSummary, len(inspections))
+	for repoTag, inspect := range inspections {
+		imgs[repoTag] = imageSummary(repoTag, inspect)
 	}
 
-	for i, service := range project.Services {
+	pinnedDigests := map[string]pinnedImageDigest{}
+	for name, service := range project.Services {
+		if service.Platform == "" {
+			continue
+		}
 		imgName := api.GetImageNameOrDefault(service, project.Name)
 		img, ok := imgs[imgName]
 		if !ok {
 			continue
 		}
-		if service.Platform != "" {
-			platform, err := platforms.Parse(service.Platform)
-			if err != nil {
-				return nil, err
-			}
-			// inspect by name, not img.ID: img.ID now holds a content-manifest
-			// digest (see contentDigest) which is not necessarily inspectable,
-			// whereas the image name always resolves.
-			inspect, err := s.apiClient().ImageInspect(ctx, imgName)
-			if err != nil {
-				return nil, err
-			}
-			actual := specs.Platform{
-				Architecture: inspect.Architecture,
-				OS:           inspect.Os,
-				Variant:      inspect.Variant,
-			}
-			if !platforms.NewMatcher(platform).Match(actual) {
-				logrus.Debugf("local image %s doesn't match expected platform %s", service.Image, service.Platform)
-				// there is a local image, but it's for the wrong platform, so
-				// pretend it doesn't exist so that we can pull/build an image
-				// for the correct platform instead
-				delete(imgs, imgName)
-			}
+		// digest selection and platform validation share the same manifest
+		// resolution (matchLocalManifest) on the inspect we already hold,
+		// otherwise the digest recorded and the platform validated could
+		// refer to different manifests of the same image
+		digest, satisfied, err := localContentDigest(inspections[imgName], service.Platform)
+		if err != nil {
+			return nil, nil, err
 		}
-
-		project.Services[i].CustomLabels.Add(api.ImageDigestLabel, img.ID)
-
+		if !satisfied {
+			logrus.Debugf("local image %s doesn't match expected platform %s", service.Image, service.Platform)
+			// there is a local image, but it's for the wrong platform, so
+			// pretend it doesn't exist so that we can pull/build an image
+			// for the correct platform instead
+			delete(imgs, imgName)
+			continue
+		}
+		pinnedDigests[name] = pinnedImageDigest{digest: digest, from: img.ID}
 	}
 
-	return imgs, nil
+	return imgs, pinnedDigests, nil
 }
 
 // resolveAndMergeBuildArgs returns the final set of build arguments to use for the service image build.

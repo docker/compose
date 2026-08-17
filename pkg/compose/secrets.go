@@ -59,7 +59,15 @@ func (s *composeService) injectFileReferences(ctx context.Context, project *type
 			return fmt.Errorf("cannot create %s %q in read-only service %s: `file` is the sole supported option", mountType, sources[mount.Source].Name, service.Name)
 		}
 
-		s.setDefaultTarget(&mount, mountType)
+		if mount.Target == "" {
+			if mountType == secretMount {
+				mount.Target = "/run/secrets/" + mount.Source
+			} else {
+				mount.Target = "/" + mount.Source
+			}
+		} else if mountType == secretMount && !isAbsTarget(mount.Target) {
+			mount.Target = "/run/secrets/" + mount.Target
+		}
 
 		if err := s.copyFileToContainer(ctx, id, content, mount); err != nil {
 			return err
@@ -108,18 +116,6 @@ func (s *composeService) resolveFileContent(project *types.Project, source types
 		return env, nil
 	}
 	return "", nil
-}
-
-func (s *composeService) setDefaultTarget(file *types.FileReferenceConfig, mountType mountType) {
-	if file.Target == "" {
-		if mountType == secretMount {
-			file.Target = "/run/secrets/" + file.Source
-		} else {
-			file.Target = "/" + file.Source
-		}
-	} else if mountType == secretMount && !isAbsTarget(file.Target) {
-		file.Target = "/run/secrets/" + file.Target
-	}
 }
 
 func (s *composeService) copyFileToContainer(ctx context.Context, id, content string, file types.FileReferenceConfig) error {

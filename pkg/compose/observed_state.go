@@ -103,12 +103,13 @@ func (s *ObservedState) selectVolume(key, desiredName string) (ObservedVolume, [
 // ObservedContainer holds the relevant state extracted from a running or stopped
 // container, with label values pre-parsed for efficient comparison.
 type ObservedContainer struct {
-	ID          string
-	Name        string
-	State       container.ContainerState // "running", "exited", "created", "restarting", etc.
-	ConfigHash  string                   // label com.docker.compose.config-hash
-	ImageDigest string                   // label com.docker.compose.image
-	Number      int                      // label com.docker.compose.container-number
+	ID                string
+	Name              string
+	State             container.ContainerState // "running", "exited", "created", "restarting", etc.
+	ConfigHash        string                   // label com.docker.compose.config-hash
+	ImageDigest       string                   // label com.docker.compose.image
+	ImageVolumeDigest string                   // label com.docker.compose.image-volume-digest
+	Number            int                      // label com.docker.compose.container-number
 
 	// ConnectedNetworks maps network IDs found in the container's network
 	// settings. Key is the network name as seen by Docker, value is the
@@ -333,6 +334,7 @@ func toObservedContainer(c container.Summary) ObservedContainer {
 		State:             c.State,
 		ConfigHash:        c.Labels[api.ConfigHashLabel],
 		ImageDigest:       c.Labels[api.ImageDigestLabel],
+		ImageVolumeDigest: c.Labels[api.ImageVolumeDigestLabel],
 		Number:            number,
 		ConnectedNetworks: networks,
 		Summary:           c,

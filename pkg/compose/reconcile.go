@@ -770,6 +770,9 @@ func (r *reconciler) mustRecreate(expected types.ServiceConfig, expectedHash str
 	if oc.ImageDigest != expected.CustomLabels[api.ImageDigestLabel] {
 		return true
 	}
+	if oc.ImageVolumeDigest != expected.CustomLabels[api.ImageVolumeDigestLabel] {
+		return true
+	}
 	if oc.State == container.StateRunning && r.hasNetworkMismatch(expected, oc) {
 		return true
 	}

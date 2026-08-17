@@ -40,11 +40,12 @@ func TestToObservedContainer(t *testing.T) {
 		Names: []string{"/testProject-web-1"},
 		State: container.StateRunning,
 		Labels: map[string]string{
-			api.ServiceLabel:         "web",
-			api.ConfigHashLabel:      "sha256:aaa",
-			api.ImageDigestLabel:     "sha256:bbb",
-			api.ContainerNumberLabel: "1",
-			api.ProjectLabel:         "testproject",
+			api.ServiceLabel:           "web",
+			api.ConfigHashLabel:        "sha256:aaa",
+			api.ImageDigestLabel:       "sha256:bbb",
+			api.ImageVolumeDigestLabel: "/data=sha256:ccc",
+			api.ContainerNumberLabel:   "1",
+			api.ProjectLabel:           "testproject",
 		},
 		NetworkSettings: &container.NetworkSettingsSummary{
 			Networks: map[string]*network.EndpointSettings{
@@ -60,6 +61,7 @@ func TestToObservedContainer(t *testing.T) {
 	assert.Equal(t, oc.State, container.StateRunning)
 	assert.Equal(t, oc.ConfigHash, "sha256:aaa")
 	assert.Equal(t, oc.ImageDigest, "sha256:bbb")
+	assert.Equal(t, oc.ImageVolumeDigest, "/data=sha256:ccc")
 	assert.Equal(t, oc.Number, 1)
 	assert.Equal(t, oc.ConnectedNetworks["mynet"], "net123")
 	assert.Equal(t, oc.Summary.ID, "abc123")

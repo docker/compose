@@ -83,7 +83,7 @@ func (opts upOptions) apply(project *types.Project, services []string) (*types.P
 	return project, nil
 }
 
-func (opts *upOptions) validateNavigationMenu(dockerCli command.Cli) {
+func (opts *upOptions) resolveNavigationMenu(dockerCli command.Cli) {
 	if !dockerCli.Out().IsTerminal() {
 		opts.navigationMenu = false
 		return
@@ -135,7 +135,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 				return errors.New("cannot combine --attach and --attach-dependencies")
 			}
 
-			up.validateNavigationMenu(dockerCli)
+			up.resolveNavigationMenu(dockerCli)
 
 			if !p.All && len(project.Services) == 0 {
 				return fmt.Errorf("no service selected")
@@ -350,14 +350,4 @@ func runUp(
 			NavigationMenu: upOptions.navigationMenu && display.Mode != "plain" && dockerCli.In().IsTerminal(),
 		},
 	})
-}
-
-func setServiceScale(project *types.Project, name string, replicas int) error {
-	service, err := project.GetService(name)
-	if err != nil {
-		return err
-	}
-	service.SetScale(replicas)
-	project.Services[name] = service
-	return nil
 }

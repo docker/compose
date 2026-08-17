@@ -42,16 +42,20 @@ const (
 	mountsHeader     = "MOUNTS"
 	localVolumes     = "LOCAL VOLUMES"
 	networksHeader   = "NETWORKS"
+	engineHeader     = "ENGINE"
 )
 
 // NewContainerFormat returns a Format for rendering using a Context
-func NewContainerFormat(source string, quiet bool, size bool) formatter.Format {
+func NewContainerFormat(source string, quiet bool, size bool, engine bool) formatter.Format {
 	switch source {
 	case formatter.TableFormatKey, "": // table formatting is the default if none is set.
 		if quiet {
 			return formatter.DefaultQuietFormat
 		}
 		format := defaultContainerTableFormat
+		if engine {
+			format += `\t{{.Engine}}`
+		}
 		if size {
 			format += `\t{{.Size}}`
 		}
@@ -126,6 +130,7 @@ func NewContainerContext() *ContainerContext {
 		"Status":     formatter.StatusHeader,
 		"Size":       formatter.SizeHeader,
 		"Labels":     formatter.LabelsHeader,
+		"Engine":     engineHeader,
 	}
 	return &containerCtx
 }
@@ -243,6 +248,15 @@ func (c *ContainerContext) Labels() string {
 		joinLabels = append(joinLabels, fmt.Sprintf("%s=%s", k, v))
 	}
 	return strings.Join(joinLabels, ",")
+}
+
+// Engine returns the name of the engine that runs the container, as stored in
+// the com.docker.compose.engine label, or an empty string if unset.
+func (c *ContainerContext) Engine() string {
+	if c.c.Labels == nil {
+		return ""
+	}
+	return c.c.Labels[api.ContainerEngineLabel]
 }
 
 // Label returns the value of the label with the given name or an empty string
