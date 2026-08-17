@@ -105,7 +105,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	return nil
 }
 
-func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) { //nolint:gocyclo
+func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) {
 	var action string
 	switch command {
 	case "up":

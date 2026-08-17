@@ -51,7 +51,9 @@ func (s *composeService) Publish(ctx context.Context, project *types.Project, re
 	}, "publish", s.events)
 }
 
-//nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (s *composeService) publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
 	project, err := project.WithProfiles([]string{"*"})
 	if err != nil {
@@ -684,6 +686,9 @@ func (s *composeService) checkForBindMount(project *types.Project) map[string][]
 	return allFindings
 }
 
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (s *composeService) checkForSensitiveData(ctx context.Context, project *types.Project) ([]secrets.DetectedSecret, error) {
 	var allFindings []secrets.DetectedSecret
 	scan := scanner.NewDefaultScanner()

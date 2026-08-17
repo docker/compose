@@ -31,6 +31,9 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (s *composeService) Logs(
 	ctx context.Context,
 	projectName string,

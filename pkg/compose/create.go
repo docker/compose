@@ -249,7 +249,6 @@ func warnUnmanagedVolumes(project *types.Project, observed *ObservedState) {
 	}
 }
 
-//nolint:gocyclo
 func (s *composeService) getCreateConfigs(ctx context.Context,
 	p *types.Project,
 	service types.ServiceConfig,
@@ -474,6 +473,9 @@ func getAliases(project *types.Project, service types.ServiceConfig, serviceInde
 	return aliases
 }
 
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func createEndpointSettings(p *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, links []string, useNetworkAliases bool) (*network.EndpointSettings, error) {
 	const ifname = "com.docker.network.endpoint.ifname"
 
@@ -931,6 +933,9 @@ func getDependentServiceFromMode(mode string) string {
 	return ""
 }
 
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (s *composeService) buildContainerVolumes(
 	ctx context.Context,
 	p types.Project,

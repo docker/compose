@@ -28,7 +28,9 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-//nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (s *composeService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	projectName = strings.ToLower(projectName)
 	oneOff := oneOffExclude

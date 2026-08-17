@@ -121,7 +121,9 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	return imageIDs, err
 }
 
-//nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (s *composeService) doBuildImage(ctx context.Context, project *types.Project, service types.ServiceConfig, options api.BuildOptions) (string, error) {
 	var (
 		buildCtx      io.ReadCloser

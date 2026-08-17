@@ -9,8 +9,8 @@ linters:
     - errcheck
     - errorlint
     - forbidigo
+    - gocognit
     - gocritic
-    - gocyclo
     - gomodguard
     - govet
     - ineffassign
@@ -63,8 +63,8 @@ linters:
         - diagnostic
         - opinionated
         - style
-    gocyclo:
-      min-complexity: 16
+    gocognit:
+      min-complexity: 30
     gomodguard:
       blocked:
         modules:

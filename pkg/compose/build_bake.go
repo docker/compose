@@ -115,7 +115,10 @@ type buildStatus struct {
 	Image  string `json:"image.name"`
 }
 
-func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) { //nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
+func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) {
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
 	displayMode := progressui.DisplayMode(options.Progress)

@@ -34,7 +34,10 @@ func (s *composeService) Restart(ctx context.Context, projectName string, option
 	}, "restart", s.events)
 }
 
-func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error { //nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
+func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err

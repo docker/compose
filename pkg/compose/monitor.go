@@ -53,7 +53,9 @@ func (c *monitor) withServices(services []string) {
 
 // Start runs monitor to detect application events and return after termination
 //
-//nolint:gocyclo
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func (c *monitor) Start(ctx context.Context) error {
 	// collect initial application container
 	initialState, err := c.apiClient.ContainerList(ctx, client.ContainerListOptions{

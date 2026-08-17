@@ -162,6 +162,9 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 }
 
 // LoadAdditionalResources loads additional resources from the project, such as image references, secrets, configs and exposed ports
+// FIXME(ndeloof) complete migration to gocognit
+//
+//nolint:gocognit
 func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project *types.Project) (*types.Project, error) {
 	for name, service := range project.Services {
 		imageName := api.GetImageNameOrDefault(service, project.Name)
