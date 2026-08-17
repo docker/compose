@@ -6,6 +6,6 @@ services:
       - data:/shared
     pre_start:
       - image: alpine
-        command: sh -c 'echo v1 >> /shared/versions.txt'
+        command: sh -c 'echo $(cat /proc/sys/kernel/random/uuid) >> /shared/tokens.txt'
 volumes:
   data:

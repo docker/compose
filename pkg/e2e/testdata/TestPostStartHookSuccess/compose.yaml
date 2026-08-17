@@ -1,5 +1,7 @@
 services:
   test:
-    image: nginx
+    image: alpine
+    init: true
+    command: sleep infinity
     post_start:
       - command: sh -c 'echo env'
