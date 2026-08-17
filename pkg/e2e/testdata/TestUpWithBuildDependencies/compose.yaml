@@ -1,9 +1,9 @@
 services:
   foo:
-    image: built-image-dependency
+    image: ${BUILT_IMAGE}
     build:
       context: .
   bar:
-    image: built-image-dependency
+    image: ${BUILT_IMAGE}
     depends_on:
       - foo

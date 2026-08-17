@@ -88,6 +88,20 @@ func StdoutContains(sub string) Check {
 	}
 }
 
+// StderrContains expects the command's stderr to contain a string, e.g. a
+// container's stderr stream relayed by up.
+func StderrContains(sub string) Check {
+	return Check{
+		name: fmt.Sprintf("stderr contains %q", sub),
+		fn: func(ctx *CheckContext) error {
+			if !strings.Contains(ctx.result.Stderr(), sub) {
+				return fmt.Errorf("not found in stderr")
+			}
+			return nil
+		},
+	}
+}
+
 // OutputNotContains expects the command output not to contain a string.
 func OutputNotContains(sub string) Check {
 	return Check{

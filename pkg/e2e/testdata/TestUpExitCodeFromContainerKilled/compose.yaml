@@ -1,0 +1,14 @@
+services:
+  safe:
+    image: 'alpine'
+    init: true
+    command: ['/bin/sh', '-c', 'sleep infinity']  # never exiting
+  failure:
+    image: 'alpine'
+    init: true
+    command: ['/bin/sh', '-c', 'sleep 1 ; echo "exiting with error" ; exit 42']
+  test:
+    image: 'alpine'
+    init: true
+    command: ['/bin/sh', '-c', 'sleep 99999 ; echo "tests are OK"']  # very long job
+    depends_on: [safe]

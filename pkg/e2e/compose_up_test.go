@@ -20,95 +20,61 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
 func TestUpWait(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-deps-wait"
-
-	timeout := time.After(30 * time.Second)
-	done := make(chan bool)
-	go func() {
-		//nolint:nolintlint,testifylint // helper asserts inside goroutine; acceptable in this e2e test
-		res := c.RunDockerComposeCmd(t, "-f", "fixtures/dependencies/deps-completed-successfully.yaml", "--project-name", projectName, "up", "--wait", "-d")
-		assert.Assert(t, strings.Contains(res.Combined(), "e2e-deps-wait-oneshot-1"), res.Combined())
-		done <- true
-	}()
-
-	select {
-	case <-timeout:
-		t.Fatal("test did not finish in time")
-	case <-done:
-		break
-	}
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	s := NewScenario(t, "up --wait must return once dependencies completed and services run")
+	s.Step("up --wait returns with the long-running service up and the oneshot completed",
+		ComposeCmd("up", "--wait", "-d").Within(30*time.Second),
+		OutputContains(s.Project()+"-oneshot-1"),
+		ServiceState("longrunning", "running"),
+		ServiceState("oneshot", "exited"))
 }
 
 func TestUpExitCodeFrom(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-exit-code-from"
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start-fail/start-depends_on-long-lived.yaml", "--project-name", projectName, "up", "--menu=false", "--exit-code-from=failure", "failure")
-	res.Assert(t, icmd.Expected{ExitCode: 42})
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
+	NewScenario(t, "up --exit-code-from must return the selected service's exit code").
+		Step("up returns the failing service's code once it exits",
+			ComposeCmd("up", "--menu=false", "--exit-code-from=failure", "failure").MayFail().Within(60*time.Second),
+			ExitCode(42))
 }
 
 func TestUpExitCodeFromContainerKilled(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-exit-code-from-kill"
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start-fail/start-depends_on-long-lived.yaml", "--project-name", projectName, "up", "--menu=false", "--exit-code-from=test")
-	res.Assert(t, icmd.Expected{ExitCode: 143})
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
+	NewScenario(t, "up --exit-code-from must report 143 for a service stopped by the abort").
+		Step("the watched long-lived service is stopped when another exits",
+			ComposeCmd("up", "--menu=false", "--exit-code-from=test").MayFail().Within(60*time.Second),
+			ExitCode(143))
 }
 
 func TestPortRange(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-port-range"
-
-	reset := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans", "--timeout=0")
-	}
-	reset()
-	t.Cleanup(reset)
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/port-range/compose.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Success)
+	NewScenario(t, "a published port range must accommodate scaled replicas and single ports alike").
+		Step("up binds every replica within the range",
+			ComposeCmd("up", "-d"),
+			ServiceScale("a", 5),
+			ServiceState("b", "running"),
+			ServiceState("c", "running"))
 }
 
 func TestStdoutStderr(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-stdout-stderr"
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/stdout-stderr/compose.yaml", "--project-name", projectName, "up", "--menu=false")
-	res.Assert(t, icmd.Expected{Out: "log to stdout", Err: "log to stderr"})
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
+	NewScenario(t, "up must relay each container stream to its own: stdout to stdout, stderr to stderr").
+		Step("the two streams arrive separated",
+			ComposeCmd("up", "--menu=false"),
+			StdoutContains("log to stdout"),
+			StderrContains("log to stderr"))
 }
 
 func TestLoggingDriver(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "e2e-logging-driver"
-	defer c.cleanupWithDown(t, projectName)
-
-	host := "HOST=127.0.0.1"
-	res := c.RunDockerCmd(t, "info", "-f", "{{.OperatingSystem}}")
-	os := res.Stdout()
-	if strings.TrimSpace(os) == "Docker Desktop" {
-		host = "HOST=host.docker.internal"
+	s := NewScenario(t, "a logging-driver address change must reconfigure the service on the next up")
+	host := "127.0.0.1"
+	if strings.Contains(s.CLI().RunDockerCmd(t, "info", "-f", "{{.OperatingSystem}}").Stdout(), "Docker Desktop") {
+		host = "host.docker.internal"
 	}
-
-	cmd := c.NewDockerComposeCmd(t, "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
-	cmd.Env = append(cmd.Env, host, "BAR=foo")
-	icmd.RunCmd(cmd).Assert(t, icmd.Success)
-
-	cmd = c.NewDockerComposeCmd(t, "-f", "fixtures/logging-driver/compose.yaml", "--project-name", projectName, "up", "-d")
-	cmd.Env = append(cmd.Env, host, "BAR=zot")
-	icmd.RunCmd(cmd).Assert(t, icmd.Success)
+	s.Env("HOST="+host).
+		Step("up starts the log collector and the app",
+			ComposeCmd("up", "-d").WithEnv("BAR=foo"),
+			ServiceState("fluentbit", "running"),
+			ServiceState("app", "running")).
+		Step("a collector config change is applied by recreating it",
+			ComposeCmd("up", "-d").WithEnv("BAR=zot"),
+			Recreated("fluentbit"),
+			ServiceState("app", "running"))
 }
