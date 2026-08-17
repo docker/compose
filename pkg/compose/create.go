@@ -473,15 +473,10 @@ func getAliases(project *types.Project, service types.ServiceConfig, serviceInde
 	return aliases
 }
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func createEndpointSettings(p *types.Project, service types.ServiceConfig, serviceIndex int, networkKey string, links []string, useNetworkAliases bool) (*network.EndpointSettings, error) {
-	const ifname = "com.docker.network.endpoint.ifname"
-
 	config := service.Networks[networkKey]
-	var ipam *network.EndpointIPAMConfig
 	var (
+		ipam        *network.EndpointIPAMConfig
 		ipv4Address netip.Addr
 		ipv6Address netip.Addr
 		macAddress  string
@@ -490,46 +485,12 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 	)
 	if config != nil {
 		var err error
-		if config.Ipv4Address != "" {
-			ipv4Address, err = netip.ParseAddr(config.Ipv4Address)
-			if err != nil {
-				return nil, fmt.Errorf("invalid IPv4 address: %w", err)
-			}
-		}
-		if config.Ipv6Address != "" {
-			ipv6Address, err = netip.ParseAddr(config.Ipv6Address)
-			if err != nil {
-				return nil, fmt.Errorf("invalid IPv6 address: %w", err)
-			}
-		}
-		var linkLocalIPs []netip.Addr
-		for _, link := range config.LinkLocalIPs {
-			if link == "" {
-				continue
-			}
-			llIP, err := netip.ParseAddr(link)
-			if err != nil {
-				return nil, fmt.Errorf("invalid link-local IP: %w", err)
-			}
-			linkLocalIPs = append(linkLocalIPs, llIP)
-		}
-
-		ipam = &network.EndpointIPAMConfig{
-			IPv4Address:  ipv4Address.Unmap(),
-			IPv6Address:  ipv6Address,
-			LinkLocalIPs: linkLocalIPs,
+		ipam, ipv4Address, ipv6Address, err = parseEndpointIPAM(config)
+		if err != nil {
+			return nil, err
 		}
 		macAddress = config.MacAddress
-		driverOpts = config.DriverOpts
-		if config.InterfaceName != "" {
-			if driverOpts == nil {
-				driverOpts = map[string]string{}
-			}
-			if name, ok := driverOpts[ifname]; ok && name != config.InterfaceName {
-				logrus.Warnf("ignoring services.%s.networks.%s.interface_name as %s driver_opts is already declared", service.Name, networkKey, ifname)
-			}
-			driverOpts[ifname] = config.InterfaceName
-		}
+		driverOpts = endpointDriverOpts(service, networkKey, config)
 		gwPriority = config.GatewayPriority
 	}
 	var ma network.HardwareAddr
@@ -551,6 +512,63 @@ func createEndpointSettings(p *types.Project, service types.ServiceConfig, servi
 		DriverOpts:  driverOpts,
 		GwPriority:  gwPriority,
 	}, nil
+}
+
+// parseEndpointIPAM parses the static addresses configured for an endpoint
+func parseEndpointIPAM(config *types.ServiceNetworkConfig) (*network.EndpointIPAMConfig, netip.Addr, netip.Addr, error) {
+	var (
+		ipv4Address netip.Addr
+		ipv6Address netip.Addr
+		err         error
+	)
+	if config.Ipv4Address != "" {
+		ipv4Address, err = netip.ParseAddr(config.Ipv4Address)
+		if err != nil {
+			return nil, ipv4Address, ipv6Address, fmt.Errorf("invalid IPv4 address: %w", err)
+		}
+	}
+	if config.Ipv6Address != "" {
+		ipv6Address, err = netip.ParseAddr(config.Ipv6Address)
+		if err != nil {
+			return nil, ipv4Address, ipv6Address, fmt.Errorf("invalid IPv6 address: %w", err)
+		}
+	}
+	var linkLocalIPs []netip.Addr
+	for _, link := range config.LinkLocalIPs {
+		if link == "" {
+			continue
+		}
+		llIP, err := netip.ParseAddr(link)
+		if err != nil {
+			return nil, ipv4Address, ipv6Address, fmt.Errorf("invalid link-local IP: %w", err)
+		}
+		linkLocalIPs = append(linkLocalIPs, llIP)
+	}
+
+	ipam := &network.EndpointIPAMConfig{
+		IPv4Address:  ipv4Address.Unmap(),
+		IPv6Address:  ipv6Address,
+		LinkLocalIPs: linkLocalIPs,
+	}
+	return ipam, ipv4Address, ipv6Address, nil
+}
+
+// endpointDriverOpts merges interface_name into the endpoint driver_opts
+func endpointDriverOpts(service types.ServiceConfig, networkKey string, config *types.ServiceNetworkConfig) types.Options {
+	const ifname = "com.docker.network.endpoint.ifname"
+
+	driverOpts := config.DriverOpts
+	if config.InterfaceName == "" {
+		return driverOpts
+	}
+	if driverOpts == nil {
+		driverOpts = map[string]string{}
+	}
+	if name, ok := driverOpts[ifname]; ok && name != config.InterfaceName {
+		logrus.Warnf("ignoring services.%s.networks.%s.interface_name as %s driver_opts is already declared", service.Name, networkKey, ifname)
+	}
+	driverOpts[ifname] = config.InterfaceName
+	return driverOpts
 }
 
 // copy/pasted from https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697 + RelativePath
@@ -933,9 +951,6 @@ func getDependentServiceFromMode(mode string) string {
 	return ""
 }
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
 func (s *composeService) buildContainerVolumes(
 	ctx context.Context,
 	p types.Project,
@@ -956,44 +971,68 @@ func (s *composeService) buildContainerVolumes(
 			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
 			// see https://github.com/moby/moby/issues/43483
-			v := findVolumeByTarget(service.Volumes, m.Target)
-			if v != nil {
-				if v.Type != types.VolumeTypeBind {
-					v.Source = m.Source
-				}
-				if !bindRequiresMountAPI(v.Bind) {
-					source := m.Source
-					if vol := findVolumeByName(p.Volumes, m.Source); vol != nil {
-						source = m.Source
-					}
-					binds = append(binds, toBindString(source, v))
-					continue
-				}
+			if bind, ok := bindStringForMount(service, m); ok {
+				binds = append(binds, bind)
+				continue
 			}
 		case mount.TypeVolume:
-			v := findVolumeByTarget(service.Volumes, m.Target)
-			vol := findVolumeByName(p.Volumes, m.Source)
-			if v != nil && vol != nil {
-				// Prefer the bind API if no advanced option is used, to preserve backward compatibility
-				if !volumeRequiresMountAPI(v.Volume) {
-					binds = append(binds, toBindString(vol.Name, v))
-					continue
-				}
+			if bind, ok := volumeBindString(p, service, m); ok {
+				binds = append(binds, bind)
+				continue
 			}
 		case mount.TypeImage:
-			// The daemon validates image mounts against the negotiated API version
-			// from the request path, not the server's own max version.
-			version, err := s.RuntimeAPIVersion(ctx)
+			err := s.checkImageMountSupported(ctx)
 			if err != nil {
 				return nil, nil, err
-			}
-			if versions.LessThan(version, apiVersion148) {
-				return nil, nil, fmt.Errorf("volume with type=image require Docker Engine %s or later", dockerEngineV28)
 			}
 		}
 		mounts = append(mounts, m)
 	}
 	return binds, mounts, nil
+}
+
+// bindStringForMount returns the legacy Bind-API string for a bind mount
+// which doesn't require the Mount API
+func bindStringForMount(service types.ServiceConfig, m mount.Mount) (string, bool) {
+	v := findVolumeByTarget(service.Volumes, m.Target)
+	if v == nil {
+		return "", false
+	}
+	if v.Type != types.VolumeTypeBind {
+		v.Source = m.Source
+	}
+	if bindRequiresMountAPI(v.Bind) {
+		return "", false
+	}
+	return toBindString(m.Source, v), true
+}
+
+// volumeBindString returns the legacy Bind-API string for a volume mount
+// without advanced options, preferred to preserve backward compatibility
+func volumeBindString(p types.Project, service types.ServiceConfig, m mount.Mount) (string, bool) {
+	v := findVolumeByTarget(service.Volumes, m.Target)
+	vol := findVolumeByName(p.Volumes, m.Source)
+	if v == nil || vol == nil {
+		return "", false
+	}
+	if volumeRequiresMountAPI(v.Volume) {
+		return "", false
+	}
+	return toBindString(vol.Name, v), true
+}
+
+// checkImageMountSupported verifies the negotiated API version supports image
+// mounts. The daemon validates image mounts against the negotiated API
+// version from the request path, not the server's own max version.
+func (s *composeService) checkImageMountSupported(ctx context.Context) error {
+	version, err := s.RuntimeAPIVersion(ctx)
+	if err != nil {
+		return err
+	}
+	if versions.LessThan(version, apiVersion148) {
+		return fmt.Errorf("volume with type=image require Docker Engine %s or later", dockerEngineV28)
+	}
+	return nil
 }
 
 func toBindString(name string, v *types.ServiceVolumeConfig) string {
