@@ -1,0 +1,10 @@
+services:
+  faster:
+    image: alpine
+    command: sleep 2
+  slower:
+    image: alpine
+    command: sleep 5
+  infinity:
+    image: alpine
+    command: sleep infinity

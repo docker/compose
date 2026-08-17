@@ -20,24 +20,25 @@ package e2e
 
 import (
 	"testing"
-
-	"gotest.tools/v3/icmd"
 )
 
 func TestUpContainerNameConflict(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-container_name_conflict"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/container_name/compose.yaml", "--project-name", projectName, "up")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container name "test" is already in use`})
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	c.RunDockerComposeCmd(t, "-f", "fixtures/container_name/compose.yaml", "--project-name", projectName, "up", "test")
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	c.RunDockerComposeCmd(t, "-f", "fixtures/container_name/compose.yaml", "--project-name", projectName, "up", "another_test")
+	s := NewScenario(t, "two services claiming the same container_name must be rejected together, but each must run alone")
+	name := s.Project() + "-fixed"
+	s.Env("FIXED_NAME="+name).
+		Step("up with both services is rejected over the name conflict",
+			ComposeCmd("up").MayFail(),
+			ExitCode(1),
+			OutputContains(`container name "`+name+`" is already in use`)).
+		Step("the failed up leaves nothing behind",
+			ComposeCmd("down")).
+		Step("the first service runs alone under the shared name",
+			ComposeCmd("up", "test"),
+			ServiceState("test", "exited")).
+		Step("down frees the name",
+			ComposeCmd("down"),
+			ServiceNotCreated("test")).
+		Step("the other service runs alone under the shared name",
+			ComposeCmd("up", "another_test"),
+			ServiceState("another_test", "exited"))
 }

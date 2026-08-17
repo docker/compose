@@ -17,7 +17,6 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -26,31 +25,24 @@ import (
 )
 
 func TestWaitOnFaster(t *testing.T) {
-	const projectName = "e2e-wait-faster"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d")
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "wait", "faster")
+	NewScenario(t, "wait must return once the selected service exits, whatever the others do").
+		Step("up starts all services",
+			ComposeCmd("up", "-d")).
+		Step("wait returns when the fastest service exits",
+			ComposeCmd("wait", "faster"),
+			ServiceState("faster", "exited"),
+			ServiceState("infinity", "running"))
 }
 
 func TestWaitOnSlower(t *testing.T) {
-	const projectName = "e2e-wait-slower"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d")
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "wait", "slower")
+	NewScenario(t, "wait must block until the selected service exits, even if others exited first").
+		Step("up starts all services",
+			ComposeCmd("up", "-d")).
+		Step("wait returns when the slower service exits",
+			ComposeCmd("wait", "slower"),
+			ServiceState("faster", "exited"),
+			ServiceState("slower", "exited"),
+			ServiceState("infinity", "running"))
 }
 
 func TestWaitOnInfinity(t *testing.T) {
@@ -89,18 +81,12 @@ func TestWaitOnInfinity(t *testing.T) {
 }
 
 func TestWaitAndDrop(t *testing.T) {
-	const projectName = "e2e-wait-and-drop"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/wait/compose.yaml", "--project-name", projectName, "up", "-d")
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "wait", "--down-project", "faster")
-
-	res := c.RunDockerCmd(t, "ps", "--all")
-	assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
+	NewScenario(t, "wait --down-project must take the whole project down once the selected service exits").
+		Step("up starts all services",
+			ComposeCmd("up", "-d")).
+		Step("wait --down-project removes every container when the service exits",
+			ComposeCmd("wait", "--down-project", "faster"),
+			ServiceNotCreated("faster"),
+			ServiceNotCreated("slower"),
+			ServiceNotCreated("infinity"))
 }
