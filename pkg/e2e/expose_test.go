@@ -19,30 +19,20 @@
 package e2e
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
-
-	"gotest.tools/v3/assert"
 )
 
-// see https://github.com/docker/compose/issues/13378
 func TestExposeRange(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	f := filepath.Join(t.TempDir(), "compose.yaml")
-	err := os.WriteFile(f, []byte(`
-name: test-expose-range
+	// Regression test for https://github.com/docker/compose/issues/13378
+	// a port range in expose used to fail container creation.
+	NewScenario(t, "a port range in expose must be accepted").
+		Compose(`
 services:
   test:
     image: alpine
     expose:
       - "9091-9092"
-`), 0o644)
-	assert.NilError(t, err)
-
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, "test-expose-range")
-	})
-	c.RunDockerComposeCmd(t, "-f", f, "up")
+`).
+		Step("up creates and runs the service",
+			ComposeCmd("up"))
 }

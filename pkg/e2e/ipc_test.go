@@ -17,48 +17,47 @@
 package e2e
 
 import (
-	"fmt"
 	"strings"
 	"testing"
-
-	"gotest.tools/v3/icmd"
 )
 
 func TestIPC(t *testing.T) {
-	c := NewParallelCLI(t)
+	s := NewScenario(t, "every ipc mode must materialize in the created containers: shareable, service: and container:")
+	external := s.Project() + "-external"
 
-	const projectName = "ipc_e2e"
-	var cid string
-	t.Run("create ipc mode container", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "run", "-d", "--rm", "--ipc=shareable", "--name", "ipc_mode_container", "alpine",
-			"top")
-		cid = strings.Trim(res.Stdout(), "\n")
-	})
+	// the container: mode references a container compose doesn't manage;
+	// create it up front so its id is known when the steps assert against it
+	cid := strings.TrimSpace(s.CLI().RunDockerCmd(t, "run", "-d", "--rm", "--ipc=shareable", "--name", external, "alpine", "top").Stdout())
+	s.Defer(DockerCmd("rm", "-f", external).MayFail())
 
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/ipc-test/compose.yaml", "--project-name", projectName, "up", "-d")
-	})
-
-	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: `shareable`})
-	})
-
-	t.Run("check ipcmode in container inspect", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "inspect", projectName+"-shareable-1")
-		res.Assert(t, icmd.Expected{Out: `"IpcMode": "shareable",`})
-
-		res = c.RunDockerCmd(t, "inspect", projectName+"-service-1")
-		res.Assert(t, icmd.Expected{Out: `"IpcMode": "container:`})
-
-		res = c.RunDockerCmd(t, "inspect", projectName+"-container-1")
-		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`"IpcMode": "container:%s",`, cid)})
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-	t.Run("remove ipc mode container", func(t *testing.T) {
-		_ = c.RunDockerCmd(t, "rm", "-f", "ipc_mode_container")
-	})
+	s.Compose(`
+services:
+  service:
+    image: alpine
+    command: top
+    ipc: "service:shareable"
+  container:
+    image: alpine
+    command: top
+    ipc: "container:${EXTERNAL_NAME}"
+  shareable:
+    image: alpine
+    command: top
+    ipc: shareable
+`).
+		Env("EXTERNAL_NAME="+external).
+		Step("up starts the three services",
+			ComposeCmd("up", "-d"),
+			ServiceState("service", "running"),
+			ServiceState("container", "running"),
+			ServiceState("shareable", "running")).
+		Step("the shareable service owns a shareable ipc namespace",
+			DockerCmd("inspect", "-f", "{{.HostConfig.IpcMode}}", s.Project()+"-shareable-1"),
+			OutputContains("shareable")).
+		Step("the service: mode resolves to the target service's container",
+			DockerCmd("inspect", "-f", "{{.HostConfig.IpcMode}}", s.Project()+"-service-1"),
+			OutputContains("container:")).
+		Step("the container: mode resolves to the external container",
+			DockerCmd("inspect", "-f", "{{.HostConfig.IpcMode}}", s.Project()+"-container-1"),
+			OutputContains("container:"+cid))
 }
