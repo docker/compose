@@ -52,7 +52,10 @@ type ProjectLoadOptions struct {
 	EnvFiles []string
 	// Profiles to activate
 	Profiles []string
-	// Services to select (empty = all)
+	// Services narrows the loaded project to the named services and their
+	// dependencies, and enables the profiles they require (empty = all).
+	// This is where an operation's scope is decided: the Services fields of
+	// downstream option structs do not filter.
 	Services []string
 	// Offline mode disables remote resource loading
 	Offline bool
@@ -80,6 +83,14 @@ type OCIOptions struct {
 
 // Compose is the API interface one can use to programmatically use docker/compose in a third-party software
 // Use [compose.NewComposeService] to get an actual instance
+//
+// Methods act on the whole *types.Project they receive: to scope an operation
+// to a subset of services, narrow the project itself before calling — at load
+// time through ProjectLoadOptions.Services, or with
+// types.Project.WithSelectedServices. The Services fields found on some
+// option structs are not filters: they mark the services the user explicitly
+// named, and only drive side concerns (recreation policy, log scoping) as
+// documented on each field.
 type Compose interface {
 	// Build executes the equivalent to a `compose build`
 	Build(ctx context.Context, project *types.Project, options BuildOptions) error
@@ -271,7 +282,11 @@ func (o BuildOptions) Apply(project *types.Project) error {
 // CreateOptions group options of the Create API
 type CreateOptions struct {
 	Build *BuildOptions
-	// Services defines the services user interacts with
+	// Services names the services the user explicitly targeted. It does NOT
+	// restrict what gets created — the whole project converges; narrow the
+	// project instead. Targeted services follow the Recreate policy, the
+	// others follow RecreateDependencies. Empty means every service is
+	// targeted.
 	Services []string
 	// Remove legacy containers for services that are not defined in the project
 	RemoveOrphans bool
@@ -306,7 +321,9 @@ type StartOptions struct {
 	// Wait won't return until containers reached the running|healthy state
 	Wait        bool
 	WaitTimeout time.Duration
-	// Services passed in the command line to be started
+	// Services names the services the user explicitly targeted; it only
+	// scopes the log monitor of Up's foreground session. Start ignores it:
+	// narrow the project instead.
 	Services       []string
 	Watch          bool
 	NavigationMenu bool
