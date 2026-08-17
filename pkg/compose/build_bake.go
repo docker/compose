@@ -115,9 +115,18 @@ type buildStatus struct {
 	Image  string `json:"image.name"`
 }
 
-// FIXME(ndeloof) complete migration to gocognit
-//
-//nolint:gocognit
+// bakeBuild is everything derived from the project that doBuildBake needs to
+// drive `buildx bake`: the bake file definition, plus the settings that travel
+// as command arguments or environment variables rather than in the file.
+type bakeBuild struct {
+	cfg            bakeConfig
+	targetNames    map[string]string // service name -> bake target name
+	expectedImages map[string]string // service name -> expected image
+	localPaths     []string          // local build contexts bake needs `--allow fs.read` for
+	privileged     bool
+	secretsEnv     []string
+}
+
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) {
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
@@ -138,103 +147,128 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return err
 	})
 
-	cfg := bakeConfig{
-		Groups:  map[string]bakeGroup{},
-		Targets: map[string]bakeTarget{},
-	}
-	var (
-		group          bakeGroup
-		privileged     bool
-		read           []string
-		expectedImages = make(map[string]string, len(serviceToBeBuild)) // service name -> expected image
-		targets        = make(map[string]string, len(serviceToBeBuild)) // service name -> build target
-	)
+	bake := s.prepareBakeBuild(project, serviceToBeBuild, options)
 
-	// produce a unique ID for service used as bake target
-	for serviceName := range project.Services {
-		t := strings.ReplaceAll(serviceName, ".", "_")
-		for {
-			if _, ok := targets[serviceName]; !ok {
-				targets[serviceName] = t
-				break
-			}
-			t += "_"
+	cfgJSON, err := json.MarshalIndent(bake.cfg, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	if options.Print {
+		_, err = fmt.Fprintln(s.stdout(), string(cfgJSON))
+		return nil, err
+	}
+	logrus.Debugf("bake build config:\n%s", string(cfgJSON))
+
+	metadataFile, err := bakeMetadataPath()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = os.Remove(metadataFile)
+	}()
+
+	buildx, err := s.getBuildxPlugin()
+	if err != nil {
+		return nil, err
+	}
+	args := bakeArgs(bake, metadataFile, options)
+	logrus.Debugf("Executing bake with args: %v", args)
+
+	if s.dryRun {
+		return s.dryRunBake(bake.cfg), nil
+	}
+	cmd := exec.CommandContext(ctx, buildx.Path, args...)
+
+	err = s.prepareShellOut(ctx, types.NewMapping(os.Environ()), cmd)
+	if err != nil {
+		return nil, err
+	}
+	endpoint, cleanup, err := s.propagateDockerEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	cmd.Env = append(cmd.Env, endpoint...)
+	cmd.Env = append(cmd.Env, bake.secretsEnv...)
+
+	cmd.Stdout = s.stdout()
+	cmd.Stdin = bytes.NewBuffer(cfgJSON)
+	pipe, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	eg.Go(cmd.Wait)
+
+	errMessage, err := forwardBakeStatus(pipe, ch)
+	if err != nil {
+		return nil, err
+	}
+	close(ch) // stop build progress UI
+
+	err = eg.Wait()
+	if err != nil {
+		if len(errMessage) > 0 {
+			return nil, errors.New(strings.Join(errMessage, "\n"))
 		}
+		return nil, fmt.Errorf("failed to execute bake: %w", err)
 	}
 
-	var secretsEnv []string
+	return s.collectBakeResults(ctx, metadataFile, serviceToBeBuild, bake)
+}
+
+// prepareBakeBuild translates the project's build configuration into a bake
+// file definition and the side-band settings bake takes on its command line.
+func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) *bakeBuild {
+	bake := &bakeBuild{
+		cfg: bakeConfig{
+			Groups:  map[string]bakeGroup{},
+			Targets: map[string]bakeTarget{},
+		},
+		targetNames:    bakeTargetNames(project),
+		expectedImages: make(map[string]string, len(serviceToBeBuild)),
+	}
+
+	// project.Services lists every service (we still need their bake targets
+	// defined so additional_contexts: service:xxx references can resolve),
+	// but only emit "Building" progress and track expected images for
+	// services we actually plan to build.
 	for serviceName, service := range project.Services {
 		if service.Build == nil {
 			continue
 		}
 		buildConfig := *service.Build
-		labels := getImageBuildLabels(project, service)
 
 		args := resolveAndMergeBuildArgs(s.getProxyConfig(), project, service, options).ToMapping()
 		for k, v := range args {
 			args[k] = strings.ReplaceAll(v, "${", "$${")
 		}
 
-		entitlements := buildConfig.Entitlements
-		if slices.Contains(buildConfig.Entitlements, "security.insecure") {
-			privileged = true
-		}
-		if buildConfig.Privileged {
-			entitlements = append(entitlements, "security.insecure")
-			privileged = true
-		}
-
-		var outputs []string
-		var call string
-		push := options.Push && service.Image != ""
-		switch {
-		case options.Check:
-			call = "lint"
-		case len(service.Build.Platforms) > 1:
-			outputs = []string{fmt.Sprintf("type=image,push=%t", push)}
-		default:
-			if push {
-				outputs = []string{"type=registry"}
-			} else {
-				outputs = []string{"type=docker"}
-			}
-		}
-
-		if _, _, err := gitutil.ParseGitRef(buildConfig.Context); !strings.Contains(buildConfig.Context, "://") && err != nil {
-			read = append(read, buildConfig.Context)
-		}
-		for _, path := range buildConfig.AdditionalContexts {
-			_, _, err := gitutil.ParseGitRef(path)
-			if !strings.Contains(path, "://") && err != nil {
-				read = append(read, path)
-			}
-		}
+		entitlements, privileged := bakeEntitlements(buildConfig)
+		bake.privileged = bake.privileged || privileged
+		bake.localPaths = append(bake.localPaths, localBuildPaths(buildConfig)...)
 
 		image := api.GetImageNameOrDefault(service, project.Name)
-		// project.Services lists every service (we still need their bake
-		// targets defined so additional_contexts: service:xxx references can
-		// resolve), but only emit "Building" progress and track expected
-		// images for services we actually plan to build.
 		if _, ok := serviceToBeBuild[serviceName]; ok {
 			s.events.On(buildingEvent(image))
-			expectedImages[serviceName] = image
+			bake.expectedImages[serviceName] = image
 		}
 
-		pull := service.Build.Pull || options.Pull
-		noCache := service.Build.NoCache || options.NoCache
-
-		target := targets[serviceName]
-
 		secrets, env := toBakeSecrets(project, buildConfig.Secrets)
-		secretsEnv = append(secretsEnv, env...)
+		bake.secretsEnv = append(bake.secretsEnv, env...)
 
-		cfg.Targets[target] = bakeTarget{
+		outputs, call := bakeOutputs(service, options)
+		bake.cfg.Targets[bake.targetNames[serviceName]] = bakeTarget{
 			Context:          buildConfig.Context,
-			Contexts:         additionalContexts(buildConfig.AdditionalContexts, targets),
+			Contexts:         additionalContexts(buildConfig.AdditionalContexts, bake.targetNames),
 			Dockerfile:       dockerFilePath(buildConfig.Context, buildConfig.Dockerfile),
 			DockerfileInline: strings.ReplaceAll(buildConfig.DockerfileInline, "${", "$${"),
 			Args:             args,
-			Labels:           labels,
+			Labels:           getImageBuildLabels(project, service),
 			Tags:             append(buildConfig.Tags, image),
 
 			CacheFrom:     buildConfig.CacheFrom,
@@ -245,8 +279,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 			Target:        buildConfig.Target,
 			Secrets:       secrets,
 			SSH:           toBakeSSH(append(buildConfig.SSH, options.SSHs...)),
-			Pull:          pull,
-			NoCache:       noCache,
+			Pull:          buildConfig.Pull || options.Pull,
+			NoCache:       buildConfig.NoCache || options.NoCache,
 			ShmSize:       buildConfig.ShmSize,
 			Ulimits:       toBakeUlimits(buildConfig.Ulimits),
 			Entitlements:  entitlements,
@@ -259,57 +293,105 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 
 	// create a bake group with targets for services to build
+	var group bakeGroup
 	for serviceName, service := range serviceToBeBuild {
 		if service.Build == nil {
 			continue
 		}
-		group.Targets = append(group.Targets, targets[serviceName])
+		group.Targets = append(group.Targets, bake.targetNames[serviceName])
 	}
+	bake.cfg.Groups["default"] = group
 
-	cfg.Groups["default"] = group
+	return bake
+}
 
-	b, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-
-	if options.Print {
-		_, err = fmt.Fprintln(s.stdout(), string(b))
-		return nil, err
-	}
-	logrus.Debugf("bake build config:\n%s", string(b))
-
-	tmpdir := os.TempDir()
-	var metadataFile string
-	for {
-		// we don't use os.CreateTemp here as we need a temporary file name, but don't want it actually created
-		// as bake relies on atomicwriter and this creates conflict during rename
-		metadataFile = filepath.Join(tmpdir, fmt.Sprintf("compose-build-metadataFile-%s.json", uuid.New().String()))
-		if _, err = os.Stat(metadataFile); err != nil {
-			if os.IsNotExist(err) {
+// bakeTargetNames produces a unique ID for each service, used as bake target
+func bakeTargetNames(project *types.Project) map[string]string {
+	targets := make(map[string]string, len(project.Services))
+	for serviceName := range project.Services {
+		t := strings.ReplaceAll(serviceName, ".", "_")
+		for {
+			if _, ok := targets[serviceName]; !ok {
+				targets[serviceName] = t
 				break
 			}
-			var pathError *fs.PathError
-			if errors.As(err, &pathError) {
-				return nil, fmt.Errorf("can't access os.tempDir %s: %w", tmpdir, pathError.Err)
-			}
+			t += "_"
 		}
 	}
-	defer func() {
-		_ = os.Remove(metadataFile)
-	}()
+	return targets
+}
 
-	buildx, err := s.getBuildxPlugin()
-	if err != nil {
-		return nil, err
+// bakeEntitlements returns the entitlements for a build target, and whether
+// bake must be granted `security.insecure`.
+func bakeEntitlements(buildConfig types.BuildConfig) ([]string, bool) {
+	entitlements := buildConfig.Entitlements
+	privileged := slices.Contains(buildConfig.Entitlements, "security.insecure")
+	if buildConfig.Privileged {
+		entitlements = append(entitlements, "security.insecure")
+		privileged = true
 	}
+	return entitlements, privileged
+}
 
+// bakeOutputs selects the bake output type — or the lint call for `--check` —
+// for a service build.
+func bakeOutputs(service types.ServiceConfig, options api.BuildOptions) (outputs []string, call string) {
+	push := options.Push && service.Image != ""
+	switch {
+	case options.Check:
+		return nil, "lint"
+	case len(service.Build.Platforms) > 1:
+		return []string{fmt.Sprintf("type=image,push=%t", push)}, ""
+	case push:
+		return []string{"type=registry"}, ""
+	default:
+		return []string{"type=docker"}, ""
+	}
+}
+
+// localBuildPaths returns the build context paths that live on the local
+// filesystem — remote (git or URL) contexts need no fs.read entitlement.
+func localBuildPaths(buildConfig types.BuildConfig) []string {
+	paths := []string{buildConfig.Context}
+	for _, path := range buildConfig.AdditionalContexts {
+		paths = append(paths, path)
+	}
+	var local []string
+	for _, path := range paths {
+		if _, _, err := gitutil.ParseGitRef(path); !strings.Contains(path, "://") && err != nil {
+			local = append(local, path)
+		}
+	}
+	return local
+}
+
+// bakeMetadataPath picks a fresh temporary path for bake's --metadata-file.
+// We don't use os.CreateTemp here as we need a temporary file name, but don't
+// want it actually created, as bake relies on atomicwriter and this creates
+// conflict during rename.
+func bakeMetadataPath() (string, error) {
+	tmpdir := os.TempDir()
+	for {
+		metadataFile := filepath.Join(tmpdir, fmt.Sprintf("compose-build-metadataFile-%s.json", uuid.New().String()))
+		_, err := os.Stat(metadataFile)
+		if os.IsNotExist(err) {
+			return metadataFile, nil
+		}
+		var pathError *fs.PathError
+		if errors.As(err, &pathError) {
+			return "", fmt.Errorf("can't access os.tempDir %s: %w", tmpdir, pathError.Err)
+		}
+	}
+}
+
+// bakeArgs assembles the buildx bake command line.
+func bakeArgs(bake *bakeBuild, metadataFile string, options api.BuildOptions) []string {
 	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadataFile}
 	// FIXME we should prompt user about this, but this is a breaking change in UX
-	for _, path := range read {
+	for _, path := range bake.localPaths {
 		args = append(args, "--allow", "fs.read="+path)
 	}
-	if privileged {
+	if bake.privileged {
 		args = append(args, "--allow", "security.insecure")
 	}
 	if options.SBOM != "" {
@@ -318,90 +400,52 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if options.Provenance != "" {
 		args = append(args, "--provenance="+options.Provenance)
 	}
-
 	if options.Builder != "" {
 		args = append(args, "--builder", options.Builder)
 	}
 	if options.Quiet {
 		args = append(args, "--progress=quiet")
 	}
+	return args
+}
 
-	logrus.Debugf("Executing bake with args: %v", args)
-
-	if s.dryRun {
-		return s.dryRunBake(cfg), nil
-	}
-	cmd := exec.CommandContext(ctx, buildx.Path, args...)
-
-	err = s.prepareShellOut(ctx, types.NewMapping(os.Environ()), cmd)
-	if err != nil {
-		return nil, err
-	}
-	endpoint, cleanup, err := s.propagateDockerEndpoint()
-	if err != nil {
-		return nil, err
-	}
-	cmd.Env = append(cmd.Env, endpoint...)
-	cmd.Env = append(cmd.Env, secretsEnv...)
-	defer cleanup()
-
-	cmd.Stdout = s.stdout()
-	cmd.Stdin = bytes.NewBuffer(b)
-	pipe, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-
+// forwardBakeStatus reads bake's rawjson stderr stream, forwarding solve
+// statuses to the progress UI channel. Lines that are not solve statuses are
+// collected as error messages, to be reported if bake exits non-zero.
+func forwardBakeStatus(pipe io.Reader, ch chan<- *client.SolveStatus) ([]string, error) {
 	var errMessage []string
 	reader := bufio.NewReader(pipe)
-
-	err = cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-	eg.Go(cmd.Wait)
 	for {
 		line, readErr := reader.ReadString('\n')
+		if readErr == io.EOF {
+			return errMessage, nil
+		}
+		if errors.Is(readErr, os.ErrClosed) {
+			logrus.Debugf("bake stopped")
+			return errMessage, nil
+		}
 		if readErr != nil {
-			if readErr == io.EOF {
-				break
-			}
-			if errors.Is(readErr, os.ErrClosed) {
-				logrus.Debugf("bake stopped")
-				break
-			}
 			return nil, fmt.Errorf("failed to execute bake: %w", readErr)
 		}
 		decoder := json.NewDecoder(strings.NewReader(line))
 		var status client.SolveStatus
-		err := decoder.Decode(&status)
-		if err != nil {
-			if strings.HasPrefix(line, "ERROR: ") {
-				errMessage = append(errMessage, line[7:])
-			} else {
-				errMessage = append(errMessage, line)
-			}
+		if err := decoder.Decode(&status); err != nil {
+			errMessage = append(errMessage, strings.TrimPrefix(line, "ERROR: "))
 			continue
 		}
 		ch <- &status
 	}
-	close(ch) // stop build progress UI
+}
 
-	err = eg.Wait()
-	if err != nil {
-		if len(errMessage) > 0 {
-			return nil, errors.New(strings.Join(errMessage, "\n"))
-		}
-		return nil, fmt.Errorf("failed to execute bake: %w", err)
-	}
-
-	b, err = os.ReadFile(metadataFile)
+// collectBakeResults reads bake's metadata file and maps each built image to
+// its canonical digest.
+func (s *composeService) collectBakeResults(ctx context.Context, metadataFile string, serviceToBeBuild types.Services, bake *bakeBuild) (map[string]string, error) {
+	raw, err := os.ReadFile(metadataFile)
 	if err != nil {
 		return nil, err
 	}
-
 	var md bakeMetadata
-	err = json.Unmarshal(b, &md)
+	err = json.Unmarshal(raw, &md)
 	if err != nil {
 		return nil, err
 	}
@@ -414,9 +458,8 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	// set — so unchanged rebuilds don't recreate containers.
 	results := map[string]string{}
 	for name, service := range serviceToBeBuild {
-		image := expectedImages[name]
-		target := targets[name]
-		built, ok := md[target]
+		image := bake.expectedImages[name]
+		built, ok := md[bake.targetNames[name]]
 		if !ok {
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
