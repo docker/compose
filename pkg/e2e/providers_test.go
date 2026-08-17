@@ -17,153 +17,139 @@
 package e2e
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
-// TestProviderStopHook verifies that "docker compose stop" invokes the provider
-// binary's "stop" subcommand. The example provider writes a sentinel file at
-// PROVIDER_STOP_MARKER when its stop subcommand runs.
-func TestProviderStopHook(t *testing.T) {
+// providerScenario creates a scenario whose commands can resolve the
+// example-provider binary from PATH. The provider echoes options back as env
+// variables, which the test service prints with its `env` command — the
+// "test-1  | " log prefix anchors the assertions to the container's output.
+func providerScenario(t *testing.T, intent string) *Scenario {
+	t.Helper()
 	provider, err := findExecutable("example-provider")
-	assert.NilError(t, err)
+	if err != nil {
+		t.Fatalf("example-provider binary not available (run make example-provider): %v", err)
+	}
+	s := NewScenario(t, intent)
+	s.Env("PATH=" + fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH")))
+	return s
+}
 
-	markerFile := filepath.Join(t.TempDir(), "example-provider-stop-marker")
-
-	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
-	c := NewParallelCLI(t, WithEnv(
-		"PATH="+path,
-		"PROVIDER_STOP_MARKER="+markerFile,
-	))
-	const projectName = "provider-stop-hook"
-
-	t.Cleanup(func() {
-		_ = os.Remove(markerFile)
-		c.cleanupWithDown(t, projectName)
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/provider-stop.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Success)
-
-	res = c.RunDockerComposeCmd(t, "-f", "fixtures/providers/provider-stop.yaml", "--project-name", projectName, "stop")
-	res.Assert(t, icmd.Success)
-
-	_, statErr := os.Stat(markerFile)
-	assert.NilError(t, statErr, "expected example-provider stop subcommand to write marker file %q", markerFile)
+func TestProviderStopHook(t *testing.T) {
+	// The example provider writes a sentinel file at PROVIDER_STOP_MARKER when
+	// its stop subcommand runs.
+	marker := filepath.Join(t.TempDir(), "example-provider-stop-marker")
+	providerScenario(t, "stop must invoke the provider binary's stop subcommand").
+		Env("PROVIDER_STOP_MARKER="+marker).
+		Compose(`
+services:
+  test:
+    image: alpine
+    command: echo ok
+    depends_on:
+      - provider
+  provider:
+    provider:
+      type: example-provider
+      options:
+        name: provider
+        type: test
+        size: 1
+`).
+		Step("up runs the provider then the service",
+			ComposeCmd("up", "-d")).
+		Step("stop triggers the provider's stop subcommand",
+			ComposeCmd("stop"),
+			FileExists(marker))
 }
 
 func TestDependsOnMultipleProviders(t *testing.T) {
-	provider, err := findExecutable("example-provider")
-	assert.NilError(t, err)
-
-	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
-	c := NewParallelCLI(t, WithEnv("PATH="+path))
-	const projectName = "depends-on-multiple-providers"
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/depends-on-multiple-providers.yaml", "--project-name", projectName, "up")
-	res.Assert(t, icmd.Success)
-	env := getEnv(res.Combined())
-	assert.Check(t, slices.Contains(env, "PROVIDER1_URL=https://magic.cloud/provider1"), env)
-	assert.Check(t, slices.Contains(env, "PROVIDER2_URL=https://magic.cloud/provider2"), env)
+	providerScenario(t, "a service depending on several providers must receive each provider's variables").
+		Compose(`
+services:
+  test:
+    image: alpine
+    command: env
+    depends_on:
+      - provider1
+      - provider2
+  provider1:
+    provider:
+      type: example-provider
+      options:
+        name: provider1
+        type: test1
+        size: 1
+  provider2:
+    provider:
+      type: example-provider
+      options:
+        name: provider2
+        type: test2
+        size: 2
+`).
+		Step("the service sees both providers' URLs",
+			ComposeCmd("up"),
+			OutputContains("test-1  | PROVIDER1_URL=https://magic.cloud/provider1"),
+			OutputContains("test-1  | PROVIDER2_URL=https://magic.cloud/provider2"))
 }
 
+const providerRawSetEnvCompose = `
+services:
+  test:
+    image: alpine
+    command: env
+    %s
+    depends_on:
+      - secrets
+  secrets:
+    provider:
+      type: example-provider
+      options:
+        name: secrets
+        type: test1
+        size: 1
+`
+
 func TestProviderRawSetEnv(t *testing.T) {
-	provider, err := findExecutable("example-provider")
-	assert.NilError(t, err)
-
-	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
-	c := NewParallelCLI(t, WithEnv("PATH="+path))
-	const projectName = "rawsetenv"
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv.yaml", "--project-name", projectName, "up")
-	res.Assert(t, icmd.Success)
-	env := getEnv(res.Combined())
-	// setenv: prefixed with service name
-	assert.Check(t, slices.Contains(env, "SECRETS_URL=https://magic.cloud/secrets"), env)
-	// rawsetenv: injected as-is without prefix
-	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
+	providerScenario(t, "setenv variables must be service-prefixed, rawsetenv injected as-is").
+		Compose(fmt.Sprintf(providerRawSetEnvCompose, "")).
+		Step("the service sees both variable flavors",
+			ComposeCmd("up"),
+			OutputContains("test-1  | SECRETS_URL=https://magic.cloud/secrets"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"))
 }
 
 func TestProviderRawSetEnvOverridesUserEnv(t *testing.T) {
-	provider, err := findExecutable("example-provider")
-	assert.NilError(t, err)
-
-	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
-	c := NewParallelCLI(t, WithEnv("PATH="+path))
-	const projectName = "rawsetenv-override"
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv-override.yaml", "--project-name", projectName, "up")
-	res.Assert(t, icmd.Success)
-	env := getEnv(res.Combined())
-	// rawsetenv overrides a user-defined environment variable
-	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
-	assert.Check(t, !slices.Contains(env, "CLOUD_REGION=user-defined-region"), env)
-	// the override is surfaced to the user rather than happening silently
-	assert.Check(t, strings.Contains(res.Combined(), "overrides environment variable"), res.Combined())
+	providerScenario(t, "rawsetenv must override a user-defined variable, with a visible warning").
+		Compose(fmt.Sprintf(providerRawSetEnvCompose, `environment:
+      CLOUD_REGION: user-defined-region`)).
+		Step("the provider's value wins and the override is surfaced",
+			ComposeCmd("up"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
+			OutputNotContains("test-1  | CLOUD_REGION=user-defined-region"),
+			OutputContains("overrides environment variable"))
 }
 
 func TestProviderRawSetEnvOverridesInheritedEnv(t *testing.T) {
-	provider, err := findExecutable("example-provider")
-	assert.NilError(t, err)
-
-	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
-	c := NewParallelCLI(t, WithEnv("PATH="+path))
-	const projectName = "rawsetenv-inherit"
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv-inherit.yaml", "--project-name", projectName, "up")
-	res.Assert(t, icmd.Success)
-	env := getEnv(res.Combined())
-	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
-	assert.Check(t, strings.Contains(res.Combined(), "overrides environment variable"), res.Combined())
+	providerScenario(t, "rawsetenv must override an inherited passthrough variable, with a visible warning").
+		Compose(fmt.Sprintf(providerRawSetEnvCompose, `environment:
+      - CLOUD_REGION`)).
+		Step("the provider's value wins over the passthrough",
+			ComposeCmd("up"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
+			OutputContains("overrides environment variable"))
 }
 
 func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
-	provider, err := findExecutable("example-provider")
-	assert.NilError(t, err)
-
-	path := fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH"))
-	c := NewParallelCLI(t, WithEnv("PATH="+path))
-	const projectName = "rawsetenv-inherit-map"
-	t.Cleanup(func() {
-		c.cleanupWithDown(t, projectName)
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/providers/rawsetenv-inherit-map.yaml", "--project-name", projectName, "up")
-	res.Assert(t, icmd.Success)
-	env := getEnv(res.Combined())
-	assert.Check(t, slices.Contains(env, "CLOUD_REGION=us-east-1"), env)
-	assert.Check(t, strings.Contains(res.Combined(), "overrides environment variable"), res.Combined())
-}
-
-func getEnv(out string) []string {
-	var env []string
-	scanner := bufio.NewScanner(strings.NewReader(out))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "test-1  | ") {
-			env = append(env, line[10:])
-		}
-	}
-	slices.Sort(env)
-	return env
+	providerScenario(t, "rawsetenv must override a map-form passthrough variable, with a visible warning").
+		Compose(fmt.Sprintf(providerRawSetEnvCompose, `environment:
+      CLOUD_REGION:`)).
+		Step("the provider's value wins over the map-form passthrough",
+			ComposeCmd("up"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
+			OutputContains("overrides environment variable"))
 }
