@@ -57,6 +57,43 @@ func TestExecutePlanEmpty(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+func TestExecutePlanOptionalFailure(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	bad := types.NetworkConfig{Name: "test_bad"}
+	good := types.NetworkConfig{Name: "test_good"}
+	project := &types.Project{
+		Name:     "test",
+		Networks: types.Networks{"bad": bad, "good": good},
+	}
+
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_bad", gomock.Any()).
+		Return(client.NetworkCreateResult{}, errors.New("boom"))
+	// the dependent node must still run after the optional node failed
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_good", gomock.Any()).
+		Return(client.NetworkCreateResult{ID: "net-good"}, nil)
+
+	plan := &Plan{}
+	optional := plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:bad",
+		Cause:      "not found",
+		Name:       bad.Name,
+		Network:    &bad,
+		Optional:   true,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:good",
+		Cause:      "not found",
+		Name:       good.Name,
+		Network:    &good,
+	}, "", optional)
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
+	assert.NilError(t, err, "an Optional node failure must not fail the plan")
+}
+
 func TestExecutePlanCreateNetwork(t *testing.T) {
 	svc, apiClient := newTestService(t)
 

@@ -154,17 +154,19 @@ func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
 
 // emitErrorEvent emits an error event for an ungrouped node.
 func emitErrorEvent(node *PlanNode, events api.EventProcessor, err error) {
-	op := node.Operation
-	var id string
-	switch {
-	case op.Container != nil:
-		id = getContainerProgressName(*op.Container)
-	default:
-		id = op.ResourceID
-	}
 	events.On(api.Resource{
-		ID:     id,
+		ID:     nodeEventName(node),
 		Status: api.Error,
 		Text:   err.Error(),
 	})
+}
+
+// nodeEventName resolves the progress-event identifier of a node: the
+// container's display name when the operation targets one, the resource ID
+// otherwise.
+func nodeEventName(node *PlanNode) string {
+	if node.Operation.Container != nil {
+		return getContainerProgressName(*node.Operation.Container)
+	}
+	return node.Operation.ResourceID
 }
