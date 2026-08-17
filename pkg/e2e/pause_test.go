@@ -17,143 +17,83 @@
 package e2e
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net"
-	"net/http"
 	"testing"
-	"time"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
 func TestPause(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-pause",
-		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
-
-	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	// launch both services and verify that they are accessible
-	cli.RunDockerComposeCmd(t, "up", "-d")
-	urls := map[string]string{
-		"a": urlForService(t, cli, "a", 80),
-		"b": urlForService(t, cli, "b", 80),
-	}
-	for _, url := range urls {
-		HTTPGetWithRetry(t, url, http.StatusOK, 50*time.Millisecond, 20*time.Second)
-	}
-
-	// pause a and verify that it can no longer be hit but b still can
-	cli.RunDockerComposeCmd(t, "pause", "a")
-	httpClient := http.Client{Timeout: 250 * time.Millisecond}
-	resp, err := httpClient.Get(urls["a"])
-	if resp != nil {
-		_ = resp.Body.Close()
-	}
-	assert.Assert(t, err != nil, "a should no longer respond")
-	var netErr net.Error
-	assert.ErrorType(t, err, &netErr, "expected a network error")
-	errors.As(err, &netErr)
-	assert.Assert(t, netErr.Timeout(), "Error should have indicated a timeout")
-	HTTPGetWithRetry(t, urls["b"], http.StatusOK, 50*time.Millisecond, 5*time.Second)
-
-	// unpause a and verify that both containers work again
-	cli.RunDockerComposeCmd(t, "unpause", "a")
-	for _, url := range urls {
-		HTTPGetWithRetry(t, url, http.StatusOK, 50*time.Millisecond, 5*time.Second)
-	}
+	NewScenario(t, "pause must freeze only the targeted service, unpause must resume it in place").
+		Compose(`
+services:
+  a:
+    image: alpine
+    init: true
+    command: sleep infinity
+  b:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("up starts both services",
+			ComposeCmd("up", "-d"),
+			ServiceState("a", "running"),
+			ServiceState("b", "running")).
+		Step("pause freezes the targeted service, the other keeps running",
+			ComposeCmd("pause", "a"),
+			ServiceState("a", "paused"),
+			ServiceState("b", "running")).
+		Step("unpause resumes the paused service without recreating anything",
+			ComposeCmd("unpause", "a"),
+			ServiceState("a", "running"),
+			ServiceState("b", "running"),
+			NotRecreated("a", "b"))
 }
 
 func TestPauseServiceNotRunning(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-pause-svc-not-running",
-		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
-
-	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	// pause a and verify that it can no longer be hit but b still can
-	res := cli.RunDockerComposeCmdNoCheck(t, "pause", "a")
-
 	// TODO: `docker pause` errors in this case, should Compose be consistent?
-	res.Assert(t, icmd.Expected{ExitCode: 0})
+	NewScenario(t, "pause of a service with no container must succeed as a no-op").
+		Compose(`
+services:
+  a:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("pause without any container is accepted",
+			ComposeCmd("pause", "a"))
 }
 
 func TestPauseServiceAlreadyPaused(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-pause-svc-already-paused",
-		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
-
-	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	// launch a and wait for it to come up
-	cli.RunDockerComposeCmd(t, "up", "--menu=false", "--wait", "a")
-	HTTPGetWithRetry(t, urlForService(t, cli, "a", 80), http.StatusOK, 50*time.Millisecond, 10*time.Second)
-
-	// pause a twice - first time should pass, second time fail
-	cli.RunDockerComposeCmd(t, "pause", "a")
-	res := cli.RunDockerComposeCmdNoCheck(t, "pause", "a")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "already paused"})
+	NewScenario(t, "pausing an already-paused service must fail").
+		Compose(`
+services:
+  a:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("a", "running")).
+		Step("a first pause freezes the service",
+			ComposeCmd("pause", "a"),
+			ServiceState("a", "paused")).
+		Step("a second pause is rejected",
+			ComposeCmd("pause", "a").MayFail(),
+			ExitCode(1),
+			OutputContains("already paused"))
 }
 
 func TestPauseServiceDoesNotExist(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-pause-svc-not-exist",
-		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
-
-	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	// pause a and verify that it can no longer be hit but b still can
-	res := cli.RunDockerComposeCmdNoCheck(t, "pause", "does_not_exist")
-	// TODO: `compose down does_not_exist` and similar error, this should too
-	res.Assert(t, icmd.Expected{ExitCode: 0})
-}
-
-func urlForService(t testing.TB, cli *CLI, service string, targetPort int) string {
-	t.Helper()
-	return fmt.Sprintf(
-		"http://localhost:%d",
-		publishedPortForService(t, cli, service, targetPort),
-	)
-}
-
-func publishedPortForService(t testing.TB, cli *CLI, service string, targetPort int) int {
-	t.Helper()
-	res := cli.RunDockerComposeCmd(t, "ps", "--format=json", service)
-	var svc struct {
-		Publishers []struct {
-			TargetPort    int
-			PublishedPort int
-		}
-	}
-	assert.NilError(t, json.Unmarshal([]byte(res.Stdout()), &svc),
-		"Failed to parse `%s` output", res.Cmd.String())
-	var found bool
-	var port int
-	for _, pp := range svc.Publishers {
-		if pp.TargetPort == targetPort {
-			found = true
-			port = pp.PublishedPort
-		}
-	}
-	assert.Assert(t, found, "No published port for target port %d\nService: %s", targetPort, res.Combined())
-	return port
+	NewScenario(t, "pause of a service unknown to the model must be rejected").
+		Compose(`
+services:
+  a:
+    image: alpine
+    init: true
+    command: sleep infinity
+`).
+		Step("pause of an unknown service is rejected",
+			ComposeCmd("pause", "does_not_exist").MayFail(),
+			ExitCode(1),
+			OutputContains("no such service: does_not_exist"))
 }

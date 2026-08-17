@@ -85,6 +85,21 @@ func OutputNotContains(sub string) Check {
 	}
 }
 
+// ExitCode expects the step's command to have exited with the given code.
+// Only meaningful on a MayFail action: without MayFail, any non-zero exit
+// already fails the step before checks run.
+func ExitCode(code int) Check {
+	return Check{
+		name: fmt.Sprintf("command exits with code %d", code),
+		fn: func(ctx *CheckContext) error {
+			if ctx.result.ExitCode != code {
+				return fmt.Errorf("exit code is %d", ctx.result.ExitCode)
+			}
+			return nil
+		},
+	}
+}
+
 // Eventually retries a state-based check until it holds or the timeout
 // expires, re-observing the project state between attempts. Output-based
 // checks are not meaningful here: the step's output never changes.
