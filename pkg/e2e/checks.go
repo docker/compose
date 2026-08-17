@@ -24,6 +24,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"slices"
 	"strings"
@@ -370,6 +371,39 @@ func OneOffsRemoved(service string) Check {
 			}
 			if len(names) > 0 {
 				return fmt.Errorf("still present: %s", strings.Join(names, ", "))
+			}
+			return nil
+		},
+	}
+}
+
+// ImageExists expects an image with the given reference to be present in the
+// local store.
+func ImageExists(ref string) Check {
+	return Check{
+		name: fmt.Sprintf("image %q exists", ref),
+		fn: func(ctx *CheckContext) error {
+			res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "image", "inspect", "--format", "{{.Id}}", ref))
+			if res.ExitCode != 0 {
+				return fmt.Errorf("not found: %s", strings.TrimSpace(res.Combined()))
+			}
+			return nil
+		},
+	}
+}
+
+// FileExists expects a non-empty file at the given host path, e.g. the output
+// of an export command.
+func FileExists(path string) Check {
+	return Check{
+		name: fmt.Sprintf("file %q exists", path),
+		fn: func(ctx *CheckContext) error {
+			info, err := os.Stat(path)
+			if err != nil {
+				return err
+			}
+			if info.Size() == 0 {
+				return fmt.Errorf("file is empty")
 			}
 			return nil
 		},

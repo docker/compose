@@ -31,46 +31,38 @@ import (
 )
 
 func TestLocalComposeLogs(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "compose-e2e-logs"
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/logs-test/compose.yaml", "--project-name", projectName, "up", "-d")
-	})
-
-	t.Run("logs", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs")
-		res.Assert(t, icmd.Expected{Out: `PING localhost`})
-		res.Assert(t, icmd.Expected{Out: `hello`})
-	})
-
-	t.Run("logs ping", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "ping")
-		res.Assert(t, icmd.Expected{Out: `PING localhost`})
-		assert.Assert(t, !strings.Contains(res.Stdout(), "hello"))
-	})
-
-	t.Run("logs hello", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "hello", "ping")
-		res.Assert(t, icmd.Expected{Out: `PING localhost`})
-		res.Assert(t, icmd.Expected{Out: `hello`})
-	})
-
-	t.Run("logs hello index", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "--index", "2", "hello")
-
-		//  docker-compose logs hello
-		// logs-test-hello-2  | hello
-		// logs-test-hello-1  | hello
-		t.Log(res.Stdout())
-		assert.Assert(t, !strings.Contains(res.Stdout(), "hello-1"))
-		assert.Assert(t, strings.Contains(res.Stdout(), "hello-2"))
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
+	NewScenario(t, "logs must aggregate the requested services' output, and --index must select one replica").
+		Compose(`
+services:
+  ping:
+    image: alpine
+    init: true
+    command: ping localhost -c 1
+  hello:
+    image: alpine
+    command: echo hello
+    deploy:
+      replicas: 2
+`).
+		Step("up starts the services",
+			ComposeCmd("up", "-d"),
+			Eventually(ServiceState("hello", "exited"), 10*time.Second)).
+		Step("logs aggregates every service's output",
+			ComposeCmd("logs"),
+			OutputContains("PING localhost"),
+			OutputContains("hello")).
+		Step("logs on one service filters the others out",
+			ComposeCmd("logs", "ping"),
+			OutputContains("PING localhost"),
+			OutputNotContains("hello")).
+		Step("logs accepts several services",
+			ComposeCmd("logs", "hello", "ping"),
+			OutputContains("PING localhost"),
+			OutputContains("hello")).
+		Step("logs --index selects a single replica",
+			ComposeCmd("logs", "--index", "2", "hello"),
+			OutputContains("hello-2"),
+			OutputNotContains("hello-1"))
 }
 
 func TestLocalComposeLogsFollow(t *testing.T) {
