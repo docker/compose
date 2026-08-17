@@ -345,7 +345,7 @@ func TestWatchMultiServices(t *testing.T) {
 			return poll.Success()
 		}
 		return poll.Continue("%v", watch.Stdout())
-	}, poll.WithTimeout(90*time.Second))
+	}, poll.WithTimeout(90*time.Second), poll.WithDelay(time.Second))
 
 	waitRebuild := func(service string, expected string) {
 		poll.WaitOn(t, func(l poll.LogT) poll.Result {
@@ -354,7 +354,7 @@ func TestWatchMultiServices(t *testing.T) {
 				return poll.Success()
 			}
 			return poll.Continue("%v", cat.Combined())
-		}, poll.WithTimeout(90*time.Second))
+		}, poll.WithTimeout(90*time.Second), poll.WithDelay(time.Second))
 	}
 	waitRebuild("a", "test")
 	waitRebuild("b", "test")
@@ -412,7 +412,7 @@ func TestWatchRebuildIgnoresDependencies(t *testing.T) {
 			return poll.Success()
 		}
 		return poll.Continue("waiting for watch to start: %v", buffer.String())
-	}, poll.WithTimeout(120*time.Second))
+	}, poll.WithTimeout(120*time.Second), poll.WithDelay(time.Second))
 
 	// Record the cutoff point in the log buffer so we only inspect output
 	// produced AFTER the file change triggers the rebuild.
