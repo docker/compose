@@ -18,9 +18,12 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
+	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -127,11 +130,161 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 	return nil
 }
 
+// execStartContainer starts a container. When the operation carries a Service
+// (start-phase nodes), it performs the full service start: secret/config
+// injection before ContainerStart, post_start hooks after — mirroring
+// startServiceContainer. Bare operations (paused/dead restarts) keep the
+// plain ContainerStart.
 func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) error {
+	id, name := exec.resolveContainer(op)
+	if id == "" {
+		return fmt.Errorf("no container to start for %s", op.ResourceID)
+	}
+
+	if op.Service != nil {
+		if err := exec.compose.injectSecrets(ctx, exec.project, *op.Service, id); err != nil {
+			return err
+		}
+		if err := exec.compose.injectConfigs(ctx, exec.project, *op.Service, id); err != nil {
+			return err
+		}
+	}
+
 	startMx.Lock()
-	defer startMx.Unlock()
-	_, err := exec.compose.apiClient().ContainerStart(ctx, op.Container.ID, client.ContainerStartOptions{})
-	return err
+	_, err := exec.compose.apiClient().ContainerStart(ctx, id, client.ContainerStartOptions{})
+	startMx.Unlock()
+	if err != nil {
+		return err
+	}
+
+	if op.Service != nil {
+		ctr := exec.containerSummary(op, id, name)
+		for _, hook := range op.Service.PostStart {
+			if err := exec.compose.runHook(ctx, ctr, *op.Service, hook, nil); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// resolveContainer returns the ID and display name of the container an
+// operation targets: the observed container when set, otherwise the result of
+// the create node the operation references.
+func (exec *planExecutor) resolveContainer(op Operation) (string, string) {
+	if op.Container != nil {
+		return op.Container.ID, getCanonicalContainerName(*op.Container)
+	}
+	res := exec.pctx.get(op.CreateNodeID)
+	name := op.Name
+	if name == "" {
+		name = res.ContainerName
+	}
+	return res.ContainerID, name
+}
+
+// containerSummary rebuilds a minimal container.Summary for helpers (hooks)
+// that need one, preferring the live view populated by earlier create nodes.
+func (exec *planExecutor) containerSummary(op Operation, id, name string) container.Summary {
+	if op.Container != nil {
+		return *op.Container
+	}
+	exec.containersMu.Lock()
+	defer exec.containersMu.Unlock()
+	if op.Service != nil {
+		for _, c := range exec.containersByService[op.Service.Name] {
+			if c.ID == id {
+				return c
+			}
+		}
+	}
+	return container.Summary{ID: id, Names: []string{"/" + name}}
+}
+
+// execWaitCondition polls the dependency service named by the operation until
+// it satisfies the declared depends_on condition, the deadline expires, or
+// the context ends. It is the plan-side equivalent of waitDependencies for a
+// single (dependent, dependency) edge; required: false edges are planned as
+// Optional nodes, so their failure is reported as a skip by the walker.
+func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) error {
+	if op.Timeout != nil {
+		withTimeout, cancel := context.WithTimeout(ctx, *op.Timeout)
+		defer cancel()
+		ctx = withTimeout
+	}
+
+	exec.containersMu.Lock()
+	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff)
+	exec.containersMu.Unlock()
+	if len(waitingFor) == 0 {
+		return fmt.Errorf("missing dependency %s", op.Name)
+	}
+	exec.compose.events.On(containerEvents(waitingFor, waiting)...)
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return fmt.Errorf("timeout waiting for dependencies")
+			}
+			return ctx.Err()
+		}
+		satisfied, err := exec.checkWaitCondition(ctx, op, waitingFor)
+		if err != nil {
+			return err
+		}
+		if satisfied {
+			return nil
+		}
+	}
+}
+
+// checkWaitCondition performs one probe of a WaitCondition operation,
+// reporting whether the dependency satisfies the declared condition.
+func (exec *planExecutor) checkWaitCondition(ctx context.Context, op Operation, waitingFor Containers) (bool, error) {
+	s := exec.compose
+	switch op.Condition {
+	case ServiceConditionRunningOrHealthy, types.ServiceConditionHealthy:
+		fallbackRunning := op.Condition == ServiceConditionRunningOrHealthy
+		ok, err := s.isServiceHealthy(ctx, waitingFor, fallbackRunning)
+		if err != nil {
+			return false, fmt.Errorf("dependency failed to start: %w", err)
+		}
+		if ok {
+			s.events.On(containerEvents(waitingFor, healthy)...)
+		}
+		return ok, nil
+	case types.ServiceConditionCompletedSuccessfully:
+		done, code, err := s.isServiceCompleted(ctx, waitingFor)
+		if err != nil {
+			return false, err
+		}
+		if !done {
+			return false, nil
+		}
+		if code != 0 {
+			return false, fmt.Errorf("service %q didn't complete successfully: exit %d", op.Name, code)
+		}
+		s.events.On(containerEvents(waitingFor, exited)...)
+		return true, nil
+	default:
+		logrus.Warnf("unsupported depends_on condition: %s", op.Condition)
+		return true, nil
+	}
+}
+
+// execRunPreStart runs the service's pre_start hooks on the replica the plan
+// selected (once per service, before any of its containers start).
+func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) error {
+	id, name := exec.resolveContainer(op)
+	if id == "" {
+		return fmt.Errorf("no container to run pre_start hooks for %s", op.ResourceID)
+	}
+	ctr := exec.containerSummary(op, id, name)
+	return exec.compose.runPreStart(ctx, exec.project, *op.Service, ctr, nil)
 }
 
 func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) error {

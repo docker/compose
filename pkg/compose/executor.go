@@ -163,6 +163,10 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 		return exec.execCreateContainer(ctx, node)
 	case OpStartContainer:
 		return exec.execStartContainer(ctx, op)
+	case OpWaitCondition:
+		return exec.execWaitCondition(ctx, op)
+	case OpRunPreStart:
+		return exec.execRunPreStart(ctx, op)
 	case OpStopContainer:
 		return exec.execStopContainer(ctx, op)
 	case OpRemoveContainer:

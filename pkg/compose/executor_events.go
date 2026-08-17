@@ -111,8 +111,7 @@ func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 	case OpCreateContainer:
 		events.On(creatingEvent("Container " + op.Name))
 	case OpStartContainer:
-		name := getContainerProgressName(*op.Container)
-		events.On(newEvent(name, api.Working, api.StatusStarting))
+		events.On(newEvent(startEventName(op), api.Working, api.StatusStarting))
 	case OpStopContainer:
 		events.On(stoppingEvent(getContainerProgressName(*op.Container)))
 	case OpRemoveContainer:
@@ -135,8 +134,7 @@ func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
 	case OpCreateContainer:
 		events.On(createdEvent("Container " + op.Name))
 	case OpStartContainer:
-		name := getContainerProgressName(*op.Container)
-		events.On(newEvent(name, api.Done, api.StatusStarted))
+		events.On(newEvent(startEventName(op), api.Done, api.StatusStarted))
 	case OpStopContainer:
 		events.On(stoppedEvent(getContainerProgressName(*op.Container)))
 	case OpRemoveContainer:
@@ -169,4 +167,13 @@ func nodeEventName(node *PlanNode) string {
 		return getContainerProgressName(*node.Operation.Container)
 	}
 	return node.Operation.ResourceID
+}
+
+// startEventName names a start operation's progress event: start-phase nodes
+// for plan-created containers carry no Summary yet, only the target name.
+func startEventName(op Operation) string {
+	if op.Container != nil {
+		return getContainerProgressName(*op.Container)
+	}
+	return "Container " + op.Name
 }
