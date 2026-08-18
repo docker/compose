@@ -111,23 +111,17 @@ func (w *Watcher) Stop() error {
 	return err
 }
 
-// getSyncImplementation returns an appropriate sync implementation for the
-// project.
-//
-// Currently, an implementation that batches files and transfers them using
-// the Moby `Untar` API.
-func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syncer, error) {
-	var useTar bool
+// getSyncImplementation returns the sync implementation for the project:
+// batching files and transferring them using the Moby `Untar` API. This is
+// the only implementation since the `docker cp`-based syncer was removed;
+// the historical COMPOSE_EXPERIMENTAL_WATCH_TAR opt-out is ignored.
+func (s *composeService) getSyncImplementation(project *types.Project) sync.Syncer {
 	if useTarEnv, ok := os.LookupEnv("COMPOSE_EXPERIMENTAL_WATCH_TAR"); ok {
-		useTar, _ = strconv.ParseBool(useTarEnv)
-	} else {
-		useTar = true
+		if useTar, _ := strconv.ParseBool(useTarEnv); !useTar {
+			logrus.Warnf("COMPOSE_EXPERIMENTAL_WATCH_TAR is ignored: the tar-based synchronization is the only remaining implementation")
+		}
 	}
-	if !useTar {
-		return nil, errors.New("no available sync implementation")
-	}
-
-	return sync.NewTar(project.Name, tarDockerClient{s: s}), nil
+	return sync.NewTar(project.Name, tarDockerClient{s: s})
 }
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) error {
@@ -194,10 +188,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	if project, err = project.WithSelectedServices(options.Services); err != nil {
 		return nil, err
 	}
-	syncer, err := s.getSyncImplementation(project)
-	if err != nil {
-		return nil, err
-	}
+	syncer := s.getSyncImplementation(project)
 	eg, ctx := errgroup.WithContext(ctx)
 
 	var (
