@@ -286,7 +286,7 @@ func TestBuildImageDependencies(t *testing.T) {
 
 	t.Run("Bake by additional contexts", func(t *testing.T) {
 		cli := NewCLI(t, WithEnv(
-			"DOCKER_BUILDKIT=1", "COMPOSE_BAKE=1",
+			"DOCKER_BUILDKIT=1",
 			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
 		))
 		doTest(t, cli, "--verbose", "build")
