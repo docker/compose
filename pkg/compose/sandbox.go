@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -300,4 +302,48 @@ func runSbx(ctx context.Context, args ...string) error {
 		return fmt.Errorf("sbx %s: %w\n%s", strings.Join(args, " "), err, out)
 	}
 	return nil
+}
+
+// sandboxExec forwards a compose exec targeting a sandboxed service to
+// sbx exec, with full terminal passthrough.
+func (s *composeService) sandboxExec(ctx context.Context, name string, options api.RunOptions) (int, error) {
+	args := []string{"exec"}
+	if options.Interactive {
+		args = append(args, "-i")
+	}
+	if options.Tty {
+		args = append(args, "-t")
+	}
+	if options.Detach {
+		args = append(args, "-d")
+	}
+	if options.User != "" {
+		args = append(args, "-u", options.User)
+	}
+	if options.Privileged {
+		args = append(args, "--privileged")
+	}
+	if options.WorkingDir != "" {
+		args = append(args, "-w", options.WorkingDir)
+	}
+	for _, kv := range options.Environment {
+		args = append(args, "-e", kv)
+	}
+	args = append(args, name)
+	args = append(args, options.Command...)
+
+	logrus.Debugf("forwarding exec to: sbx %s", strings.Join(args, " "))
+	cmd := exec.CommandContext(ctx, "sbx", args...)
+	// hand the real terminal file descriptors over so interactive TTY
+	// sessions (raw mode, resize) work as with a plain sbx exec
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		code := exitErr.ExitCode()
+		return code, cli.StatusError{StatusCode: code, Status: err.Error()}
+	}
+	return 0, err
 }

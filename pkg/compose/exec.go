@@ -31,6 +31,10 @@ func (s *composeService) Exec(ctx context.Context, projectName string, options a
 	projectName = strings.ToLower(projectName)
 	target, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
 	if err != nil {
+		// PoC: the service may run in a Docker Sandbox instead of the engine
+		if name := sandboxNameFor(projectName, options.Service); s.sandboxExists(ctx, name) {
+			return s.sandboxExec(ctx, name, options)
+		}
 		return 0, err
 	}
 
