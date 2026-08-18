@@ -114,8 +114,13 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	globalCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	var detachRequested atomic.Bool
+
 	if navigationMenu != nil {
-		navigationMenu.EnableDetach(cancel)
+		navigationMenu.EnableDetach(func() {
+			detachRequested.Store(true)
+			cancel()
+		})
 	}
 
 	var (
@@ -126,6 +131,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 	appendErr := func(err error) {
 		if err != nil {
+			if detachRequested.Load() && errors.Is(err, context.Canceled) {
+				return
+			}
 			mu.Lock()
 			errs = append(errs, err)
 			mu.Unlock()
