@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -94,7 +95,7 @@ func (s *composeService) runPreStartHook(
 	// the connection open cannot deadlock `<-logsDone`.
 	logCtx, cancelLogs := context.WithCancel(ctx)
 	defer cancelLogs()
-	logsDone := s.streamPreStartLogs(logCtx, created.ID, service, index, listener)
+	logsDone, getTail := s.streamPreStartLogs(logCtx, created.ID, service, index, listener)
 
 	if _, err := s.apiClient().ContainerStart(ctx, created.ID, client.ContainerStartOptions{}); err != nil {
 		// AutoRemove only fires after a successful start, so the never-started
@@ -119,6 +120,11 @@ func (s *composeService) runPreStartHook(
 	waitErr := waitPreStart(ctx, service.Name, index, waitRes)
 	cancelLogs()
 	<-logsDone
+	if waitErr != nil {
+		if tail := getTail(); tail != "" {
+			return fmt.Errorf("%w: %s", waitErr, tail)
+		}
+	}
 	return waitErr
 }
 
@@ -259,12 +265,32 @@ func preStartResultErr(serviceName string, index int, res container.WaitResponse
 // streamPreStartLogs returns a channel that is closed once the hook log stream
 // has been fully drained (or never opened). Callers must wait on it before
 // returning so the goroutine cannot outlive the hook.
-func (s *composeService) streamPreStartLogs(ctx context.Context, containerID string, service types.ServiceConfig, index int, listener api.ContainerEventListener) <-chan struct{} {
+// streamPreStartLogs opens the hook container's log stream in a background
+// goroutine, tees output into the listener (when non-nil) and into per-stream
+// tail buffers. It returns:
+//   - done: closed when the goroutine exits; callers must wait on it
+//   - getTail: returns the stderr-biased tail (stderr preferred, stdout fallback);
+//     safe to call only after done is closed
+//
+// The log stream is always opened even when listener is nil, so the tail is
+// populated in detached mode and can appear in error messages.
+func (s *composeService) streamPreStartLogs(
+	ctx context.Context,
+	containerID string,
+	service types.ServiceConfig,
+	index int,
+	listener api.ContainerEventListener,
+) (<-chan struct{}, func() string) {
 	done := make(chan struct{})
-	if listener == nil {
-		close(done)
-		return done
+	tailOut := newOutputTail(hookOutputTailLines, hookOutputTailBytes)
+	tailErr := newOutputTail(hookOutputTailLines, hookOutputTailBytes)
+	getTail := func() string {
+		if s := tailErr.String(); s != "" {
+			return s
+		}
+		return tailOut.String()
 	}
+
 	source := fmt.Sprintf("%s pre_start[%d] ->", service.Name, index)
 	logs, err := s.apiClient().ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
@@ -272,30 +298,44 @@ func (s *composeService) streamPreStartLogs(ctx context.Context, containerID str
 		Follow:     true,
 	})
 	if err != nil {
-		listener(api.ContainerEvent{
-			Type:    api.HookEventLog,
-			Source:  source,
-			ID:      containerID,
-			Service: service.Name,
-			Line:    fmt.Sprintf("warning: could not attach pre_start log stream: %s", err),
-		})
-		close(done)
-		return done
-	}
-	go func() {
-		defer close(done)
-		defer logs.Close() //nolint:errcheck
-		w := utils.GetWriter(func(line string) {
+		if listener != nil {
 			listener(api.ContainerEvent{
 				Type:    api.HookEventLog,
 				Source:  source,
 				ID:      containerID,
 				Service: service.Name,
-				Line:    line,
+				Line:    fmt.Sprintf("warning: could not attach pre_start log stream: %s", err),
 			})
-		})
-		defer w.Close() //nolint:errcheck
-		_, _ = stdcopy.StdCopy(w, w, logs)
+		}
+		close(done)
+		return done, getTail
+	}
+	go func() {
+		defer close(done)
+		defer logs.Close() //nolint:errcheck
+
+		var wOut, wErr io.Writer
+		wOut = tailOut
+		wErr = tailErr
+
+		if listener != nil {
+			// stdout and stderr share one listener writer: ContainerEvent has no stream
+			// field, so both appear identically in the live display.
+			lw := utils.GetWriter(func(line string) {
+				listener(api.ContainerEvent{
+					Type:    api.HookEventLog,
+					Source:  source,
+					ID:      containerID,
+					Service: service.Name,
+					Line:    line,
+				})
+			})
+			defer lw.Close() //nolint:errcheck
+			wOut = io.MultiWriter(lw, tailOut)
+			wErr = io.MultiWriter(lw, tailErr)
+		}
+
+		_, _ = stdcopy.StdCopy(wOut, wErr, logs)
 	}()
-	return done
+	return done, getTail
 }

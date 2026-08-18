@@ -367,3 +367,86 @@ func TestWaitPreStart_RaceRealErrorAndResult(t *testing.T) {
 		assert.ErrorContains(t, err, "connection lost")
 	}
 }
+
+// stdcopyFrame encodes a single stdcopy-multiplexed frame.
+// stream: 1=stdout, 2=stderr. Returns the encoded bytes.
+// This helper is kept local (not using writeStdcopyFrame from hook_test.go)
+// because hook_test.go carries a //go:build !windows constraint.
+func stdcopyFrame(stream byte, data string) []byte {
+	payload := []byte(data)
+	header := [8]byte{stream, 0, 0, 0}
+	header[4] = byte(len(payload) >> 24)
+	header[5] = byte(len(payload) >> 16)
+	header[6] = byte(len(payload) >> 8)
+	header[7] = byte(len(payload))
+	return append(header[:], payload...)
+}
+
+// TestPreStart_DetachedModeAttachesLogs verifies that ContainerLogs is opened
+// even when listener is nil (detached / compose up -d). Previously
+// streamPreStartLogs short-circuited and returned immediately, leaving the tail
+// buffer empty and any failure error without output context.
+func TestPreStart_DetachedModeAttachesLogs(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name:  "web",
+		Image: "alpine",
+		PreStart: []types.ServiceHook{
+			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		},
+	}
+	ctr := container.Summary{ID: "service-ctr-id"}
+
+	create1 := apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		Return(client.ContainerCreateResult{ID: "hook-1"}, nil)
+	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0)).After(create1)
+	// ContainerLogs MUST be called even with a nil listener.
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil).After(wait1)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(logs1)
+
+	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
+	assert.NilError(t, err)
+}
+
+// TestPreStart_FailureIncludesTail verifies that when a pre_start hook exits
+// with a non-zero code the error message includes the captured stderr output,
+// giving operators the context they need to diagnose the failure.
+func TestPreStart_FailureIncludesTail(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name:  "db",
+		Image: "postgres",
+		PreStart: []types.ServiceHook{
+			{Image: "postgres", Command: types.ShellCommand{"migrate"}},
+		},
+	}
+	ctr := container.Summary{ID: "service-ctr-id"}
+
+	// Build a stdcopy-multiplexed log stream with a stderr error line.
+	logContent := append(
+		stdcopyFrame(1, "starting migration\n"),             // stdout noise
+		stdcopyFrame(2, "table 'sites' doesn't exist\n")..., // stderr error
+	)
+
+	create1 := apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		Return(client.ContainerCreateResult{ID: "hook-1"}, nil)
+	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(1)).After(create1)
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(io.NopCloser(bytes.NewReader(logContent)), nil).After(wait1)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(logs1)
+
+	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
+	assert.Assert(t, err != nil)
+	assert.ErrorContains(t, err, "pre_start[0]")
+	// Stderr content must be in the error (stderr bias).
+	assert.ErrorContains(t, err, "doesn't exist")
+}
