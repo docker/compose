@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: avatars
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: dockersamples_avatars
+spec:
+  # In a production environment, you'd most likely use a ClusterIP service with
+  # an Ingress resource for external access.
+  # For simplicity, this configuration uses a LoadBalancer type to make the
+  # frontend directly accessible via Docker Desktop.
+  type: LoadBalancer
+  selector:
+    app: avatars-web
+  ports:
+    - protocol: TCP
+      port: 5735
+      targetPort: http

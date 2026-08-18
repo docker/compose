@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: avatars-api
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: dockersamples_avatars
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: avatars-api
+  template:
+    metadata:
+      labels:
+        app: avatars-api
+        app.kubernetes.io/name: api
+        app.kubernetes.io/part-of: dockersamples_avatars
+    spec:
+      containers:
+        - name: avatars-api
+          image: avatars-api
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              port: http
+              path: '/ready'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: dockersamples_avatars
+spec:
+  selector:
+    app: avatars-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: http

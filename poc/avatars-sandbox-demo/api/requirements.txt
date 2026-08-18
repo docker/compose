@@ -1,0 +1,3 @@
+flask~=2.1.1
+python-avatars~=1.3.0
+werkzeug~=2.3.7

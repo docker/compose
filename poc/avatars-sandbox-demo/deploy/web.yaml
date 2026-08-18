@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: avatars-web
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: dockersamples_avatars
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: avatars-web
+  template:
+    metadata:
+      labels:
+        app: avatars-web
+        app.kubernetes.io/name: web
+        app.kubernetes.io/part-of: dockersamples_avatars
+    spec:
+      containers:
+        - name: avatars-web
+          image: avatars-web
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: VITE_CLIENT_PORT
+              value: '5735'
+          ports:
+            - name: http
+              containerPort: 5173

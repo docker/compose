@@ -1,0 +1,83 @@
+body {
+  background-color: #001b20;
+  color: rgb(204, 218, 222);
+  margin: 0 5%;
+}
+
+.avatar-wrapper {
+  position: sticky;
+  top: 0;
+  background-image: linear-gradient(to bottom, rgba(0, 27, 32, 1), rgba(0, 27, 32, 0.9) 70%, rgba(0, 0, 0, 0));
+  width: 100%;
+}
+
+.avatar {
+  margin: 0 auto;
+  display: block;
+  width: min(50vw, 40vh);
+  /*padding-bottom: 1.5rem;*/
+}
+
+section {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  justify-content: space-evenly;
+  gap: 1rem;
+}
+
+section h2 {
+  flex: 1 0 100%;
+}
+
+.part-group {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: column;
+}
+
+.part-group h3 {
+  text-transform: uppercase;
+  padding-bottom: 0.25rem;
+  font-size: 1.5rem;
+  border-bottom: 1px dashed rgb(204, 218, 222);
+}
+
+.picker {
+  margin-bottom: 1rem;
+}
+
+.picker label, .picker legend {
+  text-transform: capitalize;
+  font-variant: small-caps;
+}
+
+.picker select {
+  margin-top: 0.2rem;
+}
+
+.color-picker {
+  max-width: 300px;
+}
+
+.color-picker input[type="radio"] {
+  visibility: hidden;
+}
+
+.color-picker label {
+  width: 3rem;
+  height: 3rem;
+  display: inline-block;
+}
+
+/* https://accessibility.18f.gov/hidden-content/ */
+.sr-only {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
