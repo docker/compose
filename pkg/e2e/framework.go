@@ -527,7 +527,7 @@ func (c *CLI) cleanupWithDown(t testing.TB, project string, args ...string) {
 func (c *CLI) ServicePublishedPort(t testing.TB, project, service string, targetPort int) int {
 	t.Helper()
 	res := c.RunDockerComposeCmd(t, "-p", project, "port", service, strconv.Itoa(targetPort))
-	addr := strings.TrimSpace(res.Stdout())
+	addr := strings.SplitN(res.Stdout(), "\n", 2)[0]
 	_, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		t.Fatalf("ServicePublishedPort: cannot parse compose port output %q: %v", addr, err)

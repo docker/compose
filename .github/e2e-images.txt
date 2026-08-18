@@ -1,0 +1,21 @@
+# Images pre-pulled and cached for e2e tests.
+#
+# ALLOWED: passive images that are never the subject of pull-policy or
+# pull-skip assertions in the test suite.
+#
+# EXCLUDED (must NOT appear here):
+#   - alpine:* tags  (used by TestComposePull, TestPullRefreshWindow…, etc.)
+#   - does_not_exists / doesn_t_exists_either (intentional pull-failure tags)
+#   - Any image referenced by fixtures/compose-pull/ or fixtures/image-identity/
+#
+# When modifying this list, verify it does not overlap with the fixtures under
+# pkg/e2e/fixtures/compose-pull/ and pkg/e2e/fixtures/image-identity/.
+docker:dind
+fluent/fluent-bit:3.1.7-debug
+golang:alpine
+gtardif/sentences-api
+gtardif/sentences-db
+gtardif/sentences-web
+mariadb
+nginx:alpine
+registry:3
