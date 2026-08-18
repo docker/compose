@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 
@@ -43,15 +44,25 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 		containers = containers.filter(isService(options.Services...))
 	}
 	summary := make([]api.ContainerSummary, len(containers))
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, egCtx := errgroup.WithContext(ctx)
 	for i, ctr := range containers {
 		eg.Go(func() error {
 			var err error
-			summary[i], err = s.containerSummary(ctx, ctr)
+			summary[i], err = s.containerSummary(egCtx, ctr)
 			return err
 		})
 	}
-	return summary, eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	// PoC: also report isolation:sandbox services
+	sandboxes := s.sandboxSummaries(ctx, projectName, options.All)
+	if len(options.Services) != 0 {
+		sandboxes = slices.DeleteFunc(sandboxes, func(c api.ContainerSummary) bool {
+			return !slices.Contains(options.Services, c.Service)
+		})
+	}
+	return append(summary, sandboxes...), nil
 }
 
 // containerSummary builds the api summary for a container, inspecting it to

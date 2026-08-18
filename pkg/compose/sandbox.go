@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -118,18 +121,30 @@ func (s *composeService) upSandbox(ctx context.Context, project *types.Project, 
 	name := sandboxNameFor(project.Name, service.Name)
 	eventName := "Sandbox " + name
 
-	if s.sandboxExists(ctx, name) {
+	exists, running := s.sandboxStatus(ctx, name)
+	if exists && running {
 		s.events.On(newEvent(eventName, api.Done, "Running"))
 		return nil
 	}
-
-	s.events.On(creatingEvent(eventName))
 
 	image := api.GetImageNameOrDefault(service, project.Name)
 	inspect, err := s.apiClient().ImageInspect(ctx, image)
 	if err != nil {
 		return fmt.Errorf("image %q must be present in the engine store (build or pull it first): %w", image, err)
 	}
+
+	if exists {
+		// stopped sandbox (e.g. suspended by the daemon): exec restarts it,
+		// then the service process is spawned again
+		s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
+		if err := s.startSandboxService(ctx, name, service, inspect); err != nil {
+			return err
+		}
+		s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
+		return nil
+	}
+
+	s.events.On(creatingEvent(eventName))
 
 	if err := s.loadSandboxImage(ctx, image); err != nil {
 		return err
@@ -150,6 +165,17 @@ func (s *composeService) upSandbox(ctx context.Context, project *types.Project, 
 		return err
 	}
 
+	if err := s.startSandboxService(ctx, name, service, inspect); err != nil {
+		return err
+	}
+
+	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
+	return nil
+}
+
+// startSandboxService spawns the service process in the sandbox, restarting
+// the sandbox first if it was stopped (sbx exec does).
+func (s *composeService) startSandboxService(ctx context.Context, name string, service types.ServiceConfig, inspect client.ImageInspectResult) error {
 	execArgs := []string{"exec"}
 	workingDir := service.WorkingDir
 	if workingDir == "" {
@@ -182,12 +208,7 @@ func (s *composeService) upSandbox(ctx context.Context, project *types.Project, 
 	}
 	execArgs = append(execArgs, name,
 		"sh", "-c", "nohup "+strings.Join(quoted, " ")+" >/tmp/compose-service.log 2>&1 &")
-	if err := runSbx(ctx, execArgs...); err != nil {
-		return err
-	}
-
-	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
-	return nil
+	return runSbx(ctx, execArgs...)
 }
 
 // removeSandboxServices tears down the sandboxes of isolation:sandbox
@@ -262,11 +283,31 @@ func sandboxCommand(service types.ServiceConfig, imageEntrypoint, imageCmd []str
 
 // sandboxExists reports whether a sandbox with this name is known to sbx.
 func (s *composeService) sandboxExists(ctx context.Context, name string) bool {
-	out, err := exec.CommandContext(ctx, "sbx", "ls", "-q").Output()
+	exists, _ := s.sandboxStatus(ctx, name)
+	return exists
+}
+
+// sandboxStatus reports whether a sandbox exists and is running.
+func (s *composeService) sandboxStatus(ctx context.Context, name string) (bool, bool) {
+	out, err := exec.CommandContext(ctx, "sbx", "ls", "--json").Output()
 	if err != nil {
-		return false
+		return false, false
 	}
-	return slices.Contains(strings.Fields(string(out)), name)
+	var list struct {
+		Sandboxes []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		} `json:"sandboxes"`
+	}
+	if err := json.Unmarshal(out, &list); err != nil {
+		return false, false
+	}
+	for _, sb := range list.Sandboxes {
+		if sb.Name == name {
+			return true, sb.Status == "running"
+		}
+	}
+	return false, false
 }
 
 // loadSandboxImage exports an image from the engine store and loads it into
@@ -346,4 +387,87 @@ func (s *composeService) sandboxExec(ctx context.Context, name string, options a
 		return code, cli.StatusError{StatusCode: code, Status: err.Error()}
 	}
 	return 0, err
+}
+
+// sandboxSummaries lists sandboxes matching the project's naming convention
+// (<project>-...) as container summaries, so docker compose ps also reports
+// isolation:sandbox services. Best effort: without the sbx CLI, none are
+// reported. Sandboxes carry no custom labels yet, so the service name is
+// recovered from the naming convention.
+func (s *composeService) sandboxSummaries(ctx context.Context, projectName string, all bool) []api.ContainerSummary {
+	if _, err := exec.LookPath("sbx"); err != nil {
+		return nil
+	}
+	out, err := exec.CommandContext(ctx, "sbx", "ls", "--json").Output()
+	if err != nil {
+		return nil
+	}
+	var list struct {
+		Sandboxes []struct {
+			ID     string `json:"id"`
+			Name   string `json:"name"`
+			Agent  string `json:"agent"`
+			Status string `json:"status"`
+		} `json:"sandboxes"`
+	}
+	if err := json.Unmarshal(out, &list); err != nil {
+		return nil
+	}
+	prefix := sandboxNameFor(projectName, "")
+	var summaries []api.ContainerSummary
+	for _, sb := range list.Sandboxes {
+		if !strings.HasPrefix(sb.Name, prefix) || sb.Agent != "shell" {
+			continue
+		}
+		if !all && sb.Status != "running" {
+			continue
+		}
+		state := container.StateExited
+		if sb.Status == "running" {
+			state = container.StateRunning
+		}
+		summaries = append(summaries, api.ContainerSummary{
+			ID:         sb.ID,
+			Name:       sb.Name,
+			Names:      []string{"/" + sb.Name},
+			Image:      "(sandbox)",
+			Project:    projectName,
+			Service:    strings.TrimPrefix(sb.Name, prefix),
+			State:      state,
+			Status:     sb.Status + " (sandbox)",
+			Publishers: s.sandboxPublishers(ctx, sb.Name),
+			Labels: map[string]string{
+				api.ProjectLabel: projectName,
+				api.ServiceLabel: strings.TrimPrefix(sb.Name, prefix),
+			},
+		})
+	}
+	return summaries
+}
+
+// sandboxPublishers reports a sandbox's published ports.
+func (s *composeService) sandboxPublishers(ctx context.Context, name string) api.PortPublishers {
+	out, err := exec.CommandContext(ctx, "sbx", "ports", name, "--json").Output()
+	if err != nil {
+		return nil
+	}
+	var ports []struct {
+		HostIP      string `json:"host_ip"`
+		HostPort    int    `json:"host_port"`
+		SandboxPort int    `json:"sandbox_port"`
+		Protocol    string `json:"protocol"`
+	}
+	if err := json.Unmarshal(out, &ports); err != nil {
+		return nil
+	}
+	var publishers api.PortPublishers
+	for _, p := range ports {
+		publishers = append(publishers, api.PortPublisher{
+			URL:           p.HostIP,
+			TargetPort:    p.SandboxPort,
+			PublishedPort: p.HostPort,
+			Protocol:      strings.TrimSuffix(strings.TrimSuffix(p.Protocol, "4"), "6"),
+		})
+	}
+	return publishers
 }
