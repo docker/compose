@@ -673,3 +673,19 @@ func TestBuildEscaped(t *testing.T) {
 	res = c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/build-test/escaped", "build", "--no-cache", "arg")
 	res.Assert(t, icmd.Success)
 }
+
+// TestUpBuildUnchangedContext locks the invariant that rebuilding an
+// unchanged build context hits the build cache and leaves the running
+// service alone: same image, same config hash, same container.
+// Its build context lives in testdata/TestUpBuildUnchangedContext/.
+func TestUpBuildUnchangedContext(t *testing.T) {
+	s := NewScenario(t, "an unchanged up --build must hit the build cache and not recreate the service")
+	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-app")).
+		Step("up builds the image and starts the service",
+			ComposeCmd("up", "-d", "--build"),
+			ServiceState("app", "running")).
+		Step("an unchanged up --build reuses the cached image and the container",
+			ComposeCmd("up", "-d", "--build"),
+			NotRecreated("app"),
+			LabelUnchanged("app", "com.docker.compose.config-hash"))
+}

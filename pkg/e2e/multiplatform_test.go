@@ -38,13 +38,6 @@ func TestCreateLocalMultiPlatformImage(t *testing.T) {
 	// `create` exercises the same image-resolution/pull-policy path as `up`,
 	// without requiring emulation to actually run the non-native binary
 	s.Env("REQUESTED_PLATFORM="+requested).
-		Compose(`
-services:
-  repro:
-    image: compose-e2e-multiplatform-local-only:v1
-    platform: ${REQUESTED_PLATFORM}
-    command: ["uname", "-m"]
-`).
 		Defer(DockerCmd("image", "rm", image)).
 		Step("store the amd64 variant in the local store",
 			DockerCmd("pull", "-q", "--platform", "linux/amd64", "alpine:3.22")).

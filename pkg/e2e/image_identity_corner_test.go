@@ -25,12 +25,6 @@ import (
 // that was never actually pulled — that failed with "No such image".
 func TestUpDryRunMissingImage(t *testing.T) {
 	NewScenario(t, "dry-run up with a locally-missing image must not resolve it against the real daemon").
-		Compose(`
-services:
-  app:
-    image: alpine:3.20
-    command: ["sleep", "infinity"]
-`).
 		Step("make sure the image is not in the local store",
 			DockerCmd("rmi", "-f", "alpine:3.20").MayFail()).
 		Step("dry-run up succeeds on the faked pull",
@@ -49,12 +43,6 @@ func TestCreateIdempotentDefaultPlatform(t *testing.T) {
 	// `create` exercises the same pull/label path as `up` without needing
 	// emulation to run the non-native binary
 	s.Env("DOCKER_DEFAULT_PLATFORM="+s.NonNativePlatform()).
-		Compose(`
-services:
-  app:
-    image: alpine:3.20
-    command: ["sleep", "infinity"]
-`).
 		Defer(DockerCmd("rmi", "-f", "alpine:3.20")).
 		Step("start without the image in the local store",
 			DockerCmd("rmi", "-f", "alpine:3.20").MayFail()).
@@ -77,16 +65,6 @@ func TestCreateIdempotentSharedImageMixedPlatforms(t *testing.T) {
 		Requires(ContainerdImageStore)
 
 	s.Env("PINNED_PLATFORM="+s.NonNativePlatform()).
-		Compose(`
-services:
-  native:
-    image: alpine:3.19
-    command: ["sleep", "infinity"]
-  pinned:
-    image: alpine:3.19
-    platform: ${PINNED_PLATFORM}
-    command: ["sleep", "infinity"]
-`).
 		Defer(DockerCmd("rmi", "-f", "alpine:3.19")).
 		Step("start without the image in the local store",
 			DockerCmd("rmi", "-f", "alpine:3.19").MayFail()).
@@ -108,13 +86,6 @@ services:
 // ahead of the window, so it must pull even when the image is fresh.
 func TestPullRefreshWindowExplicitPull(t *testing.T) {
 	NewScenario(t, "an explicit pull must refresh the image even when the pull_policy window is not due").
-		Compose(`
-services:
-  app:
-    image: alpine:3.18
-    pull_policy: daily
-    command: ["sleep", "infinity"]
-`).
 		Defer(DockerCmd("rmi", "-f", "alpine:3.18")).
 		Step("make the image fresh: the daily window is not due",
 			ComposeCmd("pull")).

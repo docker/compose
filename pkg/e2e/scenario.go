@@ -104,6 +104,7 @@ func NewScenario(t *testing.T, intent string, opts ...ScenarioOption) *Scenario 
 		s.cli = NewCLI(t)
 	}
 	t.Logf("scenario: %s (project %s)", intent, s.project)
+	s.anchorTestdata()
 
 	// start from — and return to — a clean slate, whatever previous runs left
 	s.cli.RunDockerComposeCmdNoCheck(t, "--project-name", s.project, "down", "-v", "--remove-orphans", "--timeout", "0")
@@ -147,16 +148,54 @@ func projectNameFor(testName string) string {
 // declarative layer doesn't cover.
 func (s *Scenario) CLI() *CLI { return s.cli }
 
-// Compose declares the project's compose model, written to a temporary
-// directory so the whole scenario is self-contained in the test source.
-func (s *Scenario) Compose(yaml string) *Scenario {
+// Project returns the compose project name the scenario runs under, e.g. to
+// Defer the removal of an image the project built.
+func (s *Scenario) Project() string { return s.project }
+
+// anchorTestdata resolves the scenario's project files from
+// testdata/<TestName>/ — the conventional anchor tying each test to its
+// standalone, directly-runnable compose files. When the directory exists it
+// is copied into a temporary directory (so a scenario can never mutate the
+// committed files) and its compose.yaml becomes the scenario's compose file.
+// Subtests map to nested directories, following t.Name().
+// A scenario without a testdata directory runs without a -f flag.
+func (s *Scenario) anchorTestdata() {
 	s.t.Helper()
-	dir := s.t.TempDir()
-	s.file = filepath.Join(dir, "compose.yaml")
-	if err := os.WriteFile(s.file, []byte(yaml), 0o644); err != nil {
-		s.t.Fatalf("failed to write compose.yaml: %v", err)
+	src := filepath.Join("testdata", filepath.FromSlash(s.t.Name()))
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		return
 	}
-	return s
+	dir := s.t.TempDir()
+	if err := copyDir(src, dir); err != nil {
+		s.t.Fatalf("failed to copy %s: %v", src, err)
+	}
+	file := filepath.Join(dir, "compose.yaml")
+	if _, err := os.Stat(file); err != nil {
+		s.t.Fatalf("%s exists but has no compose.yaml", src)
+	}
+	s.file = file
+}
+
+// copyDir recursively copies the content of src into dst.
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0o644)
+	})
 }
 
 // Env sets environment variables applied to every subsequent step command
