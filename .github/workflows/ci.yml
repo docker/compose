@@ -264,6 +264,30 @@ jobs:
         env:
           BUILD_TAGS: e2e
 
+      - name: Restore e2e image cache
+        id: image-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: /tmp/e2e-images.tar
+          # Key encodes the engine version + the image list so any change
+          # to .github/e2e-images.txt invalidates the cache automatically.
+          key: e2e-images-v1-docker${{ matrix.engine }}-${{ hashFiles('.github/e2e-images.txt') }}
+
+      - name: Load cached e2e images
+        if: steps.image-cache.outputs.cache-hit == 'true'
+        run: docker load --input /tmp/e2e-images.tar
+
+      - name: Pull and cache e2e images
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: |
+          # Pull all passive images in parallel (4 at a time).
+          # alpine:* and pull-policy test images are intentionally absent from
+          # .github/e2e-images.txt so they are never pre-pulled.
+          grep -v '^#' .github/e2e-images.txt | xargs -P 4 -n 1 docker pull
+          # Pack them into a single archive for the GHA cache.
+          docker save $(cat .github/e2e-images.txt | grep -v '^#' | tr '\n' ' ') \
+            -o /tmp/e2e-images.tar
+
       - name: Setup tmate session
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
         uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3.24
