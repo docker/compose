@@ -200,18 +200,6 @@ func TestImageVolumeImageAlreadyLocal(t *testing.T) {
 	// accident, when a previous test left the image in the local store.
 	NewScenario(t, "an image volume whose source image is already local must mount, and stay idempotent", Serial()).
 		Requires(EngineVersionAtLeast(28)).
-		Compose(`
-services:
-  app:
-    image: alpine
-    command: "ls -al /mnt/image"
-    volumes:
-      - type: image
-        source: nginx:alpine
-        target: /mnt/image
-        image:
-          subpath: usr/share/nginx/html/
-`).
 		Step("have the source image already in the local store",
 			DockerCmd("pull", "-q", "nginx:alpine")).
 		Step("up mounts the image volume content",

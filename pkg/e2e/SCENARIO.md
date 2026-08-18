@@ -11,16 +11,21 @@ requirements) and [`checks.go`](checks.go) (the vocabulary of observables).
 
 ## Writing a scenario
 
-```go
-func TestRestart(t *testing.T) {
-	NewScenario(t, "restart must bring an exited service back up, restarting the same container").
-		Compose(`
+The project files live in `testdata/<TestName>/` — standalone compose files,
+directly runnable with `docker compose -f testdata/TestRestart/compose.yaml`:
+
+```yaml
+# testdata/TestRestart/compose.yaml
 services:
   app:
     image: alpine
     init: true
     command: ash -c "if [[ -f /tmp/restart.lock ]] ; then sleep infinity; else touch /tmp/restart.lock; fi"
-`).
+```
+
+```go
+func TestRestart(t *testing.T) {
+	NewScenario(t, "restart must bring an exited service back up, restarting the same container").
 		Step("up starts the service, whose first run exits at once",
 			ComposeCmd("up", "-d"),
 			Eventually(ServiceState("app", "exited"), 10*time.Second)).
@@ -41,8 +46,14 @@ Rules:
 - **Step names are behavior sentences**, not command echoes: "an unchanged
   create is a no-op", not "run create again". The transcript of step names
   should read as the specification.
-- **The compose model is inline.** A scenario is self-contained in the test
-  source; no fixture directories. Interpolate runtime values via `Env`.
+- **The project files live in `testdata/<TestName>/`.** The scenario resolves
+  that directory by convention (subtests map to nested directories, following
+  `t.Name()`) and copies it to a temporary directory, so the committed files
+  are never mutated. The directory holds a `compose.yaml` plus whatever the
+  project needs (Dockerfile, env or config files) in their native format,
+  directly runnable outside the test. Ownership is strictly one test per
+  directory — no shared fixtures — and a check fails the suite on any
+  `testdata` directory no test owns. Interpolate runtime values via `Env`.
 - **Regression tests link the issue** in a comment above the test, with a
   sentence on the failure mode being locked.
 

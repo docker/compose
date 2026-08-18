@@ -38,13 +38,6 @@ func TestRestart(t *testing.T) {
 	// later run of the same container finds the lock and sleeps forever, so
 	// staying up after `restart` proves the same container was restarted
 	NewScenario(t, "restart must bring an exited service back up, restarting the same container").
-		Compose(`
-services:
-  app:
-    image: alpine
-    init: true
-    command: ash -c "if [[ -f /tmp/restart.lock ]] ; then sleep infinity; else touch /tmp/restart.lock; fi"
-`).
 		Step("up starts the service, whose first run exits at once",
 			ComposeCmd("up", "-d"),
 			Eventually(ServiceState("app", "exited"), 10*time.Second)).
