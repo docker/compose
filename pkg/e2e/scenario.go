@@ -162,7 +162,13 @@ func projectNameFor(testName string) string {
 		case unicode.IsLower(r) || unicode.IsDigit(r):
 			b.WriteRune(r)
 		default:
-			b.WriteRune('-')
+			// `--` for the subtest separator so TestFoo/bar and TestFooBar
+			// cannot collide on the same project name
+			if r == '/' {
+				b.WriteString("--")
+			} else {
+				b.WriteRune('-')
+			}
 		}
 		prev = r
 	}
@@ -230,7 +236,13 @@ func copyDir(src, dst string) error {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, data, 0o644)
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		// preserve the source mode so an executable testdata script stays
+		// executable in the scenario's project directory
+		return os.WriteFile(target, data, info.Mode())
 	})
 }
 

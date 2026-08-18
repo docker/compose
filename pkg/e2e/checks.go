@@ -92,10 +92,11 @@ func StdoutContains(sub string) Check {
 // OutputMatches expects the regular expression to match the command's stdout,
 // for expectations OutputContains cannot express (e.g. ordering).
 func OutputMatches(pattern string) Check {
+	re := regexp.MustCompile(pattern) // panics at construction, not mid-check
 	return Check{
 		name: fmt.Sprintf("output matches %q", pattern),
 		fn: func(ctx *CheckContext) error {
-			if !regexp.MustCompile(pattern).MatchString(ctx.result.Stdout()) {
+			if !re.MatchString(ctx.result.Stdout()) {
 				return fmt.Errorf("no match in stdout")
 			}
 			return nil
@@ -106,10 +107,11 @@ func OutputMatches(pattern string) Check {
 // OutputMatchesCount expects the regular expression to match the command's
 // stdout exactly n times, e.g. counting how many times a service was built.
 func OutputMatchesCount(pattern string, n int) Check {
+	re := regexp.MustCompile(pattern) // panics at construction, not mid-check
 	return Check{
 		name: fmt.Sprintf("output matches %q %d time(s)", pattern, n),
 		fn: func(ctx *CheckContext) error {
-			matches := regexp.MustCompile(pattern).FindAllString(ctx.result.Stdout(), -1)
+			matches := re.FindAllString(ctx.result.Stdout(), -1)
 			if len(matches) != n {
 				return fmt.Errorf("matched %d time(s)", len(matches))
 			}
