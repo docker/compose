@@ -41,7 +41,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 	}, "down", s.events)
 }
 
-func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error { //nolint:gocyclo
+func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
 	resourceToRemove := false
 
 	include := oneOffExclude

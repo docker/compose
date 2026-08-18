@@ -164,42 +164,11 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 // LoadAdditionalResources loads additional resources from the project, such as image references, secrets, configs and exposed ports
 func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project *types.Project) (*types.Project, error) {
 	for name, service := range project.Services {
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-
-		var inspect image.InspectResponse
-		if service.Build != nil && service.Image == "" {
-			result, err := dockerCLI.Client().ImageInspect(ctx, imageName)
-			if err != nil {
-				if !errdefs.IsNotFound(err) {
-					return nil, err
-				}
-				logrus.Warnf("image %s for service %s not found locally; Dockerfile-exposed ports will not be included — run `docker compose build` first to include them", imageName, name)
-			}
-			inspect = result.InspectResponse
-		} else {
-			var err error
-			inspect, err = inspectWithPull(ctx, dockerCLI, imageName)
-			if err != nil {
-				return nil, err
-			}
+		updated, err := loadServiceImageResources(ctx, dockerCLI, project.Name, name, service)
+		if err != nil {
+			return nil, err
 		}
-		service.Image = imageName
-		exposed := utils.Set[string]{}
-		exposed.AddAll(service.Expose...)
-		if inspect.Config != nil {
-			for port := range inspect.Config.ExposedPorts {
-				p, err := network.ParsePort(port)
-				if err != nil {
-					return nil, err
-				}
-				exposed.Add(strconv.Itoa(int(p.Num())))
-			}
-		}
-		for _, port := range service.Ports {
-			exposed.Add(strconv.Itoa(int(port.Target)))
-		}
-		service.Expose = exposed.Elements()
-		project.Services[name] = service
+		project.Services[name] = updated
 	}
 
 	for name, secret := range project.Secrets {
@@ -219,6 +188,51 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 	}
 
 	return project, nil
+}
+
+// loadServiceImageResources resolves the service image and merges the ports
+// it exposes into the service's Expose list
+func loadServiceImageResources(ctx context.Context, dockerCLI command.Cli, projectName, name string, service types.ServiceConfig) (types.ServiceConfig, error) {
+	imageName := api.GetImageNameOrDefault(service, projectName)
+
+	inspect, err := inspectServiceImage(ctx, dockerCLI, name, imageName, service)
+	if err != nil {
+		return service, err
+	}
+
+	service.Image = imageName
+	exposed := utils.Set[string]{}
+	exposed.AddAll(service.Expose...)
+	if inspect.Config != nil {
+		for port := range inspect.Config.ExposedPorts {
+			p, err := network.ParsePort(port)
+			if err != nil {
+				return service, err
+			}
+			exposed.Add(strconv.Itoa(int(p.Num())))
+		}
+	}
+	for _, port := range service.Ports {
+		exposed.Add(strconv.Itoa(int(port.Target)))
+	}
+	service.Expose = exposed.Elements()
+	return service, nil
+}
+
+// inspectServiceImage inspects the service image, pulling it when needed; a
+// buildable image missing locally only degrades to a warning
+func inspectServiceImage(ctx context.Context, dockerCLI command.Cli, name, imageName string, service types.ServiceConfig) (image.InspectResponse, error) {
+	if service.Build != nil && service.Image == "" {
+		result, err := dockerCLI.Client().ImageInspect(ctx, imageName)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return image.InspectResponse{}, err
+			}
+			logrus.Warnf("image %s for service %s not found locally; Dockerfile-exposed ports will not be included — run `docker compose build` first to include them", imageName, name)
+		}
+		return result.InspectResponse, nil
+	}
+	return inspectWithPull(ctx, dockerCLI, imageName)
 }
 
 func loadFileObject(conf types.FileObjectConfig) (types.FileObjectConfig, error) {

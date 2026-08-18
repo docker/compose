@@ -28,7 +28,6 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-//nolint:gocyclo
 func (s *composeService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	projectName = strings.ToLower(projectName)
 	oneOff := oneOffExclude
@@ -47,88 +46,110 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 	eg, ctx := errgroup.WithContext(ctx)
 	for i, ctr := range containers {
 		eg.Go(func() error {
-			publishers := make([]api.PortPublisher, len(ctr.Ports))
-			sort.Slice(ctr.Ports, func(i, j int) bool {
-				return ctr.Ports[i].PrivatePort < ctr.Ports[j].PrivatePort
-			})
-			for i, p := range ctr.Ports {
-				var url string
-				if p.IP.IsValid() {
-					url = p.IP.String()
-				}
-				publishers[i] = api.PortPublisher{
-					URL:           url, // TODO(thaJeztah); change this to a netip.Addr ??
-					TargetPort:    int(p.PrivatePort),
-					PublishedPort: int(p.PublicPort),
-					Protocol:      p.Type,
-				}
-			}
-
-			inspect, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
-			if err != nil {
-				return err
-			}
-
-			var (
-				health   container.HealthStatus
-				exitCode int
-			)
-			if inspect.Container.State != nil {
-				switch inspect.Container.State.Status {
-				case container.StateRunning:
-					if inspect.Container.State.Health != nil {
-						health = inspect.Container.State.Health.Status
-					}
-				case container.StateExited, container.StateDead:
-					exitCode = inspect.Container.State.ExitCode
-				}
-			}
-
-			var (
-				local  int
-				mounts []string
-			)
-			for _, m := range ctr.Mounts {
-				name := m.Name
-				if name == "" {
-					name = m.Source
-				}
-				if m.Driver == "local" {
-					local++
-				}
-				mounts = append(mounts, name)
-			}
-
-			var networks []string
-			if ctr.NetworkSettings != nil {
-				for k := range ctr.NetworkSettings.Networks {
-					networks = append(networks, k)
-				}
-			}
-
-			summary[i] = api.ContainerSummary{
-				ID:           ctr.ID,
-				Name:         getCanonicalContainerName(ctr),
-				Names:        ctr.Names,
-				Image:        ctr.Image,
-				Project:      ctr.Labels[api.ProjectLabel],
-				Service:      ctr.Labels[api.ServiceLabel],
-				Command:      ctr.Command,
-				State:        ctr.State,
-				Status:       ctr.Status,
-				Created:      ctr.Created,
-				Labels:       ctr.Labels,
-				SizeRw:       ctr.SizeRw,
-				SizeRootFs:   ctr.SizeRootFs,
-				Mounts:       mounts,
-				LocalVolumes: local,
-				Networks:     networks,
-				Health:       health,
-				ExitCode:     exitCode,
-				Publishers:   publishers,
-			}
-			return nil
+			var err error
+			summary[i], err = s.containerSummary(ctx, ctr)
+			return err
 		})
 	}
 	return summary, eg.Wait()
+}
+
+// containerSummary builds the api summary for a container, inspecting it to
+// retrieve its health and exit code
+func (s *composeService) containerSummary(ctx context.Context, ctr container.Summary) (api.ContainerSummary, error) {
+	inspect, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+	if err != nil {
+		return api.ContainerSummary{}, err
+	}
+	health, exitCode := containerHealthAndExitCode(inspect)
+	mounts, localVolumes := containerMounts(ctr)
+	return api.ContainerSummary{
+		ID:           ctr.ID,
+		Name:         getCanonicalContainerName(ctr),
+		Names:        ctr.Names,
+		Image:        ctr.Image,
+		Project:      ctr.Labels[api.ProjectLabel],
+		Service:      ctr.Labels[api.ServiceLabel],
+		Command:      ctr.Command,
+		State:        ctr.State,
+		Status:       ctr.Status,
+		Created:      ctr.Created,
+		Labels:       ctr.Labels,
+		SizeRw:       ctr.SizeRw,
+		SizeRootFs:   ctr.SizeRootFs,
+		Mounts:       mounts,
+		LocalVolumes: localVolumes,
+		Networks:     containerNetworks(ctr),
+		Health:       health,
+		ExitCode:     exitCode,
+		Publishers:   containerPublishers(ctr),
+	}, nil
+}
+
+func containerPublishers(ctr container.Summary) []api.PortPublisher {
+	sort.Slice(ctr.Ports, func(i, j int) bool {
+		return ctr.Ports[i].PrivatePort < ctr.Ports[j].PrivatePort
+	})
+	publishers := make([]api.PortPublisher, len(ctr.Ports))
+	for i, p := range ctr.Ports {
+		var url string
+		if p.IP.IsValid() {
+			url = p.IP.String()
+		}
+		publishers[i] = api.PortPublisher{
+			URL:           url, // TODO(thaJeztah); change this to a netip.Addr ??
+			TargetPort:    int(p.PrivatePort),
+			PublishedPort: int(p.PublicPort),
+			Protocol:      p.Type,
+		}
+	}
+	return publishers
+}
+
+func containerHealthAndExitCode(inspect client.ContainerInspectResult) (container.HealthStatus, int) {
+	var (
+		health   container.HealthStatus
+		exitCode int
+	)
+	state := inspect.Container.State
+	if state == nil {
+		return health, exitCode
+	}
+	switch state.Status {
+	case container.StateRunning:
+		if state.Health != nil {
+			health = state.Health.Status
+		}
+	case container.StateExited, container.StateDead:
+		exitCode = state.ExitCode
+	}
+	return health, exitCode
+}
+
+func containerMounts(ctr container.Summary) ([]string, int) {
+	var (
+		local  int
+		mounts []string
+	)
+	for _, m := range ctr.Mounts {
+		name := m.Name
+		if name == "" {
+			name = m.Source
+		}
+		if m.Driver == "local" {
+			local++
+		}
+		mounts = append(mounts, name)
+	}
+	return mounts, local
+}
+
+func containerNetworks(ctr container.Summary) []string {
+	var networks []string
+	if ctr.NetworkSettings != nil {
+		for k := range ctr.NetworkSettings.Networks {
+			networks = append(networks, k)
+		}
+	}
+	return networks
 }

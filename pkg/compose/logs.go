@@ -37,41 +37,15 @@ func (s *composeService) Logs(
 	consumer api.LogConsumer,
 	options api.LogOptions,
 ) error {
-	var containers Containers
-	var err error
-
-	if options.Index > 0 {
-		ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, options.Services[0], options.Index)
-		if err != nil {
-			return err
-		}
-		containers = append(containers, ctr)
-	} else {
-		containers, err = s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
-		if err != nil {
-			return err
-		}
-	}
-
-	if options.Project != nil && len(options.Services) == 0 {
-		// we run with an explicit compose.yaml, so only consider services defined in this file
-		options.Services = options.Project.ServiceNames()
-		containers = containers.filter(isService(options.Services...))
+	containers, err := s.selectLogsContainers(ctx, projectName, &options)
+	if err != nil {
+		return err
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, ctr := range containers {
 		eg.Go(func() error {
-			res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
-			if err != nil {
-				return err
-			}
-			err = s.doLogContainer(ctx, consumer, getContainerNameWithoutProject(ctr), res.Container, options)
-			if errdefs.IsNotImplemented(err) {
-				logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
-				return nil
-			}
-			return err
+			return s.logContainer(ctx, consumer, ctr, options)
 		})
 	}
 
@@ -85,29 +59,7 @@ func (s *composeService) Logs(
 			monitor.withServices(options.Project.ServiceNames())
 		}
 		monitor.withListener(printer.HandleEvent)
-		monitor.withListener(func(event api.ContainerEvent) {
-			if event.Type == api.ContainerEventStarted {
-				eg.Go(func() error {
-					res, err := s.apiClient().ContainerInspect(ctx, event.ID, client.ContainerInspectOptions{})
-					if err != nil {
-						return err
-					}
-
-					err = s.doLogContainer(ctx, consumer, event.Source, res.Container, api.LogOptions{
-						Follow:     options.Follow,
-						Since:      res.Container.State.StartedAt,
-						Until:      options.Until,
-						Tail:       options.Tail,
-						Timestamps: options.Timestamps,
-					})
-					if errdefs.IsNotImplemented(err) {
-						// ignore
-						return nil
-					}
-					return err
-				})
-			}
-		})
+		monitor.withListener(s.followStartedContainersLogs(ctx, eg, consumer, options))
 		eg.Go(func() error {
 			// pass ctx so monitor will immediately stop on SIGINT
 			return monitor.Start(ctx)
@@ -115,6 +67,73 @@ func (s *composeService) Logs(
 	}
 
 	return eg.Wait()
+}
+
+// selectLogsContainers returns the containers to stream logs from, per the
+// requested services, container index, and project
+func (s *composeService) selectLogsContainers(ctx context.Context, projectName string, options *api.LogOptions) (Containers, error) {
+	if options.Index > 0 {
+		ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, options.Services[0], options.Index)
+		if err != nil {
+			return nil, err
+		}
+		return Containers{ctr}, nil
+	}
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
+	if err != nil {
+		return nil, err
+	}
+	if options.Project != nil && len(options.Services) == 0 {
+		// we run with an explicit compose.yaml, so only consider services defined in this file
+		options.Services = options.Project.ServiceNames()
+		containers = containers.filter(isService(options.Services...))
+	}
+	return containers, nil
+}
+
+// logContainer streams a container's logs, warning when its logging driver
+// doesn't support reading logs
+func (s *composeService) logContainer(ctx context.Context, consumer api.LogConsumer, ctr container.Summary, options api.LogOptions) error {
+	res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+	if err != nil {
+		return err
+	}
+	err = s.doLogContainer(ctx, consumer, getContainerNameWithoutProject(ctr), res.Container, options)
+	if errdefs.IsNotImplemented(err) {
+		logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
+		return nil
+	}
+	return err
+}
+
+// followStartedContainersLogs streams the logs of containers (re)started
+// while following, ignoring those whose logging driver doesn't support
+// reading logs
+func (s *composeService) followStartedContainersLogs(ctx context.Context, eg *errgroup.Group, consumer api.LogConsumer, options api.LogOptions) api.ContainerEventListener {
+	return func(event api.ContainerEvent) {
+		if event.Type != api.ContainerEventStarted {
+			return
+		}
+		eg.Go(func() error {
+			res, err := s.apiClient().ContainerInspect(ctx, event.ID, client.ContainerInspectOptions{})
+			if err != nil {
+				return err
+			}
+
+			err = s.doLogContainer(ctx, consumer, event.Source, res.Container, api.LogOptions{
+				Follow:     options.Follow,
+				Since:      res.Container.State.StartedAt,
+				Until:      options.Until,
+				Tail:       options.Tail,
+				Timestamps: options.Timestamps,
+			})
+			if errdefs.IsNotImplemented(err) {
+				// ignore
+				return nil
+			}
+			return err
+		})
+	}
 }
 
 func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {

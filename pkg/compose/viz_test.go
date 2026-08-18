@@ -131,50 +131,14 @@ func TestViz(t *testing.T) {
 		assert.Check(t, is.Contains(graphStr, "\n  "))
 		assert.Check(t, !is.Contains(graphStr, "\n   ")().Success(), graphStr)
 
-		// check digraph name
-		assert.Check(t, is.Contains(graphStr, "digraph \""+project.Name+"\""))
-
-		// check nodes
-		for _, service := range project.Services {
-			assert.Check(t, is.Contains(graphStr, "\""+service.Name+"\" [style=\"filled\""))
-		}
+		assertVizGraphNodes(t, graphStr, project)
 
 		// check node attributes
 		assert.Check(t, !is.Contains(graphStr, "Networks")().Success())
 		assert.Check(t, !is.Contains(graphStr, "Image")().Success())
 		assert.Check(t, !is.Contains(graphStr, "Ports")().Success())
 
-		// check edges that SHOULD exist in the generated graph
-		allowedEdges := make(map[string][]string)
-		for name, service := range project.Services {
-			allowed := make([]string, 0, len(service.DependsOn))
-			for depName := range service.DependsOn {
-				allowed = append(allowed, depName)
-			}
-			allowedEdges[name] = allowed
-		}
-		for serviceName, dependencies := range allowedEdges {
-			for _, dependencyName := range dependencies {
-				assert.Check(t, is.Contains(graphStr, "\""+serviceName+"\" -> \""+dependencyName+"\""))
-			}
-		}
-
-		// check edges that SHOULD NOT exist in the generated graph
-		forbiddenEdges := make(map[string][]string)
-		for name, service := range project.Services {
-			forbiddenEdges[name] = make([]string, 0, len(project.ServiceNames())-len(service.DependsOn))
-			for _, serviceName := range project.ServiceNames() {
-				_, edgeExists := service.DependsOn[serviceName]
-				if !edgeExists {
-					forbiddenEdges[name] = append(forbiddenEdges[name], serviceName)
-				}
-			}
-		}
-		for serviceName, forbiddenDeps := range forbiddenEdges {
-			for _, forbiddenDep := range forbiddenDeps {
-				assert.Check(t, !is.Contains(graphStr, "\""+serviceName+"\" -> \""+forbiddenDep+"\"")().Success())
-			}
-		}
+		assertVizDependencyEdges(t, graphStr, project)
 	})
 
 	t.Run("viz (with ports, networks and image)", func(t *testing.T) {
@@ -190,13 +154,7 @@ func TestViz(t *testing.T) {
 		assert.Check(t, is.Contains(graphStr, "\n\t"))
 		assert.Check(t, !is.Contains(graphStr, "\n\t\t")().Success(), graphStr)
 
-		// check digraph name
-		assert.Check(t, is.Contains(graphStr, "digraph \""+project.Name+"\""))
-
-		// check nodes
-		for _, service := range project.Services {
-			assert.Check(t, is.Contains(graphStr, "\""+service.Name+"\" [style=\"filled\""))
-		}
+		assertVizGraphNodes(t, graphStr, project)
 
 		// check node attributes
 		assert.Check(t, is.Contains(graphStr, "Networks"))
@@ -214,4 +172,30 @@ func TestViz(t *testing.T) {
 			}
 		}
 	})
+}
+
+// assertVizGraphNodes checks the digraph is named after the project and has a
+// node per service
+func assertVizGraphNodes(t *testing.T, graphStr string, project types.Project) {
+	t.Helper()
+	assert.Check(t, is.Contains(graphStr, "digraph \""+project.Name+"\""))
+	for _, service := range project.Services {
+		assert.Check(t, is.Contains(graphStr, "\""+service.Name+"\" [style=\"filled\""))
+	}
+}
+
+// assertVizDependencyEdges checks the graph has an edge per depends_on
+// relation, and none between independent services
+func assertVizDependencyEdges(t *testing.T, graphStr string, project types.Project) {
+	t.Helper()
+	for name, service := range project.Services {
+		for _, other := range project.ServiceNames() {
+			edge := "\"" + name + "\" -> \"" + other + "\""
+			if _, expected := service.DependsOn[other]; expected {
+				assert.Check(t, is.Contains(graphStr, edge))
+			} else {
+				assert.Check(t, !is.Contains(graphStr, edge)().Success())
+			}
+		}
+	}
 }

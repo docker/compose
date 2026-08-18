@@ -50,7 +50,22 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 	}, "pull", s.events)
 }
 
-func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error { //nolint:gocyclo
+// imagePuller tracks the state of a `compose pull` run: the images already
+// scheduled (a same image may back several services), per-service pull
+// failures, and services whose image must be built as a fallback.
+type imagePuller struct {
+	*composeService
+	project    *types.Project
+	opts       api.PullOptions
+	images     map[string]api.ImageSummary
+	eg         *errgroup.Group
+	scheduled  map[string]string // image -> first service pulling it
+	pullErrors []error
+	mu         sync.Mutex
+	mustBuild  []string
+}
+
+func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
 	images, _, err := s.getLocalImagesDigests(ctx, project)
 	if err != nil {
 		return err
@@ -59,126 +74,30 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(s.maxConcurrency)
 
-	var (
-		mustBuild         []string
-		pullErrors        = make([]error, len(project.Services))
-		imagesBeingPulled = map[string]string{}
-	)
-
-	i := 0
-	for name, service := range project.Services {
-		if service.Image == "" {
-			s.events.On(api.Resource{
-				ID:      name,
-				Status:  api.Done,
-				Text:    "Skipped",
-				Details: "No image to be pulled",
-			})
-			continue
-		}
-
-		pullRequired, skipReason, err := shouldPullImage(service, images)
-		if err != nil {
-			// join already-scheduled pulls before returning: bailing out with
-			// goroutines still in flight would leak them past pull()'s return
-			return errors.Join(err, eg.Wait())
-		}
-		if !pullRequired {
-			s.events.On(api.Resource{
-				ID:      "Image " + service.Image,
-				Status:  api.Done,
-				Text:    "Skipped",
-				Details: skipReason,
-			})
-			continue
-		}
-
-		if service.Build != nil && opts.IgnoreBuildable {
-			s.events.On(api.Resource{
-				ID:      "Image " + service.Image,
-				Status:  api.Done,
-				Text:    "Skipped",
-				Details: "Image can be built",
-			})
-			continue
-		}
-
-		if _, ok := imagesBeingPulled[service.Image]; ok {
-			continue
-		}
-
-		imagesBeingPulled[service.Image] = service.Name
-
-		idx := i
-		eg.Go(func() error {
-			err := s.pullServiceImage(ctx, service, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
-			if err != nil {
-				pullErrors[idx] = err
-				if service.Build != nil {
-					mustBuild = append(mustBuild, service.Name)
-				}
-				if !opts.IgnoreFailures && service.Build == nil {
-					if s.dryRun {
-						s.events.On(errorEventf("Image "+service.Image,
-							"error pulling image: %s", service.Image))
-					}
-					// fail fast if image can't be pulled nor built
-					return err
-				}
-			}
-			return nil
-		})
-		i++
+	p := &imagePuller{
+		composeService: s,
+		project:        project,
+		opts:           opts,
+		images:         images,
+		eg:             eg,
+		scheduled:      map[string]string{},
+		pullErrors:     make([]error, len(project.Services)),
 	}
 
-	// pre_start hook images run as ephemeral init containers with their own
-	// registry image. They have no pull policy of their own, so we inherit the
-	// parent service's policy for skip decisions — through the same
-	// shouldPullImage decision as the service image. Unlike the service
-	// image, a hook image can't be built, so `build` falls back to
-	// pull-if-missing instead of exempting it from pulling.
-	for name, service := range project.Services {
-		hookPolicy := service.PullPolicy
-		if hookPolicy == types.PullPolicyBuild {
-			hookPolicy = types.PullPolicyMissing
-		}
-		for _, img := range api.GetDependentImages(service, project.Name) {
-			pullRequired, skipReason, err := shouldPullImage(types.ServiceConfig{Name: name, Image: img, PullPolicy: hookPolicy}, images)
-			if err != nil {
-				// same as the service loop: never leave scheduled pulls unjoined
-				return errors.Join(err, eg.Wait())
-			}
-			if !pullRequired {
-				if skipReason != "" {
-					s.events.On(api.Resource{
-						ID:      "Image " + img,
-						Status:  api.Done,
-						Text:    "Skipped",
-						Details: skipReason,
-					})
-				}
-				continue
-			}
-			if _, ok := imagesBeingPulled[img]; ok {
-				continue
-			}
-			imagesBeingPulled[img] = name
-			hookService := types.ServiceConfig{Name: name, Image: img}
-			eg.Go(func() error {
-				err := s.pullServiceImage(ctx, hookService, opts.Quiet, project.Environment["DOCKER_DEFAULT_PLATFORM"])
-				if err != nil && !opts.IgnoreFailures {
-					// fail fast: a hook image can't be built as a fallback
-					return err
-				}
-				return nil
-			})
-		}
+	err = p.pullServiceImages(ctx)
+	if err == nil {
+		err = p.pullHookImages(ctx)
+	}
+	if err != nil {
+		// join already-scheduled pulls before returning: bailing out with
+		// goroutines still in flight would leak them past pull()'s return
+		return errors.Join(err, eg.Wait())
 	}
 
 	err = eg.Wait()
 
-	if len(mustBuild) > 0 {
-		logrus.Warnf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(mustBuild, " "))
+	if len(p.mustBuild) > 0 {
+		logrus.Warnf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(p.mustBuild, " "))
 	}
 
 	if err != nil {
@@ -187,7 +106,117 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	if opts.IgnoreFailures {
 		return nil
 	}
-	return errors.Join(pullErrors...)
+	return errors.Join(p.pullErrors...)
+}
+
+// pullServiceImages schedules a pull for each service image which requires
+// one, emitting a Skipped event for the others
+func (p *imagePuller) pullServiceImages(ctx context.Context) error {
+	i := 0
+	for name, service := range p.project.Services {
+		if service.Image == "" {
+			p.eventSkippedPull(name, "No image to be pulled")
+			continue
+		}
+
+		pullRequired, skipReason, err := shouldPullImage(service, p.images)
+		if err != nil {
+			return err
+		}
+		if !pullRequired {
+			p.eventSkippedPull("Image "+service.Image, skipReason)
+			continue
+		}
+		if service.Build != nil && p.opts.IgnoreBuildable {
+			p.eventSkippedPull("Image "+service.Image, "Image can be built")
+			continue
+		}
+		if _, ok := p.scheduled[service.Image]; ok {
+			continue
+		}
+		p.scheduled[service.Image] = service.Name
+
+		idx := i
+		p.eg.Go(func() error {
+			return p.runServicePull(ctx, idx, service)
+		})
+		i++
+	}
+	return nil
+}
+
+// runServicePull pulls a service image, recording the failure and whether the
+// image could be built instead, per the fail-fast rules of `compose pull`
+func (p *imagePuller) runServicePull(ctx context.Context, idx int, service types.ServiceConfig) error {
+	err := p.pullServiceImage(ctx, service, p.opts.Quiet, p.project.Environment["DOCKER_DEFAULT_PLATFORM"])
+	if err == nil {
+		return nil
+	}
+	p.pullErrors[idx] = err
+	if service.Build != nil {
+		p.mu.Lock()
+		p.mustBuild = append(p.mustBuild, service.Name)
+		p.mu.Unlock()
+	}
+	if !p.opts.IgnoreFailures && service.Build == nil {
+		if p.dryRun {
+			p.events.On(errorEventf("Image "+service.Image,
+				"error pulling image: %s", service.Image))
+		}
+		// fail fast if image can't be pulled nor built
+		return err
+	}
+	return nil
+}
+
+// pullHookImages schedules pulls for pre_start hook images, which run as
+// ephemeral init containers with their own registry image. They have no pull
+// policy of their own, so we inherit the parent service's policy for skip
+// decisions — through the same shouldPullImage decision as the service image.
+// Unlike the service image, a hook image can't be built, so `build` falls
+// back to pull-if-missing instead of exempting it from pulling.
+func (p *imagePuller) pullHookImages(ctx context.Context) error {
+	for name, service := range p.project.Services {
+		hookPolicy := service.PullPolicy
+		if hookPolicy == types.PullPolicyBuild {
+			hookPolicy = types.PullPolicyMissing
+		}
+		for _, img := range api.GetDependentImages(service, p.project.Name) {
+			pullRequired, skipReason, err := shouldPullImage(types.ServiceConfig{Name: name, Image: img, PullPolicy: hookPolicy}, p.images)
+			if err != nil {
+				return err
+			}
+			if !pullRequired {
+				if skipReason != "" {
+					p.eventSkippedPull("Image "+img, skipReason)
+				}
+				continue
+			}
+			if _, ok := p.scheduled[img]; ok {
+				continue
+			}
+			p.scheduled[img] = name
+			hookService := types.ServiceConfig{Name: name, Image: img}
+			p.eg.Go(func() error {
+				err := p.pullServiceImage(ctx, hookService, p.opts.Quiet, p.project.Environment["DOCKER_DEFAULT_PLATFORM"])
+				if err != nil && !p.opts.IgnoreFailures {
+					// fail fast: a hook image can't be built as a fallback
+					return err
+				}
+				return nil
+			})
+		}
+	}
+	return nil
+}
+
+func (p *imagePuller) eventSkippedPull(id, details string) {
+	p.events.On(api.Resource{
+		ID:      id,
+		Status:  api.Done,
+		Text:    "Skipped",
+		Details: details,
+	})
 }
 
 // shouldPullImage decides whether `compose pull` refreshes a service's image,

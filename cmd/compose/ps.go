@@ -92,7 +92,7 @@ func psCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	return psCmd
 }
 
-func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, opts psOptions) error { //nolint:gocyclo
+func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, opts psOptions) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
