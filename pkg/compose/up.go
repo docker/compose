@@ -43,7 +43,13 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		err := s.create(ctx, project, options.Create)
+		// PoC: services with isolation:sandbox run in a Docker Sandbox, the
+		// engine only sees the remaining services
+		project, err := s.prepareSandboxServices(ctx, project)
+		if err != nil {
+			return err
+		}
+		err = s.create(ctx, project, options.Create)
 		if err != nil {
 			return err
 		}

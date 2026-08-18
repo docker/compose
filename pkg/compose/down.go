@@ -61,6 +61,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
+	// PoC: tear down the sandboxes of isolation:sandbox services
+	s.removeSandboxServices(ctx, project)
+
 	// keep only the requested services that exist in the model
 	var services []string
 	for _, service := range options.Services {
