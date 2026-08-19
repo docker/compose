@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -241,6 +242,10 @@ func runUp(
 		return err
 	}
 
+	if err := rejectScheduledJobs(project); err != nil {
+		return err
+	}
+
 	err := createOptions.Apply(project)
 	if err != nil {
 		return err
@@ -348,4 +353,21 @@ func runUp(
 			NavigationMenu: upOptions.navigationMenu && display.Mode != display.ModePlain && dockerCli.In().IsTerminal(),
 		},
 	})
+}
+
+// rejectScheduledJobs refuses to bring a project up when it declares active
+// scheduled jobs: silently not scheduling them would break the user's
+// expectations, unlike manual jobs which simply wait for an explicit trigger.
+func rejectScheduledJobs(project *types.Project) error {
+	names := make([]string, 0, len(project.Jobs))
+	for name, job := range project.Jobs {
+		if job.Triggers != nil && len(job.Triggers.Schedule) > 0 {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	sort.Strings(names)
+	return fmt.Errorf("scheduled jobs are not supported in this version: %s", strings.Join(names, ", "))
 }

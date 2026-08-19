@@ -98,6 +98,11 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 }
 
 func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
+	// same contract as up: an active scheduled job is refused before any
+	// resource is created — silently not scheduling would break expectations
+	if err := rejectScheduledJobs(project); err != nil {
+		return err
+	}
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}
