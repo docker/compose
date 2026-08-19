@@ -373,9 +373,11 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		service, ok := set[serviceLabel]
 		if !ok {
 			service = types.ServiceConfig{
-				Name:   serviceLabel,
-				Image:  ctr.Image,
-				Labels: ctr.Labels,
+				Name: serviceLabel,
+				ContainerSpec: types.ContainerSpec{
+					Image:  ctr.Image,
+					Labels: ctr.Labels,
+				},
 			}
 		}
 		service.Scale = increment(service.Scale)

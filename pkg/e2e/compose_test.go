@@ -201,11 +201,11 @@ func TestConfig(t *testing.T) {
 		OutputContains(fmt.Sprintf(`name: %s
 services:
   nginx:
+    networks:
+      default: null
     build:
       context: %s
       dockerfile: Dockerfile
-    networks:
-      default: null
 networks:
   default:
     name: %s_default

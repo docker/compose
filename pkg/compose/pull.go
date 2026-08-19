@@ -182,7 +182,7 @@ func (p *imagePuller) pullHookImages(ctx context.Context) error {
 			hookPolicy = types.PullPolicyMissing
 		}
 		for _, img := range api.GetDependentImages(service, p.project.Name) {
-			pullRequired, skipReason, err := shouldPullImage(types.ServiceConfig{Name: name, Image: img, PullPolicy: hookPolicy}, p.images)
+			pullRequired, skipReason, err := shouldPullImage(types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img, PullPolicy: hookPolicy}}, p.images)
 			if err != nil {
 				return err
 			}
@@ -196,7 +196,7 @@ func (p *imagePuller) pullHookImages(ctx context.Context) error {
 				continue
 			}
 			p.scheduled[img] = name
-			hookService := types.ServiceConfig{Name: name, Image: img}
+			hookService := types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img}}
 			p.eg.Go(func() error {
 				err := p.pullServiceImage(ctx, hookService, p.opts.Quiet, p.project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				if err != nil && !p.opts.IgnoreFailures {
@@ -429,8 +429,8 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 					// Hack: create a fake ServiceConfig so we pull missing volume image
 					n := fmt.Sprintf("%s:volume %d", name, i)
 					needPull[n] = types.ServiceConfig{
-						Name:  n,
-						Image: vol.Source,
+						Name:          n,
+						ContainerSpec: types.ContainerSpec{Image: vol.Source},
 					}
 					scheduled[vol.Source] = true
 				}
@@ -525,7 +525,7 @@ func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSum
 			hookPolicy = types.PullPolicyMissing
 		}
 		for i, img := range api.GetDependentImages(service, project.Name) {
-			pull, err := mustPull(types.ServiceConfig{Name: name, Image: img, PullPolicy: hookPolicy}, images)
+			pull, err := mustPull(types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img, PullPolicy: hookPolicy}}, images)
 			if err != nil {
 				return err
 			}
@@ -536,8 +536,8 @@ func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSum
 			// Hack: create a fake ServiceConfig so we pull missing pre_start hook image
 			n := fmt.Sprintf("%s:pre_start %d", name, i)
 			needPull[n] = types.ServiceConfig{
-				Name:  n,
-				Image: img,
+				Name:          n,
+				ContainerSpec: types.ContainerSpec{Image: img},
 			}
 		}
 	}

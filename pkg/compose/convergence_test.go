@@ -247,13 +247,12 @@ func TestWaitDependencies(t *testing.T) {
 		replicas := 0
 		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
 			"app": {
-				Name: "app",
-				DependsOn: types.DependsOnConfig{
+				Name: "app", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 					"disabled": {
 						Condition: ServiceConditionRunningOrHealthy,
 						Required:  true,
 					},
-				},
+				}},
 			},
 			"disabled": {
 				Name:   "disabled",
@@ -485,15 +484,14 @@ func TestCreateMobyContainer(t *testing.T) {
 	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
 
 	service := types.ServiceConfig{
-		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
+		Name: "test", ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{
 			"a": {
 				Priority: 10,
 			},
 			"b": {
 				Priority: 100,
 			},
-		},
+		}},
 	}
 	project := types.Project{
 		Name: "bork",
@@ -584,11 +582,10 @@ func TestCreateMobyContainerLegacyAPI(t *testing.T) {
 	apiClient.EXPECT().ClientVersion().Return("1.43").AnyTimes()
 
 	service := types.ServiceConfig{
-		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
+		Name: "test", ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{
 			"a": {Priority: 10},
 			"b": {Priority: 100},
-		},
+		}},
 	}
 	project := types.Project{
 		Name: "bork",
@@ -673,11 +670,10 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 	apiClient.EXPECT().ClientVersion().Return("1.43").AnyTimes()
 
 	service := types.ServiceConfig{
-		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
+		Name: "test", ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{
 			"a": {Priority: 10},
 			"b": {Priority: 100},
-		},
+		}},
 	}
 	project := types.Project{
 		Name: "bork",
