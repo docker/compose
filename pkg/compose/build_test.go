@@ -84,26 +84,22 @@ func Test_dockerFilePath(t *testing.T) {
 func Test_addBuildDependencies(t *testing.T) {
 	project := &types.Project{Services: types.Services{
 		"test": types.ServiceConfig{
-			Build: &types.BuildConfig{
+			WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
 				AdditionalContexts: map[string]string{
 					"foo": "service:foo",
 					"bar": "service:bar",
 				},
-			},
+			}},
 		},
 		"foo": types.ServiceConfig{
-			Build: &types.BuildConfig{
+			WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
 				AdditionalContexts: map[string]string{
 					"zot": "service:zot",
 				},
-			},
+			}},
 		},
-		"bar": types.ServiceConfig{
-			Build: &types.BuildConfig{},
-		},
-		"zot": types.ServiceConfig{
-			Build: &types.BuildConfig{},
-		},
+		"bar": types.ServiceConfig{WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{}}},
+		"zot": types.ServiceConfig{WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{}}},
 	}}
 
 	services := addBuildDependencies([]string{"test"}, project)
@@ -122,11 +118,11 @@ func TestGetLocalImagesDigests_PreStartHook(t *testing.T) {
 		Name: "demo",
 		Services: types.Services{
 			"web": types.ServiceConfig{
-				Name:  "web",
-				Image: "alpine:3.20",
-				PreStart: []types.ServiceHook{
-					{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "init"}},
-				},
+				Name: "web",
+
+				PreStart: []types.PreStartHook{
+					{ContainerSpec: types.ContainerSpec{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "init"}}},
+				}, ContainerSpec: types.ContainerSpec{Image: "alpine:3.20"},
 			},
 		},
 	}
@@ -155,9 +151,10 @@ func TestResolveImageVolumes(t *testing.T) {
 
 	t.Run("source is an image name", func(t *testing.T) {
 		service := types.ServiceConfig{
-			Name:         "web",
-			CustomLabels: types.Labels{},
-			Volumes:      []types.ServiceVolumeConfig{imageVolume("content:1", "/data")},
+			Name: "web", ContainerSpec: types.ContainerSpec{
+				CustomLabels: types.Labels{},
+				Volumes:      []types.ServiceVolumeConfig{imageVolume("content:1", "/data")},
+			},
 		}
 		resolveImageVolumes(&service, images, "p")
 		assert.Equal(t, service.Volumes[0].Source, "content:1")
@@ -166,9 +163,10 @@ func TestResolveImageVolumes(t *testing.T) {
 
 	t.Run("source is another service resolves to its image name", func(t *testing.T) {
 		service := types.ServiceConfig{
-			Name:         "web",
-			CustomLabels: types.Labels{},
-			Volumes:      []types.ServiceVolumeConfig{imageVolume("source", "/data")},
+			Name: "web", ContainerSpec: types.ContainerSpec{
+				CustomLabels: types.Labels{},
+				Volumes:      []types.ServiceVolumeConfig{imageVolume("source", "/data")},
+			},
 		}
 		resolveImageVolumes(&service, images, "p")
 		// the mount Source must stay a daemon-resolvable name, never a digest
@@ -178,9 +176,10 @@ func TestResolveImageVolumes(t *testing.T) {
 
 	t.Run("unresolvable source is left untouched and unlabelled", func(t *testing.T) {
 		service := types.ServiceConfig{
-			Name:         "web",
-			CustomLabels: types.Labels{},
-			Volumes:      []types.ServiceVolumeConfig{imageVolume("ghost:1", "/data")},
+			Name: "web", ContainerSpec: types.ContainerSpec{
+				CustomLabels: types.Labels{},
+				Volumes:      []types.ServiceVolumeConfig{imageVolume("ghost:1", "/data")},
+			},
 		}
 		resolveImageVolumes(&service, images, "p")
 		assert.Equal(t, service.Volumes[0].Source, "ghost:1")
@@ -190,11 +189,12 @@ func TestResolveImageVolumes(t *testing.T) {
 
 	t.Run("several volumes produce a deterministic sorted label", func(t *testing.T) {
 		service := types.ServiceConfig{
-			Name:         "web",
-			CustomLabels: types.Labels{},
-			Volumes: []types.ServiceVolumeConfig{
-				imageVolume("assets:2", "/b"),
-				imageVolume("content:1", "/a"),
+			Name: "web", ContainerSpec: types.ContainerSpec{
+				CustomLabels: types.Labels{},
+				Volumes: []types.ServiceVolumeConfig{
+					imageVolume("assets:2", "/b"),
+					imageVolume("content:1", "/a"),
+				},
 			},
 		}
 		resolveImageVolumes(&service, images, "p")
@@ -203,9 +203,10 @@ func TestResolveImageVolumes(t *testing.T) {
 
 	t.Run("no image volumes writes no label", func(t *testing.T) {
 		service := types.ServiceConfig{
-			Name:         "web",
-			CustomLabels: types.Labels{},
-			Volumes:      []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Source: "vol", Target: "/data"}},
+			Name: "web", ContainerSpec: types.ContainerSpec{
+				CustomLabels: types.Labels{},
+				Volumes:      []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Source: "vol", Target: "/data"}},
+			},
 		}
 		resolveImageVolumes(&service, images, "p")
 		_, labelled := service.CustomLabels[api.ImageVolumeDigestLabel]

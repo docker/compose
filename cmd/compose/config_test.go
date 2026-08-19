@@ -139,14 +139,17 @@ func TestImagesOnly(t *testing.T) {
 		Name: "test",
 		Services: types.Services{
 			"test": types.ServiceConfig{
-				Name:    "test",
-				Image:   "docker.io/library/nginx@" + testDigest,
-				Command: types.ShellCommand{"echo", "hello"},
+				Name: "test",
+
 				// hooks can't be overridden element-wise on merge, so the lock must not carry them
-				PreStart: []types.ServiceHook{{Image: "docker.io/library/hookimage@" + testDigest}},
-				Volumes: []types.ServiceVolumeConfig{
-					{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
-					{Type: types.VolumeTypeBind, Source: "/host", Target: "/bind"},
+				PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "docker.io/library/hookimage@" + testDigest}}}, ContainerSpec: types.ContainerSpec{
+					Image:   "docker.io/library/nginx@" + testDigest,
+					Command: types.ShellCommand{"echo", "hello"},
+
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
+						{Type: types.VolumeTypeBind, Source: "/host", Target: "/bind"},
+					},
 				},
 			},
 		},
@@ -158,9 +161,11 @@ func TestImagesOnly(t *testing.T) {
 	assert.DeepEqual(t, locked, &types.Project{
 		Services: types.Services{
 			"test": types.ServiceConfig{
-				Image: "docker.io/library/nginx@" + testDigest,
-				Volumes: []types.ServiceVolumeConfig{
-					{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
+				ContainerSpec: types.ContainerSpec{
+					Image: "docker.io/library/nginx@" + testDigest,
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
+					},
 				},
 			},
 		},
@@ -177,8 +182,8 @@ func TestWarnHooksNotLockable(t *testing.T) {
 
 	warnHooksNotLockable(&types.Project{
 		Services: types.Services{
-			"with-hook-image": types.ServiceConfig{PreStart: []types.ServiceHook{{Image: "alpine:latest"}}},
-			"inline-hook":     types.ServiceConfig{PreStart: []types.ServiceHook{{Command: types.ShellCommand{"echo"}}}},
+			"with-hook-image": types.ServiceConfig{PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "alpine:latest"}}}},
+			"inline-hook":     types.ServiceConfig{PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"echo"}}}}},
 			"without-hook":    types.ServiceConfig{},
 		},
 	})

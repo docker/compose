@@ -46,58 +46,57 @@ func TestGetDependentImages(t *testing.T) {
 	}{
 		{
 			name:     "no hooks",
-			service:  types.ServiceConfig{Image: "alpine:3.20"},
+			service:  types.ServiceConfig{ContainerSpec: types.ContainerSpec{Image: "alpine:3.20"}},
 			expected: nil,
 		},
 		{
 			name: "pre_start hook with explicit image",
 			service: types.ServiceConfig{
-				Image: "alpine:3.20",
-				PreStart: []types.ServiceHook{
-					{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "init"}},
-				},
+				PreStart: []types.PreStartHook{
+					{ContainerSpec: types.ContainerSpec{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "init"}}},
+				}, ContainerSpec: types.ContainerSpec{Image: "alpine:3.20"},
 			},
 			expected: []string{"alpine:3.19"},
 		},
 		{
 			name: "pre_start hook without image is ignored",
 			service: types.ServiceConfig{
-				Image: "alpine:3.20",
-				PreStart: []types.ServiceHook{
-					{Image: "busybox", Command: types.ShellCommand{"echo", "a"}},
-					{Command: types.ShellCommand{"echo", "b"}},
-				},
+				PreStart: []types.PreStartHook{
+					{ContainerSpec: types.ContainerSpec{Image: "busybox", Command: types.ShellCommand{"echo", "a"}}},
+					{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"echo", "b"}}},
+				}, ContainerSpec: types.ContainerSpec{Image: "alpine:3.20"},
 			},
 			expected: []string{"busybox"},
 		},
 		{
 			name: "pre_start hook reusing the service image is ignored",
 			service: types.ServiceConfig{
-				Image: "alpine:3.20",
-				PreStart: []types.ServiceHook{
-					{Image: "alpine:3.20", Command: types.ShellCommand{"echo", "same"}},
-					{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "other"}},
-				},
+				PreStart: []types.PreStartHook{
+					{ContainerSpec: types.ContainerSpec{Image: "alpine:3.20", Command: types.ShellCommand{"echo", "same"}}},
+					{ContainerSpec: types.ContainerSpec{Image: "alpine:3.19", Command: types.ShellCommand{"echo", "other"}}},
+				}, ContainerSpec: types.ContainerSpec{Image: "alpine:3.20"},
 			},
 			expected: []string{"alpine:3.19"},
 		},
 		{
 			name: "pre_start hook reusing the default (build) image name is ignored",
 			service: types.ServiceConfig{
-				Name:  "web",
-				Build: &types.BuildConfig{Context: "."},
-				PreStart: []types.ServiceHook{
-					{Image: "demo-web", Command: types.ShellCommand{"echo", "same"}},
-				},
+				Name: "web",
+
+				PreStart: []types.PreStartHook{
+					{ContainerSpec: types.ContainerSpec{Image: "demo-web", Command: types.ShellCommand{"echo", "same"}}},
+				}, WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
 			},
 			expected: nil,
 		},
 		{
+			// exec hooks carry no image at all since the container spec
+			// layering: nothing to collect, by construction
 			name: "post_start and pre_stop hooks are not collected",
 			service: types.ServiceConfig{
-				Image:     "alpine:3.20",
-				PostStart: []types.ServiceHook{{Image: "ignored:post", Command: types.ShellCommand{"echo"}}},
-				PreStop:   []types.ServiceHook{{Image: "ignored:stop", Command: types.ShellCommand{"echo"}}},
+				PostStart:     []types.ServiceHook{{Command: types.ShellCommand{"echo"}}},
+				PreStop:       []types.ServiceHook{{Command: types.ShellCommand{"echo"}}},
+				ContainerSpec: types.ContainerSpec{Image: "alpine:3.20"},
 			},
 			expected: nil,
 		},

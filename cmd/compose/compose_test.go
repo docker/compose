@@ -31,10 +31,9 @@ func TestFilterServices(t *testing.T) {
 				Links: []string{"bar"},
 			},
 			"bar": {
-				Name: "bar",
-				DependsOn: map[string]types.ServiceDependency{
+				Name: "bar", WorkloadSpec: types.WorkloadSpec{DependsOn: map[string]types.ServiceDependency{
 					"zot": {},
-				},
+				}},
 			},
 			"zot": {
 				Name: "zot",
