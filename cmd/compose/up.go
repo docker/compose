@@ -245,6 +245,7 @@ func runUp(
 	if err := rejectScheduledJobs(project); err != nil {
 		return err
 	}
+	warnIgnoredJobs(project)
 
 	err := createOptions.Apply(project)
 	if err != nil {
@@ -353,6 +354,21 @@ func runUp(
 			NavigationMenu: upOptions.navigationMenu && display.Mode != display.ModePlain && dockerCli.In().IsTerminal(),
 		},
 	})
+}
+
+// warnIgnoredJobs names the declared jobs up will not act on: manual jobs
+// wait for an explicit `compose run <job>` trigger.
+func warnIgnoredJobs(project *types.Project) {
+	jobs := project.AllJobs()
+	if len(jobs) == 0 {
+		return
+	}
+	names := make([]string, 0, len(jobs))
+	for name := range jobs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
 }
 
 // rejectScheduledJobs refuses to bring a project up when it declares active
