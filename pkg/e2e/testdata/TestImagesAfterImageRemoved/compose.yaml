@@ -1,0 +1,6 @@
+services:
+  app:
+    image: ${REMOVED_IMAGE}
+    pull_policy: never
+    init: true
+    command: ["sleep", "infinity"]

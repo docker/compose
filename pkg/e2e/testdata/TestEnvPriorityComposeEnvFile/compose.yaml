@@ -1,0 +1,6 @@
+services:
+  env-compose-priority:
+    build:
+      context: .
+    env_file:
+      - .env.override

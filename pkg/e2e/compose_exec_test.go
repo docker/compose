@@ -17,78 +17,37 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 )
 
 func TestLocalComposeExec(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "compose-e2e-exec"
-
-	cmdArgs := func(cmd string, args ...string) []string {
-		ret := []string{"--project-directory", "fixtures/simple-composefile", "--project-name", projectName, cmd}
-		ret = append(ret, args...)
-		return ret
-	}
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, cmdArgs("down", "--timeout=0")...)
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	c.RunDockerComposeCmd(t, cmdArgs("up", "-d")...)
-
-	t.Run("exec true", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, cmdArgs("exec", "simple", "/bin/true")...)
-	})
-
-	t.Run("exec false", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, cmdArgs("exec", "simple", "/bin/false")...)
-		res.Assert(t, icmd.Expected{ExitCode: 1})
-	})
-
-	t.Run("exec with env set", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...),
-			func(cmd *icmd.Cmd) {
-				cmd.Env = append(cmd.Env, "FOO=BAR")
-			})
-		res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
-	})
-
-	t.Run("exec without env set", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...)
-		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="), res.Combined())
-	})
+	NewScenario(t, "exec must run in the service container, propagate the exit code and pass only requested env").
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("simple", "running")).
+		Step("a successful command exits 0",
+			ComposeCmd("exec", "simple", "/bin/true")).
+		Step("a failing command's exit code is propagated",
+			ComposeCmd("exec", "simple", "/bin/false").MayFail(),
+			ExitCode(1)).
+		Step("exec -e forwards the variable when set on the caller",
+			ComposeCmd("exec", "-e", "FOO", "simple", "/usr/bin/env").WithEnv("FOO=BAR"),
+			OutputContains("FOO=BAR")).
+		Step("exec -e without a value does not leak an empty variable",
+			ComposeCmd("exec", "-e", "FOO", "simple", "/usr/bin/env"),
+			OutputNotContains("FOO="))
 }
 
 func TestLocalComposeExecOneOff(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	const projectName = "compose-e2e-exec-one-off"
-	defer c.cleanupWithDown(t, projectName)
-	cmdArgs := func(cmd string, args ...string) []string {
-		ret := []string{"--project-directory", "fixtures/simple-composefile", "--project-name", projectName, cmd}
-		ret = append(ret, args...)
-		return ret
-	}
-
-	c.RunDockerComposeCmd(t, cmdArgs("run", "-d", "simple")...)
-
-	t.Run("exec in one-off container", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...)
-		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="), res.Combined())
-	})
-
-	t.Run("exec with index", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, cmdArgs("exec", "--index", "1", "-e", "FOO", "simple", "/usr/bin/env")...)
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "service \"simple\" is not running container #1"})
-	})
-	cmdResult := c.RunDockerCmd(t, "ps", "-q", "--filter", "label=com.docker.compose.project=compose-e2e-exec-one-off").Stdout()
-	containerIDs := strings.Split(cmdResult, "\n")
-	_ = c.RunDockerOrExitError(t, append([]string{"stop"}, containerIDs...)...)
+	NewScenario(t, "exec must reach a one-off container, but --index must only match numbered replicas").
+		Step("run starts a detached one-off",
+			ComposeCmd("run", "-d", "simple", "top"),
+			OneOffState("simple", "running")).
+		Step("exec lands in the one-off container",
+			ComposeCmd("exec", "-e", "FOO", "simple", "/usr/bin/env"),
+			OutputNotContains("FOO=")).
+		Step("exec --index rejects a one-off: it is not replica #1",
+			ComposeCmd("exec", "--index", "1", "-e", "FOO", "simple", "/usr/bin/env").MayFail(),
+			ExitCode(1),
+			OutputContains(`service "simple" is not running container #1`))
 }

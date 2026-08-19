@@ -1,0 +1,18 @@
+services:
+  ssh:
+    image: ${SECRET_IMAGE}
+    build:
+      context: .
+      secrets:
+        - mysecret
+        - dotenvsecret
+        - source: envsecret
+          target: build_secret
+
+secrets:
+  mysecret:
+    file: ./secret.txt
+  envsecret:
+    environment: SOME_SECRET
+  dotenvsecret:
+    environment: ANOTHER_SECRET

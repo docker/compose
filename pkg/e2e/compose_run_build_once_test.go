@@ -17,87 +17,47 @@
 package e2e
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"regexp"
-	"strings"
 	"testing"
-
-	"gotest.tools/v3/assert"
 )
 
-// TestRunBuildOnce tests that services with pull_policy: build are only built once
-// when using 'docker compose run', even when they are dependencies.
-// This addresses a bug where dependencies were built twice: once in startDependencies
-// and once in ensureImagesExists.
-func TestRunBuildOnce(t *testing.T) {
-	c := NewParallelCLI(t)
+// The build-once scenarios lock a regression where run built pull_policy:
+// build dependencies twice — once in startDependencies and once in
+// ensureImagesExists. Counting the "naming to ... done" build reports in the
+// verbose output is the observable.
 
-	t.Run("dependency with pull_policy build is built only once", func(t *testing.T) {
-		projectName := randomProjectName("build-once")
-		composeFile := "./fixtures/run-test/build-once.yaml"
-		t.Cleanup(func() {
-			c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "down", "--rmi", "local", "--remove-orphans", "-v")
-		})
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "--verbose", "run", "--build", "--rm", "curl")
-
-		output := res.Stdout()
-
-		nginxBuilds := countServiceBuilds(output, projectName, "nginx")
-
-		assert.Equal(t, nginxBuilds, 1, "nginx should build once, built %d times\nOutput:\n%s", nginxBuilds, output)
-		assert.Assert(t, strings.Contains(res.Stdout(), "curl service"))
-	})
-
-	t.Run("nested dependencies build only once each", func(t *testing.T) {
-		projectName := randomProjectName("build-nested")
-		composeFile := "./fixtures/run-test/build-once-nested.yaml"
-		t.Cleanup(func() {
-			c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "down", "--rmi", "local", "--remove-orphans", "-v")
-		})
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "--verbose", "run", "--build", "--rm", "app")
-
-		output := res.Stdout()
-
-		dbBuilds := countServiceBuilds(output, projectName, "db")
-		apiBuilds := countServiceBuilds(output, projectName, "api")
-		appBuilds := countServiceBuilds(output, projectName, "app")
-
-		assert.Equal(t, dbBuilds, 1, "db should build once, built %d times\nOutput:\n%s", dbBuilds, output)
-		assert.Equal(t, apiBuilds, 1, "api should build once, built %d times\nOutput:\n%s", apiBuilds, output)
-		assert.Equal(t, appBuilds, 1, "app should build once, built %d times\nOutput:\n%s", appBuilds, output)
-		assert.Assert(t, strings.Contains(output, "App running"))
-	})
-
-	t.Run("service with no dependencies builds once", func(t *testing.T) {
-		projectName := randomProjectName("build-simple")
-		composeFile := "./fixtures/run-test/build-once-no-deps.yaml"
-		t.Cleanup(func() {
-			c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "down", "--rmi", "local", "--remove-orphans", "-v")
-		})
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "-f", composeFile, "run", "--build", "--rm", "simple")
-
-		output := res.Stdout()
-
-		simpleBuilds := countServiceBuilds(output, projectName, "simple")
-
-		assert.Equal(t, simpleBuilds, 1, "simple should build once, built %d times\nOutput:\n%s", simpleBuilds, output)
-		assert.Assert(t, strings.Contains(res.Stdout(), "Simple service"))
-	})
+func builtOnce(project, service string) Check {
+	return OutputMatchesCount(`naming to .*`+regexp.QuoteMeta(project)+`-`+regexp.QuoteMeta(service)+`.* done`, 1)
 }
 
-// countServiceBuilds counts how many times a service was built by matching
-// the "naming to *{projectName}-{serviceName}* done" pattern in the output
-func countServiceBuilds(output, projectName, serviceName string) int {
-	pattern := regexp.MustCompile(`naming to .*` + regexp.QuoteMeta(projectName) + `-` + regexp.QuoteMeta(serviceName) + `.* done`)
-	return len(pattern.FindAllString(output, -1))
+func TestRunBuildOnceDependency(t *testing.T) {
+	s := NewScenario(t, "run --build must build a pull_policy: build dependency exactly once")
+	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-nginx").MayFail()).
+		Step("run builds the dependency once and executes the service",
+			ComposeCmd("--verbose", "run", "--build", "--rm", "curl"),
+			builtOnce(s.Project(), "nginx"),
+			StdoutContains("curl service"))
 }
 
-// randomProjectName generates a unique project name for parallel test execution
-// Format: prefix-<8 random hex chars> (e.g., "build-once-3f4a9b2c")
-func randomProjectName(prefix string) string {
-	b := make([]byte, 4) // 4 bytes = 8 hex chars
-	rand.Read(b)
-	return fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(b))
+func TestRunBuildOnceNestedDependencies(t *testing.T) {
+	s := NewScenario(t, "run --build must build each service of a dependency chain exactly once")
+	s.Defer(
+		DockerCmd("image", "rm", "-f", s.Project()+"-db").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-api").MayFail(),
+		DockerCmd("image", "rm", "-f", s.Project()+"-app").MayFail()).
+		Step("run builds the whole chain, each image once",
+			ComposeCmd("--verbose", "run", "--build", "--rm", "app"),
+			builtOnce(s.Project(), "db"),
+			builtOnce(s.Project(), "api"),
+			builtOnce(s.Project(), "app"),
+			StdoutContains("App running"))
+}
+
+func TestRunBuildOnceNoDeps(t *testing.T) {
+	s := NewScenario(t, "run --build on a dependency-less service must build it exactly once")
+	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-simple").MayFail()).
+		Step("run builds the service once and executes it",
+			ComposeCmd("run", "--build", "--rm", "simple"),
+			builtOnce(s.Project(), "simple"),
+			StdoutContains("Simple service"))
 }

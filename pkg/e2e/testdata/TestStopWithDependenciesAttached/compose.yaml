@@ -1,0 +1,10 @@
+services:
+  foo:
+    image: alpine
+    command: echo hello
+    depends_on:
+      - bar
+  bar:
+    image: alpine
+    init: true
+    command: sleep infinity

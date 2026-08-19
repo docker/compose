@@ -1,0 +1,9 @@
+services:
+  orphan:
+    profiles: [run]
+    image: alpine
+    command: echo hello
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity

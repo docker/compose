@@ -1,5 +1,0 @@
-services:
-  test:
-    image: test
-    ports:
-      - ${PORT:-8080}:80

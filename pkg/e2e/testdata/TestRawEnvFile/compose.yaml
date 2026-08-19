@@ -1,0 +1,7 @@
+services:
+  test:
+    image: alpine
+    command: sh -c "echo $$TEST_VAR"
+    env_file:
+      - path: .env.raw
+        format: raw # parse without interpolation

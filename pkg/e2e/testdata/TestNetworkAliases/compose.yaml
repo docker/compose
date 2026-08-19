@@ -1,0 +1,14 @@
+services:
+  container1:
+    image: nginx
+    stop_signal: SIGTERM
+    links:
+      - container2:container
+
+  container2:
+    image: nginx
+    stop_signal: SIGTERM
+    networks:
+      default:
+        aliases:
+          - alias-of-container2

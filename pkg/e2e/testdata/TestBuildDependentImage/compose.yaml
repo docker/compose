@@ -1,0 +1,26 @@
+services:
+  firstbuild:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+      additional_contexts:
+        dep1: service:dep1
+    entrypoint: ["echo", "Hello from firstbuild"]
+    depends_on:
+      - dep1
+
+  secondbuild:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+      additional_contexts:
+        dep1: service:dep1
+    entrypoint: ["echo", "Hello from secondbuild"]
+    depends_on:
+      - dep1
+
+  dep1:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+    entrypoint: ["echo", "Hello from dep1"]

@@ -18,30 +18,24 @@ package e2e
 
 import (
 	"testing"
-
-	"gotest.tools/v3/icmd"
 )
 
 func TestExec(t *testing.T) {
-	const projectName = "e2e-exec"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/exec/compose.yaml", "--project-name", projectName, "run", "-d", "test", "cat")
-
-	res := c.RunDockerComposeCmdNoCheck(t, "--project-name", projectName, "exec", "--index=1", "test", "ps")
-	res.Assert(t, icmd.Expected{Err: "service \"test\" is not running container #1", ExitCode: 1})
-
-	res = c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "ps")
-	res.Assert(t, icmd.Expected{Out: "cat"}) // one-off container was selected
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/exec/compose.yaml", "--project-name", projectName, "up", "-d")
-
-	res = c.RunDockerComposeCmd(t, "--project-name", projectName, "exec", "test", "ps")
-	res.Assert(t, icmd.Expected{Out: "tail"}) // service container was selected
+	NewScenario(t, "exec must prefer the service container over a one-off, falling back to the one-off when alone").
+		Step("run starts a detached one-off with its own command",
+			ComposeCmd("run", "-d", "test", "cat"),
+			OneOffState("test", "running")).
+		Step("exec --index=1 finds no numbered replica",
+			ComposeCmd("exec", "--index=1", "test", "ps").MayFail(),
+			ExitCode(1),
+			OutputContains(`service "test" is not running container #1`)).
+		Step("with only a one-off around, exec lands in it",
+			ComposeCmd("exec", "test", "ps"),
+			StdoutContains("cat")).
+		Step("up starts the service container",
+			ComposeCmd("up", "-d"),
+			ServiceState("test", "running")).
+		Step("exec now selects the service container",
+			ComposeCmd("exec", "test", "ps"),
+			StdoutContains("tail"))
 }

@@ -1,0 +1,14 @@
+services:
+  back:
+    image: alpine
+    command: echo "Hello there!!"
+    depends_on:
+      - db
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+  front:
+    image: alpine
+    init: true
+    command: sleep infinity

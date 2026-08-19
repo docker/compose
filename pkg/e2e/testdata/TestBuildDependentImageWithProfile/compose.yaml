@@ -1,0 +1,12 @@
+secrets:
+  test-secret:
+    file: test-secret.txt
+
+services:
+  secret-build-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - test-secret

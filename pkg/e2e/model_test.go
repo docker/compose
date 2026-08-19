@@ -24,8 +24,7 @@ func TestComposeModel(t *testing.T) {
 	if _, err := findPluginExecutable(DockerModelExecutableName); err != nil {
 		t.Skip("docker-model plugin not available")
 	}
-	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, "model-test")
-
-	c.RunDockerComposeCmd(t, "-p", "model-test", "-f", "./fixtures/model/compose.yaml", "run", "--rm", "test", "sh", "-c", "curl ${FOO_URL}")
+	NewScenario(t, "a service bound to a model must receive the model runner's URL").
+		Step("the service can reach the model endpoint variable",
+			ComposeCmd("run", "--rm", "test", "sh", "-c", "curl ${FOO_URL}"))
 }

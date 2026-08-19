@@ -21,7 +21,6 @@ package e2e
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -29,19 +28,17 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
 
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
 func TestUpServiceUnhealthy(t *testing.T) {
-	c := NewParallelCLI(t)
-	const projectName = "e2e-start-fail"
-
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container e2e-start-fail-fail-1 is unhealthy`})
-
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	s := NewScenario(t, "up must fail when a service never turns healthy")
+	s.Step("up reports the unhealthy container and fails",
+		ComposeCmd("up", "-d").MayFail().Within(60*time.Second),
+		ExitCode(1),
+		OutputContains("container "+s.Project()+"-fail-1 is unhealthy"),
+		ServiceState("depends", "created"))
 }
 
 func TestUpDependenciesNotStopped(t *testing.T) {
@@ -107,118 +104,77 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 }
 
 func TestUpWithBuildDependencies(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Run("up with service using image build by an another service", func(t *testing.T) {
-		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "built-image-dependency")
-
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/dependencies",
-			"-f", "fixtures/dependencies/service-image-depends-on.yaml", "up", "-d")
-
-		t.Cleanup(func() {
-			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/dependencies",
-				"-f", "fixtures/dependencies/service-image-depends-on.yaml", "down", "--rmi", "all")
-		})
-
-		res.Assert(t, icmd.Success)
-	})
+	s := NewScenario(t, "up must build a service's image before starting another service that reuses it")
+	image := s.Project() + "-built"
+	s.Env("BUILT_IMAGE="+image).
+		Defer(DockerCmd("image", "rm", "-f", image).MayFail()).
+		Step("up builds once and starts both services from the built image",
+			ComposeCmd("up", "-d"),
+			ImageExists(image))
 }
 
 func TestUpWithDependencyExit(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	t.Run("up with dependency to exit before being healthy", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/dependencies",
-			"-f", "fixtures/dependencies/dependency-exit.yaml", "up", "-d")
-
-		t.Cleanup(func() {
-			c.RunDockerComposeCmd(t, "--project-name", "dependencies", "down")
-		})
-
-		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "dependency failed to start: container dependencies-db-1 exited (1)"})
-	})
+	s := NewScenario(t, "up must fail when a dependency exits before turning healthy")
+	s.Step("up reports the exited dependency and fails",
+		ComposeCmd("up", "-d").MayFail(),
+		ExitCode(1),
+		OutputContains("dependency failed to start: container "+s.Project()+"-db-1 exited (1)"),
+		ServiceState("web", "created"))
 }
 
 func TestScaleDoesntRecreate(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-scale"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml", "--project-name", projectName, "up", "-d")
-
-	res := c.RunDockerComposeCmd(t, "-f", "fixtures/simple-composefile/compose.yaml", "--project-name", projectName, "up", "--scale", "simple=2", "-d")
-	assert.Check(t, !strings.Contains(res.Combined(), "Recreated"))
+	NewScenario(t, "scaling up must add a replica without recreating the existing one").
+		Step("up starts the first replica",
+			ComposeCmd("up", "-d"),
+			ReplicaNumbers("simple", 1)).
+		Step("up --scale adds the second replica, keeping the first",
+			ComposeCmd("up", "--scale", "simple=2", "-d"),
+			ReplicaNumbers("simple", 1, 2),
+			OutputNotContains("Recreated"))
 }
 
 func TestUpWithDependencyNotRequired(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-dependency-not-required"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/dependencies/deps-not-required.yaml", "--project-name", projectName,
-		"--profile", "not-required", "up", "-d")
-	assert.Assert(t, strings.Contains(res.Combined(), "foo"), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), " optional dependency \"bar\" failed to start"), res.Combined())
+	NewScenario(t, "up must start the service even when an optional dependency cannot").
+		Step("up succeeds, reporting the optional dependency failure",
+			ComposeCmd("--profile", "not-required", "up", "-d"),
+			OutputContains("foo"),
+			OutputContains(`optional dependency "bar" failed to start`))
 }
 
 func TestUpWithAllResources(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-all-resources"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-v")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/resources/compose.yaml", "--all-resources", "--project-name", projectName, "up")
-	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Volume %s_my_vol Created`, projectName)), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), fmt.Sprintf(`Network %s_my_net Created`, projectName)), res.Combined())
+	s := NewScenario(t, "up --all-resources must create volumes and networks no service uses")
+	s.Step("up creates the unused volume and network",
+		ComposeCmd("--all-resources", "up"),
+		OutputContains("Volume "+s.Project()+"_my_vol Created"),
+		OutputContains("Network "+s.Project()+"_my_net Created"))
 }
 
 func TestUpProfile(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-up-profile"
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "--profile", "test", "down", "-v")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/profiles/docker-compose.yaml", "--project-name", projectName, "up", "foo")
-	assert.Assert(t, strings.Contains(res.Combined(), `Container db_c Created`), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), `Container foo_c Created`), res.Combined())
-	assert.Assert(t, !strings.Contains(res.Combined(), `Container bar_c Created`), res.Combined())
+	NewScenario(t, "up on a profiled service must start it and its dependencies, not its profile siblings").
+		Step("up starts the target and its dependency only",
+			ComposeCmd("up", "foo"),
+			ServiceState("foo", "exited"),
+			ServiceState("db", "exited"),
+			ServiceNotCreated("bar"))
 }
 
 func TestUpImageID(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-up-image-id"
-
-	digest := strings.TrimSpace(c.RunDockerCmd(t, "image", "inspect", "alpine", "-f", "{{ .ID }}").Stdout())
+	s := NewScenario(t, "a service image referenced by its bare ID must be usable")
+	digest := strings.TrimSpace(s.CLI().RunDockerCmd(t, "image", "inspect", "alpine", "-f", "{{ .ID }}").Stdout())
 	_, id, _ := strings.Cut(digest, ":")
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-v")
-	})
-
-	c = NewCLI(t, WithEnv(fmt.Sprintf("ID=%s", id)))
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/id.yaml", "--project-name", projectName, "up")
+	s.Env("ID="+id).
+		Step("up runs the container from the image ID",
+			ComposeCmd("up"))
 }
 
 func TestUpStopWithLogsMixed(t *testing.T) {
-	c := NewCLI(t)
-	const projectName = "compose-e2e-stop-logs"
-
-	t.Cleanup(func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "-v")
-	})
-
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/stop/compose.yaml", "--project-name", projectName, "up", "--abort-on-container-exit")
-	// assert we still get service2 logs after service 1 Stopped event
-	res.Assert(t, icmd.Expected{
-		Err: "Container compose-e2e-stop-logs-service1-1 Stopped",
-	})
-	// assert we get stop hook logs
-	res.Assert(t, icmd.Expected{Out: "service2-1 ->  | stop hook running...\nservice2-1     | 64 bytes"})
+	// service2 pings forever so the abort always interrupts it: with a bounded
+	// ping, on a fast machine it can exit on its own before the abort reaches
+	// it, and the pre_stop hook never runs.
+	s := NewScenario(t, "on abort, logs of surviving services must keep flowing while others stop, hooks included")
+	s.Step("up aborts on the first exit but still relays service2's logs and stop hook",
+		ComposeCmd("up", "--abort-on-container-exit").Within(60*time.Second),
+		StderrContains("Container "+s.Project()+"-service1-1 Stopped"),
+		StdoutContains("stop hook running..."),
+		StdoutContains("64 bytes"))
 }

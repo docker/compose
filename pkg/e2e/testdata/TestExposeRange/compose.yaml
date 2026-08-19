@@ -1,0 +1,5 @@
+services:
+  test:
+    image: alpine
+    expose:
+      - "9091-9092"

@@ -1,0 +1,14 @@
+services:
+  nginx:
+    pull_policy: build
+    build:
+      dockerfile_inline: |
+        FROM alpine
+        RUN echo "Nginx built at $(date)" > /build-time.txt
+        CMD sleep 3600
+
+  curl:
+    image: alpine
+    depends_on:
+      - nginx
+    command: echo "curl service"

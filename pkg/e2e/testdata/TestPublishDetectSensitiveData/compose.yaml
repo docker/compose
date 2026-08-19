@@ -1,0 +1,20 @@
+services:
+  serviceA:
+    image: "alpine:3.12"
+    environment:
+      - AWS_ACCESS_KEY_ID=A3TX1234567890ABCDEF
+      - AWS_SECRET_ACCESS_KEY=aws"12345+67890/abcdefghijklm+NOPQRSTUVWXYZ+"
+    configs:
+      - myconfig
+  serviceB:
+    image: "alpine:3.12"
+    env_file:
+      - publish-sensitive.env
+    secrets:
+      - mysecret
+configs:
+  myconfig:
+    file: config.txt
+secrets:
+  mysecret:
+    file: secret.txt

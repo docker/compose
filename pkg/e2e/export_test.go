@@ -17,34 +17,32 @@
 package e2e
 
 import (
+	"path/filepath"
 	"testing"
 )
 
 func TestExport(t *testing.T) {
-	const projectName = "e2e-export-service"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/export/compose.yaml", "--project-name", projectName, "up", "-d", "service")
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "service.tar", "service")
+	out := filepath.Join(t.TempDir(), "service.tar")
+	NewScenario(t, "export must write the service container's filesystem as a tar archive").
+		Step("up starts the service",
+			ComposeCmd("up", "-d", "service"),
+			ServiceState("service", "running")).
+		Step("export writes the container filesystem to the output file",
+			ComposeCmd("export", "-o", out, "service"),
+			FileExists(out))
 }
 
 func TestExportWithReplicas(t *testing.T) {
-	const projectName = "e2e-export-service-with-replicas"
-	c := NewParallelCLI(t)
-
-	cleanup := func() {
-		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--timeout=0", "--remove-orphans")
-	}
-	t.Cleanup(cleanup)
-	cleanup()
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/export/compose.yaml", "--project-name", projectName, "up", "-d", "service-with-replicas")
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "r1.tar", "--index=1", "service-with-replicas")
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "export", "-o", "r2.tar", "--index=2", "service-with-replicas")
+	dir := t.TempDir()
+	r1, r2 := filepath.Join(dir, "r1.tar"), filepath.Join(dir, "r2.tar")
+	NewScenario(t, "export --index must pick the requested replica of a scaled service").
+		Step("up starts the replicas",
+			ComposeCmd("up", "-d", "service-with-replicas"),
+			ServiceScale("service-with-replicas", 3)).
+		Step("export --index=1 writes the first replica's filesystem",
+			ComposeCmd("export", "-o", r1, "--index=1", "service-with-replicas"),
+			FileExists(r1)).
+		Step("export --index=2 writes the second replica's filesystem",
+			ComposeCmd("export", "-o", r2, "--index=2", "service-with-replicas"),
+			FileExists(r2))
 }

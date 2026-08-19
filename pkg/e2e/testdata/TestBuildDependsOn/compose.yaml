@@ -1,0 +1,15 @@
+services:
+  test1:
+    pull_policy: build
+    build:
+      dockerfile_inline: FROM alpine
+    command:
+      - echo
+      - "test 1 success"
+  test2:
+    image: alpine
+    depends_on:
+      - test1
+    command:
+      - echo
+      - "test 2 success"

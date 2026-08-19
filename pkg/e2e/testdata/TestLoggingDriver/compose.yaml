@@ -1,0 +1,21 @@
+services:
+  fluentbit:
+    image: fluent/fluent-bit:3.1.7-debug
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    environment:
+      FOO: ${BAR}
+
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      fluentbit:
+        condition: service_started
+        restart: true
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: ${HOST:-127.0.0.1}:24224

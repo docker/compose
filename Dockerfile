@@ -120,7 +120,7 @@ FROM base AS license-set
 ARG LICENSE_FILES
 RUN --mount=type=bind,target=.,rw \
     --mount=from=addlicense,source=/app/addlicense,target=/usr/bin/addlicense \
-    find . -regex "${LICENSE_FILES}" | xargs addlicense -c 'Docker Compose CLI' -l apache && \
+    find . -regex "${LICENSE_FILES}" | xargs addlicense -c 'Docker Compose CLI' -l apache -ignore validate -ignore testdata -ignore '**/testdata/**' -ignore resolvepath && \
     mkdir /out && \
     find . -regex "${LICENSE_FILES}" | cpio -pdm /out
 
@@ -131,7 +131,7 @@ FROM base AS license-validate
 ARG LICENSE_FILES
 RUN --mount=type=bind,target=. \
     --mount=from=addlicense,source=/app/addlicense,target=/usr/bin/addlicense \
-    find . -regex "${LICENSE_FILES}" | xargs addlicense -check -c 'Docker Compose CLI' -l apache -ignore validate -ignore testdata -ignore resolvepath -v
+    find . -regex "${LICENSE_FILES}" | xargs addlicense -check -c 'Docker Compose CLI' -l apache -ignore validate -ignore testdata -ignore '**/testdata/**' -ignore resolvepath -v
 
 FROM base AS docsgen
 WORKDIR /src

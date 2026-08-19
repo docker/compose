@@ -1,0 +1,13 @@
+services:
+  service:
+    image: alpine
+    command: top
+    ipc: "service:shareable"
+  container:
+    image: alpine
+    command: top
+    ipc: "container:${EXTERNAL_NAME}"
+  shareable:
+    image: alpine
+    command: top
+    ipc: shareable
