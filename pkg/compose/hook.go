@@ -31,7 +31,7 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
-func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
+func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, hookType string, listener api.ContainerEventListener) error {
 	wOut := utils.GetWriter(func(line string) {
 		listener(api.ContainerEvent{
 			Type:    api.HookEventLog,
@@ -52,6 +52,16 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 		Cmd:          hook.Command,
 		AttachStdout: !detached,
 		AttachStderr: !detached,
+		// PoC: tee the hook output into the container's logging driver,
+		// stamped with the hook's identity, so `compose logs --hooks` can
+		// surface it later without any client-side state. Daemons whose API
+		// predates CaptureLogs simply ignore both fields.
+		CaptureLogs: true,
+		Labels: map[string]string{
+			api.ProjectLabel: ctr.Labels[api.ProjectLabel],
+			api.ServiceLabel: service.Name,
+			api.HookLabel:    hookType,
+		},
 	})
 	if err != nil {
 		return err

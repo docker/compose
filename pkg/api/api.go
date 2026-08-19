@@ -630,6 +630,9 @@ type LogOptions struct {
 	Until      string
 	Follow     bool
 	Timestamps bool
+	// Hooks includes the captured output of lifecycle hooks (PoC), labeled
+	// with the hook type.
+	Hooks bool
 }
 
 // PauseOptions group options of the Pause API

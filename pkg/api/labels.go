@@ -27,6 +27,9 @@ const (
 	ProjectLabel = "com.docker.compose.project"
 	// ServiceLabel allow to track resource related to a compose service
 	ServiceLabel = "com.docker.compose.service"
+	// HookLabel is set on lifecycle-hook execs (and stamped on their captured
+	// log messages) with the hook type: "post_start" or "pre_stop". PoC.
+	HookLabel = "com.docker.compose.hook"
 	// ConfigHashLabel stores configuration hash for a compose service
 	ConfigHashLabel = "com.docker.compose.config-hash"
 	// ContainerNumberLabel stores the container index of a replicated service

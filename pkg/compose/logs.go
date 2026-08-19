@@ -145,15 +145,29 @@ func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogCon
 		Until:      options.Until,
 		Tail:       options.Tail,
 		Timestamps: options.Timestamps,
+		// PoC: details expose the per-message attributes hook execs are
+		// stamped with, letting hook output be told apart and labeled
+		Details: options.Hooks,
 	})
 	if err != nil {
 		return err
 	}
 	defer r.Close() //nolint:errcheck
 
-	w := utils.GetWriter(func(line string) {
+	sink := func(line string) {
 		consumer.Log(name, line)
-	})
+	}
+	if options.Hooks {
+		sink = func(line string) {
+			parsed := parseDetailsLine(line, options.Timestamps)
+			if parsed.Hook != "" {
+				consumer.Log(name+" ["+parsed.Hook+"]", parsed.Payload)
+				return
+			}
+			consumer.Log(name, parsed.Payload)
+		}
+	}
+	w := utils.GetWriter(sink)
 	if ctr.Config.Tty {
 		_, err = io.Copy(w, r)
 	} else {

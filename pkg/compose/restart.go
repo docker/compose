@@ -108,7 +108,7 @@ func (s *composeService) prepareRestartProject(ctx context.Context, containers C
 // hooks around the restart
 func (s *composeService) restartContainer(ctx context.Context, def types.ServiceConfig, ctr container.Summary, options api.RestartOptions) error {
 	for _, hook := range def.PreStop {
-		err := s.runHook(ctx, ctr, def, hook, nil)
+		err := s.runHook(ctx, ctr, def, hook, "post_start", nil)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (s *composeService) restartContainer(ctx context.Context, def types.Service
 	}
 	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
 	for _, hook := range def.PostStart {
-		err := s.runHook(ctx, ctr, def, hook, nil)
+		err := s.runHook(ctx, ctr, def, hook, "post_start", nil)
 		if err != nil {
 			return err
 		}

@@ -112,7 +112,7 @@ func (s *composeService) runPostStartHooksOnEvent(ctx context.Context, container
 	}
 
 	for _, hook := range service.PostStart {
-		if err := s.runHook(ctx, ctr, service, hook, nil); err != nil {
+		if err := s.runHook(ctx, ctr, service, hook, "post_start", nil); err != nil {
 			return err
 		}
 	}
