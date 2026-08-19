@@ -107,6 +107,10 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
+	if err := s.removePreStartHookContainers(ctx, projectName, options.Services); err != nil {
+		return err
+	}
+
 	ops := s.ensureNetworksDown(ctx, project)
 
 	if options.Images != "" {
@@ -384,4 +388,44 @@ func (s *composeService) getProjectWithResources(ctx context.Context, containers
 	project.Networks = networks
 
 	return project, nil
+}
+
+// removePreStartHookContainers force-removes any pre_start hook containers that
+// were retained after a failed hook run. These containers are created without a
+// ConfigHashLabel, so getContainers and the normal teardown path never see them;
+// without this step they would survive compose down. When services is non-empty
+// the cleanup is scoped to those services; otherwise the whole project is swept.
+// Individual removal failures are logged at warn level and do not abort teardown.
+func (s *composeService) removePreStartHookContainers(ctx context.Context, projectName string, services []string) error {
+	var filters []client.Filters
+	if len(services) == 0 {
+		f := projectFilter(projectName)
+		f.Add("label", hookFilter(preStartHookType))
+		filters = []client.Filters{f}
+	} else {
+		for _, service := range services {
+			f := projectFilter(projectName)
+			f.Add("label", serviceFilter(service))
+			f.Add("label", hookFilter(preStartHookType))
+			filters = append(filters, f)
+		}
+	}
+	for _, f := range filters {
+		res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+			All:     true,
+			Filters: f,
+		})
+		if err != nil {
+			return err
+		}
+		for _, ctr := range res.Items {
+			if _, removeErr := s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			}); removeErr != nil {
+				logrus.Warnf("failed to remove retained pre_start hook container %s: %v", ctr.ID, removeErr)
+			}
+		}
+	}
+	return nil
 }

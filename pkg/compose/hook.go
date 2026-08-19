@@ -216,7 +216,7 @@ func (t *outputTail) pushLine(line string) {
 
 // String returns the kept output, newest content last, trimmed to maxBytes.
 func (t *outputTail) String() string {
-	lines := t.lines
+	lines := append([]string(nil), t.lines...)
 	if partial := strings.TrimSpace(strings.ToValidUTF8(t.partial.String(), "")); partial != "" {
 		lines = append(lines, partial)
 	}
