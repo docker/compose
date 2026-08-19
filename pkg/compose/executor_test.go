@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -70,6 +71,41 @@ func TestExecutePlanCreateNetwork(t *testing.T) {
 	// made by the reconciler from the observed state, not here).
 	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
 		Return(client.NetworkCreateResult{ID: "net1"}, nil)
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:default",
+		Cause:      "not found",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
+	assert.NilError(t, err)
+}
+
+func TestExecutePlanCreateNetworkWithIPAMOptions(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	nw := types.NetworkConfig{
+		Name: "test_default",
+		Ipam: types.IPAMConfig{
+			Options: types.Options{"ipam-option": "enabled"},
+		},
+	}
+	project := &types.Project{
+		Name:     "test",
+		Networks: types.Networks{"default": nw},
+	}
+
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, opts client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+			assert.DeepEqual(t, opts.IPAM, &network.IPAM{
+				Options: map[string]string{"ipam-option": "enabled"},
+			})
+			return client.NetworkCreateResult{ID: "net1"}, nil
+		})
 
 	plan := &Plan{}
 	plan.addNode(Operation{
