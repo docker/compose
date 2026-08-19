@@ -45,7 +45,7 @@ A great way to contribute to the project is to send a detailed report when you
 encounter an issue. We always appreciate a well-written, thorough bug report,
 and will thank you for it!
 
-Check that [our issue database](https://github.com/docker/compose/labels/Docker%20Compose%20V2)
+Check that [our issue database](https://github.com/docker/compose/issues)
 doesn't already include that problem or suggestion before submitting an issue.
 If you find a match, you can use the "subscribe" button to get notified of
 updates. Do *not* leave random "+1" or "I have this too" comments, as they
@@ -78,8 +78,8 @@ This section gives the experienced contributor some tips and guidelines.
 ### Pull requests are always welcome
 
 Not sure if that typo is worth a pull request? Found a bug and know how to fix
-it? Do it! We will appreciate it. Any significant change, like adding a backend,
-should be documented as
+it? Do it! We will appreciate it. Any significant change, like a new feature or
+a significant behavior change, should be documented as
 [a GitHub issue](https://github.com/docker/compose/issues)
 before anybody starts working on it.
 
@@ -107,10 +107,10 @@ don't get discouraged!
     </td>
   </tr>
   <tr>
-    <td>Twitter</td>
+    <td>X (Twitter)</td>
     <td>
-      You can follow <a href="https://twitter.com/docker/" target="_blank">Docker's Twitter feed</a>
-      to get updates on our products. You can also tweet us questions or just
+      You can follow <a href="https://x.com/docker" target="_blank">Docker on X</a>
+      to get updates on our products. You can also post us questions or just
       share blogs or stories.
     </td>
   </tr>
@@ -141,16 +141,22 @@ available. Run the full test suite, both unit tests and e2e tests on your
 branch before submitting a pull request. See [BUILDING.md](BUILDING.md) for
 instructions to build and run tests.
 
+Before opening a pull request, run `make validate` to catch common issues that
+would fail CI: out-of-sync `go.mod`/`go.sum`, missing documentation updates,
+and license headers.
+
 Write clean code. Universally formatted code promotes ease of writing, reading,
-and maintenance. Always run `gofmt -s -w file.go` on each changed file before
-committing your changes. Most editors have plug-ins that do this automatically.
+and maintenance. Formatting is enforced by `golangci-lint` (using `gofumpt`);
+run `golangci-lint run ./...` or `make lint` before committing. Most editors
+have plug-ins that apply formatting automatically.
 
 Pull request descriptions should be as clear as possible and include a reference
 to all the issues that they address.
 
-Commit messages must start with a capitalized and short summary (max. 50 chars)
-written in the imperative, followed by an optional, more detailed explanatory
-text which is separated from the summary by an empty line.
+We recommend following the [conventional commits](https://www.conventionalcommits.org/)
+format (`type(scope): summary`, e.g. `fix(watch): handle symlinked directories`)
+as it is increasingly adopted across the project. An optional body can follow
+after a blank line to explain the *why* behind the change.
 
 Code review comments may be added to your pull request. Discuss, then make the
 suggested modifications and push additional commits to your feature branch. Post
@@ -160,8 +166,8 @@ but the reviewers are notified only when you comment.
 Pull requests must be cleanly rebased on top of the base branch without multiple branches
 mixed into the PR.
 
-**Git tip**: If your PR no longer merges cleanly, use `rebase master` in your
-feature branch to update your pull request rather than `merge master`.
+**Git tip**: If your PR no longer merges cleanly, use `rebase main` in your
+feature branch to update your pull request rather than `merge main`.
 
 Before you make a pull request, squash your commits into logical units of work
 using `git rebase -i` and `git push -f`. A logical unit of work is a consistent
@@ -180,20 +186,16 @@ Include an issue reference like `Closes #XXXX` or `Fixes #XXXX` in the pull
 request description that closes an issue. Including references automatically
 closes the issue on a merge.
 
-Please do not add yourself to the `AUTHORS` file, as it is regenerated regularly
-from the Git history.
-
 Please see the [Coding Style](#coding-style) for further guidelines.
 
 ### Merge approval
 
-Docker maintainers use LGTM (Looks Good To Me) in comments on the code review to
+Docker maintainers use the GitHub review system (Approve / Request changes) to
 indicate acceptance.
 
-A change requires at least 2 LGTMs from the maintainers of each
-component affected.
+A change requires at least 1 approval from a maintainer before it can be
+merged.
 
-For more details, see the [MAINTAINERS](MAINTAINERS) page.
 
 ### Sign your work
 
@@ -307,9 +309,9 @@ mind when nudging others to comply.
 
 The rules:
 
-1. All code should be formatted with `gofmt -s`.
-2. All code should pass the default levels of
-   [`golint`](https://github.com/golang/lint).
+1. All code should be formatted with `gofumpt` (enforced via `golangci-lint`).
+2. All code should pass [`golangci-lint`](https://golangci-lint.run/) using the
+   project's `.golangci.yml` configuration. Run `make lint` to check locally.
 3. All code should follow the guidelines covered in [Effective
    Go](https://go.dev/doc/effective_go) and [Go Code Review
    Comments](https://go.dev/wiki/CodeReviewComments).
