@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -354,6 +355,15 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 	project, err := backend.LoadProject(ctx, loadOpts)
 	if err != nil {
 		return nil, metrics, err
+	}
+
+	if jobs := project.AllJobs(); len(jobs) > 0 {
+		names := make([]string, 0, len(jobs))
+		for name := range jobs {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		logrus.Warnf("jobs are not supported yet and will be ignored: %s", strings.Join(names, ", "))
 	}
 
 	return project, metrics, nil
