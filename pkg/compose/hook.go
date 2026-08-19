@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -31,34 +31,48 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
-func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
-	wOut := utils.GetWriter(func(line string) {
-		listener(api.ContainerEvent{
-			Type:    api.HookEventLog,
-			Source:  getContainerNameWithoutProject(ctr) + " ->",
-			ID:      ctr.ID,
-			Service: service.Name,
-			Line:    line,
-		})
-	})
-	defer wOut.Close() //nolint:errcheck
+const (
+	// hookOutputTailLines and hookOutputTailBytes bound how much of a failing
+	// hook's output is kept for the error message.
+	hookOutputTailLines = 10
+	hookOutputTailBytes = 2048
+)
 
-	detached := listener == nil
+func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
+	// The output of a hook is the only explanation of why it failed, so keep the
+	// tail of it even when no listener is attached: the exec used to run
+	// unattached in that case, the daemon discarded both streams, and the caller
+	// was left with a bare exit code. Only surfaced on failure, and bounded.
+	tail := newOutputTail(hookOutputTailLines, hookOutputTailBytes)
+
+	var out io.Writer = tail
+
+	if listener != nil {
+		wOut := utils.GetWriter(func(line string) {
+			listener(api.ContainerEvent{
+				Type:    api.HookEventLog,
+				Source:  getContainerNameWithoutProject(ctr) + " ->",
+				ID:      ctr.ID,
+				Service: service.Name,
+				Line:    line,
+			})
+		})
+		defer wOut.Close() //nolint:errcheck
+
+		out = io.MultiWriter(wOut, tail)
+	}
+
 	exec, err := s.apiClient().ExecCreate(ctx, ctr.ID, client.ExecCreateOptions{
 		User:         hook.User,
 		Privileged:   hook.Privileged,
 		Env:          ToMobyEnv(hook.Environment),
 		WorkingDir:   hook.WorkingDir,
 		Cmd:          hook.Command,
-		AttachStdout: !detached,
-		AttachStderr: !detached,
+		AttachStdout: true,
+		AttachStderr: true,
 	})
 	if err != nil {
 		return err
-	}
-
-	if detached {
-		return s.runWaitExec(ctx, exec.ID, service, listener)
 	}
 
 	attachOptions := client.ExecAttachOptions{
@@ -71,6 +85,7 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 			Height: height,
 		}
 	}
+
 	attach, err := s.apiClient().ExecAttach(ctx, exec.ID, attachOptions)
 	if err != nil {
 		return err
@@ -78,9 +93,9 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 	defer attach.Close()
 
 	if service.Tty {
-		_, err = io.Copy(wOut, attach.Reader)
+		_, err = io.Copy(out, attach.Reader)
 	} else {
-		_, err = stdcopy.StdCopy(wOut, wOut, attach.Reader)
+		_, err = stdcopy.StdCopy(out, out, attach.Reader)
 	}
 	if err != nil {
 		return err
@@ -91,37 +106,73 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 		return err
 	}
 	if inspected.ExitCode != 0 {
+		if output := tail.String(); output != "" {
+			return fmt.Errorf("%s hook exited with status %d: %s", service.Name, inspected.ExitCode, output)
+		}
+
 		return fmt.Errorf("%s hook exited with status %d", service.Name, inspected.ExitCode)
 	}
 	return nil
 }
 
-func (s *composeService) runWaitExec(ctx context.Context, execID string, service types.ServiceConfig, listener api.ContainerEventListener) error {
-	_, err := s.apiClient().ExecStart(ctx, execID, client.ExecStartOptions{
-		Detach: listener == nil,
-		TTY:    service.Tty,
-	})
-	if err != nil {
-		return err
+// outputTail keeps the last lines written to it, bounded by a line and a byte
+// count. Writes past the limit are accepted and the oldest content is dropped,
+// so a chatty hook is never blocked by a full buffer. It is written from a
+// single goroutine (stdcopy or io.Copy) and read after that copy returned.
+type outputTail struct {
+	maxLines int
+	maxBytes int
+	lines    []string
+	partial  strings.Builder
+}
+
+func newOutputTail(maxLines, maxBytes int) *outputTail {
+	return &outputTail{maxLines: maxLines, maxBytes: maxBytes}
+}
+
+func (t *outputTail) Write(p []byte) (int, error) {
+	for _, b := range p {
+		if b != '\n' {
+			// Cap the line being assembled, so a hook printing megabytes without
+			// a newline cannot grow this buffer without bound.
+			if t.partial.Len() < t.maxBytes {
+				t.partial.WriteByte(b)
+			}
+
+			continue
+		}
+
+		t.pushLine(t.partial.String())
+		t.partial.Reset()
 	}
 
-	// We miss a ContainerExecWait API
-	tick := time.NewTicker(100 * time.Millisecond)
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-tick.C:
-			inspect, err := s.apiClient().ExecInspect(ctx, execID, client.ExecInspectOptions{})
-			if err != nil {
-				return nil
-			}
-			if !inspect.Running {
-				if inspect.ExitCode != 0 {
-					return fmt.Errorf("%s hook exited with status %d", service.Name, inspect.ExitCode)
-				}
-				return nil
-			}
-		}
+	return len(p), nil
+}
+
+// pushLine appends a line and drops the oldest one when the limit is reached.
+func (t *outputTail) pushLine(line string) {
+	line = strings.TrimRight(line, "\r")
+	if strings.TrimSpace(line) == "" {
+		return
 	}
+
+	t.lines = append(t.lines, line)
+	if len(t.lines) > t.maxLines {
+		t.lines = t.lines[len(t.lines)-t.maxLines:]
+	}
+}
+
+// String returns the kept output, newest content last, trimmed to maxBytes.
+func (t *outputTail) String() string {
+	lines := t.lines
+	if partial := strings.TrimSpace(t.partial.String()); partial != "" {
+		lines = append(append([]string{}, lines...), partial)
+	}
+
+	output := strings.TrimSpace(strings.Join(lines, "\n"))
+	if len(output) > t.maxBytes {
+		output = output[len(output)-t.maxBytes:]
+	}
+
+	return output
 }
