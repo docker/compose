@@ -54,6 +54,11 @@ func containerNumberFilter(index int) string {
 	return labelFilter(api.ContainerNumberLabel, strconv.Itoa(index))
 }
 
+// hookFilter returns a label filter that matches containers by hook type
+// (stored in api.HookLabel). hookType is parametric for future hook types
+// (e.g. post_start); today all callers pass preStartHookType.
+//
+//nolint:unparam
 func hookFilter(hookType string) string {
 	return labelFilter(api.HookLabel, hookType)
 }

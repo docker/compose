@@ -203,20 +203,35 @@ func TestStartService_PreStartOnLowestReplica(t *testing.T) {
 	replica1 := serviceContainer("web", 1, container.StateExited)
 	containers := Containers{replica2, replica1}
 
+	// runPreStart sweeps orphan hook containers from any previous failed run
+	// before creating the new one.
+	orphanScan := apiClient.EXPECT().
+		ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{}, nil)
+
 	// The hook container shares the volumes of the lowest-numbered replica.
 	hookCreate := apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		After(orphanScan).
 		DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
 			assert.DeepEqual(t, opts.HostConfig.VolumesFrom, []string{replica1.ID})
 			return client.ContainerCreateResult{ID: "hook-1"}, nil
 		})
 	hookWait := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0)).After(hookCreate)
+	// streamPreStartLogs always opens ContainerLogs (even with nil listener) so
+	// the tail is available for failure error messages.
+	hookLogs := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil).After(hookWait)
 	hookStart := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(hookWait)
+		Return(client.ContainerStartResult{}, nil).After(hookLogs)
+	// On success the hook container is removed explicitly (AutoRemove is false).
+	hookRemove := apiClient.EXPECT().
+		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{RemoveVolumes: true}).
+		Return(client.ContainerRemoveResult{}, nil).After(hookStart)
 
 	// Replicas are then started sequentially, in list order, after the hook.
 	start2 := apiClient.EXPECT().ContainerStart(gomock.Any(), replica2.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(hookStart)
+		Return(client.ContainerStartResult{}, nil).After(hookRemove)
 	apiClient.EXPECT().ContainerStart(gomock.Any(), replica1.ID, gomock.Any()).
 		Return(client.ContainerStartResult{}, nil).After(start2)
 
