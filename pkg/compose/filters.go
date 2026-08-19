@@ -53,3 +53,7 @@ func oneOffFilter(b bool) string {
 func containerNumberFilter(index int) string {
 	return labelFilter(api.ContainerNumberLabel, strconv.Itoa(index))
 }
+
+func hookFilter(hookType string) string {
+	return labelFilter(api.HookLabel, hookType)
+}
