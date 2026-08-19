@@ -603,7 +603,7 @@ func (s *composeService) startServiceContainer(ctx context.Context, project *typ
 	}
 
 	for _, hook := range service.PostStart {
-		if err := s.runHook(ctx, ctr, service, hook, listener); err != nil {
+		if err := s.runHook(ctx, ctr, service, hook, "post_start", listener); err != nil {
 			return err
 		}
 	}

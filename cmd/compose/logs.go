@@ -40,6 +40,7 @@ type logsOptions struct {
 	noColor    bool
 	noPrefix   bool
 	timestamps bool
+	hooks      bool
 }
 
 func logsCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
@@ -71,6 +72,7 @@ func logsCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output")
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs")
 	flags.BoolVarP(&opts.timestamps, "timestamps", "t", false, "Show timestamps")
+	flags.BoolVar(&opts.hooks, "hooks", false, "Include the output of lifecycle hooks (PoC, requires engine API v1.56)")
 	flags.SetAnnotation("timestamps", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/#timestamps"}) //nolint:errcheck
 	flags.StringVarP(&opts.tail, "tail", "n", "all", "Number of lines to show from the end of the logs for each container")
 	flags.SetAnnotation("tail", annotation.ExternalURL, []string{"https://docs.docker.com/reference/cli/docker/container/logs/#tail"}) //nolint:errcheck
@@ -106,6 +108,7 @@ func runLogs(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		Since:      opts.since,
 		Until:      opts.until,
 		Timestamps: opts.timestamps,
+		Hooks:      opts.hooks,
 	})
 }
 
