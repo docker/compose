@@ -228,8 +228,7 @@ func TestInitialSyncFilesRegularFile(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir},
+		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, types.Trigger{
 		Path:   hostFile,
 		Target: "/app/test.txt",
