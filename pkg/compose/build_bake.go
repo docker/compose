@@ -494,11 +494,23 @@ func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
 	return buildx, nil
 }
 
-// makeConsole wraps the provided writer to match [containerd.File] interface if it is of type *streams.Out.
-// buildkit's NewDisplay doesn't actually require a [io.Reader], it only uses the [containerd.Console] type to
-// benefits from ANSI capabilities, but only does writes.
+// makeConsole adapts the provided writer for buildkit's NewDisplay, which
+// requires a [console.File] to enable the TTY rendering (it only ever writes,
+// but goes through [console.ConsoleFromFile] for the ANSI capabilities).
+//
+// When the stream was constructed from a real file — the interactive case,
+// where it wraps os.Stdout — the genuine [*os.File] is handed over: on
+// Windows, containerd/console only accepts the exact os.Stdin/Stdout/Stderr
+// values (identity check in newMaster), so any wrapper fails with "creating a
+// console from a file is not supported on windows" and the TTY progress can
+// never engage (#14086). For file-less streams the [console.File] wrapper is
+// kept: the TTY rendering then works on Unix, where only the descriptor
+// matters, and falls back to plain elsewhere.
 func makeConsole(out io.Writer) io.Writer {
 	if s, ok := out.(*streams.Out); ok {
+		if f, ok := s.File(); ok {
+			return f
+		}
 		return &_console{s}
 	}
 	return out
