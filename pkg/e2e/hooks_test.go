@@ -209,3 +209,38 @@ func TestPreStartHookRunsOnceForScaledService(t *testing.T) {
 			probeVolume(s, "wc", "-l", "/mnt/log"),
 			OutputContains("1 /mnt/log"))
 }
+
+// A pre_start hook is a full container specification inheriting in the
+// spirit of the yaml merge rules: collections complete the inherited value,
+// the hook's declarations winning on conflicts (docker/compose#13939).
+func TestPreStartHookExtraHosts(t *testing.T) {
+	NewScenario(t, "pre_start hooks must inherit the service's extra_hosts, completed by their own declarations").
+		Step("up succeeds: both hooks asserted their /etc/hosts content",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("app", "running"))
+}
+
+// The init-container use case of docker/compose#13934: the hook redeclares a
+// service volume read-write to prepare content the service mounts read-only.
+func TestPreStartHookVolumes(t *testing.T) {
+	NewScenario(t, "a pre_start hook must write through its own read-write volume declaration while the service stays read-only").
+		Step("up succeeds: the hook wrote through its rw mount",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("the service reads what the hook prepared",
+			ComposeCmd("exec", "app", "cat", "/data/init.txt"),
+			OutputContains("initialized")).
+		Step("the service's own mount is still read-only",
+			ComposeCmd("exec", "app", "touch", "/data/blocked").MayFail(),
+			OutputContains("Read-only file system"))
+}
+
+// Volumes merge by target: the hook keeps every service mount it did not
+// redeclare (docker/compose#13934).
+func TestPreStartHookVolumesMerge(t *testing.T) {
+	NewScenario(t, "a pre_start hook declaring a volume must still see the service's other mounts").
+		Step("up succeeds: the hook read the inherited mount and wrote through its own",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("the hook combined the inherited mount's content with its own write",
+			ComposeCmd("exec", "app", "cat", "/data/init.txt"),
+			OutputContains("saw-config"))
+}

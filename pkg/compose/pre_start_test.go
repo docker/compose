@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/goleak"
@@ -50,9 +51,11 @@ func newPreStartTestServiceWithVersion(t *testing.T, apiVersion string) (*compos
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
 		Return(client.PingResult{APIVersion: apiVersion}, nil).AnyTimes()
 	apiClient.EXPECT().ClientVersion().Return(apiVersion).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 	return tested.(*composeService), apiClient
@@ -1129,6 +1132,9 @@ func TestPreStart_RuntimeAPIVersionError(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	// the merged-spec create path reads the CLI config and daemon host
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 	s := tested.(*composeService)
