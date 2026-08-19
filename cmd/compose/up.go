@@ -359,7 +359,7 @@ func runUp(
 // warnIgnoredJobs names the declared jobs up will not act on: manual jobs
 // wait for an explicit `compose run <job>` trigger.
 func warnIgnoredJobs(project *types.Project) {
-	jobs := project.Jobs
+	jobs := project.AllJobs()
 	if len(jobs) == 0 {
 		return
 	}
