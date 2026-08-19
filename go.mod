@@ -219,3 +219,7 @@ exclude (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
+
+replace github.com/moby/moby/api => github.com/ndeloof/docker/api v0.0.0-20260819110214-21c8742baa27
+
+replace github.com/moby/moby/client => github.com/ndeloof/docker/client v0.0.0-20260819110214-21c8742baa27
