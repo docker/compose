@@ -1,0 +1,17 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data:ro
+      - config:/config:ro
+    pre_start:
+      # declares only /data read-write: /config must still be visible,
+      # inherited through volumes_from
+      - command: sh -c 'test -d /config && echo "saw-config" > /data/init.txt'
+        volumes:
+          - data:/data:rw
+volumes:
+  data: {}
+  config: {}
