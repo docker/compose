@@ -18,8 +18,11 @@ package e2e
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
@@ -132,4 +135,23 @@ func TestPs(t *testing.T) {
 		res = c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "unknown")
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: "no such service: unknown"})
 	})
+}
+
+// #13643: compose ps did not honor psFormat from Docker config when no
+// --format flag was given; the flag defaulted to "table", preventing the
+// empty-string check from firing.
+func TestPsHonorsPsFormat(t *testing.T) {
+	s := NewScenario(t, "compose ps must apply psFormat from Docker CLI config when no --format flag is given")
+	// Write psFormat into the CLI's config dir, which already holds the
+	// test-built compose binary in cli-plugins/. Redirecting DOCKER_CONFIG
+	// via s.Env() to a separate directory would strip those plugins, causing
+	// docker compose to fall back to the system binary that predates the fix.
+	assert.NilError(t, os.WriteFile(filepath.Join(s.CLI().ConfigDir, "config.json"), []byte(`{"psFormat":"table {{.Name}}"}`), 0o600))
+	s.Step("service starts",
+		ComposeCmd("up", "-d"),
+		Eventually(ServiceState("app", "running"), 10*time.Second)).
+		Step("ps without --format renders only the NAME column from psFormat",
+			ComposeCmd("ps"),
+			OutputContains("NAME"),
+			OutputNotContains("IMAGE"))
 }
