@@ -29,6 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -193,4 +194,22 @@ func TestRejectScheduledJobs(t *testing.T) {
 
 	err := rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": scheduled, "migrate": manual}})
 	assert.Error(t, err, "scheduled jobs are not supported in this version: backup, sync")
+}
+
+// warnIgnoredJobs must only name profile-enabled jobs: a job disabled by
+// profile selection isn't part of this invocation and up never reaching it
+// isn't worth a warning — unlike rejectScheduledJobs, which already gets
+// this right via project.Jobs.
+func TestWarnIgnoredJobs(t *testing.T) {
+	hook := logrustest.NewGlobal()
+
+	warnIgnoredJobs(&types.Project{
+		Jobs:         types.Jobs{"migrate": {}},
+		DisabledJobs: types.Jobs{"backup": {}},
+	})
+
+	assert.Equal(t, len(hook.AllEntries()), 1)
+	msg := hook.LastEntry().Message
+	assert.Assert(t, strings.Contains(msg, "migrate"), msg)
+	assert.Assert(t, !strings.Contains(msg, "backup"), msg)
 }
