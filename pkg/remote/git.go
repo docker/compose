@@ -38,8 +38,14 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// GIT_REMOTE_ENABLED is the environment variable controlling support for
+// git remote compose resources. Despite the EXPERIMENTAL name (kept for
+// backward compatibility), the feature is enabled by default: the variable
+// is effectively an opt-out, to be set to a falsy value to disable it.
 const GIT_REMOTE_ENABLED = "COMPOSE_EXPERIMENTAL_GIT_REMOTE"
 
+// gitRemoteLoaderEnabled reports whether git remote resources are enabled.
+// Defaults to true when GIT_REMOTE_ENABLED is unset — see the constant doc.
 func gitRemoteLoaderEnabled() (bool, error) {
 	if v := os.Getenv(GIT_REMOTE_ENABLED); v != "" {
 		enabled, err := strconv.ParseBool(v)
