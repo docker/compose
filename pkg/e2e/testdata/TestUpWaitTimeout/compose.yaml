@@ -1,0 +1,12 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    healthcheck:
+      # Keeps failing during a long start_period, so health stays "starting"
+      # and --wait can only end by hitting its timeout.
+      test: ["CMD", "false"]
+      interval: 1s
+      retries: 3
+      start_period: 120s

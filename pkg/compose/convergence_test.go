@@ -22,6 +22,7 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -771,4 +772,44 @@ func TestRuntimeAPIVersionRetriesOnTransientError(t *testing.T) {
 	version, err = tested.RuntimeAPIVersion(t.Context())
 	assert.NilError(t, err)
 	assert.Equal(t, version, "1.44")
+}
+
+// TestWaitDependencyDeadline locks the timeout semantics of the dependency
+// wait: an expired deadline surfaces as "timeout waiting for dependencies",
+// while a plain user cancellation is not a wait failure.
+func TestWaitDependencyDeadline(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+
+	project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+		"db": {Name: "db", Scale: intPtr(1)},
+	}}
+	dependencies := types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: true},
+	}
+	containers := Containers{{
+		ID:     "db-ctr",
+		Names:  []string{"/db-ctr"},
+		Labels: map[string]string{api.ServiceLabel: "db"},
+	}}
+
+	t.Run("expired deadline is an error", func(t *testing.T) {
+		// Timeout shorter than the first 500ms poll tick: the deadline fires
+		// before any condition check, and must not be swallowed.
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 50*time.Millisecond)
+		assert.Error(t, err, "timeout waiting for dependencies")
+	})
+
+	t.Run("user cancellation is not a wait failure", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		err := tested.(*composeService).waitDependencies(ctx, &project, "app", dependencies, containers, 0)
+		assert.NilError(t, err)
+	})
 }

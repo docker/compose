@@ -198,6 +198,11 @@ func (s *composeService) waitDependency(ctx context.Context, dep string, config 
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
+			// An expired deadline is precisely the failure this wait is meant
+			// to detect; only a plain cancellation (Ctrl-C) stays silent.
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return ctx.Err()
+			}
 			return nil
 		}
 		var (

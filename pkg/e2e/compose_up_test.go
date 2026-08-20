@@ -31,6 +31,15 @@ func TestUpWait(t *testing.T) {
 		ServiceState("oneshot", "exited"))
 }
 
+func TestUpWaitTimeout(t *testing.T) {
+	s := NewScenario(t, "up --wait --wait-timeout must fail once the timeout expires instead of silently succeeding")
+	s.Step("up --wait fails after the timeout with the service still starting",
+		ComposeCmd("up", "--wait", "--wait-timeout", "3", "-d").MayFail().Within(60*time.Second),
+		ExitCode(1),
+		OutputContains("application not healthy after 3s"),
+		ServiceState("app", "running"))
+}
+
 func TestUpExitCodeFrom(t *testing.T) {
 	NewScenario(t, "up --exit-code-from must return the selected service's exit code").
 		Step("up returns the failing service's code once it exits",
