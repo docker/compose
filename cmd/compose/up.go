@@ -345,7 +345,7 @@ func runUp(
 			WaitTimeout:    timeout,
 			Watch:          upOptions.watch,
 			Services:       services,
-			NavigationMenu: upOptions.navigationMenu && display.Mode != "plain" && dockerCli.In().IsTerminal(),
+			NavigationMenu: upOptions.navigationMenu && display.Mode != display.ModePlain && dockerCli.In().IsTerminal(),
 		},
 	})
 }

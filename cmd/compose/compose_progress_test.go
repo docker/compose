@@ -86,18 +86,21 @@ func TestSelectEventProcessor_AutoMode(t *testing.T) {
 		errIsTTY bool
 		ansi     string
 		wantType string
+		wantMode string
 	}{
 		{
 			name:     "stderr TTY, stdout piped -> Full",
 			errIsTTY: true,
 			ansi:     "auto",
 			wantType: "*display.ttyWriter",
+			wantMode: display.ModeTTY,
 		},
 		{
 			name:     "stderr piped, stdout TTY -> Plain (do not fall back to stdout)",
 			outIsTTY: true,
 			ansi:     "auto",
 			wantType: "*display.plainWriter",
+			wantMode: display.ModePlain,
 		},
 		{
 			name:     "both TTY -> Full",
@@ -105,11 +108,13 @@ func TestSelectEventProcessor_AutoMode(t *testing.T) {
 			errIsTTY: true,
 			ansi:     "auto",
 			wantType: "*display.ttyWriter",
+			wantMode: display.ModeTTY,
 		},
 		{
 			name:     "both piped -> Plain",
 			ansi:     "auto",
 			wantType: "*display.plainWriter",
+			wantMode: display.ModePlain,
 		},
 		{
 			name:     "ansi never forces Plain even when stderr is TTY",
@@ -117,6 +122,7 @@ func TestSelectEventProcessor_AutoMode(t *testing.T) {
 			errIsTTY: true,
 			ansi:     "never",
 			wantType: "*display.plainWriter",
+			wantMode: display.ModePlain,
 		},
 	}
 
@@ -128,6 +134,8 @@ func TestSelectEventProcessor_AutoMode(t *testing.T) {
 			ep, err := selectEventProcessor(cli, "", tc.ansi, false)
 			assert.NilError(t, err)
 			assert.Equal(t, fmt.Sprintf("%T", ep), tc.wantType)
+			// the global must hold the mode actually rendered, never ModeAuto
+			assert.Equal(t, display.Mode, tc.wantMode)
 		})
 	}
 }
@@ -138,12 +146,14 @@ func TestSelectEventProcessor_ExplicitMode(t *testing.T) {
 		progress    string
 		ansi        string
 		wantType    string
+		wantMode    string
 		wantErrText string
 	}{
 		{
 			name:     "progress=tty forces Full regardless of streams",
 			progress: display.ModeTTY,
 			ansi:     "auto",
+			wantMode: display.ModeTTY,
 			wantType: "*display.ttyWriter",
 		},
 		{
@@ -156,6 +166,7 @@ func TestSelectEventProcessor_ExplicitMode(t *testing.T) {
 			name:     "progress=plain forces Plain",
 			progress: display.ModePlain,
 			ansi:     "auto",
+			wantMode: display.ModePlain,
 			wantType: "*display.plainWriter",
 		},
 		{
@@ -168,18 +179,21 @@ func TestSelectEventProcessor_ExplicitMode(t *testing.T) {
 			name:     "progress=quiet returns Quiet",
 			progress: display.ModeQuiet,
 			ansi:     "auto",
+			wantMode: display.ModeQuiet,
 			wantType: "*display.quiet",
 		},
 		{
 			name:     `progress="none" aliases to Quiet`,
 			progress: "none",
 			ansi:     "auto",
+			wantMode: display.ModeQuiet,
 			wantType: "*display.quiet",
 		},
 		{
 			name:     "progress=json returns JSON",
 			progress: display.ModeJSON,
 			ansi:     "auto",
+			wantMode: display.ModeJSON,
 			wantType: "*display.jsonWriter",
 		},
 		{
@@ -204,6 +218,8 @@ func TestSelectEventProcessor_ExplicitMode(t *testing.T) {
 			}
 			assert.NilError(t, err)
 			assert.Equal(t, fmt.Sprintf("%T", ep), tc.wantType)
+			// the global must hold the mode actually rendered, never ModeAuto
+			assert.Equal(t, display.Mode, tc.wantMode)
 		})
 	}
 }
