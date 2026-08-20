@@ -303,7 +303,7 @@ type StartOptions struct {
 	OnExit Cascade
 	// ExitCodeFrom return exit code from specified service
 	ExitCodeFrom string
-	// Wait won't return until containers reached the running|healthy state
+	// Wait won't return until containers are running, or healthy if they have a healthcheck
 	Wait        bool
 	WaitTimeout time.Duration
 	// Services passed in the command line to be started

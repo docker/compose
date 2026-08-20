@@ -45,8 +45,8 @@ func startCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := startCmd.Flags()
-	flags.BoolVar(&opts.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
-	flags.IntVar(&opts.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
+	flags.BoolVar(&opts.wait, "wait", false, "Wait until services are running, or healthy if they have a healthcheck. Implies detached mode.")
+	flags.IntVar(&opts.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for services to be running or healthy")
 
 	return startCmd
 }
