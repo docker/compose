@@ -125,7 +125,7 @@ func TestSelectEventProcessor_AutoMode(t *testing.T) {
 			saveGlobalState(t)
 			cli := newMockCli(t, newStream(t, tc.outIsTTY), newStream(t, tc.errIsTTY))
 
-			ep, err := selectEventProcessor(cli, "", tc.ansi, false)
+			ep, err := selectEventProcessor(cli, "", tc.ansi, false, false)
 			assert.NilError(t, err)
 			assert.Equal(t, fmt.Sprintf("%T", ep), tc.wantType)
 		})
@@ -196,7 +196,7 @@ func TestSelectEventProcessor_ExplicitMode(t *testing.T) {
 			// Explicit modes don't probe IsTerminal; pipes are fine for both.
 			cli := newMockCli(t, newStream(t, false), newStream(t, false))
 
-			ep, err := selectEventProcessor(cli, tc.progress, tc.ansi, false)
+			ep, err := selectEventProcessor(cli, tc.progress, tc.ansi, false, false)
 			if tc.wantErrText != "" {
 				assert.ErrorContains(t, err, tc.wantErrText)
 				assert.Assert(t, ep == nil)
