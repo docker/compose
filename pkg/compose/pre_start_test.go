@@ -247,6 +247,40 @@ func TestPreStart_VolumesFromServiceContainer(t *testing.T) {
 	assert.Assert(t, gotAutoRemove)
 }
 
+func TestPreStart_ExtraHostsPassedToContainer(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name:  "web",
+		Image: "alpine",
+		ExtraHosts: types.HostsList{
+			"somehost": {"162.242.195.82"},
+		},
+		PreStart: []types.ServiceHook{
+			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		},
+	}
+	ctr := container.Summary{ID: "service-ctr-id"}
+
+	var gotExtraHosts []string
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			gotExtraHosts = opts.HostConfig.ExtraHosts
+			return client.ContainerCreateResult{ID: "hook-1"}, nil
+		})
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil)
+	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0))
+
+	err := tested.runPreStart(t.Context(), project, service, ctr, func(api.ContainerEvent) {})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, gotExtraHosts, []string{"somehost:162.242.195.82"})
+}
+
 func TestPreStart_ContainerCreateFailurePropagates(t *testing.T) {
 	tested, apiClient := newPreStartTestService(t)
 
