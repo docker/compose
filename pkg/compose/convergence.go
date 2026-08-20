@@ -354,7 +354,11 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	return ctr, nil
 }
 
-// force sequential calls to ContainerStart to prevent race condition in engine assigning ports from ranges
+// startMx serializes ContainerStart calls across the whole process: the
+// engine allocates published ports from ranges non-atomically, and two
+// concurrent starts can be assigned the same port. Every code path calling
+// ContainerStart on a service container must hold it (the plan executor's
+// execStartContainer and the imperative startServiceContainer both do).
 var startMx sync.Mutex
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
@@ -603,7 +607,10 @@ func (s *composeService) startServiceContainer(ctx context.Context, project *typ
 
 	eventName := getContainerProgressName(ctr)
 	s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
-	if _, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{}); err != nil {
+	startMx.Lock()
+	_, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
+	startMx.Unlock()
+	if err != nil {
 		return err
 	}
 
