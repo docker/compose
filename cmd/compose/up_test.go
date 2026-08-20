@@ -155,8 +155,7 @@ services:
 		WorkingDir: dir,
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
+				Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx"},
 			},
 		},
 	}
@@ -178,4 +177,19 @@ services:
 	assert.Assert(t, strings.Contains(output, "LXKNS_ADDRESS"), output)
 	assert.Assert(t, strings.Contains(output, "LXKNS_PORT"), output)
 	assert.Assert(t, !strings.Contains(fmt.Sprint(err), "invalid ip address"), fmt.Sprint(err))
+}
+
+func TestRejectScheduledJobs(t *testing.T) {
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: true}}
+	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
+		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+	}}
+
+	assert.NilError(t, rejectScheduledJobs(&types.Project{}))
+	assert.NilError(t, rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual}}))
+	// profile-disabled scheduled jobs don't block up
+	assert.NilError(t, rejectScheduledJobs(&types.Project{DisabledJobs: types.Jobs{"backup": scheduled}}))
+
+	err := rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": scheduled, "migrate": manual}})
+	assert.Error(t, err, "scheduled jobs are not supported in this version: backup, sync")
 }

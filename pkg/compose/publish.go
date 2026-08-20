@@ -322,7 +322,7 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	}
 	for name, service := range project.Services {
 		override.Services[name] = types.ServiceConfig{
-			Image: service.Image,
+			ContainerSpec: types.ContainerSpec{Image: service.Image},
 		}
 	}
 	return override.MarshalYAML()
