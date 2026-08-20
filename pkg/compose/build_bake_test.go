@@ -51,6 +51,55 @@ func TestBakeTargetNames(t *testing.T) {
 	})
 }
 
+func TestToBakeAttest(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   types.BuildConfig
+		expected []string
+	}{
+		{
+			name:     "empty — no attest entries",
+			config:   types.BuildConfig{},
+			expected: nil,
+		},
+		{
+			name:     "provenance true",
+			config:   types.BuildConfig{Provenance: "true"},
+			expected: []string{"type=provenance"},
+		},
+		{
+			name:     "provenance false — must disable, not omit",
+			config:   types.BuildConfig{Provenance: "false"},
+			expected: []string{"type=provenance,disabled=true"},
+		},
+		{
+			name:     "provenance mode=max",
+			config:   types.BuildConfig{Provenance: "mode=max"},
+			expected: []string{"type=provenance,mode=max"},
+		},
+		{
+			name:     "sbom true",
+			config:   types.BuildConfig{SBOM: "true"},
+			expected: []string{"type=sbom"},
+		},
+		{
+			name:     "sbom false — must disable, not omit",
+			config:   types.BuildConfig{SBOM: "false"},
+			expected: []string{"type=sbom,disabled=true"},
+		},
+		{
+			name:     "provenance false + sbom false",
+			config:   types.BuildConfig{Provenance: "false", SBOM: "false"},
+			expected: []string{"type=provenance,disabled=true", "type=sbom,disabled=true"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.DeepEqual(t, toBakeAttest(tc.config), tc.expected)
+		})
+	}
+}
+
 // makeConsole must hand the genuine *os.File over when the stream wraps one:
 // on Windows, containerd/console rejects anything but the exact
 // os.Stdin/Stdout/Stderr values, so a wrapper would disable the TTY progress
