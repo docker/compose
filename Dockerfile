@@ -74,6 +74,25 @@ RUN --mount=type=bind,target=.,rw <<EOT
   fi
 EOT
 
+FROM build-base AS mocks-generate
+RUN --mount=type=bind,target=.,rw \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make mocks && mkdir /out && cp pkg/mocks/*.go /out
+
+FROM mocks-generate AS mocks-validate
+RUN --mount=type=bind,target=.,rw <<EOT
+  set -e
+  git add -A
+  cp -f /out/* pkg/mocks/
+  diff=$(git status --porcelain -- pkg/mocks)
+  if [ -n "$diff" ]; then
+    echo >&2 'ERROR: Generated mocks differ. Please regenerate them with "make mocks"'
+    echo "$diff"
+    exit 1
+  fi
+EOT
+
 FROM build-base AS build
 ARG BUILD_TAGS
 ARG BUILD_FLAGS
