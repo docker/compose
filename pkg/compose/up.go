@@ -37,11 +37,17 @@ import (
 
 	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/internal/desktop"
+	"github.com/docker/compose/v5/internal/stackext"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
+	// PoC: publish the resolved stack definition to the engine's compose
+	// stack extension point (moby extensions framework) before anything else,
+	// best effort
+	stackext.Publish(ctx, s.dockerCli, project, len(options.Create.Services) == 0)
+
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
