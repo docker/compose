@@ -280,6 +280,48 @@ func TestWaitDependencies(t *testing.T) {
 		}
 		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil, 0))
 	})
+	t.Run("missing required dependency is an error", func(t *testing.T) {
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+		}}
+		dependencies := types.DependsOnConfig{
+			"db": {Condition: ServiceConditionRunningOrHealthy, Required: true},
+		}
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, nil, 0)
+		assert.Error(t, err, "app is missing dependency db")
+	})
+	t.Run("missing optional dependency is only a warning", func(t *testing.T) {
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+		}}
+		dependencies := types.DependsOnConfig{
+			"db": {Condition: ServiceConditionRunningOrHealthy, Required: false},
+		}
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, nil, 0))
+	})
+	t.Run("failing optional dependency is skipped, not an error", func(t *testing.T) {
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1)},
+		}}
+		dependencies := types.DependsOnConfig{
+			"db": {Condition: types.ServiceConditionHealthy, Required: false},
+		}
+		containers := Containers{{
+			ID:     "db-ctr",
+			Names:  []string{"/db-ctr"},
+			Labels: map[string]string{api.ServiceLabel: "db"},
+		}}
+		// The dependency exited: a required dependency would fail the wait,
+		// an optional one is skipped after the first poll.
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).Return(client.ContainerInspectResult{
+			Container: container.InspectResponse{
+				ID:    "db-ctr",
+				Name:  "/db-ctr",
+				State: &container.State{Status: container.StateExited, ExitCode: 1},
+			},
+		}, nil)
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0))
+	})
 }
 
 func TestIsServiceHealthy(t *testing.T) {
