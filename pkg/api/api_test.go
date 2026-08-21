@@ -23,6 +23,22 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func TestPortPublisherString(t *testing.T) {
+	tests := []struct {
+		name string
+		pub  PortPublisher
+		want string
+	}{
+		{"ipv4", PortPublisher{URL: "0.0.0.0", TargetPort: 80, PublishedPort: 8080, Protocol: "tcp"}, "80/tcp -> 0.0.0.0:8080"},
+		{"ipv6", PortPublisher{URL: "::", TargetPort: 5060, PublishedPort: 32769, Protocol: "udp"}, "5060/udp -> [::]:32769"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.pub.String(), tt.want)
+		})
+	}
+}
+
 func TestRunOptionsEnvironmentMap(t *testing.T) {
 	opts := RunOptions{
 		Environment: []string{
