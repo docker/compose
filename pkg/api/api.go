@@ -52,7 +52,10 @@ type ProjectLoadOptions struct {
 	EnvFiles []string
 	// Profiles to activate
 	Profiles []string
-	// Services to select (empty = all)
+	// Services narrows the loaded project to the named services and their
+	// dependencies, and enables the profiles they require (empty = all).
+	// This is where an operation's scope is decided: the Services fields of
+	// downstream option structs do not filter.
 	Services []string
 	// Offline mode disables remote resource loading
 	Offline bool
@@ -80,6 +83,14 @@ type OCIOptions struct {
 
 // Compose is the API interface one can use to programmatically use docker/compose in a third-party software
 // Use [compose.NewComposeService] to get an actual instance
+//
+// Methods act on the whole *types.Project they receive: to scope an operation
+// to a subset of services, narrow the project itself before calling — at load
+// time through ProjectLoadOptions.Services, or with
+// types.Project.WithSelectedServices. The Services fields found on some
+// option structs are not filters: they mark the services the user explicitly
+// named, and only drive side concerns (recreation policy, log scoping) as
+// documented on each field.
 type Compose interface {
 	// Build executes the equivalent to a `compose build`
 	Build(ctx context.Context, project *types.Project, options BuildOptions) error
@@ -137,7 +148,9 @@ type Compose interface {
 	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
 	// Wait blocks until at least one of the services' container exits
 	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
-	// Scale manages numbers of container instances running per service
+	// Scale sets the number of replicas of the selected services
+	// (ScaleOptions.Replicas) and converges the project to it, creating,
+	// removing and starting containers as needed
 	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
 	// Export a service container's filesystem as a tar archive
 	Export(ctx context.Context, projectName string, options ExportOptions) error
@@ -158,6 +171,13 @@ type VolumesOptions struct {
 type VolumesSummary = volume.Volume
 
 type ScaleOptions struct {
+	// Replicas maps a service name to the number of replicas it must run.
+	// Scale applies these counts to the project model before converging it.
+	Replicas map[string]int
+	// Services selects the services whose containers may be recreated on
+	// configuration divergence while converging (see CreateOptions.Services);
+	// it does not scale anything by itself. When empty, it defaults to the
+	// keys of Replicas.
 	Services []string
 }
 
@@ -262,7 +282,11 @@ func (o BuildOptions) Apply(project *types.Project) error {
 // CreateOptions group options of the Create API
 type CreateOptions struct {
 	Build *BuildOptions
-	// Services defines the services user interacts with
+	// Services names the services the user explicitly targeted. It does NOT
+	// restrict what gets created — the whole project converges; narrow the
+	// project instead. Targeted services follow the Recreate policy, the
+	// others follow RecreateDependencies. Empty means every service is
+	// targeted.
 	Services []string
 	// Remove legacy containers for services that are not defined in the project
 	RemoveOrphans bool
@@ -286,20 +310,34 @@ type CreateOptions struct {
 type StartOptions struct {
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project *types.Project
-	// Attach to container and forward logs if not nil
+	// Attach receives the containers' logs during Up's foreground session.
+	// It doubles as the mode switch: when nil, Up returns once containers
+	// are started (detached mode); when set, Up keeps running the
+	// interactive session (log streaming, cascade, keyboard menu).
+	// Ignored by Start.
 	Attach LogConsumer
-	// AttachTo set the services to attach to
+	// AttachTo carries two unrelated meanings: for Start, the service names
+	// used to rebuild a project from container labels when Project is nil;
+	// for Up's foreground session, the services whose logs are streamed.
 	AttachTo []string
-	// OnExit defines behavior when a container stops
+	// OnExit defines behavior when a container stops. Honored by Up's
+	// foreground session only; ignored by Start.
 	OnExit Cascade
-	// ExitCodeFrom return exit code from specified service
+	// ExitCodeFrom reports the exit code of the specified service. Honored
+	// by Up's foreground session only; ignored by Start.
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
 	Wait        bool
 	WaitTimeout time.Duration
-	// Services passed in the command line to be started
-	Services       []string
-	Watch          bool
+	// Services names the services the user explicitly targeted; it only
+	// scopes the log monitor of Up's foreground session. Start ignores it:
+	// narrow the project instead.
+	Services []string
+	// Watch enables watch mode during Up's foreground session; ignored by
+	// Start.
+	Watch bool
+	// NavigationMenu enables the keyboard menu of Up's foreground session;
+	// ignored by Start.
 	NavigationMenu bool
 }
 
@@ -412,8 +450,15 @@ type RemoveOptions struct {
 	Services []string
 }
 
-// RunOptions group options of the Run API
+// RunOptions group options of the Run API — and, for historical reasons, of
+// the Exec API, which only honors the exec-relevant subset: Service, Index,
+// Command, Environment, WorkingDir, User, Privileged, Interactive, Tty and
+// Detach.
 type RunOptions struct {
+	// CreateOptions is embedded, but creating the one-off's dependencies
+	// only honors Build, IgnoreOrphans, RemoveOrphans and QuietPull; the
+	// other fields (Recreate, RecreateDependencies, Inherit, Timeout,
+	// Services, SkipProviders) are ignored.
 	CreateOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
@@ -434,7 +479,7 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
-	// used by exec
+	// Index selects the replica to target; only used by Exec.
 	Index int
 }
 

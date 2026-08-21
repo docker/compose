@@ -19,13 +19,17 @@
 package compose
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/creack/pty"
@@ -141,11 +145,11 @@ func writeStdcopyFrame(w io.Writer, stream byte, payload string) error {
 // daemon, leaving no way to find out at all.
 func TestRunHook_FailureIncludesOutput(t *testing.T) {
 	tests := []struct {
-		name     string
-		listener api.ContainerEventListener
+		name         string
+		withListener bool
 	}{
-		{name: "with listener", listener: func(api.ContainerEvent) {}},
-		{name: "without listener", listener: nil},
+		{name: "with listener", withListener: true},
+		{name: "without listener", withListener: false},
 	}
 
 	for _, tc := range tests {
@@ -194,9 +198,23 @@ func TestRunHook_FailureIncludesOutput(t *testing.T) {
 			s, err := NewComposeService(mockCli)
 			assert.NilError(t, err)
 
-			err = s.(*composeService).runHook(t.Context(), ctr, service, hook, tc.listener)
+			var got []string
+			var listener api.ContainerEventListener
+			if tc.withListener {
+				listener = func(event api.ContainerEvent) {
+					got = append(got, event.Line)
+				}
+			}
+
+			err = s.(*composeService).runHook(t.Context(), ctr, service, hook, listener)
 			assert.ErrorContains(t, err, "db hook exited with status 1")
 			assert.ErrorContains(t, err, "SQLSTATE[42S02]: table not found")
+			if tc.withListener {
+				assert.Check(t, slices.Contains(got, "migrating"),
+					"listener must receive stdout lines on failure; got: %v", got)
+				assert.Check(t, slices.Contains(got, "SQLSTATE[42S02]: table not found"),
+					"listener must receive stderr lines on failure; got: %v", got)
+			}
 		})
 	}
 }
@@ -284,4 +302,298 @@ func TestOutputTail(t *testing.T) {
 		assert.Check(t, len(tail.String()) <= 16, "output must stay within the byte limit")
 		assert.Check(t, strings.HasSuffix(tail.String(), "last line"), "the newest output must survive")
 	})
+
+	t.Run("strips trailing CR (CRLF lines)", func(t *testing.T) {
+		tail := newOutputTail(5, 1024)
+		_, err := tail.Write([]byte("line one\r\nline two\r\n"))
+		assert.NilError(t, err)
+		assert.Equal(t, tail.String(), "line one\nline two")
+	})
+
+	t.Run("progress bar: keeps last segment after mid-line CR", func(t *testing.T) {
+		tail := newOutputTail(5, 1024)
+		_, err := tail.Write([]byte("10%\r20%\r30%\n"))
+		assert.NilError(t, err)
+		assert.Equal(t, tail.String(), "30%")
+	})
+
+	t.Run("byte-truncation in String is UTF-8 safe", func(t *testing.T) {
+		// maxBytes=5: joining two € lines gives "€\n€" (7 bytes); the last-5-byte
+		// slice cuts inside the first €, leaving a broken leading byte. ToValidUTF8
+		// must strip it so the result is valid UTF-8.
+		tail := newOutputTail(10, 5)
+		_, err := tail.Write([]byte("€\n€\n"))
+		assert.NilError(t, err)
+		out := tail.String()
+		assert.Check(t, out != "", "truncated string must not be empty")
+		assert.Check(t, strings.ToValidUTF8(out, "\uFFFD") == out,
+			"String() must return valid UTF-8 after byte truncation; got %q", out)
+	})
+}
+
+// TestRunHook_StderrBias verifies that when a failing hook produces output on
+// both stdout and stderr, the error message preferentially shows stderr content.
+// Stderr is where hooks write their actual error; stdout is progress noise.
+func TestRunHook_StderrBias(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+	mockCli := mocks.NewMockCli(mockCtrl)
+	mockCli.EXPECT().Client().Return(mockAPI).AnyTimes()
+	mockCli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+
+	serverConn, clientConn := net.Pipe()
+
+	go func() {
+		// stdout: progress noise that should NOT dominate the error message
+		assert.NilError(t, writeStdcopyFrame(serverConn, 1, "running migration…\n"))
+		// stderr: the actual error that SHOULD appear in the error message
+		assert.NilError(t, writeStdcopyFrame(serverConn, 2, "Table 'service.sites' doesn't exist\n"))
+		serverConn.Close() //nolint:errcheck
+	}()
+
+	mockAPI.EXPECT().ExecCreate(gomock.Any(), "ctr-a1b2c3d4e5f6", gomock.Any()).
+		Return(client.ExecCreateResult{ID: "exec-x"}, nil)
+	mockAPI.EXPECT().ExecAttach(gomock.Any(), "exec-x", gomock.Any()).
+		Return(client.ExecAttachResult{
+			HijackedResponse: client.NewHijackedResponse(clientConn, ""),
+		}, nil)
+	mockAPI.EXPECT().ExecInspect(gomock.Any(), "exec-x", gomock.Any()).
+		Return(client.ExecInspectResult{ExitCode: 1}, nil)
+
+	s, err := NewComposeService(mockCli)
+	assert.NilError(t, err)
+
+	var got []string
+	listener := func(event api.ContainerEvent) {
+		got = append(got, event.Line)
+	}
+
+	runErr := s.(*composeService).runHook(t.Context(),
+		container.Summary{ID: "ctr-a1b2c3d4e5f6"},
+		types.ServiceConfig{Name: "db"},
+		types.ServiceHook{Command: []string{"migrate"}},
+		listener)
+
+	assert.ErrorContains(t, runErr, "doesn't exist", "stderr content must appear in the error")
+	assert.Assert(t, !strings.Contains(runErr.Error(), "running migration"),
+		"stdout progress noise must not dominate when stderr has content; got: %s", runErr.Error())
+	// The listener receives all lines from both streams regardless of stderr bias.
+	assert.Check(t, slices.Contains(got, "running migration\u2026"),
+		"listener must receive stdout lines; got: %v", got)
+	assert.Check(t, slices.Contains(got, "Table 'service.sites' doesn't exist"),
+		"listener must receive stderr lines; got: %v", got)
+}
+
+// TestRunHook_ContextCancellation verifies that cancelling the context unblocks
+// a hook that is waiting for output (e.g. a hung or slow container) and causes
+// runHook to return promptly with context.Canceled. Without the goroutine/select
+// fix the first Ctrl+C had no effect because StdCopy blocked on the attach reader.
+func TestRunHook_ContextCancellation(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+	mockCli := mocks.NewMockCli(mockCtrl)
+	mockCli.EXPECT().Client().Return(mockAPI).AnyTimes()
+	mockCli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+
+	// serverConn is held open and never writes data: StdCopy will block on Read.
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close() //nolint:errcheck
+
+	mockAPI.EXPECT().ExecCreate(gomock.Any(), "ctr-hang", gomock.Any()).
+		Return(client.ExecCreateResult{ID: "exec-hang"}, nil)
+	mockAPI.EXPECT().ExecAttach(gomock.Any(), "exec-hang", gomock.Any()).
+		Return(client.ExecAttachResult{
+			HijackedResponse: client.NewHijackedResponse(clientConn, ""),
+		}, nil)
+	// ExecInspect must NOT be called: runHook must return before reaching it.
+
+	ctx, cancel := context.WithCancel(t.Context())
+	s, err := NewComposeService(mockCli)
+	assert.NilError(t, err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- s.(*composeService).runHook(ctx,
+			container.Summary{ID: "ctr-hang"},
+			types.ServiceConfig{Name: "svc"},
+			types.ServiceHook{Command: []string{"sleep", "infinity"}},
+			nil)
+	}()
+
+	cancel()
+
+	select {
+	case runErr := <-errCh:
+		assert.ErrorIs(t, runErr, context.Canceled,
+			"runHook must return context.Canceled after ctx cancellation")
+	case <-time.After(5 * time.Second):
+		t.Fatal("runHook did not return within 5 s after ctx cancellation")
+	}
+}
+
+// TestRunHook_CopyError covers the branch in runHook where the copy goroutine
+// itself returns an error (e.g. a mid-stream I/O failure on the exec reader).
+// The error must be propagated immediately without blocking.
+func TestRunHook_CopyError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+	mockCli := mocks.NewMockCli(mockCtrl)
+	mockCli.EXPECT().Client().Return(mockAPI).AnyTimes()
+	mockCli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+
+	ctr := container.Summary{ID: "ctr-1"}
+	service := types.ServiceConfig{Name: "svc", Tty: false}
+	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
+
+	mockAPI.EXPECT().
+		ExecCreate(gomock.Any(), "ctr-1", gomock.Any()).
+		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
+
+	// Build a pipe whose read side immediately returns a hard error, simulating
+	// an I/O failure mid-stream rather than a clean EOF.
+	pr, pw := io.Pipe()
+	_ = pw.CloseWithError(fmt.Errorf("simulated I/O failure"))
+
+	// Use net.Pipe() only for the Conn field (Close); reads come from pr.
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close() //nolint:errcheck
+	defer clientConn.Close() //nolint:errcheck
+
+	mockAPI.EXPECT().
+		ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
+		Return(client.ExecAttachResult{
+			HijackedResponse: client.HijackedResponse{
+				Conn:   clientConn,
+				Reader: bufio.NewReader(pr),
+			},
+		}, nil)
+	// ExecInspect must NOT be called: runHook must return the copy error first.
+
+	s, err := NewComposeService(mockCli)
+	assert.NilError(t, err)
+
+	err = s.(*composeService).runHook(t.Context(), ctr, service, hook, nil)
+	assert.ErrorContains(t, err, "simulated I/O failure")
+}
+
+// TestHookExitError_NoOutput covers the branch in hookExitError where both
+// stdout and stderr tails are empty — the error must not include an output suffix.
+func TestHookExitError_NoOutput(t *testing.T) {
+	empty1 := newOutputTail(10, 512)
+	empty2 := newOutputTail(10, 512)
+	err := hookExitError("mysvc", 127, empty1, empty2)
+	assert.ErrorContains(t, err, "mysvc")
+	assert.ErrorContains(t, err, "127")
+	// No colon separator: the no-output format has no ': <output>' suffix.
+	assert.Assert(t, !strings.Contains(err.Error(), ": "), "unexpected output suffix in: %q", err.Error())
+}
+
+// TestHookExitError_StdoutFallback covers the branch in hookExitError where
+// stderr is empty but stdout has content: stdout is used as the fallback output.
+func TestHookExitError_StdoutFallback(t *testing.T) {
+	stdoutTail := newOutputTail(10, 512)
+	_, _ = stdoutTail.Write([]byte("stdout only line\n"))
+	stderrTail := newOutputTail(10, 512) // empty
+
+	err := hookExitError("mysvc", 1, stdoutTail, stderrTail)
+	assert.ErrorContains(t, err, "stdout only line")
+}
+
+// TestRunHook_ExecCreateError covers the branch where ExecCreate returns an
+// error — runHook must propagate it immediately.
+func TestRunHook_ExecCreateError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+	mockCli := mocks.NewMockCli(mockCtrl)
+	mockCli.EXPECT().Client().Return(mockAPI).AnyTimes()
+	mockCli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+
+	ctr := container.Summary{ID: "ctr-1"}
+	service := types.ServiceConfig{Name: "svc"}
+	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
+
+	mockAPI.EXPECT().
+		ExecCreate(gomock.Any(), "ctr-1", gomock.Any()).
+		Return(client.ExecCreateResult{}, fmt.Errorf("exec create failed"))
+
+	s, err := NewComposeService(mockCli)
+	assert.NilError(t, err)
+	err = s.(*composeService).runHook(t.Context(), ctr, service, hook, nil)
+	assert.ErrorContains(t, err, "exec create failed")
+}
+
+// TestRunHook_ExecAttachError covers the branch where ExecAttach returns an
+// error — runHook must propagate it immediately.
+func TestRunHook_ExecAttachError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+	mockCli := mocks.NewMockCli(mockCtrl)
+	mockCli.EXPECT().Client().Return(mockAPI).AnyTimes()
+	mockCli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+
+	ctr := container.Summary{ID: "ctr-1"}
+	service := types.ServiceConfig{Name: "svc"}
+	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
+
+	mockAPI.EXPECT().
+		ExecCreate(gomock.Any(), "ctr-1", gomock.Any()).
+		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
+	mockAPI.EXPECT().
+		ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
+		Return(client.ExecAttachResult{}, fmt.Errorf("exec attach failed"))
+
+	s, err := NewComposeService(mockCli)
+	assert.NilError(t, err)
+	err = s.(*composeService).runHook(t.Context(), ctr, service, hook, nil)
+	assert.ErrorContains(t, err, "exec attach failed")
+}
+
+// TestRunHook_ExecInspectError covers the branch where ExecInspect returns an
+// error — runHook must propagate it (copy finished successfully beforehand).
+func TestRunHook_ExecInspectError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+	mockCli := mocks.NewMockCli(mockCtrl)
+	mockCli.EXPECT().Client().Return(mockAPI).AnyTimes()
+	mockCli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+
+	ctr := container.Summary{ID: "ctr-1"}
+	service := types.ServiceConfig{Name: "svc", Tty: false}
+	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
+
+	mockAPI.EXPECT().
+		ExecCreate(gomock.Any(), "ctr-1", gomock.Any()).
+		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
+
+	// Pipe that closes immediately (EOF) so StdCopy returns with no error.
+	serverConn, clientConn := net.Pipe()
+	serverConn.Close() //nolint:errcheck
+	mockAPI.EXPECT().
+		ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
+		Return(client.ExecAttachResult{
+			HijackedResponse: client.NewHijackedResponse(clientConn, ""),
+		}, nil)
+
+	mockAPI.EXPECT().
+		ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
+		Return(client.ExecInspectResult{}, fmt.Errorf("inspect failed"))
+
+	s, err := NewComposeService(mockCli)
+	assert.NilError(t, err)
+	err = s.(*composeService).runHook(t.Context(), ctr, service, hook, nil)
+	assert.ErrorContains(t, err, "inspect failed")
 }

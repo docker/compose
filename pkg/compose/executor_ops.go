@@ -103,13 +103,13 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 		labels = labels.Add(api.ContainerReplaceLabel, replacedName)
 	}
 
-	opts := createOptions{
+	options := createOptions{
 		AutoRemove:        false,
 		AttachStdin:       false,
 		UseNetworkAliases: true,
 		Labels:            labels,
 	}
-	ctr, err := exec.compose.createMobyContainer(ctx, exec.project, service, op.Name, op.Number, op.Inherited, opts)
+	ctr, err := exec.compose.createMobyContainer(ctx, exec.project, service, op.Name, op.Number, op.Inherited, options)
 	if err != nil {
 		return err
 	}

@@ -417,8 +417,8 @@ func sortedMapKeys[V any](m map[string]V) []string {
 }
 
 func (f *envCheckFindings) hasEnvFinding() bool {
-	for _, svc := range f.services {
-		if svc.hasEnvFile || len(svc.suspiciousKeys) > 0 {
+	for _, serviceFindings := range f.services {
+		if serviceFindings.hasEnvFile || len(serviceFindings.suspiciousKeys) > 0 {
 			return true
 		}
 	}

@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -31,6 +32,11 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
+
+// preStartHookType is stored in the HookLabel on every pre_start hook container
+// so orphan containers from a previous failed run can be identified and removed
+// by a project+service+hook label filter.
+const preStartHookType = "pre_start"
 
 // lowestNumberedContainer returns the container with the lowest
 // com.docker.compose.container-number label, so pre_start always targets the
@@ -64,6 +70,14 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 			return fmt.Errorf("service %q pre_start[%d]: per_replica is not yet supported; remove per_replica or set it to false", service.Name, i)
 		}
 	}
+	// Remove any hook containers left behind by a previous failed run so they do
+	// not accumulate. Only one orphan can exist per service (failure gates the
+	// remaining hooks), but we clean the whole set in case the service definition
+	// changed between runs. Removal failures are non-fatal: they are logged so
+	// the operator can identify the stale container.
+	if err := s.removeOrphanPreStartContainers(ctx, project.Name, service.Name); err != nil {
+		logrus.Warnf("service %q: failed to remove stale pre_start hook containers: %v", service.Name, err)
+	}
 	for i, hook := range service.PreStart {
 		if err := s.runPreStartHook(ctx, project, service, ctr, i, hook, listener); err != nil {
 			return err
@@ -88,20 +102,18 @@ func (s *composeService) runPreStartHook(
 		Condition: container.WaitConditionNextExit,
 	})
 
-	// Open the log stream before ContainerStart so AutoRemove cannot race us
-	// to a 404 on a fast-exiting hook. The dedicated logCtx lets us force the
-	// follow stream closed once the hook has exited, so a daemon that keeps
-	// the connection open cannot deadlock `<-logsDone`.
+	// Open the log stream before ContainerStart so a fast-exiting hook cannot
+	// race us to a 404. The dedicated logCtx lets us force the follow stream
+	// closed once the hook has exited, so a daemon that keeps the connection
+	// open cannot deadlock `<-logsDone`.
 	logCtx, cancelLogs := context.WithCancel(ctx)
 	defer cancelLogs()
-	logsDone := s.streamPreStartLogs(logCtx, created.ID, service, index, listener)
+	logsDone, getTail := s.streamPreStartLogs(logCtx, created.ID, service, index, listener)
 
 	if _, err := s.apiClient().ContainerStart(ctx, created.ID, client.ContainerStartOptions{}); err != nil {
-		// AutoRemove only fires after a successful start, so the never-started
-		// container has to be dropped explicitly. A failed removal is logged
-		// at warn level — without that hint the orphan is only discoverable
-		// via the project/service labels.
-		if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true}); removeErr != nil {
+		// AutoRemove is false, so we must remove the never-started container
+		// explicitly. A failed removal is logged so the orphan is visible.
+		if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
 			logrus.Warnf("service %q pre_start[%d]: failed to remove orphan hook container %s: %v", service.Name, index, created.ID, removeErr)
 		}
 		// Drain waitRes so the client's wait goroutine exits without having to
@@ -119,7 +131,35 @@ func (s *composeService) runPreStartHook(
 	waitErr := waitPreStart(ctx, service.Name, index, waitRes)
 	cancelLogs()
 	<-logsDone
-	return waitErr
+	if waitErr != nil {
+		// Ctrl-C is a user cancellation, not a hook failure: remove the container
+		// and return the raw context error without decorating it with the tail or
+		// retaining the container for post-mortem inspection.
+		if ctx.Err() != nil {
+			if _, removeErr := s.apiClient().ContainerRemove(context.Background(), created.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
+				logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s after cancellation: %v", service.Name, index, created.ID, removeErr)
+			}
+			return waitErr
+		}
+		// Genuine hook failure: retain the container so the operator can run
+		// `docker logs <id>` and `docker inspect <id>` to diagnose the failure.
+		// Include the short container ID in the error to make it actionable.
+		shortID := created.ID
+		if len(shortID) > 12 {
+			shortID = shortID[:12]
+		}
+		if tail := getTail(); tail != "" {
+			return fmt.Errorf("%w: %s (hook container %s retained for inspection)", waitErr, tail, shortID)
+		}
+		return fmt.Errorf("%w (hook container %s retained for inspection)", waitErr, shortID)
+	}
+	// Success: remove the hook container, mirroring the old AutoRemove behaviour
+	// (including its anonymous volumes). A removal failure is logged but does not
+	// gate service start — the hook already succeeded.
+	if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); removeErr != nil {
+		logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s: %v", service.Name, index, created.ID, removeErr)
+	}
+	return nil
 }
 
 func (s *composeService) createPreStartContainer(
@@ -138,16 +178,21 @@ func (s *composeService) createPreStartContainer(
 		WorkingDir: hook.WorkingDir,
 		Env:        append(ToMobyEnv(service.Environment), ToMobyEnv(hook.Environment)...),
 		// Tag the ephemeral hook container with the project/service it belongs
-		// to so a failed AutoRemove leaves something that `compose down` (and
-		// other label-scoped tooling) can still find.
+		// to so it can be found by `compose down` and label-scoped tooling.
+		// HookLabel also distinguishes hook containers from the real service
+		// container (which shares ProjectLabel and ServiceLabel).
 		Labels: map[string]string{
 			api.ProjectLabel: project.Name,
 			api.ServiceLabel: service.Name,
 			api.VersionLabel: api.ComposeVersion,
+			api.HookLabel:    preStartHookType,
 		},
 	}
 	hostCfg := &container.HostConfig{
-		AutoRemove:  true,
+		// AutoRemove is intentionally false: a failed hook container is retained
+		// so the operator can inspect its logs. On success runPreStartHook
+		// removes the container explicitly (see the success path below).
+		AutoRemove:  false,
 		Privileged:  hook.Privileged,
 		VolumesFrom: []string{ctr.ID},
 	}
@@ -174,10 +219,9 @@ func (s *composeService) createPreStartContainer(
 
 	if versions.LessThan(apiVersion, apiVersion144) {
 		if err := s.connectPreStartExtraNetworks(ctx, project, service, created.ID, networkMode); err != nil {
-			// Same reason as the ContainerStart-failure cleanup: AutoRemove never
-			// fires on a container that was created but not started. Surface
-			// any cleanup failure so the orphan is at least visible in logs.
-			if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true}); removeErr != nil {
+			// AutoRemove is false; remove the container explicitly since it was
+			// never started. Log failures so the orphan is at least visible.
+			if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
 				logrus.Warnf("service %q pre_start: failed to remove orphan hook container %s: %v", service.Name, created.ID, removeErr)
 			}
 			return client.ContainerCreateResult{}, err
@@ -204,6 +248,32 @@ func (s *composeService) connectPreStartExtraNetworks(ctx context.Context, proje
 			EndpointConfig: eps,
 		}); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// removeOrphanPreStartContainers finds and force-removes any hook containers
+// left behind by a previous failed run of this service's pre_start hooks.
+// Containers are identified by project + service + HookLabel=pre_start.
+// Removal failures are logged at warn level and do not abort the run.
+func (s *composeService) removeOrphanPreStartContainers(ctx context.Context, projectName, serviceName string) error {
+	f := projectFilter(projectName)
+	f.Add("label", serviceFilter(serviceName))
+	f.Add("label", hookFilter(preStartHookType))
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: f,
+	})
+	if err != nil {
+		return err
+	}
+	for _, ctr := range res.Items {
+		if _, removeErr := s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		}); removeErr != nil {
+			logrus.Warnf("failed to remove stale pre_start hook container %s: %v", ctr.ID, removeErr)
 		}
 	}
 	return nil
@@ -256,15 +326,32 @@ func preStartResultErr(serviceName string, index int, res container.WaitResponse
 	return nil
 }
 
-// streamPreStartLogs returns a channel that is closed once the hook log stream
-// has been fully drained (or never opened). Callers must wait on it before
-// returning so the goroutine cannot outlive the hook.
-func (s *composeService) streamPreStartLogs(ctx context.Context, containerID string, service types.ServiceConfig, index int, listener api.ContainerEventListener) <-chan struct{} {
+// streamPreStartLogs opens the hook container's log stream in a background
+// goroutine, tees output into the listener (when non-nil) and into per-stream
+// tail buffers. It returns:
+//   - done: closed when the goroutine exits; callers must wait on it
+//   - getTail: returns the stderr-biased tail (stderr preferred, stdout fallback);
+//     safe to call only after done is closed
+//
+// The log stream is always opened even when listener is nil, so the tail is
+// populated in detached mode and can appear in error messages.
+func (s *composeService) streamPreStartLogs(
+	ctx context.Context,
+	containerID string,
+	service types.ServiceConfig,
+	index int,
+	listener api.ContainerEventListener,
+) (<-chan struct{}, func() string) {
 	done := make(chan struct{})
-	if listener == nil {
-		close(done)
-		return done
+	tailOut := newOutputTail(hookOutputTailLines, hookOutputTailBytes)
+	tailErr := newOutputTail(hookOutputTailLines, hookOutputTailBytes)
+	getTail := func() string {
+		if s := tailErr.String(); s != "" {
+			return s
+		}
+		return tailOut.String()
 	}
+
 	source := fmt.Sprintf("%s pre_start[%d] ->", service.Name, index)
 	logs, err := s.apiClient().ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
@@ -272,30 +359,44 @@ func (s *composeService) streamPreStartLogs(ctx context.Context, containerID str
 		Follow:     true,
 	})
 	if err != nil {
-		listener(api.ContainerEvent{
-			Type:    api.HookEventLog,
-			Source:  source,
-			ID:      containerID,
-			Service: service.Name,
-			Line:    fmt.Sprintf("warning: could not attach pre_start log stream: %s", err),
-		})
-		close(done)
-		return done
-	}
-	go func() {
-		defer close(done)
-		defer logs.Close() //nolint:errcheck
-		w := utils.GetWriter(func(line string) {
+		if listener != nil {
 			listener(api.ContainerEvent{
 				Type:    api.HookEventLog,
 				Source:  source,
 				ID:      containerID,
 				Service: service.Name,
-				Line:    line,
+				Line:    fmt.Sprintf("warning: could not attach pre_start log stream: %s", err),
 			})
-		})
-		defer w.Close() //nolint:errcheck
-		_, _ = stdcopy.StdCopy(w, w, logs)
+		}
+		close(done)
+		return done, getTail
+	}
+	go func() {
+		defer close(done)
+		defer logs.Close() //nolint:errcheck
+
+		var wOut, wErr io.Writer
+		wOut = tailOut
+		wErr = tailErr
+
+		if listener != nil {
+			// stdout and stderr share one listener writer: ContainerEvent has no stream
+			// field, so both appear identically in the live display.
+			lw := utils.GetWriter(func(line string) {
+				listener(api.ContainerEvent{
+					Type:    api.HookEventLog,
+					Source:  source,
+					ID:      containerID,
+					Service: service.Name,
+					Line:    line,
+				})
+			})
+			defer lw.Close() //nolint:errcheck
+			wOut = io.MultiWriter(lw, tailOut)
+			wErr = io.MultiWriter(lw, tailErr)
+		}
+
+		_, _ = stdcopy.StdCopy(wOut, wErr, logs)
 	}()
-	return done
+	return done, getTail
 }

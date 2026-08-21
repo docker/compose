@@ -79,7 +79,7 @@ func (s *composeService) createRemoteLoaders(options api.ProjectLoadOptions) []l
 
 // buildProjectOptions constructs compose-go ProjectOptions from API options
 func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, remoteLoaders []loader.ResourceLoader) (*cli.ProjectOptions, error) {
-	opts := []cli.ProjectOptionsFn{
+	projectOptionsFns := []cli.ProjectOptionsFn{
 		cli.WithWorkingDirectory(options.WorkingDir),
 		cli.WithOsEnv,
 	}
@@ -87,16 +87,16 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 	// Add PWD if not present
 	if _, present := os.LookupEnv("PWD"); !present {
 		if pwd, err := os.Getwd(); err == nil {
-			opts = append(opts, cli.WithEnv([]string{"PWD=" + pwd}))
+			projectOptionsFns = append(projectOptionsFns, cli.WithEnv([]string{"PWD=" + pwd}))
 		}
 	}
 
 	// Add remote loaders
 	for _, r := range remoteLoaders {
-		opts = append(opts, cli.WithResourceLoader(r))
+		projectOptionsFns = append(projectOptionsFns, cli.WithResourceLoader(r))
 	}
 
-	opts = append(opts,
+	projectOptionsFns = append(projectOptionsFns,
 		// Load PWD/.env if present and no explicit --env-file has been set
 		cli.WithEnvFiles(options.EnvFiles...),
 		// read dot env file to populate project environment
@@ -113,7 +113,7 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 		cli.WithName(options.ProjectName),
 	)
 
-	return cli.NewProjectOptions(options.ConfigPaths, append(options.ProjectOptionsFns, opts...)...)
+	return cli.NewProjectOptions(options.ConfigPaths, append(options.ProjectOptionsFns, projectOptionsFns...)...)
 }
 
 // postProcessProject applies post-loading transformations to the project

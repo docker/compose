@@ -52,9 +52,9 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	var containers []container.Summary
 	if len(options.Services) > 0 {
 		// filter service containers
-		for _, c := range allContainers.Items {
-			if slices.Contains(options.Services, c.Labels[api.ServiceLabel]) {
-				containers = append(containers, c)
+		for _, ctr := range allContainers.Items {
+			if slices.Contains(options.Services, ctr.Labels[api.ServiceLabel]) {
+				containers = append(containers, ctr)
 			}
 		}
 	} else {
@@ -72,15 +72,15 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	summary := map[string]api.ImageSummary{}
 	var mux sync.Mutex
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range containers {
+	for _, ctr := range containers {
 		eg.Go(func() error {
-			img, err := s.containerImageSummary(ctx, c, withPlatform)
+			img, err := s.containerImageSummary(ctx, ctr, withPlatform)
 			if err != nil {
 				return err
 			}
 			mux.Lock()
 			defer mux.Unlock()
-			summary[getCanonicalContainerName(c)] = img
+			summary[getCanonicalContainerName(ctr)] = img
 			return nil
 		})
 	}

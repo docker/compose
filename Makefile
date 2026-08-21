@@ -32,6 +32,8 @@ endif
 BUILD_FLAGS?=
 TEST_FLAGS?=
 E2E_TEST?=
+E2E_PARALLEL_PLUGIN?=4
+E2E_STANDALONE_PARALLEL?=4
 ifneq ($(E2E_TEST),)
 	TEST_FLAGS:=$(TEST_FLAGS) -run '$(E2E_TEST)'
 endif
@@ -75,11 +77,11 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: example-provider ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -v $(TEST_FLAGS) -count=1 -timeout 20m ./pkg/e2e
+	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -v $(TEST_FLAGS) -count=1 -parallel=$(E2E_PARALLEL_PLUGIN) -timeout 20m ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
-	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- $(TEST_FLAGS) -v -count=1 -parallel=1 -timeout 20m --tags=standalone ./pkg/e2e
+	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- $(TEST_FLAGS) -v -count=1 -parallel=$(E2E_STANDALONE_PARALLEL) -timeout 20m --tags=standalone ./pkg/e2e
 
 .PHONY: build-and-e2e-compose
 build-and-e2e-compose: build e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
@@ -91,12 +93,16 @@ build-and-e2e-compose-standalone: build e2e-compose-standalone ## Compile the co
 example-provider: ## build example provider for e2e tests
 	go build -o bin/build/example-provider docs/examples/provider.go
 
+# mockgen is pinned to v0.4.0: the package mode introduced in v0.5 copies
+# parameter names from the mocked source, and moby's APIClient names its
+# variadic options `_`, which produces invalid Go code.
+MOCKGEN = go run go.uber.org/mock/mockgen@v0.4.0
+
 .PHONY: mocks
-mocks:
-	mockgen --version >/dev/null 2>&1 || go install go.uber.org/mock/mockgen@v0.4.0
-	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
-	mockgen -destination pkg/mocks/mock_docker_api.go -package mocks github.com/moby/moby/client APIClient
-	mockgen -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go Service
+mocks: ## Regenerate pkg/mocks
+	$(MOCKGEN) -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
+	$(MOCKGEN) -destination pkg/mocks/mock_docker_api.go -package mocks github.com/moby/moby/client APIClient
+	$(MOCKGEN) -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go
 
 .PHONY: e2e
 e2e: e2e-compose e2e-compose-standalone ## Run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
@@ -153,7 +159,11 @@ go-mod-tidy: ## Run go mod tidy in a container and output resulting go.mod and g
 validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 	$(BUILDX_CMD) bake vendor-validate
 
-validate: validate-go-mod validate-headers validate-docs  ## Validate sources
+.PHONY: validate-mocks
+validate-mocks: ## Validate pkg/mocks is up-to-date with the mocked interfaces
+	$(BUILDX_CMD) bake mocks-validate
+
+validate: validate-go-mod validate-headers validate-docs validate-mocks  ## Validate sources
 
 pre-commit: validate check-dependencies lint build test e2e-compose
 

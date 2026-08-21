@@ -16,7 +16,13 @@
 
 package display
 
-// Mode define how progress should be rendered, either as ModePlain or ModeTTY
+// Mode is the effective progress rendering mode for the current command.
+//
+// It starts as ModeAuto and is resolved during command setup by
+// selectEventProcessor (cmd/compose), which assigns the mode matching the
+// renderer it returns — so code running after setup never observes ModeAuto.
+// The only other writers are the `--quiet` flags of `run` and `build`, which
+// force ModeQuiet from their PreRun hooks.
 var Mode = ModeAuto
 
 const (

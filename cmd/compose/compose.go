@@ -481,7 +481,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 			if err != nil {
 				return err
 			}
-			applyDisplayMode(dockerCli, ansi)
+			applyAnsiMode(dockerCli, ansi)
 
 			detached, _ := cmd.Flags().GetBool("detach")
 			ep, err := selectEventProcessor(dockerCli, opts.Progress, ansi, detached)
@@ -619,21 +619,15 @@ func resolveAnsiMode(cmd *cobra.Command, ansi string, noAnsi bool) (string, erro
 	return ansi, nil
 }
 
-// applyDisplayMode configures ANSI output and the progress display mode,
-// honoring the NO_COLOR convention (https://no-color.org).
-func applyDisplayMode(dockerCli command.Cli, ansi string) {
+// applyAnsiMode configures ANSI output, honoring the NO_COLOR convention
+// (https://no-color.org). The progress display mode is resolved separately,
+// by selectEventProcessor.
+func applyAnsiMode(dockerCli command.Cli, ansi string) {
 	formatter.SetANSIMode(dockerCli, ansi)
 
 	if noColor, ok := os.LookupEnv("NO_COLOR"); ok && noColor != "" {
 		display.NoColor()
 		formatter.SetANSIMode(dockerCli, formatter.Never)
-	}
-
-	switch ansi {
-	case "never":
-		display.Mode = display.ModePlain
-	case "always":
-		display.Mode = display.ModeTTY
 	}
 }
 
@@ -689,7 +683,9 @@ func stdinfo(dockerCli command.Cli) io.Writer {
 	return dockerCli.Err()
 }
 
-// selectEventProcessor picks the EventProcessor for Compose progress rendering.
+// selectEventProcessor picks the EventProcessor for Compose progress rendering,
+// and resolves display.Mode to the mode actually rendered: every branch assigns
+// it, so after command setup the global never holds ModeAuto.
 //
 // In auto mode we probe Err() (not Out()) because the renderer writes to stderr;
 // probing stdout would force plain mode whenever stdout is redirected (e.g.
@@ -702,8 +698,10 @@ func selectEventProcessor(dockerCli command.Cli, progress, ansi string, detached
 			display.Mode = display.ModePlain
 			return display.Plain(dockerCli.Err()), nil
 		case dockerCli.Err().IsTerminal():
+			display.Mode = display.ModeTTY
 			return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached), nil
 		default:
+			display.Mode = display.ModePlain
 			return display.Plain(dockerCli.Err()), nil
 		}
 	case display.ModeTTY:

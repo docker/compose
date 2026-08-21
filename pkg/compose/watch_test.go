@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -193,6 +194,51 @@ func newFakeSyncer() *fakeSyncer {
 func (f *fakeSyncer) Sync(ctx context.Context, service string, paths []*sync.PathMapping) error {
 	f.synced <- paths
 	return nil
+}
+
+// #13725: initialSyncFiles used to skip files whose mtime predated the image
+// creation time, which silently dropped all pre-existing host files.
+func TestInitialSyncFilesDirectory(t *testing.T) {
+	hostDir := t.TempDir()
+	hostFile := filepath.Join(hostDir, "test.txt")
+	assert.NilError(t, os.WriteFile(hostFile, []byte("hello"), 0o600))
+	// back-date the file to simulate a file that predates the image
+	oldTime := time.Now().Add(-time.Hour)
+	assert.NilError(t, os.Chtimes(hostFile, oldTime, oldTime))
+
+	paths, err := (&composeService{}).initialSyncFiles(types.ServiceConfig{Name: "svc"}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app/src",
+	}, watch.EmptyMatcher{})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: "/app/src/test.txt",
+	}})
+}
+
+// #13725: single-file trigger path was also gated on the image-creation-time
+// check, preventing pre-existing files from being synced.
+func TestInitialSyncFilesRegularFile(t *testing.T) {
+	hostDir := t.TempDir()
+	hostFile := filepath.Join(hostDir, "test.txt")
+	assert.NilError(t, os.WriteFile(hostFile, []byte("hello"), 0o600))
+	oldTime := time.Now().Add(-time.Hour)
+	assert.NilError(t, os.Chtimes(hostFile, oldTime, oldTime))
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: hostDir},
+	}, types.Trigger{
+		Path:   hostFile,
+		Target: "/app/test.txt",
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      hostFile,
+		ContainerPath: "/app/test.txt",
+	}})
 }
 
 // TestPruneDanglingImagesOnRebuild verifies the post-rebuild prune only
