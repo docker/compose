@@ -569,6 +569,26 @@ func TestDoneDeadlockFix(t *testing.T) {
 	}
 }
 
+func TestDoneAfterContextCancelDoesNotHang(t *testing.T) {
+	w, _ := newTestWriter()
+	ctx, cancel := context.WithCancel(context.Background())
+	w.Start(ctx, "down")
+	cancel()
+	// Let the render goroutine observe the cancellation and exit.
+	time.Sleep(100 * time.Millisecond)
+
+	finished := make(chan struct{})
+	go func() {
+		w.Done("down", false)
+		close(finished)
+	}()
+	select {
+	case <-finished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ttyWriter.Done blocked forever after context cancellation")
+	}
+}
+
 // TestAdjustLineWidth_WideProgressForcesSizeInfoDrop is the unit-level
 // regression test for docker/compose#13595. When progress contains the
 // " X.XMB / Y.YMB" size suffix and the bar makes beforeStatus large enough
