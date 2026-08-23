@@ -241,6 +241,33 @@ func TestInitialSyncFilesRegularFile(t *testing.T) {
 	}})
 }
 
+// initialSync's doc comment promises the Dockerfile and compose files are
+// never copied into the container, but a refactor (ed10804e0) dropped the
+// matcher enforcing it without replacement — neither the .dockerignore-derived
+// matcher nor EphemeralPathMatcher cover this.
+func TestInitialSync_ExcludesDockerfileAndComposeFiles(t *testing.T) {
+	hostDir := t.TempDir()
+	for _, name := range []string{"Dockerfile", "compose.yaml", "compose.override.yml", "app.go"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(hostDir, name), []byte("content"), 0o600))
+	}
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: hostDir},
+	}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app",
+	}, syncer)
+	assert.NilError(t, err)
+
+	paths := <-syncer.synced
+	assert.DeepEqual(t, paths, []*sync.PathMapping{{
+		HostPath:      filepath.Join(hostDir, "app.go"),
+		ContainerPath: "/app/app.go",
+	}})
+}
+
 // TestPruneDanglingImagesOnRebuild verifies the post-rebuild prune only
 // removes superseded dangling images: a dangling image whose ID matches one
 // of the freshly built images must be spared. The lookup used to probe the

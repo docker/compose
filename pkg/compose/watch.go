@@ -784,11 +784,19 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 	if err != nil {
 		return err
 	}
-	// FIXME .dockerignore
+
+	// the Dockerfile and compose files drive the build/orchestration, not the
+	// application: never copy them into the container on initial sync
+	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", []string{"Dockerfile", "*compose*.y*ml"})
+	if err != nil {
+		return err
+	}
+
 	ignoreInitialSync := watch.NewCompositeMatcher(
 		dockerIgnores,
 		watch.EphemeralPathMatcher(),
 		dotGitIgnore,
+		dockerFileIgnore,
 		triggerIgnore)
 
 	pathsToCopy, err := s.initialSyncFiles(service, trigger, ignoreInitialSync)
