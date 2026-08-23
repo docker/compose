@@ -50,6 +50,7 @@ import (
 type WatchFunc func(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error)
 
 type Watcher struct {
+	mx      gsync.Mutex
 	project *types.Project
 	options api.WatchOptions
 	watchFn WatchFunc
@@ -78,21 +79,16 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, cons
 	return nil, fmt.Errorf("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
 }
 
-// ensure state changes are atomic
-var mx gsync.Mutex
-
 func (w *Watcher) Start(ctx context.Context) error {
-	mx.Lock()
-	defer mx.Unlock()
+	w.mx.Lock()
+	defer w.mx.Unlock()
 	ctx, cancelFunc := context.WithCancel(ctx)
-	w.stopFn = cancelFunc
 	wait, err := w.watchFn(ctx, w.project, w.options)
 	if err != nil {
-		go func() {
-			w.errCh <- err
-		}()
+		cancelFunc()
 		return err
 	}
+	w.stopFn = cancelFunc
 	go func() {
 		w.errCh <- wait()
 	}()
@@ -100,8 +96,8 @@ func (w *Watcher) Start(ctx context.Context) error {
 }
 
 func (w *Watcher) Stop() error {
-	mx.Lock()
-	defer mx.Unlock()
+	w.mx.Lock()
+	defer w.mx.Unlock()
 	if w.stopFn == nil {
 		return nil
 	}
