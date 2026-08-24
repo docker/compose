@@ -29,6 +29,7 @@ import (
 	gsync "sync"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
 	ccli "github.com/docker/cli/cli/command/container"
@@ -785,9 +786,14 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 		return err
 	}
 
-	// the Dockerfile and compose files drive the build/orchestration, not the
-	// application: never copy them into the container on initial sync
-	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", []string{"Dockerfile", "*compose*.y*ml"})
+	// also exclude override compose files and any custom-named Dockerfile
+	dockerFilePatterns := append([]string{"Dockerfile"}, cli.DefaultFileNames...)
+	dockerFilePatterns = append(dockerFilePatterns, cli.DefaultOverrideFileNames...)
+	if service.Build != nil && service.Build.Dockerfile != "" {
+		dockerFilePatterns = append(dockerFilePatterns, filepath.Base(service.Build.Dockerfile))
+	}
+
+	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", dockerFilePatterns)
 	if err != nil {
 		return err
 	}
