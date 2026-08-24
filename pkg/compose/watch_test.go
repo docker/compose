@@ -241,6 +241,88 @@ func TestInitialSyncFilesRegularFile(t *testing.T) {
 	}})
 }
 
+// initialSync's doc comment promises the Dockerfile and compose files are
+// never copied into the container, but a refactor (ed10804e0) dropped the
+// matcher enforcing it without replacement — neither the .dockerignore-derived
+// matcher nor EphemeralPathMatcher cover this.
+func TestInitialSync_ExcludesDockerfileAndComposeFiles(t *testing.T) {
+	hostDir := t.TempDir()
+	for _, name := range []string{"Dockerfile", "compose.yaml", "docker-compose.yml", "compose.override.yml", "app.go"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(hostDir, name), []byte("content"), 0o600))
+	}
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: hostDir},
+	}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app",
+	}, syncer)
+	assert.NilError(t, err)
+
+	paths := <-syncer.synced
+	assert.DeepEqual(t, paths, []*sync.PathMapping{{
+		HostPath:      filepath.Join(hostDir, "app.go"),
+		ContainerPath: "/app/app.go",
+	}})
+}
+
+// TestInitialSync_ExcludesCustomNamedDockerfile verifies that a service using
+// a non-default Dockerfile name (build.dockerfile) still has it excluded from
+// the initial sync, not just the literal "Dockerfile".
+func TestInitialSync_ExcludesCustomNamedDockerfile(t *testing.T) {
+	hostDir := t.TempDir()
+	for _, name := range []string{"Dockerfile.prod", "app.go"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(hostDir, name), []byte("content"), 0o600))
+	}
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: hostDir, Dockerfile: "Dockerfile.prod"},
+	}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app",
+	}, syncer)
+	assert.NilError(t, err)
+
+	paths := <-syncer.synced
+	assert.DeepEqual(t, paths, []*sync.PathMapping{{
+		HostPath:      filepath.Join(hostDir, "app.go"),
+		ContainerPath: "/app/app.go",
+	}})
+}
+
+// TestInitialSync_ExcludesNestedCustomNamedDockerfile verifies that a
+// build.dockerfile living in a subdirectory of the build context (e.g.
+// "docker/Dockerfile.prod") is still excluded by its basename: the ignore
+// matcher only ever receives filepath.Base(path), so appending the raw
+// service.Build.Dockerfile value (which may include the subdirectory) would
+// never match.
+func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
+	hostDir := t.TempDir()
+	assert.NilError(t, os.MkdirAll(filepath.Join(hostDir, "docker"), 0o755))
+	assert.NilError(t, os.WriteFile(filepath.Join(hostDir, "docker", "Dockerfile.prod"), []byte("content"), 0o600))
+	assert.NilError(t, os.WriteFile(filepath.Join(hostDir, "app.go"), []byte("content"), 0o600))
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: hostDir, Dockerfile: "docker/Dockerfile.prod"},
+	}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app",
+	}, syncer)
+	assert.NilError(t, err)
+
+	paths := <-syncer.synced
+	assert.DeepEqual(t, paths, []*sync.PathMapping{{
+		HostPath:      filepath.Join(hostDir, "app.go"),
+		ContainerPath: "/app/app.go",
+	}})
+}
+
 // TestPruneDanglingImagesOnRebuild verifies the post-rebuild prune only
 // removes superseded dangling images: a dangling image whose ID matches one
 // of the freshly built images must be spared. The lookup used to probe the

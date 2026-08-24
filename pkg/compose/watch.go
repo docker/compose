@@ -29,6 +29,7 @@ import (
 	gsync "sync"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
 	ccli "github.com/docker/cli/cli/command/container"
@@ -784,11 +785,24 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 	if err != nil {
 		return err
 	}
-	// FIXME .dockerignore
+
+	// also exclude override compose files and any custom-named Dockerfile
+	dockerFilePatterns := append([]string{"Dockerfile"}, cli.DefaultFileNames...)
+	dockerFilePatterns = append(dockerFilePatterns, cli.DefaultOverrideFileNames...)
+	if service.Build != nil && service.Build.Dockerfile != "" {
+		dockerFilePatterns = append(dockerFilePatterns, filepath.Base(service.Build.Dockerfile))
+	}
+
+	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", dockerFilePatterns)
+	if err != nil {
+		return err
+	}
+
 	ignoreInitialSync := watch.NewCompositeMatcher(
 		dockerIgnores,
 		watch.EphemeralPathMatcher(),
 		dotGitIgnore,
+		dockerFileIgnore,
 		triggerIgnore)
 
 	pathsToCopy, err := s.initialSyncFiles(service, trigger, ignoreInitialSync)
