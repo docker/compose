@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
@@ -279,7 +280,11 @@ func (s *composeService) resolveRunServiceReferences(ctx context.Context, projec
 func (s *composeService) startDependencies(ctx context.Context, project *types.Project, options api.RunOptions) error {
 	project = project.WithServicesDisabled(options.Service)
 
-	err := s.Create(ctx, project, api.CreateOptions{
+	// calls the unexported create/start, not the public Create/Start: this
+	// already runs inside the "run" operation's Start/Done bracket (see
+	// prepareRun), and the public variants would open a second, nested one
+	// on the same shared bus.
+	err := s.create(ctx, project, api.CreateOptions{
 		Build:         options.Build,
 		IgnoreOrphans: options.IgnoreOrphans,
 		RemoveOrphans: options.RemoveOrphans,
@@ -290,9 +295,9 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 	}
 
 	if len(project.Services) > 0 {
-		return s.Start(ctx, project.Name, api.StartOptions{
+		return s.start(ctx, strings.ToLower(project.Name), api.StartOptions{
 			Project: project,
-		})
+		}, nil)
 	}
 	return nil
 }
