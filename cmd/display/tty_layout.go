@@ -83,6 +83,12 @@ func layoutFrame(t *taskTree, operation string, o layoutOpts) []string {
 	if more > 0 {
 		lines = append(lines, renderSegs([]seg{{text: fmt.Sprintf(" ... %d more", more)}}, o.width))
 	}
+	// hard guarantee against degenerate heights (height==1 would otherwise
+	// still yield header + "more" = 2 lines): never return more lines than
+	// the terminal has rows
+	if o.height > 0 && len(lines) > o.height {
+		lines = lines[:o.height]
+	}
 	return lines
 }
 
@@ -101,7 +107,7 @@ type row struct {
 
 func buildRows(t *taskTree, o layoutOpts) []row {
 	var rows []row
-	for _, root := range t.roots() {
+	for _, root := range t.roots {
 		rows = append(rows, makeRow(t, root, o))
 	}
 	return rows
@@ -112,7 +118,7 @@ func makeRow(t *taskTree, n *node, o layoutOpts) row {
 		spin:        spinGlyph(n, o.now),
 		id:          n.id,
 		status:      n.text,
-		statusColor: colorFn(n.status),
+		statusColor: eventColor(n.status, nocolor),
 		details:     n.details,
 		timer:       fmt.Sprintf("%.1fs", nodeElapsed(n, o.now).Seconds()),
 	}
@@ -145,7 +151,7 @@ func aggregateProgress(t *taskTree, root *node) (strip, sizes string) {
 		hideSizes      bool
 		glyphs         []string
 	)
-	for _, child := range t.children(root.id) {
+	for _, child := range t.children[root.id] {
 		if child.status == api.Working && child.total == 0 {
 			hideSizes = true
 		}
@@ -313,7 +319,11 @@ var (
 	termSpinnerFrames = spinnerFrames()
 )
 
-func colorFn(s api.EventStatus) colorFunc {
+// eventColor maps an event status to its display color; statuses without a
+// dedicated color (typically Working) fall back to def, which differs
+// between the progress rows (no color) and the plain per-event lines
+// (success green).
+func eventColor(s api.EventStatus, def colorFunc) colorFunc {
 	switch s {
 	case api.Done:
 		return SuccessColor
@@ -322,7 +332,7 @@ func colorFn(s api.EventStatus) colorFunc {
 	case api.Error:
 		return ErrorColor
 	default:
-		return nocolor
+		return def
 	}
 }
 
@@ -345,10 +355,9 @@ func spinGlyph(n *node, now time.Time) seg {
 	case api.Error:
 		return seg{text: spinnerError, color: ErrorColor}
 	default:
+		// now and startedAt come from the writer's single clock (see
+		// taskTree doc), so the difference is never negative
 		frame := int(now.Sub(n.startedAt)/tickInterval) % len(termSpinnerFrames)
-		if frame < 0 {
-			frame = 0
-		}
 		return seg{text: termSpinnerFrames[frame], color: CountColor}
 	}
 }

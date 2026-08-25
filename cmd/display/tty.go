@@ -97,17 +97,17 @@ func (w *termWriter) Start(ctx context.Context, operation string) {
 	defer w.mu.Unlock()
 	// A Start before the matching Done (nested brackets are a misuse, but
 	// Full is public API): retire the previous cycle so its refresh
-	// goroutine doesn't outlive it.
+	// goroutine doesn't outlive it. Cancellation only guarantees the old
+	// goroutine *will* exit — not that it already has when Start returns;
+	// a last repaint from it is harmless (same model, under the mutex).
 	if w.stopTicks != nil {
 		w.stopTicks()
 		w.stopTicks = nil
 	}
 	// Build suspension is scoped to a cycle: a new operation must not stay
-	// silent because the previous one ended mid-build, and buildkit wrote
-	// below the last frame, so the new cycle starts a fresh block.
+	// silent because the previous one ended mid-build.
 	if w.suspended {
-		w.suspended = false
-		w.scr.reset()
+		w.unsuspend()
 	}
 	w.operation = operation
 	// The refresh goroutine is bound to a derived context: parent
@@ -185,16 +185,22 @@ func (w *termWriter) handle(e api.Resource) {
 	if e.Text == api.StatusBuilding {
 		w.suspended = true
 	} else if w.suspended {
-		w.suspended = false
-		w.scr.reset()
+		w.unsuspend()
 	}
 
 	w.tree.apply(e, w.now())
 
 	if w.operation == "" {
 		// outside any operation: degrade to one plain line per event
-		_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, plainEventColor(e.Status)(e.Text), e.Details)
+		_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, eventColor(e.Status, SuccessColor)(e.Text), e.Details)
 	}
+}
+
+// unsuspend clears build suspension and starts a fresh block below whatever
+// buildkit wrote, instead of repainting over it.
+func (w *termWriter) unsuspend() {
+	w.suspended = false
+	w.scr.reset()
 }
 
 func (w *termWriter) repaint() {
@@ -209,15 +215,4 @@ func (w *termWriter) repaint() {
 		now:    w.now(),
 	})
 	w.scr.paint(lines, width)
-}
-
-func plainEventColor(s api.EventStatus) colorFunc {
-	switch s {
-	case api.Warning:
-		return WarningColor
-	case api.Error:
-		return ErrorColor
-	default:
-		return SuccessColor
-	}
 }
