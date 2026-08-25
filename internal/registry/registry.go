@@ -17,11 +17,10 @@
 package registry
 
 import (
-	"encoding/base64"
-	"encoding/json"
-
 	"github.com/distribution/reference"
 	clitypes "github.com/docker/cli/cli/config/types"
+	"github.com/moby/moby/api/pkg/authconfig"
+	registrytypes "github.com/moby/moby/api/types/registry"
 )
 
 const (
@@ -44,6 +43,11 @@ const (
 
 // GetAuthConfigKey special-cases using the full index address of the official
 // index as the AuthConfig key, and uses the (host)name[:port] for private indexes.
+//
+// It differs from the docker CLI configfile's own normalization by also
+// mapping the registry host (registry-1.docker.io): OCI resolvers hand the
+// credential callback the network host actually contacted, not the reference
+// domain.
 func GetAuthConfigKey(indexName string) string {
 	if indexName == IndexName || indexName == IndexHostname || indexName == DefaultRegistryHost {
 		return IndexServer
@@ -59,16 +63,19 @@ type AuthProvider interface {
 
 // EncodedAuth returns the credentials for the registry hosting the given
 // image reference, base64-encoded as expected by the Docker API's
-// X-Registry-Auth header.
+// X-Registry-Auth header. The configfile normalizes the Docker Hub domain to
+// its canonical credentials key itself.
 func EncodedAuth(ref reference.Named, cfg AuthProvider) (string, error) {
-	authConfig, err := cfg.GetAuthConfig(GetAuthConfigKey(reference.Domain(ref)))
+	auth, err := cfg.GetAuthConfig(reference.Domain(ref))
 	if err != nil {
 		return "", err
 	}
-
-	buf, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(buf), nil
+	return authconfig.Encode(registrytypes.AuthConfig{
+		Username:      auth.Username,
+		Password:      auth.Password,
+		Auth:          auth.Auth,
+		ServerAddress: auth.ServerAddress,
+		IdentityToken: auth.IdentityToken,
+		RegistryToken: auth.RegistryToken,
+	})
 }
