@@ -247,7 +247,11 @@ func (v *Vertex) GetChildren() []*Vertex {
 	return res
 }
 
-// NewGraph returns the dependency graph of the services
+// NewGraph returns the dependency graph of the services. It never modifies
+// the project: an optional (required: false) dependency on a service absent
+// from the model simply contributes no edge; pruning such references from
+// the model itself is the caller's explicit decision — see
+// Project.WithoutUnresolvedOptionalDependencies.
 func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, error) {
 	graph := &Graph{
 		lock:     sync.RWMutex{},
@@ -258,13 +262,11 @@ func NewGraph(project *types.Project, initialStatus ServiceStatus) (*Graph, erro
 		graph.AddVertex(s.Name, s.Name, initialStatus)
 	}
 
-	for index, s := range project.Services {
+	for _, s := range project.Services {
 		for _, name := range s.GetDependencies() {
 			err := graph.AddEdge(s.Name, name)
 			if err != nil {
 				if !s.DependsOn[name].Required {
-					delete(s.DependsOn, name)
-					project.Services[index] = s
 					continue
 				}
 				if api.IsNotFoundError(err) {
