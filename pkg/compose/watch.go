@@ -694,11 +694,17 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("service(s) %q successfully built", services))
 
+	// Guard the recreate so it does not cascade to depends_on dependencies.
+	// Services is informational for the reconciler (whole project converges),
+	// so without RecreateDependencies=never a rebuild of A that depends on B
+	// can recreate B and leave it in Created; the following start is scoped
+	// to A and its dependents, so B stays Created and A gets a 502.
 	err = s.create(ctx, project, api.CreateOptions{
-		Services:      services,
-		Inherit:       true,
-		Recreate:      api.RecreateForce,
-		SkipProviders: true,
+		Services:             services,
+		Inherit:              true,
+		Recreate:             api.RecreateForce,
+		RecreateDependencies: api.RecreateNever,
+		SkipProviders:        true,
 	})
 	if err != nil {
 		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate services after update. Error: %v", err))
