@@ -69,11 +69,12 @@ type termWriter struct {
 	detached bool
 	dryRun   bool
 
-	tree      taskTree
-	scr       screen
-	operation string
-	suspended bool
-	stopTicks context.CancelFunc
+	tree        taskTree
+	scr         screen
+	operation   string
+	suspended   bool
+	stopTicks   context.CancelFunc
+	ticksExited chan struct{} // closed by the refresh goroutine when it returns
 
 	// injected for tests
 	size func() (width, height int)
@@ -94,16 +95,33 @@ func termSize() (int, int) {
 func (w *termWriter) Start(ctx context.Context, operation string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	// A Start before the matching Done (nested brackets are a misuse, but
+	// Full is public API): retire the previous cycle so its refresh
+	// goroutine doesn't outlive it.
+	if w.stopTicks != nil {
+		w.stopTicks()
+		w.stopTicks = nil
+	}
+	// Build suspension is scoped to a cycle: a new operation must not stay
+	// silent because the previous one ended mid-build, and buildkit wrote
+	// below the last frame, so the new cycle starts a fresh block.
+	if w.suspended {
+		w.suspended = false
+		w.scr.reset()
+	}
 	w.operation = operation
 	// The refresh goroutine is bound to a derived context: parent
 	// cancellation (Ctrl-C) and Done both stop it by cancelling, which can
 	// never block — there is no channel handshake to miss.
 	tickCtx, cancel := context.WithCancel(ctx)
+	exited := make(chan struct{})
 	w.stopTicks = cancel
-	go w.refresh(tickCtx)
+	w.ticksExited = exited
+	go w.refresh(tickCtx, exited)
 }
 
-func (w *termWriter) refresh(ctx context.Context) {
+func (w *termWriter) refresh(ctx context.Context, exited chan<- struct{}) {
+	defer close(exited)
 	ticker := time.NewTicker(tickInterval)
 	defer ticker.Stop()
 	for {
@@ -120,15 +138,25 @@ func (w *termWriter) refresh(ctx context.Context) {
 
 func (w *termWriter) Done(string, bool) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	if w.stopTicks != nil {
 		w.stopTicks()
 		w.stopTicks = nil
 	}
+	exited := w.ticksExited
+	w.ticksExited = nil
 	w.repaint() // leave the final state on screen
 	w.operation = ""
 	// The tree and the screen survive: a follow-up operation on the same
 	// writer (`up` chains create and start) extends the same block.
+	w.mu.Unlock()
+
+	// Wait for the refresh goroutine outside the lock (it may be blocked on
+	// it, about to no-op since operation is cleared): once Done returns,
+	// nothing repaints anymore, so output printed right after an operation
+	// (a prompt, container logs) cannot be garbled by a stray frame.
+	if exited != nil {
+		<-exited
+	}
 }
 
 func (w *termWriter) On(events ...api.Resource) {
@@ -140,7 +168,10 @@ func (w *termWriter) On(events ...api.Resource) {
 			continue
 		}
 		if w.operation != "start" && (e.Text == api.StatusStarted || e.Text == api.StatusStarting) && !w.detached {
-			// skip those events to avoid mixing with container logs
+			// Deliberate: attached run/up stream container logs on this same
+			// terminal, and painting Starting/Started rows here would repaint
+			// over the first log lines of the container that just started.
+			// Outside an explicit `start` operation those events are dropped.
 			continue
 		}
 		w.handle(e)
