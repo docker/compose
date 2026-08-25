@@ -26,6 +26,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/mattn/go-runewidth"
+	"go.uber.org/goleak"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -165,6 +166,59 @@ func TestTerm_DoneReturnsAfterContextCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Done() blocked after context cancellation")
 	}
+}
+
+// Done is reachable through the public api.EventProcessor interface, so a
+// caller isn't guaranteed to have called Start first: it must be a no-op,
+// not a nil dereference.
+func TestTerm_DoneBeforeStartDoesNotPanic(t *testing.T) {
+	w, _, _ := newTermWriter(80, 24)
+	w.Done("op", false)
+}
+
+// Once Done returns, nothing repaints anymore: the refresh goroutine must
+// not survive the bracket, or a stray frame could garble whatever the caller
+// prints next (a prompt, container logs). goleak needs no settling sleep
+// precisely because Done waits for the goroutine to exit.
+func TestTerm_NoRenderGoroutineSurvivesDone(t *testing.T) {
+	w, _, _ := newTermWriter(80, 24)
+	w.Start(t.Context(), "pull")
+	w.On(api.Resource{ID: "Image foo", Text: "Pulling", Status: api.Working})
+	w.Done("pull", true)
+	goleak.VerifyNone(t)
+}
+
+// A Start before the matching Done (nested brackets are a misuse, but Full
+// is public API) must retire the previous cycle instead of leaking its
+// refresh goroutine until the parent context is cancelled.
+func TestTerm_NestedStartRetiresPreviousCycle(t *testing.T) {
+	w, _, _ := newTermWriter(80, 24)
+	ctx := t.Context()
+	w.Start(ctx, "outer")
+	w.Start(ctx, "inner")
+	w.Done("inner", false)
+	w.Done("outer", false)
+	goleak.VerifyNone(t)
+}
+
+// Build suspension is scoped to a cycle: an operation ending mid-build (a
+// failed build aborts the bracket with suspended still set) must not leave
+// the next operation's progress permanently silent.
+func TestTerm_StartResetsBuildSuspension(t *testing.T) {
+	w, buf, _ := newTermWriter(80, 24)
+	w.Start(t.Context(), "build")
+	w.On(api.Resource{ID: "Image app", Text: api.StatusBuilding, Status: api.Working})
+	w.Done("build", false)
+
+	w.Start(t.Context(), "create")
+	w.On(api.Resource{ID: "container app-1", Text: "Creating", Status: api.Working})
+	w.mu.Lock()
+	w.repaint()
+	w.mu.Unlock()
+	w.Done("create", true)
+
+	frame := stripAnsi(buf.String())
+	assert.Assert(t, strings.Contains(frame, "container app-1"), "expected the new cycle to paint, got: %q", frame)
 }
 
 // The spinner animation must be a function of time, not of how often the

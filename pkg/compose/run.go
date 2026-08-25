@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/signal"
 	"slices"
-	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
@@ -295,7 +294,7 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 	}
 
 	if len(project.Services) > 0 {
-		return s.start(ctx, strings.ToLower(project.Name), api.StartOptions{
+		return s.start(ctx, project.Name, api.StartOptions{
 			Project: project,
 		}, nil)
 	}
