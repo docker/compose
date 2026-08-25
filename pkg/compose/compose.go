@@ -26,7 +26,6 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
@@ -248,11 +247,18 @@ func (s *composeService) getContextInfo() api.ContextInfo {
 }
 
 // getProxyConfig returns the proxy config - either custom override or environment-based
-func (s *composeService) getProxyConfig() map[string]string {
+func (s *composeService) getProxyConfig() map[string]*string {
 	if s.proxyConfig != nil {
-		return s.proxyConfig
+		m := make(map[string]*string, len(s.proxyConfig))
+		for k, v := range s.proxyConfig {
+			m[k] = &v
+		}
+		return m
 	}
-	return storeutil.GetProxyConfig(s.dockerCli)
+	// proxy configuration from the CLI config file, keyed by daemon host
+	// with "default" as fallback — the same lookup `docker build` uses.
+	// Passing nil runOpts hands us a freshly allocated map we own.
+	return s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil)
 }
 
 func (s *composeService) stdout() *streams.Out {

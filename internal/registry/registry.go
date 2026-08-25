@@ -16,6 +16,14 @@
 
 package registry
 
+import (
+	"encoding/base64"
+	"encoding/json"
+
+	"github.com/distribution/reference"
+	clitypes "github.com/docker/cli/cli/config/types"
+)
+
 const (
 	// DefaultNamespace is the default namespace
 	DefaultNamespace = "docker.io"
@@ -41,4 +49,26 @@ func GetAuthConfigKey(indexName string) string {
 		return IndexServer
 	}
 	return indexName
+}
+
+// AuthProvider provides registry credentials for a registry hostname, as
+// implemented by the docker CLI's configfile.
+type AuthProvider interface {
+	GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error)
+}
+
+// EncodedAuth returns the credentials for the registry hosting the given
+// image reference, base64-encoded as expected by the Docker API's
+// X-Registry-Auth header.
+func EncodedAuth(ref reference.Named, cfg AuthProvider) (string, error) {
+	authConfig, err := cfg.GetAuthConfig(GetAuthConfigKey(reference.Domain(ref)))
+	if err != nil {
+		return "", err
+	}
+
+	buf, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(buf), nil
 }
