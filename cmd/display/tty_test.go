@@ -25,6 +25,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/mattn/go-runewidth"
 	"go.uber.org/goleak"
 	"gotest.tools/v3/assert"
@@ -53,31 +54,31 @@ func stripAnsi(s string) string {
 	return result.String()
 }
 
-// testClock returns a controllable clock starting at a fixed instant.
-func testClock() (func() time.Time, *time.Time) {
-	now := time.Unix(1_700_000_000, 0)
-	return func() time.Time { return now }, &now
+// testClock returns a fake clock starting at a fixed instant; tests advance
+// it explicitly instead of sleeping.
+func testClock() *clockwork.FakeClock {
+	return clockwork.NewFakeClockAt(time.Unix(1_700_000_000, 0))
 }
 
-func newTermWriter(width, height int) (*termWriter, *bytes.Buffer, *time.Time) {
+func newTermWriter(width, height int) (*termWriter, *bytes.Buffer, *clockwork.FakeClock) {
 	var buf bytes.Buffer
-	clock, now := testClock()
+	clock := testClock()
 	w := &termWriter{
 		out:       &buf,
 		info:      &buf,
 		tree:      newTaskTree(),
 		scr:       screen{out: &buf},
 		size:      func() (int, int) { return width, height },
-		now:       clock,
+		clock:     clock,
 		operation: "pull",
 	}
-	return w, &buf, now
+	return w, &buf, clock
 }
 
 // feed applies events at the writer's current clock.
 func feed(w *termWriter, events ...api.Resource) {
 	for _, e := range events {
-		w.tree.apply(e, w.now())
+		w.tree.apply(e, w.clock.Now())
 	}
 }
 
@@ -154,7 +155,7 @@ func TestTerm_DoneReturnsAfterContextCancel(t *testing.T) {
 	w.Start(ctx, "pull")
 	w.On(api.Resource{ID: "Image foo", Text: "Pulling", Status: api.Working})
 	cancel()
-	time.Sleep(20 * time.Millisecond) // let the refresh goroutine exit
+	// no settling sleep: Done itself waits for the refresh goroutine to exit
 
 	finished := make(chan struct{})
 	go func() {
@@ -221,18 +222,66 @@ func TestTerm_StartResetsBuildSuspension(t *testing.T) {
 	assert.Assert(t, strings.Contains(frame, "container app-1"), "expected the new cycle to paint, got: %q", frame)
 }
 
+// Degenerate terminal heights must never overflow: even height==1 (where
+// header + "... more" would naively yield two lines) returns a single line.
+func TestTerm_FrameNeverExceedsTerminalHeight(t *testing.T) {
+	tree := newTaskTree()
+	clock := testClock()
+	for _, id := range []string{"a", "b", "c"} {
+		tree.apply(api.Resource{ID: id, Text: "Pulling", Status: api.Working}, clock.Now())
+	}
+	for height := 1; height <= 4; height++ {
+		lines := layoutFrame(&tree, "pull", layoutOpts{width: 40, height: height, now: clock.Now()})
+		assert.Assert(t, len(lines) <= height, "height %d yielded %d lines", height, len(lines))
+	}
+}
+
+// roots, children and the completed count are maintained incrementally by
+// apply; this locks the bookkeeping across the tricky transitions: a node
+// created as root later gaining a parent, and a completed node going back
+// to work.
+func TestTerm_TreeIncrementalBookkeeping(t *testing.T) {
+	tree := newTaskTree()
+	clock := testClock()
+
+	tree.apply(api.Resource{ID: "layer", Text: "Waiting", Status: api.Working}, clock.Now())
+	assert.Equal(t, len(tree.roots), 1)
+
+	// gaining a first parent demotes the node from the roots ("Image app"
+	// has no node of its own yet, so no root remains at this point)
+	tree.apply(api.Resource{ID: "layer", ParentID: "Image app", Text: "Downloading", Status: api.Working}, clock.Now())
+	assert.Equal(t, len(tree.roots), 0)
+	tree.apply(api.Resource{ID: "Image app", Text: "Pulling", Status: api.Working}, clock.Now())
+	assert.Equal(t, len(tree.roots), 1)
+	assert.Equal(t, tree.roots[0].id, "Image app")
+	assert.Equal(t, len(tree.children["Image app"]), 1)
+
+	// completion transitions keep the running counter exact, both ways.
+	// "layer" was first seen without a parent, so its anchor is "" and only
+	// parentless events update its state (the anchor rule).
+	done, total := tree.counts()
+	assert.Equal(t, done, 0)
+	assert.Equal(t, total, 2)
+	tree.apply(api.Resource{ID: "layer", Text: "Pulled", Status: api.Done}, clock.Now())
+	done, _ = tree.counts()
+	assert.Equal(t, done, 1)
+	tree.apply(api.Resource{ID: "layer", Text: "Downloading", Status: api.Working}, clock.Now())
+	done, _ = tree.counts()
+	assert.Equal(t, done, 0)
+}
+
 // The spinner animation must be a function of time, not of how often the
 // layout runs.
 func TestTerm_SpinnerIsTimeBased(t *testing.T) {
-	clock, now := testClock()
-	n := &node{status: api.Working, startedAt: clock()}
+	clock := testClock()
+	n := &node{status: api.Working, startedAt: clock.Now()}
 
-	a := spinGlyph(n, *now)
-	b := spinGlyph(n, *now)
+	a := spinGlyph(n, clock.Now())
+	b := spinGlyph(n, clock.Now())
 	assert.Equal(t, a.text, b.text, "same instant must yield the same frame")
 
-	*now = now.Add(tickInterval)
-	c := spinGlyph(n, *now)
+	clock.Advance(tickInterval)
+	c := spinGlyph(n, clock.Now())
 	assert.Assert(t, a.text != c.text, "advancing the clock must advance the frame")
 }
 
@@ -300,9 +349,9 @@ func TestTerm_ChildTasksAggregateIntoParentRow(t *testing.T) {
 // Deterministic visual check with a fixed clock: overall shape, id
 // truncation and right-aligned timers.
 func TestTerm_VisualSnapshot(t *testing.T) {
-	w, buf, now := newTermWriter(50, 24)
+	w, buf, clock := newTermWriter(50, 24)
 	feed(w, api.Resource{ID: "Image docker.io/library/nginx-long-name", Text: "Pulling", Status: api.Working})
-	*now = now.Add(2 * time.Second)
+	clock.Advance(2 * time.Second)
 	feed(w, api.Resource{ID: "Image docker.io/library/nginx-long-name", Text: "Pulled", Status: api.Done})
 	feed(w, api.Resource{ID: "Image docker.io/library/postgres-database", Text: "Pulling", Status: api.Working})
 	w.repaint()

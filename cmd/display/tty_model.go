@@ -52,13 +52,27 @@ func (n *node) completed() bool {
 // taskTree stores tasks in arrival order and resolves parent/child links.
 // It is a plain data structure: all mutation goes through apply, all time is
 // injected, so its behavior is exhaustively testable without a terminal.
+//
+// Roots, per-parent children and the completed count are maintained
+// incrementally by apply: the layout reads them on every refresh tick, so a
+// frame with an unchanged tree costs O(1) here instead of a full rescan.
+//
+// Every time value handed to apply (and to the layout) must come from the
+// writer's single clock: the model relies on time never regressing between
+// calls — spinner frames and elapsed timers are computed as bare
+// differences against startedAt/endedAt.
 type taskTree struct {
-	order []string
-	nodes map[string]*node
+	nodes    map[string]*node
+	roots    []*node            // nodes without any parent, in arrival order
+	children map[string][]*node // parent id → children, in link-arrival order
+	done     int                // nodes currently in a completed status
 }
 
 func newTaskTree() taskTree {
-	return taskTree{nodes: map[string]*node{}}
+	return taskTree{
+		nodes:    map[string]*node{},
+		children: map[string][]*node{},
+	}
 }
 
 // apply is the single state transition of the model.
@@ -72,10 +86,19 @@ func (t *taskTree) apply(e api.Resource, now time.Time) {
 			startedAt: now,
 		}
 		t.nodes[e.ID] = n
-		t.order = append(t.order, e.ID)
+		if e.ParentID == "" {
+			t.roots = append(t.roots, n)
+		}
 	}
 	if e.ParentID != "" {
-		n.parents.Add(e.ParentID)
+		if !n.parents.Has(e.ParentID) {
+			n.parents.Add(e.ParentID)
+			t.children[e.ParentID] = append(t.children[e.ParentID], n)
+			if len(n.parents) == 1 {
+				// first parent ever: the node is not a root after all
+				t.removeRoot(n)
+			}
+		}
 		// Layers shared by several images receive the same events once per
 		// image. Accept updates from the first declared parent only, so the
 		// rendered state doesn't flicker between concurrent pull streams.
@@ -92,41 +115,26 @@ func (t *taskTree) apply(e api.Resource, now time.Time) {
 	n.total = max(n.total, e.Total)
 	n.current = max(n.current, e.Current)
 	n.percent = max(n.percent, e.Percent)
-	if n.completed() && !wasCompleted {
+	switch {
+	case n.completed() && !wasCompleted:
 		n.endedAt = now
+		t.done++
+	case !n.completed() && wasCompleted:
+		t.done--
 	}
 }
 
-// roots returns the top-level tasks in arrival order.
-func (t *taskTree) roots() []*node {
-	var roots []*node
-	for _, id := range t.order {
-		if n := t.nodes[id]; len(n.parents) == 0 {
-			roots = append(roots, n)
+func (t *taskTree) removeRoot(n *node) {
+	for i, root := range t.roots {
+		if root == n {
+			t.roots = append(t.roots[:i], t.roots[i+1:]...)
+			return
 		}
 	}
-	return roots
-}
-
-// children returns the tasks attached to parent, in arrival order. A layer
-// shared by several images is listed under each of them.
-func (t *taskTree) children(parent string) []*node {
-	var children []*node
-	for _, id := range t.order {
-		if n := t.nodes[id]; n.parents.Has(parent) {
-			children = append(children, n)
-		}
-	}
-	return children
 }
 
 // counts returns completed and total task counts, children included, to
 // preserve the historical "[+] pull 3/15" header semantics.
 func (t *taskTree) counts() (done, total int) {
-	for _, n := range t.nodes {
-		if n.completed() {
-			done++
-		}
-	}
-	return done, len(t.nodes)
+	return t.done, len(t.nodes)
 }
