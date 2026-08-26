@@ -64,7 +64,11 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 	if !accept {
 		return api.ErrCanceled
 	}
-	err = s.Push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
+	// unexported push, not the public Push: publish already runs inside its
+	// own "publish" Start/Done bracket, and Push would open a second one on
+	// the same shared bus. Quiet:true would also suppress push progress
+	// reporting, not just the bracket, so it's not an option here.
+	err = s.push(ctx, project, api.PushOptions{IgnoreFailures: true, ImageMandatory: true})
 	if err != nil {
 		return err
 	}
