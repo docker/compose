@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,7 +30,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
-	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
@@ -294,7 +292,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return err
 	}
 
-	encodedAuth, err := encodedAuth(ref, s.configFile())
+	encodedAuth, err := registry.EncodedAuth(ref, s.configFile())
 	if err != nil {
 		return err
 	}
@@ -377,7 +375,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 // never pin a published reference with a per-platform digest.
 func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {
 	return func(named reference.Named) (digest.Digest, error) {
-		auth, err := encodedAuth(named, file)
+		auth, err := registry.EncodedAuth(named, file)
 		if err != nil {
 			return "", err
 		}
@@ -390,23 +388,6 @@ func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiCl
 		}
 		return inspect.Descriptor.Digest, nil
 	}
-}
-
-type authProvider interface {
-	GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error)
-}
-
-func encodedAuth(ref reference.Named, configFile authProvider) (string, error) {
-	authConfig, err := configFile.GetAuthConfig(registry.GetAuthConfigKey(reference.Domain(ref)))
-	if err != nil {
-		return "", err
-	}
-
-	buf, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(buf), nil
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {

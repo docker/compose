@@ -341,7 +341,7 @@ func (s *composeService) classicAuthConfigs() (map[string]registry.AuthConfig, e
 	return authConfigs, nil
 }
 
-func imageBuildOptions(proxyConfigs map[string]string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) client.ImageBuildOptions {
+func imageBuildOptions(proxyConfigs map[string]*string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) client.ImageBuildOptions {
 	config := service.Build
 	return client.ImageBuildOptions{
 		Version:     buildtypes.BuilderV1,

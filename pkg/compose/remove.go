@@ -31,6 +31,8 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	projectName = strings.ToLower(projectName)
 
 	if options.Stop {
+		// Stop's own "stop" Start/Done cycle runs sequentially, fully
+		// closed, before "remove"'s below — ttyWriter supports that.
 		err := s.Stop(ctx, projectName, api.StopOptions{
 			Services: options.Services,
 			Project:  options.Project,

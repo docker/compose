@@ -599,25 +599,21 @@ func toBakeSecrets(project *types.Project, secrets []types.ServiceSecretConfig) 
 
 func toBakeAttest(buildConfig types.BuildConfig) []string {
 	var attests []string
+	attests = appendAttest(attests, "provenance", buildConfig.Provenance)
+	attests = appendAttest(attests, "sbom", buildConfig.SBOM)
+	return attests
+}
 
-	// Handle per-service provenance configuration (only from build config, not global options)
-	if buildConfig.Provenance != "" {
-		if buildConfig.Provenance == "true" {
-			attests = append(attests, "type=provenance")
-		} else if buildConfig.Provenance != "false" {
-			attests = append(attests, fmt.Sprintf("type=provenance,%s", buildConfig.Provenance))
-		}
+func appendAttest(attests []string, attestType, value string) []string {
+	switch value {
+	case "":
+	case "true":
+		attests = append(attests, "type="+attestType)
+	case "false":
+		attests = append(attests, "type="+attestType+",disabled=true")
+	default:
+		attests = append(attests, fmt.Sprintf("type=%s,%s", attestType, value))
 	}
-
-	// Handle per-service SBOM configuration (only from build config, not global options)
-	if buildConfig.SBOM != "" {
-		if buildConfig.SBOM == "true" {
-			attests = append(attests, "type=sbom")
-		} else if buildConfig.SBOM != "false" {
-			attests = append(attests, fmt.Sprintf("type=sbom,%s", buildConfig.SBOM))
-		}
-	}
-
 	return attests
 }
 
