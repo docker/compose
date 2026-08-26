@@ -25,7 +25,7 @@ import (
 )
 
 func TestMaterializeManualJob(t *testing.T) {
-	yes := true
+	yes, no := true, false
 	base := func() *types.Project {
 		return &types.Project{
 			Services: types.Services{
@@ -39,8 +39,13 @@ func TestMaterializeManualJob(t *testing.T) {
 					WorkloadSpec:  types.WorkloadSpec{DependsOn: types.DependsOnConfig{"db": {Condition: types.ServiceConditionStarted, Required: true}}},
 				},
 				"backup": {
-					Name:     "backup",
-					Triggers: &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}},
+					Name:          "backup",
+					Triggers:      &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}},
+					ContainerSpec: types.ContainerSpec{Image: "backup-tool"},
+				},
+				"rotation": {
+					Name:     "rotation",
+					Triggers: &types.TriggerConfig{Manual: &no, Schedule: []types.ScheduleConfig{{Cron: "0 3 1 * *"}}},
 				},
 				"prep": {
 					Name:          "prep",
@@ -105,9 +110,17 @@ func TestMaterializeManualJob(t *testing.T) {
 		assert.Equal(t, svc.Image, "the-service", "a same-named service must not be shadowed by the job")
 	})
 
-	t.Run("a schedule-only job is rejected", func(t *testing.T) {
-		_, err := materializeManualJob(base(), "backup")
-		assert.Error(t, err, `job "backup" has no manual trigger, it cannot be run`)
+	t.Run("a scheduled job without explicit manual opt-out can be run", func(t *testing.T) {
+		got, err := materializeManualJob(base(), "backup")
+		assert.NilError(t, err)
+		svc, err := got.GetService("backup")
+		assert.NilError(t, err)
+		assert.Equal(t, svc.Image, "backup-tool")
+	})
+
+	t.Run("manual: false explicitly forbids manual execution", func(t *testing.T) {
+		_, err := materializeManualJob(base(), "rotation")
+		assert.Error(t, err, `job "rotation" is declared with manual: false, it cannot be run manually`)
 	})
 }
 
