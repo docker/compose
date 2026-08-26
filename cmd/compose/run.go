@@ -376,18 +376,20 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 	return err
 }
 
-// materializeManualJob lets run target a manual-trigger job exactly like a
-// service. A job is a ContainerSpec+WorkloadSpec — the same layers a service
-// is made of — so it materializes as a service for the one-off machinery:
-// its profile is activated and the project narrowed to its dependencies by
+// materializeManualJob lets run target a job exactly like a service: per the
+// spec, any job can be triggered manually regardless of its automated
+// triggers, unless it explicitly opts out with `triggers.manual: false`.
+// A job is a ContainerSpec+WorkloadSpec — the same layers a service is made
+// of — so it materializes as a service for the one-off machinery: its
+// profile is activated and the project narrowed to its dependencies by
 // WithSelectedJob, then the job joins Services under its own name.
 func materializeManualJob(project *types.Project, name string) (*types.Project, error) {
 	job, ok := project.AllJobs()[name]
 	if !ok {
 		return project, nil
 	}
-	if job.Triggers == nil || !job.Triggers.Manual {
-		return nil, fmt.Errorf("job %q has no manual trigger, it cannot be run", name)
+	if job.Triggers != nil && job.Triggers.Manual != nil && !*job.Triggers.Manual {
+		return nil, fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
 	}
 	project, err := project.WithSelectedJob(name)
 	if err != nil {

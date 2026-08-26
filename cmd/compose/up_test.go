@@ -180,7 +180,8 @@ services:
 }
 
 func TestRejectScheduledJobs(t *testing.T) {
-	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: true}}
+	yes := true
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
 	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
 		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
 	}}

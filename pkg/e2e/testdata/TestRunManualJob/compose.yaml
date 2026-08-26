@@ -18,3 +18,10 @@ jobs:
     triggers:
       schedule:
         - cron: "0 3 * * *"
+  rotation:
+    image: alpine
+    command: echo rotation
+    triggers:
+      manual: false
+      schedule:
+        - cron: "0 3 1 * *"

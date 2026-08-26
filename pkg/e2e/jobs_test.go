@@ -30,16 +30,20 @@ func TestUpRejectsScheduledJobs(t *testing.T) {
 			ServiceNotCreated("web"))
 }
 
-// A manual-trigger job runs through `compose run` exactly like a service
-// would: its declared dependencies start first, its output and exit flow
-// back. A schedule-only job stays out of reach.
+// A job runs through `compose run` exactly like a service would: its
+// declared dependencies start first, its output and exit flow back. Per the
+// spec, manual execution is always available — scheduled jobs included —
+// unless the job explicitly opts out with `triggers.manual: false`.
 func TestRunManualJob(t *testing.T) {
-	NewScenario(t, "run must execute a manual job like a service, starting its depends_on services first").
+	NewScenario(t, "run must execute a job like a service, starting its depends_on services first").
 		Step("run executes the job after starting its dependency",
 			ComposeCmd("run", "--rm", "migrate"),
 			OutputContains("migration done"),
 			ServiceState("db", "running")).
-		Step("a schedule-only job cannot be run",
-			ComposeCmd("run", "--rm", "backup").MayFail(),
-			StderrContains(`job "backup" has no manual trigger`))
+		Step("a scheduled job without explicit opt-out can be run manually",
+			ComposeCmd("run", "--rm", "backup"),
+			OutputContains("backup")).
+		Step("manual: false explicitly forbids manual execution",
+			ComposeCmd("run", "--rm", "rotation").MayFail(),
+			StderrContains(`job "rotation" is declared with manual: false`))
 }
