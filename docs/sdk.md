@@ -25,52 +25,53 @@ Here's a basic example demonstrating how to load a Compose project and start the
 package main
 
 import (
-    "context"
-    "log"
+	"context"
+	"log"
 
-    "github.com/docker/cli/cli/command"
-    "github.com/docker/cli/cli/flags"
-    "github.com/docker/compose/v5/pkg/api"
-    "github.com/docker/compose/v5/pkg/compose"
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/flags"
+
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/compose"
 )
 
 func main() {
-    ctx := context.Background()
+	ctx := context.Background()
 
-    dockerCLI, err := command.NewDockerCli()
-    if err != nil {
-        log.Fatalf("Failed to create docker CLI: %v", err)
-    }
-    err = dockerCLI.Initialize(&flags.ClientOptions{})
-    if err != nil {
-        log.Fatalf("Failed to initialize docker CLI: %v", err)
-    }
+	dockerCLI, err := command.NewDockerCli()
+	if err != nil {
+		log.Fatalf("Failed to create docker CLI: %v", err)
+	}
+	err = dockerCLI.Initialize(&flags.ClientOptions{})
+	if err != nil {
+		log.Fatalf("Failed to initialize docker CLI: %v", err)
+	}
 
-    // Create a new Compose service instance
-    service, err := compose.NewComposeService(dockerCLI)
-    if err != nil {
-        log.Fatalf("Failed to create compose service: %v", err)
-    }
+	// Create a new Compose service instance
+	service, err := compose.NewComposeService(dockerCLI)
+	if err != nil {
+		log.Fatalf("Failed to create compose service: %v", err)
+	}
 
-    // Load the Compose project from a compose file
-    project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
-        ConfigPaths: []string{"compose.yaml"},
-        ProjectName: "my-app",
-    })
-    if err != nil {
-        log.Fatalf("Failed to load project: %v", err)
-    }
+	// Load the Compose project from a compose file
+	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		ConfigPaths: []string{"compose.yaml"},
+		ProjectName: "my-app",
+	})
+	if err != nil {
+		log.Fatalf("Failed to load project: %v", err)
+	}
 
-    // Start the services defined in the Compose file
-    err = service.Up(ctx, project, api.UpOptions{
-        Create: api.CreateOptions{},
-        Start:  api.StartOptions{},
-    })
-    if err != nil {
-        log.Fatalf("Failed to start services: %v", err)
-    }
+	// Start the services defined in the Compose file
+	err = service.Up(ctx, project, api.UpOptions{
+		Create: api.CreateOptions{},
+		Start:  api.StartOptions{},
+	})
+	if err != nil {
+		log.Fatalf("Failed to start services: %v", err)
+	}
 
-    log.Printf("Successfully started project: %s", project.Name)
+	log.Printf("Successfully started project: %s", project.Name)
 }
 ```
 
@@ -84,16 +85,16 @@ The `NewComposeService()` function accepts optional `compose.Option` parameters 
 options allow you to configure I/O streams, concurrency limits, dry-run mode, and other advanced features.
 
 ```go
-    // Create a custom output buffer to capture logs
-    var outputBuffer bytes.Buffer
+	// Create a custom output buffer to capture logs
+	var outputBuffer bytes.Buffer
 
-    // Create a compose service with custom options
-    service, err := compose.NewComposeService(dockerCLI,
-        compose.WithOutputStream(&outputBuffer),          // Redirect output to custom writer
-        compose.WithErrorStream(os.Stderr),               // Use stderr for errors
-        compose.WithMaxConcurrency(4),                    // Limit concurrent operations
-        compose.WithPrompt(compose.AlwaysOkPrompt()),     // Auto-confirm all prompts
-    )
+	// Create a compose service with custom options
+	service, err := compose.NewComposeService(dockerCLI,
+		compose.WithOutputStream(&outputBuffer),      // Redirect output to custom writer
+		compose.WithErrorStream(os.Stderr),           // Use stderr for errors
+		compose.WithMaxConcurrency(4),                // Limit concurrent operations
+		compose.WithPrompt(compose.AlwaysOkPrompt()), // Auto-confirm all prompts
+	)
 ```
 
 ### Available options
