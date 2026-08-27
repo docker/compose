@@ -47,6 +47,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		if err != nil {
 			return err
 		}
+		if err := s.registerScheduledJobs(ctx, project); err != nil {
+			return err
+		}
 		if options.Start.Attach == nil {
 			return s.start(ctx, project.Name, options.Start, nil)
 		}

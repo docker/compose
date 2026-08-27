@@ -242,9 +242,6 @@ func runUp(
 		return err
 	}
 
-	if err := rejectScheduledJobs(project); err != nil {
-		return err
-	}
 	warnIgnoredJobs(project)
 
 	err := createOptions.Apply(project)
@@ -356,34 +353,26 @@ func runUp(
 	})
 }
 
-// warnIgnoredJobs names the declared jobs up will not act on: manual jobs
-// wait for an explicit `compose run <job>` trigger.
+// warnIgnoredJobs names the declared manual jobs up will not act on: they
+// wait for an explicit `compose run <job>` trigger. Scheduled jobs are not
+// ignored — they are registered with the engine (see pkg/compose Up).
 func warnIgnoredJobs(project *types.Project) {
-	jobs := project.AllJobs()
-	if len(jobs) == 0 {
+	names := manualJobNames(project)
+	if len(names) == 0 {
 		return
 	}
-	names := make([]string, 0, len(jobs))
-	for name := range jobs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
 	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
 }
 
-// rejectScheduledJobs refuses to bring a project up when it declares active
-// scheduled jobs: silently not scheduling them would break the user's
-// expectations, unlike manual jobs which simply wait for an explicit trigger.
-func rejectScheduledJobs(project *types.Project) error {
-	names := make([]string, 0, len(project.Jobs))
-	for name, job := range project.Jobs {
-		if job.Triggers != nil && len(job.Triggers.Schedule) > 0 {
+// manualJobNames returns the sorted names of the project's manual-trigger jobs.
+func manualJobNames(project *types.Project) []string {
+	jobs := project.AllJobs()
+	names := make([]string, 0, len(jobs))
+	for name, job := range jobs {
+		if job.Triggers != nil && job.Triggers.Manual {
 			names = append(names, name)
 		}
 	}
-	if len(names) == 0 {
-		return nil
-	}
 	sort.Strings(names)
-	return fmt.Errorf("scheduled jobs are not supported in this version: %s", strings.Join(names, ", "))
+	return names
 }

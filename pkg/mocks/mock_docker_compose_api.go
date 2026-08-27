@@ -371,6 +371,21 @@ func (mr *MockComposeMockRecorder) Restart(ctx, projectName, options any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Restart", reflect.TypeOf((*MockCompose)(nil).Restart), ctx, projectName, options)
 }
 
+// RunJob mocks base method.
+func (m *MockCompose) RunJob(ctx context.Context, project *types.Project, name string, options api.RunOptions) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RunJob", ctx, project, name, options)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RunJob indicates an expected call of RunJob.
+func (mr *MockComposeMockRecorder) RunJob(ctx, project, name, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunJob", reflect.TypeOf((*MockCompose)(nil).RunJob), ctx, project, name, options)
+}
+
 // RunOneOffContainer mocks base method.
 func (m *MockCompose) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
 	m.ctrl.T.Helper()

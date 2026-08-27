@@ -1,3 +1,5 @@
+//go:build e2e
+
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -18,16 +20,21 @@ package e2e
 
 import (
 	"testing"
+	"time"
 )
 
-// Scheduled jobs cannot run in this version: silently not scheduling them
-// would break the user's expectations, so up must refuse the whole project.
-func TestUpRejectsScheduledJobs(t *testing.T) {
-	NewScenario(t, "up must reject a project declaring active scheduled jobs, before creating anything").
-		Step("up fails naming the scheduled job",
-			ComposeCmd("up", "-d").MayFail(),
-			StderrContains("scheduled jobs are not supported in this version: backup"),
-			ServiceNotCreated("web"))
+// A scheduled job registers with the engine instead of being rejected: up is
+// safely re-runnable on an unchanged spec, and the schedule fires on the
+// engine's own clock, independent of the client.
+func TestUpRegistersScheduledJobs(t *testing.T) {
+	NewScenario(t, "up must register a project's scheduled jobs with the engine and let them fire on their own").
+		Step("up starts services and registers the scheduled job",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		Step("re-up is a no-op on the unchanged job spec, and the schedule fires on the engine's own clock",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running"),
+			Eventually(ServiceState("backup", "exited"), 90*time.Second))
 }
 
 // A manual-trigger job runs through `compose run` exactly like a service

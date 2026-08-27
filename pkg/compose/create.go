@@ -112,11 +112,22 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	warnUnmanagedNetworks(project, observed)
 	warnUnmanagedVolumes(project, observed)
 
-	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
+	// A kept job run container (RemoveOnFailure: false) has no matching
+	// service by design — it's not something the user forgot to clean up, so
+	// it shouldn't trigger this warning. It's still a real orphan for
+	// reconcileOrphans (down/up --remove-orphans can sweep it), so the
+	// exclusion is scoped to this warning's own name list, not observed.Orphans.
+	var nonJobOrphans []string
+	for _, o := range observed.Orphans {
+		if _, isJobRun := o.Summary.Labels[jobContainerIDLabel]; !isJobRun {
+			nonJobOrphans = append(nonJobOrphans, o.Name)
+		}
+	}
+	if len(nonJobOrphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
 		logrus.Warnf("Found orphan containers (%s) for this project. If "+
 			"you removed or renamed this service in your compose "+
 			"file, you can run this command with the "+
-			"--remove-orphans flag to clean it up.", observed.orphanNames())
+			"--remove-orphans flag to clean it up.", strings.Join(nonJobOrphans, ", "))
 	}
 
 	plan, err := reconcile(ctx, project, observed, toReconcileOptions(options), s.prompt)
@@ -270,6 +281,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	for dep, d := range service.DependsOn {
 		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", dep, d.Condition, d.Restart))
 	}
+	slices.Sort(dependencies)
 	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
 
 	var runCmd, entrypoint []string

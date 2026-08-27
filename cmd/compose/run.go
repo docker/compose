@@ -358,6 +358,21 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		Index:             0,
 	}
 
+	if _, ok := project.AllJobs()[options.Service]; ok {
+		if options.name != "" {
+			logrus.Warnf("--name has no effect on a job: the engine names its run containers itself")
+		}
+		exitCode, err := backend.RunJob(ctx, project, options.Service, runOpts)
+		if exitCode != 0 {
+			errMsg := ""
+			if err != nil {
+				errMsg = err.Error()
+			}
+			return cli.StatusError{StatusCode: exitCode, Status: errMsg}
+		}
+		return err
+	}
+
 	for name, service := range project.Services {
 		if name == options.Service {
 			service.StdinOpen = options.interactive
