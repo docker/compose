@@ -142,18 +142,26 @@ func isService(services ...string) containerPredicate {
 	}
 }
 
-// isOrphaned is a predicate to select containers without a matching service definition in compose project
+// isOrphaned selects the containers `--remove-orphans` cleans up — and that
+// `up` warns about otherwise. A container is orphaned when:
+//
+//   - it is a one-off (`compose run`) that FINISHED its task (exited/dead):
+//     one-offs are ephemeral by design, a terminated one is a leftover. A
+//     still-RUNNING one-off is somebody's live session and is deliberately
+//     NOT an orphan: `up --remove-orphans` must never kill it. `down` does
+//     stop running one-offs, but on purpose and through the per-service
+//     removal path — down stops the application, and a running one-off is
+//     part of what goes down (see down.go);
+//   - or it carries this project's labels but its service is not defined by
+//     the compose model (neither enabled nor disabled) — the typical leftover
+//     after the compose file was edited and a service removed or renamed.
 func isOrphaned(project *types.Project) containerPredicate {
 	services := append(project.ServiceNames(), project.DisabledServiceNames()...)
 	return func(c container.Summary) bool {
-		// One-off container
-		v, ok := c.Labels[api.OneoffLabel]
-		if ok && v == "True" {
+		if v, ok := c.Labels[api.OneoffLabel]; ok && v == "True" {
 			return c.State == container.StateExited || c.State == container.StateDead
 		}
-		// Service that is not defined in the compose model
-		service := c.Labels[api.ServiceLabel]
-		return !slices.Contains(services, service)
+		return !slices.Contains(services, c.Labels[api.ServiceLabel])
 	}
 }
 

@@ -151,9 +151,9 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	}
 
 	// --- Containers ---
-	// One-off (run) containers are included in the listing on purpose: exited
-	// one-offs are classified as orphans below, so `--remove-orphans` can
-	// clean them up.
+	// One-off (run) containers are included in the listing on purpose:
+	// FINISHED ones are classified as orphans below (see isOrphaned), so `up`
+	// can warn about them and `--remove-orphans` can clean them up.
 	raw, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return nil, err
@@ -175,6 +175,10 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		} else if isOrphaned(project)(ctr) {
 			state.Orphans = append(state.Orphans, toObservedContainer(ctr))
 		}
+		// else: a still-RUNNING one-off. Deliberately absent from the
+		// observed state: it is somebody's live `compose run` session — up
+		// neither reconciles it, nor warns about it, nor removes it (only
+		// `down` stops running one-offs).
 	}
 
 	// --- Networks ---
