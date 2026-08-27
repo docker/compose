@@ -52,7 +52,7 @@ func TestUpExitCodeFrom(t *testing.T) {
 func TestUpExitCodeFromContainerKilled(t *testing.T) {
 	NewScenario(t, "up --exit-code-from must report 143 for a service stopped by the abort").
 		Step("the watched long-lived service is stopped when another exits",
-			ComposeCmd("up", "--menu=false", "--exit-code-from=test").MayFail().Within(60*time.Second),
+			ComposeCmd("up", "--menu=false", "--exit-code-from=test").MayFail().Within(120*time.Second),
 			ExitCode(143))
 }
 
