@@ -26,6 +26,15 @@
 - In tests: use `t.Context()` instead of `context.Background()` or `context.TODO()`
 - Prefer `fmt.Fprintf` over `WriteString(fmt.Sprintf(...))`
 
+## Environment variables
+
+- Every environment variable the binary reads is registered in
+  `docs/envvars.md` (name, read site, moment, default) — consult it before
+  adding a read, and update it in the same commit when you do
+  (`docs/envvars_registry_test.go` fails otherwise). The moment a variable is
+  read decides whether the project `.env` can set it; the registry explains
+  the three moments.
+
 ## Git
 
 - **All commits MUST be signed off (DCO)**. Always pass `--signoff` (`-s`) to `git commit` and `git commit --amend`.
