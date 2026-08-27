@@ -157,7 +157,15 @@ func TestAttachRestart(t *testing.T) {
 				debug)
 	}, 4*time.Minute, 2*time.Second)
 
-	assert.Equal(t, strings.Count(res.Stdout(), "failing-1  | world"), 3, res.Combined())
+	// The exit notice comes from the events monitor while the log line comes
+	// from the logs stream compose re-attaches after each restart: two
+	// asynchronous channels, so the third "world" may land shortly after the
+	// third exit notice — wait for it rather than asserting a snapshot.
+	c.WaitForCondition(t, func() (bool, string) {
+		return strings.Count(res.Stdout(),
+				"failing-1  | world") == 3, fmt.Sprintf("'failing-1  | world' not found 3 times in : \n%s\n",
+				res.Combined())
+	}, time.Minute, time.Second)
 }
 
 func TestInitContainer(t *testing.T) {
