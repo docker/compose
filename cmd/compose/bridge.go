@@ -39,12 +39,27 @@ func bridgeCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 		Use:              "bridge CMD [OPTIONS]",
 		Short:            "Convert compose files into another model",
 		TraverseChildren: true,
+		RunE:             rejectUnknownSubcommand,
 	}
 	cmd.AddCommand(
 		convertCommand(p, dockerCli),
 		transformersCommand(dockerCli),
 	)
 	return cmd
+}
+
+// rejectUnknownSubcommand is the RunE for a parent command that only groups
+// subcommands: by default (no Run/RunE), cobra shows help for an unknown
+// subcommand but exits 0.
+func rejectUnknownSubcommand(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return cmd.Help()
+	}
+	_ = cmd.Help()
+	return cli.StatusError{
+		StatusCode: 1,
+		Status:     fmt.Sprintf("unknown docker command: %q", cmd.CommandPath()+" "+args[0]),
+	}
 }
 
 func convertCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
@@ -81,6 +96,7 @@ func transformersCommand(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "transformations CMD [OPTIONS]",
 		Short: "Manage transformation images",
+		RunE:  rejectUnknownSubcommand,
 	}
 	cmd.AddCommand(
 		listTransformersCommand(dockerCli),
