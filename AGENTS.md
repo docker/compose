@@ -4,9 +4,11 @@
 
 - Build: `make build`
 - Test all: `make test`
-- Test unit: `go test ./pkg/...`
+- Test unit: `go test ./pkg/...` — needs no Docker daemon; the e2e suite is
+  gated behind the `e2e` build tag and is not picked up
 - Test single: `go test ./pkg/compose/ -run TestFunctionName`
-- E2E tests: `go test -tags e2e ./pkg/e2e/ -run TestName`
+- E2E tests: `go test -tags e2e ./pkg/e2e/ -run TestName` — requires a Docker
+  daemon and the locally built binary (`make build`)
 
 ## E2E tests
 

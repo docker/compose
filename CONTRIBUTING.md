@@ -315,7 +315,8 @@ The rules:
 3. All code should follow the guidelines covered in [Effective
    Go](https://go.dev/doc/effective_go) and [Go Code Review
    Comments](https://go.dev/wiki/CodeReviewComments).
-4. Include code comments. Tell us the why, the history and the context.
+4. Include code comments. Tell us the why and the context — as statements
+   about current behavior, not history (see [Legibility](#legibility)).
 5. Document _all_ declarations and methods, even private ones. Declare
    expectations, caveats and anything else that may be important. If a type
    gets exported, having the comments already there will ensure it's ready.
@@ -334,6 +335,23 @@ The rules:
    packages are acceptable if they provide _real_ incremental value.
 10. Even though we call these "rules" above, they are actually just
     guidelines. Since you've read all the rules, you now know that.
+
+### Legibility
+
+Coding agents and new contributors navigate this codebase by reading it
+locally: file names, doc comments, option structs and error messages are
+their map. A signpost that lies produces plausible-looking regressions, so
+keep the map truthful:
+
+1. Comments state behavior, not history. "Matching the previous
+   `ensureNetwork` behavior" becomes meaningless — then misleading — the day
+   the referenced code is deleted. Say what the code guarantees instead;
+   history belongs in the commit message.
+2. Never justify code by pointing at deleted code, commit hashes, or line
+   numbers in other files: they go stale silently.
+3. A file's name and doc comment describe what it contains today. When the
+   concept a file was named after moves out or disappears, rename the file.
+4. Error messages name a remedy that actually exists today.
 
 If you are having trouble getting into the mood of idiomatic Go, we recommend
 reading through [Effective Go](https://go.dev/doc/effective_go). The

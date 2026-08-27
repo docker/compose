@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build e2e && !windows
 
 /*
    Copyright 2022 Docker Compose CLI authors

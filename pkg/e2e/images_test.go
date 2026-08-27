@@ -1,3 +1,5 @@
+//go:build e2e
+
 /*
    Copyright 2026 Docker Compose CLI authors
 
