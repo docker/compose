@@ -79,6 +79,8 @@ const (
 	// declared hook with the runner container the reconciliation plan
 	// prepared for it.
 	HookIndexLabel = "com.docker.compose.hook-index"
+	// JobLabel allow to track resource related to a compose job
+	JobLabel = "com.docker.compose.job"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel
