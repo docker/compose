@@ -289,6 +289,10 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 		IgnoreOrphans: options.IgnoreOrphans,
 		RemoveOrphans: options.RemoveOrphans,
 		QuietPull:     options.QuietPull,
+		// empty means the default "diverged" policy; `run --no-recreate`
+		// passes "never" so an existing dependency is reused as-is
+		Recreate:             options.Recreate,
+		RecreateDependencies: options.RecreateDependencies,
 	})
 	if err != nil {
 		return err

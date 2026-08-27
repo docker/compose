@@ -1,0 +1,14 @@
+services:
+  task:
+    image: alpine
+    command: echo "task done"
+    depends_on:
+      - dep
+  dep:
+    image: alpine
+    init: true
+    command: sleep infinity
+    environment:
+      # divergence vector: changing TAG between invocations changes the
+      # config-hash of dep, which the default policy answers by recreating
+      TAG: ${TAG:-initial}
