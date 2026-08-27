@@ -77,6 +77,10 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		if err != nil {
 			return err
 		}
+		// No compose file to read Jobs from: reconstruct them from the
+		// engine's own registry, otherwise ensureJobsDown silently sees none
+		// and a project's scheduled jobs outlive `down` forever.
+		project.Jobs = s.actualJobs(ctx, projectName)
 	}
 
 	// keep only the requested services that exist in the model
@@ -129,6 +133,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	ops := s.ensureNetworksDown(ctx, project, limiter)
 	ops = append(ops, s.ensureRelayLinkNetworksDown(ctx, project, limiter)...)
+	ops = append(ops, s.ensureJobsDown(ctx, project)...)
 
 	if options.Images != api.ImagePruneNone {
 		ops = append(ops, s.ensureImagesDown(ctx, project, options, limiter)...)

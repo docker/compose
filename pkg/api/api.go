@@ -176,6 +176,14 @@ type ImageManager interface {
 type Runner interface {
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
+	// RunJob triggers a manual-trigger job's Run on the engine's jobs API,
+	// starts its dependencies first, and returns the Run's exit code. options
+	// carries the same CLI overrides RunOneOffContainer accepts (User,
+	// Command, Entrypoint, WorkingDir, CapAdd/CapDrop, Environment, Labels,
+	// NoDeps); Service is ignored, name is authoritative. Name has no effect:
+	// the jobs API assigns the run container's identity itself, there is no
+	// per-run naming hook to plug --name into.
+	RunJob(ctx context.Context, project *types.Project, name string, options RunOptions) (int, error)
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, projectName string, options RunOptions) (int, error)
 	// Attach STDIN,STDOUT,STDERR to a running service container

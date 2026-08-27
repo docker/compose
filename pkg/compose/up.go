@@ -43,9 +43,15 @@ import (
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		if options.Start.Attach == nil {
-			return s.upDetached(ctx, project, options)
+			if err := s.upDetached(ctx, project, options); err != nil {
+				return err
+			}
+			return s.registerScheduledJobs(ctx, project)
 		}
-		return s.create(ctx, project, options.Create)
+		if err := s.create(ctx, project, options.Create); err != nil {
+			return err
+		}
+		return s.registerScheduledJobs(ctx, project)
 	}), "up", s.events)
 	if err != nil {
 		return err
