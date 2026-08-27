@@ -161,10 +161,14 @@ func TestAttachRestart(t *testing.T) {
 	// from the logs stream compose re-attaches after each restart: two
 	// asynchronous channels, so the third "world" may land shortly after the
 	// third exit notice — wait for it rather than asserting a snapshot.
+	// On failure, dump the daemon's own view of the container log: it
+	// discriminates a line compose failed to relay (present below, absent
+	// above) from a line the daemon itself never captured.
 	c.WaitForCondition(t, func() (bool, string) {
+		daemonView := icmd.RunCmd(c.NewDockerCmd(t, "logs", "attach-restart-failing-1")).Combined()
 		return strings.Count(res.Stdout(),
-				"failing-1  | world") == 3, fmt.Sprintf("'failing-1  | world' not found 3 times in : \n%s\n",
-				res.Combined())
+				"failing-1  | world") == 3, fmt.Sprintf("'failing-1  | world' not found 3 times in : \n%s\ndaemon log view:\n%s\n",
+				res.Combined(), daemonView)
 	}, time.Minute, time.Second)
 }
 
