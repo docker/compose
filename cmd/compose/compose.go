@@ -73,6 +73,21 @@ const (
 )
 
 // rawEnv load a dot env file using docker/cli key=value parser, without attempt to interpolate or evaluate values
+// removeOrphansFromEnv resolves the effective --remove-orphans value for a
+// command: an explicit flag always wins; otherwise COMPOSE_REMOVE_ORPHANS is
+// read from the process environment. Meant to be called from a command's
+// PreRunE — after the root PersistentPreRunE completed the process
+// environment with the COMPOSE_* keys of the project's local .env (see
+// setEnvWithDotEnv) — so every command carrying the flag resolves the
+// variable identically, whether it is exported in the shell or declared in
+// the local .env.
+func removeOrphansFromEnv(flags *pflag.FlagSet, current bool) bool {
+	if flags.Changed("remove-orphans") {
+		return current
+	}
+	return utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
+}
+
 func rawEnv(r io.Reader, filename string, vars map[string]string, lookup func(key string) (string, bool)) error {
 	lines, err := kvfile.ParseFromReader(r, lookup)
 	if err != nil {
@@ -728,16 +743,22 @@ func selectEventProcessor(dockerCli command.Cli, progress, ansi string, detached
 	}
 }
 
+// setEnvWithDotEnv completes the process environment with the COMPOSE_*
+// keys declared in the project's local .env (and explicit --env-file files),
+// so they act as per-project defaults for the matching CLI flags. Keys
+// already present in the process environment win, and an explicit flag wins
+// over both — see removeOrphansFromEnv.
+//
+// Remote configs (OCI, Git) are deliberately excluded: COMPOSE_* variables
+// exist so a local user doesn't have to repeat a flag on every command.
+// They are the local user's choice, and a remote model must not steer the
+// behavior of the CLI consuming it. This is a product decision, not a
+// technical limitation.
 func setEnvWithDotEnv(opts ProjectOptions, dockerCli command.Cli) error {
-	// Check if we're using a remote config (OCI or Git)
-	// If so, skip env loading as remote loaders haven't been initialized yet
-	// and trying to process the path would fail
 	remoteLoaders := opts.remoteLoaders(dockerCli)
 	for _, path := range opts.ConfigPaths {
 		for _, loader := range remoteLoaders {
 			if loader.Accept(path) {
-				// Remote config - skip env loading for now
-				// It will be loaded later when the project is fully initialized
 				return nil
 			}
 		}

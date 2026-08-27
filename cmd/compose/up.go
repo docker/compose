@@ -121,9 +121,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 			create.pullChanged = cmd.Flags().Changed("pull")
 			create.timeChanged = cmd.Flags().Changed("timeout")
 			up.navigationMenuChanged = cmd.Flags().Changed("menu")
-			if !cmd.Flags().Changed("remove-orphans") {
-				create.removeOrphans = utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
-			}
+			create.removeOrphans = removeOrphansFromEnv(cmd.Flags(), create.removeOrphans)
 			return validateFlags(&up, &create)
 		}),
 		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {

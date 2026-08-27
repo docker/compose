@@ -195,6 +195,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				display.Mode = display.ModeQuiet
 				backendOptions.Add(compose.WithEventProcessor(display.Quiet()))
 			}
+			options.removeOrphans = removeOrphansFromEnv(cmd.Flags(), options.removeOrphans)
 			createOpts.pullChanged = cmd.Flags().Changed("pull")
 			return nil
 		}),
