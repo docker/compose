@@ -163,10 +163,13 @@ func TestAttachRestart(t *testing.T) {
 	// orders one relative to the other, so the last restart's log line can
 	// still be in flight the instant the 3rd "exited" is observed above —
 	// wait for it instead of counting it immediately.
+	// On failure, dump the daemon's own view of the container log: it
+	// discriminates a line compose failed to relay (present below, absent
+	// above) from a line the daemon itself never captured.
 	c.WaitForCondition(t, func() (bool, string) {
-		debug := res.Combined()
+		daemonView := icmd.RunCmd(c.NewDockerCmd(t, "logs", "attach-restart-failing-1")).Combined()
 		return strings.Count(res.Stdout(), "failing-1  | world") == 3,
-			fmt.Sprintf("'failing-1  | world' not found 3 times in : \n%s\n", debug)
+			fmt.Sprintf("'failing-1  | world' not found 3 times in : \n%s\ndaemon log view:\n%s\n", res.Combined(), daemonView)
 	}, 30*time.Second, 1*time.Second)
 }
 
