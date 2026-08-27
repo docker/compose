@@ -338,26 +338,35 @@ func (u *upSession) captureExitCodeFrom() api.ContainerEventListener {
 // followStartedContainers streams logs of containers (re)started after `up`,
 // so they are followed like the initially attached ones.
 func (u *upSession) followStartedContainers(attached []string) api.ContainerEventListener {
+	runEnds := newRunEndTracker()
 	return func(event api.ContainerEvent) {
+		runEnds.Observe(event)
 		if !shouldFollowStartEvent(event, attached, u.options.Start.AttachTo) {
 			return
 		}
+		// Captured synchronously — see followStartedContainersLogs: read any
+		// later, a fast run's own exit could already be recorded and the log
+		// window would drop the whole run.
+		since := runEnds.Since(event.ID)
 		u.eg.Go(func() error {
-			u.appendErr(u.streamContainerLogs(event))
+			u.appendErr(u.streamContainerLogs(event, since))
 			return nil
 		})
 	}
 }
 
-func (u *upSession) streamContainerLogs(event api.ContainerEvent) error {
+func (u *upSession) streamContainerLogs(event api.ContainerEvent, since string) error {
 	res, err := u.apiClient().ContainerInspect(u.globalCtx, event.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return err
 	}
+	if since == "" {
+		since = logsSinceLastRun(res.Container)
+	}
 
 	err = u.doLogContainer(u.globalCtx, u.options.Start.Attach, event.Source, res.Container, api.LogOptions{
 		Follow: true,
-		Since:  res.Container.State.StartedAt,
+		Since:  since,
 	})
 	if errdefs.IsNotImplemented(err) {
 		// container may be configured with logging_driver: none
