@@ -38,17 +38,23 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// This file gathers the per-service container helpers shared by both
+// lifecycle engines: the plan-based reconciler (reconcile.go, entered through
+// create/up) and the imperative dependency-ordered engine (dependencies.go,
+// used by start/stop/restart/down). It covers container naming, resolution of
+// service references (volumes_from, network_mode/ipc/pid, links), dependency
+// waiting, container creation through the Docker API, and service startup.
+
 const (
 	doubledContainerNameWarning = "WARNING: The %q service is using the custom container name %q. " +
 		"Docker requires each container to have a unique name. " +
 		"Remove the custom name to scale the service"
 )
 
-// convergence manages service's container lifecycle.
-// Based on initially observed state, it reconciles the existing container with desired state, which might include
-// re-creating container, adding or removing replicas, or starting stopped containers.
-// Cross services dependencies are managed by creating services in expected order and updating `service:xx` reference
-// when a service has converged, so dependent ones can be managed with resolved containers references.
+// getScale returns the number of replicas the service must run. A service
+// pinned to a custom container_name cannot scale beyond one replica, as every
+// container needs a distinct name: this is rejected here rather than at
+// container-creation time.
 func getScale(config types.ServiceConfig) (int, error) {
 	scale := config.GetScale()
 	if scale > 1 && config.ContainerName != "" {

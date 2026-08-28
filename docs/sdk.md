@@ -25,52 +25,53 @@ Here's a basic example demonstrating how to load a Compose project and start the
 package main
 
 import (
-    "context"
-    "log"
+	"context"
+	"log"
 
-    "github.com/docker/cli/cli/command"
-    "github.com/docker/cli/cli/flags"
-    "github.com/docker/compose/v5/pkg/api"
-    "github.com/docker/compose/v5/pkg/compose"
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/flags"
+
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/compose"
 )
 
 func main() {
-    ctx := context.Background()
+	ctx := context.Background()
 
-    dockerCLI, err := command.NewDockerCli()
-    if err != nil {
-        log.Fatalf("Failed to create docker CLI: %v", err)
-    }
-    err = dockerCLI.Initialize(&flags.ClientOptions{})
-    if err != nil {
-        log.Fatalf("Failed to initialize docker CLI: %v", err)
-    }
+	dockerCLI, err := command.NewDockerCli()
+	if err != nil {
+		log.Fatalf("Failed to create docker CLI: %v", err)
+	}
+	err = dockerCLI.Initialize(&flags.ClientOptions{})
+	if err != nil {
+		log.Fatalf("Failed to initialize docker CLI: %v", err)
+	}
 
-    // Create a new Compose service instance
-    service, err := compose.NewComposeService(dockerCLI)
-    if err != nil {
-        log.Fatalf("Failed to create compose service: %v", err)
-    }
+	// Create a new Compose service instance
+	service, err := compose.NewComposeService(dockerCLI)
+	if err != nil {
+		log.Fatalf("Failed to create compose service: %v", err)
+	}
 
-    // Load the Compose project from a compose file
-    project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
-        ConfigPaths: []string{"compose.yaml"},
-        ProjectName: "my-app",
-    })
-    if err != nil {
-        log.Fatalf("Failed to load project: %v", err)
-    }
+	// Load the Compose project from a compose file
+	project, err := service.LoadProject(ctx, api.ProjectLoadOptions{
+		ConfigPaths: []string{"compose.yaml"},
+		ProjectName: "my-app",
+	})
+	if err != nil {
+		log.Fatalf("Failed to load project: %v", err)
+	}
 
-    // Start the services defined in the Compose file
-    err = service.Up(ctx, project, api.UpOptions{
-        Create: api.CreateOptions{},
-        Start:  api.StartOptions{},
-    })
-    if err != nil {
-        log.Fatalf("Failed to start services: %v", err)
-    }
+	// Start the services defined in the Compose file
+	err = service.Up(ctx, project, api.UpOptions{
+		Create: api.CreateOptions{},
+		Start:  api.StartOptions{},
+	})
+	if err != nil {
+		log.Fatalf("Failed to start services: %v", err)
+	}
 
-    log.Printf("Successfully started project: %s", project.Name)
+	log.Printf("Successfully started project: %s", project.Name)
 }
 ```
 
@@ -84,16 +85,16 @@ The `NewComposeService()` function accepts optional `compose.Option` parameters 
 options allow you to configure I/O streams, concurrency limits, dry-run mode, and other advanced features.
 
 ```go
-    // Create a custom output buffer to capture logs
-    var outputBuffer bytes.Buffer
+	// Create a custom output buffer to capture logs
+	var outputBuffer bytes.Buffer
 
-    // Create a compose service with custom options
-    service, err := compose.NewComposeService(dockerCLI,
-        compose.WithOutputStream(&outputBuffer),          // Redirect output to custom writer
-        compose.WithErrorStream(os.Stderr),               // Use stderr for errors
-        compose.WithMaxConcurrency(4),                    // Limit concurrent operations
-        compose.WithPrompt(compose.AlwaysOkPrompt()),     // Auto-confirm all prompts
-    )
+	// Create a compose service with custom options
+	service, err := compose.NewComposeService(dockerCLI,
+		compose.WithOutputStream(&outputBuffer),      // Redirect output to custom writer
+		compose.WithErrorStream(os.Stderr),           // Use stderr for errors
+		compose.WithMaxConcurrency(4),                // Limit concurrent operations
+		compose.WithPrompt(compose.AlwaysOkPrompt()), // Auto-confirm all prompts
+	)
 ```
 
 ### Available options
@@ -107,7 +108,7 @@ options allow you to configure I/O streams, concurrency limits, dry-run mode, an
 - `WithDryRun` - Run operations in dry-run mode without actually applying changes
 - `WithContextInfo(api.ContextInfo)` - Set custom Docker context information
 - `WithProxyConfig(map[string]string)` - Configure HTTP proxy settings for builds
-- `WithEventProcessor(progress.EventProcessor)` - Receive progress events and operation notifications
+- `WithEventProcessor(api.EventProcessor)` - Receive progress events and operation notifications
 
 These options provide fine-grained control over the SDK's behavior, making it suitable for various integration
 scenarios including CLI tools, web services, automation scripts, and testing environments.
@@ -145,13 +146,17 @@ Common status text values include: `Creating`, `Created`, `Starting`, `Started`,
 
 ### Built-in `EventProcessor` implementations
 
-The SDK provides three ready-to-use `EventProcessor` implementations:
+The `EventProcessor` interface is defined in `github.com/docker/compose/v5/pkg/api`. When no
+`WithEventProcessor` option is passed, events are silently discarded.
 
-- `progress.NewTTYWriter(io.Writer)` - Renders an interactive terminal UI with progress bars and task lists
-  (similar to the Docker Compose CLI output)
-- `progress.NewPlainWriter(io.Writer)` - Outputs simple text-based progress messages suitable for non-interactive
+The renderers used by the Docker Compose CLI live in the `github.com/docker/compose/v5/cmd/display`
+package and can be reused:
+
+- `display.Full(out, info io.Writer, detached bool)` - Renders the interactive terminal UI with progress bars
+  and task lists (the default Docker Compose CLI output)
+- `display.Plain(out io.Writer)` - Outputs simple text-based progress messages suitable for non-interactive
   environments or log files
-- `progress.NewJSONWriter()` - Render events as JSON objects
-- `progress.NewQuietWriter()` - (Default) Silently processes events without producing any output
+- `display.JSON(out io.Writer)` - Renders each event as a JSON object
+- `display.Quiet()` - Silently discards events (same behavior as the default)
 
 Using `EventProcessor`, a custom UI can be plugged into `docker/compose`.
