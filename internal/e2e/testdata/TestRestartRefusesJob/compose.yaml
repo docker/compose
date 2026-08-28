@@ -1,0 +1,10 @@
+services:
+  web:
+    image: alpine
+    command: sleep infinity
+jobs:
+  migrate:
+    image: alpine
+    command: sh -c 'echo "migration done"'
+    triggers:
+      manual: true
