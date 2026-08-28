@@ -31,6 +31,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
+	"github.com/compose-spec/compose-go/v2/errdefs"
 	"github.com/compose-spec/compose-go/v2/loader"
 	composepaths "github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -243,6 +244,20 @@ func defaultStringArrayVar(env string) []string {
 	})
 }
 
+// projectOrName resolves the target project for commands that exploit the
+// compose model when one is available and fall back to container labels
+// otherwise. The project name follows one precedence everywhere, shared with
+// toProjectName and applied identically by compose-go while loading:
+// --project-name, then COMPOSE_PROJECT_NAME, then the model's name.
+//
+// When the model cannot be loaded:
+//   - an explicit --file is a hard error: the user named the file, failing
+//     to read it cannot be ignored;
+//   - no compose file around and a name available from COMPOSE_PROJECT_NAME
+//     is the normal file-less workflow: label-based mode, silently;
+//   - a compose file present but broken, with COMPOSE_PROJECT_NAME set,
+//     falls back to label-based mode with an explicit warning (this used to
+//     happen silently).
 func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cli, services ...string) (*types.Project, string, error) {
 	name := o.ProjectName
 	var project *types.Project
@@ -254,8 +269,14 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 
 		p, _, err := o.ToProject(ctx, dockerCli, backend, services, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
 		if err != nil {
+			if len(o.ConfigPaths) > 0 {
+				return nil, "", err
+			}
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
+				if !errdefs.IsNotFoundError(err) {
+					logrus.Warnf("compose file found but could not be loaded (%s) — falling back to label-based mode for project %q", err, envProjectName)
+				}
 				return nil, envProjectName, nil
 			}
 			return nil, "", err
@@ -266,6 +287,31 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 	return project, name, nil
 }
 
+// validateServiceNames rejects service arguments that don't exist in the
+// loaded model — profile-disabled services are legitimate targets (commands
+// like restart enable them on demand). With no model (label-based mode) no
+// validation is possible: a name without containers cannot be told apart
+// from a container already removed.
+func validateServiceNames(project *types.Project, services []string) error {
+	if project == nil {
+		return nil
+	}
+	for _, service := range services {
+		if _, ok := project.Services[service]; ok {
+			continue
+		}
+		if _, ok := project.DisabledServices[service]; ok {
+			continue
+		}
+		return fmt.Errorf("no such service: %s", service)
+	}
+	return nil
+}
+
+// toProjectName resolves the project name for commands that only need the
+// name, never the model. Same precedence as projectOrName: --project-name,
+// then COMPOSE_PROJECT_NAME, then the loaded model's name — the two first
+// short-circuit the load entirely.
 func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cli) (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil
