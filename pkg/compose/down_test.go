@@ -37,6 +37,24 @@ import (
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
+// An invalid image prune mode must be rejected before any resource is
+// touched: the mocks carry no expectation, so a single daemon call would
+// fail the test. Guards the down() precondition — validating mid-down,
+// after containers were removed, would leave the teardown half done.
+func TestDownRejectsInvalidImagePruneModeUpfront(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	_, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{
+		Images: "bogus",
+	})
+	assert.ErrorContains(t, err, `invalid image prune mode "bogus"`)
+}
+
 func TestDown(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

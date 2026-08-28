@@ -377,6 +377,31 @@ type UpOptions struct {
 	Start  StartOptions
 }
 
+// ImagePruneMode controls how aggressively `down` removes the images
+// associated with the project.
+type ImagePruneMode string
+
+const (
+	// ImagePruneNone keeps all project images.
+	ImagePruneNone ImagePruneMode = ""
+	// ImagePruneLocal removes only the images built locally by Compose
+	// (no custom tag).
+	ImagePruneLocal ImagePruneMode = "local"
+	// ImagePruneAll removes every project-associated image, remote ones
+	// included.
+	ImagePruneAll ImagePruneMode = "all"
+)
+
+// Valid reports whether the mode is one of the declared values.
+func (m ImagePruneMode) Valid() bool {
+	switch m {
+	case ImagePruneNone, ImagePruneLocal, ImagePruneAll:
+		return true
+	default:
+		return false
+	}
+}
+
 // DownOptions group options of the Down API
 type DownOptions struct {
 	// RemoveOrphans will cleanup containers that are not declared on the compose model but own the same labels
@@ -385,8 +410,11 @@ type DownOptions struct {
 	Project *types.Project
 	// Timeout override container stop timeout
 	Timeout *time.Duration
-	// Images remove image used by services. 'all': Remove all images. 'local': Remove only images that don't have a tag
-	Images string
+	// Images removes images used by the services: ImagePruneAll removes
+	// every project image, ImagePruneLocal only those without a custom tag,
+	// ImagePruneNone (the zero value) keeps them all. Down rejects any other
+	// value before touching a single resource.
+	Images ImagePruneMode
 	// Volumes remove volumes, both declared in the `volumes` section and anonymous ones
 	Volumes bool
 	// Services passed in the command line to be stopped

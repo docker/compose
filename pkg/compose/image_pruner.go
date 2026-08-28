@@ -32,19 +32,20 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// ImagePruneMode controls how aggressively images associated with the project
-// are removed from the engine.
-type ImagePruneMode string
+// ImagePruneMode aliases the pkg/api definition: the legal values of
+// DownOptions.Images belong to the SDK surface, kept aliased here for the
+// existing consumers of this package.
+type ImagePruneMode = api.ImagePruneMode
 
 const (
 	// ImagePruneNone indicates that no project images should be removed.
-	ImagePruneNone ImagePruneMode = ""
+	ImagePruneNone = api.ImagePruneNone
 	// ImagePruneLocal indicates that only images built locally by Compose
 	// should be removed.
-	ImagePruneLocal ImagePruneMode = "local"
+	ImagePruneLocal = api.ImagePruneLocal
 	// ImagePruneAll indicates that all project-associated images, including
 	// remote images should be removed.
-	ImagePruneAll ImagePruneMode = "all"
+	ImagePruneAll = api.ImagePruneAll
 )
 
 // ImagePruneOptions controls the behavior of image pruning.
