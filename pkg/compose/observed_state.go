@@ -151,8 +151,9 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	}
 
 	// --- Containers ---
-	// Use oneOffInclude to detect orphaned one-off containers (matching the
-	// previous behavior of create() which used oneOffInclude + isOrphaned).
+	// One-off (run) containers are included in the listing on purpose: exited
+	// one-offs are classified as orphans below, so `--remove-orphans` can
+	// clean them up.
 	raw, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return nil, err
@@ -365,8 +366,9 @@ func (s *ObservedState) setResolvedVolumes(volumes map[string]string) {
 }
 
 // emitRunningEvents emits "Running" progress events for containers that are already
-// running and have no operations planned for them. This matches the previous behavior
-// where convergence.ensureService emitted runningEvent for up-to-date containers.
+// running and have no operations planned for them, so the progress display
+// accounts for every container of the project — including the up-to-date ones
+// the plan deliberately leaves alone.
 //
 // Iterates project.Services (not observed.Containers) so that containers of
 // disabled services (e.g. dependencies untouched by `compose run --no-deps`)

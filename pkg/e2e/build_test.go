@@ -1,3 +1,5 @@
+//go:build e2e
+
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -172,20 +174,17 @@ func TestBuildSSH(t *testing.T) {
 		c.RunDockerCmd(t, "image", "inspect", "build-test-ssh")
 	})
 
-	/*
-		FIXME disabled waiting for https://github.com/moby/buildkit/issues/5558
-		t.Run("build failed with wrong ssh key id from CLI", func(t *testing.T) {
-			c.RunDockerOrExitError(t, "rmi", "build-test-ssh")
+	t.Run("build failed with wrong ssh key id from CLI", func(t *testing.T) {
+		c.RunDockerOrExitError(t, "rmi", "build-test-ssh")
 
-			res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/build-test/ssh/compose-without-ssh.yaml",
-				"--project-directory", "fixtures/build-test/ssh", "build", "--no-cache", "--ssh",
-				"wrong-ssh=./fixtures/build-test/ssh/fake_rsa")
-			res.Assert(t, icmd.Expected{
-				ExitCode: 1,
-				Err:      "unset ssh forward key fake-ssh",
-			})
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/build-test/ssh/compose-without-ssh.yaml",
+			"--project-directory", "fixtures/build-test/ssh", "build", "--no-cache", "--ssh",
+			"wrong-ssh=./fixtures/build-test/ssh/fake_rsa")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "unset ssh forward key fake-ssh",
 		})
-	*/
+	})
 
 	t.Run("build succeed as part of up with ssh from Compose file", func(t *testing.T) {
 		c.RunDockerOrExitError(t, "rmi", "build-test-ssh")
@@ -402,7 +401,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "the classic builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use BuildKit",
+			Err:      "the classic builder doesn't support multi-arch build; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0",
 		})
 	})
 
@@ -470,7 +469,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "the classic builder doesn't support privileged mode, set DOCKER_BUILDKIT=1 to use BuildKit",
+			Err:      "the classic builder doesn't support privileged mode; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0",
 		})
 	})
 }

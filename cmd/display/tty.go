@@ -42,11 +42,28 @@ func Full(out io.Writer, info io.Writer, detached, dryRun bool) api.EventProcess
 		out:      out,
 		info:     info,
 		tasks:    map[string]*task{},
-		done:     make(chan bool),
+		done:     newDoneSignal(),
 		mtx:      &sync.Mutex{},
 		detached: detached,
 		dryRun:   dryRun,
 	}
+}
+
+// doneSignal is a channel that's safe to close more than once: a shared bus
+// can go through more than one sequential Start/Done cycle in its lifetime
+// (e.g. `docker compose rm --stop` runs a "stop" cycle before its own
+// "remove" cycle), and a bare channel can only ever be closed once.
+type doneSignal struct {
+	ch   chan bool
+	once sync.Once
+}
+
+func newDoneSignal() *doneSignal {
+	return &doneSignal{ch: make(chan bool)}
+}
+
+func (d *doneSignal) close() {
+	d.once.Do(func() { close(d.ch) })
 }
 
 type ttyWriter struct {
@@ -55,7 +72,7 @@ type ttyWriter struct {
 	tasks     map[string]*task
 	repeated  bool
 	numLines  int
-	done      chan bool
+	done      *doneSignal // (re)created by Start for each Start/Done cycle
 	mtx       *sync.Mutex
 	dryRun    bool
 	operation string
@@ -153,18 +170,36 @@ func (t *task) Completed() bool {
 }
 
 func (w *ttyWriter) Start(ctx context.Context, operation string) {
-	w.ticker = time.NewTicker(100 * time.Millisecond)
+	w.mtx.Lock()
+	// If a previous cycle is still open (Start called again before its
+	// matching Done, e.g. nested Start/Done misuse), close it out first so
+	// its render goroutine exits instead of leaking until ctx is done.
+	if w.done != nil {
+		w.done.close()
+	}
+	if w.ticker != nil {
+		w.ticker.Stop()
+	}
+	done := newDoneSignal()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	w.done = done
+	w.ticker = ticker
 	w.operation = operation
+	w.mtx.Unlock()
+
+	// done and ticker are this cycle's own, captured locally: a later Start
+	// (a new Start/Done cycle on the same writer) reassigns w.done/w.ticker,
+	// but that never affects this goroutine's own wait.
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				// interrupted
-				w.ticker.Stop()
+				ticker.Stop()
 				return
-			case <-w.done:
+			case <-done.ch:
 				return
-			case <-w.ticker.C:
+			case <-ticker.C:
 				w.print()
 			}
 		}
@@ -173,11 +208,19 @@ func (w *ttyWriter) Start(ctx context.Context, operation string) {
 
 func (w *ttyWriter) Done(operation string, success bool) {
 	w.print()
-	w.done <- true
+	w.mtx.Lock()
+	done := w.done
+	ticker := w.ticker
+	w.mtx.Unlock()
+
+	// close never blocks, unlike a send, so this returns even if the render
+	// goroutine already exited via ctx.Done().
+	done.close()
+
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	if w.ticker != nil {
-		w.ticker.Stop()
+	if ticker != nil {
+		ticker.Stop()
 	}
 	w.operation = ""
 }

@@ -30,14 +30,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/buildx/builder"
-	"github.com/docker/buildx/util/imagetools"
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/config/configfile"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
+
+	"github.com/docker/compose/v5/internal/registry"
 )
 
 var _ client.APIClient = &DryRunClient{}
@@ -47,7 +49,7 @@ type DryRunClient struct {
 	apiClient  client.APIClient
 	containers []containerType.Summary
 	execs      sync.Map
-	resolver   *imagetools.Resolver
+	configFile *configfile.ConfigFile
 }
 
 type execDetails struct {
@@ -65,20 +67,31 @@ func (e fakeStreamResult) Close() error               { return e.ReadCloser.Clos
 
 // NewDryRunClient produces a DryRunClient
 func NewDryRunClient(apiClient client.APIClient, cli command.Cli) (*DryRunClient, error) {
-	b, err := builder.New(cli, builder.WithSkippedValidation())
-	if err != nil {
-		return nil, err
-	}
-	configFile, err := b.ImageOpt()
-	if err != nil {
-		return nil, err
-	}
 	return &DryRunClient{
 		apiClient:  apiClient,
 		containers: []containerType.Summary{},
 		execs:      sync.Map{},
-		resolver:   imagetools.New(configFile),
+		configFile: cli.ConfigFile(),
 	}, nil
+}
+
+// resolve checks the image reference exists in the registry, without pulling
+// or pushing anything: the manifest is resolved through the daemon
+// (DistributionInspect) with the credentials the equivalent real operation
+// would use.
+func (d *DryRunClient) resolve(ctx context.Context, ref string) error {
+	named, err := reference.ParseDockerRef(ref)
+	if err != nil {
+		return err
+	}
+	auth, err := registry.EncodedAuth(named, d.configFile)
+	if err != nil {
+		return err
+	}
+	_, err = d.apiClient.DistributionInspect(ctx, named.String(), client.DistributionInspectOptions{
+		EncodedRegistryAuth: auth,
+	})
+	return err
 }
 
 func getCallingFunction() string {
@@ -219,14 +232,14 @@ func (d *DryRunClient) ImageInspect(ctx context.Context, imageName string, optio
 }
 
 func (d *DryRunClient) ImagePull(ctx context.Context, ref string, options client.ImagePullOptions) (client.ImagePullResponse, error) {
-	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
+	if err := d.resolve(ctx, ref); err != nil {
 		return nil, err
 	}
 	return fakeStreamResult{ReadCloser: http.NoBody}, nil
 }
 
 func (d *DryRunClient) ImagePush(ctx context.Context, ref string, options client.ImagePushOptions) (client.ImagePushResponse, error) {
-	if _, _, err := d.resolver.Resolve(ctx, ref); err != nil {
+	if err := d.resolve(ctx, ref); err != nil {
 		return nil, err
 	}
 	jsonMessage, err := json.Marshal(&jsonstream.Message{

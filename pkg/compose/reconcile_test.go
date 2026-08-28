@@ -1242,7 +1242,7 @@ func TestReconcileContainers_ExitedIsNoop(t *testing.T) {
 
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
-	// Exited containers are left as-is, matching convergence.go:199 behavior
+	// Exited containers are left as-is: starting containers is not the plan engine's job
 	assert.Assert(t, plan.IsEmpty())
 }
 
