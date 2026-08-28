@@ -30,7 +30,9 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/consts"
 	"github.com/compose-spec/compose-go/v2/dotenv"
+	"github.com/compose-spec/compose-go/v2/errdefs"
 	"github.com/compose-spec/compose-go/v2/loader"
 	composepaths "github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -278,10 +280,34 @@ func defaultStringArrayVar(env string) []string {
 	})
 }
 
+// projectOrName resolves the target project for commands that exploit the
+// compose model when one is available and fall back to container labels
+// otherwise. The project name follows one precedence everywhere, shared with
+// toProjectName and applied identically by compose-go while loading:
+// --project-name, then COMPOSE_PROJECT_NAME, then the model's name.
+//
+// When the model cannot be loaded:
+//   - a service argument naming a declared job is reported clearly instead,
+//     regardless of the cases below: the file loaded fine, only the
+//     target's selection failed, and every caller here treats a job as
+//     run-only;
+//   - an explicit file (--file, or COMPOSE_FILE, its environment equivalent)
+//     is a hard error: the user named the file, failing to read it cannot be
+//     ignored;
+//   - no compose file around and a name available from COMPOSE_PROJECT_NAME
+//     is the normal file-less workflow: label-based mode, silently;
+//   - a compose file present but broken, with COMPOSE_PROJECT_NAME set,
+//     falls back to label-based mode with an explicit warning (this used to
+//     happen silently); a file that loads and only fails the selection of
+//     the requested services falls back silently, as it always did, so that
+//     a service removed from the file can still be stopped.
 func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cli, services ...string) (*types.Project, string, error) {
 	name := o.ProjectName
 	var project *types.Project
-	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
+	// --project-name alone skips the load unless the file was named
+	// explicitly; without it, the load always happens
+	explicit := o.explicitFile()
+	if o.ProjectName == "" || explicit {
 		backend, err := compose.NewComposeService(dockerCli)
 		if err != nil {
 			return nil, "", err
@@ -295,13 +321,37 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 			// either the raw "no such service" below or, worse, silently
 			// falling back to the label-driven project next -- a job that
 			// was never run left no container behind for that fallback to
-			// find, so it would otherwise look like a successful no-op.
+			// find, so it would otherwise look like a successful no-op. This
+			// takes priority over the explicit-file hard error just below:
+			// the file loaded fine, only the target's selection failed.
 			if jobErr, replaced := jobTargetErr(ctx, dockerCli, o, services, err); replaced {
 				return nil, "", jobErr
 			}
-			envProjectName := os.Getenv(ComposeProjectName)
-			if envProjectName != "" {
-				return nil, envProjectName, nil
+			// a file that loads and only fails the selection of the requested
+			// services is not an unreadable file, explicit or not: stop can
+			// still reach the container of a service removed from it
+			selection := isNoSuchServiceErr(err)
+			if explicit && !selection {
+				return nil, "", err
+			}
+			// --project-name wins over COMPOSE_PROJECT_NAME, as everywhere. With
+			// --file too, the services are the ones of that file and a name it
+			// does not declare is an error, as ever (pinned by the e2e test of
+			// `ps unknown`): neither name is a license to guess the project's
+			// containers from labels.
+			fallback := os.Getenv(ComposeProjectName)
+			if name != "" {
+				if len(o.ConfigPaths) > 0 {
+					return nil, "", err
+				}
+				fallback = name
+			}
+			if fallback != "" {
+				// no compose file around is the file-less workflow, silent
+				if !errdefs.IsNotFoundError(err) && !selection {
+					logrus.Warnf("compose file found but could not be loaded (%s) — falling back to label-based mode for project %q", err, fallback)
+				}
+				return nil, fallback, nil
 			}
 			return nil, "", err
 		}
@@ -311,6 +361,56 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 	return project, name, nil
 }
 
+// explicitFile reports whether the user named the compose file, as opposed
+// to Compose finding one by itself: --file, or COMPOSE_FILE — its environment
+// equivalent. A COMPOSE_FILE set in the project's .env file is seen through
+// the process environment: the root command's pre-run copies the COMPOSE_*
+// keys of .env there (setEnvWithDotEnv), so this is not a second reader of
+// .env that could disagree with it. An explicit file is always loaded, even
+// when --project-name would otherwise make the model unnecessary, and a
+// failure to load it is never swallowed.
+func (o *ProjectOptions) explicitFile() bool {
+	return len(o.ConfigPaths) > 0 || os.Getenv(consts.ComposeFilePath) != ""
+}
+
+// validateServiceNames rejects service arguments that don't exist in the
+// loaded model — profile-disabled services are legitimate targets (commands
+// like restart enable them on demand). With no model (label-based mode) no
+// validation is possible: a name without containers cannot be told apart
+// from a container already removed. A glob pattern is not a name: compose-go
+// selects services with filepath.Match, so it is left to the selection that
+// resolves it, which rejects a pattern matching nothing.
+//
+// Callers pass the unselected project (they call projectOrName with no
+// services, precisely so this function can validate the full name instead —
+// see runRestart/runWait), so project.AllJobs() already reflects every
+// declared job without a second reload.
+func validateServiceNames(project *types.Project, services []string) error {
+	if project == nil {
+		return nil
+	}
+	for _, service := range services {
+		if strings.ContainsAny(service, "*?[") {
+			continue
+		}
+		if _, ok := project.Services[service]; ok {
+			continue
+		}
+		if _, ok := project.DisabledServices[service]; ok {
+			continue
+		}
+		if _, ok := project.AllJobs()[service]; ok {
+			return fmt.Errorf("job %q can only be triggered with \"docker compose run\"", service)
+		}
+		return fmt.Errorf("no such service: %s", service)
+	}
+	return nil
+}
+
+// toProjectName resolves the project name for commands that only need the
+// name, never the model. Same precedence as projectOrName: --project-name,
+// then COMPOSE_PROJECT_NAME, then the loaded model's name — the two first
+// short-circuit the load entirely.
 func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cli) (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil

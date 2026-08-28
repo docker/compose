@@ -99,14 +99,13 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 	}
 
 	if project != nil {
+		// with a model, unknown requested services were already rejected
+		// while loading the project (service selection in ToProject); without
+		// one (label-based mode) there is nothing to validate them against,
+		// which is what lets ps reach the containers of a service removed
+		// from the file
 		names := project.ServiceNames()
-		if len(services) > 0 {
-			for _, service := range services {
-				if !slices.Contains(names, service) {
-					return fmt.Errorf("no such service: %s", service)
-				}
-			}
-		} else if !opts.Orphans {
+		if len(services) == 0 && !opts.Orphans {
 			// until user asks to list orphaned services, we only include those declared in project
 			services = names
 		}
