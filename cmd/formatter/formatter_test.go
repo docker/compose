@@ -73,6 +73,16 @@ func TestPrint(t *testing.T) {
 `)
 }
 
+func TestPrintNilAsJSON(t *testing.T) {
+	for _, format := range []string{JSON, TemplateLegacyJSON} {
+		t.Run(format, func(t *testing.T) {
+			var output bytes.Buffer
+			assert.NilError(t, Print(nil, format, &output, func(io.Writer) {}))
+			assert.Equal(t, output.String(), "null\n")
+		})
+	}
+}
+
 func TestColorsGoroutinesLeak(t *testing.T) {
 	goleak.VerifyNone(t)
 }
