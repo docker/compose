@@ -27,6 +27,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -150,18 +151,46 @@ func (p *ImagePruner) namedImages(ctx context.Context) ([]string, error) {
 // created from the project + service name.
 func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error) {
 	res, err := p.client.ImageList(ctx, client.ImageListOptions{
-		// TODO(milas): we should really clean up the dangling images as
-		// well (historically we have NOT); need to refactor this to handle
-		// it gracefully without producing confusing CLI output, i.e. we
-		// do not want to print out a bunch of untagged/dangling image IDs,
-		// they should be grouped into a logical operation for the relevant
-		// service
 		Filters: projectFilter(p.project.Name).Add("dangling", "false"),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return res.Items, nil
+}
+
+// removeDanglingImages removes a project's dangling images not spared by
+// keep, in parallel, tolerating individual failures so one bad image
+// doesn't abort the rest. Shared by down --rmi and watch --prune, which
+// differ only in what keep spares.
+func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]string, error) {
+	res, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
+		Filters: projectFilter(projectName).Add("dangling", "true"),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var mu sync.Mutex
+	var removed []string
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, img := range res.Items {
+		if keep(img) {
+			continue
+		}
+		eg.Go(func() error {
+			if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
+				logrus.Debugf("failed to remove dangling image %s: %v", img.ID, err)
+				return nil
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			removed = append(removed, img.ID)
+			return nil
+		})
+	}
+	_ = eg.Wait() // errgroup is only used for fan-out here; goroutines never return an error
+	return removed, nil
 }
 
 // unlabeledLocalImages are images that match the implicit naming convention

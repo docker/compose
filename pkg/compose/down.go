@@ -25,6 +25,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -176,6 +177,25 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 		ops = append(ops, func() error {
 			return s.removeResource("Image "+img, func() error {
 				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
+				return err
+			})
+		})
+	}
+
+	if pruneOpts.Mode != ImagePruneNone {
+		// mirrors ImagesToPrune's own orphan check: a dangling image from a
+		// service no longer in the project must be spared unless
+		// RemoveOrphans is set, same as that service's tagged image is.
+		keep := func(img image.Summary) bool {
+			if options.RemoveOrphans {
+				return false
+			}
+			_, err := project.GetService(img.Labels[api.ServiceLabel])
+			return err != nil
+		}
+		ops = append(ops, func() error {
+			return s.removeResource("Dangling images", func() error {
+				_, err := s.removeDanglingImages(ctx, project.Name, keep)
 				return err
 			})
 		})

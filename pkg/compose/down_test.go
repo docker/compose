@@ -330,6 +330,10 @@ func TestDownRemoveImages(t *testing.T) {
 		},
 	}}, nil).AnyTimes()
 
+	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("dangling", "true"),
+	}).Return(client.ImageListResult{}, nil).AnyTimes()
+
 	imagesToBeInspected := map[string]bool{
 		"testproject-local-anonymous":     true,
 		"local-named-image":               true,
@@ -420,6 +424,10 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 		Filters: projectFilter(strings.ToLower(testProject)).Add("dangling", "false"),
 	}).Return(client.ImageListResult{}, nil)
 
+	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("dangling", "true"),
+	}).Return(client.ImageListResult{}, nil)
+
 	api.EXPECT().ImageInspect(gomock.Any(), "testproject-service1", gomock.Any()).Return(client.ImageInspectResult{}, nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "123", client.ContainerStopOptions{}).Return(client.ContainerStopResult{}, nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
@@ -457,6 +465,129 @@ func prepareMocks(mockCtrl *gomock.Controller) (*mocks.MockAPIClient, *mocks.Moc
 	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
 	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 	return api, cli
+}
+
+// TestEnsureImagesDown_ReportsDanglingImagesAsOneGroupedEvent guards that
+// dangling-image removal is reported as a single grouped event regardless
+// of count, instead of one row per meaningless raw image ID.
+func TestEnsureImagesDown_ReportsDanglingImagesAsOneGroupedEvent(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	rec := &capturingEvents{}
+	svcIface, err := NewComposeService(cli, WithEventProcessor(rec))
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{Name: "prj"}
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "false"),
+	}).Return(client.ImageListResult{}, nil)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:aaa"},
+		{ID: "sha256:bbb"},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:aaa", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:bbb", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrNotFound.WithMessage("already removed"))
+
+	// RemoveOrphans:true bypasses the per-service keep check so this test
+	// stays focused on the single-grouped-event behavior.
+	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.NilError(t, err)
+	for _, op := range ops {
+		assert.NilError(t, op())
+	}
+
+	events := make([]string, len(rec.resources))
+	for i, e := range rec.resources {
+		events[i] = e.ID + ": " + e.Text
+	}
+	assert.DeepEqual(t, events, []string{
+		"Dangling images: Removing",
+		"Dangling images: Removed",
+	})
+}
+
+// TestEnsureImagesDown_SparesDanglingImagesOfOrphanedServices guards a bug
+// caught in review: ImagesToPrune already spares a service's tagged image
+// when the service is no longer in the project and RemoveOrphans isn't set;
+// its dangling images must be spared the same way, or `down --rmi` leaves
+// an inconsistent result (tagged image kept, dangling image gone).
+func TestEnsureImagesDown_SparesDanglingImagesOfOrphanedServices(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	project := &types.Project{
+		Name: "prj",
+		Services: types.Services{
+			"web": {Name: "web", Image: "web-image"},
+		},
+	}
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "false"),
+	}).Return(client.ImageListResult{}, nil)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:web-dangling", Labels: types.Labels{compose.ServiceLabel: "web"}},
+		{ID: "sha256:orphan-dangling", Labels: types.Labels{compose.ServiceLabel: "orphan"}},
+	}}, nil)
+	// only the known service's dangling image may be removed; a call for
+	// the orphaned one is an unexpected call and fails the test
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:web-dangling", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+
+	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local"})
+	assert.NilError(t, err)
+	for _, op := range ops {
+		assert.NilError(t, op())
+	}
+}
+
+// TestEnsureImagesDown_RemoveOrphansAlsoTakesDanglingImages guards that
+// --remove-orphans overrides the spare-orphans behavior for dangling
+// images too, matching what it already does for tagged images.
+func TestEnsureImagesDown_RemoveOrphansAlsoTakesDanglingImages(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	project := &types.Project{
+		Name: "prj",
+		Services: types.Services{
+			"web": {Name: "web", Image: "web-image"},
+		},
+	}
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "false"),
+	}).Return(client.ImageListResult{}, nil)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:orphan-dangling", Labels: types.Labels{compose.ServiceLabel: "orphan"}},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:orphan-dangling", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+
+	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.NilError(t, err)
+	for _, op := range ops {
+		assert.NilError(t, op())
+	}
 }
 
 // TestDownRemovesRetainedPreStartHookContainers verifies that compose down finds and
