@@ -34,7 +34,6 @@ import (
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
-	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type createOptions struct {
@@ -117,10 +116,11 @@ func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 	if err := rejectScheduledJobs(project); err != nil {
 		return err
 	}
-	createOpts.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-	if createOpts.ignoreOrphans && createOpts.removeOrphans {
-		return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
+	ignoreOrphans, err := resolveIgnoreOrphans(project, createOpts.removeOrphans)
+	if err != nil {
+		return err
 	}
+	createOpts.ignoreOrphans = ignoreOrphans
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}
