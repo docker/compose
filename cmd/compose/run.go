@@ -215,6 +215,9 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 			}
 
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
+			if options.ignoreOrphans && options.removeOrphans {
+				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
+			}
 			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
