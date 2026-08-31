@@ -166,15 +166,13 @@ func (s *composeService) createPreStartContainer(
 	ctx context.Context, project *types.Project, service types.ServiceConfig,
 	ctr container.Summary, hook types.PreStartHook,
 ) (client.ContainerCreateResult, error) {
-	// A pre_start hook is a full container specification (compose-spec#656)
-	// inheriting from the service per the compose file merge rules; the
-	// merged spec runs through the standard create path, so every attribute
-	// — resources, capabilities, dns, sysctls, ... — materializes exactly as
-	// it would for a service container.
-	spec, err := mergedPreStartSpec(service, hook)
-	if err != nil {
-		return client.ContainerCreateResult{}, err
-	}
+	// A pre_start hook is a full container specification (compose-spec#656),
+	// already resolved by compose-go at load time: every service attribute
+	// the hook doesn't override — resources, capabilities, dns, sysctls,
+	// image, ... — is inherited in the model itself, and the spec runs
+	// through the standard create path exactly as a service container would.
+	// Only volumes inherit here, at runtime, through volumes_from below.
+	spec := hook.ContainerSpec
 	if spec.Image == "" {
 		spec.Image = api.GetImageNameOrDefault(service, project.Name)
 	}
