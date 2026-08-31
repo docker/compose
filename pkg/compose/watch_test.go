@@ -228,8 +228,7 @@ func TestInitialSyncFilesRegularFile(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir},
+		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, types.Trigger{
 		Path:   hostFile,
 		Target: "/app/test.txt",
@@ -253,8 +252,8 @@ func TestInitialSync_ExcludesDockerfileAndComposeFiles(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir},
+		Name:         "svc",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, types.Trigger{
 		Path:   hostDir,
 		Target: "/app",
@@ -279,8 +278,8 @@ func TestInitialSync_ExcludesCustomNamedDockerfile(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir, Dockerfile: "Dockerfile.prod"},
+		Name:         "svc",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir, Dockerfile: "Dockerfile.prod"}},
 	}, types.Trigger{
 		Path:   hostDir,
 		Target: "/app",
@@ -308,8 +307,8 @@ func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir, Dockerfile: "docker/Dockerfile.prod"},
+		Name:         "svc",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir, Dockerfile: "docker/Dockerfile.prod"}},
 	}, types.Trigger{
 		Path:   hostDir,
 		Target: "/app",

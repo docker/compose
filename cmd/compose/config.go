@@ -260,7 +260,7 @@ func imagesOnly(project *types.Project) *types.Project {
 	digests := types.Services{}
 	for name, config := range project.Services {
 		service := types.ServiceConfig{
-			Image: config.Image,
+			ContainerSpec: types.ContainerSpec{Image: config.Image},
 		}
 		for _, vol := range config.Volumes {
 			if vol.Type == types.VolumeTypeImage {
@@ -384,7 +384,7 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 		}
 		for _, hook := range preStartHooks(service) {
 			image, _ := hook["image"].(string)
-			config.PreStart = append(config.PreStart, types.ServiceHook{Image: image})
+			config.PreStart = append(config.PreStart, types.PreStartHook{ContainerSpec: types.ContainerSpec{Image: image}})
 		}
 		for _, volume := range imageVolumes(service) {
 			source, _ := volume["source"].(string)

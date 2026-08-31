@@ -40,9 +40,10 @@ func TestLoadAdditionalResources_BuildOnlySkipsPull(t *testing.T) {
 		Name: "test",
 		Services: types.Services{
 			"api": {
-				Name:   "api",
-				Build:  &types.BuildConfig{Context: "."},
-				Expose: []string{"8080"},
+				Name: "api", WorkloadSpec: types.WorkloadSpec{
+					Build:  &types.BuildConfig{Context: "."},
+					Expose: []string{"8080"},
+				},
 			},
 		},
 	}
