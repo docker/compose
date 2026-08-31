@@ -244,3 +244,15 @@ func TestPreStartHookVolumesMerge(t *testing.T) {
 			ComposeCmd("exec", "app", "cat", "/data/init.txt"),
 			OutputContains("saw-config"))
 }
+
+// A service using volumes_from inherits it into its pre_start hook (full
+// container specification): the reference must resolve to the live container
+// like the service create path does, not reach the daemon as a raw service
+// name.
+func TestPreStartHookVolumesFrom(t *testing.T) {
+	NewScenario(t, "pre_start must work on a service declaring volumes_from").
+		Step("up succeeds and the hook wrote through the inherited volume",
+			ComposeCmd("up", "-d", "--wait"),
+			ServiceState("app", "running"),
+			ExecOutputContains("data", "cat /shared/marker", "ready"))
+}

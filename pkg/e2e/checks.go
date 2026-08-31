@@ -590,3 +590,28 @@ func RunsOnPlatform(service, platform string) Check {
 		},
 	}
 }
+
+// ExecOutputContains expects `docker exec` of the command in the service's
+// first container to succeed and print a string — a state probe for effects
+// only visible from inside the container (files written by hooks, mounted
+// volumes), where no host-side observable exists.
+func ExecOutputContains(service, command, sub string) Check {
+	return Check{
+		name: fmt.Sprintf("exec %q in service %q prints %q", command, service, sub),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr.service(service)
+			if len(containers) == 0 {
+				return errors.New("service has no container")
+			}
+			res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t,
+				"exec", containers[0].ID, "sh", "-c", command))
+			if res.ExitCode != 0 {
+				return fmt.Errorf("exec failed: %s", res.Combined())
+			}
+			if !strings.Contains(res.Stdout(), sub) {
+				return fmt.Errorf("output %q does not contain %q", res.Stdout(), sub)
+			}
+			return nil
+		},
+	}
+}

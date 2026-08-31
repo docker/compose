@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -37,6 +38,30 @@ import (
 // so orphan containers from a previous failed run can be identified and removed
 // by a project+service+hook label filter.
 const preStartHookType = "pre_start"
+
+// resolveHookServiceReferences resolves service-name references carried by a
+// hook's spec (volumes_from entries, service:-scoped network_mode/ipc/pid)
+// into live container IDs, listing the project's containers only when the
+// spec actually holds such a reference — the common hook has none.
+func (s *composeService) resolveHookServiceReferences(ctx context.Context, project *types.Project, hookService *types.ServiceConfig) error {
+	needs := len(hookService.VolumesFrom) > 0 ||
+		strings.HasPrefix(hookService.NetworkMode, types.ServicePrefix) ||
+		strings.HasPrefix(hookService.Ipc, types.ServicePrefix) ||
+		strings.HasPrefix(hookService.Pid, types.ServicePrefix)
+	if !needs {
+		return nil
+	}
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
+	if err != nil {
+		return err
+	}
+	byService := map[string]Containers{}
+	for _, ctr := range containers {
+		name := ctr.Labels[api.ServiceLabel]
+		byService[name] = append(byService[name], ctr)
+	}
+	return resolveServiceReferences(hookService, byService)
+}
 
 // lowestNumberedContainer returns the container with the lowest
 // com.docker.compose.container-number label, so pre_start always targets the
@@ -166,21 +191,26 @@ func (s *composeService) createPreStartContainer(
 	ctx context.Context, project *types.Project, service types.ServiceConfig,
 	ctr container.Summary, hook types.PreStartHook,
 ) (client.ContainerCreateResult, error) {
-	// A pre_start hook is a full container specification (compose-spec#656)
-	// inheriting from the service per the compose file merge rules; the
-	// merged spec runs through the standard create path, so every attribute
-	// — resources, capabilities, dns, sysctls, ... — materializes exactly as
-	// it would for a service container.
-	spec, err := mergedPreStartSpec(service, hook)
-	if err != nil {
-		return client.ContainerCreateResult{}, err
-	}
+	// A pre_start hook is a full container specification (compose-spec#656),
+	// already resolved by compose-go at load time: every service attribute
+	// the hook doesn't override — resources, capabilities, dns, sysctls,
+	// image, ... — is inherited in the model itself, and the spec runs
+	// through the standard create path exactly as a service container would.
+	// Only volumes inherit here, at runtime, through volumes_from below.
+	spec := hook.ContainerSpec
 	if spec.Image == "" {
 		spec.Image = api.GetImageNameOrDefault(service, project.Name)
 	}
 	hookService := types.ServiceConfig{
 		Name:          service.Name,
 		ContainerSpec: spec,
+	}
+	// The inherited (or hook-declared) spec may reference sibling services:
+	// volumes_from, and service:-scoped network_mode/ipc/pid. Resolve them to
+	// live container IDs exactly like the service create path does — the
+	// daemon knows nothing about service names and would reject them.
+	if err := s.resolveHookServiceReferences(ctx, project, &hookService); err != nil {
+		return client.ContainerCreateResult{}, err
 	}
 	cfgs, err := s.getCreateConfigs(ctx, project, hookService, 0, nil, createOptions{
 		// AutoRemove is intentionally false: a failed hook container is
@@ -193,13 +223,15 @@ func (s *composeService) createPreStartContainer(
 		// belongs to so `compose down` and label-scoped tooling can find it.
 		// HookLabel distinguishes hook containers from the real service
 		// container; no container-number: tooling telling replicas apart must
-		// not count hook containers.
-		Labels: types.Labels{
+		// not count hook containers. The hook's own labels — declared or
+		// inherited, like any other ContainerSpec attribute — merge in, the
+		// runtime set winning on conflicts.
+		Labels: mergeLabels(spec.Labels, types.Labels{
 			api.ProjectLabel: project.Name,
 			api.ServiceLabel: service.Name,
 			api.VersionLabel: api.ComposeVersion,
 			api.HookLabel:    preStartHookType,
-		},
+		}),
 	})
 	if err != nil {
 		return client.ContainerCreateResult{}, err
@@ -228,7 +260,9 @@ func (s *composeService) createPreStartContainer(
 	}
 
 	if versions.LessThan(apiVersion, apiVersion144) {
-		if err := s.connectPreStartExtraNetworks(ctx, project, service, created.ID, hostCfg.NetworkMode); err != nil {
+		// the hook's resolved spec drives the fallback connections too: a
+		// hook overriding networks must join ITS networks, not the service's
+		if err := s.connectPreStartExtraNetworks(ctx, project, hookService, created.ID, hostCfg.NetworkMode); err != nil {
 			// AutoRemove is false; remove the container explicitly since it was
 			// never started. Log failures so the orphan is at least visible.
 			if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
