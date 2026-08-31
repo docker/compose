@@ -17,13 +17,21 @@
 package compose
 
 import (
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/streams"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 func removeOrphansFlagSet(t *testing.T, args ...string) *pflag.FlagSet {
@@ -130,4 +138,67 @@ func TestRemoveOrphansResolutionOrder(t *testing.T) {
 
 	// an explicit flag beats both
 	assert.Equal(t, removeOrphansFromEnv(removeOrphansFlagSet(t, "--remove-orphans=false"), false), false)
+}
+
+// Every command carrying --remove-orphans resolves COMPOSE_REMOVE_ORPHANS
+// through its own PreRunE: the real commands are run with RunE stubbed out.
+func TestRemoveOrphansIsResolvedByEveryCommand(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dockerCli := mocks.NewMockCli(ctrl)
+	dockerCli.EXPECT().In().Return(streams.NewIn(io.NopCloser(strings.NewReader("")))).AnyTimes()
+	dockerCli.EXPECT().Out().Return(streams.NewOut(io.Discard)).AnyTimes()
+	dockerCli.EXPECT().Err().Return(streams.NewOut(io.Discard)).AnyTimes()
+
+	commands := map[string]func() *cobra.Command{
+		"create": func() *cobra.Command { return createCommand(&ProjectOptions{}, dockerCli, &BackendOptions{}) },
+		"down":   func() *cobra.Command { return downCommand(&ProjectOptions{}, dockerCli, &BackendOptions{}) },
+		"kill":   func() *cobra.Command { return killCommand(&ProjectOptions{}, dockerCli, &BackendOptions{}) },
+		"run":    func() *cobra.Command { return runCommand(&ProjectOptions{}, dockerCli, &BackendOptions{}) },
+		"up":     func() *cobra.Command { return upCommand(&ProjectOptions{}, dockerCli, &BackendOptions{}) },
+	}
+	tests := []struct {
+		name string
+		env  string
+		args []string
+		want string
+	}{
+		{name: "environment applies", env: "true", want: "true"},
+		{name: "explicit flag", args: []string{"--remove-orphans"}, want: "true"},
+		{name: "explicit flag beats the environment", env: "true", args: []string{"--remove-orphans=false"}, want: "false"},
+		{name: "unset", want: "false"},
+	}
+	for name, newCmd := range commands {
+		for _, tt := range tests {
+			t.Run(name+"/"+tt.name, func(t *testing.T) {
+				t.Setenv(ComposeRemoveOrphans, tt.env)
+				cmd := newCmd()
+				cmd.RunE = func(*cobra.Command, []string) error { return nil }
+				// run takes a mandatory service argument
+				cmd.SetArgs(append(tt.args, "svc"))
+
+				assert.NilError(t, cmd.ExecuteContext(t.Context()))
+
+				assert.Equal(t, cmd.Flags().Lookup("remove-orphans").Value.String(), tt.want)
+			})
+		}
+	}
+}
+
+// COMPOSE_IGNORE_ORPHANS comes from the project environment and conflicts
+// with --remove-orphans, whichever command resolves it.
+func TestResolveIgnoreOrphans(t *testing.T) {
+	project := func(value string) *types.Project {
+		return &types.Project{Environment: types.Mapping{ComposeIgnoreOrphans: value}}
+	}
+
+	ignore, err := resolveIgnoreOrphans(project("true"), false)
+	assert.NilError(t, err)
+	assert.Equal(t, ignore, true)
+
+	ignore, err = resolveIgnoreOrphans(project(""), true)
+	assert.NilError(t, err)
+	assert.Equal(t, ignore, false)
+
+	_, err = resolveIgnoreOrphans(project("true"), true)
+	assert.ErrorContains(t, err, "cannot combine COMPOSE_IGNORE_ORPHANS and --remove-orphans")
 }
