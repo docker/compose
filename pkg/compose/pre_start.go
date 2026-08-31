@@ -88,7 +88,7 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 
 func (s *composeService) runPreStartHook(
 	ctx context.Context, project *types.Project, service types.ServiceConfig,
-	ctr container.Summary, index int, hook types.ServiceHook, listener api.ContainerEventListener,
+	ctr container.Summary, index int, hook types.PreStartHook, listener api.ContainerEventListener,
 ) error {
 	created, err := s.createPreStartContainer(ctx, project, service, ctr, hook)
 	if err != nil {
@@ -164,49 +164,59 @@ func (s *composeService) runPreStartHook(
 
 func (s *composeService) createPreStartContainer(
 	ctx context.Context, project *types.Project, service types.ServiceConfig,
-	ctr container.Summary, hook types.ServiceHook,
+	ctr container.Summary, hook types.PreStartHook,
 ) (client.ContainerCreateResult, error) {
-	image := hook.Image
-	if image == "" {
-		image = api.GetImageNameOrDefault(service, project.Name)
+	// A pre_start hook is a full container specification (compose-spec#656)
+	// inheriting from the service per the compose file merge rules; the
+	// merged spec runs through the standard create path, so every attribute
+	// — resources, capabilities, dns, sysctls, ... — materializes exactly as
+	// it would for a service container.
+	spec, err := mergedPreStartSpec(service, hook)
+	if err != nil {
+		return client.ContainerCreateResult{}, err
 	}
-
-	cfg := &container.Config{
-		Image:      image,
-		Cmd:        hook.Command,
-		User:       hook.User,
-		WorkingDir: hook.WorkingDir,
-		Env:        append(ToMobyEnv(service.Environment), ToMobyEnv(hook.Environment)...),
-		// Tag the ephemeral hook container with the project/service it belongs
-		// to so it can be found by `compose down` and label-scoped tooling.
-		// HookLabel also distinguishes hook containers from the real service
-		// container (which shares ProjectLabel and ServiceLabel).
-		Labels: map[string]string{
+	if spec.Image == "" {
+		spec.Image = api.GetImageNameOrDefault(service, project.Name)
+	}
+	hookService := types.ServiceConfig{
+		Name:          service.Name,
+		ContainerSpec: spec,
+	}
+	cfgs, err := s.getCreateConfigs(ctx, project, hookService, 0, nil, createOptions{
+		// AutoRemove is intentionally false: a failed hook container is
+		// retained so the operator can inspect its logs. runPreStartHook
+		// removes it explicitly on success, and the orphan sweep catches
+		// leftovers on the next run.
+		AutoRemove:        false,
+		UseNetworkAliases: true,
+		// Tag the ephemeral hook container with the project/service it
+		// belongs to so `compose down` and label-scoped tooling can find it.
+		// HookLabel distinguishes hook containers from the real service
+		// container; no container-number: tooling telling replicas apart must
+		// not count hook containers.
+		Labels: types.Labels{
 			api.ProjectLabel: project.Name,
 			api.ServiceLabel: service.Name,
 			api.VersionLabel: api.ComposeVersion,
 			api.HookLabel:    preStartHookType,
 		},
+	})
+	if err != nil {
+		return client.ContainerCreateResult{}, err
 	}
-	hostCfg := &container.HostConfig{
-		// AutoRemove is intentionally false: a failed hook container is retained
-		// so the operator can inspect its logs. On success runPreStartHook
-		// removes the container explicitly (see the success path below).
-		AutoRemove:  false,
-		Privileged:  hook.Privileged,
-		VolumesFrom: []string{ctr.ID},
-	}
+	// Mounts inherit from the live service container: volumes_from carries
+	// its anonymous and image volumes too. The hook's own mounts, already in
+	// the host config from the merged spec, take precedence on shared
+	// targets.
+	cfgs.Host.VolumesFrom = append(cfgs.Host.VolumesFrom, ctr.ID)
+	cfg := cfgs.Container
+	hostCfg := cfgs.Host
+	networkingConfig := cfgs.Network
 
 	apiVersion, err := s.RuntimeAPIVersion(ctx)
 	if err != nil {
 		return client.ContainerCreateResult{}, err
 	}
-
-	networkMode, networkingConfig, err := defaultNetworkSettings(project, service, 0, nil, true, apiVersion)
-	if err != nil {
-		return client.ContainerCreateResult{}, err
-	}
-	hostCfg.NetworkMode = networkMode
 
 	created, err := s.apiClient().ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config:           cfg,
@@ -218,7 +228,7 @@ func (s *composeService) createPreStartContainer(
 	}
 
 	if versions.LessThan(apiVersion, apiVersion144) {
-		if err := s.connectPreStartExtraNetworks(ctx, project, service, created.ID, networkMode); err != nil {
+		if err := s.connectPreStartExtraNetworks(ctx, project, service, created.ID, hostCfg.NetworkMode); err != nil {
 			// AutoRemove is false; remove the container explicitly since it was
 			// never started. Log failures so the orphan is at least visible.
 			if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {

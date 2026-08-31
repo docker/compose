@@ -155,8 +155,7 @@ services:
 		WorkingDir: dir,
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
+				Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx"},
 			},
 		},
 	}
@@ -178,4 +177,18 @@ services:
 	assert.Assert(t, strings.Contains(output, "LXKNS_ADDRESS"), output)
 	assert.Assert(t, strings.Contains(output, "LXKNS_PORT"), output)
 	assert.Assert(t, !strings.Contains(fmt.Sprint(err), "invalid ip address"), fmt.Sprint(err))
+}
+
+func TestManualJobNames(t *testing.T) {
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: true}}
+	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
+		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+	}}
+
+	assert.DeepEqual(t, manualJobNames(&types.Project{}), []string{})
+	assert.DeepEqual(t, manualJobNames(&types.Project{Jobs: types.Jobs{"backup": scheduled}}), []string{})
+	assert.DeepEqual(t,
+		manualJobNames(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": manual, "migrate": manual}}),
+		[]string{"migrate", "sync"},
+	)
 }

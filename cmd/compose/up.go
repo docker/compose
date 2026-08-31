@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -241,6 +242,8 @@ func runUp(
 		return err
 	}
 
+	warnIgnoredJobs(project)
+
 	err := createOptions.Apply(project)
 	if err != nil {
 		return err
@@ -348,4 +351,28 @@ func runUp(
 			NavigationMenu: upOptions.navigationMenu && display.Mode != display.ModePlain && dockerCli.In().IsTerminal(),
 		},
 	})
+}
+
+// warnIgnoredJobs names the declared manual jobs up will not act on: they
+// wait for an explicit `compose run <job>` trigger. Scheduled jobs are not
+// ignored — they are registered with the engine (see pkg/compose Up).
+func warnIgnoredJobs(project *types.Project) {
+	names := manualJobNames(project)
+	if len(names) == 0 {
+		return
+	}
+	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
+}
+
+// manualJobNames returns the sorted names of the project's manual-trigger jobs.
+func manualJobNames(project *types.Project) []string {
+	jobs := project.AllJobs()
+	names := make([]string, 0, len(jobs))
+	for name, job := range jobs {
+		if job.Triggers != nil && job.Triggers.Manual {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }

@@ -67,6 +67,8 @@ const (
 	// runPreStartHook so orphan hook containers from a previous failed run can
 	// be found and removed by project+service+hook label filters.
 	HookLabel = "com.docker.compose.hook"
+	// JobLabel allow to track resource related to a compose job
+	JobLabel = "com.docker.compose.job"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel

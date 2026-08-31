@@ -71,6 +71,11 @@ type runOptions struct {
 }
 
 func (options runOptions) apply(project *types.Project) (*types.Project, error) {
+	project, err := materializeManualJob(project, options.Service)
+	if err != nil {
+		return nil, err
+	}
+
 	if options.noDeps {
 		var err error
 		project, err = project.WithSelectedServices([]string{options.Service}, types.IgnoreDependencies)
@@ -83,7 +88,6 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	if err != nil {
 		return nil, err
 	}
-
 	target.Tty = !options.noTty
 	target.StdinOpen = options.interactive
 
@@ -272,6 +276,11 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 // their containers.
 func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, p *ProjectOptions, service string) (*types.Project, error) {
 	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, composecli.WithoutEnvironmentResolution)
+	if err != nil && strings.Contains(err.Error(), "no such service") {
+		// the run target may be a job, which the service selector cannot
+		// resolve: reload unselected and let materializeManualJob decide
+		project, _, err = p.ToProject(ctx, dockerCli, backend, nil, composecli.WithoutEnvironmentResolution)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -349,6 +358,21 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		Index:             0,
 	}
 
+	if _, ok := project.AllJobs()[options.Service]; ok {
+		if options.name != "" {
+			logrus.Warnf("--name has no effect on a job: the engine names its run containers itself")
+		}
+		exitCode, err := backend.RunJob(ctx, project, options.Service, runOpts)
+		if exitCode != 0 {
+			errMsg := ""
+			if err != nil {
+				errMsg = err.Error()
+			}
+			return cli.StatusError{StatusCode: exitCode, Status: errMsg}
+		}
+		return err
+	}
+
 	for name, service := range project.Services {
 		if name == options.Service {
 			service.StdinOpen = options.interactive
@@ -365,4 +389,30 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
+}
+
+// materializeManualJob lets run target a manual-trigger job exactly like a
+// service. A job is a ContainerSpec+WorkloadSpec — the same layers a service
+// is made of — so it materializes as a service for the one-off machinery:
+// its profile is activated and the project narrowed to its dependencies by
+// WithSelectedJob, then the job joins Services under its own name.
+func materializeManualJob(project *types.Project, name string) (*types.Project, error) {
+	job, ok := project.AllJobs()[name]
+	if !ok {
+		return project, nil
+	}
+	if job.Triggers == nil || !job.Triggers.Manual {
+		return nil, fmt.Errorf("job %q has no manual trigger, it cannot be run", name)
+	}
+	project, err := project.WithSelectedJob(name)
+	if err != nil {
+		return nil, err
+	}
+	project.Services[name] = types.ServiceConfig{
+		Name:          name,
+		Profiles:      job.Profiles,
+		ContainerSpec: job.ContainerSpec,
+		WorkloadSpec:  job.WorkloadSpec,
+	}
+	return project, nil
 }

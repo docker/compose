@@ -21,7 +21,6 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
@@ -30,6 +29,10 @@ import (
 
 	"github.com/docker/compose/v5/pkg/api"
 )
+
+// jobContainerIDLabel is the engine's reserved label identifying a job run
+// container (see the jobsv0 contract); Compose never sets it itself.
+const jobContainerIDLabel = "com.docker.job.id"
 
 // ObservedState captures the current state of all Docker resources belonging to
 // a Compose project. It is a snapshot taken before reconciliation so that the
@@ -388,15 +391,6 @@ func emitRunningEvents(project *types.Project, observed *ObservedState, plan *Pl
 			}
 		}
 	}
-}
-
-// orphanNames returns the names of orphaned containers as a comma-separated string.
-func (s *ObservedState) orphanNames() string {
-	names := make([]string, len(s.Orphans))
-	for i, o := range s.Orphans {
-		names[i] = o.Name
-	}
-	return strings.Join(names, ", ")
 }
 
 // containersByService flattens the observed containers into the shape

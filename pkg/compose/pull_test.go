@@ -64,10 +64,12 @@ func scheduledHookImages(t *testing.T, project *types.Project, present map[strin
 
 func serviceWithHook(name, img, policy string) types.ServiceConfig {
 	return types.ServiceConfig{
-		Name:       name,
-		Image:      img,
-		PullPolicy: policy,
-		PreStart:   []types.ServiceHook{{Image: "init:latest"}},
+		Name: name,
+
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "init:latest"}}}, ContainerSpec: types.ContainerSpec{
+			Image:      img,
+			PullPolicy: policy,
+		},
 	}
 }
 
@@ -166,8 +168,8 @@ func TestPullRequiredImagesUsesContentDigest(t *testing.T) {
 	project := &types.Project{
 		Name: "demo",
 		Services: types.Services{
-			"web":    {Name: "web", Image: ref},
-			"pinned": {Name: "pinned", Image: ref, Platform: "linux/amd64"},
+			"web":    {Name: "web", ContainerSpec: types.ContainerSpec{Image: ref}},
+			"pinned": {Name: "pinned", ContainerSpec: types.ContainerSpec{Image: ref, Platform: "linux/amd64"}},
 		},
 	}
 	images := map[string]api.ImageSummary{}
@@ -197,7 +199,7 @@ func TestShouldPullImage(t *testing.T) {
 		"old:1":      {LastTagTime: time.Now().Add(-48 * time.Hour)},
 	}
 	svc := func(image, policy string) types.ServiceConfig {
-		return types.ServiceConfig{Name: "web", Image: image, PullPolicy: policy}
+		return types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: image, PullPolicy: policy}}
 	}
 
 	t.Run("no explicit policy always refreshes", func(t *testing.T) {
@@ -286,9 +288,9 @@ func TestShouldPullImageProvider(t *testing.T) {
 	images := map[string]api.ImageSummary{}
 
 	pull, _, err := shouldPullImage(types.ServiceConfig{
-		Name:     "db",
-		Image:    "db:1",
-		Provider: &types.ServiceProviderConfig{Type: "acme"},
+		Name: "db",
+
+		Provider: &types.ServiceProviderConfig{Type: "acme"}, ContainerSpec: types.ContainerSpec{Image: "db:1"},
 	}, images)
 	assert.NilError(t, err)
 	assert.Assert(t, pull, "provider service with a declared image must be pulled")

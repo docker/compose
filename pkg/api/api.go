@@ -120,6 +120,14 @@ type Compose interface {
 	Kill(ctx context.Context, projectName string, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
+	// RunJob triggers a manual-trigger job's Run on the engine's jobs API,
+	// starts its dependencies first, and returns the Run's exit code. options
+	// carries the same CLI overrides RunOneOffContainer accepts (User,
+	// Command, Entrypoint, WorkingDir, CapAdd/CapDrop, Environment, Labels,
+	// NoDeps); Service is ignored, name is authoritative. Name has no effect:
+	// the jobs API assigns the run container's identity itself, there is no
+	// per-run naming hook to plug --name into.
+	RunJob(ctx context.Context, project *types.Project, name string, options RunOptions) (int, error)
 	// Remove executes the equivalent to a `compose rm`
 	Remove(ctx context.Context, projectName string, options RemoveOptions) error
 	// Exec executes a command in a running service container
