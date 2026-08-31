@@ -117,6 +117,13 @@ func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 	if err := rejectScheduledJobs(project); err != nil {
 		return err
 	}
+	// Deliberate source asymmetry with removeOrphans: the destructive
+	// variable (COMPOSE_REMOVE_ORPHANS) resolves through the process
+	// environment, which setEnvWithDotEnv completes from the local .env
+	// only — a remote model cannot enable container removal. The benign
+	// COMPOSE_IGNORE_ORPHANS reads project.Environment, remote configs
+	// included: the worst a remote model can do there is suppress a
+	// warning.
 	createOpts.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
 	if createOpts.ignoreOrphans && createOpts.removeOrphans {
 		return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
