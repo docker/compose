@@ -47,6 +47,14 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	include := oneOffExclude
 	if options.RemoveOrphans {
+		// down stops the application: one-off containers — RUNNING ones
+		// included — are part of what goes down. Those attached to a declared
+		// service are stopped/removed by the per-service loop below (they
+		// match isService); the orphan branch at the end catches the
+		// remainder (finished one-offs and model-absent services — see
+		// isOrphaned). This is deliberately broader than `up
+		// --remove-orphans`, which only cleans up FINISHED one-offs and never
+		// kills a live `compose run` session.
 		include = oneOffInclude
 	}
 	containers, err := s.getContainers(ctx, projectName, include, true)
