@@ -288,6 +288,59 @@ func TestPreStart_VolumesFromServiceContainer(t *testing.T) {
 	assert.Equal(t, gotLabels[api.HookLabel], preStartHookType)
 }
 
+// A pre_start hook is a full container specification, resolved by
+// compose-go at load time: attributes the hook doesn't override — including
+// security-sensitive ones — are inherited from the service in the model
+// itself. createPreStartContainer must forward the hook's resolved spec as
+// faithfully as a service container's own create path does; a regression
+// here would silently run hook containers with weaker isolation than the
+// service they act on.
+func TestPreStart_SecuritySensitiveFieldsHonored(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name: "web",
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{
+				Image:       "alpine",
+				Command:     types.ShellCommand{"true"},
+				Privileged:  true,
+				CapAdd:      []string{"SYS_ADMIN"},
+				CapDrop:     []string{"ALL"},
+				SecurityOpt: []string{"no-new-privileges"},
+				ReadOnly:    true,
+				Sysctls:     types.Mapping{"net.ipv4.ip_forward": "1"},
+			}},
+		},
+	}
+	ctr := container.Summary{ID: "service-ctr-id"}
+
+	var got client.ContainerCreateOptions
+	scan := expectEmptyOrphanScan(apiClient)
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			got = opts
+			return client.ContainerCreateResult{ID: "hook-1"}, nil
+		}).After(scan)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil)
+	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0))
+	expectSuccessRemove(apiClient, "hook-1")
+
+	err := tested.runPreStart(t.Context(), project, service, ctr, func(api.ContainerEvent) {})
+	assert.NilError(t, err)
+	assert.Assert(t, got.HostConfig.Privileged, "Privileged must be honored")
+	assert.DeepEqual(t, got.HostConfig.CapAdd, []string{"SYS_ADMIN"})
+	assert.DeepEqual(t, got.HostConfig.CapDrop, []string{"ALL"})
+	assert.DeepEqual(t, got.HostConfig.SecurityOpt, []string{"no-new-privileges"})
+	assert.Assert(t, got.HostConfig.ReadonlyRootfs, "ReadonlyRootfs must be honored")
+	assert.DeepEqual(t, got.HostConfig.Sysctls, map[string]string{"net.ipv4.ip_forward": "1"})
+}
+
 func TestPreStart_ContainerCreateFailurePropagates(t *testing.T) {
 	tested, apiClient := newPreStartTestService(t)
 
@@ -1060,7 +1113,17 @@ func TestPreStart_OldAPINetworkConnectFails(t *testing.T) {
 			},
 		},
 		PreStart: []types.PreStartHook{
-			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+			// the loader resolves the hook spec against the service at load
+			// time: a directly-constructed hook mimics that resolved form,
+			// networks included
+			{ContainerSpec: types.ContainerSpec{
+				Image:   "alpine",
+				Command: types.ShellCommand{"true"},
+				Networks: map[string]*types.ServiceNetworkConfig{
+					"default": nil,
+					"extra":   nil,
+				},
+			}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1102,7 +1165,17 @@ func TestPreStart_OldAPINetworkConnectAndRemoveFails(t *testing.T) {
 			},
 		},
 		PreStart: []types.PreStartHook{
-			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+			// the loader resolves the hook spec against the service at load
+			// time: a directly-constructed hook mimics that resolved form,
+			// networks included
+			{ContainerSpec: types.ContainerSpec{
+				Image:   "alpine",
+				Command: types.ShellCommand{"true"},
+				Networks: map[string]*types.ServiceNetworkConfig{
+					"default": nil,
+					"extra":   nil,
+				},
+			}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1194,4 +1267,46 @@ func TestPreStart_FailureStdoutOnlyTail(t *testing.T) {
 	assert.ErrorContains(t, err, "pre_start[0]")
 	// Stdout fallback: no stderr → stdout content appears in the error.
 	assert.ErrorContains(t, err, "schema mismatch")
+}
+
+// TestPreStart_HookLabelsMerged locks the "every ContainerSpec attribute"
+// contract for labels: a label declared on (or inherited by) the hook lands
+// on the hook container, with the runtime identification set winning on
+// conflicts.
+func TestPreStart_HookLabelsMerged(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "proj"}
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{
+				Command: types.ShellCommand{"true"},
+				Labels:  types.Labels{"telemetry": "on", api.ServiceLabel: "spoofed"},
+			}},
+		},
+	}
+	ctr := container.Summary{ID: "svc-ctr"}
+
+	var gotLabels map[string]string
+	scan := expectEmptyOrphanScan(apiClient)
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			gotLabels = opts.Config.Labels
+			return client.ContainerCreateResult{ID: "hook-1"}, nil
+		}).After(scan)
+	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0))
+	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+	expectSuccessRemove(apiClient, "hook-1")
+
+	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, gotLabels["telemetry"], "on", "hook-declared labels must reach the container")
+	assert.Equal(t, gotLabels[api.ServiceLabel], "web", "the runtime identification set wins on conflicts")
+	assert.Equal(t, gotLabels[api.HookLabel], "pre_start")
 }
