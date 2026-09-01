@@ -66,6 +66,24 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	project, observed, plan, err := s.preparePlan(ctx, project, options)
+	if err != nil {
+		return err
+	}
+
+	// Emit "Running" events for containers that are already up-to-date, so
+	// the progress display accounts for containers the plan will not touch.
+	emitRunningEvents(project, observed, plan, s.events)
+
+	return s.executePlan(ctx, project, observed, plan)
+}
+
+// preparePlan runs everything that precedes the execution of a create: model
+// preparation (images, models, networks, volumes, use_api_socket), state
+// observation, and reconciliation. It returns the canonical project (the
+// use_api_socket rewrite happens here), the observed snapshot, and the plan,
+// so a caller can hold all three before executing.
+func (s *composeService) preparePlan(ctx context.Context, project *types.Project, options api.CreateOptions) (*types.Project, *ObservedState, *Plan, error) {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
@@ -77,40 +95,40 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	err := project.CheckContainerNameUnicity()
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	err = s.ensureModels(ctx, project, options.QuietPull)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	prepareNetworks(project)
 	externalNetworks, err := s.checkExternalNetworks(ctx, project)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	prepareVolumes(project)
 	externalVolumes, err := s.checkExternalVolumes(ctx, project)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	// Temporary implementation of use_api_socket until we get actual support inside docker engine
 	project, err = s.useAPISocket(project)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	observed, err := s.collectObservedState(ctx, project)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	observed.setResolvedNetworks(externalNetworks, project)
 	observed.setResolvedVolumes(externalVolumes)
@@ -126,14 +144,10 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	plan, err := reconcile(ctx, project, observed, toReconcileOptions(options), s.prompt)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
-	// Emit "Running" events for containers that are already up-to-date, so
-	// the progress display accounts for containers the plan will not touch.
-	emitRunningEvents(project, observed, plan, s.events)
-
-	return s.executePlan(ctx, project, observed, plan)
+	return project, observed, plan, nil
 }
 
 func prepareNetworks(project *types.Project) {
