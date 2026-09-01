@@ -70,6 +70,11 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		options.Services = project.ServiceNames()
 	}
 
+	// resolve the model once: optional depends_on references left dangling by
+	// profiles or service selection are pruned before anything (dependency
+	// graph, container labels) reads them
+	project = project.WithoutUnresolvedOptionalDependencies()
+
 	err := project.CheckContainerNameUnicity()
 	if err != nil {
 		return err
