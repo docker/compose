@@ -944,7 +944,8 @@ func (r *reconciler) planStartPhase() error {
 // materialized by a create-phase node (create) or already observed (container).
 type startReplica struct {
 	resID  string
-	number int // replica number, the start order within the service
+	number int    // replica number, the start order within the service
+	name   string // container name, for progress events
 	// container is the observed container to start; nil when the create
 	// phase materializes it.
 	container *container.Summary
@@ -964,7 +965,7 @@ type startReplica struct {
 // create node), and an exceptional-state restart (paused, dead, ...) plans
 // no create at all — the observed container sits on the node itself.
 func plannedReplica(resID string, number int, node *PlanNode) startReplica {
-	rep := startReplica{resID: resID, number: number, after: node}
+	rep := startReplica{resID: resID, number: number, name: node.Operation.Name, after: node}
 	switch node.Operation.Type {
 	case OpCreateContainer:
 		rep.createNodeID = node.ID
@@ -974,6 +975,7 @@ func plannedReplica(resID string, number int, node *PlanNode) startReplica {
 		// exceptional-state restart (paused, dead, ...): that registration
 		// always carries the observed container on the node itself
 		rep.container = node.Operation.Container
+		rep.name = getCanonicalContainerName(*node.Operation.Container)
 	default:
 		// no other node type is registered in containerNodes today; leave
 		// the target unresolved so execution fails with a clean "no
@@ -1009,7 +1011,7 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 			continue
 		}
 		seen[resID] = true
-		replicas = append(replicas, startReplica{resID: resID, number: oc.Number, container: &oc.Summary})
+		replicas = append(replicas, startReplica{resID: resID, number: oc.Number, name: getCanonicalContainerName(oc.Summary), container: &oc.Summary})
 	}
 	for resID, node := range r.containerNodes {
 		if !seen[resID] && strings.HasPrefix(resID, fmt.Sprintf("service:%s:", service.Name)) {
@@ -1113,6 +1115,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 			Cause:        "pre_start hooks",
 			Service:      &serviceCopy,
 			Container:    first.container,
+			Name:         first.name,
 			CreateNodeID: first.createNodeID,
 		}
 		deps := prev
@@ -1136,6 +1139,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 			Cause:        "start",
 			Service:      &serviceCopy,
 			Container:    rep.container,
+			Name:         rep.name,
 			CreateNodeID: rep.createNodeID,
 		}
 		deps := slices.Clone(prev)
@@ -1152,6 +1156,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 				Cause:        "post_start hooks",
 				Service:      &serviceCopy,
 				Container:    rep.container,
+				Name:         rep.name,
 				CreateNodeID: op.CreateNodeID,
 			}, group, start)
 			post.Phase = PhaseStart
