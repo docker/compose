@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -31,6 +32,10 @@ import (
 const bridgeImageVersion = "v0.0.3"
 
 func TestConvertAndTransformList(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("skipping test: docker/compose-bridge-kubernetes and docker/compose-bridge-helm ship amd64 binaries under every architecture in their manifest list")
+	}
+
 	c := NewParallelCLI(t)
 
 	const projectName = "bridge"
@@ -65,6 +70,10 @@ func TestConvertAndTransformList(t *testing.T) {
 }
 
 func TestConvertBuildOnlyService(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("skipping test: docker/compose-bridge-kubernetes ships amd64 binaries under every architecture in its manifest list")
+	}
+
 	c := NewParallelCLI(t)
 	outDir := t.TempDir()
 
