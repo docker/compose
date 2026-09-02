@@ -399,7 +399,7 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 
 	opts = append(opts,
 		// Load PWD/.env if present and no explicit --env-file has been set
-		cli.WithEnvFiles(o.EnvFiles...),
+		utils.WithEnvFiles(o.EnvFiles...),
 		// read dot env file to populate project environment
 		cli.WithDotEnv,
 		// get compose file path set by COMPOSE_FILE
@@ -407,7 +407,7 @@ func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 		// if none was selected, get default compose.yaml file from current dir or parent folder
 		cli.WithDefaultConfigPath,
 		// .. and then, a project directory != PWD maybe has been set so let's load .env file
-		cli.WithEnvFiles(o.EnvFiles...), //nolint:gocritic // intentionally applying cli.WithEnvFiles twice.
+		utils.WithEnvFiles(o.EnvFiles...), //nolint:gocritic // intentionally applying cli.WithEnvFiles twice.
 		cli.WithDotEnv,                  //nolint:gocritic // intentionally applying cli.WithDotEnv twice.
 		// eventually COMPOSE_PROFILES should have been set
 		cli.WithDefaultProfiles(o.Profiles...),
@@ -746,7 +746,7 @@ func setEnvWithDotEnv(opts ProjectOptions, dockerCli command.Cli) error {
 	options, err := cli.NewProjectOptions(opts.ConfigPaths,
 		cli.WithWorkingDirectory(opts.ProjectDir),
 		cli.WithOsEnv,
-		cli.WithEnvFiles(opts.EnvFiles...),
+		utils.WithEnvFiles(opts.EnvFiles...),
 		cli.WithDotEnv,
 	)
 	if err != nil {
