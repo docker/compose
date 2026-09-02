@@ -199,6 +199,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 				testContainer("service1", "123", false),
 				testContainer("service2", "789", false),
 				testContainer("service_orphan", "321", true),
+				runningOneOff("service1", "654"),
 			},
 		}, nil)
 	api.EXPECT().VolumeList(
@@ -221,10 +222,16 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().ContainerStop(gomock.Any(), "123", stopOptions).Return(client.ContainerStopResult{}, nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", stopOptions).Return(client.ContainerStopResult{}, nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "321", stopOptions).Return(client.ContainerStopResult{}, nil)
+	// The RUNNING one-off of a declared service goes down too — down stops the
+	// application — via the per-service removal loop (it matches isService;
+	// isOrphaned deliberately excludes running one-offs so `up` never kills a
+	// live session). Exactly one stop+remove.
+	api.EXPECT().ContainerStop(gomock.Any(), "654", stopOptions).Return(client.ContainerStopResult{}, nil)
 
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "321", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "654", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
 		Filters: projectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
@@ -535,4 +542,11 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 
 	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{})
 	assert.NilError(t, err)
+}
+
+// runningOneOff builds a RUNNING `compose run` container of the given service.
+func runningOneOff(service, id string) container.Summary {
+	c := testContainer(service, id, true)
+	c.State = container.StateRunning
+	return c
 }

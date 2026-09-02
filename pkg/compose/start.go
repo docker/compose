@@ -48,6 +48,10 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 			return err
 		}
 	}
+	// resolve the model once: optional depends_on references left dangling by
+	// profiles or service selection are pruned before the dependency graph
+	// and the dependency waits read them
+	project = project.WithoutUnresolvedOptionalDependencies()
 
 	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: projectFilter(project.Name).Add("label", oneOffFilter(false)),

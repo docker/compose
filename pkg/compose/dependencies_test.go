@@ -323,6 +323,40 @@ func TestBuildGraphDependsOn(t *testing.T) {
 	}
 }
 
+// NewGraph must never rewrite the project it reads: pruning unresolved
+// optional dependencies is an explicit, separate step. Building a graph any
+// number of times leaves the model byte-identical, so what later readers
+// (dependency waits, container labels) observe no longer depends on how many
+// graphs were built before them.
+func TestNewGraphDoesNotMutateProject(t *testing.T) {
+	project := &types.Project{
+		Services: types.Services{
+			"app": {
+				Name: "app",
+				DependsOn: types.DependsOnConfig{
+					"db":    {Condition: types.ServiceConditionStarted, Required: true},
+					"debug": {Condition: types.ServiceConditionStarted, Required: false},
+				},
+			},
+			"db": {Name: "db"},
+		},
+		DisabledServices: types.Services{
+			"debug": {Name: "debug", Profiles: []string{"debug"}},
+		},
+	}
+
+	for range 2 {
+		graph, err := NewGraph(project, ServiceStopped)
+		assert.NilError(t, err)
+		// the unresolved optional dependency contributes no edge...
+		assert.Equal(t, len(graph.Vertices["app"].Children), 1)
+		// ...but stays in the model
+		assert.Equal(t, len(project.Services["app"].DependsOn), 2)
+		_, ok := project.Services["app"].DependsOn["debug"]
+		assert.Check(t, ok)
+	}
+}
+
 func isVertexEqual(a, b Vertex) bool {
 	childrenEquality := true
 	for c := range a.Children {
