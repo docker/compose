@@ -309,8 +309,11 @@ func newWatcher(paths []string) (Notify, error) {
 	}
 	MaybeIncreaseBufferSize(fsw)
 
-	err = fsw.SetRecursive()
-	isWatcherRecursive := err == nil
+	// SetRecursive only succeeds on Windows; every other platform returns
+	// "Not supported" and the non-recursive fallback below is taken. On a
+	// single GOOS staticcheck proves the comparison constant (SA4023).
+	err = fsw.SetRecursive()         //nolint:staticcheck
+	isWatcherRecursive := err == nil //nolint:staticcheck
 
 	wrappedEvents := make(chan FileEvent)
 	notifyList := make(map[string]bool, len(paths))
