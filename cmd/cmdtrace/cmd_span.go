@@ -26,6 +26,7 @@ import (
 
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
@@ -110,9 +111,9 @@ func wrapRunE(c *cobra.Command, cmdSpan trace.Span, tracingShutdown tracing.Shut
 			// been canceled already
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
-			// TODO(milas): add an env var to enable logging from the
-			// OTel components for debugging purposes
-			_ = tracingShutdown(ctx)
+			if err := tracingShutdown(ctx); err != nil {
+				logrus.WithError(err).Debug("otel: shutdown error")
+			}
 		}
 		return cmdErr
 	}
