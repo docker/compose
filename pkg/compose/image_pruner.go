@@ -174,6 +174,7 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 	var mu sync.Mutex
 	var removed []string
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(s.maxConcurrency)
 	for _, img := range res.Items {
 		if keep(img) {
 			continue
