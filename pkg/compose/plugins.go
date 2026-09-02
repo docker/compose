@@ -198,7 +198,11 @@ func (s *composeService) getPluginBinaryPath(provider string) (path string, err 
 		path = plugin.Path
 	}
 	if errdefs.IsNotFound(err) {
-		path, err = exec.LookPath(executable(provider))
+		// A plain LookPath honors Windows executable-resolution semantics
+		// (PATHEXT: .exe, but also .com/.bat/.cmd), so provider executables
+		// need not be compiled binaries. Callers must not append a hardcoded
+		// ".exe": it restricts the lookup instead of helping it.
+		path, err = exec.LookPath(provider)
 	}
 	return path, err
 }

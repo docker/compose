@@ -23,3 +23,8 @@ import "github.com/tilt-dev/fsnotify"
 func MaybeIncreaseBufferSize(w *fsnotify.Watcher) {
 	// Not needed on non-windows
 }
+
+func setRecursive(_ *fsnotify.Watcher) (bool, error) {
+	// SetRecursive is only supported on Windows.
+	return false, nil
+}
