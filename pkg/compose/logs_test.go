@@ -245,3 +245,34 @@ func (l *testLogConsumer) LogsForContainer(containerName string) []string {
 	defer l.mu.Unlock()
 	return l.logs[containerName]
 }
+
+// TestRunEndTrackerAnchorsOnPreviousRun pins the re-attach anchor against the
+// fast-run race seen in CI: with events delivered in order, the anchor
+// captured at start-event time is the PREVIOUS run's end — even when the new
+// run exits (and is observed) before the log stream is actually opened.
+func TestRunEndTrackerAnchorsOnPreviousRun(t *testing.T) {
+	tr := newRunEndTracker()
+
+	// First start: no previous exit observed → no anchor (caller falls back
+	// to the inspected FinishedAt).
+	assert.Equal(t, tr.Since("c1"), "")
+
+	// Run N exits at t=1_000_000_001ns, run N+1 starts: the anchor captured
+	// at start-event time is run N's end, nanosecond-precise.
+	tr.Observe(compose.ContainerEvent{Type: compose.ContainerEventExited, ID: "c1", Time: 1_000_000_001})
+	anchor := tr.Since("c1")
+	assert.Equal(t, anchor, "1970-01-01T00:00:01.000000001Z")
+
+	// Run N+1 is fast: its own exit is observed before the log stream opens.
+	// The anchor captured above must NOT move — reading it after this point
+	// would exclude everything run N+1 printed.
+	tr.Observe(compose.ContainerEvent{Type: compose.ContainerEventExited, ID: "c1", Time: 2_000_000_002})
+	assert.Equal(t, anchor, "1970-01-01T00:00:01.000000001Z")
+	// The NEXT start anchors on run N+1's end.
+	assert.Equal(t, tr.Since("c1"), "1970-01-01T00:00:02.000000002Z")
+
+	// Non-exit events and other containers do not pollute the anchor.
+	tr.Observe(compose.ContainerEvent{Type: compose.ContainerEventStarted, ID: "c1", Time: 9_000_000_000})
+	tr.Observe(compose.ContainerEvent{Type: compose.ContainerEventExited, ID: "c2", Time: 3_000_000_003})
+	assert.Equal(t, tr.Since("c1"), "1970-01-01T00:00:02.000000002Z")
+}
