@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/formatter"
@@ -57,18 +56,12 @@ func volumesCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Ba
 }
 
 func runVol(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, services []string, options volumesOptions) error {
-	project, name, err := options.projectOrName(ctx, dockerCli, services...)
+	// unknown requested services are rejected while loading the project
+	// (service selection in ToProject); label-based mode has no model to
+	// validate against
+	_, name, err := options.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
-	}
-
-	if project != nil {
-		names := project.ServiceNames()
-		for _, service := range services {
-			if !slices.Contains(names, service) {
-				return fmt.Errorf("no such service: %s", service)
-			}
-		}
 	}
 
 	backend, err := compose.NewComposeService(dockerCli, backendOptions.Options...)
