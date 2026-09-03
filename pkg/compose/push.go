@@ -29,7 +29,6 @@ import (
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
@@ -45,8 +44,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 }
 
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(s.maxConcurrency)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 
 	for _, service := range project.Services {
 		if service.Build == nil || service.Image == "" {
