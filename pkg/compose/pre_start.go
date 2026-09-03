@@ -195,6 +195,7 @@ func (s *composeService) createPreStartContainer(
 		AutoRemove:  false,
 		Privileged:  hook.Privileged,
 		VolumesFrom: []string{ctr.ID},
+		ExtraHosts:  service.ExtraHosts.AsList(":"),
 	}
 
 	apiVersion, err := s.RuntimeAPIVersion(ctx)
