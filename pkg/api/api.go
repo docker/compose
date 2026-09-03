@@ -326,7 +326,7 @@ type StartOptions struct {
 	// ExitCodeFrom reports the exit code of the specified service. Honored
 	// by Up's foreground session only; ignored by Start.
 	ExitCodeFrom string
-	// Wait won't return until containers reached the running|healthy state
+	// Wait won't return until containers are running, or healthy if they have a healthcheck
 	Wait        bool
 	WaitTimeout time.Duration
 	// Services names the services the user explicitly targeted; it only
