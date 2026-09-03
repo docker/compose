@@ -20,13 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type killOptions struct {
@@ -42,6 +40,10 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	cmd := &cobra.Command{
 		Use:   "kill [OPTIONS] [SERVICE...]",
 		Short: "Force stop service containers",
+		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+			opts.removeOrphans = removeOrphansFromEnv(cmd.Flags(), opts.removeOrphans)
+			return nil
+		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runKill(ctx, dockerCli, backendOptions, opts, args)
 		}),
@@ -49,8 +51,7 @@ func killCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	}
 
 	flags := cmd.Flags()
-	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
-	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file")
+	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.StringVarP(&opts.signal, "signal", "s", "SIGKILL", "SIGNAL to send to the container")
 
 	return cmd

@@ -32,6 +32,7 @@ import (
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type createOptions struct {
@@ -62,6 +63,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 		Short: "Creates containers for a service",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.pullChanged = cmd.Flags().Changed("pull")
+			opts.removeOrphans = removeOrphansFromEnv(cmd.Flags(), opts.removeOrphans)
 			if opts.Build && opts.noBuild {
 				return fmt.Errorf("--build and --no-build are incompatible")
 			}
@@ -97,6 +99,17 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 }
 
 func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
+	// Deliberate source asymmetry with removeOrphans: the destructive
+	// variable (COMPOSE_REMOVE_ORPHANS) resolves through the process
+	// environment, which setEnvWithDotEnv completes from the local .env
+	// only — a remote model cannot enable container removal. The benign
+	// COMPOSE_IGNORE_ORPHANS reads project.Environment, remote configs
+	// included: the worst a remote model can do there is suppress a
+	// warning.
+	createOpts.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
+	if createOpts.ignoreOrphans && createOpts.removeOrphans {
+		return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
+	}
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}
