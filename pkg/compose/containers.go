@@ -26,7 +26,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -186,8 +185,8 @@ func (containers Containers) filter(predicates ...containerPredicate) Containers
 }
 
 // forEachContainerConcurrent runs fn for every container concurrently and waits for all goroutines.
-func forEachContainerConcurrent(ctx context.Context, containers Containers, fn func(context.Context, container.Summary) error) error {
-	eg, ctx := errgroup.WithContext(ctx)
+func forEachContainerConcurrent(ctx context.Context, maxConcurrency int, containers Containers, fn func(context.Context, container.Summary) error) error {
+	eg, ctx := newLimitedErrgroup(ctx, maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return fn(ctx, ctr)

@@ -69,8 +69,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		return err
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(s.maxConcurrency)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 
 	p := &imagePuller{
 		composeService: s,
@@ -429,8 +428,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 
 	// the errgroup context is canceled as soon as Wait returns; the post-pull
 	// resolution below needs the caller's context
-	eg, pullCtx := errgroup.WithContext(ctx)
-	eg.SetLimit(s.maxConcurrency)
+	eg, pullCtx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	pulled := map[string]bool{}
 	var mutex sync.Mutex
 	for name, service := range needPull {

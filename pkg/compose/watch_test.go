@@ -118,8 +118,7 @@ func TestWatch_Sync(t *testing.T) {
 		syncer := newFakeSyncer()
 		go func() {
 			service := composeService{
-				dockerCli:      cli,
-				maxConcurrency: -1,
+				dockerCli: cli,
 			}
 			rules, err := getWatchRules(&types.DevelopConfig{
 				Watch: []types.Trigger{
