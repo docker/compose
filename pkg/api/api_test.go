@@ -101,6 +101,50 @@ func TestGetDependentImages(t *testing.T) {
 			},
 			expected: nil,
 		},
+		{
+			name: "type=image volume source is collected",
+			service: types.ServiceConfig{
+				Image: "nginx:alpine",
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeImage, Source: "myorg/assets:latest", Target: "/srv/static"},
+				},
+			},
+			expected: []string{"myorg/assets:latest"},
+		},
+		{
+			name: "type=image volume reusing the service image is ignored",
+			service: types.ServiceConfig{
+				Image: "myorg/shared:latest",
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeImage, Source: "myorg/shared:latest", Target: "/data"},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "non-image volume types are ignored",
+			service: types.ServiceConfig{
+				Image: "alpine:3.20",
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeBind, Source: "/host/path", Target: "/container"},
+					{Type: types.VolumeTypeVolume, Source: "myvolume", Target: "/data"},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "hook and volume images are both collected",
+			service: types.ServiceConfig{
+				Image: "alpine:3.20",
+				PreStart: []types.ServiceHook{
+					{Image: "init:latest", Command: types.ShellCommand{"echo", "init"}},
+				},
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeImage, Source: "myorg/data:1.0", Target: "/data"},
+				},
+			},
+			expected: []string{"init:latest", "myorg/data:1.0"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
