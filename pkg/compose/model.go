@@ -31,7 +31,6 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -48,7 +47,7 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	defer mdlAPI.Close()
 	availableModels, err := mdlAPI.ListModels(ctx)
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	eg.Go(func() error {
 		return mdlAPI.SetModelVariables(ctx, project)
 	})
