@@ -30,7 +30,6 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -130,7 +129,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		logrus.Warnf("Warning: No resource found to remove for project %q.", projectName)
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, op := range ops {
 		eg.Go(op)
 	}
@@ -186,7 +185,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 // this op — they've already been scheduled onto the same errgroup by the
 // time `ensureImagesDown` used to fail synchronously.
 func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *types.Project, pruneOpts ImagePruneOptions) error {
-	images, err := NewImagePruner(s.apiClient(), project).ImagesToPrune(ctx, pruneOpts)
+	images, err := NewImagePruner(s.apiClient(), project, s.maxConcurrency).ImagesToPrune(ctx, pruneOpts)
 	if err != nil {
 		s.events.On(errorEvent("Tagged images", err.Error()))
 		return err
@@ -194,8 +193,7 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 
 	var mu sync.Mutex
 	var errs []error
-	var eg errgroup.Group
-	eg.SetLimit(s.maxConcurrency)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for i := range images {
 		img := images[i]
 		eg.Go(func() error {
@@ -427,7 +425,7 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 }
 
 func (s *composeService) stopContainers(ctx context.Context, serv *types.ServiceConfig, containers []containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return s.stopContainer(ctx, serv, ctr, timeout, listener)
@@ -437,7 +435,7 @@ func (s *composeService) stopContainers(ctx context.Context, serv *types.Service
 }
 
 func (s *composeService) removeContainers(ctx context.Context, containers []containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)

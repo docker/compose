@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -98,7 +97,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 }
 
 func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)
