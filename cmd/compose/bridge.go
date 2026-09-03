@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/docker/compose/v5/pkg/bridge"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -64,11 +65,17 @@ func rejectUnknownSubcommand(cmd *cobra.Command, args []string) error {
 
 func convertCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	convertOpts := bridge.ConvertOptions{}
+	var assumeYes bool
 	cmd := &cobra.Command{
 		Use:   "convert",
 		Short: "Convert compose files to Kubernetes manifests, Helm charts, or another model",
 		Args:  cobra.NoArgs,
 		RunE: Adapt(func(ctx context.Context, args []string) error {
+			if assumeYes {
+				convertOpts.Confirm = func(string, bool) (bool, error) { return true, nil }
+			} else {
+				convertOpts.Confirm = prompt.NewPrompt(dockerCli.In(), dockerCli.Out()).Confirm
+			}
 			return runConvert(ctx, dockerCli, p, convertOpts)
 		}),
 	}
@@ -76,6 +83,8 @@ func convertCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	flags.StringVarP(&convertOpts.Output, "output", "o", "out", "The output directory for the Kubernetes resources")
 	flags.StringArrayVarP(&convertOpts.Transformations, "transformation", "t", nil, "Transformation to apply to compose model (default: docker/compose-bridge-kubernetes)")
 	flags.StringVar(&convertOpts.Templates, "templates", "", "Directory containing transformation templates")
+	flags.BoolVarP(&assumeYes, "yes", "y", false,
+		"Assume \"yes\" to the output directory overwrite prompt. For scripts/CI, where no interactive confirmation is possible")
 	return cmd
 }
 

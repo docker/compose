@@ -17,6 +17,8 @@
 package bridge
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -51,4 +53,79 @@ func TestLoadAdditionalResources_BuildOnlySkipsPull(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, actual.Services["api"].Image, "test-api")
 	assert.DeepEqual(t, actual.Services["api"].Expose, types.StringOrNumberList{"8080"})
+}
+
+func TestIsEmptyOrMissingDir(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "does-not-exist-yet")
+	empty, err := isEmptyOrMissingDir(missing)
+	assert.NilError(t, err)
+	assert.Equal(t, empty, true)
+
+	emptyDir := t.TempDir()
+	empty, err = isEmptyOrMissingDir(emptyDir)
+	assert.NilError(t, err)
+	assert.Equal(t, empty, true)
+
+	nonEmptyDir := t.TempDir()
+	assert.NilError(t, os.WriteFile(filepath.Join(nonEmptyDir, "README.md"), []byte("do not delete me"), 0o600))
+	empty, err = isEmptyOrMissingDir(nonEmptyDir)
+	assert.NilError(t, err)
+	assert.Equal(t, empty, false)
+}
+
+func failIfCalled(t *testing.T) Confirm {
+	t.Helper()
+	return func(string, bool) (bool, error) {
+		t.Fatal("Confirm should not be called")
+		return false, nil
+	}
+}
+
+func TestPrepareOutputDir_EmptyOrMissingDirNeedsNoConfirmation(t *testing.T) {
+	for name, dir := range map[string]string{
+		"missing": filepath.Join(t.TempDir(), "does-not-exist-yet"),
+		"empty":   t.TempDir(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.NilError(t, prepareOutputDir(ConvertOptions{Output: dir, Confirm: failIfCalled(t)}))
+
+			info, err := os.Stat(dir)
+			assert.NilError(t, err)
+			assert.Assert(t, info.IsDir())
+		})
+	}
+}
+
+func TestPrepareOutputDir_NilConfirmRefusesNonEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("do not delete me"), 0o600))
+
+	err := prepareOutputDir(ConvertOptions{Output: dir})
+	assert.ErrorContains(t, err, "not confirmed")
+
+	_, statErr := os.Stat(filepath.Join(dir, "README.md"))
+	assert.NilError(t, statErr, "user file must not be deleted")
+}
+
+func TestPrepareOutputDir_ConfirmedWipesNonEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "stale.yaml"), []byte("stale"), 0o600))
+	confirm := func(string, bool) (bool, error) { return true, nil }
+
+	assert.NilError(t, prepareOutputDir(ConvertOptions{Output: dir, Confirm: confirm}))
+
+	_, err := os.Stat(filepath.Join(dir, "stale.yaml"))
+	assert.Assert(t, os.IsNotExist(err))
+}
+
+func TestPrepareOutputDir_DeclinedPreservesFiles(t *testing.T) {
+	dir := t.TempDir()
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("do not delete me"), 0o600))
+	confirm := func(string, bool) (bool, error) { return false, nil }
+
+	err := prepareOutputDir(ConvertOptions{Output: dir, Confirm: confirm})
+	assert.ErrorContains(t, err, "not confirmed")
+
+	_, statErr := os.Stat(filepath.Join(dir, "README.md"))
+	assert.NilError(t, statErr, "user file must not be deleted")
 }
