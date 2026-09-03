@@ -37,7 +37,7 @@ import (
 
 // Full creates an EventProcessor that render advanced UI within a terminal.
 // On Start, TUI lists task with a progress timer
-func Full(out io.Writer, info io.Writer, detached bool) api.EventProcessor {
+func Full(out io.Writer, info io.Writer, detached, dryRun bool) api.EventProcessor {
 	return &ttyWriter{
 		out:      out,
 		info:     info,
@@ -45,6 +45,7 @@ func Full(out io.Writer, info io.Writer, detached bool) api.EventProcessor {
 		done:     newDoneSignal(),
 		mtx:      &sync.Mutex{},
 		detached: detached,
+		dryRun:   dryRun,
 	}
 }
 
@@ -73,7 +74,7 @@ type ttyWriter struct {
 	numLines  int
 	done      *doneSignal // (re)created by Start for each Start/Done cycle
 	mtx       *sync.Mutex
-	dryRun    bool // FIXME(ndeloof) (re)implement support for dry-run
+	dryRun    bool
 	operation string
 	ticker    *time.Ticker
 	suspended bool
