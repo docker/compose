@@ -42,6 +42,12 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
+	// validate before touching anything: failing on a bad image prune mode
+	// after containers are already removed would leave the teardown half done
+	if !options.Images.Valid() {
+		return fmt.Errorf("invalid image prune mode %q: legal values are %q, %q", options.Images, api.ImagePruneLocal, api.ImagePruneAll)
+	}
+
 	resourceToRemove := false
 
 	include := oneOffExclude
@@ -121,7 +127,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	ops := s.ensureNetworksDown(ctx, project)
 
-	if options.Images != "" {
+	if options.Images != api.ImagePruneNone {
 		imgOps, err := s.ensureImagesDown(ctx, project, options)
 		if err != nil {
 			return err
@@ -162,7 +168,7 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) ([]downOp, error) {
 	imagePruner := NewImagePruner(s.apiClient(), project)
 	pruneOpts := ImagePruneOptions{
-		Mode:          ImagePruneMode(options.Images),
+		Mode:          options.Images,
 		RemoveOrphans: options.RemoveOrphans,
 	}
 	images, err := imagePruner.ImagesToPrune(ctx, pruneOpts)
