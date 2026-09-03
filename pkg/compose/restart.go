@@ -23,7 +23,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -53,7 +52,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			return err
 		}
 
-		eg, ctx := errgroup.WithContext(ctx)
+		eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 		for _, ctr := range containers.filter(isService(service)) {
 			eg.Go(func() error {
 				return s.restartContainer(ctx, project.Services[service], ctr, options)
