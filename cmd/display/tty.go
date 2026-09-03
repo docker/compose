@@ -20,716 +20,199 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"iter"
-	"slices"
-	"strings"
 	"sync"
-	"time"
-	"unicode/utf8"
 
 	"github.com/buger/goterm"
-	"github.com/docker/go-units"
-	"github.com/morikuni/aec"
+	"github.com/jonboulle/clockwork"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/utils"
 )
 
-// Full creates an EventProcessor that render advanced UI within a terminal.
-// On Start, TUI lists task with a progress timer
-func Full(out io.Writer, info io.Writer, detached bool) api.EventProcessor {
-	return &ttyWriter{
+// Full creates the terminal EventProcessor, built on a model/layout/screen
+// split:
+//
+//   - tty_model.go  — event reducer, pure data, injected clock
+//   - tty_layout.go — pure (model, size, now) → lines, every line ≤ width
+//   - tty_screen.go — diff-based repaint of the block, single Write per frame
+//
+// The writer itself only coordinates: a mutex guards the model and the
+// screen, and the refresh goroutine is stopped through context cancellation
+// so no lifecycle transition can block (Done after Ctrl-C included).
+func Full(out io.Writer, info io.Writer, detached bool, opts ...TermOption) api.EventProcessor {
+	w := &termWriter{
 		out:      out,
 		info:     info,
-		tasks:    map[string]*task{},
-		done:     newDoneSignal(),
-		mtx:      &sync.Mutex{},
 		detached: detached,
+		tree:     newTaskTree(),
+		scr:      screen{out: out},
+		size:     termSize,
+		clock:    clockwork.NewRealClock(),
 	}
+	for _, opt := range opts {
+		opt(w)
+	}
+	return w
 }
 
-// doneSignal is a channel that's safe to close more than once: a shared bus
-// can go through more than one sequential Start/Done cycle in its lifetime
-// (e.g. `docker compose rm --stop` runs a "stop" cycle before its own
-// "remove" cycle), and a bare channel can only ever be closed once.
-type doneSignal struct {
-	ch   chan bool
-	once sync.Once
+// TermOption customizes the Full EventProcessor.
+type TermOption func(*termWriter)
+
+// WithDryRun prefixes every row with the dry-run marker.
+func WithDryRun() TermOption {
+	return func(w *termWriter) { w.dryRun = true }
 }
 
-func newDoneSignal() *doneSignal {
-	return &doneSignal{ch: make(chan bool)}
+type termWriter struct {
+	mu       sync.Mutex
+	out      io.Writer
+	info     io.Writer
+	detached bool
+	dryRun   bool
+
+	tree        taskTree
+	scr         screen
+	operation   string
+	suspended   bool
+	stopTicks   context.CancelFunc
+	ticksExited chan struct{} // closed by the refresh goroutine when it returns
+
+	// injected for tests
+	size  func() (width, height int)
+	clock clockwork.Clock
 }
 
-func (d *doneSignal) close() {
-	d.once.Do(func() { close(d.ch) })
+func termSize() (int, int) {
+	width, height := goterm.Width(), goterm.Height()
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+	return width, height
 }
 
-type ttyWriter struct {
-	out       io.Writer
-	ids       []string // tasks ids ordered as first event appeared
-	tasks     map[string]*task
-	repeated  bool
-	numLines  int
-	done      *doneSignal // (re)created by Start for each Start/Done cycle
-	mtx       *sync.Mutex
-	dryRun    bool // FIXME(ndeloof) (re)implement support for dry-run
-	operation string
-	ticker    *time.Ticker
-	suspended bool
-	info      io.Writer
-	detached  bool
-}
-
-type task struct {
-	ID        string
-	parent    string            // the resource this task receives updates from - other parents will be ignored
-	parents   utils.Set[string] // all resources to depend on this task
-	startTime time.Time
-	endTime   time.Time
-	text      string
-	details   string
-	status    api.EventStatus
-	current   int64
-	percent   int
-	total     int64
-	spinner   *Spinner
-}
-
-func newTask(e api.Resource) task {
-	t := task{
-		ID:        e.ID,
-		parents:   utils.NewSet[string](),
-		startTime: time.Now(),
-		text:      e.Text,
-		details:   e.Details,
-		status:    e.Status,
-		current:   e.Current,
-		percent:   e.Percent,
-		total:     e.Total,
-		spinner:   NewSpinner(),
+func (w *termWriter) Start(ctx context.Context, operation string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	// A Start before the matching Done (nested brackets are a misuse, but
+	// Full is public API): retire the previous cycle so its refresh
+	// goroutine doesn't outlive it. Cancellation only guarantees the old
+	// goroutine *will* exit — not that it already has when Start returns;
+	// a last repaint from it is harmless (same model, under the mutex).
+	if w.stopTicks != nil {
+		w.stopTicks()
+		w.stopTicks = nil
 	}
-	if e.ParentID != "" {
-		t.parent = e.ParentID
-		t.parents.Add(e.ParentID)
+	// Build suspension is scoped to a cycle: a new operation must not stay
+	// silent because the previous one ended mid-build.
+	if w.suspended {
+		w.unsuspend()
 	}
-	if e.Status == api.Done || e.Status == api.Error {
-		t.stop()
-	}
-	return t
-}
-
-// update adjusts task state based on last received event
-func (t *task) update(e api.Resource) {
-	if e.ParentID != "" {
-		t.parents.Add(e.ParentID)
-		// we may receive same event from distinct parents (typically: images sharing layers)
-		// to avoid status to flicker, only accept updates from our first declared parent
-		if t.parent != e.ParentID {
-			return
-		}
-	}
-
-	// update task based on received event
-	switch e.Status {
-	case api.Done, api.Error, api.Warning:
-		if t.status != e.Status {
-			t.stop()
-		}
-	case api.Working:
-		t.spinner.Restart()
-	}
-	t.status = e.Status
-	t.text = e.Text
-	t.details = e.Details
-	// progress can only go up
-	if e.Total > t.total {
-		t.total = e.Total
-	}
-	if e.Current > t.current {
-		t.current = e.Current
-	}
-	if e.Percent > t.percent {
-		t.percent = e.Percent
-	}
-}
-
-func (t *task) stop() {
-	t.endTime = time.Now()
-	t.spinner.Stop()
-}
-
-func (t *task) Completed() bool {
-	switch t.status {
-	case api.Done, api.Error, api.Warning:
-		return true
-	default:
-		return false
-	}
-}
-
-func (w *ttyWriter) Start(ctx context.Context, operation string) {
-	w.mtx.Lock()
-	// If a previous cycle is still open (Start called again before its
-	// matching Done, e.g. nested Start/Done misuse), close it out first so
-	// its render goroutine exits instead of leaking until ctx is done.
-	if w.done != nil {
-		w.done.close()
-	}
-	if w.ticker != nil {
-		w.ticker.Stop()
-	}
-	done := newDoneSignal()
-	ticker := time.NewTicker(100 * time.Millisecond)
-	w.done = done
-	w.ticker = ticker
 	w.operation = operation
-	w.mtx.Unlock()
+	// The refresh goroutine is bound to a derived context: parent
+	// cancellation (Ctrl-C) and Done both stop it by cancelling, which can
+	// never block — there is no channel handshake to miss.
+	tickCtx, cancel := context.WithCancel(ctx)
+	exited := make(chan struct{})
+	w.stopTicks = cancel
+	w.ticksExited = exited
+	go w.refresh(tickCtx, exited)
+}
 
-	// done and ticker are this cycle's own, captured locally: a later Start
-	// (a new Start/Done cycle on the same writer) reassigns w.done/w.ticker,
-	// but that never affects this goroutine's own wait.
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				// interrupted
-				ticker.Stop()
-				return
-			case <-done.ch:
-				return
-			case <-ticker.C:
-				w.print()
-			}
+func (w *termWriter) refresh(ctx context.Context, exited chan<- struct{}) {
+	defer close(exited)
+	ticker := w.clock.NewTicker(tickInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.Chan():
+			w.mu.Lock()
+			w.repaint()
+			w.mu.Unlock()
 		}
-	}()
-}
-
-func (w *ttyWriter) Done(operation string, success bool) {
-	w.print()
-	w.mtx.Lock()
-	done := w.done
-	ticker := w.ticker
-	w.mtx.Unlock()
-
-	// close never blocks, unlike a send, so this returns even if the render
-	// goroutine already exited via ctx.Done().
-	done.close()
-
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-	if ticker != nil {
-		ticker.Stop()
 	}
-	w.operation = ""
 }
 
-func (w *ttyWriter) On(events ...api.Resource) {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
+func (w *termWriter) Done(string, bool) {
+	w.mu.Lock()
+	if w.stopTicks != nil {
+		w.stopTicks()
+		w.stopTicks = nil
+	}
+	exited := w.ticksExited
+	w.ticksExited = nil
+	w.repaint() // leave the final state on screen
+	w.operation = ""
+	// The tree and the screen survive: a follow-up operation on the same
+	// writer (`up` chains create and start) extends the same block.
+	w.mu.Unlock()
+
+	// Wait for the refresh goroutine outside the lock (it may be blocked on
+	// it, about to no-op since operation is cleared): once Done returns,
+	// nothing repaints anymore, so output printed right after an operation
+	// (a prompt, container logs) cannot be garbled by a stray frame.
+	if exited != nil {
+		<-exited
+	}
+}
+
+func (w *termWriter) On(events ...api.Resource) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	for _, e := range events {
-		if e.ID == "Compose" {
+		if e.ID == api.ResourceCompose {
 			_, _ = fmt.Fprintln(w.info, ErrorColor(e.Details))
 			continue
 		}
-
 		if w.operation != "start" && (e.Text == api.StatusStarted || e.Text == api.StatusStarting) && !w.detached {
-			// skip those events to avoid mix with container logs
+			// Deliberate: attached run/up stream container logs on this same
+			// terminal, and painting Starting/Started rows here would repaint
+			// over the first log lines of the container that just started.
+			// Outside an explicit `start` operation those events are dropped.
 			continue
 		}
-		w.event(e)
+		w.handle(e)
 	}
 }
 
-func (w *ttyWriter) event(e api.Resource) {
-	// Suspend print while a build is in progress, to avoid collision with buildkit Display
-	if w.ticker != nil {
-		if e.Text == api.StatusBuilding {
-			w.ticker.Stop()
-			w.suspended = true
-		} else if w.suspended {
-			w.ticker.Reset(100 * time.Millisecond)
-			w.suspended = false
-		}
+func (w *termWriter) handle(e api.Resource) {
+	// Buildkit paints its own UI on the same stream: stay silent while a
+	// build is in flight, and once it's over start a fresh block below
+	// whatever buildkit wrote instead of repainting over it.
+	if e.Text == api.StatusBuilding {
+		w.suspended = true
+	} else if w.suspended {
+		w.unsuspend()
 	}
 
-	if last, ok := w.tasks[e.ID]; ok {
-		last.update(e)
-	} else {
-		t := newTask(e)
-		w.tasks[e.ID] = &t
-		w.ids = append(w.ids, e.ID)
+	w.tree.apply(e, w.clock.Now())
+
+	if w.operation == "" {
+		// outside any operation: degrade to one plain line per event
+		_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, eventColor(e.Status, SuccessColor)(e.Text), e.Details)
 	}
-	w.printEvent(e)
 }
 
-func (w *ttyWriter) printEvent(e api.Resource) {
-	if w.operation != "" {
-		// event will be displayed by progress UI on ticker's ticks
+// unsuspend clears build suspension and starts a fresh block below whatever
+// buildkit wrote, instead of repainting over it.
+func (w *termWriter) unsuspend() {
+	w.suspended = false
+	w.scr.reset()
+}
+
+func (w *termWriter) repaint() {
+	if w.suspended || w.operation == "" || len(w.tree.nodes) == 0 {
 		return
 	}
-
-	var color colorFunc
-	switch e.Status {
-	case api.Working:
-		color = SuccessColor
-	case api.Done:
-		color = SuccessColor
-	case api.Warning:
-		color = WarningColor
-	case api.Error:
-		color = ErrorColor
-	}
-	_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, color(e.Text), e.Details)
+	width, height := w.size()
+	lines := layoutFrame(&w.tree, w.operation, layoutOpts{
+		width:  width,
+		height: height,
+		dryRun: w.dryRun,
+		now:    w.clock.Now(),
+	})
+	w.scr.paint(lines, width)
 }
-
-func (w *ttyWriter) parentTasks() iter.Seq[*task] {
-	return func(yield func(*task) bool) {
-		for _, id := range w.ids { // iterate on ids to enforce a consistent order
-			t := w.tasks[id]
-			if len(t.parents) == 0 {
-				yield(t)
-			}
-		}
-	}
-}
-
-func (w *ttyWriter) childrenTasks(parent string) iter.Seq[*task] {
-	return func(yield func(*task) bool) {
-		for _, id := range w.ids { // iterate on ids to enforce a consistent order
-			t := w.tasks[id]
-			if t.parents.Has(parent) {
-				yield(t)
-			}
-		}
-	}
-}
-
-// lineData holds pre-computed formatting for a task line
-type lineData struct {
-	spinner           string // rendered spinner with color
-	prefix            string // dry-run prefix if any
-	taskID            string // possibly abbreviated
-	progress          string // progress bar and (optionally) size info appended
-	progressSizeBytes int    // byte length of the trailing size suffix in progress, 0 if none
-	status            string // rendered status with color
-	details           string // possibly abbreviated
-	timer             string // rendered timer with color
-	statusPad         int    // padding before status to align
-	timerPad          int    // padding before timer to align
-	statusColor       colorFunc
-}
-
-func (w *ttyWriter) print() {
-	terminalWidth := goterm.Width()
-	terminalHeight := goterm.Height()
-	if terminalWidth <= 0 {
-		terminalWidth = 80
-	}
-	if terminalHeight <= 0 {
-		terminalHeight = 24
-	}
-	w.printWithDimensions(terminalWidth, terminalHeight)
-}
-
-func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
-	w.mtx.Lock()
-	defer w.mtx.Unlock()
-	if len(w.tasks) == 0 {
-		return
-	}
-
-	up := w.numLines + 1
-	if !w.repeated {
-		up--
-		w.repeated = true
-	}
-	b := aec.NewBuilder(
-		aec.Hide, // Hide the cursor while we are printing
-		aec.Up(uint(up)),
-		aec.Column(0),
-	)
-	_, _ = fmt.Fprint(w.out, b.ANSI)
-	defer func() {
-		_, _ = fmt.Fprint(w.out, aec.Show)
-	}()
-
-	firstLine := fmt.Sprintf("[+] %s %d/%d", w.operation, numDone(w.tasks), len(w.tasks))
-	_, _ = fmt.Fprintln(w.out, firstLine)
-
-	// Collect parent tasks in original order
-	allTasks := slices.Collect(w.parentTasks())
-
-	// Available lines: terminal height - 2 (header line + potential "more" line)
-	maxLines := max(terminalHeight-2, 1)
-
-	showMore := len(allTasks) > maxLines
-	tasksToShow := allTasks
-	if showMore {
-		tasksToShow = allTasks[:maxLines-1] // Reserve one line for "more" message
-	}
-
-	// collect line data and compute timerLen
-	lines := make([]lineData, len(tasksToShow))
-	var timerLen int
-	for i, t := range tasksToShow {
-		lines[i] = w.prepareLineData(t)
-		if len(lines[i].timer) > timerLen {
-			timerLen = len(lines[i].timer)
-		}
-	}
-
-	// pad timers so they all have the same visible width
-	for i := range lines {
-		l := &lines[i]
-		if l.timer == "" {
-			continue
-		}
-		timerWidth := utf8.RuneCountInString(l.timer)
-		if timerWidth < timerLen {
-			// Left-pad so the timer's right edge stays aligned on the terminal.
-			// This also prevents stale suffix characters from visually “sticking”
-			// when a previously-rendered timer was wider (e.g. "10.6s" -> "0.0s").
-			l.timer = strings.Repeat(" ", timerLen-timerWidth) + l.timer
-		}
-	}
-
-	// shorten details/taskID to fit terminal width
-	w.adjustLineWidth(lines, timerLen, terminalWidth)
-
-	// compute padding
-	w.applyPadding(lines, terminalWidth, timerLen)
-
-	// Render lines
-	numLines := 0
-	for _, l := range lines {
-		_, _ = fmt.Fprint(w.out, lineText(l))
-		numLines++
-	}
-
-	if showMore {
-		moreCount := len(allTasks) - len(tasksToShow)
-		moreText := fmt.Sprintf(" ... %d more", moreCount)
-		pad := max(terminalWidth-len(moreText), 0)
-		_, _ = fmt.Fprintf(w.out, "%s%s\n", moreText, strings.Repeat(" ", pad))
-		numLines++
-	}
-
-	// Clear any remaining lines from previous render
-	for i := numLines; i < w.numLines; i++ {
-		_, _ = fmt.Fprintln(w.out, strings.Repeat(" ", terminalWidth))
-		numLines++
-	}
-	w.numLines = numLines
-}
-
-func (w *ttyWriter) applyPadding(lines []lineData, terminalWidth int, timerLen int) {
-	var maxBeforeStatus int
-	for i := range lines {
-		l := &lines[i]
-		// Width before statusPad: space(1) + spinner(1) + prefix + space(1) + taskID + progress
-		beforeStatus := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
-		if beforeStatus > maxBeforeStatus {
-			maxBeforeStatus = beforeStatus
-		}
-	}
-
-	for i, l := range lines {
-		// Position before statusPad: space(1) + spinner(1) + prefix + space(1) + taskID + progress
-		beforeStatus := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
-		// statusPad aligns status; lineText adds 1 more space after statusPad
-		l.statusPad = maxBeforeStatus - beforeStatus
-
-		// Format: beforeStatus + statusPad + space(1) + status
-		lineLen := beforeStatus + l.statusPad + 1 + utf8.RuneCountInString(l.status)
-		if l.details != "" {
-			lineLen += 1 + utf8.RuneCountInString(l.details)
-		}
-		l.timerPad = max(terminalWidth-lineLen-timerLen, 1)
-		lines[i] = l
-
-	}
-}
-
-func (w *ttyWriter) adjustLineWidth(lines []lineData, timerLen int, terminalWidth int) {
-	const minIDLen = 10
-	maxStatusLen := maxStatusLength(lines)
-
-	// Iteratively truncate until all lines fit
-	for range 100 { // safety limit
-		maxBeforeStatus := maxBeforeStatusWidth(lines)
-		overflow := computeOverflow(lines, maxBeforeStatus, maxStatusLen, timerLen, terminalWidth)
-
-		if overflow <= 0 {
-			break
-		}
-
-		// Drop ancillary content (details, progress size info) before touching the taskID.
-		if !truncateDetails(lines, overflow) && !truncateProgressSize(lines) && !truncateLongestTaskID(lines, overflow, minIDLen) {
-			break // Can't truncate further
-		}
-	}
-}
-
-// maxStatusLength returns the maximum status text length across all lines.
-func maxStatusLength(lines []lineData) int {
-	var maxLen int
-	for i := range lines {
-		if len(lines[i].status) > maxLen {
-			maxLen = len(lines[i].status)
-		}
-	}
-	return maxLen
-}
-
-// maxBeforeStatusWidth computes the maximum width before statusPad across all lines.
-// This is: space(1) + spinner(1) + prefix + space(1) + taskID + progress
-func maxBeforeStatusWidth(lines []lineData) int {
-	var maxWidth int
-	for i := range lines {
-		l := &lines[i]
-		width := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
-		if width > maxWidth {
-			maxWidth = width
-		}
-	}
-	return maxWidth
-}
-
-// computeOverflow calculates how many characters the widest line exceeds the terminal width.
-// Returns 0 or negative if all lines fit.
-func computeOverflow(lines []lineData, maxBeforeStatus, maxStatusLen, timerLen, terminalWidth int) int {
-	var maxOverflow int
-	for i := range lines {
-		l := &lines[i]
-		detailsLen := len(l.details)
-		if detailsLen > 0 {
-			detailsLen++ // space before details
-		}
-		// Line width: maxBeforeStatus + space(1) + status + details + minTimerPad(1) + timer
-		lineWidth := maxBeforeStatus + 1 + maxStatusLen + detailsLen + 1 + timerLen
-		overflow := lineWidth - terminalWidth
-		if overflow > maxOverflow {
-			maxOverflow = overflow
-		}
-	}
-	return maxOverflow
-}
-
-// truncateProgressSize drops the trailing "X.XMB / Y.YMB" size info from the
-// line currently driving maxBeforeStatusWidth — only that line's shrink can
-// reduce overflow. Returns true if any line was modified.
-func truncateProgressSize(lines []lineData) bool {
-	maxIdx := -1
-	var maxWidth int
-	for i := range lines {
-		l := &lines[i]
-		if l.progressSizeBytes == 0 {
-			continue
-		}
-		w := lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
-		if maxIdx < 0 || w > maxWidth {
-			maxWidth = w
-			maxIdx = i
-		}
-	}
-	if maxIdx < 0 {
-		return false
-	}
-	l := &lines[maxIdx]
-	l.progress = l.progress[:len(l.progress)-l.progressSizeBytes]
-	l.progressSizeBytes = 0
-	return true
-}
-
-// truncateDetails tries to truncate the first line's details to reduce overflow.
-// Returns true if any truncation was performed.
-func truncateDetails(lines []lineData, overflow int) bool {
-	for i := range lines {
-		l := &lines[i]
-		if len(l.details) > 3 {
-			reduction := min(overflow, len(l.details)-3)
-			l.details = l.details[:len(l.details)-reduction-3] + "..."
-			return true
-		} else if l.details != "" {
-			l.details = ""
-			return true
-		}
-	}
-	return false
-}
-
-// truncateLongestTaskID truncates the longest taskID to reduce overflow.
-// Returns true if truncation was performed. Lengths and slicing are in runes
-// to avoid emitting invalid UTF-8 when taskID contains multi-byte chars.
-func truncateLongestTaskID(lines []lineData, overflow, minIDLen int) bool {
-	longestIdx := -1
-	longestLen := minIDLen
-	for i := range lines {
-		if utf8.RuneCountInString(lines[i].taskID) > longestLen {
-			longestLen = utf8.RuneCountInString(lines[i].taskID)
-			longestIdx = i
-		}
-	}
-
-	if longestIdx < 0 {
-		return false
-	}
-
-	l := &lines[longestIdx]
-	reduction := overflow + 3 // account for "..."
-	newLen := max(longestLen-reduction, minIDLen-3)
-	runes := []rune(l.taskID)
-	l.taskID = string(runes[:newLen]) + "..."
-	return true
-}
-
-func (w *ttyWriter) prepareLineData(t *task) lineData {
-	endTime := time.Now()
-	if t.status != api.Working {
-		endTime = t.startTime
-		if (t.endTime != time.Time{}) {
-			endTime = t.endTime
-		}
-	}
-
-	prefix := ""
-	if w.dryRun {
-		prefix = PrefixColor(DRYRUN_PREFIX)
-	}
-
-	elapsed := endTime.Sub(t.startTime).Seconds()
-
-	var (
-		hideDetails bool
-		total       int64
-		current     int64
-		completion  []string
-	)
-
-	// only show the aggregated progress while the root operation is in-progress
-	if t.status == api.Working {
-		for child := range w.childrenTasks(t.ID) {
-			if child.status == api.Working && child.total == 0 {
-				hideDetails = true
-			}
-			total += child.total
-			current += child.current
-			r := len(percentChars) - 1
-			p := min(child.percent, 100)
-			completion = append(completion, percentChars[r*p/100])
-		}
-	}
-
-	if total == 0 {
-		hideDetails = true
-	}
-
-	var progress string
-	var progressSizeBytes int
-	if len(completion) > 0 {
-		progress = " [" + SuccessColor(strings.Join(completion, "")) + "]"
-		if !hideDetails {
-			sizeInfo := fmt.Sprintf(" %7s / %-7s", units.HumanSize(float64(current)), units.HumanSize(float64(total)))
-			progress += sizeInfo
-			progressSizeBytes = len(sizeInfo)
-		}
-	}
-
-	return lineData{
-		spinner:           spinner(t),
-		prefix:            prefix,
-		taskID:            t.ID,
-		progress:          progress,
-		progressSizeBytes: progressSizeBytes,
-		status:            t.text,
-		statusColor:       colorFn(t.status),
-		details:           t.details,
-		timer:             fmt.Sprintf("%.1fs", elapsed),
-	}
-}
-
-func lineText(l lineData) string {
-	var sb strings.Builder
-	sb.WriteString(" ")
-	sb.WriteString(l.spinner)
-	sb.WriteString(l.prefix)
-	sb.WriteString(" ")
-	sb.WriteString(l.taskID)
-	sb.WriteString(l.progress)
-	sb.WriteString(strings.Repeat(" ", l.statusPad))
-	sb.WriteString(" ")
-	sb.WriteString(l.statusColor(l.status))
-	if l.details != "" {
-		sb.WriteString(" ")
-		sb.WriteString(l.details)
-	}
-	sb.WriteString(strings.Repeat(" ", l.timerPad))
-	sb.WriteString(TimerColor(l.timer))
-	sb.WriteString("\n")
-	return sb.String()
-}
-
-var (
-	spinnerDone    = "✔"
-	spinnerWarning = "!"
-	spinnerError   = "✘"
-)
-
-func spinner(t *task) string {
-	switch t.status {
-	case api.Done:
-		return SuccessColor(spinnerDone)
-	case api.Warning:
-		return WarningColor(spinnerWarning)
-	case api.Error:
-		return ErrorColor(spinnerError)
-	default:
-		return CountColor(t.spinner.String())
-	}
-}
-
-func colorFn(s api.EventStatus) colorFunc {
-	switch s {
-	case api.Done:
-		return SuccessColor
-	case api.Warning:
-		return WarningColor
-	case api.Error:
-		return ErrorColor
-	default:
-		return nocolor
-	}
-}
-
-func numDone(tasks map[string]*task) int {
-	i := 0
-	for _, t := range tasks {
-		if t.status != api.Working {
-			i++
-		}
-	}
-	return i
-}
-
-// lenAnsi count of user-perceived characters in ANSI string.
-func lenAnsi(s string) int {
-	length := 0
-	ansiCode := false
-	for _, r := range s {
-		if r == '\x1b' {
-			ansiCode = true
-			continue
-		}
-		if ansiCode && r == 'm' {
-			ansiCode = false
-			continue
-		}
-		if !ansiCode {
-			length++
-		}
-	}
-	return length
-}
-
-var percentChars = strings.Split("⠀⡀⣀⣄⣤⣦⣶⣷⣿", "")
