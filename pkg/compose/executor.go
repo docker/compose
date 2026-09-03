@@ -23,6 +23,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // planExecutor executes a reconciliation Plan by walking the DAG and performing
@@ -32,6 +34,11 @@ type planExecutor struct {
 	compose *composeService
 	project *types.Project
 	pctx    *reconciliationContext
+
+	// listener receives lifecycle-hook output (pre_start/post_start) when a
+	// caller attaches one; nil discards it, like the imperative engine when
+	// running detached.
+	listener api.ContainerEventListener
 
 	// containersByService is a live view used to resolve service references
 	// (network_mode: service:x, volumes_from, ipc, pid) without a daemon
@@ -153,7 +160,7 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 	case OpCreateContainer:
 		return exec.execCreateContainer(ctx, node)
 	case OpStartContainer:
-		return exec.execStartContainer(ctx, op)
+		return exec.execStartContainer(ctx, node)
 	case OpStopContainer:
 		return exec.execStopContainer(ctx, op)
 	case OpRemoveContainer:
@@ -162,6 +169,12 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 		return exec.execRenameContainer(ctx, node)
 	case OpRunProvider:
 		return exec.compose.runPlugin(ctx, exec.project, *op.Service, "up")
+	case OpWaitCondition:
+		return exec.execWaitCondition(ctx, node)
+	case OpRunPreStart:
+		return exec.execRunPreStart(ctx, node)
+	case OpRunPostStart:
+		return exec.execRunPostStart(ctx, node)
 	default:
 		return fmt.Errorf("unknown operation type: %s", op.Type)
 	}

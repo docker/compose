@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -30,29 +31,52 @@ type groupTracker struct {
 }
 
 type groupState struct {
-	eventName string // e.g. "Container myproject-web-1"
-	total     int    // total nodes in this group
-	started   int    // nodes that have started
-	done      int    // nodes that have completed
+	eventName   string // e.g. "Container myproject-web-1"
+	workingText string // event text while the group runs, e.g. "Recreate"
+	doneText    string // event text once the whole group completed
+	total       int    // total nodes in this group
+	started     int    // nodes that have started
+	done        int    // nodes that have completed
 }
 
 func (exec *planExecutor) buildGroupTracker(plan *Plan) *groupTracker {
 	gt := &groupTracker{groups: map[string]*groupState{}}
+	nameFallback := map[string]string{}
 	for _, node := range plan.Nodes {
 		if node.Group == "" {
 			continue
 		}
 		if _, ok := gt.groups[node.Group]; !ok {
-			gt.groups[node.Group] = &groupState{}
+			gs := &groupState{workingText: "Recreate", doneText: "Recreated"}
+			if strings.HasPrefix(node.Group, "start:") {
+				// the group closes on the chain's last node (post_start when
+				// declared), so Started is emitted after the hooks ran —
+				// word-for-word the imperative sequence
+				gs.workingText = api.StatusStarting
+				gs.doneText = api.StatusStarted
+			}
+			gt.groups[node.Group] = gs
 		}
 		gt.groups[node.Group].total++
-		// Pick the event name from a node that has the existing container reference
+		// Pick the event name from a node that has the existing container
+		// reference — its canonical name. A name computed at plan time is
+		// only a fallback (below): in a recreate group the create node
+		// carries the temporary name, and must never win over the observed
+		// container's canonical name whatever the node order.
 		if gt.groups[node.Group].eventName == "" && node.Operation.Container != nil {
 			gt.groups[node.Group].eventName = getContainerProgressName(*node.Operation.Container)
 		}
+		if nameFallback[node.Group] == "" && node.Operation.Name != "" {
+			nameFallback[node.Group] = "Container " + node.Operation.Name
+		}
 	}
-	// Fallback for groups where no node had a Container (shouldn't happen for recreate)
+	// Fallback for groups where no node had a Container: the deterministic
+	// name computed at plan time (start groups over plan-materialized
+	// replicas), else the group key.
 	for name, gs := range gt.groups {
+		if gs.eventName == "" {
+			gs.eventName = nameFallback[name]
+		}
 		if gs.eventName == "" {
 			gs.eventName = name
 		}
@@ -71,7 +95,7 @@ func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) {
 	gs := gt.groups[node.Group]
 	gs.started++
 	if gs.started == 1 {
-		events.On(newEvent(gs.eventName, api.Working, "Recreate"))
+		events.On(newEvent(gs.eventName, api.Working, gs.workingText))
 	}
 }
 
@@ -85,7 +109,7 @@ func (gt *groupTracker) onNodeDone(node *PlanNode, events api.EventProcessor) {
 	gs := gt.groups[node.Group]
 	gs.done++
 	if gs.done == gs.total {
-		events.On(newEvent(gs.eventName, api.Done, "Recreated"))
+		events.On(newEvent(gs.eventName, api.Done, gs.doneText))
 	}
 }
 
@@ -111,8 +135,7 @@ func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 	case OpCreateContainer:
 		events.On(creatingEvent("Container " + op.Name))
 	case OpStartContainer:
-		name := getContainerProgressName(*op.Container)
-		events.On(newEvent(name, api.Working, api.StatusStarting))
+		events.On(newEvent(startEventName(op), api.Working, api.StatusStarting))
 	case OpStopContainer:
 		events.On(stoppingEvent(getContainerProgressName(*op.Container)))
 	case OpRemoveContainer:
@@ -135,8 +158,7 @@ func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
 	case OpCreateContainer:
 		events.On(createdEvent("Container " + op.Name))
 	case OpStartContainer:
-		name := getContainerProgressName(*op.Container)
-		events.On(newEvent(name, api.Done, api.StatusStarted))
+		events.On(newEvent(startEventName(op), api.Done, api.StatusStarted))
 	case OpStopContainer:
 		events.On(stoppedEvent(getContainerProgressName(*op.Container)))
 	case OpRemoveContainer:
@@ -150,6 +172,16 @@ func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
 	case OpRemoveVolume:
 		events.On(removedEvent("Volume " + op.Name))
 	}
+}
+
+// startEventName names the progress event of a container start: the
+// observed container when the plan carries one, else the deterministic name
+// computed at plan time for a container the same plan materializes.
+func startEventName(op Operation) string {
+	if op.Container != nil {
+		return getContainerProgressName(*op.Container)
+	}
+	return "Container " + op.Name
 }
 
 // emitErrorEvent emits an error event for an ungrouped node.
