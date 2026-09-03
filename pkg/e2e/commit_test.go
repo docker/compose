@@ -29,6 +29,9 @@ func TestCommit(t *testing.T) {
 		Step("up starts the service",
 			ComposeCmd("up", "-d", "service"),
 			ServiceState("service", "running")).
+		Step("commit --dry-run must not create the image",
+			ComposeCmd("--dry-run", "commit", "service", image),
+			ImageAbsent(image)).
 		Step("commit turns the container into a tagged image",
 			ComposeCmd("commit",
 				"-a", "John Hannibal Smith <hannibal@a-team.com>",

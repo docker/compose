@@ -453,6 +453,21 @@ func ImageExists(ref string) Check {
 	}
 }
 
+// ImageAbsent expects no image with the given reference in the local store —
+// the observable proof that a dry-run left the engine untouched.
+func ImageAbsent(ref string) Check {
+	return Check{
+		name: fmt.Sprintf("image %q is absent", ref),
+		fn: func(ctx *CheckContext) error {
+			res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "image", "inspect", "--format", "{{.Id}}", ref))
+			if res.ExitCode == 0 {
+				return fmt.Errorf("image %s exists", ref)
+			}
+			return nil
+		},
+	}
+}
+
 // FileExists expects a non-empty file at the given host path, e.g. the output
 // of an export command.
 func FileExists(path string) Check {
