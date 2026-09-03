@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -38,6 +39,7 @@ import (
 	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
+	"github.com/docker/compose/v5/pkg/filter"
 )
 
 type configOptions struct {
@@ -51,6 +53,7 @@ type configOptions struct {
 	noResolvePath       bool
 	noResolveEnv        bool
 	services            bool
+	filter              []string
 	volumes             bool
 	networks            bool
 	models              bool
@@ -72,6 +75,20 @@ func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, ba
 func (o *configOptions) ToModel(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (map[string]any, error) {
 	po = append(po, o.toProjectOptionsFns()...)
 	return o.ProjectOptions.ToModel(ctx, dockerCli, services, po...)
+}
+
+// validateFilter checks the flag combinations --filter can be used with.
+func (o *configOptions) validateFilter() error {
+	if len(o.filter) == 0 {
+		return nil
+	}
+	if !o.services {
+		return errors.New("--filter requires --services")
+	}
+	if o.noInterpolate {
+		return errors.New("--filter cannot be combined with --no-interpolate")
+	}
+	return nil
 }
 
 // toProjectOptionsFns converts config options to cli.ProjectOptionsFn
@@ -111,7 +128,7 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 			if opts.lockImageDigests {
 				opts.resolveImageDigests = true
 			}
-			return nil
+			return opts.validateFilter()
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.services {
@@ -161,6 +178,7 @@ func configCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	flags.BoolVar(&opts.noResolveEnv, "no-env-resolution", false, "Don't resolve service env files")
 
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
+	flags.StringArrayVar(&opts.filter, "filter", nil, `With --services, only print services matching a criteria=value expression ("profile=NAME", "label=KEY[=VALUE]"). Repeat to combine criteria.`)
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
 	flags.BoolVar(&opts.networks, "networks", false, "Print the network names, one per line.")
 	flags.BoolVar(&opts.models, "models", false, "Print the model names, one per line.")
@@ -495,6 +513,25 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 	if err != nil {
 		return err
 	}
+
+	if len(opts.filter) > 0 {
+		serviceFilter, err := filter.Parse(opts.filter)
+		if err != nil {
+			return err
+		}
+		// Filtering on a profile implies activating it.
+		if profiles := serviceFilter.Profiles(); len(profiles) > 0 {
+			project, err = project.WithProfiles(append(project.Profiles, profiles...))
+			if err != nil {
+				return err
+			}
+		}
+		for _, name := range serviceFilter.SelectNames(project) {
+			_, _ = fmt.Fprintln(dockerCli.Out(), name)
+		}
+		return nil
+	}
+
 	err = project.ForEachService(project.ServiceNames(), func(serviceName string, _ *types.ServiceConfig) error {
 		_, _ = fmt.Fprintln(dockerCli.Out(), serviceName)
 		return nil
