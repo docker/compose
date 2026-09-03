@@ -91,6 +91,30 @@ func up(options options, args []string) {
 	servicename := args[0]
 	fmt.Printf(`{ "type": "debug", "message": "Starting %s" }%s`, servicename, lineSeparator)
 
+	// Ask the running Compose process for the resolved definition of the
+	// service this provider manages. A Compose that predates the message
+	// aborts on it, so only providers that require the configuration
+	// should send it. The decoder must be created once and reused across
+	// requests: it reads ahead, so a fresh decoder per request would discard
+	// buffered bytes and hang on the next answer.
+	responses := json.NewDecoder(os.Stdin)
+	fmt.Printf(`{ "type": "get-service-config" }%s`, lineSeparator)
+	var config struct {
+		Provider struct {
+			Type string `json:"type"`
+		} `json:"provider"`
+	}
+	if err := responses.Decode(&config); err != nil {
+		// error text is not JSON-safe either: encode, don't interpolate
+		msg, _ := json.Marshal(map[string]string{"type": "error", "message": fmt.Sprintf("get-service-config failed: %v", err)})
+		fmt.Println(string(msg))
+		return
+	}
+	// values read from the configuration are not necessarily JSON-safe:
+	// encode the message instead of interpolating it into a JSON literal
+	setenv, _ := json.Marshal(map[string]string{"type": "setenv", "message": "CONFIG_TYPE=" + config.Provider.Type})
+	fmt.Println(string(setenv))
+
 	for i := 0; i < options.size; i += 10 {
 		time.Sleep(1 * time.Second)
 		fmt.Printf(`{ "type": "info", "message": "Processing ... %d%%" }%s`, i*100/options.size, lineSeparator)
