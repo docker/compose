@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -37,7 +36,7 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 		containers = containers.filter(isService(services...))
 	}
 	summary := make([]api.ContainerProcSummary, len(containers))
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for i, ctr := range containers {
 		eg.Go(func() error {
 			topContent, err := s.apiClient().ContainerTop(ctx, ctr.ID, client.ContainerTopOptions{

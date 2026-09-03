@@ -35,6 +35,7 @@ import (
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
@@ -151,12 +152,25 @@ func WithPrompt(prompt Prompt) Option {
 	}
 }
 
-// WithMaxConcurrency defines upper limit for concurrent operations against engine API
+// WithMaxConcurrency defines upper limit for concurrent operations against
+// engine API. A value <= 0 means unlimited.
 func WithMaxConcurrency(maxConcurrency int) Option {
 	return func(s *composeService) error {
 		s.maxConcurrency = maxConcurrency
 		return nil
 	}
+}
+
+// newLimitedErrgroup returns an errgroup.Group bounded to maxConcurrency
+// concurrent goroutines. maxConcurrency<=0 (including the Go zero-value)
+// leaves it unlimited, since errgroup.SetLimit(0) means "allow zero
+// goroutines", not "unlimited".
+func newLimitedErrgroup(ctx context.Context, maxConcurrency int) (*errgroup.Group, context.Context) {
+	eg, ctx := errgroup.WithContext(ctx)
+	if maxConcurrency > 0 {
+		eg.SetLimit(maxConcurrency)
+	}
+	return eg, ctx
 }
 
 // WithDryRun configure Compose to run without actually applying changes

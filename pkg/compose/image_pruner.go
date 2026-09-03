@@ -28,7 +28,6 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -59,15 +58,17 @@ type ImagePruneOptions struct {
 
 // ImagePruner handles image removal during Compose `down` operations.
 type ImagePruner struct {
-	client  client.ImageAPIClient
-	project *types.Project
+	client         client.ImageAPIClient
+	project        *types.Project
+	maxConcurrency int
 }
 
 // NewImagePruner creates an ImagePruner object for a project.
-func NewImagePruner(imageClient client.ImageAPIClient, project *types.Project) *ImagePruner {
+func NewImagePruner(imageClient client.ImageAPIClient, project *types.Project, maxConcurrency int) *ImagePruner {
 	return &ImagePruner{
-		client:  imageClient,
-		project: project,
+		client:         imageClient,
+		project:        project,
+		maxConcurrency: maxConcurrency,
 	}
 }
 
@@ -173,8 +174,7 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 
 	var mu sync.Mutex
 	var removed []string
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(s.maxConcurrency)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, img := range res.Items {
 		if keep(img) {
 			continue
@@ -225,7 +225,7 @@ func (p *ImagePruner) filterImagesByExistence(ctx context.Context, imageNames []
 	var mu sync.Mutex
 	var ret []string
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, p.maxConcurrency)
 	for _, img := range imageNames {
 		eg.Go(func() error {
 			_, err := p.client.ImageInspect(ctx, img)

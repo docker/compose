@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -35,7 +34,7 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 		return 0, fmt.Errorf("no containers for project %q", projectName)
 	}
 
-	eg, waitCtx := errgroup.WithContext(ctx)
+	eg, waitCtx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	var statusCode int64
 	for _, ctr := range containers {
 		eg.Go(func() error {
