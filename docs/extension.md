@@ -59,6 +59,53 @@ JSON messages MUST include a `type` and a `message` attribute.
 - `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. The variable is automatically prefixed with the service name. See next section for further details.
 - `rawsetenv`: Same as `setenv`, but the variable is injected as-is without the service name prefix. Useful when applications require exact variable names that cannot be altered.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
+- `addhost`: Injects an `extra_hosts` entry into every service depending on the provider service. The message is
+  `"hostname=value"`, where value is an IP or the special `host-gateway`. A provider that exposes its resource on
+  the host (published ports) typically sends its own service name — `{"type": "addhost", "message": "database=host-gateway"}` —
+  so consumers reach it by the service name they already use, e.g. `http://database:5734`.
+
+### Recommended convention: links-style endpoint variables
+
+A provider whose resource listens on network ports should describe each endpoint with `setenv` variables following
+the legacy [docker links](https://docs.docker.com/engine/network/links/) naming: the variable name is keyed by the
+**port the application knows** (the container port), the value carries where that port is actually reachable. With
+the automatic service-name prefix, a consumer of a `database` provider managing a resource whose port 5432 is
+reachable at `database:31002` (via an `addhost` alias) sees:
+
+```
+DATABASE_PORT                 = tcp://database:31002    (primary port: the first one declared)
+DATABASE_PORT_5432_TCP        = tcp://database:31002
+DATABASE_PORT_5432_TCP_ADDR   = database
+DATABASE_PORT_5432_TCP_PORT   = 31002
+DATABASE_PORT_5432_TCP_PROTO  = tcp
+```
+
+This lets the provider assign actual ports freely (avoiding host port collisions between projects and providers)
+while consumers look endpoints up by the well-known port number.
+- `get-service-config`: Asks Compose for the resolved configuration of the service the provider manages. See next section.
+
+## Requesting the service configuration
+
+A provider can ask the running Compose process for the resolved definition of the service it manages —
+the exact model Compose is executing, not a re-resolution. The request is a regular JSON line on `stdout`:
+```json
+{ "type": "get-service-config" }
+```
+
+Compose answers on the provider's `stdin` with one JSON line: the resolved, canonical JSON of the service —
+the same shape as this service's entry in `docker compose config --format json`, after interpolation and
+normalization:
+```json
+{ "image": "mysql:8", "environment": { "...": "..." } }
+```
+
+There is no parameter: a provider can only obtain the definition of its own service. The message can be sent
+several times; each occurrence is answered with one line.
+
+Compose versions that predate this message treat it as a protocol error and abort the command, and never
+write anything to the provider's `stdin` (the provider reads EOF). A provider that requires the service
+configuration should treat EOF as "this Compose version does not support provider requests" and report an
+actionable error; a provider that can operate without it should simply not send the message.
 
 ```mermaid
 sequenceDiagram
