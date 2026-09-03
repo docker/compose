@@ -35,7 +35,6 @@ import (
 	godigest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -71,7 +70,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 
 	summary := map[string]api.ImageSummary{}
 	var mux sync.Mutex
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			img, err := s.containerImageSummary(ctx, ctr, withPlatform)
@@ -164,7 +163,7 @@ func (s *composeService) inspectLocalImages(ctx context.Context, repoTags []stri
 	}
 	inspections := map[string]client.ImageInspectResult{}
 	l := sync.Mutex{}
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, repoTag := range repoTags {
 		eg.Go(func() error {
 			inspect, err := s.apiClient().ImageInspect(ctx, repoTag, opts...)

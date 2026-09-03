@@ -28,7 +28,6 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -132,7 +131,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		logrus.Warnf("Warning: No resource found to remove for project %q.", projectName)
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, op := range ops {
 		eg.Go(op)
 	}
@@ -155,7 +154,7 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 }
 
 func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) ([]downOp, error) {
-	imagePruner := NewImagePruner(s.apiClient(), project)
+	imagePruner := NewImagePruner(s.apiClient(), project, s.maxConcurrency)
 	pruneOpts := ImagePruneOptions{
 		Mode:          ImagePruneMode(options.Images),
 		RemoveOrphans: options.RemoveOrphans,
@@ -336,7 +335,7 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 }
 
 func (s *composeService) stopContainers(ctx context.Context, serv *types.ServiceConfig, containers []containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return s.stopContainer(ctx, serv, ctr, timeout, listener)
@@ -346,7 +345,7 @@ func (s *composeService) stopContainers(ctx context.Context, serv *types.Service
 }
 
 func (s *composeService) removeContainers(ctx context.Context, containers []containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
