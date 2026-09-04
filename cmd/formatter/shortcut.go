@@ -26,10 +26,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/buger/goterm"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/eiannone/keyboard"
 	"github.com/skratchdot/open-golang/open"
+	"golang.org/x/term"
 
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/tracing"
@@ -149,12 +149,12 @@ func (lk *LogKeyboard) printNavigationMenu() {
 	lk.createBuffer(offset)
 
 	if lk.logLevel == INFO {
-		height := goterm.Height()
 		menu := lk.navigationMenu()
 
 		carriageReturn()
 		saveCursor()
 
+		_, height := getTermSize()
 		lk.kError.printError(height, menu)
 
 		moveCursor(height-extraLines(menu), 0)
@@ -191,11 +191,11 @@ func (lk *LogKeyboard) navigationMenu() string {
 }
 
 func (lk *LogKeyboard) clearNavigationMenu() {
-	height := goterm.Height()
 	carriageReturn()
 	saveCursor()
 
 	// clearLine()
+	_, height := getTermSize()
 	for range height {
 		moveCursorDown(1)
 		clearLine()
@@ -376,7 +376,8 @@ func allocateSpace(lines int) {
 }
 
 func extraLines(s string) int {
-	return int(math.Floor(float64(lenAnsi(s)) / float64(goterm.Width())))
+	width, _ := getTermSize()
+	return int(math.Floor(float64(lenAnsi(s)) / float64(width)))
 }
 
 func shortcutKeyColor(key string) string {
@@ -389,4 +390,12 @@ func shortcutKeyColor(key string) string {
 
 func navColor(key string) string {
 	return ansiColor(FAINT, key)
+}
+
+func getTermSize() (width, height int) {
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || width <= 0 || height <= 0 {
+		return 80, 24
+	}
+	return width, height
 }

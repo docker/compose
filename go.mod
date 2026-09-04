@@ -7,7 +7,6 @@ require (
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e
 	github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
-	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.15.0
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd/v2 v2.3.4
@@ -54,6 +53,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
+	golang.org/x/term v0.45.0
 	google.golang.org/grpc v1.83.2
 	gotest.tools/v3 v3.5.2
 	tags.cncf.io/container-device-interface v1.1.0
@@ -127,7 +127,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.56.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect
