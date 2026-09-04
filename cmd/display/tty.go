@@ -21,15 +21,16 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"os"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
-	"github.com/buger/goterm"
 	"github.com/docker/go-units"
 	"github.com/morikuni/aec"
+	"golang.org/x/term"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -321,13 +322,9 @@ type lineData struct {
 }
 
 func (w *ttyWriter) print() {
-	terminalWidth := goterm.Width()
-	terminalHeight := goterm.Height()
-	if terminalWidth <= 0 {
-		terminalWidth = 80
-	}
-	if terminalHeight <= 0 {
-		terminalHeight = 24
+	terminalWidth, terminalHeight, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || terminalWidth <= 0 || terminalHeight <= 0 {
+		terminalWidth, terminalHeight = 80, 24
 	}
 	w.printWithDimensions(terminalWidth, terminalHeight)
 }
