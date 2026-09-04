@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/buger/goterm"
+	"golang.org/x/term"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -82,12 +83,9 @@ type termWriter struct {
 }
 
 func termSize() (int, int) {
-	width, height := goterm.Width(), goterm.Height()
-	if width <= 0 {
-		width = 80
-	}
-	if height <= 0 {
-		height = 24
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || width <= 0 || height <= 0 {
+		width, height = 80, 24
 	}
 	return width, height
 }
