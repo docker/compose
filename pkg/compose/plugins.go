@@ -41,7 +41,7 @@ import (
 
 type JsonMessage struct {
 	Type    string `json:"type"`
-	Message string `json:"message"`
+	Message string `json:"message,omitempty"`
 }
 
 const (
@@ -50,15 +50,43 @@ const (
 	SetEnvType                = "setenv"
 	RawSetEnvType             = "rawsetenv"
 	DebugType                 = "debug"
+	AddHostType               = "addhost"
 	providerMetadataDirectory = "compose/providers"
+
+	// GetServiceConfigType is a message the provider sends to receive, on
+	// its stdin, one JSON line holding the resolved canonical configuration
+	// of the service it manages — answered from the in-memory model.
+	GetServiceConfigType = "get-service-config"
 )
 
 type pluginVariables struct {
 	prefixed types.Mapping
 	raw      types.Mapping
+	// hosts are extra_hosts entries ("hostname=value" addhost messages) to
+	// inject into dependent services, letting them address the provider's
+	// resource by name — typically "<service>=host-gateway" for a resource
+	// published on the host.
+	hosts types.Mapping
 }
 
 var mux sync.Mutex
+
+// prepareProviderInjection makes every provider-dependent service ready to
+// receive injections from injectPluginVariables. It must run before the plan
+// is built: plan nodes hold value copies of ServiceConfig, so an injection is
+// only visible to them through a map that already existed — and was therefore
+// shared — when the copy was made. Environment always exists on a loaded
+// project; ExtraHosts may be nil and is materialized here.
+func prepareProviderInjection(project *types.Project) {
+	for name, s := range project.Services {
+		for dep := range s.DependsOn {
+			if svc, ok := project.Services[dep]; ok && svc.Provider != nil && s.ExtraHosts == nil {
+				s.ExtraHosts = types.HostsList{}
+				project.Services[name] = s
+			}
+		}
+	}
+}
 
 func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string) error {
 	provider := *service.Provider
@@ -85,24 +113,38 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return nil
 	}
 
+	injectPluginVariables(project, service, variables)
+	return nil
+}
+
+// injectPluginVariables applies what the provider declared to every service
+// that depends on it: setenv variables prefixed with the provider service
+// name, rawsetenv variables as-is, and addhost entries as extra_hosts.
+func injectPluginVariables(project *types.Project, service types.ServiceConfig, variables pluginVariables) {
 	mux.Lock()
 	defer mux.Unlock()
 	for name, s := range project.Services {
-		if _, ok := s.DependsOn[service.Name]; ok {
-			prefix := strings.ToUpper(service.Name) + "_"
-			for key, val := range variables.prefixed {
-				s.Environment[prefix+key] = &val
-			}
-			for key, val := range variables.raw {
-				if existing, ok := s.Environment[key]; ok && (existing == nil || *existing != val) {
-					logrus.Warnf("provider %q overrides environment variable %q in service %q", service.Name, key, name)
-				}
-				s.Environment[key] = &val
-			}
-			project.Services[name] = s
+		if _, ok := s.DependsOn[service.Name]; !ok {
+			continue
 		}
+		prefix := strings.ToUpper(service.Name) + "_"
+		for key, val := range variables.prefixed {
+			s.Environment[prefix+key] = &val
+		}
+		for key, val := range variables.raw {
+			if existing, ok := s.Environment[key]; ok && (existing == nil || *existing != val) {
+				logrus.Warnf("provider %q overrides environment variable %q in service %q", service.Name, key, name)
+			}
+			s.Environment[key] = &val
+		}
+		for host, val := range variables.hosts {
+			if _, ok := s.ExtraHosts[host]; ok {
+				logrus.Warnf("provider %q overrides extra_hosts entry %q in service %q", service.Name, host, name)
+			}
+			s.ExtraHosts[host] = []string{val}
+		}
+		project.Services[name] = s
 	}
-	return nil
 }
 
 func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) {
@@ -125,6 +167,14 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	if err != nil {
 		return pluginVariables{}, err
 	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return pluginVariables{}, err
+	}
+	// closing stdin on exit unblocks a provider waiting for a response the
+	// loop will never produce (e.g. a request emitted after an error)
+	defer func() { _ = stdin.Close() }()
+	responses := json.NewEncoder(stdin)
 
 	err = cmd.Start()
 	if err != nil {
@@ -137,6 +187,7 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	variables := pluginVariables{
 		prefixed: types.Mapping{},
 		raw:      types.Mapping{},
+		hosts:    types.Mapping{},
 	}
 
 	for {
@@ -166,6 +217,16 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
 			}
 			variables.raw[key] = val
+		case AddHostType:
+			key, val, found := strings.Cut(msg.Message, "=")
+			if !found {
+				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+			}
+			variables.hosts[key] = val
+		case GetServiceConfigType:
+			if err := responses.Encode(service); err != nil {
+				return pluginVariables{}, fmt.Errorf("failed to answer get-service-config: %w", err)
+			}
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:

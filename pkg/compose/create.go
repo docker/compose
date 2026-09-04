@@ -91,6 +91,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	}
 
 	prepareNetworks(project)
+	prepareProviderInjection(project)
 	externalNetworks, err := s.checkExternalNetworks(ctx, project)
 	if err != nil {
 		return err

@@ -91,6 +91,22 @@ func up(options options, args []string) {
 	servicename := args[0]
 	fmt.Printf(`{ "type": "debug", "message": "Starting %s" }%s`, servicename, lineSeparator)
 
+	// Ask the running Compose process for the resolved definition of the
+	// service this provider manages. A Compose that predates the message
+	// aborts on it, so only providers that require the configuration
+	// should send it.
+	fmt.Printf(`{ "type": "get-service-config" }%s`, lineSeparator)
+	var config struct {
+		Provider struct {
+			Type string `json:"type"`
+		} `json:"provider"`
+	}
+	if err := json.NewDecoder(os.Stdin).Decode(&config); err != nil {
+		fmt.Printf(`{ "type": "error", "message": "get-service-config failed: %v" }%s`, err, lineSeparator)
+		return
+	}
+	fmt.Printf(`{ "type": "setenv", "message": "CONFIG_TYPE=%s" }%s`, config.Provider.Type, lineSeparator)
+
 	for i := 0; i < options.size; i += 10 {
 		time.Sleep(1 * time.Second)
 		fmt.Printf(`{ "type": "info", "message": "Processing ... %d%%" }%s`, i*100/options.size, lineSeparator)

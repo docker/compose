@@ -61,6 +61,16 @@ func TestDependsOnMultipleProviders(t *testing.T) {
 			OutputContains("test-1  | PROVIDER2_URL=https://magic.cloud/provider2"))
 }
 
+func TestProviderControlChannel(t *testing.T) {
+	// The example provider requests its own resolved service config over the
+	// stdio control channel and reflects provider.type back through setenv:
+	// the dependent service seeing DB_CONFIG_TYPE proves the round trip.
+	providerScenario(t, "a provider must be able to request its resolved service config from the running compose process").
+		Step("the dependent service sees the value the provider read from its config",
+			ComposeCmd("up"),
+			OutputContains("test-1  | DB_CONFIG_TYPE=example-provider"))
+}
+
 func TestProviderRawSetEnv(t *testing.T) {
 	providerScenario(t, "setenv variables must be service-prefixed, rawsetenv injected as-is").
 		Step("the service sees both variable flavors",
