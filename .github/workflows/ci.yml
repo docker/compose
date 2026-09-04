@@ -39,14 +39,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       -
         name: Run
         run: |
           make ${{ matrix.target }}
 
   binary:
-    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
+    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
     permissions:
       contents: read # same as global permission
       id-token: write # for signing attestation(s) with GitHub OIDC Token
@@ -120,7 +120,7 @@ jobs:
 
   bin-image-test:
     if: github.event_name == 'pull_request'
-    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
+    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
     with:
       runner: amd64
       target: image-cross
@@ -141,7 +141,7 @@ jobs:
     steps:
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       -
         name: Test
         uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
@@ -236,7 +236,7 @@ jobs:
           docker info -f '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Set up Docker Model
         run: |
