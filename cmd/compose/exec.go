@@ -83,10 +83,11 @@ func execCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	runCmd.Flags().IntVar(&opts.index, "index", 0, "Index of the container if service has multiple replicas")
 	runCmd.Flags().BoolVarP(&opts.privileged, "privileged", "", false, "Give extended privileges to the process")
 	runCmd.Flags().StringVarP(&opts.user, "user", "u", "", "Run the command as this user")
-	runCmd.Flags().BoolVarP(&opts.noTty, "no-tty", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation. By default 'docker compose exec' allocates a TTY.")
+	isTTY := dockerCli.Out().IsTerminal()
+	runCmd.Flags().BoolVarP(&opts.noTty, "no-tty", "T", !isTTY, "Disable pseudo-TTY allocation. By default 'docker compose exec' allocates a TTY.")
 	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command")
 
-	runCmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
+	runCmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", isTTY, "Keep STDIN open even if not attached")
 	runCmd.Flags().MarkHidden("interactive") //nolint:errcheck
 	runCmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY")
 	runCmd.Flags().MarkHidden("tty") //nolint:errcheck
