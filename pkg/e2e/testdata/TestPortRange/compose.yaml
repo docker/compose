@@ -1,0 +1,22 @@
+services:
+  a:
+    image: alpine
+    init: true
+    command: sleep infinity
+    scale: 5
+    ports:
+      - "6005-6015:80"
+
+  b:
+    image: alpine
+    init: true
+    command: sleep infinity
+    ports:
+      - 80
+
+  c:
+    image: alpine
+    init: true
+    command: sleep infinity
+    ports:
+      - 80

@@ -118,7 +118,14 @@ func runList(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return nil
 	}
 
-	view := viewFromStackList(stackList)
+	view := make([]stackView, len(stackList))
+	for i, s := range stackList {
+		view[i] = stackView{
+			Name:        s.Name,
+			Status:      strings.TrimSpace(s.Status + " " + s.Reason),
+			ConfigFiles: s.ConfigFiles,
+		}
+	}
 	return formatter.Print(view, lsOpts.Format, dockerCli.Out(), func(w io.Writer) {
 		for _, stack := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", stack.Name, stack.Status, stack.ConfigFiles)
@@ -130,16 +137,4 @@ type stackView struct {
 	Name        string
 	Status      string
 	ConfigFiles string
-}
-
-func viewFromStackList(stackList []api.Stack) []stackView {
-	retList := make([]stackView, len(stackList))
-	for i, s := range stackList {
-		retList[i] = stackView{
-			Name:        s.Name,
-			Status:      strings.TrimSpace(fmt.Sprintf("%s %s", s.Status, s.Reason)),
-			ConfigFiles: s.ConfigFiles,
-		}
-	}
-	return retList
 }

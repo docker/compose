@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/sirupsen/logrus"
@@ -71,7 +72,14 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 		return err
 	}
 
-	project, _, err := watchOpts.ToProject(ctx, dockerCli, backend, services)
+	project, _, err := watchOpts.ToProject(ctx, dockerCli, backend, services, cli.WithoutEnvironmentResolution)
+	if err != nil {
+		return err
+	}
+
+	// resolve environment after the project has been reduced to selected services,
+	// so env_file declared by unrelated services doesn't need to exist
+	project, err = project.WithServicesEnvironmentResolved(true)
 	if err != nil {
 		return err
 	}

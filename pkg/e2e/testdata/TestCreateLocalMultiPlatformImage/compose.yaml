@@ -1,0 +1,5 @@
+services:
+  repro:
+    image: compose-e2e-multiplatform-local-only:v1
+    platform: ${REQUESTED_PLATFORM}
+    command: ["uname", "-m"]

@@ -1,0 +1,13 @@
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    networks:
+      - test
+
+networks:
+  test:
+    ipam:
+      config:
+        - subnet: ${SUBNET-172.99.0.0/16}

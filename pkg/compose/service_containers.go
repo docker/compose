@@ -1,0 +1,639 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package compose
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"maps"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/platforms"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/versions"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
+)
+
+// This file gathers the per-service container helpers shared by both
+// lifecycle engines: the plan-based reconciler (reconcile.go, entered through
+// create/up) and the imperative dependency-ordered engine (dependencies.go,
+// used by start/stop/restart/down). It covers container naming, resolution of
+// service references (volumes_from, network_mode/ipc/pid, links), dependency
+// waiting, container creation through the Docker API, and service startup.
+
+const (
+	doubledContainerNameWarning = "WARNING: The %q service is using the custom container name %q. " +
+		"Docker requires each container to have a unique name. " +
+		"Remove the custom name to scale the service"
+)
+
+// getScale returns the number of replicas the service must run. A service
+// pinned to a custom container_name cannot scale beyond one replica, as every
+// container needs a distinct name: this is rejected here rather than at
+// container-creation time.
+func getScale(config types.ServiceConfig) (int, error) {
+	scale := config.GetScale()
+	if scale > 1 && config.ContainerName != "" {
+		return 0, fmt.Errorf(doubledContainerNameWarning,
+			config.Name,
+			config.ContainerName)
+	}
+	return scale, nil
+}
+
+// resolveServiceReferences replaces references to other services with references
+// to actual container IDs. It resolves VolumesFrom, NetworkMode, IPC and PID
+// shared namespaces. The containersByService map provides the observed containers
+// grouped by service name.
+func resolveServiceReferences(service *types.ServiceConfig, containersByService map[string]Containers) error {
+	if err := resolveVolumeFrom(service, containersByService); err != nil {
+		return err
+	}
+	return resolveSharedNamespaces(service, containersByService)
+}
+
+func resolveVolumeFrom(service *types.ServiceConfig, containersByService map[string]Containers) error {
+	for i, vol := range service.VolumesFrom {
+		spec := strings.Split(vol, ":")
+		if len(spec) == 0 {
+			continue
+		}
+		if spec[0] == "container" {
+			service.VolumesFrom[i] = spec[1]
+			continue
+		}
+		name := spec[0]
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share volume with service %s: container missing", name)
+		}
+		service.VolumesFrom[i] = dependencies.sorted()[0].ID
+	}
+	return nil
+}
+
+func resolveSharedNamespaces(service *types.ServiceConfig, containersByService map[string]Containers) error {
+	if name := getDependentServiceFromMode(service.NetworkMode); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
+		}
+		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
+	}
+
+	if name := getDependentServiceFromMode(service.Ipc); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
+		}
+		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
+	}
+
+	if name := getDependentServiceFromMode(service.Pid); name != "" {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
+		}
+		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
+	}
+
+	return nil
+}
+
+func getContainerName(projectName string, service types.ServiceConfig, number int) string {
+	name := getDefaultContainerName(projectName, service.Name, strconv.Itoa(number))
+	if service.ContainerName != "" {
+		name = service.ContainerName
+	}
+	return name
+}
+
+func getDefaultContainerName(projectName, serviceName, index string) string {
+	return strings.Join([]string{projectName, serviceName, index}, api.Separator)
+}
+
+func getContainerProgressName(ctr container.Summary) string {
+	return "Container " + getCanonicalContainerName(ctr)
+}
+
+func containerEvents(containers Containers, eventFunc func(string) api.Resource) []api.Resource {
+	events := []api.Resource{}
+	for _, ctr := range containers {
+		events = append(events, eventFunc(getContainerProgressName(ctr)))
+	}
+	return events
+}
+
+func containerReasonEvents(containers Containers, eventFunc func(string, string) api.Resource, reason string) []api.Resource {
+	events := []api.Resource{}
+	for _, ctr := range containers {
+		events = append(events, eventFunc(getContainerProgressName(ctr), reason))
+	}
+	return events
+}
+
+// ServiceConditionRunningOrHealthy is a service condition on status running or healthy
+const ServiceConditionRunningOrHealthy = "running_or_healthy"
+
+func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
+	if timeout > 0 {
+		withTimeout, cancelFunc := context.WithTimeout(ctx, timeout)
+		defer cancelFunc()
+		ctx = withTimeout
+	}
+	eg, ctx := errgroup.WithContext(ctx)
+	for dep, config := range dependencies {
+		if shouldWait, err := shouldWaitForDependency(dep, config, project); err != nil {
+			return err
+		} else if !shouldWait {
+			continue
+		}
+
+		waitingFor := containers.filter(isService(dep), isNotOneOff)
+		s.events.On(containerEvents(waitingFor, waiting)...)
+		if len(waitingFor) == 0 {
+			if config.Required {
+				return fmt.Errorf("%s is missing dependency %s", dependant, dep)
+			}
+			logrus.Warnf("%s is missing dependency %s", dependant, dep)
+			continue
+		}
+
+		eg.Go(func() error {
+			return s.waitDependency(ctx, dep, config, waitingFor)
+		})
+	}
+	err := eg.Wait()
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("timeout waiting for dependencies")
+	}
+	return err
+}
+
+// waitDependency polls the dependency's containers until its depends_on
+// condition is satisfied (done), definitively failed (err), or ctx is
+// cancelled. Each check reports (done, err): (false, nil) means keep polling.
+func (s *composeService) waitDependency(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			// An expired deadline is precisely the failure this wait is meant
+			// to detect; only a plain cancellation (Ctrl-C) stays silent.
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return ctx.Err()
+			}
+			return nil
+		}
+		var (
+			done bool
+			err  error
+		)
+		switch config.Condition {
+		case ServiceConditionRunningOrHealthy:
+			done, err = s.checkDependencyRunningOrHealthy(ctx, dep, config, waitingFor)
+		case types.ServiceConditionHealthy:
+			done, err = s.checkDependencyHealthy(ctx, dep, config, waitingFor)
+		case types.ServiceConditionCompletedSuccessfully:
+			done, err = s.checkDependencyCompleted(ctx, dep, config, waitingFor)
+		default:
+			logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
+			return nil
+		}
+		if done || err != nil {
+			return err
+		}
+	}
+}
+
+func (s *composeService) checkDependencyRunningOrHealthy(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
+	isHealthy, err := s.isServiceHealthy(ctx, waitingFor, true)
+	if err != nil {
+		if !config.Required {
+			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+				fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep))...)
+			logrus.Warnf("optional dependency %q is not running or is unhealthy: %s", dep, err.Error())
+			return true, nil
+		}
+		return false, err
+	}
+	if isHealthy {
+		s.events.On(containerEvents(waitingFor, healthy)...)
+	}
+	return isHealthy, nil
+}
+
+func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
+	isHealthy, err := s.isServiceHealthy(ctx, waitingFor, false)
+	if err != nil {
+		if !config.Required {
+			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+				fmt.Sprintf("optional dependency %q failed to start", dep))...)
+			logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
+			return true, nil
+		}
+		s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
+			return errorEventf(s, "dependency %s failed to start", dep)
+		})...)
+		return false, fmt.Errorf("dependency failed to start: %w", err)
+	}
+	if isHealthy {
+		s.events.On(containerEvents(waitingFor, healthy)...)
+	}
+	return isHealthy, nil
+}
+
+func (s *composeService) checkDependencyCompleted(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
+	isExited, code, err := s.isServiceCompleted(ctx, waitingFor)
+	if err != nil {
+		return false, err
+	}
+	if !isExited {
+		return false, nil
+	}
+	if code == 0 {
+		s.events.On(containerEvents(waitingFor, exited)...)
+		return true, nil
+	}
+
+	messageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
+	if !config.Required {
+		// optional -> mark as skipped & don't propagate error
+		s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+			fmt.Sprintf("optional dependency %s", messageSuffix))...)
+		logrus.Warnf("optional dependency %s", messageSuffix)
+		return true, nil
+	}
+
+	msg := fmt.Sprintf("service %s", messageSuffix)
+	s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
+		return errorEventf(s, "service %s", messageSuffix)
+	})...)
+	return false, errors.New(msg)
+}
+
+func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceDependency, project *types.Project) (bool, error) {
+	if dependencyConfig.Condition == types.ServiceConditionStarted {
+		// already managed by InDependencyOrder
+		return false, nil
+	}
+	if service, err := project.GetService(serviceName); err != nil {
+		for _, ds := range project.DisabledServices {
+			if ds.Name == serviceName {
+				// don't wait for disabled service (--no-deps)
+				return false, nil
+			}
+		}
+		return false, err
+	} else if service.GetScale() == 0 {
+		// don't wait for the dependency which configured to have 0 containers running
+		return false, nil
+	} else if service.Provider != nil {
+		// don't wait for provider services
+		return false, nil
+	}
+	return true, nil
+}
+
+func nextContainerNumber(containers []container.Summary) int {
+	maxNumber := 0
+	for _, ctr := range containers {
+		s, ok := ctr.Labels[api.ContainerNumberLabel]
+		if !ok {
+			logrus.Warnf("container %s is missing %s label", ctr.ID, api.ContainerNumberLabel)
+		}
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			logrus.Warnf("container %s has invalid %s label: %s", ctr.ID, api.ContainerNumberLabel, s)
+			continue
+		}
+		if n > maxNumber {
+			maxNumber = n
+		}
+	}
+	return maxNumber + 1
+}
+
+func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
+	name string, number int, options createOptions,
+) (ctr container.Summary, err error) {
+	eventName := "Container " + name
+	s.events.On(creatingEvent(eventName))
+	ctr, err = s.createMobyContainer(ctx, project, service, name, number, nil, options)
+	if err != nil {
+		if ctx.Err() == nil {
+			s.events.On(api.Resource{
+				ID:     eventName,
+				Status: api.Error,
+				Text:   err.Error(),
+			})
+		}
+		return ctr, err
+	}
+	s.events.On(createdEvent(eventName))
+	return ctr, nil
+}
+
+// startMx serializes ContainerStart calls across the whole process: the
+// engine allocates published ports from ranges non-atomically, and two
+// concurrent starts can be assigned the same port. Every code path calling
+// ContainerStart on a service container must hold it (the plan executor's
+// execStartContainer and the imperative startServiceContainer both do).
+var startMx sync.Mutex
+
+func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
+	name string, number int, inherit *container.Summary, options createOptions,
+) (container.Summary, error) {
+	var created container.Summary
+	cfgs, err := s.getCreateConfigs(ctx, project, service, number, inherit, options)
+	if err != nil {
+		return created, err
+	}
+	platform := service.Platform
+	if platform == "" {
+		platform = project.Environment["DOCKER_DEFAULT_PLATFORM"]
+	}
+	var plat *specs.Platform
+	if platform != "" {
+		var p specs.Platform
+		p, err = platforms.Parse(platform)
+		if err != nil {
+			return created, err
+		}
+		plat = &p
+	}
+
+	response, err := s.apiClient().ContainerCreate(ctx, client.ContainerCreateOptions{
+		Name:             name,
+		Platform:         plat,
+		Config:           cfgs.Container,
+		HostConfig:       cfgs.Host,
+		NetworkingConfig: cfgs.Network,
+	})
+	if err != nil {
+		return created, err
+	}
+	for _, warning := range response.Warnings {
+		s.events.On(api.Resource{
+			ID:     service.Name,
+			Status: api.Warning,
+			Text:   warning,
+		})
+	}
+	// Starting API version 1.44, the ContainerCreate API call takes multiple networks
+	// so we include all configurations there and can skip the one-by-one calls here.
+	// For older API versions (e.g. Docker 20.10/API 1.41, Synology DSM 7.1/7.2),
+	// extra networks must be connected individually after creation via NetworkConnect.
+	apiVersion, err := s.RuntimeAPIVersion(ctx)
+	if err != nil {
+		return created, err
+	}
+	if versions.LessThan(apiVersion, apiVersion144) {
+		serviceNetworks := service.NetworksByPriority()
+		for _, networkKey := range serviceNetworks {
+			mobyNetworkName := project.Networks[networkKey].Name
+			if string(cfgs.Host.NetworkMode) == mobyNetworkName {
+				// primary network already configured as part of ContainerCreate
+				continue
+			}
+			epSettings, err := createEndpointSettings(project, service, number, networkKey, cfgs.Links, options.UseNetworkAliases)
+			if err != nil {
+				_, _ = s.apiClient().ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
+				return created, err
+			}
+			if _, err := s.apiClient().NetworkConnect(ctx, mobyNetworkName, client.NetworkConnectOptions{
+				Container:      response.ID,
+				EndpointConfig: epSettings,
+			}); err != nil {
+				_, _ = s.apiClient().ContainerRemove(ctx, response.ID, client.ContainerRemoveOptions{Force: true})
+				return created, err
+			}
+		}
+	}
+
+	res, err := s.apiClient().ContainerInspect(ctx, response.ID, client.ContainerInspectOptions{})
+	if err != nil {
+		return created, err
+	}
+	created = container.Summary{
+		ID:     res.Container.ID,
+		Labels: res.Container.Config.Labels,
+		Names:  []string{res.Container.Name},
+		NetworkSettings: &container.NetworkSettingsSummary{
+			Networks: res.Container.NetworkSettings.Networks,
+		},
+	}
+
+	return created, nil
+}
+
+// getLinks mimics V1 compose/service.py::Service::_get_links()
+func (s *composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) ([]string, error) {
+	var links []string
+	format := func(k, v string) string {
+		return fmt.Sprintf("%s:%s", k, v)
+	}
+	getServiceContainers := func(serviceName string) (Containers, error) {
+		return s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+	}
+
+	for _, rawLink := range service.Links {
+		// linkName if informed like in: "serviceName[:linkName]"
+		linkServiceName, linkName, ok := strings.Cut(rawLink, ":")
+		if !ok {
+			linkName = linkServiceName
+		}
+		serviceContainers, err := getServiceContainers(linkServiceName)
+		if err != nil {
+			return nil, err
+		}
+		for _, ctr := range serviceContainers {
+			containerName := getCanonicalContainerName(ctr)
+			links = append(links,
+				format(containerName, linkName),
+				format(containerName, linkServiceName+api.Separator+strconv.Itoa(number)),
+				format(containerName, strings.Join([]string{projectName, linkServiceName, strconv.Itoa(number)}, api.Separator)),
+			)
+		}
+	}
+
+	if service.Labels[api.OneoffLabel] == "True" {
+		serviceContainers, err := getServiceContainers(service.Name)
+		if err != nil {
+			return nil, err
+		}
+		for _, ctr := range serviceContainers {
+			containerName := getCanonicalContainerName(ctr)
+			links = append(links,
+				format(containerName, service.Name),
+				format(containerName, strings.TrimPrefix(containerName, projectName+api.Separator)),
+				format(containerName, containerName),
+			)
+		}
+	}
+
+	for _, rawExtLink := range service.ExternalLinks {
+		externalLink, linkName, ok := strings.Cut(rawExtLink, ":")
+		if !ok {
+			linkName = externalLink
+		}
+		links = append(links, format(externalLink, linkName))
+	}
+	return links, nil
+}
+
+func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool) (bool, error) {
+	for _, ctr := range containers {
+		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			return false, err
+		}
+		ctr := res.Container
+		name := ctr.Name[1:]
+
+		if ctr.State.Status == container.StateExited {
+			return false, fmt.Errorf("container %s exited (%d)", name, ctr.State.ExitCode)
+		}
+
+		noHealthcheck := ctr.Config.Healthcheck == nil || (len(ctr.Config.Healthcheck.Test) > 0 && ctr.Config.Healthcheck.Test[0] == "NONE")
+		if noHealthcheck && fallbackRunning {
+			// Container does not define a health check, but we can fall back to "running" state
+			return ctr.State != nil && ctr.State.Status == container.StateRunning, nil
+		}
+
+		if ctr.State == nil || ctr.State.Health == nil {
+			return false, fmt.Errorf("container %s has no healthcheck configured", name)
+		}
+		switch ctr.State.Health.Status {
+		case container.Healthy:
+			// Continue by checking the next container.
+		case container.Unhealthy:
+			return false, fmt.Errorf("container %s is unhealthy", name)
+		case container.Starting:
+			return false, nil
+		default:
+			return false, fmt.Errorf("container %s had unexpected health status %q", name, ctr.State.Health.Status)
+		}
+	}
+	return true, nil
+}
+
+func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
+	for _, ctr := range containers {
+		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			return false, 0, err
+		}
+		if res.Container.State != nil && res.Container.State.Status == container.StateExited {
+			return true, res.Container.State.ExitCode, nil
+		}
+	}
+	return false, 0, nil
+}
+
+func (s *composeService) startService(ctx context.Context,
+	project *types.Project, service types.ServiceConfig,
+	containers Containers, listener api.ContainerEventListener,
+	timeout time.Duration,
+) error {
+	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
+		return nil
+	}
+
+	err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, containers, timeout)
+	if err != nil {
+		return err
+	}
+
+	if len(containers) == 0 {
+		if service.GetScale() == 0 {
+			return nil
+		}
+		return fmt.Errorf("service %q has no container to start", service.Name)
+	}
+
+	serviceContainers := containers.filter(isService(service.Name), isNotOneOff)
+	toStart := serviceContainers.filter(isNotRunning)
+	if len(toStart) == 0 {
+		return nil
+	}
+
+	// pre_start runs once per service, only when no replica is already running
+	// (e.g. initial up, force-recreate, or spec change). per_replica: false is
+	// the only currently supported mode. Pick the replica with the lowest
+	// container-number so the choice is deterministic regardless of the order
+	// the daemon returns containers in.
+	if len(service.PreStart) > 0 && len(serviceContainers) == len(toStart) {
+		if err := s.runPreStart(ctx, project, service, lowestNumberedContainer(toStart), listener); err != nil {
+			return err
+		}
+	}
+
+	for _, ctr := range toStart {
+		if err := s.startServiceContainer(ctx, project, service, ctr, listener); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *composeService) startServiceContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, ctr container.Summary, listener api.ContainerEventListener) error {
+	if err := s.injectSecrets(ctx, project, service, ctr.ID); err != nil {
+		return err
+	}
+	if err := s.injectConfigs(ctx, project, service, ctr.ID); err != nil {
+		return err
+	}
+
+	eventName := getContainerProgressName(ctr)
+	s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
+	startMx.Lock()
+	_, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
+	startMx.Unlock()
+	if err != nil {
+		return err
+	}
+
+	for _, hook := range service.PostStart {
+		if err := s.runHook(ctx, ctr, service, hook, listener); err != nil {
+			return err
+		}
+	}
+
+	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
+	return nil
+}
+
+func mergeLabels(ls ...types.Labels) types.Labels {
+	merged := types.Labels{}
+	for _, l := range ls {
+		maps.Copy(merged, l)
+	}
+	return merged
+}

@@ -164,7 +164,7 @@ func (opts createOptions) GetTimeout() *time.Duration {
 
 func (opts createOptions) Apply(project *types.Project) error {
 	if opts.pullChanged {
-		if !opts.isPullPolicyValid() {
+		if !slices.Contains(validPullPolicies, opts.Pull) {
 			return fmt.Errorf("invalid --pull option %q", opts.Pull)
 		}
 		for i, service := range project.Services {
@@ -214,10 +214,7 @@ func applyScaleOpts(project *types.Project, opts []string) error {
 	return nil
 }
 
-func (opts createOptions) isPullPolicyValid() bool {
-	pullPolicies := []string{
-		types.PullPolicyAlways, types.PullPolicyNever, types.PullPolicyBuild,
-		types.PullPolicyMissing, types.PullPolicyIfNotPresent,
-	}
-	return slices.Contains(pullPolicies, opts.Pull)
+var validPullPolicies = []string{
+	types.PullPolicyAlways, types.PullPolicyNever, types.PullPolicyBuild,
+	types.PullPolicyMissing, types.PullPolicyIfNotPresent,
 }

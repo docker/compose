@@ -29,12 +29,14 @@ import (
 	gsync "sync"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
 	ccli "github.com/docker/cli/cli/command/container"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -186,7 +188,7 @@ func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 	}
 }
 
-func (s *composeService) watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) { //nolint: gocyclo
+func (s *composeService) watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) {
 	var err error
 	if project, err = project.WithSelectedServices(options.Services); err != nil {
 		return nil, err
@@ -215,47 +217,16 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 			continue
 		}
 
-		for _, trigger := range config.Watch {
-			if trigger.Action == types.WatchActionRebuild {
-				if service.Build == nil {
-					return nil, fmt.Errorf("can't watch service %q with action %s without a build context", service.Name, types.WatchActionRebuild)
-				}
-				if options.Build == nil {
-					return nil, fmt.Errorf("--no-build is incompatible with watch action %s in service %s", types.WatchActionRebuild, service.Name)
-				}
-				// set the service to always be built - watch triggers `Up()` when it receives a rebuild event
-				service.PullPolicy = types.PullPolicyBuild
-				project.Services[serviceName] = service
-			}
+		service, err = prepareRebuildTriggers(project, serviceName, service, config, options)
+		if err != nil {
+			return nil, err
 		}
 
-		for _, trigger := range config.Watch {
-			if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
-				logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
-				continue
-			} else {
-				shouldInitialSync := trigger.InitialSync
-
-				// Check legacy extension attribute for backward compatibility
-				if !shouldInitialSync {
-					var legacyInitialSync bool
-					success, err := trigger.Extensions.Get("x-initialSync", &legacyInitialSync)
-					if err == nil && success && legacyInitialSync {
-						shouldInitialSync = true
-						logrus.Warnf("x-initialSync is DEPRECATED, please use the official `initial_sync` attribute\n")
-					}
-				}
-
-				if shouldInitialSync && isSync(trigger) {
-					// Need to check that initial files meant to be synced from the watch action are in the container
-					err := s.initialSync(ctx, project, service, trigger, syncer)
-					if err != nil {
-						return nil, err
-					}
-				}
-			}
-			paths = append(paths, trigger.Path)
+		triggerPaths, err := s.watchTriggerPaths(ctx, service, config, syncer)
+		if err != nil {
+			return nil, err
 		}
+		paths = append(paths, triggerPaths...)
 
 		serviceWatchRules, err := getWatchRules(config, service)
 		if err != nil {
@@ -290,6 +261,63 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 		}
 		return err
 	}, nil
+}
+
+// prepareRebuildTriggers validates rebuild watch actions and marks the
+// service to always be built — watch triggers `Up()` when it receives a
+// rebuild event. It returns the possibly-updated service config.
+func prepareRebuildTriggers(project *types.Project, serviceName string, service types.ServiceConfig, config *types.DevelopConfig, options api.WatchOptions) (types.ServiceConfig, error) {
+	for _, trigger := range config.Watch {
+		if trigger.Action != types.WatchActionRebuild {
+			continue
+		}
+		if service.Build == nil {
+			return service, fmt.Errorf("can't watch service %q with action %s without a build context", service.Name, types.WatchActionRebuild)
+		}
+		if options.Build == nil {
+			return service, fmt.Errorf("--no-build is incompatible with watch action %s in service %s", types.WatchActionRebuild, service.Name)
+		}
+		service.PullPolicy = types.PullPolicyBuild
+		project.Services[serviceName] = service
+	}
+	return service, nil
+}
+
+// watchTriggerPaths collects the paths to monitor for a service, skipping
+// (with a warning) those already covered by a bind mount volume, and runs the
+// initial sync for sync triggers requesting one.
+func (s *composeService) watchTriggerPaths(ctx context.Context, service types.ServiceConfig, config *types.DevelopConfig, syncer sync.Syncer) ([]string, error) {
+	var paths []string
+	for _, trigger := range config.Watch {
+		if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+			logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
+			continue
+		}
+		if initialSyncRequested(trigger) && isSync(trigger) {
+			// Need to check that initial files meant to be synced from the watch action are in the container
+			err := s.initialSync(ctx, service, trigger, syncer)
+			if err != nil {
+				return nil, err
+			}
+		}
+		paths = append(paths, trigger.Path)
+	}
+	return paths, nil
+}
+
+// initialSyncRequested tells whether a sync trigger requests an initial sync,
+// honoring the DEPRECATED x-initialSync extension attribute
+func initialSyncRequested(trigger types.Trigger) bool {
+	if trigger.InitialSync {
+		return true
+	}
+	var legacyInitialSync bool
+	success, err := trigger.Extensions.Get("x-initialSync", &legacyInitialSync)
+	if err == nil && success && legacyInitialSync {
+		logrus.Warnf("x-initialSync is DEPRECATED, please use the official `initial_sync` attribute\n")
+		return true
+	}
+	return false
 }
 
 func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]watchRule, error) {
@@ -529,7 +557,6 @@ func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCl
 	return err
 }
 
-//nolint:gocyclo
 func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, options api.WatchOptions, batch []watch.FileEvent, rules []watchRule, syncer sync.Syncer) error {
 	var (
 		restart   = map[string]bool{}
@@ -612,7 +639,7 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 	if err != nil {
 		return err
 	}
-	for _, c := range containers {
+	for _, ctr := range containers {
 		eg.Go(func() error {
 			exec := ccli.NewExecOptions()
 			exec.User = x.User
@@ -626,7 +653,7 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 					return err
 				}
 			}
-			return ccli.RunExec(ctx, s.dockerCli, c.ID, exec)
+			return ccli.RunExec(ctx, s.dockerCli, ctr.ID, exec)
 		})
 	}
 	return nil
@@ -718,27 +745,24 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 }
 
 func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
-	images, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
-		Filters: projectFilter(projectName).Add("dangling", "true"),
-	})
-	if err != nil {
-		logrus.Debugf("Failed to list images: %v", err)
-		return
+	// imageNameToIdMap is keyed by image name; the freshly built images to
+	// spare are its VALUES (image IDs), matched against the dangling IDs
+	builtIDs := make(map[string]struct{}, len(imageNameToIdMap))
+	for _, id := range imageNameToIdMap {
+		builtIDs[id] = struct{}{}
 	}
-
-	for _, img := range images.Items {
-		if _, ok := imageNameToIdMap[img.ID]; !ok {
-			_, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{})
-			if err != nil {
-				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
-			}
-		}
+	keep := func(img image.Summary) bool {
+		_, ok := builtIDs[img.ID]
+		return ok
+	}
+	if _, err := s.removeDanglingImages(ctx, projectName, keep); err != nil {
+		logrus.Debugf("Failed to list images: %v", err)
 	}
 }
 
 // Walks develop.watch.path and checks which files should be copied inside the container
 // ignores develop.watch.ignore, Dockerfile, compose files, bind mounted paths and .git
-func (s *composeService) initialSync(ctx context.Context, project *types.Project, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
+func (s *composeService) initialSync(ctx context.Context, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
 	dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
 	if err != nil {
 		return err
@@ -753,14 +777,27 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 	if err != nil {
 		return err
 	}
-	// FIXME .dockerignore
+
+	// also exclude override compose files and any custom-named Dockerfile
+	dockerFilePatterns := append([]string{"Dockerfile"}, cli.DefaultFileNames...)
+	dockerFilePatterns = append(dockerFilePatterns, cli.DefaultOverrideFileNames...)
+	if service.Build != nil && service.Build.Dockerfile != "" {
+		dockerFilePatterns = append(dockerFilePatterns, filepath.Base(service.Build.Dockerfile))
+	}
+
+	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", dockerFilePatterns)
+	if err != nil {
+		return err
+	}
+
 	ignoreInitialSync := watch.NewCompositeMatcher(
 		dockerIgnores,
 		watch.EphemeralPathMatcher(),
 		dotGitIgnore,
+		dockerFileIgnore,
 		triggerIgnore)
 
-	pathsToCopy, err := s.initialSyncFiles(ctx, project, service, trigger, ignoreInitialSync)
+	pathsToCopy, err := s.initialSyncFiles(service, trigger, ignoreInitialSync)
 	if err != nil {
 		return err
 	}
@@ -768,69 +805,63 @@ func (s *composeService) initialSync(ctx context.Context, project *types.Project
 	return syncer.Sync(ctx, service.Name, pathsToCopy)
 }
 
-// Syncs files from develop.watch.path if they have been modified after the image has been created
-//
-//nolint:gocyclo
-func (s *composeService) initialSyncFiles(ctx context.Context, project *types.Project, service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
+// Syncs files from develop.watch.path, ignoring bind-mounted and excluded paths.
+func (s *composeService) initialSyncFiles(service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
 	fi, err := os.Stat(trigger.Path)
 	if err != nil {
 		return nil, err
 	}
-	timeImageCreated, err := s.imageCreatedTime(ctx, project, service.Name)
-	if err != nil {
-		return nil, err
-	}
-	var pathsToCopy []*sync.PathMapping
 	switch mode := fi.Mode(); {
 	case mode.IsDir():
 		// process directory
-		err = filepath.WalkDir(trigger.Path, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				// handle possible path err, just in case...
-				return err
-			}
-			if trigger.Path == path {
-				// walk starts at the root directory
-				return nil
-			}
-			if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
-				// By definition sync ignores bind mounted paths
-				if d.IsDir() {
-					// skip folder
-					return fs.SkipDir
-				}
-				return nil // skip file
-			}
-			info, err := d.Info()
-			if err != nil {
-				return err
-			}
-			if !d.IsDir() {
-				if info.ModTime().Before(timeImageCreated) {
-					// skip file if it was modified before image creation
-					return nil
-				}
-				rel, err := filepath.Rel(trigger.Path, path)
-				if err != nil {
-					return err
-				}
-				// only copy files (and not full directories)
-				pathsToCopy = append(pathsToCopy, &sync.PathMapping{
-					HostPath:      path,
-					ContainerPath: filepath.Join(trigger.Target, rel),
-				})
-			}
-			return nil
-		})
+		return initialSyncDirectory(trigger, service, ignore)
 	case mode.IsRegular():
 		// process file
-		if fi.ModTime().After(timeImageCreated) && !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
-			pathsToCopy = append(pathsToCopy, &sync.PathMapping{
+		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+			return []*sync.PathMapping{{
 				HostPath:      trigger.Path,
 				ContainerPath: trigger.Target,
-			})
+			}}, nil
 		}
 	}
+	return nil, nil
+}
+
+// initialSyncDirectory collects the files of a watched directory, skipping
+// ignored and bind-mounted paths.
+func initialSyncDirectory(trigger types.Trigger, service types.ServiceConfig, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
+	var pathsToCopy []*sync.PathMapping
+	err := filepath.WalkDir(trigger.Path, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			// handle possible path err, just in case...
+			return err
+		}
+		if trigger.Path == path {
+			// walk starts at the root directory
+			return nil
+		}
+		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
+			// By definition sync ignores bind mounted paths
+			if d.IsDir() {
+				// skip folder
+				return fs.SkipDir
+			}
+			return nil // skip file
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(trigger.Path, path)
+		if err != nil {
+			return err
+		}
+		// only copy files (and not full directories)
+		pathsToCopy = append(pathsToCopy, &sync.PathMapping{
+			HostPath:      path,
+			ContainerPath: filepath.Join(trigger.Target, rel),
+		})
+		return nil
+	})
 	return pathsToCopy, err
 }
 
@@ -838,29 +869,4 @@ func shouldIgnore(name string, ignore watch.PathMatcher) bool {
 	shouldIgnore, _ := ignore.Matches(name)
 	// ignore files that match any ignore pattern
 	return shouldIgnore
-}
-
-// gets the image creation time for a service
-func (s *composeService) imageCreatedTime(ctx context.Context, project *types.Project, serviceName string) (time.Time, error) {
-	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		All:     true,
-		Filters: projectFilter(project.Name).Add("label", serviceFilter(serviceName)),
-	})
-	if err != nil {
-		return time.Now(), err
-	}
-	if len(res.Items) == 0 {
-		return time.Now(), fmt.Errorf("could not get created time for service's image")
-	}
-
-	img, err := s.apiClient().ImageInspect(ctx, res.Items[0].ImageID)
-	if err != nil {
-		return time.Now(), err
-	}
-	// Need to get the oldest one?
-	timeCreated, err := time.Parse(time.RFC3339Nano, img.Created)
-	if err != nil {
-		return time.Now(), err
-	}
-	return timeCreated, nil
 }

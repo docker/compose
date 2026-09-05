@@ -1,4 +1,0 @@
-services:
-  simple:
-    image: alpine
-    command: echo "Hi there!!"

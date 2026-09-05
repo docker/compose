@@ -26,9 +26,9 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
+func (s *composeService) Volumes(ctx context.Context, projectName string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
 	allContainers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: projectFilter(project),
+		Filters: projectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err
@@ -38,9 +38,9 @@ func (s *composeService) Volumes(ctx context.Context, project string, options ap
 
 	if len(options.Services) > 0 {
 		// filter service containers
-		for _, c := range allContainers.Items {
-			if slices.Contains(options.Services, c.Labels[api.ServiceLabel]) {
-				containers = append(containers, c)
+		for _, ctr := range allContainers.Items {
+			if slices.Contains(options.Services, ctr.Labels[api.ServiceLabel]) {
+				containers = append(containers, ctr)
 			}
 		}
 	} else {
@@ -48,7 +48,7 @@ func (s *composeService) Volumes(ctx context.Context, project string, options ap
 	}
 
 	volumesResponse, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
-		Filters: projectFilter(project),
+		Filters: projectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err

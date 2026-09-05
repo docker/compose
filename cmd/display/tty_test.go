@@ -20,12 +20,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
 
+	"go.uber.org/goleak"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -37,7 +39,7 @@ func newTestWriter() (*ttyWriter, *bytes.Buffer) {
 		out:       &buf,
 		info:      &buf,
 		tasks:     map[string]*task{},
-		done:      make(chan bool),
+		done:      newDoneSignal(),
 		mtx:       &sync.Mutex{},
 		operation: "pull",
 	}
@@ -549,6 +551,15 @@ func TestLenAnsi(t *testing.T) {
 	}
 }
 
+// TestDoneBeforeStartDoesNotPanic guards against a nil-pointer panic if Done
+// is ever called without a prior Start: Full must initialize done, since
+// ttyWriter is exposed only through the public api.EventProcessor interface
+// and a caller isn't guaranteed to call Start first.
+func TestDoneBeforeStartDoesNotPanic(t *testing.T) {
+	w := Full(io.Discard, io.Discard, false)
+	w.Done("op", false)
+}
+
 func TestDoneDeadlockFix(t *testing.T) {
 	w, _ := newTestWriter()
 	addTask(w, "test-task", "Working", "details", api.Working)
@@ -566,6 +577,91 @@ func TestDoneDeadlockFix(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Deadlock detected: Done() did not complete within 5 seconds")
+	}
+}
+
+// TestDoneAfterContextCancelDoesNotHang is the regression test for
+// docker/compose#14114: a single SIGTERM/SIGINT cancels the command context
+// (AdaptCmd). The render goroutine started by Start then exits through its
+// ctx.Done() branch and never receives from the done channel. Done must
+// still return.
+func TestDoneAfterContextCancelDoesNotHang(t *testing.T) {
+	w, _ := newTestWriter()
+	ctx, cancel := context.WithCancel(t.Context())
+	w.Start(ctx, "down")
+	cancel()
+	// Let the render goroutine observe the cancellation and exit.
+	time.Sleep(100 * time.Millisecond)
+
+	finished := make(chan struct{})
+	go func() {
+		w.Done("down", false)
+		close(finished)
+	}()
+	select {
+	case <-finished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ttyWriter.Done blocked forever after context cancellation")
+	}
+}
+
+// TestNestedStartDoneDoesNotPanic guards against a panic if Start/Done are
+// ever nested (a Start called again before the matching Done): closing a
+// channel more than once panics unless each cycle's own doneSignal (with its
+// own sync.Once) is used, instead of a single shared channel. It also
+// guards against a goroutine leak: the outer cycle's render goroutine must
+// not be left waiting on a doneSignal nobody closes once Start replaces it.
+func TestNestedStartDoneDoesNotPanic(t *testing.T) {
+	w, _ := newTestWriter()
+	ctx := t.Context()
+
+	w.Start(ctx, "outer")
+	w.Start(ctx, "inner")
+	w.Done("inner", false)
+	w.Done("outer", false)
+
+	// give the outer cycle's render goroutine a chance to observe the
+	// second Start closing its signal and exit before goleak checks.
+	time.Sleep(100 * time.Millisecond)
+	goleak.VerifyNone(t)
+}
+
+// TestSequentialStartDoneEachGetFreshChannel is the regression test for the
+// bus going through more than one Start/Done cycle in its lifetime, as
+// happens with `docker compose rm --stop` (a "stop" cycle, then its own
+// "remove" cycle): each Start must allocate a fresh doneSignal, independent
+// of any earlier cycle's already-closed one, or the second cycle's render
+// goroutine would see it as immediately closed and exit without ever
+// ticking.
+func TestSequentialStartDoneEachGetFreshChannel(t *testing.T) {
+	w, _ := newTestWriter()
+	ctx := t.Context()
+
+	w.Start(ctx, "first")
+	first := w.done
+	w.Done("first", false)
+	select {
+	case <-first.ch:
+	default:
+		t.Fatal("expected the first cycle's done channel to be closed after its Done")
+	}
+
+	w.Start(ctx, "second")
+	second := w.done
+	if second == first {
+		t.Fatal("expected Start to allocate a fresh done signal for the new cycle")
+	}
+	select {
+	case <-second.ch:
+		t.Fatal("expected the second cycle's done channel to still be open before its own Done")
+	default:
+	}
+
+	w.Done("second", false)
+	select {
+	case <-second.ch:
+	default:
+		t.Fatal("expected the second cycle's done channel to be closed after its own Done")
 	}
 }
 

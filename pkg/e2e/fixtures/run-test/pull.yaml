@@ -1,4 +1,0 @@
-services:
-  backend:
-    image: nginx
-    command: nginx -t

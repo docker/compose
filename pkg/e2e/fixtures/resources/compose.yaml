@@ -1,5 +1,0 @@
-volumes:
-  my_vol: {}
-
-networks:
-  my_net: {}

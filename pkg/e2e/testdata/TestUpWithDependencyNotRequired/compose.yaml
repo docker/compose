@@ -1,0 +1,13 @@
+services:
+  foo:
+    image: bash
+    command: echo "foo"
+    depends_on:
+      bar:
+        required: false
+        condition: service_healthy
+  bar:
+    image: alpine
+    init: true
+    command: sleep infinity
+    profiles: [not-required]

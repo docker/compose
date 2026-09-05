@@ -1,0 +1,9 @@
+services:
+  foo:
+    image: ${BUILT_IMAGE}
+    build:
+      context: .
+  bar:
+    image: ${BUILT_IMAGE}
+    depends_on:
+      - foo

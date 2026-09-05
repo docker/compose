@@ -1,0 +1,13 @@
+services:
+  web:
+    image: alpine
+    init: true
+    command: sleep infinity
+  words:
+    image: alpine
+    init: true
+    command: sleep infinity
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity

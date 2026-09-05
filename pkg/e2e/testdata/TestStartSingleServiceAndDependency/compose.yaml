@@ -1,0 +1,27 @@
+services:
+  desired:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      - dep_1
+  dep_1:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      - dep_2
+  dep_2:
+    image: alpine
+    init: true
+    command: sleep infinity
+  another:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      - another_2
+  another_2:
+    image: alpine
+    init: true
+    command: sleep infinity

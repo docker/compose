@@ -96,7 +96,7 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 	eg.SetLimit(16) // arbitrary limit, adjust to taste :D
 	for i := range containers {
 		containerID := containers[i].ID
-		tarReader := tarArchive(pathsToCopy)
+		tarReader := tarArchive(pathsToCopy, keepImpliedDirectories)
 
 		eg.Go(func() error {
 			if len(deleteCmd) != 0 {
@@ -108,9 +108,24 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 			}
 
 			if err := t.client.Untar(ctx, containerID, tarReader); err != nil {
-				errMu.Lock()
-				errs = append(errs, fmt.Errorf("copying files to %s: %w", containerID, err))
-				errMu.Unlock()
+				// The engine answers with a plain 500, so the message is the only discriminator.
+				if !strings.Contains(err.Error(), "cannot overwrite non-directory") {
+					errMu.Lock()
+					errs = append(errs, fmt.Errorf("copying files to %s: %w", containerID, err))
+					errMu.Unlock()
+					return nil
+				}
+
+				// A directory header for a path the container resolves through a symlink makes
+				// the engine reject the whole copy, so retry without the headers the archive's
+				// own entries already imply. That archive is a strict subset of the one that
+				// just failed, so sending it again is safe.
+				retry := tarArchive(pathsToCopy, dropImpliedDirectories)
+				if retryErr := t.client.Untar(ctx, containerID, retry); retryErr != nil {
+					errMu.Lock()
+					errs = append(errs, fmt.Errorf("copying files to %s: %w", containerID, errors.Join(err, retryErr)))
+					errMu.Unlock()
+				}
 			}
 			return nil // don't fail-fast; collect all errors
 		})
@@ -139,7 +154,7 @@ func (a *ArchiveBuilder) Close() error {
 }
 
 // ArchivePathsIfExist creates a tar archive of all local files in `paths`. It quietly skips any paths that don't exist.
-func (a *ArchiveBuilder) ArchivePathsIfExist(paths []PathMapping) error {
+func (a *ArchiveBuilder) ArchivePathsIfExist(paths []PathMapping, dropImpliedDirs bool) error {
 	// In order to handle overlapping syncs, we
 	// 1) collect all the entries,
 	// 2) de-dupe them, with last-one-wins semantics
@@ -161,6 +176,9 @@ func (a *ArchiveBuilder) ArchivePathsIfExist(paths []PathMapping) error {
 	}
 
 	entries = dedupeEntries(entries)
+	if dropImpliedDirs {
+		entries = withoutImpliedDirectories(entries)
+	}
 	for _, entry := range entries {
 		err := a.writeEntry(entry)
 		if err != nil {
@@ -318,11 +336,17 @@ func (a *ArchiveBuilder) entriesForPath(localPath, containerPath string) ([]arch
 	return result, nil
 }
 
-func tarArchive(ops []PathMapping) io.ReadCloser {
+// Whether tarArchive keeps the header of a directory the archive itself fills with entries.
+const (
+	keepImpliedDirectories = false
+	dropImpliedDirectories = true
+)
+
+func tarArchive(ops []PathMapping, dropImpliedDirs bool) io.ReadCloser {
 	pr, pw := io.Pipe()
 	go func() {
 		ab := NewArchiveBuilder(pw)
-		err := ab.ArchivePathsIfExist(ops)
+		err := ab.ArchivePathsIfExist(ops, dropImpliedDirs)
 		if err != nil {
 			_ = pw.CloseWithError(fmt.Errorf("adding files to tar: %w", err))
 		} else {
@@ -336,6 +360,28 @@ func tarArchive(ops []PathMapping) io.ReadCloser {
 		}
 	}()
 	return pr
+}
+
+// withoutImpliedDirectories removes the header of every directory the archive already fills with
+// entries: the engine creates those while extracting, while an explicit header makes it reject the
+// whole copy when the container resolves that path through a symlink. A directory nothing else
+// would create - an empty one - keeps its header.
+//
+// The engine creates them with ImpliedDirectoryMode and its own root uid/gid rather than the host's,
+// so this is a fallback for a copy that already failed, never the first attempt.
+func withoutImpliedDirectories(entries []archiveEntry) []archiveEntry {
+	holdsEntries := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		holdsEntries[path.Dir(path.Clean(entry.header.Name))] = true
+	}
+	result := make([]archiveEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.header.Typeflag == tar.TypeDir && holdsEntries[path.Clean(entry.header.Name)] {
+			continue
+		}
+		result = append(result, entry)
+	}
+	return result
 }
 
 // Dedupe the entries with last-entry-wins semantics.

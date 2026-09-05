@@ -1,0 +1,6 @@
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    mac_address: 00:e0:84:35:d0:e8

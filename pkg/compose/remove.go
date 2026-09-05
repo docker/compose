@@ -27,10 +27,12 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error { //nolint:gocyclo
+func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
 	projectName = strings.ToLower(projectName)
 
 	if options.Stop {
+		// Stop's own "stop" Start/Done cycle runs sequentially, fully
+		// closed, before "remove"'s below — ttyWriter supports that.
 		err := s.Stop(ctx, projectName, api.StopOptions{
 			Services: options.Services,
 			Project:  options.Project,
@@ -70,8 +72,8 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 	}
 
 	var names []string
-	for _, c := range stoppedContainers {
-		names = append(names, getCanonicalContainerName(c))
+	for _, ctr := range stoppedContainers {
+		names = append(names, getCanonicalContainerName(ctr))
 	}
 
 	if len(names) == 0 {

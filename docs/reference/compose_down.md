@@ -15,6 +15,18 @@ Anonymous volumes are not removed by default. However, as they don’t have a st
 mounted by a subsequent `up`. For data that needs to persist between updates, use explicit paths as bind mounts or
 named volumes.
 
+### Pre-start hook containers
+
+When a `pre_start` lifecycle hook fails, Compose retains its container for post-mortem inspection instead of removing
+it immediately. `compose down` automatically removes these retained hook containers as part of teardown, so they do
+not accumulate over time.
+
+To list retained hook containers before running `down`:
+
+```console
+$ docker ps -a --filter label=com.docker.compose.hook=pre_start
+```
+
 ### Options
 
 | Name               | Type     | Default | Description                                                                                                             |
@@ -43,3 +55,15 @@ Networks and volumes defined as external are never removed.
 Anonymous volumes are not removed by default. However, as they don’t have a stable name, they are not automatically
 mounted by a subsequent `up`. For data that needs to persist between updates, use explicit paths as bind mounts or
 named volumes.
+
+### Pre-start hook containers
+
+When a `pre_start` lifecycle hook fails, Compose retains its container for post-mortem inspection instead of removing
+it immediately. `compose down` automatically removes these retained hook containers as part of teardown, so they do
+not accumulate over time.
+
+To list retained hook containers before running `down`:
+
+```console
+$ docker ps -a --filter label=com.docker.compose.hook=pre_start
+```

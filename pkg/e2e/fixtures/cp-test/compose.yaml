@@ -1,3 +1,0 @@
-services:
-  nginx:
-    image:  nginx:alpine

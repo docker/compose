@@ -32,10 +32,11 @@ jobs:
           - validate-go-mod
           - validate-headers
           - validate-docs
+          - validate-mocks
     steps:
       -
         name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -45,7 +46,7 @@ jobs:
           make ${{ matrix.target }}
 
   binary:
-    uses: docker/github-builder/.github/workflows/bake.yml@3415a188caae9a0da7fba83bc06985776e0b1790 # v1.14.0
+    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
     permissions:
       contents: read # same as global permission
       id-token: write # for signing attestation(s) with GitHub OIDC Token
@@ -119,7 +120,7 @@ jobs:
 
   bin-image-test:
     if: github.event_name == 'pull_request'
-    uses: docker/github-builder/.github/workflows/bake.yml@3415a188caae9a0da7fba83bc06985776e0b1790 # v1.14.0
+    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
     with:
       runner: amd64
       target: image-cross
@@ -165,35 +166,49 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }})
+    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}, ${{ matrix.store }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          # current stable
+          # current stable, both image store backends: several digest-identity
+          # bugs only manifest on one of them (graphdriver vs containerd)
           - mode: plugin
             engine: 29
             channel: stable
+            store: graphdriver
+          - mode: plugin
+            engine: 29
+            channel: stable
+            store: containerd
           - mode: standalone
             engine: 29
             channel: stable
+            store: graphdriver
+          - mode: standalone
+            engine: 29
+            channel: stable
+            store: containerd
 
           # old stable (latest major - 1)
           - mode: plugin
             engine: 28
             channel: oldstable
+            store: graphdriver
           - mode: standalone
             engine: 28
             channel: oldstable
+            store: graphdriver
     steps:
       - name: Prepare
         run: |
           mode=${{ matrix.mode }}
           engine=${{ matrix.engine }}
-          echo "MODE_ENGINE_PAIR=${mode}-${engine}" >> $GITHUB_ENV
+          store=${{ matrix.store }}
+          echo "MODE_ENGINE_PAIR=${mode}-${engine}-${store}" >> $GITHUB_ENV
 
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Docker ${{ matrix.engine }}
         run: |
@@ -205,6 +220,20 @@ jobs:
 
       - name: Check Docker Version
         run: docker --version
+
+      - name: Enable containerd image store
+        if: ${{ matrix.store == 'containerd' }}
+        run: |
+          sudo mkdir -p /etc/docker
+          if [ -s /etc/docker/daemon.json ]; then
+            jq -s '.[0] * .[1]' /etc/docker/daemon.json <(echo '{"features": {"containerd-snapshotter": true}}') \
+              | sudo tee /etc/docker/daemon.json.new > /dev/null
+            sudo mv /etc/docker/daemon.json.new /etc/docker/daemon.json
+          else
+            echo '{"features": {"containerd-snapshotter": true}}' | sudo tee /etc/docker/daemon.json > /dev/null
+          fi
+          sudo systemctl restart docker.service
+          docker info -f '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -279,7 +308,7 @@ jobs:
     steps:
       # codecov won't process the report without the source code available
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -321,7 +350,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       -
         name: Download artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

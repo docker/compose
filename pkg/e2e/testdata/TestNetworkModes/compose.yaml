@@ -1,0 +1,8 @@
+services:
+  mydb:
+    image: alpine
+    network_mode: "service:db"
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity

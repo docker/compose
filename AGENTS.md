@@ -4,9 +4,20 @@
 
 - Build: `make build`
 - Test all: `make test`
-- Test unit: `go test ./pkg/...`
+- Test unit: `go test ./pkg/...` — needs no Docker daemon; the e2e suite is
+  gated behind the `e2e` build tag and is not picked up
 - Test single: `go test ./pkg/compose/ -run TestFunctionName`
-- E2E tests: `go test -tags e2e ./pkg/e2e/ -run TestName`
+- E2E tests: `go test -tags e2e ./pkg/e2e/ -run TestName` — requires a Docker
+  daemon and the locally built binary (`make build`)
+
+## E2E tests
+
+- **New e2e tests use the declarative `Scenario` DSL** (`NewScenario` in
+  `pkg/e2e/scenario.go`): intent, inline compose model, steps as
+  `(command → expected observables)`. Read `pkg/e2e/SCENARIO.md` before
+  writing or debugging one — it codifies the rules (state-based checks first,
+  `OutputContains` as last resort, new checks go in `pkg/e2e/checks.go`) and
+  how to exploit failure artifacts and `E2E_KEEP_FAILED=1`.
 
 ## Lint
 
@@ -34,7 +45,10 @@
 
 - Never create an issue or pull request without the user's explicit instruction.
 - If a user asks you to create a pull request on their behalf, add a file named
-  `AI_AGENT_DISCLOSURE.md` to the change containing the text:
+  `AI_AGENT_DISCLOSURE.md` to the change containing the text below followed by
+  the current date (`YYYY-MM-DD`). If the file is already present in the
+  repository, update its date to the current date so the disclosure is always
+  part of the change:
 
   > *"This contribution was prepared by an AI agent acting on a human's behalf.
   > The human submitter may not have independently reviewed or tested the change."*

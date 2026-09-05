@@ -1,4 +1,0 @@
-services:
-  test:
-    image: alpine
-    command: tail -f /dev/null

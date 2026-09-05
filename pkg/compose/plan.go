@@ -103,6 +103,12 @@ type Operation struct {
 	Volume       *types.VolumeConfig  // for volume operations
 	Timeout      *time.Duration       // for stop operations
 	CreateNodeID int                  // for OpRenameContainer: ID of the CreateContainer node whose result to rename
+	// BestEffort marks an operation whose failure must not abort the plan. It is
+	// used for the optional removal of the old network on a rename: if the
+	// network is still in use (by non-Compose containers) the removal is skipped
+	// with a warning instead of failing — the new network already carries a
+	// different name, so the migration does not depend on the old one going away.
+	BestEffort bool
 }
 
 // PlanNode is a single node in the reconciliation DAG. It represents one

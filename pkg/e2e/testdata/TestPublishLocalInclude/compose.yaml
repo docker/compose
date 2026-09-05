@@ -1,0 +1,6 @@
+include:
+  - common.yaml
+
+services:
+  test:
+    image: test

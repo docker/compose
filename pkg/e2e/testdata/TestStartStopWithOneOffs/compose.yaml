@@ -1,0 +1,9 @@
+services:
+  foo:
+    image: alpine
+    init: true
+    command: sleep infinity
+  bar:
+    image: alpine
+    init: true
+    command: sleep infinity

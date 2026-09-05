@@ -1,0 +1,10 @@
+services:
+  ping:
+    image: alpine
+    init: true
+    command: ping localhost -c 1
+  hello:
+    image: alpine
+    command: echo hello
+    deploy:
+      replicas: 2

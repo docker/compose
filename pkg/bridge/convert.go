@@ -42,10 +42,17 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
+// Confirm asks the user to confirm a destructive action described by
+// message, returning defaultValue when no explicit answer can be read.
+type Confirm func(message string, defaultValue bool) (bool, error)
+
 type ConvertOptions struct {
 	Output          string
 	Templates       string
 	Transformations []string
+	// Confirm is asked before deleting a non-empty output directory. If nil,
+	// deletion is refused whenever the directory is not empty.
+	Confirm Confirm
 }
 
 func Convert(ctx context.Context, dockerCli command.Cli, project *types.Project, opts ConvertOptions) error {
@@ -70,14 +77,56 @@ func Convert(ctx context.Context, dockerCli command.Cli, project *types.Project,
 	}
 
 	if opts.Output != "" {
-		_ = os.RemoveAll(opts.Output)
-		err := os.MkdirAll(opts.Output, 0o744)
-		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("cannot create output folder: %w", err)
+		if err := prepareOutputDir(opts); err != nil {
+			return err
 		}
 	}
 	// Run Transformers images
 	return convert(ctx, dockerCli, model, opts)
+}
+
+// prepareOutputDir makes sure output exists and is empty. If it already
+// contains files, it asks for confirmation before deleting them, so a typo
+// or misuse (e.g. -o . or -o $HOME) doesn't silently destroy user data.
+func prepareOutputDir(opts ConvertOptions) error {
+	empty, err := isEmptyOrMissingDir(opts.Output)
+	if err != nil {
+		return err
+	}
+	if empty {
+		return os.MkdirAll(opts.Output, 0o744)
+	}
+
+	confirmed := false
+	if opts.Confirm != nil {
+		confirmed, err = opts.Confirm(
+			fmt.Sprintf("Output directory '%s' is not empty, all its content will be permanently deleted. Continue?", opts.Output),
+			false)
+		if err != nil {
+			return err
+		}
+	}
+	if !confirmed {
+		return fmt.Errorf("deletion of output directory '%s' was not confirmed", opts.Output)
+	}
+	if err := os.RemoveAll(opts.Output); err != nil {
+		return fmt.Errorf("cannot remove existing output folder: %w", err)
+	}
+	if err := os.MkdirAll(opts.Output, 0o744); err != nil {
+		return fmt.Errorf("output directory '%s' was deleted but could not be recreated: %w", opts.Output, err)
+	}
+	return nil
+}
+
+func isEmptyOrMissingDir(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true, nil
+		}
+		return false, fmt.Errorf("cannot read output folder: %w", err)
+	}
+	return len(entries) == 0, nil
 }
 
 func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, opts ConvertOptions) error {
@@ -164,27 +213,11 @@ func convert(ctx context.Context, dockerCli command.Cli, model map[string]any, o
 // LoadAdditionalResources loads additional resources from the project, such as image references, secrets, configs and exposed ports
 func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project *types.Project) (*types.Project, error) {
 	for name, service := range project.Services {
-		imageName := api.GetImageNameOrDefault(service, project.Name)
-
-		inspect, err := inspectWithPull(ctx, dockerCLI, imageName)
+		updated, err := loadServiceImageResources(ctx, dockerCLI, project.Name, name, service)
 		if err != nil {
 			return nil, err
 		}
-		service.Image = imageName
-		exposed := utils.Set[string]{}
-		exposed.AddAll(service.Expose...)
-		for port := range inspect.Config.ExposedPorts {
-			p, err := network.ParsePort(port)
-			if err != nil {
-				return nil, err
-			}
-			exposed.Add(strconv.Itoa(int(p.Num())))
-		}
-		for _, port := range service.Ports {
-			exposed.Add(strconv.Itoa(int(port.Target)))
-		}
-		service.Expose = exposed.Elements()
-		project.Services[name] = service
+		project.Services[name] = updated
 	}
 
 	for name, secret := range project.Secrets {
@@ -204,6 +237,51 @@ func LoadAdditionalResources(ctx context.Context, dockerCLI command.Cli, project
 	}
 
 	return project, nil
+}
+
+// loadServiceImageResources resolves the service image and merges the ports
+// it exposes into the service's Expose list
+func loadServiceImageResources(ctx context.Context, dockerCLI command.Cli, projectName, name string, service types.ServiceConfig) (types.ServiceConfig, error) {
+	imageName := api.GetImageNameOrDefault(service, projectName)
+
+	inspect, err := inspectServiceImage(ctx, dockerCLI, name, imageName, service)
+	if err != nil {
+		return service, err
+	}
+
+	service.Image = imageName
+	exposed := utils.Set[string]{}
+	exposed.AddAll(service.Expose...)
+	if inspect.Config != nil {
+		for port := range inspect.Config.ExposedPorts {
+			p, err := network.ParsePort(port)
+			if err != nil {
+				return service, err
+			}
+			exposed.Add(strconv.Itoa(int(p.Num())))
+		}
+	}
+	for _, port := range service.Ports {
+		exposed.Add(strconv.Itoa(int(port.Target)))
+	}
+	service.Expose = exposed.Elements()
+	return service, nil
+}
+
+// inspectServiceImage inspects the service image, pulling it when needed; a
+// buildable image missing locally only degrades to a warning
+func inspectServiceImage(ctx context.Context, dockerCLI command.Cli, name, imageName string, service types.ServiceConfig) (image.InspectResponse, error) {
+	if service.Build != nil && service.Image == "" {
+		result, err := dockerCLI.Client().ImageInspect(ctx, imageName)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return image.InspectResponse{}, err
+			}
+			logrus.Warnf("image %s for service %s not found locally; Dockerfile-exposed ports will not be included — run `docker compose build` first to include them", imageName, name)
+		}
+		return result.InspectResponse, nil
+	}
+	return inspectWithPull(ctx, dockerCLI, imageName)
 }
 
 func loadFileObject(conf types.FileObjectConfig) (types.FileObjectConfig, error) {

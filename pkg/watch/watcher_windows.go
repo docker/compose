@@ -33,3 +33,10 @@ import (
 func MaybeIncreaseBufferSize(w *fsnotify.Watcher) {
 	w.SetBufferSize(DesiredWindowsBufferSize())
 }
+
+func setRecursive(w *fsnotify.Watcher) (bool, error) {
+	if err := w.SetRecursive(); err != nil {
+		return false, err
+	}
+	return true, nil
+}

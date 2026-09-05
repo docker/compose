@@ -1,0 +1,11 @@
+services:
+  app:
+    image: alpine
+    init: true
+    # /app/data/sub is a symlink, so synced files have to land in /var/sub through it
+    command: sh -c 'mkdir -p /app/data /var/sub && ln -s /var/sub /app/data/sub && sleep infinity'
+    develop:
+      watch:
+        - action: sync
+          path: ./data
+          target: /app/data

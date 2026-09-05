@@ -53,7 +53,7 @@ group "default" {
 }
 
 group "validate" {
-  targets = ["lint", "vendor-validate", "license-validate"]
+  targets = ["lint", "vendor-validate", "license-validate", "mocks-validate"]
 }
 
 target "lint" {
@@ -75,6 +75,12 @@ target "license-update" {
 target "vendor-validate" {
   inherits = ["_common"]
   target = "vendor-validate"
+  output = ["type=cacheonly"]
+}
+
+target "mocks-validate" {
+  inherits = ["_common"]
+  target = "mocks-validate"
   output = ["type=cacheonly"]
 }
 

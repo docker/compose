@@ -26,7 +26,6 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/buildx/store/storeutil"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
@@ -248,11 +247,18 @@ func (s *composeService) getContextInfo() api.ContextInfo {
 }
 
 // getProxyConfig returns the proxy config - either custom override or environment-based
-func (s *composeService) getProxyConfig() map[string]string {
+func (s *composeService) getProxyConfig() map[string]*string {
 	if s.proxyConfig != nil {
-		return s.proxyConfig
+		m := make(map[string]*string, len(s.proxyConfig))
+		for k, v := range s.proxyConfig {
+			m[k] = &v
+		}
+		return m
 	}
-	return storeutil.GetProxyConfig(s.dockerCli)
+	// proxy configuration from the CLI config file, keyed by daemon host
+	// with "default" as fallback — the same lookup `docker build` uses.
+	// Passing nil runOpts hands us a freshly allocated map we own.
+	return s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil)
 }
 
 func (s *composeService) stdout() *streams.Out {
@@ -365,17 +371,17 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		return project, fmt.Errorf("no container found for project %q: %w", projectName, api.ErrNotFound)
 	}
 	set := types.Services{}
-	for _, c := range containers {
-		serviceLabel, ok := c.Labels[api.ServiceLabel]
+	for _, ctr := range containers {
+		serviceLabel, ok := ctr.Labels[api.ServiceLabel]
 		if !ok {
-			serviceLabel = getCanonicalContainerName(c)
+			serviceLabel = getCanonicalContainerName(ctr)
 		}
 		service, ok := set[serviceLabel]
 		if !ok {
 			service = types.ServiceConfig{
 				Name:   serviceLabel,
-				Image:  c.Image,
-				Labels: c.Labels,
+				Image:  ctr.Image,
+				Labels: ctr.Labels,
 			}
 		}
 		service.Scale = increment(service.Scale)
@@ -433,10 +439,10 @@ func increment(scale *int) *int {
 }
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
-	opts := client.VolumeListOptions{
+	options := client.VolumeListOptions{
 		Filters: projectFilter(projectName),
 	}
-	volumes, err := s.apiClient().VolumeList(ctx, opts)
+	volumes, err := s.apiClient().VolumeList(ctx, options)
 	if err != nil {
 		return nil, err
 	}

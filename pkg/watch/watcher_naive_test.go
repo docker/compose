@@ -157,3 +157,42 @@ func TestDontRecurseWhenWatchingParentsOfNonExistentFiles(t *testing.T) {
 		t.Fatalf("watching more than 5 files: %d", n)
 	}
 }
+
+// A directory the current user cannot read costs us visibility into that
+// subtree, but it must not prevent the rest of the tree from being watched.
+//
+// Uses a real unreadable directory, so it is skipped as root and covers
+// nothing in CI. See watcher_naive_walk_test.go for the unit tests.
+func TestWatchRecursivelySkipsUnreadableDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission semantics differ on windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses the permission bit this test relies on")
+	}
+
+	root := t.TempDir()
+	unreadable := filepath.Join(root, "unreadable")
+	if err := os.MkdirAll(filepath.Join(unreadable, "inner"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "watched.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(unreadable, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(unreadable, 0o755) })
+
+	if _, err := os.ReadDir(unreadable); err == nil {
+		t.Skip("could not make the directory unreadable in this environment")
+	}
+
+	notify, err := NewWatcher([]string{root})
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = notify.Close() })
+
+	if err := notify.Start(); err != nil {
+		t.Fatalf("Start() must not fail because of an unreadable directory: %v", err)
+	}
+}

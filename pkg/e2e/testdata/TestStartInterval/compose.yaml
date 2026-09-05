@@ -1,0 +1,19 @@
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+    healthcheck:
+      interval: 30s
+      start_period: 10s
+      start_interval: 1s
+      test: "/bin/true"
+
+  error:
+    image: alpine
+    init: true
+    command: sleep infinity
+    healthcheck:
+      interval: 30s
+      start_interval: 1s
+      test: "/bin/true"

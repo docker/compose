@@ -57,7 +57,7 @@ func eventsCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 }
 
 func runEvents(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts eventsOpts, services []string) error {
-	name, err := opts.toProjectName(ctx, dockerCli)
+	_, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
 		return err
 	}

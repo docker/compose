@@ -23,14 +23,13 @@ import (
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/container"
-	containerType "github.com/moby/moby/api/types/container"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *composeService) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
 	projectName = strings.ToLower(projectName)
-	target, err := s.getExecTarget(ctx, projectName, options)
+	target, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return 0, err
 	}
@@ -56,8 +55,4 @@ func (s *composeService) Exec(ctx context.Context, projectName string, options a
 		return sterr.StatusCode, err
 	}
 	return 0, err
-}
-
-func (s *composeService) getExecTarget(ctx context.Context, projectName string, opts api.RunOptions) (containerType.Summary, error) {
-	return s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, opts.Service, opts.Index)
 }

@@ -1,0 +1,18 @@
+services:
+  test:
+    image: alpine
+    init: true
+    command: sleep infinity
+
+  other:
+    image: alpine
+    init: true
+    command: sleep infinity
+    networks:
+      test_network:
+        ipv4_address: 8.8.8.8
+
+networks:
+  test_network:
+    external: true
+    name: foo_bar

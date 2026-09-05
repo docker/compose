@@ -6,6 +6,7 @@ services:
         RUN echo "backend_build_marker" > /built
     command: sleep infinity
     init: true
+    stop_signal: SIGTERM
   frontend:
     build:
       dockerfile_inline: |
@@ -14,6 +15,7 @@ services:
         RUN echo "frontend_build_marker" > /built
     command: sleep infinity
     init: true
+    stop_signal: SIGTERM
     depends_on:
       - backend
     develop:

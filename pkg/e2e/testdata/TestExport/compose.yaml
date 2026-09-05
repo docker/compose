@@ -1,0 +1,9 @@
+services:
+  service:
+    image: alpine
+    command: sleep infinity
+  service-with-replicas:
+    image: alpine
+    command: sleep infinity
+    deploy:
+      replicas: 3

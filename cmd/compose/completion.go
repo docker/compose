@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
@@ -44,7 +45,9 @@ func completeServiceNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil)
+		// only service names are needed, so skip environment resolution: a missing
+		// env_file must not prevent completion
+		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -90,7 +93,9 @@ func completeProfileNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil)
+		// only profile names are needed, so skip environment resolution: a missing
+		// env_file must not prevent completion
+		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -108,9 +113,9 @@ func completeProfileNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 	}
 }
 
-func completeScaleArgs(cli command.Cli, p *ProjectOptions) cobra.CompletionFunc {
+func completeScaleArgs(dockerCli command.Cli, p *ProjectOptions) cobra.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		completions, directive := completeServiceNames(cli, p)(cmd, args, toComplete)
+		completions, directive := completeServiceNames(dockerCli, p)(cmd, args, toComplete)
 		for i, completion := range completions {
 			completions[i] = completion + "="
 		}

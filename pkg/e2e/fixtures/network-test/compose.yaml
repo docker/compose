@@ -15,7 +15,7 @@ services:
     image: gtardif/sentences-api
     init: true
     ports:
-      - "8080:8080"
+      - "8080"
     networks:
       - dbnet
       - servicenet
@@ -23,7 +23,7 @@ services:
     image: gtardif/sentences-web
     init: true
     ports:
-      - "80:80"
+      - "80"
     labels:
       - "my-label=test"
     networks:

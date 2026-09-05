@@ -1,0 +1,17 @@
+services:
+  my-service:
+    image: alpine
+    command: sleep infinity
+    init: true
+    depends_on:
+      dep: {condition: service_healthy}
+
+  dep:
+    image: alpine
+    command: sleep infinity
+    init: true
+    healthcheck:
+      test:     "/bin/true"
+      interval: 2s
+      timeout:  1s
+      retries:  10

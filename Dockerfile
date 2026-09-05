@@ -15,9 +15,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.26.4
+ARG GO_VERSION=1.26.8
 ARG XX_VERSION=1.9.0
-ARG GOLANGCI_LINT_VERSION=v2.11.3
+ARG GOLANGCI_LINT_VERSION=v2.13.2
 ARG ADDLICENSE_VERSION=v1.0.0
 
 ARG BUILD_TAGS="e2e"
@@ -74,6 +74,25 @@ RUN --mount=type=bind,target=.,rw <<EOT
   fi
 EOT
 
+FROM build-base AS mocks-generate
+RUN --mount=type=bind,target=.,rw \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make mocks && mkdir /out && cp pkg/mocks/*.go /out
+
+FROM mocks-generate AS mocks-validate
+RUN --mount=type=bind,target=.,rw <<EOT
+  set -e
+  git add -A
+  cp -f /out/* pkg/mocks/
+  diff=$(git status --porcelain -- pkg/mocks)
+  if [ -n "$diff" ]; then
+    echo >&2 'ERROR: Generated mocks differ. Please regenerate them with "make mocks"'
+    echo "$diff"
+    exit 1
+  fi
+EOT
+
 FROM build-base AS build
 ARG BUILD_TAGS
 ARG BUILD_FLAGS
@@ -120,7 +139,7 @@ FROM base AS license-set
 ARG LICENSE_FILES
 RUN --mount=type=bind,target=.,rw \
     --mount=from=addlicense,source=/app/addlicense,target=/usr/bin/addlicense \
-    find . -regex "${LICENSE_FILES}" | xargs addlicense -c 'Docker Compose CLI' -l apache && \
+    find . -regex "${LICENSE_FILES}" | xargs addlicense -c 'Docker Compose CLI' -l apache -ignore validate -ignore testdata -ignore '**/testdata/**' -ignore resolvepath && \
     mkdir /out && \
     find . -regex "${LICENSE_FILES}" | cpio -pdm /out
 
@@ -131,7 +150,7 @@ FROM base AS license-validate
 ARG LICENSE_FILES
 RUN --mount=type=bind,target=. \
     --mount=from=addlicense,source=/app/addlicense,target=/usr/bin/addlicense \
-    find . -regex "${LICENSE_FILES}" | xargs addlicense -check -c 'Docker Compose CLI' -l apache -ignore validate -ignore testdata -ignore resolvepath -v
+    find . -regex "${LICENSE_FILES}" | xargs addlicense -check -c 'Docker Compose CLI' -l apache -ignore validate -ignore testdata -ignore '**/testdata/**' -ignore resolvepath -v
 
 FROM base AS docsgen
 WORKDIR /src

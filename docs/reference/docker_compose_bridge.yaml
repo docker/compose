@@ -1,6 +1,7 @@
 command: docker compose bridge
 short: Convert compose files into another model
 long: Convert compose files into another model
+usage: docker compose bridge CMD [OPTIONS]
 pname: docker compose
 plink: docker_compose.yaml
 cname:

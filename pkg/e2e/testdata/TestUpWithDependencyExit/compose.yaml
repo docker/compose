@@ -1,0 +1,11 @@
+services:
+  web:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: alpine
+    command: sh -c "exit 1"

@@ -1,0 +1,13 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes_from:
+      - db
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - /var/data

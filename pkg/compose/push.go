@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,18 +91,13 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 		return err
 	}
 
-	authConfig, err := s.configFile().GetAuthConfig(registry.GetAuthConfigKey(reference.Domain(ref)))
-	if err != nil {
-		return err
-	}
-
-	buf, err := json.Marshal(authConfig)
+	encodedAuth, err := registry.EncodedAuth(ref, s.configFile())
 	if err != nil {
 		return err
 	}
 
 	stream, err := s.apiClient().ImagePush(ctx, tag, client.ImagePushOptions{
-		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+		RegistryAuth: encodedAuth,
 	})
 	if err != nil {
 		return err

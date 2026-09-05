@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 
@@ -64,8 +63,9 @@ type configOptions struct {
 	lockImageDigests    bool
 }
 
-func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string) (*types.Project, error) {
-	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, backend, services, o.toProjectOptionsFns()...)
+func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+	po = append(po, o.toProjectOptionsFns()...)
+	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, backend, services, po...)
 	return project, err
 }
 
@@ -189,7 +189,7 @@ func runConfig(ctx context.Context, dockerCli command.Cli, opts configOptions, s
 	}
 
 	if !opts.noInterpolate {
-		content = escapeDollarSign(content)
+		content = bytes.ReplaceAll(content, []byte{'$'}, []byte{'$', '$'})
 	}
 
 	if opts.quiet {
@@ -491,7 +491,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 		return err
 	}
 
-	project, _, err := opts.ProjectOptions.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -509,7 +509,7 @@ func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) 
 		return err
 	}
 
-	project, _, err := opts.ProjectOptions.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -525,7 +525,7 @@ func runNetworks(ctx context.Context, dockerCli command.Cli, opts configOptions)
 		return err
 	}
 
-	project, _, err := opts.ProjectOptions.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -541,7 +541,7 @@ func runModels(ctx context.Context, dockerCli command.Cli, opts configOptions) e
 		return err
 	}
 
-	project, _, err := opts.ProjectOptions.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -564,7 +564,14 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		return err
 	}
 
-	project, _, err := opts.ProjectOptions.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	if err != nil {
+		return err
+	}
+
+	// narrow the project to the services being hashed, so a broken env_file
+	// or platforms on an unrelated service doesn't prevent hashing the requested ones
+	project, err = project.WithSelectedServices(services, types.IgnoreDependencies)
 	if err != nil {
 		return err
 	}
@@ -573,14 +580,16 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		return err
 	}
 
-	if len(services) == 0 {
-		services = project.ServiceNames()
+	if !opts.noResolveEnv {
+		// containers are created from a project with service environment
+		// resolved (env_file merged into environment), so hash the same content
+		project, err = project.WithServicesEnvironmentResolved(true)
+		if err != nil {
+			return err
+		}
 	}
 
-	sorted := services
-	slices.Sort(sorted)
-
-	for _, name := range sorted {
+	for _, name := range project.ServiceNames() {
 		s, err := project.GetService(name)
 		if err != nil {
 			return err
@@ -636,6 +645,9 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 
 	for _, s := range project.Services {
 		_, _ = fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
+		for _, img := range api.GetDependentImages(s, project.Name) {
+			_, _ = fmt.Fprintln(dockerCli.Out(), img)
+		}
 	}
 	return nil
 }
@@ -683,10 +695,4 @@ func runEnvironment(ctx context.Context, dockerCli command.Cli, opts configOptio
 		fmt.Println(v)
 	}
 	return nil
-}
-
-func escapeDollarSign(marshal []byte) []byte {
-	dollar := []byte{'$'}
-	escDollar := []byte{'$', '$'}
-	return bytes.ReplaceAll(marshal, dollar, escDollar)
 }

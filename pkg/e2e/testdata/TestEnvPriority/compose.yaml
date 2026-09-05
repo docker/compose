@@ -1,0 +1,4 @@
+services:
+  env-compose-priority:
+    build:
+      context: .

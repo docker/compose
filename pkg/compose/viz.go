@@ -29,7 +29,7 @@ import (
 // maps a service with the services it depends on
 type vizGraph map[*types.ServiceConfig][]*types.ServiceConfig
 
-func (s *composeService) Viz(_ context.Context, project *types.Project, opts api.VizOptions) (string, error) {
+func (s *composeService) Viz(_ context.Context, project *types.Project, options api.VizOptions) (string, error) {
 	graph := make(vizGraph)
 	for _, service := range project.Services {
 		graph[&service] = make([]*types.ServiceConfig, 0, len(service.DependsOn))
@@ -50,12 +50,12 @@ func (s *composeService) Viz(_ context.Context, project *types.Project, opts api
 
 	// graph layout
 	// dot is the perfect layout for this use case since graph is directed and hierarchical
-	graphBuilder.WriteString(opts.Indentation + "layout=dot;\n")
+	graphBuilder.WriteString(options.Indentation + "layout=dot;\n")
 
-	addNodes(&graphBuilder, graph, project.Name, &opts)
+	addNodes(&graphBuilder, graph, project.Name, &options)
 	graphBuilder.WriteByte('\n')
 
-	addEdges(&graphBuilder, graph, &opts)
+	addEdges(&graphBuilder, graph, &options)
 	graphBuilder.WriteString("}\n")
 
 	return graphBuilder.String(), nil
@@ -63,17 +63,17 @@ func (s *composeService) Viz(_ context.Context, project *types.Project, opts api
 
 // addNodes adds the corresponding graphviz representation of all the nodes in the given graph to the graphBuilder
 // returns the same graphBuilder
-func addNodes(graphBuilder *strings.Builder, graph vizGraph, projectName string, opts *api.VizOptions) *strings.Builder {
+func addNodes(graphBuilder *strings.Builder, graph vizGraph, projectName string, options *api.VizOptions) *strings.Builder {
 	for serviceNode := range graph {
 		// write:
 		// "service name" [style="filled" label<<font point-size="15">service name</font>
-		graphBuilder.WriteString(opts.Indentation)
+		graphBuilder.WriteString(options.Indentation)
 		writeQuoted(graphBuilder, serviceNode.Name)
 		graphBuilder.WriteString(" [style=\"filled\" label=<<font point-size=\"15\">")
 		graphBuilder.WriteString(serviceNode.Name)
 		graphBuilder.WriteString("</font>")
 
-		if opts.IncludeNetworks && len(serviceNode.Networks) > 0 {
+		if options.IncludeNetworks && len(serviceNode.Networks) > 0 {
 			graphBuilder.WriteString("<font point-size=\"10\">")
 			graphBuilder.WriteString("<br/><br/><b>Networks:</b>")
 			for _, networkName := range serviceNode.NetworksByPriority() {
@@ -83,7 +83,7 @@ func addNodes(graphBuilder *strings.Builder, graph vizGraph, projectName string,
 			graphBuilder.WriteString("</font>")
 		}
 
-		if opts.IncludePorts && len(serviceNode.Ports) > 0 {
+		if options.IncludePorts && len(serviceNode.Ports) > 0 {
 			graphBuilder.WriteString("<font point-size=\"10\">")
 			graphBuilder.WriteString("<br/><br/><b>Ports:</b>")
 			for _, portConfig := range serviceNode.Ports {
@@ -104,7 +104,7 @@ func addNodes(graphBuilder *strings.Builder, graph vizGraph, projectName string,
 			graphBuilder.WriteString("</font>")
 		}
 
-		if opts.IncludeImageName {
+		if options.IncludeImageName {
 			graphBuilder.WriteString("<font point-size=\"10\">")
 			graphBuilder.WriteString("<br/><br/><b>Image:</b><br/>")
 			graphBuilder.WriteString(api.GetImageNameOrDefault(*serviceNode, projectName))
@@ -119,10 +119,10 @@ func addNodes(graphBuilder *strings.Builder, graph vizGraph, projectName string,
 
 // addEdges adds the corresponding graphviz representation of all edges in the given graph to the graphBuilder
 // returns the same graphBuilder
-func addEdges(graphBuilder *strings.Builder, graph vizGraph, opts *api.VizOptions) *strings.Builder {
+func addEdges(graphBuilder *strings.Builder, graph vizGraph, options *api.VizOptions) *strings.Builder {
 	for parent, children := range graph {
 		for _, child := range children {
-			graphBuilder.WriteString(opts.Indentation)
+			graphBuilder.WriteString(options.Indentation)
 			writeQuoted(graphBuilder, parent.Name)
 			graphBuilder.WriteString(" -> ")
 			writeQuoted(graphBuilder, child.Name)

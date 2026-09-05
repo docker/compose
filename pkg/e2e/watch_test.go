@@ -1,3 +1,5 @@
+//go:build e2e
+
 /*
    Copyright 2023 Docker Compose CLI authors
 
@@ -345,7 +347,7 @@ func TestWatchMultiServices(t *testing.T) {
 			return poll.Success()
 		}
 		return poll.Continue("%v", watch.Stdout())
-	}, poll.WithTimeout(90*time.Second))
+	}, poll.WithTimeout(90*time.Second), poll.WithDelay(time.Second))
 
 	waitRebuild := func(service string, expected string) {
 		poll.WaitOn(t, func(l poll.LogT) poll.Result {
@@ -354,7 +356,7 @@ func TestWatchMultiServices(t *testing.T) {
 				return poll.Success()
 			}
 			return poll.Continue("%v", cat.Combined())
-		}, poll.WithTimeout(90*time.Second))
+		}, poll.WithTimeout(90*time.Second), poll.WithDelay(time.Second))
 	}
 	waitRebuild("a", "test")
 	waitRebuild("b", "test")
@@ -412,7 +414,7 @@ func TestWatchRebuildIgnoresDependencies(t *testing.T) {
 			return poll.Success()
 		}
 		return poll.Continue("waiting for watch to start: %v", buffer.String())
-	}, poll.WithTimeout(120*time.Second))
+	}, poll.WithTimeout(120*time.Second), poll.WithDelay(time.Second))
 
 	// Record the cutoff point in the log buffer so we only inspect output
 	// produced AFTER the file change triggers the rebuild.
@@ -443,6 +445,64 @@ func TestWatchRebuildIgnoresDependencies(t *testing.T) {
 		"backend was unexpectedly rebuilt; got:\n%s", rebuildLog)
 	assert.Assert(t, !strings.Contains(rebuildLog, "backend Built"),
 		"backend was unexpectedly rebuilt; got:\n%s", rebuildLog)
+
+	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
+}
+
+// Reproduces docker/compose#13795: syncing a directory onto a path the image exposes as a
+// symlink failed with `cannot overwrite non-directory "/app/data/sub" with directory "/"`.
+func TestWatchSyncIntoSymlinkedDirectory(t *testing.T) {
+	c := NewCLI(t)
+	const projectName = "test_watch_symlink"
+
+	defer c.cleanupWithDown(t, projectName)
+
+	tmpdir := t.TempDir()
+	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
+	CopyFile(t, filepath.Join("fixtures", "watch", "symlink.yaml"), composeFilePath)
+	dataDir := filepath.Join(tmpdir, "data")
+	assert.NilError(t, os.Mkdir(dataDir, 0o700))
+
+	// Fill the directory outside the watched tree and move it in, so a single change carries
+	// the directory together with its content, the way a branch switch does.
+	staged := filepath.Join(tmpdir, "staged")
+	assert.NilError(t, os.Mkdir(staged, 0o700))
+	assert.NilError(t, os.WriteFile(filepath.Join(staged, "hello.txt"), []byte("hello symlink\n"), 0o600))
+
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--watch")
+	buffer := bytes.NewBuffer(nil)
+	cmd.Stdout = buffer
+	cmd.Stderr = buffer
+	watch := icmd.StartCmd(cmd)
+	assert.NilError(t, watch.Error)
+	t.Cleanup(func() {
+		if watch.Cmd.Process != nil {
+			_ = watch.Cmd.Process.Kill()
+		}
+	})
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		if strings.Contains(buffer.String(), "Watch enabled") {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for watch to start: %v", buffer.String())
+	}, poll.WithTimeout(120*time.Second))
+
+	assert.NilError(t, os.Rename(staged, filepath.Join(dataDir, "sub")))
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		// The image resolves /app/data/sub to /var/sub, where the synced file has to show up.
+		cat := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", "app", "cat", "/var/sub/hello.txt")
+		if strings.Contains(cat.Stdout(), "hello symlink") {
+			return poll.Success()
+		}
+		return poll.Continue("%v\n%v", cat.Combined(), buffer.String())
+	}, poll.WithTimeout(60*time.Second), poll.WithDelay(time.Second))
+
+	// the sync must go through the symlink, not replace it
+	c.RunDockerComposeCmd(t, "-p", projectName, "exec", "app", "test", "-L", "/app/data/sub")
+	assert.Assert(t, !strings.Contains(buffer.String(), "cannot overwrite non-directory"),
+		"sync failed on the symlinked path:\n%s", buffer.String())
 
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }

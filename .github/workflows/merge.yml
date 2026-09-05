@@ -27,7 +27,7 @@ jobs:
       - run: echo "Exposing env vars for reusable workflow"
 
   bin-image:
-    uses: docker/github-builder/.github/workflows/bake.yml@3415a188caae9a0da7fba83bc06985776e0b1790 # v1.14.0
+    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
     needs:
       - bin-image-prepare
     permissions:
@@ -48,14 +48,13 @@ jobs:
         type=ref,event=tag
         type=edge
       meta-bake-target: meta-helper
-    secrets:
-      registry-auths: |
-        - registry: docker.io
-          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
-          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
+      registry-identities: |
+        - type: dockerhub
+          username: docker
+          connection_id: a295c8b7-54ab-4507-ac88-5c43003c73a5
 
   module-image:
-    uses: docker/github-builder/.github/workflows/bake.yml@3415a188caae9a0da7fba83bc06985776e0b1790 # v1.14.0
+    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
     permissions:
       contents: read # same as global permission
       id-token: write # for signing attestation(s) with GitHub OIDC Token
@@ -74,10 +73,9 @@ jobs:
         type=ref,event=branch
         type=ref,event=tag
       meta-bake-target: meta-helper
-    secrets:
-      registry-auths: |
-        - registry: docker.io
-          username: ${{ secrets.DOCKERPUBLICBOT_USERNAME }}
-          password: ${{ secrets.DOCKERPUBLICBOT_WRITE_PAT }}
+      registry-identities: |
+        - type: dockerhub
+          username: docker
+          connection_id: a295c8b7-54ab-4507-ac88-5c43003c73a5
 
  

@@ -1,0 +1,36 @@
+services:
+  main:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+      additional_contexts:
+        dep1: service:dep1
+        dep2: service:dep2
+    entrypoint: ["echo", "Hello from main"]
+
+  dep1:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+      additional_contexts:
+        subdep1: service:subdep1
+        subdep2: service:subdep2
+    entrypoint: ["echo", "Hello from dep1"]
+
+  dep2:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+    entrypoint: ["echo", "Hello from dep2"]
+
+  subdep1:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+    entrypoint: ["echo", "Hello from subdep1"]
+
+  subdep2:
+    build:
+      dockerfile_inline: |
+        FROM alpine
+    entrypoint: ["echo", "Hello from subdep2"]

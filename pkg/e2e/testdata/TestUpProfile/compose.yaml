@@ -1,0 +1,12 @@
+services:
+  foo:
+    profiles: [ test ]
+    image: alpine
+    depends_on: [ db ]
+
+  bar:
+    profiles: [ test ]
+    image: alpine
+
+  db:
+    image: alpine
