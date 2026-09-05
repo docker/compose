@@ -170,7 +170,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	flags.StringArrayVar(&up.attach, "attach", []string{}, "Restrict attaching to the specified services. Incompatible with --attach-dependencies.")
 	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services")
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
-	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
+	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode, unless combined with --attach or --attach-dependencies to also stream logs while waiting.")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
@@ -197,10 +197,19 @@ func validateFlags(up *upOptions, create *createOptions) error {
 		return fmt.Errorf("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
 	}
 	if up.wait {
-		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
-			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
+		if up.cascadeStop || up.cascadeFail {
+			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit or --abort-on-container-failure")
 		}
-		up.Detach = true
+		if up.watch {
+			return fmt.Errorf("--wait cannot be combined with --watch")
+		}
+		if !up.attachDependencies && len(up.attach) == 0 {
+			// Nothing was asked to stream logs, so --wait keeps its historical
+			// silent, detached behavior. Passing --attach or
+			// --attach-dependencies alongside --wait streams logs while
+			// waiting, then detaches once the wait condition is met.
+			up.Detach = true
+		}
 	}
 	if create.Build && create.noBuild {
 		return fmt.Errorf("--build and --no-build are incompatible")

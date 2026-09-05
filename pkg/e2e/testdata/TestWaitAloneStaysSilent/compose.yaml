@@ -1,0 +1,10 @@
+services:
+  test:
+    image: alpine
+    init: true
+    command: sh -c "echo hello-while-waiting; sleep 3; touch /tmp/ready; sleep infinity"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 30s
+      start_period: 10s
+      start_interval: 1s

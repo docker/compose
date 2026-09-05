@@ -192,6 +192,14 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 		return err
 	}
 
+	if options.Start.Wait && !u.isTerminated.Load() {
+		// --wait attached long enough to stream logs while services became
+		// running|healthy; detach now instead of following logs forever like
+		// a plain foreground `up`, exactly as if the user had pressed the
+		// detach shortcut. Containers are left running.
+		cancel()
+	}
+
 	_ = u.eg.Wait()
 	err = errors.Join(u.errs...)
 	if u.exitCode != 0 {
