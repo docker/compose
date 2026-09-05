@@ -193,6 +193,64 @@ func warnUnmanagedNetworks(project *types.Project, observed *ObservedState) {
 	}
 }
 
+// PerReplicaVolumeExtension opts a named volume mount into a distinct
+// underlying Docker volume per service replica, instead of every replica
+// sharing the single volume declared under the top-level `volumes:` key.
+// Set it on the long-syntax service volume entry:
+//
+//	volumes:
+//	  - type: volume
+//	    source: data
+//	    target: /data
+//	    x-per-replica: true
+//
+// https://github.com/docker/compose/issues/9026
+const PerReplicaVolumeExtension = "x-per-replica"
+
+func isPerReplicaVolume(v types.ServiceVolumeConfig) bool {
+	enabled, _ := v.Extensions[PerReplicaVolumeExtension].(bool)
+	return enabled
+}
+
+// perReplicaVolumeName derives the distinct volume name backing a given
+// replica of a service opted into PerReplicaVolumeExtension.
+func perReplicaVolumeName(base types.VolumeConfig, number int) string {
+	return fmt.Sprintf("%s-%d", base.Name, number)
+}
+
+// ensurePerReplicaVolumes provisions the distinct volumes declared via
+// PerReplicaVolumeExtension ahead of container creation. Unlike the
+// project-wide volumes the plan creates once (planCreateVolume), a
+// per-replica volume has no single OpCreateVolume node to own it: every
+// replica needs its own, keyed off a replica number only known once
+// container creation begins.
+func (s *composeService) ensurePerReplicaVolumes(ctx context.Context, p types.Project, service types.ServiceConfig, number int) error {
+	if number <= 0 {
+		return nil
+	}
+	for _, v := range service.Volumes {
+		if !isPerReplicaVolume(v) {
+			continue
+		}
+		if v.Type != types.VolumeTypeVolume || v.Source == "" {
+			return fmt.Errorf("service %q: %s requires a named volume source", service.Name, PerReplicaVolumeExtension)
+		}
+		base, ok := p.Volumes[v.Source]
+		if !ok {
+			return fmt.Errorf("service %q: volume %q is not declared", service.Name, v.Source)
+		}
+		if base.External {
+			return fmt.Errorf("service %q: %s cannot be combined with external volume %q", service.Name, PerReplicaVolumeExtension, v.Source)
+		}
+		replica := base
+		replica.Name = perReplicaVolumeName(base, number)
+		if err := s.createVolume(ctx, replica); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // prepareVolumes injects the compose-managed labels onto every project volume so
 // that createVolume (executed later as a plan operation) persists them and the
 // volume can be matched back to the project on the next run. It mirrors
@@ -341,7 +399,10 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		k, v, _ := strings.Cut(t, ":")
 		tmpfs[k] = v
 	}
-	binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
+	if err := s.ensurePerReplicaVolumes(ctx, *p, service, number); err != nil {
+		return createConfigs{}, err
+	}
+	binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, number, inherit)
 	if err != nil {
 		return createConfigs{}, err
 	}
@@ -960,12 +1021,13 @@ func (s *composeService) buildContainerVolumes(
 	ctx context.Context,
 	p types.Project,
 	service types.ServiceConfig,
+	number int,
 	inherit *container.Summary,
 ) ([]string, []mount.Mount, error) {
 	var mounts []mount.Mount
 	var binds []string
 
-	mountOptions, err := s.buildContainerMountOptions(ctx, p, service, inherit)
+	mountOptions, err := s.buildContainerMountOptions(ctx, p, service, number, inherit)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1110,7 +1172,7 @@ func volumeRequiresMountAPI(vol *types.ServiceVolumeVolume) bool {
 	}
 }
 
-func (s *composeService) buildContainerMountOptions(ctx context.Context, p types.Project, service types.ServiceConfig, inherit *container.Summary) ([]mount.Mount, error) {
+func (s *composeService) buildContainerMountOptions(ctx context.Context, p types.Project, service types.ServiceConfig, number int, inherit *container.Summary) ([]mount.Mount, error) {
 	mounts := map[string]mount.Mount{}
 	if inherit != nil {
 		for _, m := range inherit.Mounts {
@@ -1156,7 +1218,7 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 		}
 	}
 
-	mounts, err := fillBindMounts(p, service, mounts)
+	mounts, err := fillBindMounts(p, service, number, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -1168,9 +1230,9 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	return values, nil
 }
 
-func fillBindMounts(project types.Project, service types.ServiceConfig, mounts map[string]mount.Mount) (map[string]mount.Mount, error) {
+func fillBindMounts(project types.Project, service types.ServiceConfig, number int, mounts map[string]mount.Mount) (map[string]mount.Mount, error) {
 	for _, volume := range service.Volumes {
-		bindMount, err := buildMount(project, volume)
+		bindMount, err := buildMount(project, volume, number)
 		if err != nil {
 			return nil, err
 		}
@@ -1238,7 +1300,7 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			Source:   definedConfig.File,
 			Target:   target,
 			ReadOnly: true,
-		})
+		}, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -1295,7 +1357,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			Bind: &types.ServiceVolumeBind{
 				CreateHostPath: false,
 			},
-		})
+		}, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -1320,7 +1382,7 @@ func isWindowsAbs(p string) bool {
 	return paths.IsWindowsAbs(p)
 }
 
-func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
+func buildMount(project types.Project, volume types.ServiceVolumeConfig, number int) (mount.Mount, error) {
 	source := volume.Source
 	switch volume.Type {
 	case types.VolumeTypeBind:
@@ -1337,6 +1399,9 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 			pVolume, ok := project.Volumes[volume.Source]
 			if ok {
 				source = pVolume.Name
+				if number > 0 && isPerReplicaVolume(volume) {
+					source = perReplicaVolumeName(pVolume, number)
+				}
 			}
 		}
 	}

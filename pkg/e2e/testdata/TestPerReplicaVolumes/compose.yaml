@@ -1,0 +1,15 @@
+services:
+  test:
+    image: alpine
+    init: true
+    command: sh -c "wc -l < /data/log 2>/dev/null || echo 0; echo seed >> /data/log; sleep infinity"
+    volumes:
+      - type: volume
+        source: data
+        target: /data
+        x-per-replica: true
+    deploy:
+      replicas: 2
+
+volumes:
+  data:

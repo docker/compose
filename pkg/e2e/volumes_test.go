@@ -169,6 +169,25 @@ func TestUpRecreateVolumesIgnoreBinds(t *testing.T) {
 			NotRecreated("app"))
 }
 
+// https://github.com/docker/compose/issues/9026
+// x-per-replica must give each replica of a scaled service its own volume
+// instead of every replica sharing the single volume declared in `volumes:`.
+func TestPerReplicaVolumes(t *testing.T) {
+	s := NewScenario(t, "x-per-replica must give each replica of a scaled service its own volume")
+	s.Step("up creates two replicas, each seeding its own volume",
+		ComposeCmd("up", "-d"),
+		ServiceScale("test", 2)).
+		Step("the first replica's own volume exists",
+			DockerCmd("volume", "inspect", s.Project()+"_data-1")).
+		Step("the second replica's own volume exists",
+			DockerCmd("volume", "inspect", s.Project()+"_data-2")).
+		Step("recreating both replicas shows neither ever saw the other's write",
+			ComposeCmd("up", "-d", "--force-recreate"),
+			Recreated("test"),
+			StdoutContains("test-1  | 1"),
+			StdoutContains("test-2  | 1"))
+}
+
 func TestImageVolume(t *testing.T) {
 	NewScenario(t, "an image volume must mount the source image's content at the requested subpath").
 		Requires(EngineVersionAtLeast(28)).
