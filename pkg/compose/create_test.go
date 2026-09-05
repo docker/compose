@@ -85,6 +85,68 @@ func TestBuildVolumeMount(t *testing.T) {
 	assert.Equal(t, mount.Type, mountTypes.TypeVolume)
 }
 
+// https://github.com/docker/compose/issues/11867
+// driver: copy must skip the bind mount entirely: the secret/config is
+// instead delivered by injectSecrets/injectConfigs (secrets.go), which
+// copies the client-read content into the container after it's created.
+func TestBuildContainerSecretMounts_CopyDriverSkipsBindMount(t *testing.T) {
+	project := composetypes.Project{
+		Secrets: composetypes.Secrets(map[string]composetypes.SecretConfig{
+			"db_password": {Name: "db_password", Driver: copyDriver, File: "/home/user/secret.txt"},
+		}),
+	}
+	service := composetypes.ServiceConfig{
+		Secrets: []composetypes.ServiceSecretConfig{{Source: "db_password"}},
+	}
+
+	mounts, err := buildContainerSecretMounts(project, service)
+	assert.NilError(t, err)
+	assert.Equal(t, len(mounts), 0)
+}
+
+func TestBuildContainerSecretMounts_CopyDriverRequiresFile(t *testing.T) {
+	project := composetypes.Project{
+		Secrets: composetypes.Secrets(map[string]composetypes.SecretConfig{
+			"db_password": {Name: "db_password", Driver: copyDriver},
+		}),
+	}
+	service := composetypes.ServiceConfig{
+		Secrets: []composetypes.ServiceSecretConfig{{Source: "db_password"}},
+	}
+
+	_, err := buildContainerSecretMounts(project, service)
+	assert.ErrorContains(t, err, "driver: copy requires file to be set")
+}
+
+func TestBuildContainerSecretMounts_UnsupportedDriverStillRejected(t *testing.T) {
+	project := composetypes.Project{
+		Secrets: composetypes.Secrets(map[string]composetypes.SecretConfig{
+			"db_password": {Name: "db_password", Driver: "vault"},
+		}),
+	}
+	service := composetypes.ServiceConfig{
+		Secrets: []composetypes.ServiceSecretConfig{{Source: "db_password"}},
+	}
+
+	_, err := buildContainerSecretMounts(project, service)
+	assert.ErrorContains(t, err, "does not support secrets.*.driver")
+}
+
+func TestBuildContainerConfigMounts_CopyDriverSkipsBindMount(t *testing.T) {
+	project := composetypes.Project{
+		Configs: composetypes.Configs(map[string]composetypes.ConfigObjConfig{
+			"app_config": {Name: "app_config", Driver: copyDriver, File: "/home/user/config.yaml"},
+		}),
+	}
+	service := composetypes.ServiceConfig{
+		Configs: []composetypes.ServiceConfigObjConfig{{Source: "app_config"}},
+	}
+
+	mounts, err := buildContainerConfigMounts(project, service)
+	assert.NilError(t, err)
+	assert.Equal(t, len(mounts), 0)
+}
+
 func TestServiceImageName(t *testing.T) {
 	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
 	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Name: "aService"}, "myProject"), "myProject-aService")

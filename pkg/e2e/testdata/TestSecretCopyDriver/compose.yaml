@@ -1,0 +1,11 @@
+services:
+  test:
+    image: alpine
+    command: sleep infinity
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    file: ./secret.txt
+    driver: copy

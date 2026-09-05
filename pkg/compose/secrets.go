@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -33,6 +34,22 @@ type mountType string
 const (
 	secretMount mountType = "secret"
 	configMount mountType = "config"
+
+	// copyDriver is a Compose-specific `driver` value (secrets.*.driver /
+	// configs.*.driver) opting a `file`-based secret or config into being
+	// read from the CLIENT's local filesystem and copied into the
+	// container, instead of bind-mounted from a path on the Docker host.
+	// This is the only supported value; any other non-empty driver is
+	// still rejected, as before.
+	//
+	// It exists because `file:` bind-mounting a path off the Docker host
+	// breaks entirely when the daemon is remote (DOCKER_HOST/context):
+	// Compose is a client-side tool and cannot bind-mount a path that only
+	// exists on the client. Switching unconditionally was rejected upstream
+	// (https://github.com/docker/compose/issues/11867) as a breaking
+	// change for users who rely on the existing bind mount (live editing on
+	// the host, `watch`-driven sync); `driver: copy` makes it opt-in.
+	copyDriver = "copy"
 )
 
 func (s *composeService) injectSecrets(ctx context.Context, project *types.Project, service types.ServiceConfig, id string) error {
@@ -114,6 +131,13 @@ func (s *composeService) resolveFileContent(project *types.Project, source types
 			return "", fmt.Errorf("environment variable %q required by %s %q is not set", source.Environment, mountType, source.Name)
 		}
 		return env, nil
+	}
+	if source.Driver == copyDriver {
+		content, err := os.ReadFile(source.File)
+		if err != nil {
+			return "", fmt.Errorf("reading %s %q from client to copy into container: %w", mountType, source.Name, err)
+		}
+		return string(content), nil
 	}
 	return "", nil
 }
