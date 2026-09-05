@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -131,7 +132,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, project)...)
+		ops = append(ops, s.ensureVolumesDown(ctx, project, containers)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
@@ -145,9 +146,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	return eg.Wait()
 }
 
-func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project) []downOp {
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, containers Containers) []downOp {
 	var ops []downOp
-	for _, vol := range project.Volumes {
+	for key, vol := range project.Volumes {
 		if vol.External {
 			continue
 		}
@@ -155,9 +156,43 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 		ops = append(ops, func() error {
 			return s.removeVolume(ctx, volumeName)
 		})
+		for _, name := range perReplicaVolumeNamesInUse(project, key, vol, containers) {
+			ops = append(ops, func() error {
+				return s.removeVolume(ctx, name)
+			})
+		}
 	}
 
 	return ops
+}
+
+// perReplicaVolumeNamesInUse returns the distinct per-replica volume names
+// (PerReplicaVolumeExtension) actually backing the given volume's observed
+// containers. The base volume name (vol.Name) never exists on disk for a
+// volume used exclusively in per-replica mode, so it must be found this way
+// rather than guessed from the service's current scale.
+func perReplicaVolumeNamesInUse(project *types.Project, key string, vol types.VolumeConfig, containers Containers) []string {
+	var names []string
+	for _, service := range project.Services {
+		usesPerReplica := false
+		for _, v := range service.Volumes {
+			if v.Source == key && isPerReplicaVolume(v) {
+				usesPerReplica = true
+				break
+			}
+		}
+		if !usesPerReplica {
+			continue
+		}
+		for _, ctr := range containers.filter(isService(service.Name)) {
+			number, err := strconv.Atoi(ctr.Labels[api.ContainerNumberLabel])
+			if err != nil {
+				continue
+			}
+			names = append(names, perReplicaVolumeName(vol, number))
+		}
+	}
+	return names
 }
 
 func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) ([]downOp, error) {

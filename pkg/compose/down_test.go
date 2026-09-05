@@ -285,6 +285,71 @@ func TestDownRemoveVolumes(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// https://github.com/docker/compose/issues/9026
+// down --volumes must remove every per-replica volume actually backing a
+// scaled service's containers, not just the (never-created) base volume
+// name, since PerReplicaVolumeExtension gives each replica its own volume.
+func TestDownRemovesPerReplicaVolumes(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	projectName := strings.ToLower(testProject)
+	project := &types.Project{
+		Name: projectName,
+		Volumes: types.Volumes{
+			"data": types.VolumeConfig{Name: projectName + "_data"},
+		},
+		Services: types.Services{
+			"web": {
+				Name: "web",
+				Volumes: []types.ServiceVolumeConfig{
+					{
+						Type:       types.VolumeTypeVolume,
+						Source:     "data",
+						Target:     "/data",
+						Extensions: types.Extensions{PerReplicaVolumeExtension: true},
+					},
+				},
+			},
+		},
+	}
+
+	replicaLabels := func(number string) map[string]string {
+		return map[string]string{
+			compose.ServiceLabel:         "web",
+			compose.ProjectLabel:         projectName,
+			compose.ContainerNumberLabel: number,
+		}
+	}
+	containers := []container.Summary{
+		{ID: "c1", Names: []string{"/c1"}, Labels: replicaLabels("1"), State: container.StateExited},
+		{ID: "c2", Names: []string{"/c2"}, Labels: replicaLabels("2"), State: container.StateExited},
+	}
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
+		client.ContainerListResult{Items: containers}, nil)
+
+	for _, id := range []string{"c1", "c2"} {
+		api.EXPECT().ContainerStop(gomock.Any(), id, client.ContainerStopOptions{}).Return(client.ContainerStopResult{}, nil)
+		api.EXPECT().ContainerRemove(gomock.Any(), id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
+			Return(client.ContainerRemoveResult{}, nil)
+	}
+
+	for _, name := range []string{projectName + "_data", projectName + "_data-1", projectName + "_data-2"} {
+		api.EXPECT().VolumeInspect(gomock.Any(), name, gomock.Any()).Return(client.VolumeInspectResult{}, nil)
+		api.EXPECT().VolumeRemove(gomock.Any(), name, client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
+	}
+
+	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
+
+	err = tested.Down(t.Context(), projectName, compose.DownOptions{Volumes: true, Project: project})
+	assert.NilError(t, err)
+}
+
 func TestDownRemoveImages(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

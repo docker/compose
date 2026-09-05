@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"context"
 	"net"
 	"net/netip"
 	"os"
@@ -45,7 +46,7 @@ func TestBuildBindMount(t *testing.T) {
 		Source: "",
 		Target: "/data",
 	}
-	mount, err := buildMount(project, volume)
+	mount, err := buildMount(project, volume, 0)
 	assert.NilError(t, err)
 	assert.Assert(t, filepath.IsAbs(mount.Source))
 	_, err = os.Stat(mount.Source)
@@ -60,7 +61,7 @@ func TestBuildNamedPipeMount(t *testing.T) {
 		Source: "\\\\.\\pipe\\docker_engine_windows",
 		Target: "\\\\.\\pipe\\docker_engine",
 	}
-	mount, err := buildMount(project, volume)
+	mount, err := buildMount(project, volume, 0)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Type, mountTypes.TypeNamedPipe)
 }
@@ -79,10 +80,124 @@ func TestBuildVolumeMount(t *testing.T) {
 		Source: "myVolume",
 		Target: "/data",
 	}
-	mount, err := buildMount(project, volume)
+	mount, err := buildMount(project, volume, 0)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Source, "myProject_myVolume")
 	assert.Equal(t, mount.Type, mountTypes.TypeVolume)
+}
+
+// https://github.com/docker/compose/issues/9026
+// PerReplicaVolumeExtension must give each replica its own volume instead of
+// every replica of a scaled service sharing the single declared volume.
+func TestBuildVolumeMount_PerReplica(t *testing.T) {
+	project := composetypes.Project{
+		Name: "myProject",
+		Volumes: composetypes.Volumes(map[string]composetypes.VolumeConfig{
+			"myVolume": {Name: "myProject_myVolume"},
+		}),
+	}
+	volume := composetypes.ServiceVolumeConfig{
+		Type:       composetypes.VolumeTypeVolume,
+		Source:     "myVolume",
+		Target:     "/data",
+		Extensions: composetypes.Extensions{PerReplicaVolumeExtension: true},
+	}
+
+	mount, err := buildMount(project, volume, 2)
+	assert.NilError(t, err)
+	assert.Equal(t, mount.Source, "myProject_myVolume-2")
+
+	// number == 0 (a one-off container) keeps the shared, unsuffixed volume
+	mount, err = buildMount(project, volume, 0)
+	assert.NilError(t, err)
+	assert.Equal(t, mount.Source, "myProject_myVolume")
+
+	// without the extension, replicas keep sharing the one declared volume
+	plain := composetypes.ServiceVolumeConfig{Type: composetypes.VolumeTypeVolume, Source: "myVolume", Target: "/data"}
+	mount, err = buildMount(project, plain, 2)
+	assert.NilError(t, err)
+	assert.Equal(t, mount.Source, "myProject_myVolume")
+}
+
+func TestEnsurePerReplicaVolumes(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mock, cli := prepareMocks(mockCtrl)
+	s := composeService{dockerCli: cli, events: &ignore{}}
+
+	project := composetypes.Project{
+		Name: "myProject",
+		Volumes: composetypes.Volumes(map[string]composetypes.VolumeConfig{
+			"myVolume": {Name: "myProject_myVolume", Driver: "local"},
+		}),
+	}
+	service := composetypes.ServiceConfig{
+		Name: "web",
+		Volumes: []composetypes.ServiceVolumeConfig{
+			{
+				Type:       composetypes.VolumeTypeVolume,
+				Source:     "myVolume",
+				Target:     "/data",
+				Extensions: composetypes.Extensions{PerReplicaVolumeExtension: true},
+			},
+		},
+	}
+
+	mock.EXPECT().VolumeCreate(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts client.VolumeCreateOptions) (client.VolumeCreateResult, error) {
+			assert.Equal(t, opts.Name, "myProject_myVolume-3")
+			assert.Equal(t, opts.Driver, "local")
+			return client.VolumeCreateResult{}, nil
+		})
+
+	err := s.ensurePerReplicaVolumes(t.Context(), project, service, 3)
+	assert.NilError(t, err)
+
+	// number == 0 means a one-off container: no per-replica volume to create
+	err = s.ensurePerReplicaVolumes(t.Context(), project, service, 0)
+	assert.NilError(t, err)
+}
+
+func TestEnsurePerReplicaVolumes_RejectsExternalVolume(t *testing.T) {
+	s := composeService{}
+	project := composetypes.Project{
+		Volumes: composetypes.Volumes(map[string]composetypes.VolumeConfig{
+			"myVolume": {Name: "myProject_myVolume", External: true},
+		}),
+	}
+	service := composetypes.ServiceConfig{
+		Name: "web",
+		Volumes: []composetypes.ServiceVolumeConfig{
+			{
+				Type:       composetypes.VolumeTypeVolume,
+				Source:     "myVolume",
+				Target:     "/data",
+				Extensions: composetypes.Extensions{PerReplicaVolumeExtension: true},
+			},
+		},
+	}
+
+	err := s.ensurePerReplicaVolumes(t.Context(), project, service, 1)
+	assert.ErrorContains(t, err, "external volume")
+}
+
+func TestEnsurePerReplicaVolumes_RejectsBindMount(t *testing.T) {
+	s := composeService{}
+	service := composetypes.ServiceConfig{
+		Name: "web",
+		Volumes: []composetypes.ServiceVolumeConfig{
+			{
+				Type:       composetypes.VolumeTypeBind,
+				Source:     "/host/path",
+				Target:     "/data",
+				Extensions: composetypes.Extensions{PerReplicaVolumeExtension: true},
+			},
+		},
+	}
+
+	err := s.ensurePerReplicaVolumes(t.Context(), composetypes.Project{}, service, 1)
+	assert.ErrorContains(t, err, "requires a named volume source")
 }
 
 func TestServiceImageName(t *testing.T) {
@@ -166,7 +281,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	}
 	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(client.ImageInspectResult{}, nil)
 
-	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
+	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], 0, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -178,7 +293,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
-	mounts, err = s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
+	mounts, err = s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], 0, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
@@ -477,7 +592,7 @@ volumes:
 			})
 			assert.NilError(t, err)
 			s := &composeService{}
-			binds, mounts, err := s.buildContainerVolumes(t.Context(), *p, p.Services["test"], nil)
+			binds, mounts, err := s.buildContainerVolumes(t.Context(), *p, p.Services["test"], 0, nil)
 			assert.NilError(t, err)
 			assert.DeepEqual(t, tt.binds, binds)
 			assert.DeepEqual(t, tt.mounts, mounts)
