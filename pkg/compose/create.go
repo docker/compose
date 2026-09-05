@@ -1218,14 +1218,17 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
 		}
 
-		if definedConfig.Driver != "" {
+		if definedConfig.Driver != "" && definedConfig.Driver != copyDriver {
 			return nil, errors.New("Docker Compose does not support configs.*.driver") //nolint:staticcheck
 		}
 		if definedConfig.TemplateDriver != "" {
 			return nil, errors.New("Docker Compose does not support configs.*.template_driver") //nolint:staticcheck
 		}
+		if definedConfig.Driver == copyDriver && definedConfig.File == "" {
+			return nil, fmt.Errorf("config %s: driver: copy requires file to be set", definedConfig.Name)
+		}
 
-		if definedConfig.Environment != "" || definedConfig.Content != "" {
+		if definedConfig.Environment != "" || definedConfig.Content != "" || definedConfig.Driver == copyDriver {
 			continue
 		}
 
@@ -1268,14 +1271,17 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
 		}
 
-		if definedSecret.Driver != "" {
+		if definedSecret.Driver != "" && definedSecret.Driver != copyDriver {
 			return nil, errors.New("Docker Compose does not support secrets.*.driver") //nolint:staticcheck
 		}
 		if definedSecret.TemplateDriver != "" {
 			return nil, errors.New("Docker Compose does not support secrets.*.template_driver") //nolint:staticcheck
 		}
+		if definedSecret.Driver == copyDriver && definedSecret.File == "" {
+			return nil, fmt.Errorf("secret %s: driver: copy requires file to be set", definedSecret.Name)
+		}
 
-		if definedSecret.Environment != "" {
+		if definedSecret.Environment != "" || definedSecret.Driver == copyDriver {
 			continue
 		}
 

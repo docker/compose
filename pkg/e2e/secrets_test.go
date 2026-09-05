@@ -19,6 +19,8 @@
 package e2e
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -38,4 +40,31 @@ func TestSecretFromInclude(t *testing.T) {
 		Step("the included service reads the secret defined by the include's env_file",
 			ComposeCmd("run", "included"),
 			OutputContains("this-is-secret"))
+}
+
+// https://github.com/docker/compose/issues/11867
+// secrets.*.driver: copy must deliver a one-time snapshot of the CLIENT's
+// local file, read and copied into the container — not a live bind mount
+// from a path on the Docker host, which breaks entirely once the daemon is
+// remote. Editing the client's file after `up` must not reach the running
+// container: that's the behavioral difference from the default bind mount,
+// and the whole point of opting in.
+func TestSecretCopyDriver(t *testing.T) {
+	s := NewScenario(t, "secrets.*.driver: copy must copy the client's file once, not bind-mount it live")
+	s.Step("up copies the secret's original content into the container",
+		ComposeCmd("up", "-d"),
+		ServiceState("test", "running")).
+		Step("the container holds the original content",
+			ComposeCmd("exec", "test", "cat", "/run/secrets/db_password"),
+			StdoutContains("original-secret"))
+
+	err := os.WriteFile(filepath.Join(s.Dir(), "secret.txt"), []byte("changed-secret"), 0o644)
+	if err != nil {
+		t.Fatalf("updating client secret file: %v", err)
+	}
+
+	s.Step("the running container's copy is unaffected by the client-side edit",
+		ComposeCmd("exec", "test", "cat", "/run/secrets/db_password"),
+		StdoutContains("original-secret"),
+		OutputNotContains("changed-secret"))
 }
