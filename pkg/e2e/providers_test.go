@@ -93,3 +93,27 @@ func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
 			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
 			OutputContains("overrides environment variable"))
 }
+
+// https://github.com/docker/compose/issues/14163
+// setsecret must let a provider hand a dependent service a file-based
+// secret, service-prefixed, without the secret being declared in the
+// compose file - mirroring setenv but delivered as a mounted file instead
+// of an environment variable.
+func TestProviderSetSecret(t *testing.T) {
+	providerScenario(t, "setsecret must inject a service-prefixed, file-based secret into a dependent service").
+		Step("the dependent service can read the provider's secret content",
+			ComposeCmd("up"),
+			StdoutContains("hunter2"))
+}
+
+// https://github.com/docker/compose/issues/14163
+// rawsetsecret must override a secret the user already declared, exactly as
+// rawsetenv already does for environment variables, with a visible warning.
+func TestProviderRawSetSecretOverridesUserSecret(t *testing.T) {
+	providerScenario(t, "rawsetsecret must override a user-declared secret's content, with a visible warning").
+		Step("the provider's secret content wins and the override is surfaced",
+			ComposeCmd("up"),
+			StdoutContains("raw-secret-value"),
+			OutputNotContains("user-defined-value"),
+			OutputContains("overrides secret"))
+}

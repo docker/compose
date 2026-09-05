@@ -18,8 +18,10 @@ package compose
 
 import (
 	"encoding/json"
+	"os/exec"
 	"testing"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"gotest.tools/v3/assert"
 )
 
@@ -104,4 +106,40 @@ func TestProviderMetadata_StopAdvertisedWithoutParameters(t *testing.T) {
 	err := json.Unmarshal([]byte(raw), &metadata)
 	assert.NilError(t, err)
 	assert.Assert(t, metadata.Stop != nil, "Stop should be non-nil when key present even with null parameters")
+}
+
+func TestExecutePlugin_ParsesSecretMessages(t *testing.T) {
+	script := `printf '%s\n' ` +
+		`'{"type":"setsecret","message":"db_password=hunter2"}' ` +
+		`'{"type":"rawsetsecret","message":"api_key=s3cr3t=withpadding"}'`
+	cmd := exec.Command("sh", "-c", script)
+
+	s := &composeService{events: &ignore{}}
+	variables, err := s.executePlugin(cmd, "up", types.ServiceConfig{Name: "provider"})
+	assert.NilError(t, err)
+	assert.Equal(t, variables.secrets["db_password"], "hunter2")
+	assert.Equal(t, variables.rawSecrets["api_key"], "s3cr3t=withpadding")
+}
+
+func TestExecutePlugin_InvalidSecretMessage(t *testing.T) {
+	cmd := exec.Command("sh", "-c", `printf '%s\n' '{"type":"setsecret","message":"no-equals-sign"}'`)
+
+	s := &composeService{events: &ignore{}}
+	_, err := s.executePlugin(cmd, "up", types.ServiceConfig{Name: "provider"})
+	assert.ErrorContains(t, err, "invalid response from plugin")
+}
+
+func TestUpsertProviderSecret(t *testing.T) {
+	project := &types.Project{Secrets: types.Secrets{}}
+
+	secrets := upsertProviderSecret(project, nil, "database_db_password", "hunter2")
+	assert.Equal(t, len(secrets), 1)
+	assert.Equal(t, secrets[0].Source, "database_db_password")
+	assert.Equal(t, project.Secrets["database_db_password"].Content, "hunter2")
+
+	// Re-running the provider (idempotent `up`) must update the content
+	// without appending a duplicate reference to the dependent service.
+	secrets = upsertProviderSecret(project, secrets, "database_db_password", "rotated")
+	assert.Equal(t, len(secrets), 1)
+	assert.Equal(t, project.Secrets["database_db_password"].Content, "rotated")
 }

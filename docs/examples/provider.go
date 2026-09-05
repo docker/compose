@@ -97,6 +97,8 @@ func up(options options, args []string) {
 	}
 	fmt.Printf(`{ "type": "setenv", "message": "URL=https://magic.cloud/%s" }%s`, servicename, lineSeparator)
 	fmt.Printf(`{ "type": "rawsetenv", "message": "CLOUD_REGION=us-east-1" }%s`, lineSeparator)
+	fmt.Printf(`{ "type": "setsecret", "message": "db_password=hunter2" }%s`, lineSeparator)
+	fmt.Printf(`{ "type": "rawsetsecret", "message": "shared_api_key=raw-secret-value" }%s`, lineSeparator)
 }
 
 func down(_ *cobra.Command, _ []string) {

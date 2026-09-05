@@ -49,13 +49,17 @@ const (
 	InfoType                  = "info"
 	SetEnvType                = "setenv"
 	RawSetEnvType             = "rawsetenv"
+	SetSecretType             = "setsecret"
+	RawSetSecretType          = "rawsetsecret"
 	DebugType                 = "debug"
 	providerMetadataDirectory = "compose/providers"
 )
 
 type pluginVariables struct {
-	prefixed types.Mapping
-	raw      types.Mapping
+	prefixed   types.Mapping
+	raw        types.Mapping
+	secrets    types.Mapping
+	rawSecrets types.Mapping
 }
 
 var mux sync.Mutex
@@ -87,22 +91,61 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 
 	mux.Lock()
 	defer mux.Unlock()
-	for name, s := range project.Services {
-		if _, ok := s.DependsOn[service.Name]; ok {
-			prefix := strings.ToUpper(service.Name) + "_"
-			for key, val := range variables.prefixed {
-				s.Environment[prefix+key] = &val
-			}
-			for key, val := range variables.raw {
-				if existing, ok := s.Environment[key]; ok && (existing == nil || *existing != val) {
-					logrus.Warnf("provider %q overrides environment variable %q in service %q", service.Name, key, name)
-				}
-				s.Environment[key] = &val
-			}
-			project.Services[name] = s
+	if len(variables.secrets) > 0 || len(variables.rawSecrets) > 0 {
+		if project.Secrets == nil {
+			project.Secrets = types.Secrets{}
 		}
 	}
+	for name, dependent := range project.Services {
+		if _, ok := dependent.DependsOn[service.Name]; !ok {
+			continue
+		}
+		project.Services[name] = applyProviderVariables(project, service.Name, name, dependent, variables)
+	}
 	return nil
+}
+
+// applyProviderVariables merges a provider's env vars and secrets into one
+// dependent service, mirroring how setenv/rawsetenv/setsecret/rawsetsecret
+// are documented to behave (docs/extension.md).
+func applyProviderVariables(project *types.Project, providerName, dependentName string, dependent types.ServiceConfig, variables pluginVariables) types.ServiceConfig {
+	prefix := strings.ToUpper(providerName) + "_"
+	for key, val := range variables.prefixed {
+		dependent.Environment[prefix+key] = &val
+	}
+	for key, val := range variables.raw {
+		if existing, ok := dependent.Environment[key]; ok && (existing == nil || *existing != val) {
+			logrus.Warnf("provider %q overrides environment variable %q in service %q", providerName, key, dependentName)
+		}
+		dependent.Environment[key] = &val
+	}
+
+	secretPrefix := providerName + "_"
+	for key, val := range variables.secrets {
+		dependent.Secrets = upsertProviderSecret(project, dependent.Secrets, secretPrefix+key, val)
+	}
+	for key, val := range variables.rawSecrets {
+		if existing, ok := project.Secrets[key]; ok && existing.Content != val {
+			logrus.Warnf("provider %q overrides secret %q in service %q", providerName, key, dependentName)
+		}
+		dependent.Secrets = upsertProviderSecret(project, dependent.Secrets, key, val)
+	}
+	return dependent
+}
+
+// upsertProviderSecret declares (or updates) a project-level secret carrying
+// content contributed by a provider, and ensures the dependent service
+// references it — mirroring how setenv/rawsetenv mutate the environment map,
+// but for the service's Secrets list, which has no natural key to overwrite
+// in place.
+func upsertProviderSecret(project *types.Project, secrets []types.ServiceSecretConfig, name, content string) []types.ServiceSecretConfig {
+	project.Secrets[name] = types.SecretConfig{Name: name, Content: content}
+	for _, ref := range secrets {
+		if ref.Source == name {
+			return secrets
+		}
+	}
+	return append(secrets, types.ServiceSecretConfig{Source: name})
 }
 
 func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) {
@@ -135,8 +178,10 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	defer func() { _ = stdout.Close() }()
 
 	variables := pluginVariables{
-		prefixed: types.Mapping{},
-		raw:      types.Mapping{},
+		prefixed:   types.Mapping{},
+		raw:        types.Mapping{},
+		secrets:    types.Mapping{},
+		rawSecrets: types.Mapping{},
 	}
 
 	for {
@@ -166,6 +211,18 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
 			}
 			variables.raw[key] = val
+		case SetSecretType:
+			key, val, found := strings.Cut(msg.Message, "=")
+			if !found {
+				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+			}
+			variables.secrets[key] = val
+		case RawSetSecretType:
+			key, val, found := strings.Cut(msg.Message, "=")
+			if !found {
+				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+			}
+			variables.rawSecrets[key] = val
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
