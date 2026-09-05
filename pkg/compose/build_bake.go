@@ -140,7 +140,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if out == nil {
 		out = s.stdout()
 	}
-	display, err := progressui.NewDisplay(makeConsole(out), displayMode)
+	display, err := newBakeDisplay(out, displayMode)
 	if err != nil {
 		return nil, err
 	}
@@ -509,12 +509,25 @@ func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
 // matters, and falls back to plain elsewhere.
 func makeConsole(out io.Writer) io.Writer {
 	if s, ok := out.(*streams.Out); ok {
-		if f, ok := s.File(); ok {
+		if f, ok := s.File(); ok && s.IsTerminal() {
 			return f
 		}
-		return &_console{s}
+		if s.IsTerminal() {
+			return &_console{s}
+		}
+		return s
 	}
 	return out
+}
+
+// newBakeDisplay falls back to plain when TTY mode is requested but out is not a console
+// (e.g. `docker compose build >/dev/null`, #14182).
+func newBakeDisplay(out io.Writer, mode progressui.DisplayMode) (progressui.Display, error) {
+	d, err := progressui.NewDisplay(makeConsole(out), mode)
+	if err != nil && mode != progressui.PlainMode && mode != progressui.QuietMode {
+		d, err = progressui.NewDisplay(out, progressui.PlainMode)
+	}
+	return d, err
 }
 
 var _ console.File = &_console{}

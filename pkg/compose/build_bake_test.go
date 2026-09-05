@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
+	"github.com/moby/buildkit/util/progress/progressui"
 	"gotest.tools/v3/assert"
 )
 
@@ -105,19 +106,52 @@ func TestToBakeAttest(t *testing.T) {
 // os.Stdin/Stdout/Stderr values, so a wrapper would disable the TTY progress
 // rendering entirely (#14086).
 func TestMakeConsole(t *testing.T) {
-	t.Run("stream wrapping a real file yields the file itself", func(t *testing.T) {
-		out := makeConsole(streams.NewOut(os.Stdout))
-		assert.Equal(t, out, os.Stdout)
+	t.Run("terminal stdout yields the real file", func(t *testing.T) {
+		s := streams.NewOut(os.Stdout)
+		out := makeConsole(s)
+		if s.IsTerminal() {
+			assert.Equal(t, out, os.Stdout)
+			return
+		}
+		assert.Check(t, out != os.Stdout, "non-console stdout must not be passed to ConsoleFromFile")
+	})
+
+	t.Run("redirected file is not treated as a console", func(t *testing.T) {
+		r, w, err := os.Pipe()
+		assert.NilError(t, err)
+		t.Cleanup(func() {
+			_ = r.Close()
+			_ = w.Close()
+		})
+		s := streams.NewOut(w)
+		out := makeConsole(s)
+		assert.Check(t, out != w, "pipe fd must not be handed to ConsoleFromFile")
 	})
 
 	t.Run("file-less stream keeps the console.File wrapper", func(t *testing.T) {
-		out := makeConsole(streams.NewOut(&bytes.Buffer{}))
-		_, ok := out.(*_console)
-		assert.Check(t, ok, "expected a *_console, got %T", out)
+		s := streams.NewOut(&bytes.Buffer{})
+		out := makeConsole(s)
+		if s.IsTerminal() {
+			_, ok := out.(*_console)
+			assert.Check(t, ok, "expected a *_console, got %T", out)
+			return
+		}
+		assert.Equal(t, out, io.Writer(s))
 	})
 
 	t.Run("plain writer is left untouched", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		assert.Equal(t, makeConsole(buf), io.Writer(buf))
 	})
+}
+
+func TestNewBakeDisplayFallsBackWhenNotConsole(t *testing.T) {
+	r, w, err := os.Pipe()
+	assert.NilError(t, err)
+	t.Cleanup(func() {
+		_ = r.Close()
+		_ = w.Close()
+	})
+	_, err = newBakeDisplay(streams.NewOut(w), progressui.TtyMode)
+	assert.NilError(t, err)
 }
