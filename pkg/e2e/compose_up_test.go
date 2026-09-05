@@ -42,6 +42,32 @@ func TestUpWaitTimeout(t *testing.T) {
 		ServiceState("app", "running"))
 }
 
+// https://github.com/docker/compose/issues/9122
+// --wait combined with --attach must stream the waited-for service's logs
+// while polling for health, then detach (leaving it running) once the wait
+// condition is met, instead of following logs forever like a plain
+// foreground `up`.
+func TestWaitStreamsLogsThenDetaches(t *testing.T) {
+	NewScenario(t, "up --wait --attach must stream logs while waiting, then detach with the service left running").
+		Step("up --wait --attach prints the service's early log line and returns once healthy",
+			ComposeCmd("up", "--wait", "--attach", "test").Within(30*time.Second),
+			StdoutContains("hello-while-waiting"),
+			ServiceState("test", "running"),
+			ServiceHealthy("test"))
+}
+
+// https://github.com/docker/compose/issues/9122
+// Without --attach or --attach-dependencies, --wait must keep its historical
+// silent, detached behavior.
+func TestWaitAloneStaysSilent(t *testing.T) {
+	NewScenario(t, "up --wait alone must not stream logs, preserving its historical silent behavior").
+		Step("up --wait completes without echoing the service's logs",
+			ComposeCmd("up", "--wait", "test").Within(30*time.Second),
+			OutputNotContains("hello-while-waiting"),
+			ServiceState("test", "running"),
+			ServiceHealthy("test"))
+}
+
 func TestUpExitCodeFrom(t *testing.T) {
 	NewScenario(t, "up --exit-code-from must return the selected service's exit code").
 		Step("up returns the failing service's code once it exits",

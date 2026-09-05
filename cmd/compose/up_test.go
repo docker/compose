@@ -179,3 +179,42 @@ services:
 	assert.Assert(t, strings.Contains(output, "LXKNS_PORT"), output)
 	assert.Assert(t, !strings.Contains(fmt.Sprint(err), "invalid ip address"), fmt.Sprint(err))
 }
+
+// https://github.com/docker/compose/issues/9122
+// --wait must be combinable with --attach/--attach-dependencies, to stream
+// logs while waiting instead of only polling silently.
+func TestValidateFlags_WaitWithAttach(t *testing.T) {
+	up := &upOptions{wait: true, attach: []string{"web"}}
+	err := validateFlags(up, &createOptions{})
+	assert.NilError(t, err)
+	assert.Assert(t, !up.Detach, "--wait --attach must not force detached mode")
+
+	up = &upOptions{wait: true, attachDependencies: true}
+	err = validateFlags(up, &createOptions{})
+	assert.NilError(t, err)
+	assert.Assert(t, !up.Detach, "--wait --attach-dependencies must not force detached mode")
+}
+
+func TestValidateFlags_WaitAloneStaysDetached(t *testing.T) {
+	up := &upOptions{wait: true}
+	err := validateFlags(up, &createOptions{})
+	assert.NilError(t, err)
+	assert.Assert(t, up.Detach, "--wait alone must keep its historical detached behavior")
+}
+
+func TestValidateFlags_WaitIncompatibleFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		up   *upOptions
+	}{
+		{"abort-on-container-exit", &upOptions{wait: true, cascadeStop: true}},
+		{"abort-on-container-failure", &upOptions{wait: true, cascadeFail: true}},
+		{"watch", &upOptions{wait: true, watch: true}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateFlags(tc.up, &createOptions{})
+			assert.ErrorContains(t, err, "--wait cannot be combined with")
+		})
+	}
+}

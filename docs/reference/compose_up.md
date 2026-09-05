@@ -64,7 +64,7 @@ hook runs again. Running `compose down` also removes them.
 | `--scale`                      | `stringArray` |          | Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.                                                       |
 | `-t`, `--timeout`              | `int`         | `0`      | Use this timeout in seconds for container shutdown when attached or when containers are already running                                             |
 | `--timestamps`                 | `bool`        |          | Show timestamps                                                                                                                                     |
-| `--wait`                       | `bool`        |          | Wait for services to be running\|healthy. Implies detached mode.                                                                                    |
+| `--wait`                       | `bool`        |          | Wait for services to be running\|healthy. Implies detached mode, unless combined with --attach or --attach-dependencies to also stream logs while waiting. |
 | `--wait-timeout`               | `int`         | `0`      | Maximum duration in seconds to wait for the project to be running\|healthy                                                                          |
 | `-w`, `--watch`                | `bool`        |          | Watch source code and rebuild/refresh containers when files are updated.                                                                            |
 | `-y`, `--yes`                  | `bool`        |          | Assume "yes" as answer to all prompts and run non-interactively                                                                                     |
