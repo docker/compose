@@ -19,9 +19,10 @@ package prompt
 import (
 	"fmt"
 	"io"
+	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/docker/cli/cli/streams"
+	"golang.org/x/term"
 
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -74,17 +75,34 @@ func (s streamsFileReader) Fd() uintptr {
 
 // Confirm asks for yes or no input
 func (u User) Confirm(message string, defaultValue bool) (bool, error) {
-	qs := &survey.Confirm{
-		Message: message,
-		Default: defaultValue,
+	if err := u.stdin.stream.SetRawTerminal(); err != nil {
+		return false, err
 	}
-	var b bool
-	err := survey.AskOne(qs, &b, func(options *survey.AskOptions) error {
-		options.Stdio.In = u.stdin
-		options.Stdio.Out = u.stdout
-		return nil
-	})
-	return b, err
+	defer u.stdin.stream.RestoreTerminal()
+
+	terminal := term.NewTerminal(struct {
+		io.Reader
+		io.Writer
+	}{
+		Reader: u.stdin,
+		Writer: u.stdout,
+	}, message)
+
+	for {
+		answer, err := terminal.ReadLine()
+		if err != nil {
+			return false, err
+		}
+
+		switch strings.ToLower(answer) {
+		case "":
+			return defaultValue, nil
+		case "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		}
+	}
 }
 
 // Pipe - aggregates prompt methods
