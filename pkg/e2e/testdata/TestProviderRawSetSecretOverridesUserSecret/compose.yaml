@@ -1,0 +1,19 @@
+services:
+  test:
+    image: alpine
+    command: sh -c "cat /run/secrets/shared_api_key"
+    depends_on:
+      - secrets
+    secrets:
+      - shared_api_key
+  secrets:
+    provider:
+      type: example-provider
+      options:
+        name: secrets
+        type: test1
+        size: 1
+
+secrets:
+  shared_api_key:
+    content: "user-defined-value"

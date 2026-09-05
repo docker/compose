@@ -58,6 +58,8 @@ JSON messages MUST include a `type` and a `message` attribute.
 - `error`: Lets the user know something went wrong with details about the error. Compose will render the message as the reason for the service failure.
 - `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. The variable is automatically prefixed with the service name. See next section for further details.
 - `rawsetenv`: Same as `setenv`, but the variable is injected as-is without the service name prefix. Useful when applications require exact variable names that cannot be altered.
+- `setsecret`: Lets the plugin hand dependent services a file-based secret instead of an environment variable. The secret name is automatically prefixed with the service name, and its content is mounted at `/run/secrets/<name>` in the dependent service. Prefer this over `setenv` for credentials: environment variables can leak through process inspection, debugging output, logs and crash reports, while a mounted file does not. See next section for further details.
+- `rawsetsecret`: Same as `setsecret`, but the secret name is used as-is without the service name prefix. Useful when applications require exact secret file names that cannot be altered, or to provide content for a secret the user already declared in the compose file.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
 
 ```mermaid
@@ -77,6 +79,32 @@ sequenceDiagram
     Provider-)Compose: EOF (command complete) exit 0
     Compose-)Shell: service started
 ```
+
+## Secrets and mounts
+
+`setenv`/`rawsetenv` are convenient, but environment variables are a poor fit for credentials: they show up in `docker inspect`, process listings, debugging output and crash reports. `setsecret` and `rawsetsecret` let a provider deliver such values as a mounted file instead:
+
+```json
+{ "type": "setsecret", "message": "db_password=hunter2" }
+```
+
+Given a provider service named `database`, this declares a project secret named `database_db_password` with `hunter2` as its content, and adds a reference to it on every dependent service — exactly as if the compose file had declared:
+
+```yaml
+services:
+  app:
+    secrets:
+      - database_db_password
+secrets:
+  database_db_password:
+    content: hunter2
+```
+
+The secret is mounted read-only at `/run/secrets/database_db_password` in the `app` service, without the compose file ever declaring it. `rawsetsecret` behaves like `rawsetenv`: the name is used as-is, letting the provider target a secret name the application expects or that the user already declared in the compose file (in which case the provider's content wins, and Compose logs a warning — the same behavior `rawsetenv` has for environment variables).
+
+Both directives are additive to `setenv`/`rawsetenv`: a provider can emit any mix of the four message types to expose some values as environment variables and others as mounted secrets.
+
+> __Note:__ As with environment variables, the `compose up` provider command _MUST_ be idempotent: re-running it against an already-running resource must produce the same secret content, not rotate it on every `up`.
 
 ## Connection to a service managed by a provider
 
