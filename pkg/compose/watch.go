@@ -376,7 +376,7 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 	defer cancel()
 
 	// debounce and group filesystem events so that we capture IDE saving many files as one "batch" event
-	batchEvents := watch.BatchDebounceEvents(ctx, s.clock, watcher.Events())
+	batchEvents := watch.BatchDebounceEvents(ctx, watcher.Events())
 
 	for {
 		select {
