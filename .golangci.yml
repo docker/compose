@@ -1,6 +1,8 @@
 version: "2"
 run:
   concurrency: 2
+  build-tags:
+    - e2e # Avoid "unused" linter issues for code only used in e2e.
 linters:
   default: none
   disable:

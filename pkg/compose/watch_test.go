@@ -22,11 +22,11 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	"github.com/jonboulle/clockwork"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
@@ -75,87 +75,81 @@ func (s stdLogger) Status(containerName, msg string) {
 }
 
 func TestWatch_Sync(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	cli := mocks.NewMockCli(mockCtrl)
-	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
-	apiClient := mocks.NewMockAPIClient(mockCtrl)
-	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
-		Items: []container.Summary{
-			testContainer("test", "123", false),
-		},
-	}, nil).AnyTimes()
-	// we expect the image to be pruned
-	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: make(client.Filters).
-			Add("dangling", "true").
-			Add("label", api.ProjectLabel+"=myProjectName"),
-	}).Return(client.ImageListResult{
-		Items: []image.Summary{
-			{ID: "123"},
-			{ID: "456"},
-		},
-	}, nil).Times(1)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "123", client.ImageRemoveOptions{}).Times(1)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "456", client.ImageRemoveOptions{}).Times(1)
-	//
-	cli.EXPECT().Client().Return(apiClient).AnyTimes()
-
-	ctx, cancelFunc := context.WithCancel(t.Context())
-	t.Cleanup(cancelFunc)
-
-	proj := types.Project{
-		Name: "myProjectName",
-		Services: types.Services{
-			"test": {
-				Name: "test",
+	synctest.Test(t, func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		cli := mocks.NewMockCli(mockCtrl)
+		cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+			Items: []container.Summary{
+				testContainer("test", "123", false),
 			},
-		},
-	}
+		}, nil).AnyTimes()
+		// we expect the image to be pruned
+		apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+			Filters: make(client.Filters).
+				Add("dangling", "true").
+				Add("label", api.ProjectLabel+"=myProjectName"),
+		}).Return(client.ImageListResult{
+			Items: []image.Summary{
+				{ID: "123"},
+				{ID: "456"},
+			},
+		}, nil).Times(1)
+		apiClient.EXPECT().ImageRemove(gomock.Any(), "123", client.ImageRemoveOptions{}).Times(1)
+		apiClient.EXPECT().ImageRemove(gomock.Any(), "456", client.ImageRemoveOptions{}).Times(1)
+		//
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
-	watcher := testWatcher{
-		events: make(chan watch.FileEvent),
-		errors: make(chan error),
-	}
-
-	syncer := newFakeSyncer()
-	clock := clockwork.NewFakeClock()
-	go func() {
-		service := composeService{
-			dockerCli:      cli,
-			clock:          clock,
-			maxConcurrency: -1,
+		proj := types.Project{
+			Name: "myProjectName",
+			Services: types.Services{
+				"test": {
+					Name: "test",
+				},
+			},
 		}
-		rules, err := getWatchRules(&types.DevelopConfig{
-			Watch: []types.Trigger{
-				{
-					Path:   "/sync",
-					Action: "sync",
-					Target: "/work",
-					Ignore: []string{"ignore"},
-				},
-				{
-					Path:   "/rebuild",
-					Action: "rebuild",
-				},
-			},
-		}, types.ServiceConfig{Name: "test"})
-		assert.NilError(t, err)
 
-		err = service.watchEvents(ctx, &proj, api.WatchOptions{
-			Build: &api.BuildOptions{},
-			LogTo: stdLogger{},
-			Prune: true,
-		}, watcher, syncer, rules)
-		assert.NilError(t, err)
-	}()
+		watcher := testWatcher{
+			events: make(chan watch.FileEvent),
+			errors: make(chan error),
+		}
 
-	watcher.Events() <- watch.NewFileEvent("/sync/changed")
-	watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
-	err := clock.BlockUntilContext(ctx, 3)
-	assert.NilError(t, err)
-	clock.Advance(watch.QuietPeriod)
-	select {
-	case actual := <-syncer.synced:
+		syncer := newFakeSyncer()
+		go func() {
+			service := composeService{
+				dockerCli:      cli,
+				maxConcurrency: -1,
+			}
+			rules, err := getWatchRules(&types.DevelopConfig{
+				Watch: []types.Trigger{
+					{
+						Path:   "/sync",
+						Action: "sync",
+						Target: "/work",
+						Ignore: []string{"ignore"},
+					},
+					{
+						Path:   "/rebuild",
+						Action: "rebuild",
+					},
+				},
+			}, types.ServiceConfig{Name: "test"})
+			assert.NilError(t, err)
+
+			err = service.watchEvents(t.Context(), &proj, api.WatchOptions{
+				Build: &api.BuildOptions{},
+				LogTo: stdLogger{},
+				Prune: true,
+			}, watcher, syncer, rules)
+			assert.NilError(t, err)
+		}()
+
+		watcher.Events() <- watch.NewFileEvent("/sync/changed")
+		watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
+		time.Sleep(watch.QuietPeriod)
+		synctest.Wait()
+		actual := <-syncer.synced
 		expected := []*sync.PathMapping{
 			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 			{HostPath: "/sync/changed/sub", ContainerPath: "/work/changed/sub"},
@@ -164,22 +158,20 @@ func TestWatch_Sync(t *testing.T) {
 			return cmp.Compare(a.HostPath, b.HostPath)
 		})
 		assert.DeepEqual(t, expected, actual)
-	case <-time.After(100 * time.Millisecond):
-		t.Error("timeout")
-	}
 
-	watcher.Events() <- watch.NewFileEvent("/rebuild")
-	watcher.Events() <- watch.NewFileEvent("/sync/changed")
-	err = clock.BlockUntilContext(ctx, 4)
-	assert.NilError(t, err)
-	clock.Advance(watch.QuietPeriod)
-	select {
-	case batch := <-syncer.synced:
-		t.Fatalf("received unexpected events: %v", batch)
-	case <-time.After(100 * time.Millisecond):
-		// expected
-	}
-	// TODO: there's not a great way to assert that the rebuild attempt happened
+		// Rebuild fails before sync actions from the same batch are processed.
+		watcher.Events() <- watch.NewFileEvent("/rebuild")
+		watcher.Events() <- watch.NewFileEvent("/sync/changed")
+		time.Sleep(watch.QuietPeriod)
+		synctest.Wait()
+		select {
+		case batch := <-syncer.synced:
+			t.Fatalf("received unexpected events: %v", batch)
+		default:
+			// expected
+		}
+		// TODO: there's not a great way to assert that the rebuild attempt happened
+	})
 }
 
 type fakeSyncer struct {
