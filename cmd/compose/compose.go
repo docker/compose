@@ -356,6 +356,9 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		return nil, metrics, err
 	}
 
+	// Warn about deploy attributes that are ignored in standalone mode
+	warnIgnoredDeployAttributes(project)
+
 	return project, metrics, nil
 }
 
