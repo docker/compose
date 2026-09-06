@@ -60,6 +60,25 @@ JSON messages MUST include a `type` and a `message` attribute.
 - `rawsetenv`: Same as `setenv`, but the variable is injected as-is without the service name prefix. Useful when applications require exact variable names that cannot be altered.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
 - `get-service-config`: Asks Compose for the resolved configuration of the service the provider manages. See next section.
+- `publish-endpoint`: Declares where a network endpoint of the provider's resource is actually reachable. The
+  message is `"<container-port>=<host>:<port>"` — the port consumers know on the left, the real location on the
+  right, as seen FROM THE PROVIDER'S HOST (typically a port published on the host):
+  ```json
+  { "type": "publish-endpoint", "message": "80=localhost:49152" }
+  ```
+  The provider does not need to know how containers reach its host: the relay translates a loopback (or
+  unspecified) upstream host into `host.docker.internal` — resolved through the `host-gateway` extra_host
+  Compose injects — while routable addresses pass through untouched.
+  When a provider publishes at least one endpoint, Compose deploys a **relay container** in place of the service:
+  a minimal TCP forwarder (`docker/compose-relay` — set `COMPOSE_RELAY_IMAGE` to pull the image from an internal
+  registry instead of Docker Hub) joining the networks of the services that depend on the
+  provider service, aliased with the service name. Consumers then reach the resource at the compose-native
+  address — `http://<service>:<container-port>` — with no injected variables involved. The relay is a regular
+  project container (standard compose labels, canonical `<project>-<service>-1` name), so `ps`, `logs`, `stop`
+  and `down` treat it as the service; it additionally carries the `com.docker.compose.relay` label identifying
+  its role, and process-level commands (`exec`, `cp`) refuse it. The relay is recreated when the published
+  endpoints change, and removed by `down` like any project container. TCP only; the message may be repeated,
+  one per port.
 
 ## Requesting the service configuration
 

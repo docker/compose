@@ -17,9 +17,13 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,6 +36,7 @@ func main() {
 		Use:   "demo",
 	}
 	cmd.AddCommand(composeCommand())
+	cmd.AddCommand(serveDemoCommand())
 	err := cmd.Execute()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -85,6 +90,44 @@ func composeCommand() *cobra.Command {
 	return c
 }
 
+// serveDemoCommand is the detached helper process behind the
+// publish-endpoint demonstration: a TCP server on the given address
+// answering every connection with a fixed HTTP response, exiting on its own
+// after three minutes. It owns the port from bind to exit: the bound address
+// is reported on stdout once listening, so the parent never has to probe or
+// pre-reserve the port (no TOCTOU window, and works on Windows where handing
+// a socket over ExtraFiles is not supported).
+func serveDemoCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:    "serve-demo ADDR",
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			listener, err := net.Listen("tcp", args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Println(listener.Addr().String())
+			go func() {
+				time.Sleep(3 * time.Minute)
+				os.Exit(0)
+			}()
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					return err
+				}
+				go func() {
+					defer func() { _ = conn.Close() }()
+					buf := make([]byte, 1024)
+					_, _ = conn.Read(buf)
+					_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 19\r\nConnection: close\r\n\r\nhello from provider"))
+				}()
+			}
+		},
+	}
+}
+
 const lineSeparator = "\n"
 
 func up(options options, args []string) {
@@ -114,6 +157,42 @@ func up(options options, args []string) {
 	// encode the message instead of interpolating it into a JSON literal
 	setenv, _ := json.Marshal(map[string]string{"type": "setenv", "message": "CONFIG_TYPE=" + config.Provider.Type})
 	fmt.Println(string(setenv))
+
+	// When asked to, stand up a real endpoint on the host and publish it, so
+	// compose deploys a relay and consumers reach it as http://<service>:80.
+	if os.Getenv("PROVIDER_DEMO_ENDPOINT") != "" {
+		// The subprocess binds the port itself and reports the resulting
+		// address on its stdout; only then is the endpoint published. This
+		// avoids the two races of a pre-reserved port: another process
+		// grabbing it between release and re-bind, and publish-endpoint
+		// pointing at a server that is not listening yet.
+		// All interfaces, not loopback: on a plain Linux engine host-gateway
+		// is the bridge IP, which cannot reach a host loopback bind.
+		server := exec.Command(os.Args[0], "serve-demo", "0.0.0.0:0")
+		stdout, err := server.StdoutPipe()
+		if err != nil {
+			fmt.Printf(`{ "type": "error", "message": "demo endpoint: %v" }%s`, err, lineSeparator)
+			return
+		}
+		if err := server.Start(); err != nil {
+			fmt.Printf(`{ "type": "error", "message": "demo endpoint: %v" }%s`, err, lineSeparator)
+			return
+		}
+		// A crashed subprocess closes the pipe (EOF below); a hung one would
+		// block the read forever, so kill it after a deadline — the read then
+		// fails with EOF and lands on the same error path.
+		watchdog := time.AfterFunc(30*time.Second, func() { _ = server.Process.Kill() })
+		addr, err := bufio.NewReader(stdout).ReadString('\n')
+		watchdog.Stop()
+		if err != nil {
+			fmt.Printf(`{ "type": "error", "message": "demo endpoint did not come up: %v" }%s`, err, lineSeparator)
+			return
+		}
+		// the endpoint is announced as seen from THIS process's host —
+		// the relay translates loopback into the container-visible name
+		_, port, _ := net.SplitHostPort(strings.TrimSpace(addr))
+		fmt.Printf(`{ "type": "publish-endpoint", "message": "80=localhost:%s" }%s`, port, lineSeparator)
+	}
 
 	for i := 0; i < options.size; i += 10 {
 		time.Sleep(1 * time.Second)

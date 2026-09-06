@@ -1,0 +1,13 @@
+services:
+  test:
+    image: alpine
+    command: wget -qO- -T 10 http://db
+    depends_on:
+      - db
+  db:
+    provider:
+      type: example-provider
+      options:
+        name: db
+        type: test1
+        size: 1

@@ -23,9 +23,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -50,6 +52,7 @@ const (
 	SetEnvType                = "setenv"
 	RawSetEnvType             = "rawsetenv"
 	DebugType                 = "debug"
+	PublishEndpointType       = "publish-endpoint"
 	providerMetadataDirectory = "compose/providers"
 
 	// GetServiceConfigType is a message the provider sends to receive, on
@@ -61,6 +64,11 @@ const (
 type pluginVariables struct {
 	prefixed types.Mapping
 	raw      types.Mapping
+	// endpoints are "port=host:port" publish-endpoint messages: container
+	// port the consumers know, mapped to where the provider's resource
+	// actually listens. When present, compose deploys a relay container
+	// under the service's name on the consumers' networks.
+	endpoints map[int]string
 }
 
 var mux sync.Mutex
@@ -107,7 +115,28 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 			project.Services[name] = s
 		}
 	}
+	if command == "up" && len(variables.endpoints) > 0 {
+		if err := s.ensureServiceRelay(ctx, project, service, variables.endpoints); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// parseEndpointMessage decodes a publish-endpoint payload: "80=host:port".
+func parseEndpointMessage(message string) (int, string, error) {
+	portPart, upstream, found := strings.Cut(message, "=")
+	if !found {
+		return 0, "", fmt.Errorf("publish-endpoint %q: want port=host:port", message)
+	}
+	port, err := strconv.Atoi(portPart)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, "", fmt.Errorf("publish-endpoint %q: invalid port", message)
+	}
+	if _, _, err := net.SplitHostPort(upstream); err != nil {
+		return 0, "", fmt.Errorf("publish-endpoint %q: invalid endpoint: %w", message, err)
+	}
+	return port, upstream, nil
 }
 
 func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) {
@@ -180,8 +209,9 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	defer func() { _ = stdout.Close() }()
 
 	variables := pluginVariables{
-		prefixed: types.Mapping{},
-		raw:      types.Mapping{},
+		prefixed:  types.Mapping{},
+		raw:       types.Mapping{},
+		endpoints: map[int]string{},
 	}
 
 	for {
@@ -224,6 +254,12 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 				defer stdinMu.Unlock()
 				_, _ = stdin.Write(payload)
 			}()
+		case PublishEndpointType:
+			port, upstream, err := parseEndpointMessage(msg.Message)
+			if err != nil {
+				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %w", err)
+			}
+			variables.endpoints[port] = upstream
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
