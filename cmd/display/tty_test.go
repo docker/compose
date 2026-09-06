@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -763,4 +764,66 @@ func TestPrintWithDimensions_MultipleRendersFit(t *testing.T) {
 				tick, i, lenAnsi(line), terminalWidth, line)
 		}
 	}
+}
+
+var ansiSequencePattern = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// stripAnsiSequences removes ANSI escape sequences so tests can assert on
+// the visible text (indentation, task IDs) of rendered lines.
+func stripAnsiSequences(s string) string {
+	return ansiSequencePattern.ReplaceAllString(s, "")
+}
+
+// TestPrintWithDimensions_ShowsChildTasks is a regression test for
+// docker/compose#13757: per-layer pull progress lines (child tasks) must be
+// rendered indented under their parent task instead of being dropped.
+func TestPrintWithDimensions_ShowsChildTasks(t *testing.T) {
+	w, buf := newTestWriter()
+	addParentWithDownloadingChildren(w, "Image foo/bar", 3, 3_000_000)
+
+	w.printWithDimensions(100, 24)
+
+	plainLines := strings.Split(stripAnsiSequences(buf.String()), "\n")
+	assert.Assert(t, len(plainLines) > 0)
+	assert.Assert(t, strings.Contains(plainLines[1], "Image foo/bar"),
+		"parent task line missing: %q", plainLines)
+	for i := range 3 {
+		id := fmt.Sprintf("Image foo/bar/layer%d", i)
+		found := false
+		for _, line := range plainLines {
+			if strings.Contains(line, id) {
+				found = true
+				assert.Assert(t, strings.HasPrefix(line, "   "),
+					"child task line %q is not indented", line)
+			}
+		}
+		assert.Assert(t, found, "child task line %q missing in:\n%s", id, plainLines)
+	}
+	for i, line := range plainLines {
+		if lenAnsi(line) == 0 {
+			continue
+		}
+		assert.Assert(t, lenAnsi(line) <= 100,
+			"line %d has length %d which exceeds terminal width 100: %q",
+			i, lenAnsi(line), line)
+	}
+}
+
+// TestPrintWithDimensions_ChildrenCountAgainstLineBudget verifies child task
+// lines share the terminal height budget with parent lines: with a single
+// parent and three children on a 5-line terminal, only the parent and the
+// first child fit before the "more" indicator.
+func TestPrintWithDimensions_ChildrenCountAgainstLineBudget(t *testing.T) {
+	w, buf := newTestWriter()
+	addParentWithDownloadingChildren(w, "Image foo/bar", 3, 3_000_000)
+
+	w.printWithDimensions(100, 5)
+
+	plain := stripAnsiSequences(buf.String())
+	assert.Assert(t, strings.Contains(plain, "Image foo/bar"))
+	assert.Assert(t, strings.Contains(plain, "Image foo/bar/layer0"))
+	assert.Assert(t, strings.Contains(plain, "more"),
+		"expected a \"more\" indicator, got:\n%s", plain)
+	assert.Assert(t, !strings.Contains(plain, "Image foo/bar/layer2"),
+		"child task beyond the line budget should be hidden, got:\n%s", plain)
 }

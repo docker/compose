@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -309,6 +308,7 @@ func (w *ttyWriter) childrenTasks(parent string) iter.Seq[*task] {
 type lineData struct {
 	spinner           string // rendered spinner with color
 	prefix            string // dry-run prefix if any
+	indent            string // indentation for child task lines
 	taskID            string // possibly abbreviated
 	progress          string // progress bar and (optionally) size info appended
 	progressSizeBytes int    // byte length of the trailing size suffix in progress, 0 if none
@@ -357,48 +357,82 @@ func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
 	firstLine := fmt.Sprintf("[+] %s %d/%d", w.operation, numDone(w.tasks), len(w.tasks))
 	_, _ = fmt.Fprintln(w.out, firstLine)
 
-	// Collect parent tasks in original order
-	allTasks := slices.Collect(w.parentTasks())
+	// Collect parent tasks with their children in original order, so that
+	// per-layer pull progress (child tasks) is rendered under its parent.
+	// See https://github.com/docker/compose/issues/13757
+	type taskEntry struct {
+		t      *task
+		indent string
+	}
+	var entries []taskEntry
+	for t := range w.parentTasks() {
+		entries = append(entries, taskEntry{t, ""})
+		for child := range w.childrenTasks(t.ID) {
+			entries = append(entries, taskEntry{child, "  "})
+		}
+	}
 
 	// Available lines: terminal height - 2 (header line + potential "more" line)
 	maxLines := max(terminalHeight-2, 1)
 
-	showMore := len(allTasks) > maxLines
-	tasksToShow := allTasks
+	showMore := len(entries) > maxLines
+	entriesToShow := entries
 	if showMore {
-		tasksToShow = allTasks[:maxLines-1] // Reserve one line for "more" message
+		entriesToShow = entries[:maxLines-1] // Reserve one line for "more" message
 	}
 
-	// collect line data and compute timerLen
-	lines := make([]lineData, len(tasksToShow))
-	var timerLen int
-	for i, t := range tasksToShow {
-		lines[i] = w.prepareLineData(t)
-		if len(lines[i].timer) > timerLen {
-			timerLen = len(lines[i].timer)
+	// layoutLines prepares, truncates and pads lines for the given entries.
+	layoutLines := func(entries []taskEntry) []lineData {
+		// collect line data and compute timerLen
+		lines := make([]lineData, len(entries))
+		var timerLen int
+		for i, e := range entries {
+			lines[i] = w.prepareLineData(e.t)
+			lines[i].indent = e.indent
+			if len(lines[i].timer) > timerLen {
+				timerLen = len(lines[i].timer)
+			}
 		}
+
+		// pad timers so they all have the same visible width
+		for i := range lines {
+			l := &lines[i]
+			if l.timer == "" {
+				continue
+			}
+			timerWidth := utf8.RuneCountInString(l.timer)
+			if timerWidth < timerLen {
+				// Left-pad so the timer's right edge stays aligned on the terminal.
+				// This also prevents stale suffix characters from visually “sticking”
+				// when a previously-rendered timer was wider (e.g. "10.6s" -> "0.0s").
+				l.timer = strings.Repeat(" ", timerLen-timerWidth) + l.timer
+			}
+		}
+
+		// shorten details/taskID to fit terminal width
+		w.adjustLineWidth(lines, timerLen, terminalWidth)
+
+		// compute padding
+		w.applyPadding(lines, terminalWidth, timerLen)
+		return lines
 	}
 
-	// pad timers so they all have the same visible width
-	for i := range lines {
-		l := &lines[i]
-		if l.timer == "" {
-			continue
+	lines := layoutLines(entriesToShow)
+
+	// Child task lines carry indentation and longer status labels, so when
+	// lines still overflow the terminal width after truncation, drop the
+	// expendable child lines and re-layout parents only.
+	if linesOverflow(lines, terminalWidth) {
+		var parents []taskEntry
+		for _, e := range entriesToShow {
+			if e.indent == "" {
+				parents = append(parents, e)
+			}
 		}
-		timerWidth := utf8.RuneCountInString(l.timer)
-		if timerWidth < timerLen {
-			// Left-pad so the timer's right edge stays aligned on the terminal.
-			// This also prevents stale suffix characters from visually “sticking”
-			// when a previously-rendered timer was wider (e.g. "10.6s" -> "0.0s").
-			l.timer = strings.Repeat(" ", timerLen-timerWidth) + l.timer
+		if len(parents) < len(entriesToShow) {
+			lines = layoutLines(parents)
 		}
 	}
-
-	// shorten details/taskID to fit terminal width
-	w.adjustLineWidth(lines, timerLen, terminalWidth)
-
-	// compute padding
-	w.applyPadding(lines, terminalWidth, timerLen)
 
 	// Render lines
 	numLines := 0
@@ -408,7 +442,7 @@ func (w *ttyWriter) printWithDimensions(terminalWidth, terminalHeight int) {
 	}
 
 	if showMore {
-		moreCount := len(allTasks) - len(tasksToShow)
+		moreCount := len(entries) - len(entriesToShow)
 		moreText := fmt.Sprintf(" ... %d more", moreCount)
 		pad := max(terminalWidth-len(moreText), 0)
 		_, _ = fmt.Fprintf(w.out, "%s%s\n", moreText, strings.Repeat(" ", pad))
@@ -427,16 +461,16 @@ func (w *ttyWriter) applyPadding(lines []lineData, terminalWidth int, timerLen i
 	var maxBeforeStatus int
 	for i := range lines {
 		l := &lines[i]
-		// Width before statusPad: space(1) + spinner(1) + prefix + space(1) + taskID + progress
-		beforeStatus := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
+		// Width before statusPad: space(1) + indent + spinner(1) + prefix + space(1) + taskID + progress
+		beforeStatus := 3 + utf8.RuneCountInString(l.indent) + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
 		if beforeStatus > maxBeforeStatus {
 			maxBeforeStatus = beforeStatus
 		}
 	}
 
 	for i, l := range lines {
-		// Position before statusPad: space(1) + spinner(1) + prefix + space(1) + taskID + progress
-		beforeStatus := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
+		// Position before statusPad: space(1) + indent + spinner(1) + prefix + space(1) + taskID + progress
+		beforeStatus := 3 + utf8.RuneCountInString(l.indent) + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
 		// statusPad aligns status; lineText adds 1 more space after statusPad
 		l.statusPad = maxBeforeStatus - beforeStatus
 
@@ -483,12 +517,12 @@ func maxStatusLength(lines []lineData) int {
 }
 
 // maxBeforeStatusWidth computes the maximum width before statusPad across all lines.
-// This is: space(1) + spinner(1) + prefix + space(1) + taskID + progress
+// This is: space(1) + indent + spinner(1) + prefix + space(1) + taskID + progress
 func maxBeforeStatusWidth(lines []lineData) int {
 	var maxWidth int
 	for i := range lines {
 		l := &lines[i]
-		width := 3 + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
+		width := 3 + utf8.RuneCountInString(l.indent) + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
 		if width > maxWidth {
 			maxWidth = width
 		}
@@ -516,6 +550,17 @@ func computeOverflow(lines []lineData, maxBeforeStatus, maxStatusLen, timerLen, 
 	return maxOverflow
 }
 
+// linesOverflow reports whether any rendered line exceeds the terminal width.
+func linesOverflow(lines []lineData, terminalWidth int) bool {
+	for i := range lines {
+		// lineText appends a trailing newline, don't count it as visible width
+		if lenAnsi(strings.TrimSuffix(lineText(lines[i]), "\n")) > terminalWidth {
+			return true
+		}
+	}
+	return false
+}
+
 // truncateProgressSize drops the trailing "X.XMB / Y.YMB" size info from the
 // line currently driving maxBeforeStatusWidth — only that line's shrink can
 // reduce overflow. Returns true if any line was modified.
@@ -527,7 +572,7 @@ func truncateProgressSize(lines []lineData) bool {
 		if l.progressSizeBytes == 0 {
 			continue
 		}
-		w := lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
+		w := utf8.RuneCountInString(l.indent) + lenAnsi(l.prefix) + utf8.RuneCountInString(l.taskID) + lenAnsi(l.progress)
 		if maxIdx < 0 || w > maxWidth {
 			maxWidth = w
 			maxIdx = i
@@ -652,6 +697,7 @@ func (w *ttyWriter) prepareLineData(t *task) lineData {
 func lineText(l lineData) string {
 	var sb strings.Builder
 	sb.WriteString(" ")
+	sb.WriteString(l.indent)
 	sb.WriteString(l.spinner)
 	sb.WriteString(l.prefix)
 	sb.WriteString(" ")
