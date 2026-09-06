@@ -43,6 +43,12 @@ const (
 	EnvironmentFileLabel = "com.docker.compose.project.environment_file"
 	// OneoffLabel stores value 'True' for one-off containers created by `compose run`
 	OneoffLabel = "com.docker.compose.oneoff"
+	// RelayLabel marks the network relay container compose deploys in place
+	// of a provider-managed service (see the publish-endpoint provider
+	// message). Its value is a hash of the relay's routes, used to decide
+	// whether an existing relay can be kept on the next up. Commands that
+	// act on a service's process (exec, ...) refuse relay containers.
+	RelayLabel = "com.docker.compose.relay"
 	// SlugLabel stores unique slug used for one-off container identity
 	SlugLabel = "com.docker.compose.slug"
 	// ImageDigestLabel stores digest of the container image used to run service

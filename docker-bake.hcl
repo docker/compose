@@ -166,3 +166,12 @@ target "image-module-cross" {
     "windows/arm64",
   ]
 }
+
+target "relay-image" {
+  context = "./relay"
+  tags = ["docker/compose-relay:v1"]
+  platforms = [
+    "linux/amd64",
+    "linux/arm64",
+  ]
+}

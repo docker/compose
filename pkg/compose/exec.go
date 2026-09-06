@@ -33,6 +33,9 @@ func (s *composeService) Exec(ctx context.Context, projectName string, options a
 	if err != nil {
 		return 0, err
 	}
+	if err := checkRelayTarget(target, options.Service, "exec"); err != nil {
+		return 0, err
+	}
 
 	exec := container.NewExecOptions()
 	exec.Interactive = options.Interactive

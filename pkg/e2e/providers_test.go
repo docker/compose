@@ -22,7 +22,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"gotest.tools/v3/assert"
 )
 
 // providerScenario creates a scenario whose commands can resolve the
@@ -102,4 +105,23 @@ func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
 			ComposeCmd("up"),
 			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
 			OutputContains("overrides environment variable"))
+}
+
+func TestProviderPublishEndpoint(t *testing.T) {
+	// The example provider stands up a real endpoint on the host and
+	// publishes it; compose deploys a relay under the service's name, so the
+	// consumer reaches the provider's resource at the compose-native
+	// address http://db. The relay stands in for the service but refuses
+	// process-level commands.
+	relayImage := "compose-relay-e2e"
+	s := providerScenario(t, "a published endpoint must be reachable at the service's compose-native address")
+	s.CLI().RunCmd(t, "docker", "build", "-t", relayImage, "../../relay")
+	s.Env("PROVIDER_DEMO_ENDPOINT=1", "COMPOSE_RELAY_IMAGE="+relayImage)
+	s.Step("the consumer fetches through the relay at http://db",
+		ComposeCmd("up"),
+		OutputContains("test-1  | hello from provider"))
+
+	res := s.CLI().RunDockerComposeCmdNoCheck(t, "--project-name", "e2e-provider-publish-endpoint", "exec", "db", "true")
+	assert.Assert(t, res.ExitCode != 0, "exec on a relay container must fail")
+	assert.Assert(t, strings.Contains(res.Combined(), "network relay"), res.Combined())
 }
