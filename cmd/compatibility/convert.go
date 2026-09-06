@@ -25,31 +25,25 @@ import (
 	"github.com/docker/compose/v5/cmd/compose"
 )
 
-func getCompletionCommands() []string {
-	return []string{
-		"__complete",
-		"__completeNoDesc",
-	}
+var completionCommands = []string{
+	"__complete",
+	"__completeNoDesc",
 }
 
-func getBoolFlags() []string {
-	return []string{
-		"--debug", "-D",
-		"--verbose",
-		"--tls",
-		"--tlsverify",
-	}
+var boolFlags = []string{
+	"--debug", "-D",
+	"--verbose",
+	"--tls",
+	"--tlsverify",
 }
 
-func getStringFlags() []string {
-	return []string{
-		"--tlscacert",
-		"--tlscert",
-		"--tlskey",
-		"--host", "-H",
-		"--context",
-		"--log-level",
-	}
+var stringFlags = []string{
+	"--tlscacert",
+	"--tlscert",
+	"--tlskey",
+	"--host", "-H",
+	"--context",
+	"--log-level",
 }
 
 // Convert transforms standalone docker-compose args into CLI plugin compliant ones
@@ -60,7 +54,7 @@ func Convert(args []string) []string {
 ARGS:
 	for i := 0; i < l; i++ {
 		arg := args[i]
-		if slices.Contains(getCompletionCommands(), arg) {
+		if slices.Contains(completionCommands, arg) {
 			command = append([]string{arg}, command...)
 			continue
 		}
@@ -80,11 +74,11 @@ ARGS:
 			arg = "version"
 		}
 
-		if slices.Contains(getBoolFlags(), arg) {
+		if slices.Contains(boolFlags, arg) {
 			rootFlags = append(rootFlags, arg)
 			continue
 		}
-		for _, flag := range getStringFlags() {
+		for _, flag := range stringFlags {
 			if arg == flag {
 				i++
 				if i >= l {
