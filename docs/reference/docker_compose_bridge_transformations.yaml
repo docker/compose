@@ -1,6 +1,7 @@
 command: docker compose bridge transformations
 short: Manage transformation images
 long: Manage transformation images
+usage: docker compose bridge transformations CMD [OPTIONS]
 pname: docker compose bridge
 plink: docker_compose_bridge.yaml
 cname:

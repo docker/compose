@@ -18,7 +18,7 @@ linters:
     - forbidigo
     - gocognit
     - gocritic
-    - gomodguard
+    - gomodguard_v2
     - govet
     - ineffassign
     - lll
@@ -72,19 +72,17 @@ linters:
         - style
     gocognit:
       min-complexity: 30
-    gomodguard:
+    gomodguard_v2:
       blocked:
-        modules:
-          - github.com/pkg/errors:
-              recommendations:
-                - errors
-                - fmt
-        versions:
-          - github.com/distribution/distribution:
-              reason: use distribution/reference
-          - gotest.tools:
-              version: < 3.0.0
-              reason: deprecated, pre-modules version
+        - module: github.com/pkg/errors
+          recommendations:
+            - errors
+            - fmt
+        - module: github.com/distribution/distribution
+          reason: use distribution/reference
+        - module: gotest.tools
+          version: < 3.0.0
+          reason: deprecated, pre-modules version
     lll:
       line-length: 200
     revive:

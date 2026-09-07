@@ -36,6 +36,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -744,27 +745,18 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 }
 
 func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
-	images, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
-		Filters: projectFilter(projectName).Add("dangling", "true"),
-	})
-	if err != nil {
-		logrus.Debugf("Failed to list images: %v", err)
-		return
-	}
-
 	// imageNameToIdMap is keyed by image name; the freshly built images to
 	// spare are its VALUES (image IDs), matched against the dangling IDs
 	builtIDs := make(map[string]struct{}, len(imageNameToIdMap))
 	for _, id := range imageNameToIdMap {
 		builtIDs[id] = struct{}{}
 	}
-	for _, img := range images.Items {
-		if _, ok := builtIDs[img.ID]; !ok {
-			_, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{})
-			if err != nil {
-				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
-			}
-		}
+	keep := func(img image.Summary) bool {
+		_, ok := builtIDs[img.ID]
+		return ok
+	}
+	if _, err := s.removeDanglingImages(ctx, projectName, keep); err != nil {
+		logrus.Debugf("Failed to list images: %v", err)
 	}
 }
 

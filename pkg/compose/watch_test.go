@@ -121,8 +121,9 @@ func TestWatch_Sync(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 	go func() {
 		service := composeService{
-			dockerCli: cli,
-			clock:     clock,
+			dockerCli:      cli,
+			clock:          clock,
+			maxConcurrency: -1,
 		}
 		rules, err := getWatchRules(&types.DevelopConfig{
 			Watch: []types.Trigger{

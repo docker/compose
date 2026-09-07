@@ -146,6 +146,20 @@ func TestCollectObservedState(t *testing.T) {
 					api.OneoffLabel:          "False",
 				},
 			},
+			{
+				// RUNNING one-off: somebody's live `compose run` session —
+				// deliberately dropped from the observed state (neither
+				// reconciled as a service replica, nor listed as orphan, so
+				// `up --remove-orphans` never kills it).
+				ID:    "c4",
+				Names: []string{"/myproject-web-run-1"},
+				State: container.StateRunning,
+				Labels: map[string]string{
+					api.ServiceLabel: "web",
+					api.ProjectLabel: "myproject",
+					api.OneoffLabel:  "True",
+				},
+			},
 		},
 	}, nil)
 
@@ -188,7 +202,9 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, len(state.Containers["db"]), 1)
 	assert.Equal(t, state.Containers["db"][0].ID, "c2")
 
-	// Orphan container (service "old" not in project)
+	// Orphans: only the model-absent service "old". The running one-off c4 is
+	// absent everywhere — not in the "web" bucket (asserted above: 1 replica),
+	// not an orphan: up leaves live `compose run` sessions alone.
 	assert.Equal(t, len(state.Orphans), 1)
 	assert.Equal(t, state.Orphans[0].ID, "c3")
 

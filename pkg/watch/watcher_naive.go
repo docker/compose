@@ -309,8 +309,10 @@ func newWatcher(paths []string) (Notify, error) {
 	}
 	MaybeIncreaseBufferSize(fsw)
 
-	err = fsw.SetRecursive()
-	isWatcherRecursive := err == nil
+	isWatcherRecursive, err := setRecursive(fsw)
+	if err != nil {
+		return nil, err
+	}
 
 	wrappedEvents := make(chan FileEvent)
 	notifyList := make(map[string]bool, len(paths))

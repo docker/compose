@@ -489,6 +489,22 @@ func FileContains(path, sub string) Check {
 	}
 }
 
+// FileAbsent expects no file or directory to exist at the given host path,
+// e.g. content a previous step wiped.
+func FileAbsent(path string) Check {
+	return Check{
+		name: fmt.Sprintf("file %q is absent", path),
+		fn: func(ctx *CheckContext) error {
+			if _, err := os.Stat(path); err == nil {
+				return fmt.Errorf("file still exists")
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
 // LabelSet expects every container of the service to carry a non-empty label.
 func LabelSet(service, key string) Check {
 	return Check{

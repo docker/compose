@@ -11,14 +11,8 @@ spec:
             com.docker.compose.network.public-network: "true"
     policyTypes:
         - Ingress
-        - Egress
     ingress:
         - from:
-            - podSelector:
-                matchLabels:
-                    com.docker.compose.network.public-network: "true"
-    egress:
-        - to:
             - podSelector:
                 matchLabels:
                     com.docker.compose.network.public-network: "true"

@@ -55,6 +55,28 @@ func TestBridgeCommandsArgsValidation(t *testing.T) {
 			args:    []string{"extra"},
 			wantErr: "unknown command",
 		},
+		{
+			name:    "bridge rejects an unknown subcommand",
+			cmd:     bridgeCommand(&ProjectOptions{}, nil),
+			args:    []string{"zzz"},
+			wantErr: "unknown docker command",
+		},
+		{
+			name: "bridge with no subcommand shows help",
+			cmd:  bridgeCommand(&ProjectOptions{}, nil),
+			args: []string{},
+		},
+		{
+			name:    "transformations rejects an unknown subcommand",
+			cmd:     bridgeCommand(&ProjectOptions{}, nil),
+			args:    []string{"transformations", "zzz"},
+			wantErr: "unknown docker command",
+		},
+		{
+			name: "transformations with no subcommand shows help",
+			cmd:  transformersCommand(nil),
+			args: []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -63,7 +85,11 @@ func TestBridgeCommandsArgsValidation(t *testing.T) {
 			test.cmd.SetOut(io.Discard)
 			test.cmd.SetErr(io.Discard)
 			err := test.cmd.Execute()
-			assert.ErrorContains(t, err, test.wantErr)
+			if test.wantErr == "" {
+				assert.NilError(t, err)
+			} else {
+				assert.ErrorContains(t, err, test.wantErr)
+			}
 		})
 	}
 }

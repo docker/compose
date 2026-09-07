@@ -25,6 +25,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -46,6 +47,14 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	include := oneOffExclude
 	if options.RemoveOrphans {
+		// down stops the application: one-off containers — RUNNING ones
+		// included — are part of what goes down. Those attached to a declared
+		// service are stopped/removed by the per-service loop below (they
+		// match isService); the orphan branch at the end catches the
+		// remainder (finished one-offs and model-absent services — see
+		// isOrphaned). This is deliberately broader than `up
+		// --remove-orphans`, which only cleans up FINISHED one-offs and never
+		// kills a live `compose run` session.
 		include = oneOffInclude
 	}
 	containers, err := s.getContainers(ctx, projectName, include, true)
@@ -168,6 +177,25 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 		ops = append(ops, func() error {
 			return s.removeResource("Image "+img, func() error {
 				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
+				return err
+			})
+		})
+	}
+
+	if pruneOpts.Mode != ImagePruneNone {
+		// mirrors ImagesToPrune's own orphan check: a dangling image from a
+		// service no longer in the project must be spared unless
+		// RemoveOrphans is set, same as that service's tagged image is.
+		keep := func(img image.Summary) bool {
+			if options.RemoveOrphans {
+				return false
+			}
+			_, err := project.GetService(img.Labels[api.ServiceLabel])
+			return err != nil
+		}
+		ops = append(ops, func() error {
+			return s.removeResource("Dangling images", func() error {
+				_, err := s.removeDanglingImages(ctx, project.Name, keep)
 				return err
 			})
 		})
