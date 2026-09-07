@@ -60,7 +60,7 @@ func runPush(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, services)
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes)
 	if err != nil {
 		return err
 	}

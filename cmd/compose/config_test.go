@@ -17,8 +17,6 @@
 package compose
 
 import (
-	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -27,8 +25,6 @@ import (
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -168,47 +164,37 @@ func TestImagesOnly(t *testing.T) {
 }
 
 func TestWarnHooksNotLockable(t *testing.T) {
-	hook := logrustest.NewGlobal()
-	logrus.SetOutput(io.Discard)
-	defer func() {
-		logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
-		logrus.SetOutput(os.Stderr)
-	}()
-
-	warnHooksNotLockable(&types.Project{
-		Services: types.Services{
-			"with-hook-image": types.ServiceConfig{PreStart: []types.ServiceHook{{Image: "alpine:latest"}}},
-			"inline-hook":     types.ServiceConfig{PreStart: []types.ServiceHook{{Command: types.ShellCommand{"echo"}}}},
-			"without-hook":    types.ServiceConfig{},
-		},
+	messages := captureWarnings(t, func() {
+		warnHooksNotLockable(&types.Project{
+			Services: types.Services{
+				"with-hook-image": types.ServiceConfig{PreStart: []types.ServiceHook{{Image: "alpine:latest"}}},
+				"inline-hook":     types.ServiceConfig{PreStart: []types.ServiceHook{{Command: types.ShellCommand{"echo"}}}},
+				"without-hook":    types.ServiceConfig{},
+			},
+		})
 	})
 
-	assert.Equal(t, len(hook.Entries), 1)
-	assert.Assert(t, strings.Contains(hook.Entries[0].Message, `service "with-hook-image"`))
+	assert.Equal(t, len(messages), 1)
+	assert.Assert(t, strings.Contains(messages[0], `service "with-hook-image"`))
 }
 
 func TestWarnModelHooksNotLockable(t *testing.T) {
-	hook := logrustest.NewGlobal()
-	logrus.SetOutput(io.Discard)
-	defer func() {
-		logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
-		logrus.SetOutput(os.Stderr)
-	}()
-
-	warnModelHooksNotLockable(map[string]any{
-		"services": map[string]any{
-			"with-hook-image": map[string]any{
-				"pre_start": []any{map[string]any{"image": "alpine:latest"}},
+	messages := captureWarnings(t, func() {
+		warnModelHooksNotLockable(map[string]any{
+			"services": map[string]any{
+				"with-hook-image": map[string]any{
+					"pre_start": []any{map[string]any{"image": "alpine:latest"}},
+				},
+				"inline-hook": map[string]any{
+					"pre_start": []any{map[string]any{"command": "echo"}},
+				},
+				"without-hook": map[string]any{"image": "nginx"},
 			},
-			"inline-hook": map[string]any{
-				"pre_start": []any{map[string]any{"command": "echo"}},
-			},
-			"without-hook": map[string]any{"image": "nginx"},
-		},
+		})
 	})
 
-	assert.Equal(t, len(hook.Entries), 1)
-	assert.Assert(t, strings.Contains(hook.Entries[0].Message, `service "with-hook-image"`))
+	assert.Equal(t, len(messages), 1)
+	assert.Assert(t, strings.Contains(messages[0], `service "with-hook-image"`))
 }
 
 func TestLockModel(t *testing.T) {

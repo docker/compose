@@ -271,7 +271,7 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 // dependencies started by run, so hashing a different value would recreate
 // their containers.
 func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, p *ProjectOptions, service string) (*types.Project, error) {
-	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, composecli.WithoutEnvironmentResolution)
+	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, warnUnsupportedAttributes, composecli.WithoutEnvironmentResolution)
 	if err != nil {
 		return nil, err
 	}

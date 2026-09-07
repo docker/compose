@@ -1229,10 +1229,6 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
-		if config.UID != "" || config.GID != "" || config.Mode != nil {
-			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
-		}
-
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedConfig.File,
@@ -1277,10 +1273,6 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 
 		if definedSecret.Environment != "" {
 			continue
-		}
-
-		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
-			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		if _, err := os.Stat(definedSecret.File); os.IsNotExist(err) {

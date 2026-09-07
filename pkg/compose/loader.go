@@ -113,6 +113,10 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 		cli.WithName(options.ProjectName),
 	)
 
+	if options.OnUnsupportedAttribute != nil {
+		projectOptionsFns = append(projectOptionsFns, unsupportedAttributesLoadOption(options.OnUnsupportedAttribute))
+	}
+
 	return cli.NewProjectOptions(options.ConfigPaths, append(options.ProjectOptionsFns, projectOptionsFns...)...)
 }
 

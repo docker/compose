@@ -63,9 +63,11 @@ type configOptions struct {
 	lockImageDigests    bool
 }
 
+// ToProject always warns: every config subcommand renders the resolved
+// model to the user, so any unsupported-attribute finding is relevant here.
 func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
 	po = append(po, o.toProjectOptionsFns()...)
-	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, backend, services, po...)
+	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes, po...)
 	return project, err
 }
 
