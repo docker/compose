@@ -30,6 +30,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -811,5 +812,23 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		cancel()
 		err := tested.(*composeService).waitDependencies(ctx, &project, "app", dependencies, containers, 0)
 		assert.NilError(t, err)
+	})
+
+	// Regression guard for the runtime fallback warning on waitDependency's
+	// default branch — see the comment on that branch for why it must stay.
+	t.Run("unsupported condition warns and returns without waiting", func(t *testing.T) {
+		hook := logrustest.NewGlobal()
+		unsupportedDeps := types.DependsOnConfig{
+			"db": {Condition: "some_future_condition", Required: true},
+		}
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", unsupportedDeps, containers, 2*time.Second)
+		assert.NilError(t, err)
+
+		var messages []string
+		for _, e := range hook.AllEntries() {
+			messages = append(messages, e.Message)
+		}
+		joined := strings.Join(messages, "\n")
+		assert.Assert(t, strings.Contains(joined, `service "app": unsupported depends_on condition "some_future_condition"`), joined)
 	})
 }

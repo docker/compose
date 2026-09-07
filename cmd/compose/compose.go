@@ -173,7 +173,7 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 			return err
 		}
 
-		project, metrics, err := o.ToProject(ctx, dockerCli, backend, services, cli.WithoutEnvironmentResolution)
+		project, metrics, err := o.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			return err
 		}
@@ -252,7 +252,7 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 			return nil, "", err
 		}
 
-		p, _, err := o.ToProject(ctx, dockerCli, backend, services, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
+		p, _, err := o.ToProject(ctx, dockerCli, backend, services, skipUnsupportedAttributesWarning, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
@@ -281,7 +281,7 @@ func (o *ProjectOptions) toProjectName(ctx context.Context, dockerCli command.Cl
 		return "", err
 	}
 
-	project, _, err := o.ToProject(ctx, dockerCli, backend, nil, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
+	project, _, err := o.ToProject(ctx, dockerCli, backend, nil, skipUnsupportedAttributesWarning, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return "", err
 	}
@@ -306,9 +306,14 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 	return options.LoadModel(ctx)
 }
 
-// ToProject loads a Compose project using the LoadProject API.
-// Accepts optional cli.ProjectOptionsFn to control loader behavior.
-func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, po ...cli.ProjectOptionsFn) (*types.Project, tracing.Metrics, error) {
+// ToProject loads a Compose project using the LoadProject API, then — when
+// warn is warnUnsupportedAttributes — warns about any unsupported-attribute
+// finding compose-go's loader reports during that load. Accepts optional
+// cli.ProjectOptionsFn to control loader behavior.
+func (o *ProjectOptions) ToProject(
+	ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string,
+	warn unsupportedAttributeWarning, po ...cli.ProjectOptionsFn,
+) (*types.Project, tracing.Metrics, error) {
 	var metrics tracing.Metrics
 	remotes := o.remoteLoaders(dockerCli)
 
@@ -349,6 +354,13 @@ func (o *ProjectOptions) ToProject(ctx context.Context, dockerCli command.Cli, b
 		ProjectOptionsFns: po,
 		LoadListeners:     []api.LoadListener{metricsListener},
 		OCI:               o.ociOptions(),
+	}
+	if warn == warnUnsupportedAttributes {
+		loadOpts.OnUnsupportedAttribute = func(findings []api.UnsupportedAttribute) {
+			for _, finding := range findings {
+				logrus.Warn(finding)
+			}
+		}
 	}
 
 	project, err := backend.LoadProject(ctx, loadOpts)
