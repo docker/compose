@@ -484,7 +484,7 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 			applyAnsiMode(dockerCli, ansi)
 
 			detached, _ := cmd.Flags().GetBool("detach")
-			ep, err := selectEventProcessor(dockerCli, opts.Progress, ansi, detached)
+			ep, err := selectEventProcessor(dockerCli, opts.Progress, ansi, detached, dryRun)
 			if err != nil {
 				return err
 			}
@@ -690,39 +690,39 @@ func stdinfo(dockerCli command.Cli) io.Writer {
 // In auto mode we probe Err() (not Out()) because the renderer writes to stderr;
 // probing stdout would force plain mode whenever stdout is redirected (e.g.
 // `docker compose up | tee log`) while stderr is still a terminal.
-func selectEventProcessor(dockerCli command.Cli, progress, ansi string, detached bool) (api.EventProcessor, error) {
+func selectEventProcessor(dockerCli command.Cli, progress, ansi string, detached, dryRun bool) (api.EventProcessor, error) {
 	switch progress {
 	case "", display.ModeAuto:
 		switch {
 		case ansi == "never":
 			display.Mode = display.ModePlain
-			return display.Plain(dockerCli.Err()), nil
+			return display.Plain(dockerCli.Err(), dryRun), nil
 		case dockerCli.Err().IsTerminal():
 			display.Mode = display.ModeTTY
-			return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached), nil
+			return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached, dryRun), nil
 		default:
 			display.Mode = display.ModePlain
-			return display.Plain(dockerCli.Err()), nil
+			return display.Plain(dockerCli.Err(), dryRun), nil
 		}
 	case display.ModeTTY:
 		if ansi == "never" {
 			return nil, fmt.Errorf("can't use --progress tty while ANSI support is disabled")
 		}
 		display.Mode = display.ModeTTY
-		return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached), nil
+		return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached, dryRun), nil
 	case display.ModePlain:
 		if ansi == "always" {
 			return nil, fmt.Errorf("can't use --progress plain while ANSI support is forced")
 		}
 		display.Mode = display.ModePlain
-		return display.Plain(dockerCli.Err()), nil
+		return display.Plain(dockerCli.Err(), dryRun), nil
 	case display.ModeQuiet, "none":
 		display.Mode = display.ModeQuiet
 		return display.Quiet(), nil
 	case display.ModeJSON:
 		display.Mode = display.ModeJSON
 		logrus.SetFormatter(&logrus.JSONFormatter{})
-		return display.JSON(dockerCli.Err()), nil
+		return display.JSON(dockerCli.Err(), dryRun), nil
 	default:
 		return nil, fmt.Errorf("unsupported --progress value %q", progress)
 	}
