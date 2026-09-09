@@ -191,8 +191,12 @@ func (w *termWriter) handle(e api.Resource) {
 	w.tree.apply(e, w.now())
 
 	if w.operation == "" {
-		// outside any operation: degrade to one plain line per event
+		// outside any operation: degrade to one plain line per event. This
+		// prints outside the tracked block, so the next repaint must not
+		// assume the block is still directly above the cursor (same reason
+		// unsuspend resets after buildkit output).
 		_, _ = fmt.Fprintf(w.out, "%s %s %s\n", e.ID, eventColor(e.Status, SuccessColor)(e.Text), e.Details)
+		w.scr.reset()
 	}
 }
 
