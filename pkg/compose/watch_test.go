@@ -159,19 +159,62 @@ func TestWatch_Sync(t *testing.T) {
 		})
 		assert.DeepEqual(t, expected, actual)
 
-		// Rebuild fails before sync actions from the same batch are processed.
+		// The rebuild triggered by "/rebuild" now runs asynchronously, so it no
+		// longer blocks the sync of "/sync/changed" from the same batch.
+		// synctest.Wait() only returns once the rebuild's goroutine has
+		// settled (it runs to completion here, exercising the mocked
+		// ImageList/ImageRemove prune calls), so the mock expectations above
+		// are already satisfied by the time we get here.
 		watcher.Events() <- watch.NewFileEvent("/rebuild")
 		watcher.Events() <- watch.NewFileEvent("/sync/changed")
 		time.Sleep(watch.QuietPeriod)
 		synctest.Wait()
-		select {
-		case batch := <-syncer.synced:
-			t.Fatalf("received unexpected events: %v", batch)
-		default:
-			// expected
+		actual = <-syncer.synced
+		expected = []*sync.PathMapping{
+			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 		}
-		// TODO: there's not a great way to assert that the rebuild attempt happened
+		assert.DeepEqual(t, expected, actual)
 	})
+}
+
+// #14051 (follow-up): a rebuild running in the background from an earlier
+// batch must not be raced by a plain restart of the same service triggered
+// by a later batch -- restart must be skipped even though this batch itself
+// carries no rebuild trigger.
+func TestHandleWatchBatch_SkipsRestartForServiceWithRebuildInFlight(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	// A correctly filtered restart never touches the Docker client at all.
+	cli.EXPECT().Client().Times(0)
+	service := composeService{dockerCli: cli}
+
+	proj := types.Project{
+		Name: "myProjectName",
+		Services: types.Services{
+			"test": {Name: "test"},
+		},
+	}
+
+	rules, err := getWatchRules(&types.DevelopConfig{
+		Watch: []types.Trigger{
+			{Path: "/restart", Action: "restart"},
+		},
+	}, types.ServiceConfig{Name: "test"})
+	assert.NilError(t, err)
+
+	release := make(chan error)
+	scheduler := newRebuildScheduler(func(_ []string) error {
+		return <-release
+	})
+	scheduler.Request([]string{"test"}) // simulate a rebuild still running from an earlier batch
+
+	err = service.handleWatchBatch(t.Context(), &proj, api.WatchOptions{LogTo: stdLogger{}},
+		[]watch.FileEvent{watch.NewFileEvent("/restart")}, rules, newFakeSyncer(), scheduler)
+	assert.NilError(t, err)
+
+	release <- nil
+	scheduler.Wait()
 }
 
 type fakeSyncer struct {
