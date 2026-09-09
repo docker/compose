@@ -79,26 +79,38 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 		logrus.Warnf("service %q: failed to remove stale pre_start hook containers: %v", service.Name, err)
 	}
 	for i, hook := range service.PreStart {
-		if err := s.runPreStartHook(ctx, project, service, ctr, i, hook, listener); err != nil {
+		created, err := s.createPreStartContainer(ctx, project, service, ctr, hook)
+		if err != nil {
 			return err
+		}
+		if err := s.execPreStartHook(ctx, service, i, created.ID, listener); err != nil {
+			return err
+		}
+		// Success: remove the hook container, mirroring the old AutoRemove behaviour
+		// (including its anonymous volumes). A removal failure is logged but does not
+		// gate service start — the hook already succeeded.
+		if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); removeErr != nil {
+			logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s: %v", service.Name, i, created.ID, removeErr)
 		}
 	}
 	return nil
 }
 
-func (s *composeService) runPreStartHook(
-	ctx context.Context, project *types.Project, service types.ServiceConfig,
-	ctr container.Summary, index int, hook types.ServiceHook, listener api.ContainerEventListener,
+// execPreStartHook starts an already-created hook container, streams its logs
+// and waits for its exit. It owns only execution-failure handling: a container
+// that never started or a run cancelled by the user is removed, a genuinely
+// failed hook is retained for post-mortem inspection. Removing the container
+// after a successful run is the caller's job — the container's lifecycle
+// belongs to whoever created it (the imperative runPreStart loop today, the
+// reconciliation plan once the executor runs hook nodes).
+func (s *composeService) execPreStartHook(
+	ctx context.Context, service types.ServiceConfig,
+	index int, containerID string, listener api.ContainerEventListener,
 ) error {
-	created, err := s.createPreStartContainer(ctx, project, service, ctr, hook)
-	if err != nil {
-		return err
-	}
-
 	// Subscribe to wait before start to avoid missing the exit event for short-lived hooks.
 	// WaitConditionNotRunning would match immediately because the container is still in
 	// "created" state, so use WaitConditionNextExit to block until the run actually finishes.
-	waitRes := s.apiClient().ContainerWait(ctx, created.ID, client.ContainerWaitOptions{
+	waitRes := s.apiClient().ContainerWait(ctx, containerID, client.ContainerWaitOptions{
 		Condition: container.WaitConditionNextExit,
 	})
 
@@ -108,13 +120,13 @@ func (s *composeService) runPreStartHook(
 	// open cannot deadlock `<-logsDone`.
 	logCtx, cancelLogs := context.WithCancel(ctx)
 	defer cancelLogs()
-	logsDone, getTail := s.streamPreStartLogs(logCtx, created.ID, service, index, listener)
+	logsDone, getTail := s.streamPreStartLogs(logCtx, containerID, service, index, listener)
 
-	if _, err := s.apiClient().ContainerStart(ctx, created.ID, client.ContainerStartOptions{}); err != nil {
+	if _, err := s.apiClient().ContainerStart(ctx, containerID, client.ContainerStartOptions{}); err != nil {
 		// AutoRemove is false, so we must remove the never-started container
 		// explicitly. A failed removal is logged so the orphan is visible.
-		if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
-			logrus.Warnf("service %q pre_start[%d]: failed to remove orphan hook container %s: %v", service.Name, index, created.ID, removeErr)
+		if _, removeErr := s.apiClient().ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
+			logrus.Warnf("service %q pre_start[%d]: failed to remove orphan hook container %s: %v", service.Name, index, containerID, removeErr)
 		}
 		// Drain waitRes so the client's wait goroutine exits without having to
 		// wait for the parent context to be canceled.
@@ -136,15 +148,15 @@ func (s *composeService) runPreStartHook(
 		// and return the raw context error without decorating it with the tail or
 		// retaining the container for post-mortem inspection.
 		if ctx.Err() != nil {
-			if _, removeErr := s.apiClient().ContainerRemove(context.Background(), created.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
-				logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s after cancellation: %v", service.Name, index, created.ID, removeErr)
+			if _, removeErr := s.apiClient().ContainerRemove(context.Background(), containerID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); removeErr != nil {
+				logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s after cancellation: %v", service.Name, index, containerID, removeErr)
 			}
 			return waitErr
 		}
 		// Genuine hook failure: retain the container so the operator can run
 		// `docker logs <id>` and `docker inspect <id>` to diagnose the failure.
 		// Include the short container ID in the error to make it actionable.
-		shortID := created.ID
+		shortID := containerID
 		if len(shortID) > 12 {
 			shortID = shortID[:12]
 		}
@@ -152,12 +164,6 @@ func (s *composeService) runPreStartHook(
 			return fmt.Errorf("%w: %s (hook container %s retained for inspection)", waitErr, tail, shortID)
 		}
 		return fmt.Errorf("%w (hook container %s retained for inspection)", waitErr, shortID)
-	}
-	// Success: remove the hook container, mirroring the old AutoRemove behaviour
-	// (including its anonymous volumes). A removal failure is logged but does not
-	// gate service start — the hook already succeeded.
-	if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); removeErr != nil {
-		logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s: %v", service.Name, index, created.ID, removeErr)
 	}
 	return nil
 }

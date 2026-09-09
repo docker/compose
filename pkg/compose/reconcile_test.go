@@ -1250,6 +1250,134 @@ func TestReconcileContainers_ExitedIsNoop(t *testing.T) {
 // container creation depends on the last plan node of the service it depends
 // on (via reconciler.serviceNodes). Without this, services declared in
 // depends_on could start before their dependencies' operations complete.
+// Stale pre_start hook runners (left by a previous run that failed before
+// removing them) are purged by the plan when pre_start is going to run again:
+// hooks declared and no replica running at observation — the imperative
+// gating. Removals are best-effort and drop the runner's anonymous volumes,
+// like the warn-only imperative purge they mirror.
+func TestReconcileContainers_StaleHookRunnersPurged(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"app": {Name: "app", Scale: intPtr(1), PreStart: []types.ServiceHook{{}}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		HookContainers: map[string][]ObservedContainer{
+			"app": {
+				// deliberately out of ID order: the plan sorts for determinism
+				{ID: "stale-b-id", Summary: container.Summary{ID: "stale-b-id"}},
+				{ID: "stale-a-id", Summary: container.Summary{ID: "stale-a-id"}},
+			},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 hook:app:stale:stale-a-id, RemoveContainer, stale pre_start hook container
+[] -> #2 hook:app:stale:stale-b-id, RemoveContainer, stale pre_start hook container
+[] -> #3 service:app:1, CreateContainer, no existing container
+`)+"\n")
+
+	for _, n := range plan.Nodes {
+		if n.Operation.Type != OpRemoveContainer {
+			continue
+		}
+		assert.Assert(t, n.Operation.BestEffort, "purge #%d must not abort the plan on failure", n.ID)
+		assert.Assert(t, n.Operation.RemoveVolumes, "purge #%d must drop the runner's anonymous volumes", n.ID)
+	}
+}
+
+// A scale-0 service never reaches its pre_start hooks (the imperative start
+// path returns before them), so its stale runners are not purged either.
+func TestReconcileContainers_StaleHookRunnersKeptWhenScaleZero(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"app": {Name: "app", Scale: intPtr(0), PreStart: []types.ServiceHook{{}}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		HookContainers: map[string][]ObservedContainer{
+			"app": {{ID: "stale-a-id", Summary: container.Summary{ID: "stale-a-id"}}},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan)
+}
+
+// A running replica gates pre_start off, so the stale runner stays: the
+// imperative purge lives inside the gated runPreStart call and would not run
+// either — a genuinely failed hook container stays retained for inspection as
+// long as its service is otherwise up.
+func TestReconcileContainers_StaleHookRunnersKeptWhenReplicaRunning(t *testing.T) {
+	svc := types.ServiceConfig{Name: "app", Scale: intPtr(1), PreStart: []types.ServiceHook{{}}}
+	hash := mustServiceHash(t, svc)
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"app": svc},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"app": {{
+				ID: "c1", Number: 1, State: container.StateRunning, ConfigHash: hash,
+				Summary: container.Summary{
+					ID: "c1", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "app", api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+				},
+			}},
+		},
+		HookContainers: map[string][]ObservedContainer{
+			"app": {{ID: "stale-a-id", Summary: container.Summary{ID: "stale-a-id"}}},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty())
+}
+
+// Without pre_start hooks in the model, stale runners are not the plan's to
+// purge: runPreStart never runs, so the imperative engine leaves them alone
+// too.
+func TestReconcileContainers_StaleHookRunnersKeptWithoutHooks(t *testing.T) {
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"app": {Name: "app", Scale: intPtr(1)}},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		HookContainers: map[string][]ObservedContainer{
+			"app": {{ID: "stale-a-id", Summary: container.Summary{ID: "stale-a-id"}}},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:app:1, CreateContainer, no existing container
+`)+"\n")
+}
+
 func TestReconcileContainers_DependsOnChain(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
