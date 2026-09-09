@@ -662,6 +662,8 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		return err
 	}
 
+	r.planPurgeStaleHookRunners(service, expected)
+
 	containers := r.observed.Containers[service.Name]
 	actual := len(containers)
 
@@ -760,6 +762,41 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 
 // mustRecreate decides whether oc must be recreated to match expected. The
 // expectedHash and parentRecreated inputs are precomputed once per service by
+// planPurgeStaleHookRunners plans the removal of hook-runner containers left
+// behind by a previous run that failed before removing them. It mirrors the
+// imperative purge living inside the gated runPreStart call: emitted only when
+// pre_start is going to run again — hooks declared, a replica to start
+// (scale > 0: the imperative start path returns before the hooks for a
+// scale-0 service) and no replica running at observation — so a genuinely
+// failed hook container stays retained for inspection as long as its service
+// is otherwise up. Removals are best-effort (the imperative purge is
+// warn-only) and independent of every other node.
+func (r *reconciler) planPurgeStaleHookRunners(service types.ServiceConfig, expectedScale int) {
+	stale := r.observed.HookContainers[service.Name]
+	if len(stale) == 0 || len(service.PreStart) == 0 || expectedScale == 0 {
+		return
+	}
+	for _, oc := range r.observed.Containers[service.Name] {
+		if oc.State == container.StateRunning {
+			return
+		}
+	}
+	serviceCopy := service
+	stale = slices.Clone(stale)
+	slices.SortFunc(stale, func(a, b ObservedContainer) int { return strings.Compare(a.ID, b.ID) })
+	for i := range stale {
+		r.plan.addNode(Operation{
+			Type:          OpRemoveContainer,
+			ResourceID:    fmt.Sprintf("hook:%s:stale:%s", service.Name, stale[i].ID[:min(12, len(stale[i].ID))]),
+			Cause:         "stale pre_start hook container",
+			Service:       &serviceCopy,
+			Container:     &stale[i].Summary,
+			RemoveVolumes: true,
+			BestEffort:    true,
+		}, "")
+	}
+}
+
 // reconcileService — see expectedConfigHash and parentNamespaceRecreated for
 // the rationale (issue #13878).
 func (r *reconciler) mustRecreate(expected types.ServiceConfig, expectedHash string, parentRecreated bool, oc ObservedContainer, policy string) bool {

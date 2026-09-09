@@ -174,6 +174,38 @@ func emptyObservedState(project string) *ObservedState {
 // Goes through newPlanExecutor + run (i.e. the same code path executePlan
 // uses in production) so the test exercises the errgroup, done-channel
 // wiring and group tracker — not a hand-rolled loop over executeNode.
+// A best-effort removal failure (stale pre_start hook runner purge) is
+// warn-only: the plan carries on, and the removal passes RemoveVolumes so the
+// runner's anonymous volumes go with it — the imperative purge semantics.
+func TestExecutePlanBestEffortRemoveContainerFailureTolerated(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	ctr := container.Summary{
+		ID:     "hook1",
+		Names:  []string{"/some-hook-runner"},
+		Labels: map[string]string{api.ServiceLabel: "web"},
+	}
+
+	apiClient.EXPECT().ContainerRemove(gomock.Any(), "hook1", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, opts client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			assert.Assert(t, opts.RemoveVolumes, "hook-runner purge must drop anonymous volumes")
+			return client.ContainerRemoveResult{}, errors.New("device or resource busy")
+		})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:          OpRemoveContainer,
+		ResourceID:    "hook:web:stale:hook1",
+		Cause:         "stale pre_start hook container",
+		Container:     &ctr,
+		RemoveVolumes: true,
+		BestEffort:    true,
+	}, "")
+
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), plan)
+	assert.NilError(t, err)
+}
+
 func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
