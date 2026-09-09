@@ -46,6 +46,11 @@ type ObservedState struct {
 	// others as orphans (see selectNetwork/selectVolume).
 	Networks map[string][]ObservedNetwork // compose network key → observed
 	Volumes  map[string][]ObservedVolume  // compose volume key → observed
+	// HookContainers are ephemeral lifecycle-hook runners (HookLabel set),
+	// per service. Any observed at collection time is stale by definition —
+	// a previous run failed before removing it — and the reconciler plans
+	// its purge before re-running the hooks.
+	HookContainers map[string][]ObservedContainer // service name → hook containers
 }
 
 // selectNetwork picks, among the live networks recorded for a compose key, the
@@ -148,6 +153,8 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		Containers:  map[string][]ObservedContainer{},
 		Networks:    map[string][]ObservedNetwork{},
 		Volumes:     map[string][]ObservedVolume{},
+
+		HookContainers: map[string][]ObservedContainer{},
 	}
 
 	// --- Containers ---
@@ -170,6 +177,18 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 
 	for _, ctr := range raw {
 		svcName := ctr.Labels[api.ServiceLabel]
+		if ctr.Labels[api.HookLabel] != "" && knownServices[svcName] {
+			// lifecycle-hook containers (ephemeral pre_start runners) are
+			// neither service replicas nor one-offs: classified apart, so
+			// they never masquerade as a replica (they carry no
+			// container-number label and would otherwise read as number 0)
+			// and the reconciler can plan purging stale ones. A hook
+			// container whose service left the model falls through to the
+			// orphan check below instead — nothing plans purges for an
+			// unknown service, and --remove-orphans must keep cleaning it.
+			state.HookContainers[svcName] = append(state.HookContainers[svcName], toObservedContainer(ctr))
+			continue
+		}
 		if isNotOneOff(ctr) && knownServices[svcName] {
 			state.Containers[svcName] = append(state.Containers[svcName], toObservedContainer(ctr))
 		} else if isOrphaned(project)(ctr) {
