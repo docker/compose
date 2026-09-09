@@ -19,7 +19,7 @@ package compose
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -301,7 +301,7 @@ func TestPreStart_ContainerCreateFailurePropagates(t *testing.T) {
 
 	scan := expectEmptyOrphanScan(apiClient)
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
-		Return(client.ContainerCreateResult{}, fmt.Errorf("no such image: missing:latest")).After(scan)
+		Return(client.ContainerCreateResult{}, errors.New("no such image: missing:latest")).After(scan)
 
 	err := tested.runPreStart(t.Context(), project, service, ctr, func(api.ContainerEvent) {})
 	assert.ErrorContains(t, err, "no such image")
@@ -328,7 +328,7 @@ func TestPreStart_ContainerStartFailurePropagates(t *testing.T) {
 	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
 		Return(emptyLogs(), nil).After(wait1)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, fmt.Errorf("daemon: container start failed")).After(logs1)
+		Return(client.ContainerStartResult{}, errors.New("daemon: container start failed")).After(logs1)
 	// AutoRemove never fires when start fails, so the hook must drop the ghost
 	// container explicitly. This is distinct from the success-path removal
 	// (RemoveVolumes:true) — the never-started container has no logs to preserve.
@@ -404,7 +404,7 @@ func TestWaitPreStart_RaceRealErrorAndResult(t *testing.T) {
 		resultC := make(chan container.WaitResponse, 1)
 		errC := make(chan error, 1)
 		resultC <- container.WaitResponse{StatusCode: 0}
-		errC <- fmt.Errorf("daemon: connection lost")
+		errC <- errors.New("daemon: connection lost")
 		waitRes := client.ContainerWaitResult{Result: resultC, Error: errC}
 		err := waitPreStart(t.Context(), "web", 0, waitRes)
 		assert.ErrorContains(t, err, "connection lost")
@@ -691,7 +691,7 @@ func TestPreStart_SuccessRemoveFailureIsNonFatal(t *testing.T) {
 	// Simulate a removal failure.
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("already removed"))
+		Return(client.ContainerRemoveResult{}, errors.New("already removed"))
 
 	// The hook succeeded; the service must start even if removal failed.
 	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
@@ -778,7 +778,7 @@ func TestPreStart_StreamLogsError_NilListener(t *testing.T) {
 		Return(waitResultExit(0))
 	// ContainerLogs fails; nil listener → no warning event, done closed immediately.
 	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(nil, fmt.Errorf("logs: connection refused"))
+		Return(nil, errors.New("logs: connection refused"))
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil)
 	expectSuccessRemove(apiClient, "hook-1")
@@ -809,7 +809,7 @@ func TestPreStart_StreamLogsError_WithListener(t *testing.T) {
 	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0))
 	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(nil, fmt.Errorf("logs: daemon unavailable"))
+		Return(nil, errors.New("logs: daemon unavailable"))
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil)
 	expectSuccessRemove(apiClient, "hook-1")
@@ -917,7 +917,7 @@ func TestPreStart_ConnectExtraNetworksFails(t *testing.T) {
 
 	apiClient.EXPECT().
 		NetworkConnect(gomock.Any(), "proj_extra", gomock.Any()).
-		Return(client.NetworkConnectResult{}, fmt.Errorf("network not found"))
+		Return(client.NetworkConnectResult{}, errors.New("network not found"))
 
 	err := tested.connectPreStartExtraNetworks(t.Context(), project, service, "ctr-id", "proj_default")
 	assert.ErrorContains(t, err, "network not found")
@@ -947,10 +947,10 @@ func TestPreStart_ContainerStartFailureAndRemoveFails(t *testing.T) {
 	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
 		Return(emptyLogs(), nil)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, fmt.Errorf("start failed")).After(logs1)
+		Return(client.ContainerStartResult{}, errors.New("start failed")).After(logs1)
 	// Both the start AND the cleanup removal fail.
 	apiClient.EXPECT().ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("removal failed")).After(start1)
+		Return(client.ContainerRemoveResult{}, errors.New("removal failed")).After(start1)
 
 	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
 	// The original start error must be returned, not the removal error.
@@ -975,7 +975,7 @@ func TestPreStart_OrphanScanFails(t *testing.T) {
 
 	// ContainerList fails → Warnf in runPreStart; hook still proceeds.
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{}, fmt.Errorf("daemon unavailable"))
+		Return(client.ContainerListResult{}, errors.New("daemon unavailable"))
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil)
 	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
@@ -1012,7 +1012,7 @@ func TestPreStart_OrphanRemovalFails(t *testing.T) {
 		Return(client.ContainerListResult{Items: []container.Summary{orphan}}, nil)
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "orphan-123", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("permission denied"))
+		Return(client.ContainerRemoveResult{}, errors.New("permission denied"))
 	// Hook still runs and succeeds.
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil)
@@ -1059,7 +1059,7 @@ func TestPreStart_OldAPINetworkConnectFails(t *testing.T) {
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil).After(scan)
 	// NetworkConnect for the secondary network fails.
 	apiClient.EXPECT().NetworkConnect(gomock.Any(), "proj_extra", gomock.Any()).
-		Return(client.NetworkConnectResult{}, fmt.Errorf("network not found"))
+		Return(client.NetworkConnectResult{}, errors.New("network not found"))
 	// The never-started container is cleaned up (Force:true).
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
@@ -1098,11 +1098,11 @@ func TestPreStart_OldAPINetworkConnectAndRemoveFails(t *testing.T) {
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil).After(scan)
 	apiClient.EXPECT().NetworkConnect(gomock.Any(), "proj_extra", gomock.Any()).
-		Return(client.NetworkConnectResult{}, fmt.Errorf("network not found"))
+		Return(client.NetworkConnectResult{}, errors.New("network not found"))
 	// Cleanup removal also fails → Warnf; original error is still returned.
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("removal also failed"))
+		Return(client.ContainerRemoveResult{}, errors.New("removal also failed"))
 
 	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
 	assert.ErrorContains(t, err, "network not found")
@@ -1139,7 +1139,7 @@ func TestPreStart_RuntimeAPIVersionError(t *testing.T) {
 	// createPreStartContainer calls RuntimeAPIVersion → Ping fails.
 	apiClient.EXPECT().
 		Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
-		Return(client.PingResult{}, fmt.Errorf("daemon unreachable"))
+		Return(client.PingResult{}, errors.New("daemon unreachable"))
 
 	err = s.runPreStart(t.Context(), project, service, ctr, nil)
 	assert.ErrorContains(t, err, "daemon unreachable")

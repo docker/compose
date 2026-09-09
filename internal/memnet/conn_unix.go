@@ -20,7 +20,7 @@ package memnet
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net"
 	"syscall"
 )
@@ -28,12 +28,12 @@ import (
 const maxUnixSocketPathSize = len(syscall.RawSockaddrUnix{}.Path)
 
 func dialNamedPipe(_ context.Context, _ string) (net.Conn, error) {
-	return nil, fmt.Errorf("named pipes are only available on Windows")
+	return nil, errors.New("named pipes are only available on Windows")
 }
 
 func validateSocketPath(addr string) error {
 	if len(addr) > maxUnixSocketPathSize {
-		return fmt.Errorf("socket address is too long: %s", addr)
+		return errors.New("socket address is too long: " + addr)
 	}
 	return nil
 }

@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -511,7 +512,7 @@ func TestReconcileVolumes_DivergedPromptMessage(t *testing.T) {
 func TestReconcileVolumes_DivergedPromptError(t *testing.T) {
 	project, observed := divergedVolumeProject(t, 1, 1)
 
-	boom := func(_ string, _ bool) (bool, error) { return false, fmt.Errorf("boom") }
+	boom := func(_ string, _ bool) (bool, error) { return false, errors.New("boom") }
 	_, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), boom)
 	assert.ErrorContains(t, err, "boom")
 }

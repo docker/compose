@@ -27,6 +27,7 @@ linters:
     - misspell
     - nakedret
     - nolintlint
+    - perfsprint
     - revive
     - staticcheck
     - testifylint

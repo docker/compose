@@ -19,7 +19,6 @@
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,7 +48,7 @@ func TestBridgeConvertOutputNotEmptyDeclined(t *testing.T) {
 
 	s.Step("convert without confirmation leaves the non-empty output directory untouched",
 		ComposeCmd("bridge", "convert", "--output", outDir,
-			"--transformation", fmt.Sprintf("docker/compose-bridge-kubernetes:%s", bridgeImageVersion)).MayFail(),
+			"--transformation", "docker/compose-bridge-kubernetes:"+bridgeImageVersion).MayFail(),
 		ExitCode(1),
 		FileContains(guardFile, "do not delete me"))
 }
@@ -60,7 +59,7 @@ func TestBridgeConvertOutputNotEmptyConfirmed(t *testing.T) {
 
 	s.Step("convert --yes wipes the stale content and regenerates the output",
 		ComposeCmd("bridge", "convert", "--output", outDir, "--yes",
-			"--transformation", fmt.Sprintf("docker/compose-bridge-kubernetes:%s", bridgeImageVersion)),
+			"--transformation", "docker/compose-bridge-kubernetes:"+bridgeImageVersion),
 		FileAbsent(guardFile),
 		FileExists(filepath.Join(outDir, "base", "0-"+s.Project()+"-namespace.yaml")))
 }

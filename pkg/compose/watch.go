@@ -77,7 +77,7 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, cons
 		}
 	}
 	// none of the services is eligible to watch
-	return nil, fmt.Errorf("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
+	return nil, errors.New("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
 }
 
 // ensure state changes are atomic
@@ -236,7 +236,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	}
 
 	if len(paths) == 0 {
-		return nil, fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
+		return nil, errors.New("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
 	watcher, err := watch.NewWatcher(paths)
@@ -543,7 +543,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return errors.New("process still running")
 	}
 	if execResult.ExitCode != 0 {
-		return fmt.Errorf("exit code %d", execResult.ExitCode)
+		return errors.New("exit code " + strconv.Itoa(execResult.ExitCode))
 	}
 	return nil
 }

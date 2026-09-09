@@ -485,7 +485,7 @@ func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
 	}
 
 	if buildx.Version == "" {
-		return nil, fmt.Errorf("failed to get version of buildx")
+		return nil, errors.New("failed to get version of buildx")
 	}
 
 	if versions.LessThan(buildx.Version[1:], buildxMinVersion) {
@@ -647,12 +647,12 @@ func (s *composeService) dryRunBake(cfg bakeConfig) map[string]string {
 		s.events.On(api.Resource{
 			ID:     name + " ==>",
 			Status: api.Done,
-			Text:   fmt.Sprintf("==> writing image %s", dryRunUUID),
+			Text:   "==> writing image " + dryRunUUID,
 		})
 		s.events.On(api.Resource{
 			ID:     name + " ==> ==>",
 			Status: api.Done,
-			Text:   fmt.Sprintf(`naming to %s`, target.Tags[0]),
+			Text:   "naming to " + target.Tags[0],
 		})
 		bakeResponse[name] = dryRunUUID
 	}

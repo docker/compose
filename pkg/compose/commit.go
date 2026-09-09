@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/moby/moby/client"
@@ -71,7 +70,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 
 	s.events.On(api.Resource{
 		ID:     name,
-		Text:   fmt.Sprintf("Committed as %s", response.ID),
+		Text:   "Committed as " + response.ID,
 		Status: api.Done,
 	})
 

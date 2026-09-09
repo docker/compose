@@ -19,7 +19,7 @@ package compose
 import (
 	"context"
 	"errors"
-	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -233,11 +233,11 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 	ctrs := make([]container.Summary, replicas)
 	for i := range ctrs {
 		ctrs[i] = container.Summary{
-			ID:    fmt.Sprintf("c%d", i),
-			Names: []string{fmt.Sprintf("/test-web-%d", i+1)},
+			ID:    "c" + strconv.Itoa(i),
+			Names: []string{"/test-web-" + strconv.Itoa(i+1)},
 			Labels: map[string]string{
 				api.ServiceLabel:         "web",
-				api.ContainerNumberLabel: fmt.Sprintf("%d", i+1),
+				api.ContainerNumberLabel: strconv.Itoa(i + 1),
 			},
 		}
 	}
@@ -268,13 +268,13 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 	for i := range ctrs {
 		stop := plan.addNode(Operation{
 			Type:       OpStopContainer,
-			ResourceID: fmt.Sprintf("service:web:%d", i+1),
+			ResourceID: "service:web:" + strconv.Itoa(i+1),
 			Cause:      "scale down",
 			Container:  &ctrs[i],
 		}, "")
 		plan.addNode(Operation{
 			Type:       OpRemoveContainer,
-			ResourceID: fmt.Sprintf("service:web:%d", i+1),
+			ResourceID: "service:web:" + strconv.Itoa(i+1),
 			Cause:      "scale down",
 			Container:  &ctrs[i],
 		}, "", stop)

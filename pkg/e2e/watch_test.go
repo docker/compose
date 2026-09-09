@@ -21,6 +21,7 @@ package e2e
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -203,7 +204,7 @@ func doTest(t *testing.T, svcName string) {
 	waitForFlush := func() {
 		b := make([]byte, 32)
 		_, _ = rand.Read(b)
-		sentinelVal := fmt.Sprintf("%x", b)
+		sentinelVal := hex.EncodeToString(b)
 		writeDataFile("wait.txt", sentinelVal)
 		poll.WaitOn(t, checkFileContents("/app/data/wait.txt", sentinelVal))
 	}

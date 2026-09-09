@@ -19,7 +19,6 @@
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +38,7 @@ func TestConvertAndTransformList(t *testing.T) {
 	t.Run("kubernetes manifests", func(t *testing.T) {
 		kubedir := filepath.Join(tmpDir, "kubernetes")
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge/compose.yaml", "--project-name", projectName, "bridge", "convert",
-			"--output", kubedir, "--transformation", fmt.Sprintf("docker/compose-bridge-kubernetes:%s", bridgeImageVersion))
+			"--output", kubedir, "--transformation", "docker/compose-bridge-kubernetes:"+bridgeImageVersion)
 		assert.NilError(t, res.Error)
 		assert.Equal(t, res.ExitCode, 0)
 		res = c.RunCmd(t, "diff", "-r", kubedir, "./fixtures/bridge/expected-kubernetes")
@@ -49,7 +48,7 @@ func TestConvertAndTransformList(t *testing.T) {
 	t.Run("helm charts", func(t *testing.T) {
 		helmDir := filepath.Join(tmpDir, "helm")
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge/compose.yaml", "--project-name", projectName, "bridge", "convert",
-			"--output", helmDir, "--transformation", fmt.Sprintf("docker/compose-bridge-helm:%s", bridgeImageVersion))
+			"--output", helmDir, "--transformation", "docker/compose-bridge-helm:"+bridgeImageVersion)
 		assert.NilError(t, res.Error)
 		assert.Equal(t, res.ExitCode, 0)
 		res = c.RunCmd(t, "diff", "-r", helmDir, "./fixtures/bridge/expected-helm")
@@ -69,7 +68,7 @@ func TestConvertBuildOnlyService(t *testing.T) {
 	outDir := t.TempDir()
 
 	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/bridge-build-only/compose.yaml", "--project-name", "bridge-build-only", "bridge", "convert",
-		"--output", outDir, "--transformation", fmt.Sprintf("docker/compose-bridge-kubernetes:%s", bridgeImageVersion))
+		"--output", outDir, "--transformation", "docker/compose-bridge-kubernetes:"+bridgeImageVersion)
 	assert.NilError(t, res.Error)
 	assert.Equal(t, res.ExitCode, 0)
 
