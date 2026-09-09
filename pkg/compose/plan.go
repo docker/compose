@@ -127,11 +127,15 @@ type Operation struct {
 	Timeout      *time.Duration       // for stop operations
 	CreateNodeID int                  // for OpRenameContainer/start-phase ops: ID of the CreateContainer node whose result to target
 	Condition    string               // for OpWaitCondition: depends_on condition to wait for (service_healthy, ...)
-	// BestEffort marks an operation whose failure must not abort the plan. It is
-	// used for the optional removal of the old network on a rename: if the
-	// network is still in use (by non-Compose containers) the removal is skipped
-	// with a warning instead of failing — the new network already carries a
-	// different name, so the migration does not depend on the old one going away.
+	// RemoveVolumes asks OpRemoveContainer to also remove the container's
+	// anonymous volumes — the imperative semantics for hook-runner containers.
+	RemoveVolumes bool
+	// BestEffort marks an operation whose failure must not abort the plan.
+	// Used for the optional removal of the old network on a rename (if the
+	// network is still in use by non-Compose containers the removal is skipped
+	// with a warning — the new network already carries a different name), and
+	// for purging stale pre_start hook runners (the imperative purge is
+	// warn-only: a failed removal leaves the container visible, never blocks).
 	BestEffort bool
 }
 

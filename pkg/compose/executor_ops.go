@@ -142,8 +142,15 @@ func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) e
 }
 
 func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation) error {
-	_, err := exec.compose.apiClient().ContainerRemove(ctx, op.Container.ID, client.ContainerRemoveOptions{Force: true})
+	_, err := exec.compose.apiClient().ContainerRemove(ctx, op.Container.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: op.RemoveVolumes})
 	if err != nil {
+		if op.BestEffort {
+			// warn-only removal (stale pre_start hook runner): the container
+			// stays visible to the operator, the plan carries on — and the
+			// live view below keeps it, since it was not removed
+			logrus.Warnf("failed to remove %s: %v", op.ResourceID, err)
+			return nil
+		}
 		return err
 	}
 	// Why: a dependent service's create may resolve `network_mode: service:X`
