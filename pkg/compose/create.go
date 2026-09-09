@@ -1452,7 +1452,7 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		EnableIPv4: n.EnableIPv4,
 	}
 
-	networkEventName := fmt.Sprintf("Network %s", n.Name)
+	networkEventName := "Network " + n.Name
 	s.events.On(creatingEvent(networkEventName))
 
 	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, networkCreateOptions); err != nil {
@@ -1523,7 +1523,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 }
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
-	eventName := fmt.Sprintf("Volume %s", volume.Name)
+	eventName := "Volume " + volume.Name
 	s.events.On(creatingEvent(eventName))
 	hash, err := VolumeHash(volume)
 	if err != nil {

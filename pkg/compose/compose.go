@@ -526,7 +526,7 @@ func (s *composeService) RuntimeAPIVersion(ctx context.Context) (string, error) 
 
 	version := cli.ClientVersion()
 	if version == "" {
-		return "", fmt.Errorf("docker client returned empty version after successful API negotiation")
+		return "", errors.New("docker client returned empty version after successful API negotiation")
 	}
 
 	s.runtimeAPIVersion.val = version

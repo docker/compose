@@ -232,19 +232,19 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 // doesn't implement
 func checkClassicBuilderSupported(service types.ServiceConfig) error {
 	if len(service.Build.Platforms) > 1 {
-		return fmt.Errorf("the classic builder doesn't support multi-arch build; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
+		return errors.New("the classic builder doesn't support multi-arch build; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
 	}
 	if service.Build.Privileged {
-		return fmt.Errorf("the classic builder doesn't support privileged mode; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
+		return errors.New("the classic builder doesn't support privileged mode; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
 	}
 	if len(service.Build.AdditionalContexts) > 0 {
-		return fmt.Errorf("the classic builder doesn't support additional contexts; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
+		return errors.New("the classic builder doesn't support additional contexts; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
 	}
 	if len(service.Build.SSH) > 0 {
-		return fmt.Errorf("the classic builder doesn't support SSH keys; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
+		return errors.New("the classic builder doesn't support SSH keys; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
 	}
 	if len(service.Build.Secrets) > 0 {
-		return fmt.Errorf("the classic builder doesn't support secrets; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
+		return errors.New("the classic builder doesn't support secrets; building with BuildKit requires the buildx Docker CLI plugin, and DOCKER_BUILDKIT must not be set to 0")
 	}
 	return nil
 }
@@ -260,7 +260,7 @@ func prepareClassicBuildContext(specifiedContext, dockerfileName string, progBuf
 	bctx := &classicBuildContext{cleanup: func() {}}
 	switch contextType {
 	case build.ContextTypeStdin:
-		return nil, fmt.Errorf("building from STDIN is not supported")
+		return nil, errors.New("building from STDIN is not supported")
 	case build.ContextTypeLocal:
 		bctx.contextDir, bctx.relDockerfile, err = build.GetContextFromLocalDir(specifiedContext, dockerfileName)
 		if err != nil {

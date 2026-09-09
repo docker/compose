@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -300,7 +301,7 @@ func (d *DryRunClient) VolumeRemove(ctx context.Context, volumeID string, option
 func (d *DryRunClient) ExecCreate(ctx context.Context, container string, config client.ExecCreateOptions) (client.ExecCreateResult, error) {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
-	id := fmt.Sprintf("%x", b)
+	id := hex.EncodeToString(b)
 	d.execs.Store(id, execDetails{
 		container: container,
 		command:   config.Cmd,

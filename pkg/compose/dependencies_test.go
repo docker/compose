@@ -18,8 +18,8 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -62,12 +62,10 @@ func TestTraversalWithMultipleParents(t *testing.T) {
 		Services: types.Services{"dependent": dependent},
 	}
 
-	for i := 1; i <= 100; i++ {
-		name := fmt.Sprintf("svc_%d", i)
+	for i := range 100 {
+		name := "svc_" + strconv.Itoa(i+1)
 		dependent.DependsOn[name] = types.ServiceDependency{}
-
-		svc := types.ServiceConfig{Name: name}
-		project.Services[name] = svc
+		project.Services[name] = types.ServiceConfig{Name: name}
 	}
 
 	svc := make(chan string, 10)
@@ -262,7 +260,7 @@ func TestBuildGraph(t *testing.T) {
 			}
 
 			graph, err := NewGraph(&project, ServiceStopped)
-			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
+			assert.NilError(t, err, "failed to build graph for: "+tC.desc)
 
 			for k, vertex := range graph.Vertices {
 				expected, ok := tC.expectedVertices[k]
@@ -312,7 +310,7 @@ func TestBuildGraphDependsOn(t *testing.T) {
 			}
 
 			graph, err := NewGraph(&project, ServiceStopped)
-			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
+			assert.NilError(t, err, "failed to build graph for: "+tC.desc)
 
 			for k, vertex := range graph.Vertices {
 				expected, ok := tC.expectedVertices[k]

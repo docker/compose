@@ -26,6 +26,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/DefangLabs/secret-detector/pkg/detectors/keyword"
@@ -610,7 +611,7 @@ func buildEnvPromptMessage(services map[string]*serviceEnvFindings) string {
 		if keys := f.sortedSuspiciousKeys(); len(keys) > 0 {
 			quoted := make([]string, len(keys))
 			for i, k := range keys {
-				quoted[i] = fmt.Sprintf("%q", k)
+				quoted[i] = strconv.Quote(k)
 			}
 			fmt.Fprintf(&b, "  service %q: literal value for %s\n", name, strings.Join(quoted, ", "))
 		}

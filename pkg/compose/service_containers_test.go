@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -695,7 +696,7 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 		Return(client.ContainerCreateResult{ID: "an-id"}, nil)
 
 	// NetworkConnect fails
-	connectErr := fmt.Errorf("network connect failed")
+	connectErr := errors.New("network connect failed")
 	apiClient.EXPECT().NetworkConnect(gomock.Any(), gomock.Eq("a-moby-name"), gomock.Any()).
 		Return(client.NetworkConnectResult{}, connectErr)
 

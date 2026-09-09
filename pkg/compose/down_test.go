@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -669,7 +670,7 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	// Removal fails — Down must still return nil.
 	api.EXPECT().ContainerRemove(gomock.Any(), "hook-2",
 		client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("daemon busy"))
+		Return(client.ContainerRemoveResult{}, errors.New("daemon busy"))
 
 	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{})
 	assert.NilError(t, err)

@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -45,7 +46,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 
 	if options.Output == "" {
 		if s.stdout().IsTerminal() {
-			return fmt.Errorf("output option is required when exporting to terminal")
+			return errors.New("output option is required when exporting to terminal")
 		}
 	} else if err := command.ValidateOutputPath(options.Output); err != nil {
 		return fmt.Errorf("failed to export container: %w", err)

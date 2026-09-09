@@ -189,7 +189,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 	}
 	err := eg.Wait()
 	if errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("timeout waiting for dependencies")
+		return errors.New("timeout waiting for dependencies")
 	}
 	return err
 }
@@ -299,12 +299,12 @@ func (s *composeService) checkDependencyCompleted(ctx context.Context, dep strin
 	if !config.Required {
 		// optional -> mark as skipped & don't propagate error
 		s.events.On(containerReasonEvents(waitingFor, skippedEvent,
-			fmt.Sprintf("optional dependency %s", messageSuffix))...)
+			"optional dependency "+messageSuffix)...)
 		logrus.Warnf("optional dependency %s", messageSuffix)
 		return true, nil
 	}
 
-	msg := fmt.Sprintf("service %s", messageSuffix)
+	msg := "service " + messageSuffix
 	s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
 		return errorEventf(s, "service %s", messageSuffix)
 	})...)

@@ -232,7 +232,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		return nil
 	}
 
-	eventName := fmt.Sprintf("Network %s", name)
+	eventName := "Network " + name
 	s.events.On(removingEvent(eventName))
 
 	var found int
@@ -277,7 +277,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 }
 
 func (s *composeService) removeVolume(ctx context.Context, id string) error {
-	resource := fmt.Sprintf("Volume %s", id)
+	resource := "Volume " + id
 
 	_, err := s.apiClient().VolumeInspect(ctx, id, client.VolumeInspectOptions{})
 	if errdefs.IsNotFound(err) {

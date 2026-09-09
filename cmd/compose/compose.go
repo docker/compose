@@ -718,13 +718,13 @@ func selectEventProcessor(dockerCli command.Cli, progress, ansi string, detached
 		}
 	case display.ModeTTY:
 		if ansi == "never" {
-			return nil, fmt.Errorf("can't use --progress tty while ANSI support is disabled")
+			return nil, errors.New("can't use --progress tty while ANSI support is disabled")
 		}
 		display.Mode = display.ModeTTY
 		return display.Full(dockerCli.Err(), stdinfo(dockerCli), detached), nil
 	case display.ModePlain:
 		if ansi == "always" {
-			return nil, fmt.Errorf("can't use --progress plain while ANSI support is forced")
+			return nil, errors.New("can't use --progress plain while ANSI support is forced")
 		}
 		display.Mode = display.ModePlain
 		return display.Plain(dockerCli.Err()), nil

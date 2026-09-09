@@ -57,7 +57,7 @@ func TestDontWatchEachFile(t *testing.T) {
 	}
 
 	for i := range 100 {
-		f.WriteFile(f.JoinPath(initialDir, fmt.Sprintf("%d", i)), "initial data")
+		f.WriteFile(f.JoinPath(initialDir, strconv.Itoa(i)), "initial data")
 	}
 
 	f.watch(watched)
@@ -80,7 +80,7 @@ func TestDontWatchEachFile(t *testing.T) {
 	}
 
 	for i := range 100 {
-		f.WriteFile(f.JoinPath(inplaceDir, fmt.Sprintf("%d", i)), "inplace data")
+		f.WriteFile(f.JoinPath(inplaceDir, strconv.Itoa(i)), "inplace data")
 	}
 
 	f.fsync()
@@ -99,7 +99,7 @@ func TestDontWatchEachFile(t *testing.T) {
 	}
 
 	for i := range 100 {
-		f.WriteFile(f.JoinPath(stagedDir, fmt.Sprintf("%d", i)), "staged data")
+		f.WriteFile(f.JoinPath(stagedDir, strconv.Itoa(i)), "staged data")
 	}
 
 	if err := os.Rename(staged, f.JoinPath(watched, "staged")); err != nil {
@@ -115,7 +115,7 @@ func TestDontWatchEachFile(t *testing.T) {
 	n, err := inotifyNodes()
 	assert.NilError(t, err)
 	if n > 10 {
-		t.Fatalf("watching more than 10 files: %d", n)
+		t.Fatal("watching more than 10 files:", n)
 	}
 }
 
@@ -147,14 +147,14 @@ func TestDontRecurseWhenWatchingParentsOfNonExistentFiles(t *testing.T) {
 
 	excludedDir := f.JoinPath(watched, "excluded")
 	for i := range 10 {
-		f.WriteFile(f.JoinPath(excludedDir, fmt.Sprintf("%d", i), "data.txt"), "initial data")
+		f.WriteFile(f.JoinPath(excludedDir, strconv.Itoa(i), "data.txt"), "initial data")
 	}
 	f.fsync()
 
 	n, err := inotifyNodes()
 	assert.NilError(t, err)
 	if n > 5 {
-		t.Fatalf("watching more than 5 files: %d", n)
+		t.Fatal("watching more than 5 files:", n)
 	}
 }
 

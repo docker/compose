@@ -18,7 +18,6 @@ package watch
 
 import (
 	"expvar"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,7 +29,7 @@ type FileEvent string
 
 func NewFileEvent(p string) FileEvent {
 	if !filepath.IsAbs(p) {
-		panic(fmt.Sprintf("NewFileEvent only accepts absolute paths. Actual: %s", p))
+		panic("NewFileEvent only accepts absolute paths. Actual: " + p)
 	}
 	return FileEvent(p)
 }
