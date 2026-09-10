@@ -67,6 +67,35 @@ func TestRelayRoutesSpec(t *testing.T) {
 	assert.Assert(t, id1 != relayIdentity("80=host.docker.internal:49153"))
 }
 
+// Providers express endpoints from the host's perspective, the relay dials
+// from a container: host-relative addresses must be rewritten to
+// host.docker.internal, everything else passes verbatim.
+func TestRelayUpstream(t *testing.T) {
+	for endpoint, want := range map[string]string{
+		"localhost:5734":            "host.docker.internal:5734",
+		"LOCALHOST:5734":            "host.docker.internal:5734",
+		"127.0.0.1:5734":            "host.docker.internal:5734",
+		"127.1.2.3:5734":            "host.docker.internal:5734",
+		"[::1]:5734":                "host.docker.internal:5734",
+		"0.0.0.0:5734":              "host.docker.internal:5734",
+		"[::]:5734":                 "host.docker.internal:5734",
+		":5734":                     "host.docker.internal:5734",
+		"192.168.1.10:5734":         "192.168.1.10:5734",
+		"[fdcb::2]:5734":            "[fdcb::2]:5734",
+		"some.host.corp:5734":       "some.host.corp:5734",
+		"host.docker.internal:5734": "host.docker.internal:5734",
+	} {
+		assert.Equal(t, relayUpstream(endpoint), want, "endpoint %q", endpoint)
+	}
+}
+
+// The rewrite happens inside relayRoutesSpec, so the relay identity hashes
+// what the relay actually dials.
+func TestRelayRoutesSpecRewritesHostRelativeUpstreams(t *testing.T) {
+	routes := relayRoutesSpec(map[int]string{80: "localhost:5734"})
+	assert.Equal(t, routes, "80=host.docker.internal:5734")
+}
+
 // The relay joins the networks of the services depending on the provider —
 // its consumers — and falls back to the project default network.
 func TestRelayNetworks(t *testing.T) {
