@@ -124,4 +124,11 @@ func TestProviderPublishEndpoint(t *testing.T) {
 	res := s.CLI().RunDockerComposeCmdNoCheck(t, "--project-name", "e2e-provider-publish-endpoint", "exec", "db", "true")
 	assert.Assert(t, res.ExitCode != 0, "exec on a relay container must fail")
 	assert.Assert(t, strings.Contains(res.Combined(), "network relay"), res.Combined())
+
+	// The relay belongs to the provider service's deprovisioning: down must
+	// remove it along with the provider's resource, or the project network
+	// stays in use and its removal fails.
+	s.Step("down removes the relay with the provider service",
+		ComposeCmd("down", "-v"),
+		ServiceNotCreated("db"))
 }

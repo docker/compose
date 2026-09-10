@@ -203,7 +203,12 @@ func up(options options, args []string) {
 }
 
 func down(_ *cobra.Command, _ []string) {
-	fmt.Printf(`{ "type": "error", "message": "Permission error" }%s`, lineSeparator)
+	// A failing down can be simulated for tests and demos.
+	if os.Getenv("PROVIDER_DOWN_FAILURE") != "" {
+		fmt.Printf(`{ "type": "error", "message": "Permission error" }%s`, lineSeparator)
+		return
+	}
+	fmt.Printf(`{ "type": "info", "message": "Resource removed" }%s`, lineSeparator)
 }
 
 func stop(_ *cobra.Command, _ []string) {
