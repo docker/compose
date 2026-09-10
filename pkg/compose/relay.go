@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"strings"
@@ -50,6 +51,8 @@ func relayImage() string {
 
 // relayRoutesSpec renders endpoints as the relay's RELAY_ROUTES value,
 // canonically ordered so it doubles as the identity the relay label hashes.
+// Upstreams are rewritten for the relay's vantage point (relayUpstream)
+// before rendering, so the identity follows what the relay actually dials.
 func relayRoutesSpec(endpoints map[int]string) string {
 	ports := make([]int, 0, len(endpoints))
 	for port := range endpoints {
@@ -58,9 +61,33 @@ func relayRoutesSpec(endpoints map[int]string) string {
 	sort.Ints(ports)
 	routes := make([]string, 0, len(ports))
 	for _, port := range ports {
-		routes = append(routes, fmt.Sprintf("%d=%s", port, endpoints[port]))
+		routes = append(routes, fmt.Sprintf("%d=%s", port, relayUpstream(endpoints[port])))
 	}
 	return strings.Join(routes, ",")
+}
+
+// relayUpstream rewrites a host-relative upstream for the relay's vantage
+// point. Providers express endpoints from the host's perspective — a loopback
+// or unspecified address names the machine compose runs on — but the relay
+// dials from its own network namespace, where those addresses name the relay
+// container itself. host.docker.internal resolves natively on Docker Desktop
+// and is provisioned through ExtraHosts (host-gateway) on plain Linux
+// engines. Anything else (a LAN IP, a DNS name) is reachable as-is from the
+// relay and passes verbatim.
+func relayUpstream(endpoint string) string {
+	host, port, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		// validated at parse time (parseEndpointMessage); keep verbatim
+		return endpoint
+	}
+	hostRelative := host == "" || strings.EqualFold(host, "localhost")
+	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsUnspecified()) {
+		hostRelative = true
+	}
+	if !hostRelative {
+		return endpoint
+	}
+	return net.JoinHostPort("host.docker.internal", port)
 }
 
 func relayIdentity(routes string) string {
