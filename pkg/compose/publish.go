@@ -119,7 +119,7 @@ func (s *composeService) pushComposeArtifact(ctx context.Context, project *types
 
 	resolver := oci.NewResolver(s.configFile(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
 
-	descriptor, usedOCIVersion, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
+	descriptor, didFallback, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 	if err != nil {
 		s.events.On(api.Resource{
 			ID:     repository,
@@ -128,8 +128,8 @@ func (s *composeService) pushComposeArtifact(ctx context.Context, project *types
 		})
 		return err
 	}
-	if options.OCIVersion == "" && usedOCIVersion == api.OCIVersion1_0 {
-		logrus.Warn("registry does not support OCI 1.1 artifacts; falling back to OCI 1.0 format")
+	if didFallback {
+		logrus.Warn("registry rejected the OCI 1.1 artifact push; falling back to OCI 1.0 format")
 	}
 
 	if options.Application {
