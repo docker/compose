@@ -27,22 +27,19 @@ func TestApplyPullOptions(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"must-build": {
-				Name: "must-build",
+				Name: "must-build", WorkloadSpec:
 				// No image, local build only
-				Build: &types.BuildConfig{
+				types.WorkloadSpec{Build: &types.BuildConfig{
 					Context: ".",
-				},
+				}},
 			},
 			"has-build": {
-				Name:  "has-build",
-				Image: "registry.example.com/myservice",
-				Build: &types.BuildConfig{
+				Name: "has-build", ContainerSpec: types.ContainerSpec{Image: "registry.example.com/myservice"}, WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
 					Context: ".",
-				},
+				}},
 			},
 			"must-pull": {
-				Name:  "must-pull",
-				Image: "registry.example.com/another-service",
+				Name: "must-pull", ContainerSpec: types.ContainerSpec{Image: "registry.example.com/another-service"},
 			},
 		},
 	}
