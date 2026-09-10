@@ -155,8 +155,7 @@ services:
 		WorkingDir: dir,
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
+				Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx"},
 			},
 		},
 	}

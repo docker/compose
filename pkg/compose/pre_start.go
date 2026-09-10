@@ -88,7 +88,7 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 
 func (s *composeService) runPreStartHook(
 	ctx context.Context, project *types.Project, service types.ServiceConfig,
-	ctr container.Summary, index int, hook types.ServiceHook, listener api.ContainerEventListener,
+	ctr container.Summary, index int, hook types.PreStartHook, listener api.ContainerEventListener,
 ) error {
 	created, err := s.createPreStartContainer(ctx, project, service, ctr, hook)
 	if err != nil {
@@ -164,7 +164,7 @@ func (s *composeService) runPreStartHook(
 
 func (s *composeService) createPreStartContainer(
 	ctx context.Context, project *types.Project, service types.ServiceConfig,
-	ctr container.Summary, hook types.ServiceHook,
+	ctr container.Summary, hook types.PreStartHook,
 ) (client.ContainerCreateResult, error) {
 	image := hook.Image
 	if image == "" {

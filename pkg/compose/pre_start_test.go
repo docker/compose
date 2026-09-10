@@ -91,12 +91,12 @@ func TestPreStart_SuccessTwoHooksInOrder(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"echo", "first"}},
-			{Image: "alpine", Command: types.ShellCommand{"echo", "second"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "first"}}},
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "second"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -134,12 +134,12 @@ func TestPreStart_FirstHookFailsStopsExecution(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"false"}},
-			{Image: "alpine", Command: types.ShellCommand{"echo", "never"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"false"}}},
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "never"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -164,11 +164,11 @@ func TestPreStart_PerReplicaRejected(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}, PerReplica: true},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{PerReplica: true, ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -184,8 +184,8 @@ func TestPreStart_ImageFallsBackToBuiltImage(t *testing.T) {
 	// Service with no explicit image (build-only); hook image also empty.
 	service := types.ServiceConfig{
 		Name: "web",
-		PreStart: []types.ServiceHook{
-			{Command: types.ShellCommand{"echo", "hi"}},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"echo", "hi"}}},
 		},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
@@ -215,11 +215,11 @@ func TestPreStart_ExplicitHookImageUsed(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "service-image:latest",
-		PreStart: []types.ServiceHook{
-			{Image: "custom-hook-image:1.2.3", Command: types.ShellCommand{"echo"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "custom-hook-image:1.2.3", Command: types.ShellCommand{"echo"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "service-image:latest"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -248,11 +248,11 @@ func TestPreStart_VolumesFromServiceContainer(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -290,12 +290,12 @@ func TestPreStart_ContainerCreateFailurePropagates(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "missing:latest", Command: types.ShellCommand{"true"}},
-			{Image: "alpine", Command: types.ShellCommand{"never"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "missing:latest", Command: types.ShellCommand{"true"}}},
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"never"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -312,11 +312,11 @@ func TestPreStart_ContainerStartFailurePropagates(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -350,11 +350,11 @@ func TestPreStart_WaitResultPreferredOverNilError(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -434,10 +434,10 @@ func TestPreStart_DetachedModeAttachesLogs(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
@@ -466,10 +466,10 @@ func TestPreStart_FailureIncludesTail(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "db",
-		Image: "postgres",
-		PreStart: []types.ServiceHook{
-			{Image: "postgres", Command: types.ShellCommand{"migrate"}},
+		Name:          "db",
+		ContainerSpec: types.ContainerSpec{Image: "postgres"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "postgres", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
@@ -510,10 +510,10 @@ func TestPreStart_SuccessRemovesContainer(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -549,10 +549,10 @@ func TestPreStart_FailureRetainsContainer(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"migrate"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -588,10 +588,10 @@ func TestPreStart_CancellationRemovesContainer(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"long-running-op"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"long-running-op"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -634,10 +634,10 @@ func TestPreStart_RemovesOrphanBeforeRun(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"migrate"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -671,10 +671,10 @@ func TestPreStart_SuccessRemoveFailureIsNonFatal(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -763,10 +763,10 @@ func TestPreStart_StreamLogsError_NilListener(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -795,10 +795,10 @@ func TestPreStart_StreamLogsError_WithListener(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -838,13 +838,15 @@ func TestPreStart_OldAPIVersion(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+			},
 		},
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -878,11 +880,13 @@ func TestPreStart_ConnectExtraNetworksSuccess(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
 	}
 
@@ -907,11 +911,13 @@ func TestPreStart_ConnectExtraNetworksFails(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
 	}
 
@@ -931,10 +937,10 @@ func TestPreStart_ContainerStartFailureAndRemoveFails(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -965,10 +971,10 @@ func TestPreStart_OrphanScanFails(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -998,10 +1004,10 @@ func TestPreStart_OrphanRemovalFails(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1042,14 +1048,16 @@ func TestPreStart_OldAPINetworkConnectFails(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1082,14 +1090,16 @@ func TestPreStart_OldAPINetworkConnectAndRemoveFails(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1125,10 +1135,10 @@ func TestPreStart_RuntimeAPIVersionError(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1153,10 +1163,10 @@ func TestPreStart_FailureStdoutOnlyTail(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "db",
-		Image: "postgres",
-		PreStart: []types.ServiceHook{
-			{Image: "postgres", Command: types.ShellCommand{"migrate"}},
+		Name:          "db",
+		ContainerSpec: types.ContainerSpec{Image: "postgres"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "postgres", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}

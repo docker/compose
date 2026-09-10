@@ -389,10 +389,11 @@ func TestPlatformPinnedDigest(t *testing.T) {
 			Name: "p",
 			Services: types.Services{
 				"app": {
-					Name:         "app",
-					Image:        "foo:1",
-					Platform:     "linux/s390x",
-					CustomLabels: types.Labels{},
+					Name: "app", ContainerSpec: types.ContainerSpec{
+						Image:        "foo:1",
+						Platform:     "linux/s390x",
+						CustomLabels: types.Labels{},
+					},
 				},
 			},
 		}
@@ -455,7 +456,7 @@ func TestPlatformPinnedDigest(t *testing.T) {
 // whichever service triggered it, so services sharing the image with another
 // pinned platform must re-resolve theirs.
 func TestServiceImageDigest(t *testing.T) {
-	pinnedService := types.ServiceConfig{Name: "app", Platform: "linux/s390x"}
+	pinnedService := types.ServiceConfig{Name: "app", ContainerSpec: types.ContainerSpec{Platform: "linux/s390x"}}
 
 	t.Run("unpinned service uses the shared digest, no inspect", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)

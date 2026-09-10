@@ -121,10 +121,11 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: envPath, Required: true},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: envPath, Required: true},
+					},
 				},
 			},
 		},
@@ -214,10 +215,11 @@ func Test_checkForSensitiveData_optional_env_file_missing(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: filepath.Join(dir, "missing.env"), Required: false},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: filepath.Join(dir, "missing.env"), Required: false},
+					},
 				},
 			},
 		},
@@ -237,10 +239,11 @@ func Test_checkForSensitiveData_optional_env_file_present(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: envPath, Required: false},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: envPath, Required: false},
+					},
 				},
 			},
 		},
@@ -257,10 +260,11 @@ func Test_checkForSensitiveData_required_env_file_missing(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: filepath.Join(dir, "missing.env"), Required: true},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: filepath.Join(dir, "missing.env"), Required: true},
+					},
 				},
 			},
 		},
@@ -703,13 +707,14 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				Volumes: []types.ServiceVolumeConfig{
-					{
-						Type:   types.VolumeTypeBind,
-						Source: "/host/path",
-						Target: "/container/path",
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					Volumes: []types.ServiceVolumeConfig{
+						{
+							Type:   types.VolumeTypeBind,
+							Source: "/host/path",
+							Target: "/container/path",
+						},
 					},
 				},
 			},
@@ -747,11 +752,14 @@ func Test_generateImageDigestsOverride_resolvesDependentImages(t *testing.T) {
 		Name: "test",
 		Services: types.Services{
 			"app": types.ServiceConfig{
-				Name:     "app",
-				Image:    "nginx:latest",
-				PreStart: []types.ServiceHook{{Image: "hookimage:latest"}},
-				Volumes: []types.ServiceVolumeConfig{
-					{Type: types.VolumeTypeImage, Source: "someimage:latest", Target: "/data"},
+				Name: "app",
+
+				PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "hookimage:latest"}}}, ContainerSpec: types.ContainerSpec{
+					Image: "nginx:latest",
+
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "someimage:latest", Target: "/data"},
+					},
 				},
 			},
 		},

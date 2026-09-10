@@ -21,8 +21,9 @@ package locker
 import (
 	"os"
 
-	"github.com/docker/compose/v5/internal/pidfile"
 	"github.com/mitchellh/go-ps"
+
+	"github.com/docker/compose/v5/internal/pidfile"
 )
 
 func (f *Pidfile) Lock() error {

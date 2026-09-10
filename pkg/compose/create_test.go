@@ -86,7 +86,7 @@ func TestBuildVolumeMount(t *testing.T) {
 }
 
 func TestServiceImageName(t *testing.T) {
-	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
+	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{ContainerSpec: composetypes.ContainerSpec{Image: "myImage"}}, "myProject"), "myImage")
 	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Name: "aService"}, "myProject"), "myProject-aService")
 }
 
@@ -108,8 +108,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		Name: "myProject",
 		Services: composetypes.Services{
 			"myService": {
-				Name: "myService",
-				Volumes: []composetypes.ServiceVolumeConfig{
+				Name: "myService", ContainerSpec: composetypes.ContainerSpec{Volumes: []composetypes.ServiceVolumeConfig{
 					{
 						Type:   composetypes.VolumeTypeVolume,
 						Target: "/var/myvolume1",
@@ -131,7 +130,7 @@ func TestBuildContainerMountOptions(t *testing.T) {
 						Source: "\\\\.\\pipe\\docker_engine_windows",
 						Target: "\\\\.\\pipe\\docker_engine",
 					},
-				},
+				}},
 			},
 		},
 		Volumes: composetypes.Volumes(map[string]composetypes.VolumeConfig{
@@ -194,15 +193,14 @@ func TestBuildContainerMountOptions(t *testing.T) {
 func TestDefaultNetworkSettings(t *testing.T) {
 	t.Run("returns the network with the highest priority as primary when service has multiple networks", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
-			Name: "myService",
-			Networks: map[string]*composetypes.ServiceNetworkConfig{
+			Name: "myService", ContainerSpec: composetypes.ContainerSpec{Networks: map[string]*composetypes.ServiceNetworkConfig{
 				"myNetwork1": {
 					Priority: 10,
 				},
 				"myNetwork2": {
 					Priority: 1000,
 				},
-			},
+			}},
 		}
 		project := composetypes.Project{
 			Name: "myProject",
@@ -275,11 +273,10 @@ func TestDefaultNetworkSettings(t *testing.T) {
 
 	t.Run("returns only primary network in EndpointsConfig for API < 1.44", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
-			Name: "myService",
-			Networks: map[string]*composetypes.ServiceNetworkConfig{
+			Name: "myService", ContainerSpec: composetypes.ContainerSpec{Networks: map[string]*composetypes.ServiceNetworkConfig{
 				"myNetwork1": {Priority: 10},
 				"myNetwork2": {Priority: 1000},
-			},
+			}},
 		}
 		project := composetypes.Project{
 			Name:     "myProject",
@@ -299,8 +296,7 @@ func TestDefaultNetworkSettings(t *testing.T) {
 
 	t.Run("returns defined network mode if explicitly set", func(t *testing.T) {
 		service := composetypes.ServiceConfig{
-			Name:        "myService",
-			NetworkMode: "host",
+			Name: "myService", ContainerSpec: composetypes.ContainerSpec{NetworkMode: "host"},
 		}
 		project := composetypes.Project{
 			Name:     "myProject",
@@ -324,8 +320,7 @@ func TestCreateEndpointSettings(t *testing.T) {
 		Name: "projName",
 	}, composetypes.ServiceConfig{
 		Name:          "serviceName",
-		ContainerName: "containerName",
-		Networks: map[string]*composetypes.ServiceNetworkConfig{
+		ContainerName: "containerName", ContainerSpec: composetypes.ContainerSpec{Networks: map[string]*composetypes.ServiceNetworkConfig{
 			"netName": {
 				Priority:     100,
 				Aliases:      []string{"alias1", "alias2"},
@@ -338,7 +333,7 @@ func TestCreateEndpointSettings(t *testing.T) {
 					"driverOpt2": "optval2",
 				},
 			},
-		},
+		}},
 	}, 0, "netName", []string{"link1", "link2"}, true)
 	assert.NilError(t, err)
 	macAddr, _ := net.ParseMAC("02:00:00:00:00:01")
