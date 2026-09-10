@@ -377,7 +377,7 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 	// debounce and group filesystem events so that we capture IDE saving many files as one "batch" event
 	batchEvents := watch.BatchDebounceEvents(ctx, watcher.Events())
 
-	scheduler := newRebuildScheduler(func(services []string) error {
+	scheduler := newRebuildScheduler(ctx, func(ctx context.Context, services []string) error {
 		return s.rebuild(ctx, project, services, options)
 	})
 	// Rebuilds run asynchronously in their own goroutine(s); cancel first so
@@ -604,13 +604,23 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 		scheduler.Request(utils.MapKeys(rebuild))
 	}
 
-	// A rebuild already recreates and starts the service; restarting one
-	// that has a rebuild in flight or queued -- from this batch or an
-	// earlier one still running asynchronously (see rebuildScheduler) --
-	// would race the rebuild's create/start on the same container.
+	// A rebuild already recreates and starts the service, so a separate
+	// restart is redundant at best and races the rebuild's create/start at
+	// worst. Which rebuild matters:
+	//   - pending: it will snapshot the build context after this change —
+	//     drop the restart, the rebuild converges on its own;
+	//   - in flight: its snapshot predates this change, so its outcome is
+	//     stale — fold the restart into a Request, which interrupts the
+	//     doomed run and rebuilds from a fresh snapshot (recreate + start:
+	//     the restart intent, converged).
 	for service := range restart {
-		if scheduler.InFlightOrPending(service) {
-			logrus.Debugf("skipping restart for service %q: rebuild already in flight or pending", service)
+		switch {
+		case scheduler.Pending(service):
+			logrus.Debugf("skipping restart for service %q: rebuild pending", service)
+			delete(restart, service)
+		case scheduler.InFlight(service):
+			logrus.Debugf("turning restart for service %q into a rebuild: stale rebuild in flight", service)
+			scheduler.Request([]string{service})
 			delete(restart, service)
 		}
 	}
