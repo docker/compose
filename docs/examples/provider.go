@@ -188,6 +188,13 @@ func up(options options, args []string) {
 			fmt.Printf(`{ "type": "error", "message": "demo endpoint did not come up: %v" }%s`, err, lineSeparator)
 			return
 		}
+		// The subprocess deliberately outlives this invocation — it IS the
+		// provisioned resource the relay forwards to, and consumers connect
+		// through it only after up has returned, so reaping it here would
+		// tear the endpoint down before anyone reached it. Its lifetime is
+		// its own: it exits by itself after three minutes (serve-demo), the
+		// way a real provider's resource outlives the provider CLI run.
+		//
 		// the endpoint is announced as seen from THIS process's host —
 		// the relay translates loopback into the container-visible name
 		_, port, _ := net.SplitHostPort(strings.TrimSpace(addr))
