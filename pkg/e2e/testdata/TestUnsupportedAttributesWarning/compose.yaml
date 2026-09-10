@@ -1,0 +1,82 @@
+services:
+  # Baseline: deploy.resources/replicas/restart_policy ARE honored outside
+  # Swarm, a port without an explicit mode defaults to mode: ingress, and
+  # label_file is resolved into real labels by compose-go's loader by
+  # default — none of these must ever produce a warning.
+  clean:
+    image: alpine
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "9090:90"
+    label_file:
+      - ./labels.env
+
+  # Every deploy.* sub-attribute that's silently ignored outside Swarm.
+  swarm-attrs:
+    image: alpine
+    credential_spec:
+      file: ./creds.json
+    deploy:
+      mode: replicated
+      labels:
+        team: backend
+      update_config:
+        parallelism: 1
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+      placement:
+        constraints:
+          - node.role==manager
+      endpoint_mode: vip
+
+  # ports[].mode: host is Swarm-only.
+  ports-demo:
+    image: alpine
+    ports:
+      - target: 80
+        published: "8080"
+        mode: host
+
+  # volumes[].type: cluster (CSI) has no effect outside Swarm.
+  cluster-vol:
+    image: alpine
+    volumes:
+      - type: cluster
+        source: my-csi-volume
+        target: /data
+
+  # configs/secrets file-reference uid/gid/mode are ignored outside Swarm.
+  file-refs:
+    image: alpine
+    configs:
+      - source: myconfig
+        uid: "1000"
+        gid: "1000"
+        mode: 0o440
+    secrets:
+      - source: mysecret
+        uid: "1000"
+        gid: "1000"
+        mode: 0o440
+
+configs:
+  myconfig:
+    file: ./myconfig.txt
+    labels:
+      team: backend # configs[].labels: reachable and flagged
+
+secrets:
+  mysecret:
+    file: ./mysecret.txt
+    driver_opts: # secrets[].driver_opts: reachable and flagged (unlike configs)
+      region: eu-west
+    labels:
+      team: backend

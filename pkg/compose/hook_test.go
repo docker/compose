@@ -22,7 +22,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -460,7 +460,7 @@ func TestRunHook_CopyError(t *testing.T) {
 	// Build a pipe whose read side immediately returns a hard error, simulating
 	// an I/O failure mid-stream rather than a clean EOF.
 	pr, pw := io.Pipe()
-	_ = pw.CloseWithError(fmt.Errorf("simulated I/O failure"))
+	_ = pw.CloseWithError(errors.New("simulated I/O failure"))
 
 	// Use net.Pipe() only for the Conn field (Close); reads come from pr.
 	serverConn, clientConn := net.Pipe()
@@ -524,7 +524,7 @@ func TestRunHook_ExecCreateError(t *testing.T) {
 
 	mockAPI.EXPECT().
 		ExecCreate(gomock.Any(), "ctr-1", gomock.Any()).
-		Return(client.ExecCreateResult{}, fmt.Errorf("exec create failed"))
+		Return(client.ExecCreateResult{}, errors.New("exec create failed"))
 
 	s, err := NewComposeService(mockCli)
 	assert.NilError(t, err)
@@ -552,7 +552,7 @@ func TestRunHook_ExecAttachError(t *testing.T) {
 		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
 	mockAPI.EXPECT().
 		ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecAttachResult{}, fmt.Errorf("exec attach failed"))
+		Return(client.ExecAttachResult{}, errors.New("exec attach failed"))
 
 	s, err := NewComposeService(mockCli)
 	assert.NilError(t, err)
@@ -590,7 +590,7 @@ func TestRunHook_ExecInspectError(t *testing.T) {
 
 	mockAPI.EXPECT().
 		ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecInspectResult{}, fmt.Errorf("inspect failed"))
+		Return(client.ExecInspectResult{}, errors.New("inspect failed"))
 
 	s, err := NewComposeService(mockCli)
 	assert.NilError(t, err)

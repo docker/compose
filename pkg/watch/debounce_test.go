@@ -15,52 +15,44 @@
 package watch
 
 import (
-	"context"
 	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"gotest.tools/v3/assert"
 )
 
 func Test_BatchDebounceEvents(t *testing.T) {
-	ch := make(chan FileEvent)
-	clock := clockwork.NewFakeClock()
-	ctx, stop := context.WithCancel(t.Context())
-	t.Cleanup(stop)
+	synctest.Test(t, func(t *testing.T) {
+		ch := make(chan FileEvent)
 
-	eventBatchCh := BatchDebounceEvents(ctx, clock, ch)
-	for i := range 100 {
-		path := "/a"
-		if i%2 == 0 {
-			path = "/b"
+		eventBatchCh := BatchDebounceEvents(t.Context(), ch)
+		for i := range 100 {
+			path := "/a"
+			if i%2 == 0 {
+				path = "/b"
+			}
+
+			ch <- FileEvent(path)
 		}
-
-		ch <- FileEvent(path)
-	}
-	// we sent 100 events + the debouncer
-	err := clock.BlockUntilContext(ctx, 101)
-	assert.NilError(t, err)
-	clock.Advance(QuietPeriod)
-	select {
-	case batch := <-eventBatchCh:
+		time.Sleep(QuietPeriod)
+		synctest.Wait()
+		batch := <-eventBatchCh
 		slices.Sort(batch)
 		assert.Equal(t, len(batch), 2)
 		assert.Equal(t, batch[0], FileEvent("/a"))
 		assert.Equal(t, batch[1], FileEvent("/b"))
-	case <-time.After(50 * time.Millisecond):
-		t.Fatal("timed out waiting for events")
-	}
-	err = clock.BlockUntilContext(ctx, 1)
-	assert.NilError(t, err)
-	clock.Advance(QuietPeriod)
 
-	// there should only be a single batch
-	select {
-	case batch := <-eventBatchCh:
-		t.Fatalf("unexpected events: %v", batch)
-	case <-time.After(50 * time.Millisecond):
-		// channel is empty
-	}
+		time.Sleep(QuietPeriod)
+		synctest.Wait()
+
+		// there should only be a single batch
+		select {
+		case batch := <-eventBatchCh:
+			t.Fatalf("unexpected events: %v", batch)
+		default:
+			// channel is empty
+		}
+	})
 }

@@ -36,6 +36,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -76,7 +77,7 @@ func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, cons
 		}
 	}
 	// none of the services is eligible to watch
-	return nil, fmt.Errorf("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
+	return nil, errors.New("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
 }
 
 // ensure state changes are atomic
@@ -235,7 +236,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	}
 
 	if len(paths) == 0 {
-		return nil, fmt.Errorf("none of the selected services is configured for watch, consider setting a 'develop' section")
+		return nil, errors.New("none of the selected services is configured for watch, consider setting a 'develop' section")
 	}
 
 	watcher, err := watch.NewWatcher(paths)
@@ -375,7 +376,7 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 	defer cancel()
 
 	// debounce and group filesystem events so that we capture IDE saving many files as one "batch" event
-	batchEvents := watch.BatchDebounceEvents(ctx, s.clock, watcher.Events())
+	batchEvents := watch.BatchDebounceEvents(ctx, watcher.Events())
 
 	for {
 		select {
@@ -542,7 +543,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return errors.New("process still running")
 	}
 	if execResult.ExitCode != 0 {
-		return fmt.Errorf("exit code %d", execResult.ExitCode)
+		return errors.New("exit code " + strconv.Itoa(execResult.ExitCode))
 	}
 	return nil
 }
@@ -744,27 +745,18 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 }
 
 func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
-	images, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
-		Filters: projectFilter(projectName).Add("dangling", "true"),
-	})
-	if err != nil {
-		logrus.Debugf("Failed to list images: %v", err)
-		return
-	}
-
 	// imageNameToIdMap is keyed by image name; the freshly built images to
 	// spare are its VALUES (image IDs), matched against the dangling IDs
 	builtIDs := make(map[string]struct{}, len(imageNameToIdMap))
 	for _, id := range imageNameToIdMap {
 		builtIDs[id] = struct{}{}
 	}
-	for _, img := range images.Items {
-		if _, ok := builtIDs[img.ID]; !ok {
-			_, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{})
-			if err != nil {
-				logrus.Debugf("Failed to remove image %s: %v", img.ID, err)
-			}
-		}
+	keep := func(img image.Summary) bool {
+		_, ok := builtIDs[img.ID]
+		return ok
+	}
+	if _, err := s.removeDanglingImages(ctx, projectName, keep); err != nil {
+		logrus.Debugf("Failed to list images: %v", err)
 	}
 }
 

@@ -283,7 +283,7 @@ func (c *ContainerContext) Mounts() string {
 
 // LocalVolumes returns the number of volumes using the "local" volume driver.
 func (c *ContainerContext) LocalVolumes() string {
-	return fmt.Sprintf("%d", c.c.LocalVolumes)
+	return strconv.Itoa(c.c.LocalVolumes)
 }
 
 // Networks returns a comma-separated string of networks that the container is

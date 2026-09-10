@@ -74,6 +74,12 @@ type ProjectLoadOptions struct {
 	// This is optional - pass nil or empty slice if not needed.
 	LoadListeners []LoadListener
 
+	// OnUnsupportedAttribute, when set, is invoked once during loading with
+	// every compose-file attribute detected as unsupported by this runtime
+	// outside Swarm mode. Detection only runs when this is set; leave nil to
+	// skip it entirely (e.g. for name-only project resolution).
+	OnUnsupportedAttribute func([]UnsupportedAttribute)
+
 	OCI OCIOptions
 }
 
@@ -161,7 +167,25 @@ type Compose interface {
 	// Volumes executes the equivalent to a `docker volume ls`
 	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
 	// LoadProject loads and validates a Compose project from configuration files.
+	// Set ProjectLoadOptions.OnUnsupportedAttribute to also be notified of
+	// compose-file attributes accepted by the schema but not honored by this
+	// runtime outside Swarm mode.
 	LoadProject(ctx context.Context, options ProjectLoadOptions) (*types.Project, error)
+}
+
+// UnsupportedAttribute reports a compose-file attribute that is accepted by
+// the schema but has no effect on this runtime outside Swarm mode.
+type UnsupportedAttribute struct {
+	Service string // service name; empty for project-scoped attributes
+	Path    string // dotted attribute path, e.g. "deploy.update_config.failure_action"
+	Reason  string // one-line human-readable explanation, ready to print as-is
+}
+
+func (u UnsupportedAttribute) String() string {
+	if u.Service == "" {
+		return fmt.Sprintf("%s: %s", u.Path, u.Reason)
+	}
+	return fmt.Sprintf("service %q: %s: %s", u.Service, u.Path, u.Reason)
 }
 
 type VolumesOptions struct {

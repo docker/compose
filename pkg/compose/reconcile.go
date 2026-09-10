@@ -229,7 +229,7 @@ func (r *reconciler) reconcileNetworks() error {
 func (r *reconciler) planCreateNetwork(key string, networkConfig *types.NetworkConfig, cause string) {
 	r.networkNodes[key] = r.plan.addNode(Operation{
 		Type:       OpCreateNetwork,
-		ResourceID: fmt.Sprintf("network:%s", key),
+		ResourceID: "network:" + key,
 		Cause:      cause,
 		Name:       networkConfig.Name,
 		Network:    networkConfig,
@@ -299,7 +299,7 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 
 		removeNode := r.plan.addNode(Operation{
 			Type:       OpRemoveNetwork,
-			ResourceID: fmt.Sprintf("network:%s", key),
+			ResourceID: "network:" + key,
 			Cause:      removeCause,
 			Name:       observed.Name,
 			BestEffort: rename,
@@ -311,7 +311,7 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 		}
 		createNode := r.plan.addNode(Operation{
 			Type:       OpCreateNetwork,
-			ResourceID: fmt.Sprintf("network:%s", key),
+			ResourceID: "network:" + key,
 			Cause:      createCause,
 			Name:       desired.Name,
 			Network:    &desired,
@@ -403,7 +403,7 @@ func (r *reconciler) reconcileVolumes() error {
 func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig, cause string) {
 	r.volumeNodes[key] = r.plan.addNode(Operation{
 		Type:       OpCreateVolume,
-		ResourceID: fmt.Sprintf("volume:%s", key),
+		ResourceID: "volume:" + key,
 		Cause:      cause,
 		Name:       vol.Name,
 		Volume:     vol,
@@ -477,13 +477,13 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 		desired := r.project.Volumes[key]
 		removeVolNode := r.plan.addNode(Operation{
 			Type:       OpRemoveVolume,
-			ResourceID: fmt.Sprintf("volume:%s", key),
+			ResourceID: "volume:" + key,
 			Cause:      "config hash diverged",
 			Name:       r.resolvedVolumes[key].Name,
 		}, "", removeNodes...)
 		createVolNode := r.plan.addNode(Operation{
 			Type:       OpCreateVolume,
-			ResourceID: fmt.Sprintf("volume:%s", key),
+			ResourceID: "volume:" + key,
 			Cause:      "recreate after config change",
 			Name:       desired.Name,
 			Volume:     &desired,
@@ -649,7 +649,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		deps := r.infrastructureDeps(service)
 		node := r.plan.addNode(Operation{
 			Type:       OpRunProvider,
-			ResourceID: fmt.Sprintf("provider:%s", service.Name),
+			ResourceID: "provider:" + service.Name,
 			Cause:      "provider service",
 			Service:    &serviceCopy,
 		}, "", deps...)
@@ -1051,14 +1051,14 @@ func (r *reconciler) reconcileOrphans() {
 	for i, oc := range r.observed.Orphans {
 		stopNode := r.plan.addNode(Operation{
 			Type:       OpStopContainer,
-			ResourceID: fmt.Sprintf("orphan:%s", oc.Name),
+			ResourceID: "orphan:" + oc.Name,
 			Cause:      "orphaned container",
 			Container:  &r.observed.Orphans[i].Summary,
 			Timeout:    r.options.Timeout,
 		}, "")
 		r.plan.addNode(Operation{
 			Type:       OpRemoveContainer,
-			ResourceID: fmt.Sprintf("orphan:%s", oc.Name),
+			ResourceID: "orphan:" + oc.Name,
 			Cause:      "orphaned container",
 			Container:  &r.observed.Orphans[i].Summary,
 		}, "", stopNode)

@@ -25,6 +25,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -180,6 +181,25 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 			})
 		})
 	}
+
+	if pruneOpts.Mode != ImagePruneNone {
+		// mirrors ImagesToPrune's own orphan check: a dangling image from a
+		// service no longer in the project must be spared unless
+		// RemoveOrphans is set, same as that service's tagged image is.
+		keep := func(img image.Summary) bool {
+			if options.RemoveOrphans {
+				return false
+			}
+			_, err := project.GetService(img.Labels[api.ServiceLabel])
+			return err != nil
+		}
+		ops = append(ops, func() error {
+			return s.removeResource("Dangling images", func() error {
+				_, err := s.removeDanglingImages(ctx, project.Name, keep)
+				return err
+			})
+		})
+	}
 	return ops, nil
 }
 
@@ -212,7 +232,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		return nil
 	}
 
-	eventName := fmt.Sprintf("Network %s", name)
+	eventName := "Network " + name
 	s.events.On(removingEvent(eventName))
 
 	var found int
@@ -257,7 +277,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 }
 
 func (s *composeService) removeVolume(ctx context.Context, id string) error {
-	resource := fmt.Sprintf("Volume %s", id)
+	resource := "Volume " + id
 
 	_, err := s.apiClient().VolumeInspect(ctx, id, client.VolumeInspectOptions{})
 	if errdefs.IsNotFound(err) {

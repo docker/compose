@@ -41,7 +41,7 @@ import (
 
 type JsonMessage struct {
 	Type    string `json:"type"`
-	Message string `json:"message"`
+	Message string `json:"message,omitempty"`
 }
 
 const (
@@ -51,6 +51,11 @@ const (
 	RawSetEnvType             = "rawsetenv"
 	DebugType                 = "debug"
 	providerMetadataDirectory = "compose/providers"
+
+	// GetServiceConfigType is a message the provider sends to receive, on
+	// its stdin, one JSON line holding the resolved canonical configuration
+	// of the service it manages — answered from the in-memory model.
+	GetServiceConfigType = "get-service-config"
 )
 
 type pluginVariables struct {
@@ -125,11 +130,51 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	if err != nil {
 		return pluginVariables{}, err
 	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return pluginVariables{}, err
+	}
+	// Answers are written from their own goroutine: writing a config larger
+	// than the OS pipe buffer from the read loop would deadlock against a
+	// provider that emits stdout before draining its stdin. Every answer is
+	// the same serialized service, so completion order is irrelevant; the
+	// mutex keeps individual writes atomic. Write failures are not reported
+	// from here — a provider missing its answer reads EOF once stdin closes.
+	var stdinMu sync.Mutex
+	var answers sync.WaitGroup
+	processExited := false
+	// Closing stdin on exit unblocks a provider waiting for a response the
+	// loop will never produce (e.g. a request emitted after an error). An
+	// answer dispatched but not yet written must land before the close —
+	// but only once the process has exited can a write not block forever
+	// (a dead peer turns it into EPIPE); on error paths the provider may
+	// still be alive and not reading, so close first to error the write
+	// out instead of hanging the wait.
+	defer func() {
+		if processExited {
+			answers.Wait()
+			_ = stdin.Close()
+		} else {
+			_ = stdin.Close()
+			answers.Wait()
+		}
+	}()
 
 	err = cmd.Start()
 	if err != nil {
 		return pluginVariables{}, err
 	}
+	// Error paths return before the normal cmd.Wait below and would leave
+	// the provider as a zombie (and possibly running): reap it — kill
+	// first, as it may be misbehaving or blocked, which also errors out
+	// any in-flight answer write. Runs before the stdin/answers defer
+	// above (LIFO).
+	defer func() {
+		if !processExited {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+	}()
 
 	decoder := json.NewDecoder(stdout)
 	defer func() { _ = stdout.Close() }()
@@ -166,6 +211,19 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
 			}
 			variables.raw[key] = val
+		case GetServiceConfigType:
+			payload, err := json.Marshal(service)
+			if err != nil {
+				return pluginVariables{}, fmt.Errorf("failed to answer get-service-config: %w", err)
+			}
+			payload = append(payload, '\n')
+			answers.Add(1)
+			go func() {
+				defer answers.Done()
+				stdinMu.Lock()
+				defer stdinMu.Unlock()
+				_, _ = stdin.Write(payload)
+			}()
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
@@ -174,6 +232,7 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	}
 
 	err = cmd.Wait()
+	processExited = true
 	if err != nil {
 		s.events.On(errorEvent(service.Name, err.Error()))
 		return pluginVariables{}, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
@@ -228,7 +287,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 		return nil, err
 	}
 
-	args := []string{"compose", fmt.Sprintf("--project-name=%s", project.Name), command}
+	args := []string{"compose", "--project-name=" + project.Name, command}
 	for k, v := range provider.Options {
 		for _, value := range v {
 			if _, ok := currentCommandMetadata.GetParameter(k); commandMetadataIsEmpty || ok {

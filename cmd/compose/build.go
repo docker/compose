@@ -68,8 +68,17 @@ func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions,
 	}
 
 	uiMode := display.Mode
-	if uiMode == display.ModeJSON {
+	switch {
+	case uiMode == display.ModeJSON:
 		uiMode = "rawjson"
+	case uiMode == display.ModeTTY && opts.Progress != display.ModeTTY:
+		// display.Mode resolves "auto" against stderr, the stream Compose's
+		// own progress renders to. Bake renders on stdout: hand the
+		// unresolved "auto" back so buildkit's progressui probes the actual
+		// output stream and degrades to plain when stdout is redirected
+		// (#14182). An explicit --progress=tty is passed through and fails
+		// loudly on a non-terminal, as `buildx bake` does.
+		uiMode = display.ModeAuto
 	}
 
 	return api.BuildOptions{
@@ -159,7 +168,7 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	}
 
 	opts.All = true // do not drop resources as build may involve some dependencies by additional_contexts
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}

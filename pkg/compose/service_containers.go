@@ -184,12 +184,12 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		}
 
 		eg.Go(func() error {
-			return s.waitDependency(ctx, dep, config, waitingFor)
+			return s.waitDependency(ctx, dependant, dep, config, waitingFor)
 		})
 	}
 	err := eg.Wait()
 	if errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("timeout waiting for dependencies")
+		return errors.New("timeout waiting for dependencies")
 	}
 	return err
 }
@@ -197,7 +197,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 // waitDependency polls the dependency's containers until its depends_on
 // condition is satisfied (done), definitively failed (err), or ctx is
 // cancelled. Each check reports (done, err): (false, nil) means keep polling.
-func (s *composeService) waitDependency(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) error {
+func (s *composeService) waitDependency(ctx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -223,7 +223,20 @@ func (s *composeService) waitDependency(ctx context.Context, dep string, config 
 		case types.ServiceConditionCompletedSuccessfully:
 			done, err = s.checkDependencyCompleted(ctx, dep, config, waitingFor)
 		default:
-			logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
+			// Every condition this switch doesn't handle explicitly ends up
+			// here: ServiceConditionStarted is filtered out before this
+			// function is ever called (shouldWaitForDependency — "already
+			// managed by InDependencyOrder"), so nothing reaching this
+			// branch is ever a value this runtime actually understands.
+			// That covers a compose file with an unrecognized condition
+			// (rejected by schema.Validate before it can even get this far
+			// — see unsupported_attributes.go's comment on
+			// valueConditionalAttributes) as well as the two situations
+			// that never go through schema validation at all: a project
+			// rebuilt from live container labels (see projectFromName), or
+			// one written by an older/newer Compose version using a
+			// condition value this build doesn't recognize.
+			logrus.Warnf("service %q: unsupported depends_on condition %q, skipping wait for %q", dependant, config.Condition, dep)
 			return nil
 		}
 		if done || err != nil {
@@ -286,12 +299,12 @@ func (s *composeService) checkDependencyCompleted(ctx context.Context, dep strin
 	if !config.Required {
 		// optional -> mark as skipped & don't propagate error
 		s.events.On(containerReasonEvents(waitingFor, skippedEvent,
-			fmt.Sprintf("optional dependency %s", messageSuffix))...)
+			"optional dependency "+messageSuffix)...)
 		logrus.Warnf("optional dependency %s", messageSuffix)
 		return true, nil
 	}
 
-	msg := fmt.Sprintf("service %s", messageSuffix)
+	msg := "service " + messageSuffix
 	s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
 		return errorEventf(s, "service %s", messageSuffix)
 	})...)

@@ -30,7 +30,6 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
-	"github.com/jonboulle/clockwork"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
@@ -65,7 +64,6 @@ type Option func(service *composeService) error
 func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, error) {
 	s := &composeService{
 		dockerCli:      dockerCli,
-		clock:          clockwork.NewRealClock(),
 		maxConcurrency: -1,
 		dryRun:         false,
 	}
@@ -211,7 +209,6 @@ type composeService struct {
 	contextInfo api.ContextInfo
 	proxyConfig map[string]string
 
-	clock          clockwork.Clock
 	maxConcurrency int
 	dryRun         bool
 
@@ -529,7 +526,7 @@ func (s *composeService) RuntimeAPIVersion(ctx context.Context) (string, error) 
 
 	version := cli.ClientVersion()
 	if version == "" {
-		return "", fmt.Errorf("docker client returned empty version after successful API negotiation")
+		return "", errors.New("docker client returned empty version after successful API negotiation")
 	}
 
 	s.runtimeAPIVersion.val = version

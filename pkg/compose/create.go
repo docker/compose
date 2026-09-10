@@ -1229,10 +1229,6 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
-		if config.UID != "" || config.GID != "" || config.Mode != nil {
-			logrus.Warn("config `uid`, `gid` and `mode` are not supported, they will be ignored")
-		}
-
 		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedConfig.File,
@@ -1277,10 +1273,6 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 
 		if definedSecret.Environment != "" {
 			continue
-		}
-
-		if secret.UID != "" || secret.GID != "" || secret.Mode != nil {
-			logrus.Warn("secrets `uid`, `gid` and `mode` are not supported, they will be ignored")
 		}
 
 		if _, err := os.Stat(definedSecret.File); os.IsNotExist(err) {
@@ -1460,7 +1452,7 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		EnableIPv4: n.EnableIPv4,
 	}
 
-	networkEventName := fmt.Sprintf("Network %s", n.Name)
+	networkEventName := "Network " + n.Name
 	s.events.On(creatingEvent(networkEventName))
 
 	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, networkCreateOptions); err != nil {
@@ -1531,7 +1523,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 }
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
-	eventName := fmt.Sprintf("Volume %s", volume.Name)
+	eventName := "Volume " + volume.Name
 	s.events.On(creatingEvent(eventName))
 	hash, err := VolumeHash(volume)
 	if err != nil {

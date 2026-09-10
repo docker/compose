@@ -23,11 +23,13 @@ package e2e
 // test-specific logic), and are named after the observable they assert.
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,7 +69,7 @@ func OutputContains(sub string) Check {
 		name: fmt.Sprintf("output contains %q", sub),
 		fn: func(ctx *CheckContext) error {
 			if !strings.Contains(ctx.result.Combined(), sub) {
-				return fmt.Errorf("not found in output")
+				return errors.New("not found in output")
 			}
 			return nil
 		},
@@ -82,7 +84,7 @@ func StdoutContains(sub string) Check {
 		name: fmt.Sprintf("stdout contains %q", sub),
 		fn: func(ctx *CheckContext) error {
 			if !strings.Contains(ctx.result.Stdout(), sub) {
-				return fmt.Errorf("not found in stdout")
+				return errors.New("not found in stdout")
 			}
 			return nil
 		},
@@ -97,7 +99,7 @@ func OutputMatches(pattern string) Check {
 		name: fmt.Sprintf("output matches %q", pattern),
 		fn: func(ctx *CheckContext) error {
 			if !re.MatchString(ctx.result.Stdout()) {
-				return fmt.Errorf("no match in stdout")
+				return errors.New("no match in stdout")
 			}
 			return nil
 		},
@@ -127,7 +129,7 @@ func StderrContains(sub string) Check {
 		name: fmt.Sprintf("stderr contains %q", sub),
 		fn: func(ctx *CheckContext) error {
 			if !strings.Contains(ctx.result.Stderr(), sub) {
-				return fmt.Errorf("not found in stderr")
+				return errors.New("not found in stderr")
 			}
 			return nil
 		},
@@ -140,7 +142,7 @@ func OutputNotContains(sub string) Check {
 		name: fmt.Sprintf("output does not contain %q", sub),
 		fn: func(ctx *CheckContext) error {
 			if strings.Contains(ctx.result.Combined(), sub) {
-				return fmt.Errorf("found in output")
+				return errors.New("found in output")
 			}
 			return nil
 		},
@@ -220,7 +222,7 @@ func ServiceState(service, state string) Check {
 		fn: func(ctx *CheckContext) error {
 			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
-				return fmt.Errorf("service has no container")
+				return errors.New("service has no container")
 			}
 			for _, c := range containers {
 				if c.State != state {
@@ -264,7 +266,7 @@ func ReplicaNumbers(service string, numbers ...int) Check {
 			slices.Sort(actual)
 			var expected []string
 			for _, n := range numbers {
-				expected = append(expected, fmt.Sprint(n))
+				expected = append(expected, strconv.Itoa(n))
 			}
 			slices.Sort(expected)
 			if !slices.Equal(actual, expected) {
@@ -353,7 +355,7 @@ func ServiceHealthy(service string) Check {
 		fn: func(ctx *CheckContext) error {
 			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
-				return fmt.Errorf("service has no container")
+				return errors.New("service has no container")
 			}
 			for _, c := range containers {
 				res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t,
@@ -378,7 +380,7 @@ func OneOffState(service, state string) Check {
 		fn: func(ctx *CheckContext) error {
 			containers := ctx.curr.oneOffs(service)
 			if len(containers) == 0 {
-				return fmt.Errorf("service has no one-off container")
+				return errors.New("service has no one-off container")
 			}
 			for _, c := range containers {
 				if c.State != state {
@@ -399,7 +401,7 @@ func OneOffsUntouched(service string) Check {
 		fn: func(ctx *CheckContext) error {
 			before, after := ctx.prev.oneOffs(service), ctx.curr.oneOffs(service)
 			if len(before) == 0 {
-				return fmt.Errorf("service had no one-off container before the step")
+				return errors.New("service had no one-off container before the step")
 			}
 			if !slices.Equal(containerIDs(before), containerIDs(after)) {
 				return fmt.Errorf("one-off containers changed: %v -> %v", containerIDs(before), containerIDs(after))
@@ -424,7 +426,7 @@ func OneOffsRemoved(service string) Check {
 		name: fmt.Sprintf("one-offs of service %q removed", service),
 		fn: func(ctx *CheckContext) error {
 			if len(ctx.prev.oneOffs(service)) == 0 {
-				return fmt.Errorf("service had no one-off container before the step")
+				return errors.New("service had no one-off container before the step")
 			}
 			var names []string
 			for _, c := range ctx.curr.oneOffs(service) {
@@ -464,7 +466,7 @@ func FileExists(path string) Check {
 				return err
 			}
 			if info.Size() == 0 {
-				return fmt.Errorf("file is empty")
+				return errors.New("file is empty")
 			}
 			return nil
 		},
@@ -489,6 +491,22 @@ func FileContains(path, sub string) Check {
 	}
 }
 
+// FileAbsent expects no file or directory to exist at the given host path,
+// e.g. content a previous step wiped.
+func FileAbsent(path string) Check {
+	return Check{
+		name: fmt.Sprintf("file %q is absent", path),
+		fn: func(ctx *CheckContext) error {
+			if _, err := os.Stat(path); err == nil {
+				return errors.New("file still exists")
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
 // LabelSet expects every container of the service to carry a non-empty label.
 func LabelSet(service, key string) Check {
 	return Check{
@@ -496,7 +514,7 @@ func LabelSet(service, key string) Check {
 		fn: func(ctx *CheckContext) error {
 			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
-				return fmt.Errorf("service has no container")
+				return errors.New("service has no container")
 			}
 			for _, c := range containers {
 				if c.Labels[key] == "" {
@@ -539,7 +557,7 @@ func LabelUnchanged(service, key string) Check {
 		fn: func(ctx *CheckContext) error {
 			before, after := ctx.prev.service(service), ctx.curr.service(service)
 			if len(before) == 0 || len(after) == 0 {
-				return fmt.Errorf("service has no container to compare")
+				return errors.New("service has no container to compare")
 			}
 			if before[0].Labels[key] != after[0].Labels[key] {
 				return fmt.Errorf("label changed: %q -> %q", before[0].Labels[key], after[0].Labels[key])
@@ -557,7 +575,7 @@ func RunsOnPlatform(service, platform string) Check {
 		fn: func(ctx *CheckContext) error {
 			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
-				return fmt.Errorf("service has no container")
+				return errors.New("service has no container")
 			}
 			res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "inspect", "--format",
 				"{{.ImageManifestDescriptor.Platform.OS}}/{{.ImageManifestDescriptor.Platform.Architecture}}",
