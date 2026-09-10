@@ -22,12 +22,14 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -165,6 +167,61 @@ func TestUpImageID(t *testing.T) {
 	s.Env("ID="+id).
 		Step("up runs the container from the image ID",
 			ComposeCmd("up"))
+}
+
+// TestUpAttachedTerminatesOnExternalStop is the #13985 repro: since 2.39.3 an
+// attached `up` never returns when the project is stopped and removed by
+// another process while a service configured with a restart policy sits in
+// its restart backoff — such a container only emits stop/destroy, never the
+// die event the monitor used to rely on exclusively to detect termination.
+func TestUpAttachedTerminatesOnExternalStop(t *testing.T) {
+	s := NewScenario(t, "an attached up must return once an external stop/down cancels a service's restart backoff")
+
+	var out utils.SafeBuffer
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	t.Cleanup(cancel)
+	cmd, err := StartWithNewGroupID(ctx,
+		s.CLI().NewDockerComposeCmd(t, "-f", filepath.Join(s.Dir(), "compose.yaml"), "--project-name", s.Project(), "up"),
+		&out, &out)
+	assert.NilError(t, err)
+
+	upDone := make(chan error, 1)
+	go func() {
+		upDone <- cmd.Wait()
+	}()
+
+	// wait until the container is in restart backoff (no process running,
+	// State.Restarting=true): the die event from its failed attempt already
+	// fired, and won't fire again until the backoff expires
+	var restartCount string
+	s.CLI().WaitForCmdResult(t,
+		s.CLI().NewDockerCmd(t, "inspect", s.Project()+"-app-1", "-f", "{{.State.Restarting}} {{.RestartCount}}"),
+		func(res *icmd.Result) bool {
+			restarting, count, ok := strings.Cut(strings.TrimSpace(res.Stdout()), " ")
+			restartCount = count
+			return ok && restarting == "true"
+		},
+		30*time.Second, 250*time.Millisecond)
+
+	// narrow (can't fully close) the race with the backoff expiring: if the
+	// container already restarted by here, the die event handles
+	// termination the same way it always has, and the #13985 fix (stop
+	// landing with no process running) never gets exercised
+	res := s.CLI().RunDockerCmd(t, "inspect", s.Project()+"-app-1", "-f", "{{.RestartCount}}")
+	assert.Equal(t, strings.TrimSpace(res.Stdout()), restartCount, "container restarted again before the external stop could land in its backoff window; rerun")
+
+	// stop while still in backoff is the #13985 regression; down is then
+	// plain teardown — the container is already untracked by the time it
+	// runs, so it does not exercise onContainerDestroy (covered separately
+	// by TestMonitorExitsOnDestroy)
+	s.CLI().RunDockerComposeCmd(t, "--project-name", s.Project(), "stop")
+	s.CLI().RunDockerComposeCmd(t, "--project-name", s.Project(), "down")
+
+	err = <-upDone
+	if ctx.Err() != nil {
+		t.Fatalf("up did not terminate after the project was stopped and removed externally (see #13985)\n%s", out.String())
+	}
+	assert.NilError(t, err, out.String())
 }
 
 func TestUpStopWithLogsMixed(t *testing.T) {
