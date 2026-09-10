@@ -98,8 +98,15 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return nil
 	}
 
+	deployRelay := command == "up" && len(variables.endpoints) > 0
+
+	// project.Services is shared state mutated by every concurrent provider
+	// run: the env-var injection below writes it, and the relay's network
+	// selection reads it — both belong under the mutex. The Docker API work
+	// in ensureServiceRelay does not: holding the lock across it would make
+	// every concurrent provider wait on the slowest one (image pull
+	// included), so the relay is deployed after the lock is released.
 	mux.Lock()
-	defer mux.Unlock()
 	for name, s := range project.Services {
 		if _, ok := s.DependsOn[service.Name]; ok {
 			prefix := strings.ToUpper(service.Name) + "_"
@@ -115,10 +122,14 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 			project.Services[name] = s
 		}
 	}
-	if command == "up" && len(variables.endpoints) > 0 {
-		if err := s.ensureServiceRelay(ctx, project, service, variables.endpoints); err != nil {
-			return err
-		}
+	var networkKeys []string
+	if deployRelay {
+		networkKeys = relayNetworks(project, service)
+	}
+	mux.Unlock()
+
+	if deployRelay {
+		return s.ensureServiceRelay(ctx, project, service, variables.endpoints, networkKeys)
 	}
 	return nil
 }

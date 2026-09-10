@@ -133,7 +133,11 @@ func relayNetworks(project *types.Project, service types.ServiceConfig) []string
 // treat it as the service, plus the RelayLabel identifying its role — the
 // reconciler leaves provider services' containers alone, and process-level
 // commands (exec) refuse it.
-func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.Project, service types.ServiceConfig, endpoints map[int]string) error {
+//
+// networkKeys (see relayNetworks) is computed by the caller under the shared
+// project mutex: this function performs only Docker API work and must not
+// touch project.Services, which concurrent provider runs mutate.
+func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.Project, service types.ServiceConfig, endpoints map[int]string, networkKeys []string) error {
 	routes := relayRoutesSpec(endpoints)
 	identity := relayIdentity(routes)
 	name := getContainerName(project.Name, service, 1)
@@ -175,7 +179,6 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 		}
 	}
 
-	networkKeys := relayNetworks(project, service)
 	if len(networkKeys) == 0 {
 		logrus.Warnf("service %q published endpoints but no service depends on it and the project has no default network; skipping relay", service.Name)
 		return nil
