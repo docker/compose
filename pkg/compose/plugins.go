@@ -232,13 +232,13 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
-				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Message)
 			}
 			variables.prefixed[key] = val
 		case RawSetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
-				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Message)
 			}
 			variables.raw[key] = val
 		case GetServiceConfigType:
@@ -257,13 +257,13 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		case PublishEndpointType:
 			port, upstream, err := parseEndpointMessage(msg.Message)
 			if err != nil {
-				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %w", err)
+				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %w", err)
 			}
 			variables.endpoints[port] = upstream
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
-			return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Type)
+			return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Type)
 		}
 	}
 
