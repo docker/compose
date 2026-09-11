@@ -1,5 +1,7 @@
 # Project: Docker Compose
 
+All agents must conform to [AI_POLICY.md](AI_POLICY.md).
+
 ## Build & Test
 
 - Build: `make build`
