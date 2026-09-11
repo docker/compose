@@ -87,7 +87,7 @@ func (s *composeService) containerSummary(ctx context.Context, ctr container.Sum
 }
 
 func containerPublishers(ctr container.Summary) []api.PortPublisher {
-	sort.Slice(ctr.Ports, func(i, j int) bool {
+	sort.SliceStable(ctr.Ports, func(i, j int) bool {
 		return ctr.Ports[i].PrivatePort < ctr.Ports[j].PrivatePort
 	})
 	publishers := make([]api.PortPublisher, len(ctr.Ports))
