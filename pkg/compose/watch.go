@@ -373,10 +373,18 @@ func isSync(trigger types.Trigger) bool {
 
 func (s *composeService) watchEvents(ctx context.Context, project *types.Project, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, rules []watchRule) error {
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	// debounce and group filesystem events so that we capture IDE saving many files as one "batch" event
 	batchEvents := watch.BatchDebounceEvents(ctx, watcher.Events())
+
+	scheduler := newRebuildScheduler(ctx, func(ctx context.Context, services []string) error {
+		return s.rebuild(ctx, project, services, options)
+	})
+	// Rebuilds run asynchronously in their own goroutine(s); cancel first so
+	// an in-flight one can unwind, then wait for it to settle so none
+	// outlive this function.
+	defer scheduler.Wait()
+	defer cancel()
 
 	for {
 		select {
@@ -406,7 +414,7 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 			}
 			start := time.Now()
 			logrus.Debugf("batch start: count[%d]", len(batch))
-			err := s.handleWatchBatch(ctx, project, options, batch, rules, syncer)
+			err := s.handleWatchBatch(ctx, project, options, batch, rules, syncer, scheduler)
 			if err != nil {
 				logrus.Warnf("Error handling changed files: %v", err)
 				// If context was canceled, exit immediately
@@ -557,7 +565,9 @@ func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCl
 	return err
 }
 
-func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, options api.WatchOptions, batch []watch.FileEvent, rules []watchRule, syncer sync.Syncer) error {
+func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, options api.WatchOptions,
+	batch []watch.FileEvent, rules []watchRule, syncer sync.Syncer, scheduler *rebuildScheduler,
+) error {
 	var (
 		restart   = map[string]bool{}
 		syncfiles = map[string][]*sync.PathMapping{}
@@ -590,15 +600,38 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 		}
 	}
 
-	logrus.Debugf("watch actions: rebuild %d sync %d restart %d", len(rebuild), len(syncfiles), len(restart))
-
 	if len(rebuild) > 0 {
-		err := s.rebuild(ctx, project, utils.MapKeys(rebuild), options)
-		if err != nil {
-			return err
+		scheduler.Request(utils.MapKeys(rebuild))
+	}
+
+	// A rebuild already recreates and starts the service, so a separate
+	// restart is redundant at best and races the rebuild's create/start at
+	// worst. Which rebuild matters:
+	//   - pending: it will snapshot the build context after this change —
+	//     drop the restart, the rebuild converges on its own;
+	//   - in flight: its snapshot predates this change, so its outcome is
+	//     stale — fold the restart into a Request, which interrupts the
+	//     doomed run and rebuilds from a fresh snapshot (recreate + start:
+	//     the restart intent, converged).
+	for service := range restart {
+		switch {
+		case scheduler.Pending(service):
+			logrus.Debugf("skipping restart for service %q: rebuild pending", service)
+			delete(restart, service)
+		case scheduler.InFlight(service):
+			logrus.Debugf("turning restart for service %q into a rebuild: stale rebuild in flight", service)
+			scheduler.Request([]string{service})
+			delete(restart, service)
 		}
 	}
 
+	logrus.Debugf("watch actions: rebuild %d sync %d restart %d", len(rebuild), len(syncfiles), len(restart))
+
+	// A sync or exec below may still target a service whose container is
+	// being replaced by an in-flight asynchronous rebuild (from this batch or
+	// an earlier one): unlike restart, this is a conscious tradeoff, since
+	// syncer.Sync/exec resolve containers by lookup and simply fail loudly
+	// (rather than racing the container lifecycle) if the container is gone.
 	for serviceName, pathMappings := range syncfiles {
 		writeWatchSyncMessage(options.LogTo, serviceName, pathMappings)
 		err := syncer.Sync(ctx, serviceName, pathMappings)
