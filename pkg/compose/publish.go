@@ -40,6 +40,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/oci"
@@ -508,9 +509,15 @@ func collectEnvCheckFindings(ctx context.Context, project *types.Project) (*envC
 			return nil, fmt.Errorf("failed to load compose file %s: %w", file, err)
 		}
 
-		for _, service := range unresolved.Services {
-			recordServiceEnvFindings(findings.services, keywordDetector, service)
-			if parent := localExtendsParent(service); parent != "" {
+		for name, service := range unresolved.Services {
+			svc := types.ServiceConfig{
+				Name:        name,
+				Environment: service.Environment,
+				EnvFiles:    service.EnvFiles,
+				Extends:     service.Extends,
+			}
+			recordServiceEnvFindings(findings.services, keywordDetector, svc)
+			if parent := localExtendsParent(svc); parent != "" {
 				queue = append(queue, parent)
 			}
 		}
@@ -631,11 +638,27 @@ func buildConfigContentPromptMessage(configs []string) string {
 	return b.String()
 }
 
-// loadUnresolvedFile loads a single compose file with interpolation and
-// environment resolution skipped, so callers can inspect raw user-provided
-// values. Used by both checkEnvironmentVariables and composeFileAsByteReader.
-func loadUnresolvedFile(ctx context.Context, project *types.Project, filePath string) (*types.Project, error) {
-	return loader.LoadWithContext(ctx, types.ConfigDetails{
+type unresolvedFile struct {
+	Services map[string]unresolvedService `yaml:"services"`
+	Configs  map[string]unresolvedConfig  `yaml:"configs"`
+}
+
+type unresolvedService struct {
+	Environment types.MappingWithEquals `yaml:"environment"`
+	EnvFiles    []types.EnvFile         `yaml:"env_file"`
+	Extends     *types.ExtendsConfig    `yaml:"extends"`
+}
+
+type unresolvedConfig struct {
+	Content string `yaml:"content"`
+}
+
+// loadUnresolvedModel loads a single compose file with interpolation and
+// environment resolution skipped, returning the raw model dictionary.
+// Callers can inspect raw user-provided values without strict decoding of
+// typed fields that fail on un-interpolated variable syntax.
+func loadUnresolvedModel(ctx context.Context, project *types.Project, filePath string) (map[string]any, error) {
+	return loader.LoadModelWithContext(ctx, types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
 		Environment: project.Environment,
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
@@ -652,6 +675,24 @@ func loadUnresolvedFile(ctx context.Context, project *types.Project, filePath st
 		options.SkipResolveEnvironment = true
 		options.Profiles = project.Profiles
 	})
+}
+
+// loadUnresolvedFile loads a single compose file with interpolation and
+// environment resolution skipped, decoding only the fields inspected by
+// collectEnvCheckFindings (service environment, env_files, extends, and
+// config content). Decoding only used fields avoids failures on un-interpolated
+// variable syntax in typed fields (e.g. ports, mem_limit, deploy.replicas).
+func loadUnresolvedFile(ctx context.Context, project *types.Project, filePath string) (*unresolvedFile, error) {
+	dict, err := loadUnresolvedModel(ctx, project, filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var file unresolvedFile
+	if err := loader.Transform(dict, &file); err != nil {
+		return nil, err
+	}
+	return &file, nil
 }
 
 func envFileLayers(files map[string]string) []v1.Descriptor {
@@ -794,12 +835,42 @@ func scanFiles(scan secrets.Scanner, kind string, paths []string) ([]secrets.Det
 	return allFindings, nil
 }
 
+func normalizeServicesEnvironment(dict map[string]any) {
+	services, ok := dict["services"].(map[string]any)
+	if !ok {
+		return
+	}
+	for serviceName, cfg := range services {
+		serviceConfig, ok := cfg.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch env := serviceConfig["environment"].(type) {
+		case []any:
+			list := make([]string, 0, len(env))
+			for _, item := range env {
+				if s, ok := item.(string); ok {
+					list = append(list, s)
+				}
+			}
+			serviceConfig["environment"] = types.NewMappingWithEquals(list)
+			services[serviceName] = serviceConfig
+		case []string:
+			serviceConfig["environment"] = types.NewMappingWithEquals(env)
+			services[serviceName] = serviceConfig
+		}
+	}
+}
+
 func composeFileAsByteReader(ctx context.Context, filePath string, project *types.Project) (io.Reader, error) {
-	base, err := loadUnresolvedFile(ctx, project, filePath)
+	dict, err := loadUnresolvedModel(ctx, project, filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load compose file %s: %w", filePath, err)
 	}
-	in, err := base.MarshalYAML()
+
+	normalizeServicesEnvironment(dict)
+
+	in, err := yaml.Marshal(dict)
 	if err != nil {
 		return nil, err
 	}
