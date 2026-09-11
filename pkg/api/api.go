@@ -29,7 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
-	"github.com/docker/cli/opts"
+	"github.com/docker/cli/v29/opts"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/volume"
 )

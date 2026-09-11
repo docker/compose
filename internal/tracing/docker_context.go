@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/context/store"
+	"github.com/docker/cli/v29/cli/command"
+	"github.com/docker/cli/v29/cli/context/store"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"google.golang.org/grpc"

@@ -33,7 +33,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/creack/pty"
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/v29/cli/streams"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"

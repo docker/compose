@@ -18,7 +18,7 @@ package registry
 
 import (
 	"github.com/distribution/reference"
-	clitypes "github.com/docker/cli/cli/config/types"
+	clitypes "github.com/docker/cli/v29/cli/config/types"
 	"github.com/moby/moby/api/pkg/authconfig"
 	registrytypes "github.com/moby/moby/api/types/registry"
 )

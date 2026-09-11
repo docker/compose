@@ -24,7 +24,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/v29/cli/streams"
 
 	"github.com/docker/compose/v5/pkg/utils"
 )

@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/v29/cli/config/configfile"
 )
 
 // --use-api-socket is not actually supported by the Docker Engine

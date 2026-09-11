@@ -32,8 +32,8 @@ import (
 	"sync"
 
 	"github.com/distribution/reference"
-	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/v29/cli/command"
+	"github.com/docker/cli/v29/cli/config/configfile"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/jsonstream"

@@ -27,8 +27,8 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli"
-	"github.com/docker/cli/cli/command/image/build"
+	"github.com/docker/cli/v29/cli"
+	"github.com/docker/cli/v29/cli/command/image/build"
 	"github.com/moby/go-archive"
 	buildtypes "github.com/moby/moby/api/types/build"
 	"github.com/moby/moby/api/types/container"
