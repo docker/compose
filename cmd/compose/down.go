@@ -50,10 +50,8 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 		Short: "Stop and remove containers, networks",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
-			if opts.images != "" {
-				if opts.images != "all" && opts.images != "local" {
-					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
-				}
+			if !api.ImagePruneMode(opts.images).Valid() {
+				return fmt.Errorf("invalid value for --rmi: %q (legal values are %q, %q)", opts.images, api.ImagePruneLocal, api.ImagePruneAll)
 			}
 			return nil
 		}),
@@ -97,7 +95,7 @@ func runDown(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		RemoveOrphans: opts.removeOrphans,
 		Project:       project,
 		Timeout:       timeout,
-		Images:        opts.images,
+		Images:        api.ImagePruneMode(opts.images),
 		Volumes:       opts.volumes,
 		Services:      services,
 	})
