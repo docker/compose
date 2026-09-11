@@ -121,6 +121,9 @@ func (s *composeService) listContainersTargetedForCopy(ctx context.Context, proj
 		if err != nil {
 			return nil, err
 		}
+		if err := checkRelayTarget(ctr, serviceName, "cp"); err != nil {
+			return nil, err
+		}
 		return append(containers, ctr), nil
 	default:
 		withOneOff := oneOffExclude
@@ -130,6 +133,11 @@ func (s *composeService) listContainersTargetedForCopy(ctx context.Context, proj
 		containers, err = s.getContainers(ctx, projectName, withOneOff, true, serviceName)
 		if err != nil {
 			return nil, err
+		}
+		for _, ctr := range containers {
+			if err := checkRelayTarget(ctr, serviceName, "cp"); err != nil {
+				return nil, err
+			}
 		}
 
 		if len(containers) < 1 {

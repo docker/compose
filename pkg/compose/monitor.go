@@ -184,11 +184,19 @@ func (c *monitor) initialContainers(ctx context.Context) (utils.Set[string], err
 	}
 	containers := utils.Set[string]{}
 	for _, ctr := range initialState.Items {
-		if c.watched(ctr.Labels[api.ServiceLabel]) {
+		if c.watched(ctr.Labels[api.ServiceLabel]) && !isRelay(ctr.Labels) {
 			containers.Add(ctr.ID)
 		}
 	}
 	return containers, nil
+}
+
+// isRelay reports whether labels identify a provider-relay container. Relays
+// are long-lived infrastructure standing in for a provider's resource: they
+// never terminate on their own, so counting them among the application's
+// containers would keep an attached `up` waiting forever.
+func isRelay(labels map[string]string) bool {
+	return labels[api.RelayLabel] != ""
 }
 
 // watched tells whether a service's containers are watched by this monitor.
@@ -205,7 +213,7 @@ func (c *monitor) notify(event api.ContainerEvent) {
 }
 
 func (c *monitor) onContainerCreate(event events.Message, ctr *api.ContainerSummary, containers utils.Set[string]) {
-	if c.watched(ctr.Labels[api.ServiceLabel]) {
+	if c.watched(ctr.Labels[api.ServiceLabel]) && !isRelay(ctr.Labels) {
 		containers.Add(ctr.ID)
 	}
 	evtType := api.ContainerEventCreated
@@ -226,7 +234,7 @@ func (c *monitor) onContainerStart(event events.Message, ctr *api.ContainerSumma
 		logrus.Debugf("container %s started", ctr.Name)
 		c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventStarted))
 	}
-	if c.watched(ctr.Labels[api.ServiceLabel]) {
+	if c.watched(ctr.Labels[api.ServiceLabel]) && !isRelay(ctr.Labels) {
 		containers.Add(ctr.ID)
 	}
 }
