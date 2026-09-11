@@ -91,26 +91,32 @@ func (s *composeService) publish(ctx context.Context, project *types.Project, re
 			fmt.Println(string(indent))
 		}
 	}
+	didFallback := false
 	if !s.dryRun {
-		err = s.pushComposeArtifact(ctx, project, repository, layers, options)
+		didFallback, err = s.pushComposeArtifact(ctx, project, repository, layers, options)
 		if err != nil {
 			return err
 		}
 	}
+	text, status := "published", api.Done
+	if didFallback {
+		text, status = "published (registry rejected OCI 1.1; fell back to OCI 1.0)", api.Warning
+	}
 	s.events.On(api.Resource{
 		ID:     repository,
-		Text:   "published",
-		Status: api.Done,
+		Text:   text,
+		Status: status,
 	})
 	return nil
 }
 
 // pushComposeArtifact pushes the compose artifact manifest to the repository,
-// and the application image index when publishing a full application
-func (s *composeService) pushComposeArtifact(ctx context.Context, project *types.Project, repository string, layers []v1.Descriptor, options api.PublishOptions) error {
+// and the application image index when publishing a full application. The
+// returned bool reports whether the push fell back from OCI 1.1 to OCI 1.0.
+func (s *composeService) pushComposeArtifact(ctx context.Context, project *types.Project, repository string, layers []v1.Descriptor, options api.PublishOptions) (bool, error) {
 	named, err := reference.ParseDockerRef(repository)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	var insecureRegistries []string
@@ -120,20 +126,20 @@ func (s *composeService) pushComposeArtifact(ctx context.Context, project *types
 
 	resolver := oci.NewResolver(s.configFile(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
 
-	descriptor, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
+	descriptor, didFallback, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 	if err != nil {
 		s.events.On(api.Resource{
 			ID:     repository,
 			Text:   "publishing",
 			Status: api.Error,
 		})
-		return err
+		return false, err
 	}
 
 	if options.Application {
-		return pushApplicationIndex(ctx, resolver, named, descriptor, project)
+		return didFallback, pushApplicationIndex(ctx, resolver, named, descriptor, project)
 	}
-	return nil
+	return didFallback, nil
 }
 
 // pushApplicationIndex pushes an image index referencing every service image,
