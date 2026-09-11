@@ -609,7 +609,12 @@ type PortPublisher struct {
 }
 
 func (p PortPublisher) String() string {
-	return fmt.Sprintf("%d/%s -> %s", p.TargetPort, p.Protocol, net.JoinHostPort(p.URL, strconv.Itoa(p.PublishedPort)))
+	return fmt.Sprintf("%d/%s -> %s", p.TargetPort, p.Protocol, p.HostPort())
+}
+
+// HostPort renders the host-side address the port is published on
+func (p PortPublisher) HostPort() string {
+	return net.JoinHostPort(p.URL, strconv.Itoa(p.PublishedPort))
 }
 
 // ContainerSummary hold high-level description of a container
