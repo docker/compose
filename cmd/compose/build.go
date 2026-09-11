@@ -24,8 +24,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli/command"
-	cliopts "github.com/docker/cli/opts"
+	"github.com/docker/cli/v29/cli/command"
+	cliopts "github.com/docker/cli/v29/opts"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/cmd/display"

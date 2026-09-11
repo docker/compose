@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/cli/cli/command/formatter"
+	"github.com/docker/cli/v29/cli/command/formatter"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"

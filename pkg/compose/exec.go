@@ -21,8 +21,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/docker/cli/cli"
-	"github.com/docker/cli/cli/command/container"
+	"github.com/docker/cli/v29/cli"
+	"github.com/docker/cli/v29/cli/command/container"
 
 	"github.com/docker/compose/v5/pkg/api"
 )

@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/containerd/platforms"
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/v29/cli/command"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/client/pkg/stringid"
 	"github.com/spf13/cobra"

@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/v29/cli/command"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose/v5/internal/desktop"

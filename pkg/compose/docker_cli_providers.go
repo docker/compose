@@ -17,7 +17,7 @@
 package compose
 
 import (
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/v29/cli/command"
 )
 
 // dockerCliContextInfo implements api.ContextInfo using Docker CLI

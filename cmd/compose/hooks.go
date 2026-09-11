@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/docker/cli/cli-plugins/hooks"
-	"github.com/docker/cli/cli-plugins/metadata"
+	"github.com/docker/cli/v29/cli-plugins/hooks"
+	"github.com/docker/cli/v29/cli-plugins/metadata"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/cmd/formatter"
