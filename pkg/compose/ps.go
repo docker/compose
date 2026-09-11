@@ -23,7 +23,6 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -43,7 +42,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 		containers = containers.filter(isService(options.Services...))
 	}
 	summary := make([]api.ContainerSummary, len(containers))
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for i, ctr := range containers {
 		eg.Go(func() error {
 			var err error
