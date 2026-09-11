@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 	"io"
+	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -110,19 +112,29 @@ func (s *composeService) logContainer(ctx context.Context, consumer api.LogConsu
 // while following, ignoring those whose logging driver doesn't support
 // reading logs
 func (s *composeService) followStartedContainersLogs(ctx context.Context, eg *errgroup.Group, consumer api.LogConsumer, options api.LogOptions) api.ContainerEventListener {
+	runEnds := newRunEndTracker()
 	return func(event api.ContainerEvent) {
+		runEnds.Observe(event)
 		if event.Type != api.ContainerEventStarted {
 			return
 		}
+		// Captured synchronously: the monitor delivers events in order, so
+		// the recorded end cannot yet include THIS run's own exit — reading
+		// it inside the goroutine below could (fast run), and the window
+		// would drop the whole run.
+		since := runEnds.Since(event.ID)
 		eg.Go(func() error {
 			res, err := s.apiClient().ContainerInspect(ctx, event.ID, client.ContainerInspectOptions{})
 			if err != nil {
 				return err
 			}
+			if since == "" {
+				since = logsSinceLastRun(res.Container)
+			}
 
 			err = s.doLogContainer(ctx, consumer, event.Source, res.Container, api.LogOptions{
 				Follow:     options.Follow,
-				Since:      res.Container.State.StartedAt,
+				Since:      since,
 				Until:      options.Until,
 				Tail:       options.Tail,
 				Timestamps: options.Timestamps,
@@ -134,6 +146,67 @@ func (s *composeService) followStartedContainersLogs(ctx context.Context, eg *er
 			return err
 		})
 	}
+}
+
+// runEndTracker remembers, per container, when the session last saw it exit —
+// the re-attach anchor that stays correct even when the NEW run is already
+// over: the event stream is ordered, so at start-event time the recorded
+// value is necessarily the PREVIOUS run's end. The inspected FinishedAt
+// (logsSinceLastRun) cannot give that guarantee — by the time we inspect, a
+// fast run's own FinishedAt has overwritten it and the window would exclude
+// everything the run printed.
+type runEndTracker struct {
+	mu   sync.Mutex
+	ends map[string]int64 // container ID → TimeNano of the last observed exit
+}
+
+func newRunEndTracker() *runEndTracker {
+	return &runEndTracker{ends: map[string]int64{}}
+}
+
+// Observe records exit events (other event types are ignored).
+func (t *runEndTracker) Observe(e api.ContainerEvent) {
+	if e.Type != api.ContainerEventExited || e.Time == 0 {
+		return
+	}
+	t.mu.Lock()
+	t.ends[e.ID] = e.Time
+	t.mu.Unlock()
+}
+
+// Since returns the log-window anchor for a container being re-attached: the
+// recorded end of its previous run in RFC3339Nano — the same format the
+// FinishedAt fallback feeds the logs API — or "" when the session never saw
+// it exit (first start).
+func (t *runEndTracker) Since(containerID string) string {
+	t.mu.Lock()
+	nano, ok := t.ends[containerID]
+	t.mu.Unlock()
+	if !ok {
+		return ""
+	}
+	return time.Unix(0, nano).UTC().Format(time.RFC3339Nano)
+}
+
+// logsSinceLastRun returns the FALLBACK log window anchor for a container
+// (re)started while we follow the project, used when the session has not
+// observed a previous exit (runEndTracker): the previous run's FinishedAt.
+// The new run's StartedAt looks like the natural anchor but loses output —
+// the daemon starts copying stdout before it records StartedAt, so a fast
+// process can get its first lines timestamped just before it, and
+// `since=StartedAt` then drops them forever. Nothing can be logged between
+// the previous run's end and the new run's start, so FinishedAt captures the
+// entire new run without replaying the previous one — UNLESS the new run
+// already finished by inspection time (its own FinishedAt shadows the
+// previous run's), which is exactly what the tracker protects against. A
+// container with no previous run has a zero FinishedAt, which means "no
+// lower bound" — equally exact for a fresh container.
+func logsSinceLastRun(ctr container.InspectResponse) string {
+	finished := ctr.State.FinishedAt
+	if t, err := time.Parse(time.RFC3339Nano, finished); err != nil || t.Unix() <= 0 {
+		return ""
+	}
+	return finished
 }
 
 func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {
