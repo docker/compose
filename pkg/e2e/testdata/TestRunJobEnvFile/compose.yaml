@@ -1,0 +1,7 @@
+jobs:
+  migrate:
+    image: alpine
+    command: sh -c 'echo "DB_URL=$$DB_URL"'
+    env_file: db.env
+    triggers:
+      manual: true

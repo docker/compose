@@ -140,8 +140,15 @@ func (s *composeService) pushComposeArtifact(ctx context.Context, project *types
 // so the application can be pulled as a single artifact
 func pushApplicationIndex(ctx context.Context, resolver remotes.Resolver, named reference.Named, descriptor v1.Descriptor, project *types.Project) error {
 	manifests := []v1.Descriptor{}
+	images := make([]string, 0, len(project.Services)+len(project.Jobs))
 	for _, service := range project.Services {
-		ref, err := reference.ParseDockerRef(service.Image)
+		images = append(images, service.Image)
+	}
+	for _, job := range project.Jobs {
+		images = append(images, job.Image)
+	}
+	for _, image := range images {
+		ref, err := reference.ParseDockerRef(image)
 		if err != nil {
 			return err
 		}
@@ -322,12 +329,39 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 	if err != nil {
 		return nil, err
 	}
+	// WithImagesResolved only walks services: dress the jobs as services to
+	// run them through the exact same resolution, then fold the digests back
+	// into a jobs override.
+	if len(project.Jobs) > 0 {
+		jobsAsServices := &types.Project{Services: types.Services{}}
+		for name, job := range project.Jobs {
+			jobsAsServices.Services[name] = types.ServiceConfig{
+				Name:          name,
+				ContainerSpec: types.ContainerSpec{Image: job.Image},
+			}
+		}
+		jobsAsServices, err = jobsAsServices.WithImagesResolved(ImageDigestResolver(ctx, s.configFile(), s.apiClient()))
+		if err != nil {
+			return nil, err
+		}
+		for name, resolved := range jobsAsServices.Services {
+			job := project.Jobs[name]
+			job.Image = resolved.Image
+			project.Jobs[name] = job
+		}
+	}
 	override := types.Project{
 		Services: types.Services{},
+		Jobs:     types.Jobs{},
 	}
 	for name, service := range project.Services {
 		override.Services[name] = types.ServiceConfig{
-			Image: service.Image,
+			ContainerSpec: types.ContainerSpec{Image: service.Image},
+		}
+	}
+	for name, job := range project.Jobs {
+		override.Jobs[name] = types.JobConfig{
+			ContainerSpec: types.ContainerSpec{Image: job.Image},
 		}
 	}
 	return override.MarshalYAML()
@@ -509,10 +543,14 @@ func collectEnvCheckFindings(ctx context.Context, project *types.Project) (*envC
 		}
 
 		for _, service := range unresolved.Services {
-			recordServiceEnvFindings(findings.services, keywordDetector, service)
+			recordEnvFindings(findings.services, keywordDetector, service.Name, service.ContainerSpec)
 			if parent := localExtendsParent(service); parent != "" {
 				queue = append(queue, parent)
 			}
+		}
+		for name, job := range unresolved.Jobs {
+			// jobs carry environment/env_file like services: same leak surface
+			recordEnvFindings(findings.services, keywordDetector, name, job.ContainerSpec)
 		}
 		for name, config := range unresolved.Configs {
 			// config.Environment is a variable *name* (only the name is
@@ -534,9 +572,9 @@ func collectEnvCheckFindings(ctx context.Context, project *types.Project) (*envC
 	return findings, nil
 }
 
-func recordServiceEnvFindings(services map[string]*serviceEnvFindings, detector secrets.Detector, service types.ServiceConfig) {
+func recordEnvFindings(services map[string]*serviceEnvFindings, detector secrets.Detector, name string, spec types.ContainerSpec) {
 	envValues := map[string]string{}
-	for key, value := range service.Environment {
+	for key, value := range spec.Environment {
 		if value == nil {
 			continue
 		}
@@ -544,16 +582,16 @@ func recordServiceEnvFindings(services map[string]*serviceEnvFindings, detector 
 	}
 
 	hits, _ := detector.ScanMap(envValues)
-	if len(hits) == 0 && len(service.EnvFiles) == 0 {
+	if len(hits) == 0 && len(spec.EnvFiles) == 0 {
 		return
 	}
 
-	f := services[service.Name]
+	f := services[name]
 	if f == nil {
 		f = &serviceEnvFindings{suspiciousKeys: map[string]struct{}{}}
-		services[service.Name] = f
+		services[name] = f
 	}
-	if len(service.EnvFiles) > 0 {
+	if len(spec.EnvFiles) > 0 {
 		f.hasEnvFile = true
 	}
 	for _, hit := range hits {
@@ -675,6 +713,11 @@ func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, er
 			errorList = append(errorList, service.Name)
 		}
 	}
+	for name, job := range project.Jobs {
+		if job.Image == "" && job.Build != nil {
+			errorList = append(errorList, name)
+		}
+	}
 	if len(errorList) > 0 {
 		var errMsg strings.Builder
 		errMsg.WriteString("your Compose stack cannot be published as it only contains a build section for service(s):\n")
@@ -688,16 +731,22 @@ func (s *composeService) checkOnlyBuildSection(project *types.Project) (bool, er
 
 func (s *composeService) checkForBindMount(project *types.Project) map[string][]types.ServiceVolumeConfig {
 	allFindings := map[string][]types.ServiceVolumeConfig{}
-	for serviceName, config := range project.Services {
+	record := func(name string, volumes []types.ServiceVolumeConfig) {
 		bindMounts := []types.ServiceVolumeConfig{}
-		for _, volume := range config.Volumes {
+		for _, volume := range volumes {
 			if volume.Type == types.VolumeTypeBind {
 				bindMounts = append(bindMounts, volume)
 			}
 		}
 		if len(bindMounts) > 0 {
-			allFindings[serviceName] = bindMounts
+			allFindings[name] = bindMounts
 		}
+	}
+	for serviceName, config := range project.Services {
+		record(serviceName, config.Volumes)
+	}
+	for name, job := range project.Jobs {
+		record(name, job.Volumes)
 	}
 	return allFindings
 }
@@ -720,9 +769,16 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 		allFindings = append(allFindings, findings...)
 	}
 
-	// Check env files
+	// Check env files — jobs declare env_file like services do
 	for _, service := range project.Services {
-		findings, err := scanEnvFiles(scan, service)
+		findings, err := scanEnvFiles(scan, service.EnvFiles)
+		if err != nil {
+			return nil, err
+		}
+		allFindings = append(allFindings, findings...)
+	}
+	for _, job := range project.Jobs {
+		findings, err := scanEnvFiles(scan, job.EnvFiles)
 		if err != nil {
 			return nil, err
 		}
@@ -754,11 +810,11 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 	return allFindings, nil
 }
 
-// scanEnvFiles scans a service's env files for sensitive data; a missing env
-// file is only an error when the service requires it
-func scanEnvFiles(scan secrets.Scanner, service types.ServiceConfig) ([]secrets.DetectedSecret, error) {
+// scanEnvFiles scans declared env files for sensitive data; a missing env
+// file is only an error when the declaration requires it
+func scanEnvFiles(scan secrets.Scanner, envFiles []types.EnvFile) ([]secrets.DetectedSecret, error) {
 	var allFindings []secrets.DetectedSecret
-	for _, envFile := range service.EnvFiles {
+	for _, envFile := range envFiles {
 		if _, statErr := os.Stat(envFile.Path); statErr != nil {
 			if !os.IsNotExist(statErr) {
 				return nil, fmt.Errorf("failed to access env file %s: %w", envFile.Path, statErr)

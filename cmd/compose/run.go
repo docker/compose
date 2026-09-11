@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -71,6 +72,11 @@ type runOptions struct {
 }
 
 func (options runOptions) apply(project *types.Project) (*types.Project, error) {
+	project, err := materializeManualJob(project, options.Service)
+	if err != nil {
+		return nil, err
+	}
+
 	if options.noDeps {
 		var err error
 		project, err = project.WithSelectedServices([]string{options.Service}, types.IgnoreDependencies)
@@ -83,7 +89,6 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	if err != nil {
 		return nil, err
 	}
-
 	target.Tty = !options.noTty
 	target.StdinOpen = options.interactive
 
@@ -273,7 +278,23 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, p *ProjectOptions, service string) (*types.Project, error) {
 	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, warnUnsupportedAttributes, composecli.WithoutEnvironmentResolution)
 	if err != nil {
-		return nil, err
+		// The run target may be a job — invisible to the service selector.
+		// Reload unselected, materialize the job as a service, and narrow to
+		// it, so the env resolution below sees the job like any selected
+		// service (its env_file resolves; unrelated services' env_file still
+		// doesn't need to exist). A target that is not a declared job keeps
+		// the original, precise selection error.
+		unselected, _, uerr := p.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes, composecli.WithoutEnvironmentResolution)
+		if uerr != nil {
+			return nil, err
+		}
+		if _, isJob := unselected.AllJobs()[service]; !isJob {
+			return nil, err
+		}
+		project, err = materializeManualJob(unselected, service)
+		if err != nil {
+			return nil, err
+		}
 	}
 	project, err = project.WithServicesEnvironmentResolved(true)
 	if err != nil {
@@ -365,4 +386,85 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
+}
+
+// materializeManualJob lets run target a job exactly like a service: per the
+// spec, any job can be triggered manually regardless of its automated
+// triggers, unless it explicitly opts out with `triggers.manual: false`.
+// A job is a ContainerSpec+WorkloadSpec — the same layers a service is made
+// of — so it materializes as a service for the one-off machinery: its
+// profile is activated and the project narrowed to its dependencies by
+// WithSelectedJob, then the job joins Services under its own name.
+func materializeManualJob(project *types.Project, name string) (*types.Project, error) {
+	// jobs and services share the depends_on namespace but not their own: a
+	// service with the target's name wins — it is what the service selector
+	// resolved — and a job already materialized must not be re-materialized
+	// (it would shed whatever resolution ran on it since).
+	if _, exists := project.Services[name]; exists {
+		return project, nil
+	}
+	job, ok := project.AllJobs()[name]
+	if !ok {
+		return project, nil
+	}
+	if job.Triggers != nil && job.Triggers.Manual != nil && !*job.Triggers.Manual {
+		return nil, fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
+	}
+	project, err := project.WithSelectedJob(name)
+	if err != nil {
+		return nil, err
+	}
+	// A job may depend on other jobs: materialize the whole job closure so
+	// every depends_on reference resolves to a service — the dependency job
+	// runs through the exact machinery a service dependency does (a
+	// run-to-completion container satisfying its declared condition),
+	// instead of dangling as an unresolvable name.
+	jobs := project.AllJobs()
+	materializeJobClosure(project, jobs, job, map[string]bool{name: true})
+	project.Services[name] = jobAsService(project, name, job)
+	return project, nil
+}
+
+// materializeJobClosure adds every job reachable through job-typed
+// depends_on edges to project.Services. seen carries the starting job and
+// guards against dependency cycles.
+func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.JobConfig, seen map[string]bool) {
+	for dep := range job.DependsOn {
+		if seen[dep] {
+			continue
+		}
+		seen[dep] = true
+		depJob, isJob := jobs[dep]
+		if !isJob {
+			continue
+		}
+		materializeJobClosure(project, jobs, depJob, seen)
+		project.Services[dep] = jobAsService(project, dep, depJob)
+	}
+}
+
+// jobAsService materializes a job as a service for the one-off machinery: a
+// job is a ContainerSpec+WorkloadSpec, the same layers a service is made of.
+// It carries the standard custom labels the loader stamps on every service —
+// materialization happens after loading, so without them the containers
+// created for a dependency job would be invisible to every label-driven
+// path: start would silently skip them, ps/down would not see them, and the
+// dependency wait would report the job as a missing dependency.
+func jobAsService(project *types.Project, name string, job types.JobConfig) types.ServiceConfig {
+	svc := types.ServiceConfig{
+		Name:          name,
+		Profiles:      job.Profiles,
+		Extensions:    job.Extensions,
+		ContainerSpec: job.ContainerSpec,
+		WorkloadSpec:  job.WorkloadSpec,
+	}
+	svc.CustomLabels = types.Labels{
+		api.ProjectLabel:     project.Name,
+		api.ServiceLabel:     name,
+		api.VersionLabel:     api.ComposeVersion,
+		api.WorkingDirLabel:  project.WorkingDir,
+		api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+		api.OneoffLabel:      "False",
+	}
+	return svc
 }

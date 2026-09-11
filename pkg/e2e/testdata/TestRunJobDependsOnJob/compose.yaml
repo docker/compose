@@ -1,0 +1,22 @@
+services:
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+jobs:
+  prep:
+    image: alpine
+    command: sh -c 'echo "prep done"'
+    triggers:
+      manual: true
+    depends_on:
+      db:
+        condition: service_started
+  deploy:
+    image: alpine
+    command: sh -c 'echo "deploy done"'
+    triggers:
+      manual: true
+    depends_on:
+      prep:
+        condition: service_completed_successfully
