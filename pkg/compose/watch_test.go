@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -177,15 +178,16 @@ func TestWatch_Sync(t *testing.T) {
 	})
 }
 
-// #14051 (follow-up): a rebuild running in the background from an earlier
-// batch must not be raced by a plain restart of the same service triggered
-// by a later batch -- restart must be skipped even though this batch itself
-// carries no rebuild trigger.
-func TestHandleWatchBatch_SkipsRestartForServiceWithRebuildInFlight(t *testing.T) {
+// A rebuild running in the background from an earlier batch must not be
+// raced by a plain restart of the same service triggered by a later batch:
+// the restart is folded into the scheduler instead — the stale run is
+// interrupted and a fresh rebuild (recreate + start, the restart intent)
+// converges on a context snapshot taken after the change.
+func TestHandleWatchBatch_RestartDuringInFlightRebuildConverges(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
-	// A correctly filtered restart never touches the Docker client at all.
+	// A correctly folded restart never touches the Docker client at all.
 	cli.EXPECT().Client().Times(0)
 	service := composeService{dockerCli: cli}
 
@@ -203,18 +205,32 @@ func TestHandleWatchBatch_SkipsRestartForServiceWithRebuildInFlight(t *testing.T
 	}, types.ServiceConfig{Name: "test"})
 	assert.NilError(t, err)
 
+	var runs int32
+	started := make(chan struct{}, 2)
 	release := make(chan error)
-	scheduler := newRebuildScheduler(func(_ []string) error {
+	scheduler := newRebuildScheduler(t.Context(), func(ctx context.Context, _ []string) error {
+		n := atomic.AddInt32(&runs, 1)
+		started <- struct{}{}
+		if n == 1 {
+			// the stale run only ever ends by interruption
+			<-ctx.Done()
+			return ctx.Err()
+		}
 		return <-release
 	})
 	scheduler.Request([]string{"test"}) // simulate a rebuild still running from an earlier batch
+	<-started
 
 	err = service.handleWatchBatch(t.Context(), &proj, api.WatchOptions{LogTo: stdLogger{}},
 		[]watch.FileEvent{watch.NewFileEvent("/restart")}, rules, newFakeSyncer(), scheduler)
 	assert.NilError(t, err)
 
+	// the trailing rebuild starting at all proves the stale run was
+	// interrupted and the restart folded into a fresh rebuild
+	<-started
 	release <- nil
 	scheduler.Wait()
+	assert.Equal(t, atomic.LoadInt32(&runs), int32(2))
 }
 
 type fakeSyncer struct {

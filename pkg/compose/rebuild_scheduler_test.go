@@ -15,6 +15,7 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"sync"
@@ -53,7 +54,7 @@ func newFakeRebuilder(t *testing.T) *fakeRebuilder {
 	}
 }
 
-func (f *fakeRebuilder) rebuild(services []string) error {
+func (f *fakeRebuilder) rebuild(ctx context.Context, services []string) error {
 	if !atomic.CompareAndSwapInt32(&f.running, 0, 1) {
 		f.t.Errorf("rebuild() invoked while a previous rebuild was still in progress: services=%v", services)
 	}
@@ -67,7 +68,14 @@ func (f *fakeRebuilder) rebuild(services []string) error {
 	f.mu.Unlock()
 
 	f.started <- sorted
-	return <-f.release
+	select {
+	case err := <-f.release:
+		return err
+	case <-ctx.Done():
+		// the run was interrupted (or the watch shut down): return like the
+		// real rebuild would once its build context is cancelled
+		return ctx.Err()
+	}
 }
 
 func (f *fakeRebuilder) callCount() int {
@@ -111,7 +119,7 @@ func assertNoRebuildStarts(t *testing.T, f *fakeRebuilder) {
 // or batched -- latency for an isolated edit must be unchanged.
 func TestRebuildScheduler_FirstRequestStartsImmediately(t *testing.T) {
 	f := newFakeRebuilder(t)
-	scheduler := newRebuildScheduler(f.rebuild)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
 
 	scheduler.Request([]string{"web"})
 
@@ -129,16 +137,17 @@ func TestRebuildScheduler_FirstRequestStartsImmediately(t *testing.T) {
 // not start a new rebuild; they accumulate into a deduplicated pending set.
 func TestRebuildScheduler_RequestsDuringBuildAreCoalescedIntoPending(t *testing.T) {
 	f := newFakeRebuilder(t)
-	scheduler := newRebuildScheduler(f.rebuild)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
 
 	scheduler.Request([]string{"web"})
 	first := awaitStarted(t, f)
 	assert.DeepEqual(t, first, []string{"web"})
 
 	// These arrive while the first rebuild is still in flight (we haven't
-	// released it yet) and must not trigger immediate rebuilds.
+	// released it yet), name no active service (a request for one would
+	// interrupt the run — covered by the interruption tests), and must not
+	// trigger immediate rebuilds.
 	scheduler.Request([]string{"api"})
-	scheduler.Request([]string{"web"}) // duplicate, must not double up
 	scheduler.Request([]string{"api", "worker"})
 
 	assertNoRebuildStarts(t, f)
@@ -161,19 +170,18 @@ func TestRebuildScheduler_RequestsDuringBuildAreCoalescedIntoPending(t *testing.
 // set is cleared.
 func TestRebuildScheduler_TrailingRebuildConsolidatesPendingServices(t *testing.T) {
 	f := newFakeRebuilder(t)
-	scheduler := newRebuildScheduler(f.rebuild)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
 
 	scheduler.Request([]string{"web"})
 	awaitStarted(t, f)
 
 	scheduler.Request([]string{"api"})
-	scheduler.Request([]string{"web"})
 	scheduler.Request([]string{"api", "worker"})
 
 	f.release <- nil // let the first rebuild finish
 
 	trailing := awaitStarted(t, f)
-	assert.DeepEqual(t, trailing, []string{"api", "web", "worker"})
+	assert.DeepEqual(t, trailing, []string{"api", "worker"})
 
 	f.release <- nil
 	scheduler.Wait()
@@ -189,7 +197,7 @@ func TestRebuildScheduler_TrailingRebuildConsolidatesPendingServices(t *testing.
 // scheduler goes idle.
 func TestRebuildScheduler_TrailingRebuildsChainUntilPendingEmpty(t *testing.T) {
 	f := newFakeRebuilder(t)
-	scheduler := newRebuildScheduler(f.rebuild)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
 
 	scheduler.Request([]string{"web"})
 	assert.DeepEqual(t, awaitStarted(t, f), []string{"web"})
@@ -218,7 +226,7 @@ func TestRebuildScheduler_TrailingRebuildsChainUntilPendingEmpty(t *testing.T) {
 // rebuild from being processed.
 func TestRebuildScheduler_RebuildErrorDoesNotBlockPendingProcessing(t *testing.T) {
 	f := newFakeRebuilder(t)
-	scheduler := newRebuildScheduler(f.rebuild)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
 
 	scheduler.Request([]string{"web"})
 	awaitStarted(t, f)
@@ -244,7 +252,7 @@ func TestRebuildScheduler_NoConcurrentRebuilds(t *testing.T) {
 	var running int32
 	var maxObservedConcurrency int32
 
-	rebuild := func(_ []string) error {
+	rebuild := func(_ context.Context, _ []string) error {
 		n := atomic.AddInt32(&running, 1)
 		defer atomic.AddInt32(&running, -1)
 
@@ -263,7 +271,7 @@ func TestRebuildScheduler_NoConcurrentRebuilds(t *testing.T) {
 		return nil
 	}
 
-	scheduler := newRebuildScheduler(rebuild)
+	scheduler := newRebuildScheduler(t.Context(), rebuild)
 
 	const goroutines = 50
 	var wg sync.WaitGroup
@@ -281,31 +289,97 @@ func TestRebuildScheduler_NoConcurrentRebuilds(t *testing.T) {
 	assert.Equal(t, atomic.LoadInt32(&maxObservedConcurrency), int32(1))
 }
 
-// TestRebuildScheduler_InFlightOrPending covers the query callers use to
-// avoid racing a plain restart against a rebuild for the same service,
-// whether that rebuild is currently running or only queued as trailing.
-func TestRebuildScheduler_InFlightOrPending(t *testing.T) {
+// TestRebuildScheduler_PendingAndInFlight covers the queries callers use to
+// decide what to do with a restart racing a rebuild of the same service:
+// drop it (pending — the coming rebuild converges on its own) or fold it
+// into a Request (in flight — the running rebuild is stale).
+func TestRebuildScheduler_PendingAndInFlight(t *testing.T) {
 	f := newFakeRebuilder(t)
-	scheduler := newRebuildScheduler(f.rebuild)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
 
-	assert.Equal(t, scheduler.InFlightOrPending("web"), false)
+	assert.Equal(t, scheduler.Pending("web"), false)
+	assert.Equal(t, scheduler.InFlight("web"), false)
 
 	scheduler.Request([]string{"web"})
 	awaitStarted(t, f)
-	assert.Equal(t, scheduler.InFlightOrPending("web"), true)
-	assert.Equal(t, scheduler.InFlightOrPending("api"), false)
+	assert.Equal(t, scheduler.InFlight("web"), true)
+	assert.Equal(t, scheduler.Pending("web"), false)
 
 	// Queued for the trailing rebuild while "web" is still building.
 	scheduler.Request([]string{"api"})
-	assert.Equal(t, scheduler.InFlightOrPending("api"), true)
+	assert.Equal(t, scheduler.Pending("api"), true)
+	assert.Equal(t, scheduler.InFlight("api"), false)
 
 	f.release <- nil // "web" finishes, "api" starts as the trailing rebuild
 	awaitStarted(t, f)
-	assert.Equal(t, scheduler.InFlightOrPending("api"), true)
-	assert.Equal(t, scheduler.InFlightOrPending("web"), false)
+	assert.Equal(t, scheduler.InFlight("api"), true)
+	assert.Equal(t, scheduler.InFlight("web"), false)
 
 	f.release <- nil
 	scheduler.Wait()
 
-	assert.Equal(t, scheduler.InFlightOrPending("api"), false)
+	assert.Equal(t, scheduler.Pending("api"), false)
+	assert.Equal(t, scheduler.InFlight("api"), false)
+}
+
+// A request naming a service the current run is rebuilding makes that run
+// stale: the run must be interrupted, and the trailing rebuild must cover
+// the interrupted run's whole active set — interruption killed the other
+// services' rebuild too — so every service converges on a fresh snapshot.
+func TestRebuildScheduler_RequestForActiveServiceInterruptsRun(t *testing.T) {
+	f := newFakeRebuilder(t)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
+
+	scheduler.Request([]string{"web", "api"})
+	assert.DeepEqual(t, awaitStarted(t, f), []string{"api", "web"})
+
+	// Interrupts the run (no f.release send: the fake returns through its
+	// cancelled context, like the real rebuild would).
+	scheduler.Request([]string{"web"})
+
+	trailing := awaitStarted(t, f)
+	assert.DeepEqual(t, trailing, []string{"api", "web"})
+
+	f.release <- nil
+	scheduler.Wait()
+	assert.Equal(t, f.callCount(), 2)
+}
+
+// A request for a service the current run is NOT rebuilding must not
+// interrupt it: the run's outcome is still wanted, the new service just
+// waits its turn in the trailing rebuild.
+func TestRebuildScheduler_RequestForOtherServiceDoesNotInterrupt(t *testing.T) {
+	f := newFakeRebuilder(t)
+	scheduler := newRebuildScheduler(t.Context(), f.rebuild)
+
+	scheduler.Request([]string{"web"})
+	awaitStarted(t, f)
+
+	scheduler.Request([]string{"api"})
+	assertNoRebuildStarts(t, f) // first run still in flight, not interrupted
+
+	f.release <- nil // it completes normally...
+	assert.DeepEqual(t, awaitStarted(t, f), []string{"api"})
+
+	f.release <- nil
+	scheduler.Wait()
+	assert.Equal(t, f.callCount(), 2)
+}
+
+// Once the watch context is cancelled the scheduler must stop draining:
+// no trailing rebuild fires with a dead context, and Wait returns.
+func TestRebuildScheduler_ShutdownStopsDraining(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	f := newFakeRebuilder(t)
+	scheduler := newRebuildScheduler(ctx, f.rebuild)
+
+	scheduler.Request([]string{"web"})
+	awaitStarted(t, f)
+	scheduler.Request([]string{"api"}) // pending when the shutdown hits
+
+	cancel() // the in-flight run unwinds through its context
+
+	scheduler.Wait()
+	assertNoRebuildStarts(t, f)
+	assert.Equal(t, f.callCount(), 1)
 }
