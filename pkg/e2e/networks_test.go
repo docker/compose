@@ -55,6 +55,8 @@ func TestNetworks(t *testing.T) {
 
 	res = c.RunDockerComposeCmd(t, "port", "words", "8080")
 	res.Assert(t, icmd.Expected{Out: `0.0.0.0:`})
+	res = c.RunDockerComposeCmd(t, "port", "words")
+	res.Assert(t, icmd.Expected{Out: `8080/tcp -> 0.0.0.0:`})
 
 	c.RunDockerComposeCmd(t, "down", "-t0", "-v")
 	res = c.RunDockerCmd(t, "network", "ls")
