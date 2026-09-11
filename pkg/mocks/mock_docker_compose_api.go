@@ -270,20 +270,19 @@ func (mr *MockComposeMockRecorder) Pause(ctx, projectName, options any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pause", reflect.TypeOf((*MockCompose)(nil).Pause), ctx, projectName, options)
 }
 
-// Port mocks base method.
-func (m *MockCompose) Port(ctx context.Context, projectName, service string, port uint16, options api.PortOptions) (string, int, error) {
+// Ports mocks base method.
+func (m *MockCompose) Ports(ctx context.Context, projectName, service string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Port", ctx, projectName, service, port, options)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(int)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "Ports", ctx, projectName, service, port, options)
+	ret0, _ := ret[0].(api.PortPublishers)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// Port indicates an expected call of Port.
-func (mr *MockComposeMockRecorder) Port(ctx, projectName, service, port, options any) *gomock.Call {
+// Ports indicates an expected call of Ports.
+func (mr *MockComposeMockRecorder) Ports(ctx, projectName, service, port, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Port", reflect.TypeOf((*MockCompose)(nil).Port), ctx, projectName, service, port, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ports", reflect.TypeOf((*MockCompose)(nil).Ports), ctx, projectName, service, port, options)
 }
 
 // Ps mocks base method.

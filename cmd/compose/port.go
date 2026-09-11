@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -41,16 +42,20 @@ func portCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 		ProjectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "port [OPTIONS] SERVICE PRIVATE_PORT",
-		Short: "Print the public port for a port binding",
-		Args:  cobra.MinimumNArgs(2),
-		PreRunE: Adapt(func(ctx context.Context, args []string) error {
-			port, err := strconv.ParseUint(args[1], 10, 16)
-			if err != nil {
-				return err
-			}
-			opts.port = uint16(port)
+		Use:   "port [OPTIONS] SERVICE [PRIVATE_PORT]",
+		Short: "List port mappings or print the public port for a specific mapping for the service",
+		Args:  cobra.RangeArgs(1, 2),
+		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.protocol = strings.ToLower(opts.protocol)
+			if len(args) > 1 {
+				port, err := strconv.ParseUint(args[1], 10, 16)
+				if err != nil {
+					return err
+				}
+				opts.port = uint16(port)
+			} else if !cmd.Flags().Changed("protocol") {
+				opts.protocol = ""
+			}
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
@@ -73,7 +78,7 @@ func runPort(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	if err != nil {
 		return err
 	}
-	ip, port, err := backend.Port(ctx, projectName, service, opts.port, api.PortOptions{
+	publishers, err := backend.Ports(ctx, projectName, service, opts.port, api.PortOptions{
 		Protocol: opts.protocol,
 		Index:    opts.index,
 	})
@@ -81,6 +86,13 @@ func runPort(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
-	_, _ = fmt.Fprintf(dockerCli.Out(), "%s:%d\n", ip, port)
+	if opts.port != 0 && len(publishers) > 0 {
+		p := publishers[0]
+		_, _ = fmt.Fprintf(dockerCli.Out(), "%s\n", net.JoinHostPort(p.URL, strconv.Itoa(p.PublishedPort)))
+		return nil
+	}
+	for _, p := range publishers {
+		_, _ = fmt.Fprintln(dockerCli.Out(), p.String())
+	}
 	return nil
 }

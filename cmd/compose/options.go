@@ -163,7 +163,7 @@ func promptForInterpolatedVariables(ctx context.Context, dockerCli command.Cli, 
 
 	// Prompt for confirmation
 	userInput := prompt.NewPrompt(dockerCli.In(), dockerCli.Out())
-	msg := "\nDo you want to proceed with these variables? [Y/n]: "
+	msg := "\nDo you want to proceed with these variables?"
 	confirmed, err := userInput.Confirm(msg, true)
 	if err != nil {
 		return err
@@ -287,7 +287,7 @@ func confirmRemoteIncludes(dockerCli command.Cli, options buildOptions, assumeYe
 	}
 	_, _ = fmt.Fprintln(dockerCli.Out(), "\nRemote includes could potentially be malicious. Make sure you trust the source.")
 
-	msg := "Do you want to continue? [y/N]: "
+	msg := "Do you want to continue?"
 	confirmed, err := prompt.NewPrompt(dockerCli.In(), dockerCli.Out()).Confirm(msg, false)
 	if err != nil {
 		return err
