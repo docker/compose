@@ -271,7 +271,22 @@ func imagesOnly(project *types.Project) *types.Project {
 		}
 		digests[name] = service
 	}
-	project = &types.Project{Services: digests}
+	var jobDigests types.Jobs
+	if len(project.Jobs) > 0 {
+		jobDigests = types.Jobs{}
+	}
+	for name, config := range project.Jobs {
+		job := types.JobConfig{
+			ContainerSpec: types.ContainerSpec{Image: config.Image},
+		}
+		for _, vol := range config.Volumes {
+			if vol.Type == types.VolumeTypeImage {
+				job.Volumes = append(job.Volumes, vol)
+			}
+		}
+		jobDigests[name] = job
+	}
+	project = &types.Project{Services: digests, Jobs: jobDigests}
 	return project
 }
 
