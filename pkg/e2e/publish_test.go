@@ -39,7 +39,7 @@ func TestPublishPromptEnvFile(t *testing.T) {
 			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("n\n").MayFail(),
 			ExitCode(130),
 			OutputContains("you are about to publish env-related declarations within your OCI artifact."),
-			OutputContains(`service "serviceA": env_file declared`),
+			OutputContains(`"serviceA": env_file declared`),
 			OutputContains("Are you ok to publish these env declarations?"),
 			OutputNotContains("test/test published")).
 		Step("--with-env publishes without prompting",
@@ -53,7 +53,7 @@ func TestPublishPromptSuspiciousEnv(t *testing.T) {
 		Step("declining the prompt aborts the publication",
 			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("n\n").MayFail(),
 			ExitCode(130),
-			OutputContains(`service "serviceA": literal value for "MYSQL_ROOT_PASSWORD"`)).
+			OutputContains(`"serviceA": literal value for "MYSQL_ROOT_PASSWORD"`)).
 		Step("--with-env publishes without prompting",
 			ComposeCmd("publish", "test/test", "--with-env", "-y", "--dry-run"),
 			OutputContains("test/test publishing"),
@@ -73,9 +73,9 @@ func TestPublishPromptAggregatesFindings(t *testing.T) {
 		Step("every finding is listed before the prompt",
 			ComposeCmd("publish", "test/test", "--dry-run").WithStdin("n\n").MayFail(),
 			ExitCode(130),
-			OutputContains(`service "serviceB": env_file declared`),
-			OutputContains(`service "serviceA": literal value for "DB_PASSWORD"`),
-			OutputContains(`service "serviceB": literal value for "API_KEY"`),
+			OutputContains(`"serviceB": env_file declared`),
+			OutputContains(`"serviceA": literal value for "DB_PASSWORD"`),
+			OutputContains(`"serviceB": literal value for "API_KEY"`),
 			OutputContains("Use --with-env to silence this prompt"))
 }
 
