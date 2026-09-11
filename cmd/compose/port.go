@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
@@ -86,9 +85,8 @@ func runPort(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 
-	if opts.port != 0 && len(publishers) > 0 {
-		p := publishers[0]
-		_, _ = fmt.Fprintf(dockerCli.Out(), "%s\n", net.JoinHostPort(p.URL, strconv.Itoa(p.PublishedPort)))
+	if opts.port != 0 {
+		_, _ = fmt.Fprintf(dockerCli.Out(), "%s\n", publishers[0].HostPort())
 		return nil
 	}
 	for _, p := range publishers {
