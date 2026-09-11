@@ -36,6 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/internal/coordinator"
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
@@ -43,6 +44,22 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
+		// When the current Docker context opts into the project-config push, send
+		// the project configuration to the coordinator before any other Docker API
+		// call. Failures are non-fatal: warn and continue bringing the project up.
+		if !s.dryRun && coordinator.Enabled(s.dockerCli) {
+			// Any narrowing ("up <svc...>", profiles) moves excluded services
+			// to DisabledServices, which MarshalJSON omits. A non-empty
+			// DisabledServices means the payload is partial and the coordinator
+			// must merge it rather than treat it as authoritative.
+			complete := len(project.DisabledServices) == 0
+			if err := s.pushProjectConfig(ctx, project, complete); err != nil {
+				if !errors.Is(err, coordinator.ErrNotSupported) {
+					s.events.On(newEvent(api.ResourceCompose, api.Warning, "project config push to coordinator failed, continuing", err.Error()))
+				}
+			}
+		}
+
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
 			return err
@@ -365,6 +382,14 @@ func (u *upSession) streamContainerLogs(event api.ContainerEvent) error {
 		return u.doAttachContainer(u.globalCtx, event.Service, event.ID, event.Source, u.printer.HandleEvent)
 	}
 	return err
+}
+
+func (s *composeService) pushProjectConfig(ctx context.Context, project *types.Project, complete bool) error {
+	version, err := s.RuntimeAPIVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("negotiating API version: %w", err)
+	}
+	return coordinator.NewClient(s.apiClient().Dialer()).PushProjectConfig(ctx, version, project, complete)
 }
 
 func shouldFollowStartEvent(event api.ContainerEvent, attached []string, attachTo []string) bool {
