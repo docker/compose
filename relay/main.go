@@ -40,6 +40,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -149,6 +150,28 @@ func serve(ctx context.Context, listener net.Listener, upstream string, wg *sync
 	}
 }
 
+// halfCloseIdleTimeout bounds how long the surviving direction may sit IDLE
+// once the other one has finished. Half-close semantics stay intact — a peer
+// that keeps sending data after the other side's FIN is relayed for as long
+// as it takes — but a peer that never closes after our FIN can no longer
+// pin the goroutine pair and both connections forever (and with them the
+// drain in main). A variable so tests exercise the expiry quickly.
+var halfCloseIdleTimeout = 60 * time.Second
+
+// idleConn re-arms a read deadline before each Read once armed: active
+// transfers never expire, idle ones do.
+type idleConn struct {
+	net.Conn
+	armed atomic.Bool
+}
+
+func (c *idleConn) Read(p []byte) (int, error) {
+	if c.armed.Load() {
+		_ = c.Conn.SetReadDeadline(time.Now().Add(halfCloseIdleTimeout))
+	}
+	return c.Conn.Read(p)
+}
+
 // forward deliberately takes no context: a connection accepted at the
 // shutdown boundary (context cancelled, listener not yet closed) must still
 // be served — that is the drain contract — and a cancelled context would make
@@ -163,10 +186,21 @@ func forward(downstream net.Conn, upstream string) {
 	}
 	defer up.Close()
 
+	down := &idleConn{Conn: downstream}
+	upc := &idleConn{Conn: up}
 	done := make(chan struct{}, 2)
-	go func() { _, _ = io.Copy(up, downstream); closeWrite(up); done <- struct{}{} }()
-	go func() { _, _ = io.Copy(downstream, up); closeWrite(downstream); done <- struct{}{} }()
+	go func() { _, _ = io.Copy(up, down); closeWrite(up); done <- struct{}{} }()
+	go func() { _, _ = io.Copy(downstream, upc); closeWrite(downstream); done <- struct{}{} }()
 	<-done
+	// One direction is done: from here on the survivor may stream for as
+	// long as data flows, but no longer sit idle forever. Arm the per-read
+	// deadline for its future Reads, and set one immediately for a survivor
+	// already blocked in Read.
+	down.armed.Store(true)
+	upc.armed.Store(true)
+	deadline := time.Now().Add(halfCloseIdleTimeout)
+	_ = downstream.SetReadDeadline(deadline)
+	_ = up.SetReadDeadline(deadline)
 	<-done
 }
 
