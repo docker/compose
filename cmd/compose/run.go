@@ -195,6 +195,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				display.Mode = display.ModeQuiet
 				backendOptions.Add(compose.WithEventProcessor(display.Quiet()))
 			}
+			options.removeOrphans = removeOrphansFromEnv(cmd.Flags(), options.removeOrphans)
 			createOpts.pullChanged = cmd.Flags().Changed("pull")
 			return nil
 		}),
@@ -213,7 +214,17 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				buildOpts.Progress = string(xprogress.QuietMode)
 			}
 
+			// Deliberate source asymmetry with removeOrphans: the destructive
+			// variable (COMPOSE_REMOVE_ORPHANS) resolves through the process
+			// environment, which setEnvWithDotEnv completes from the local .env
+			// only — a remote model cannot enable container removal. The benign
+			// COMPOSE_IGNORE_ORPHANS reads project.Environment, remote configs
+			// included: the worst a remote model can do there is suppress a
+			// warning.
 			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
+			if options.ignoreOrphans && options.removeOrphans {
+				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
+			}
 			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),

@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/docker/cli/cli/command"
@@ -29,7 +28,6 @@ import (
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
-	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type downOptions struct {
@@ -50,6 +48,7 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 		Short: "Stop and remove containers, networks",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
+			opts.removeOrphans = removeOrphansFromEnv(cmd.Flags(), opts.removeOrphans)
 			if opts.images != "" {
 				if opts.images != "all" && opts.images != "local" {
 					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
@@ -63,8 +62,7 @@ func downCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := downCmd.Flags()
-	removeOrphans := utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
-	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file")
+	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.IntVarP(&opts.timeout, "timeout", "t", 0, "Specify a shutdown timeout in seconds")
 	flags.BoolVarP(&opts.volumes, "volumes", "v", false, `Remove named volumes declared in the "volumes" section of the Compose file and anonymous volumes attached to containers`)
 	flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
