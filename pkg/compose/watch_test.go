@@ -316,6 +316,67 @@ func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
 	}})
 }
 
+// getWatchRules historically never excluded Dockerfile/compose files (see
+// #14117). The continuous loop matches absolute host paths, so the same
+// basename-only matcher initialSync used would miss them.
+func TestGetWatchRules_ExcludesDockerfileAndComposeFilesFromSync(t *testing.T) {
+	rules, err := getWatchRules(&types.DevelopConfig{
+		Watch: []types.Trigger{{
+			Path:   "/proj",
+			Action: types.WatchActionSync,
+			Target: "/app",
+		}},
+	}, types.ServiceConfig{Name: "svc"})
+	assert.NilError(t, err)
+	assert.Equal(t, 1, len(rules))
+
+	for _, name := range []string{"Dockerfile", "compose.yaml", "docker-compose.yml", "compose.override.yml"} {
+		assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/"+name)) == nil, name)
+	}
+
+	got := rules[0].Matches(watch.NewFileEvent("/proj/app.go"))
+	assert.DeepEqual(t, got, &sync.PathMapping{
+		HostPath:      "/proj/app.go",
+		ContainerPath: "/app/app.go",
+	})
+}
+
+func TestGetWatchRules_ExcludesCustomNamedDockerfileFromSync(t *testing.T) {
+	rules, err := getWatchRules(&types.DevelopConfig{
+		Watch: []types.Trigger{{
+			Path:   "/proj",
+			Action: types.WatchActionSync,
+			Target: "/app",
+		}},
+	}, types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: t.TempDir(), Dockerfile: "docker/Dockerfile.prod"},
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/docker/Dockerfile.prod")) == nil)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/app.go")) != nil)
+}
+
+func TestGetWatchRules_CopyActionsExcludeDockerfile(t *testing.T) {
+	rules, err := getWatchRules(&types.DevelopConfig{
+		Watch: []types.Trigger{
+			{Path: "/proj", Action: types.WatchActionSync, Target: "/app"},
+			{Path: "/proj", Action: types.WatchActionRebuild},
+			{Path: "/proj", Action: types.WatchActionSyncExec, Target: "/app"},
+		},
+	}, types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: t.TempDir()},
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, 3, len(rules))
+
+	event := watch.NewFileEvent("/proj/Dockerfile")
+	assert.Assert(t, rules[0].Matches(event) == nil)
+	assert.Assert(t, rules[1].Matches(event) != nil)
+	assert.Assert(t, rules[2].Matches(event) == nil)
+}
+
 // TestPruneDanglingImagesOnRebuild verifies the post-rebuild prune only
 // removes superseded dangling images: a dangling image whose ID matches one
 // of the freshly built images must be spared. The lookup used to probe the
