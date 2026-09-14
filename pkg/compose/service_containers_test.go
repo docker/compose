@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/v29/cli/config/configfile"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"

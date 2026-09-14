@@ -29,7 +29,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
-	"github.com/docker/cli/cli"
+	"github.com/docker/cli/v29/cli"
 	"github.com/eiannone/keyboard"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"

@@ -24,9 +24,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docker/cli/cli/command"
-	cliformatter "github.com/docker/cli/cli/command/formatter"
-	cliflags "github.com/docker/cli/cli/flags"
+	"github.com/docker/cli/v29/cli/command"
+	cliformatter "github.com/docker/cli/v29/cli/command/formatter"
+	cliflags "github.com/docker/cli/v29/cli/flags"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/cmd/formatter"

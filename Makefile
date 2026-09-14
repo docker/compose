@@ -100,7 +100,7 @@ MOCKGEN = go run go.uber.org/mock/mockgen@v0.4.0
 
 .PHONY: mocks
 mocks: ## Regenerate pkg/mocks
-	$(MOCKGEN) -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
+	$(MOCKGEN) -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/v29/cli/command Cli
 	$(MOCKGEN) -destination pkg/mocks/mock_docker_api.go -package mocks github.com/moby/moby/client APIClient
 	$(MOCKGEN) -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go
 

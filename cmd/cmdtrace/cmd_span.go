@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	dockercli "github.com/docker/cli/cli"
-	"github.com/docker/cli/cli/command"
+	dockercli "github.com/docker/cli/v29/cli"
+	"github.com/docker/cli/v29/cli/command"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"

@@ -31,8 +31,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
-	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/cli/cli/config"
+	"github.com/docker/cli/v29/cli-plugins/manager"
+	"github.com/docker/cli/v29/cli/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 

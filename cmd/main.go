@@ -19,10 +19,10 @@ package main
 import (
 	"os"
 
-	dockercli "github.com/docker/cli/cli"
-	"github.com/docker/cli/cli-plugins/metadata"
-	"github.com/docker/cli/cli-plugins/plugin"
-	"github.com/docker/cli/cli/command"
+	dockercli "github.com/docker/cli/v29/cli"
+	"github.com/docker/cli/v29/cli-plugins/metadata"
+	"github.com/docker/cli/v29/cli-plugins/plugin"
+	"github.com/docker/cli/v29/cli/command"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 

@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/creack/pty"
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/v29/cli/streams"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"

@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/distribution/reference"
-	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/v29/cli/config/configfile"
 	"github.com/opencontainers/go-digest"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 	"gotest.tools/v3/assert"

@@ -23,9 +23,9 @@ import (
 	"path/filepath"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli-plugins/metadata"
-	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/flags"
+	"github.com/docker/cli/v29/cli-plugins/metadata"
+	"github.com/docker/cli/v29/cli/command"
+	"github.com/docker/cli/v29/cli/flags"
 	"github.com/moby/moby/client"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"

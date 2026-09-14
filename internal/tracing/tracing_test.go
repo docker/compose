@@ -19,8 +19,8 @@ package tracing_test
 import (
 	"testing"
 
-	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/context/store"
+	"github.com/docker/cli/v29/cli/command"
+	"github.com/docker/cli/v29/cli/context/store"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/tracing"

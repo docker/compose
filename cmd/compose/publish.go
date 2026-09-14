@@ -20,8 +20,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/docker/cli/cli"
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/v29/cli"
+	"github.com/docker/cli/v29/cli/command"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

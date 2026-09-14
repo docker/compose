@@ -28,8 +28,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
-	"github.com/docker/cli/cli/command"
-	cli "github.com/docker/cli/cli/command/container"
+	"github.com/docker/cli/v29/cli/command"
+	cli "github.com/docker/cli/v29/cli/command/container"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/network"

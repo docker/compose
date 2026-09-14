@@ -29,7 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
-	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/v29/cli/config/configfile"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"

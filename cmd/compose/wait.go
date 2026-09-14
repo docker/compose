@@ -20,8 +20,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/docker/cli/cli"
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/v29/cli"
+	"github.com/docker/cli/v29/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/pkg/api"

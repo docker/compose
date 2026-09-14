@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/v29/cli/streams"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 

@@ -25,7 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/v29/cli/streams"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/network"

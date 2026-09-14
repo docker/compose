@@ -23,7 +23,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/v29/cli/command"
 	_ "github.com/moby/buildkit/util/tracing/childprocess" //nolint:blank-imports // initializes BuildKit tracing child process propagation.
 	"github.com/moby/buildkit/util/tracing/detect"
 	"go.opentelemetry.io/otel"

@@ -28,7 +28,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/v29/cli/streams"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 

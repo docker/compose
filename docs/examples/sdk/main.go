@@ -24,8 +24,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/flags"
+	"github.com/docker/cli/v29/cli/command"
+	"github.com/docker/cli/v29/cli/flags"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"

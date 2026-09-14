@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/v29/cli/command"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/cmd/formatter"

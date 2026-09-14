@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/v29/cli/streams"
 	"gotest.tools/v3/assert"
 )
 

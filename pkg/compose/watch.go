@@ -32,7 +32,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
-	ccli "github.com/docker/cli/cli/command/container"
+	ccli "github.com/docker/cli/v29/cli/command/container"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/moby/moby/api/types/container"
