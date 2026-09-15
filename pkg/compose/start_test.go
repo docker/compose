@@ -190,11 +190,11 @@ func TestStartService_StartsOnlyStoppedReplicas(t *testing.T) {
 	})
 }
 
-// TestStartService_PreStartOnLowestReplica locks the pre_start gating: with no
-// replica running, the hooks run exactly once, against the replica with the
-// lowest container-number — regardless of the order the daemon listed them in
-// — and before any service container is started.
-func TestStartService_PreStartOnLowestReplica(t *testing.T) {
+// TestStartService_PreStartRunsBeforeReplicas locks the pre_start gating: with
+// no replica running, the hooks run exactly once — executing the runner
+// container the reconciliation plan prepared — and before any service
+// container is started.
+func TestStartService_PreStartRunsBeforeReplicas(t *testing.T) {
 	svc, apiClient, _ := newStartTestService(t)
 
 	project := &types.Project{Name: "prj"}
@@ -209,21 +209,13 @@ func TestStartService_PreStartOnLowestReplica(t *testing.T) {
 	// Listed out of order on purpose: replica 2 first.
 	containers := Containers{replica2, replica1}
 
-	// runPreStart sweeps orphan hook containers from any previous failed run
-	// before creating the new one.
-	orphanScan := apiClient.EXPECT().
+	// runPreStart looks up the runner containers prepared by the plan.
+	runnerScan := apiClient.EXPECT().
 		ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{}, nil)
+		Return(client.ContainerListResult{Items: []container.Summary{runnerSummary("hook-1", 0)}}, nil)
 
-	// The hook container shares the volumes of the lowest-numbered replica.
-	hookCreate := apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
-		After(orphanScan).
-		DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
-			assert.DeepEqual(t, opts.HostConfig.VolumesFrom, []string{replica1.ID})
-			return client.ContainerCreateResult{ID: "hook-1"}, nil
-		})
 	hookWait := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
-		Return(waitResultExit(0)).After(hookCreate)
+		Return(waitResultExit(0)).After(runnerScan)
 	// streamPreStartLogs always opens ContainerLogs (even with nil listener) so
 	// the tail is available for failure error messages.
 	hookLogs := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).

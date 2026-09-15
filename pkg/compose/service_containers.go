@@ -606,11 +606,12 @@ func (s *composeService) startService(ctx context.Context,
 
 	// pre_start runs once per service, only when no replica is already running
 	// (e.g. initial up, force-recreate, or spec change). per_replica: false is
-	// the only currently supported mode. Pick the replica with the lowest
-	// container-number so the choice is deterministic regardless of the order
-	// the daemon returns containers in.
+	// the only currently supported mode. The hooks execute in runner containers
+	// prepared by the reconciliation plan. Pick the replica with the lowest
+	// container-number so the choice is deterministic regardless of the
+	// order the daemon returns containers in.
 	if candidate := lowestNumberedContainer(toStart); len(service.PreStart) > 0 && len(serviceContainers) == len(toStart) && !isRelayContainer(candidate) {
-		if err := s.runPreStart(ctx, project, service, candidate, listener); err != nil {
+		if err := s.runPreStart(ctx, project, service, listener); err != nil {
 			return err
 		}
 	}

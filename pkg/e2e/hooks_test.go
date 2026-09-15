@@ -200,6 +200,39 @@ func TestPreStartHookNotReRunOnScaleUp(t *testing.T) {
 			OutputContains("1 /mnt/tokens.txt"))
 }
 
+func TestPreStartHookCreateThenStart(t *testing.T) {
+	s := NewScenario(t, "create must prepare the pre_start runners so a later start executes them")
+	s.Step("create leaves the service created, hooks not yet run",
+		ComposeCmd("create"),
+		ServiceState("sample", "created")).
+		Step("nothing in the volume before start",
+			probeVolume(s, "sh", "-c", "wc -l < /mnt/tokens.txt || echo missing"),
+			OutputContains("missing")).
+		Step("start runs the hook then the service",
+			ComposeCmd("start"),
+			ServiceState("sample", "running")).
+		Step("the hook ran exactly once",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("1 /mnt/tokens.txt"))
+}
+
+func TestPreStartHookStopThenStartFails(t *testing.T) {
+	NewScenario(t, "start after stop must fail on a hooked service: the runners were consumed, only a reconciliation (up) prepares new ones").
+		Step("up runs the hook and starts the service",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("stop leaves the service exited",
+			ComposeCmd("stop"),
+			ServiceState("sample", "exited")).
+		Step("start fails, pointing at the reconciliation command",
+			ComposeCmd("start").MayFail(),
+			ExitCode(1),
+			OutputContains("pre_start[0]"),
+			OutputContains("docker compose up")).
+		Step("up prepares fresh runners and recovers",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("sample", "running"))
+}
+
 func TestPreStartHookRunsOnceForScaledService(t *testing.T) {
 	s := NewScenario(t, "with the default per_replica: false, a pre_start hook must run once for the whole service")
 	s.Step("up starts both replicas",
