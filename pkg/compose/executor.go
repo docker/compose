@@ -160,6 +160,8 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 		return exec.execRemoveContainer(ctx, op)
 	case OpRenameContainer:
 		return exec.execRenameContainer(ctx, node)
+	case OpCreateHookContainer:
+		return exec.execCreateHookContainer(ctx, node)
 	case OpRunProvider:
 		return exec.compose.runPlugin(ctx, exec.project, *op.Service, "up")
 	default:

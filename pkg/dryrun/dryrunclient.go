@@ -95,6 +95,20 @@ func (d *DryRunClient) resolve(ctx context.Context, ref string) error {
 	return err
 }
 
+// matchesLabelFilters reports whether labels satisfy every requested
+// "key" or "key=value" label filter, mirroring the daemon's label filtering
+// for the faked containers the cache serves.
+func matchesLabelFilters(labels map[string]string, wanted map[string]bool) bool {
+	for f := range wanted {
+		k, v, hasValue := strings.Cut(f, "=")
+		actual, ok := labels[k]
+		if !ok || (hasValue && actual != v) {
+			return false
+		}
+	}
+	return true
+}
+
 func getCallingFunction() string {
 	pc, _, _, _ := runtime.Caller(2)
 	fullName := runtime.FuncForPC(pc).Name()
@@ -122,6 +136,9 @@ func (d *DryRunClient) ContainerCreate(ctx context.Context, options client.Conta
 		ID:     options.Name,
 		Names:  []string{options.Name},
 		Labels: options.Config.Labels,
+		// a container just created is in created state; listings that
+		// filter on state (listPreStartRunners) must see the faked ones
+		State: containerType.StateCreated,
 		HostConfig: struct {
 			NetworkMode string            `json:",omitempty"`
 			Annotations map[string]string `json:",omitempty"`
@@ -179,6 +196,20 @@ func (d *DryRunClient) ContainerList(ctx context.Context, options client.Contain
 				Items: d.containers,
 			}, err
 		}
+	case "listPreStartRunners":
+		// Hook runners created under dry-run exist only in the cache: answer
+		// from it, honoring the caller's label filters (project, service,
+		// hook type). The status=created filter is implicit — every faked
+		// container is in created state by construction, and a real runner
+		// seeded into the cache in any other state is discarded by the
+		// caller's own state check.
+		var items []containerType.Summary
+		for _, ctr := range d.containers {
+			if matchesLabelFilters(ctr.Labels, options.Filters["label"]) {
+				items = append(items, ctr)
+			}
+		}
+		return client.ContainerListResult{Items: items}, nil
 	}
 	return d.apiClient.ContainerList(ctx, options)
 }

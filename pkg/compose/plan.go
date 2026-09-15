@@ -58,6 +58,9 @@ const (
 	OpWaitCondition OperationType = 40
 	OpRunPreStart   OperationType = 41
 	OpRunPostStart  OperationType = 42
+
+	// Hook operations
+	OpCreateHookContainer OperationType = 43
 )
 
 // PlanPhase situates a node in the plan lifecycle. The Create phase converges
@@ -105,6 +108,8 @@ func (o OperationType) String() string {
 		return "RunPreStart"
 	case OpRunPostStart:
 		return "RunPostStart"
+	case OpCreateHookContainer:
+		return "CreateHookContainer"
 	default:
 		return fmt.Sprintf("Unknown(%d)", int(o))
 	}
@@ -127,6 +132,7 @@ type Operation struct {
 	Timeout      *time.Duration       // for stop operations
 	CreateNodeID int                  // for OpRenameContainer/start-phase ops: ID of the CreateContainer node whose result to target
 	Condition    string               // for OpWaitCondition: depends_on condition to wait for (service_healthy, ...)
+	HookIndex    int                  // for OpCreateHookContainer: position of the hook in the service's hook list
 	// RemoveVolumes asks OpRemoveContainer to also remove the container's
 	// anonymous volumes — the imperative semantics for hook-runner containers.
 	RemoveVolumes bool

@@ -50,6 +50,11 @@ type createOptions struct {
 	AttachStdin       bool
 	UseNetworkAliases bool
 	Labels            types.Labels
+	// NoConfigHash skips the ConfigHashLabel stamp: hook runners have no
+	// spec-drift concept and must stay invisible to every listing that
+	// filters on the label's mere presence (ps/start's default listing,
+	// down's normal teardown path).
+	NoConfigHash bool
 }
 
 type createConfigs struct {
@@ -262,11 +267,13 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	options createOptions,
 ) (createConfigs, error) {
 	labels := options.Labels
-	hash, err := ServiceHash(service)
-	if err != nil {
-		return createConfigs{}, err
+	if !options.NoConfigHash {
+		hash, err := ServiceHash(service)
+		if err != nil {
+			return createConfigs{}, err
+		}
+		labels[api.ConfigHashLabel] = hash
 	}
-	labels[api.ConfigHashLabel] = hash
 	if number > 0 {
 		// One-off containers are not indexed
 		labels[api.ContainerNumberLabel] = strconv.Itoa(number)

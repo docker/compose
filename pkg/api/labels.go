@@ -69,10 +69,16 @@ const (
 	// ContainerEngineLabel stores the name of the engine that runs the container
 	ContainerEngineLabel = "com.docker.compose.engine"
 	// HookLabel identifies an ephemeral lifecycle-hook container and stores the
-	// hook type, e.g. "pre_start". It is applied to every container created by
-	// runPreStartHook so orphan hook containers from a previous failed run can
-	// be found and removed by project+service+hook label filters.
+	// hook type, e.g. "pre_start". It is applied to every runner container
+	// created by createPreStartContainer so stale runners from a previous
+	// failed run can be found and removed by project+service+hook label
+	// filters, and down can sweep them all by project+hook label.
 	HookLabel = "com.docker.compose.hook"
+	// HookIndexLabel stores the position of the hook in its service's hook
+	// list (e.g. pre_start[2] → "2"), so the start phase can match each
+	// declared hook with the runner container the reconciliation plan
+	// prepared for it.
+	HookIndexLabel = "com.docker.compose.hook-index"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel

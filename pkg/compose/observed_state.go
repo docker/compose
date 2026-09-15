@@ -47,9 +47,11 @@ type ObservedState struct {
 	Networks map[string][]ObservedNetwork // compose network key → observed
 	Volumes  map[string][]ObservedVolume  // compose volume key → observed
 	// HookContainers are ephemeral lifecycle-hook runners (HookLabel set),
-	// per service. Any observed at collection time is stale by definition —
-	// a previous run failed before removing it — and the reconciler plans
-	// its purge before re-running the hooks.
+	// per service: fresh runners prepared by a previous plan and not yet
+	// consumed, or leftovers of a run that failed before removing them.
+	// Whenever the hooks are going to run again, the reconciler purges every
+	// observed runner and plans fresh ones (see planPreStartHookRunners), so
+	// the set always converges to the current service definition.
 	HookContainers map[string][]ObservedContainer // service name → hook containers
 }
 
