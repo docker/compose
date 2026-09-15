@@ -1,0 +1,9 @@
+services:
+  crasher:
+    image: alpine
+    command: "false"
+    restart: unless-stopped
+  sleeper:
+    image: alpine
+    init: true
+    command: sleep infinity
