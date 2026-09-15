@@ -136,6 +136,24 @@ jobs:
         type=ref,event=pr
       meta-bake-target: meta-helper
 
+  relay-image-test:
+    if: github.event_name == 'pull_request'
+    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
+    with:
+      runner: amd64
+      target: relay-image-cross
+      cache: true
+      cache-scope: relay-image-test
+      output: image
+      push: false
+      sbom: true
+      set-meta-labels: true
+      meta-images: |
+        compose-relay
+      meta-tags: |
+        type=ref,event=pr
+      meta-bake-target: meta-helper
+
   test:
     runs-on: ubuntu-latest
     steps:

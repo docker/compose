@@ -53,6 +53,34 @@ jobs:
           username: docker
           connection_id: a295c8b7-54ab-4507-ac88-5c43003c73a5
 
+  relay-image:
+    uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
+    permissions:
+      contents: read # same as global permission
+      id-token: write # for signing attestation(s) with GitHub OIDC Token
+    with:
+      runner: amd64
+      target: relay-image-cross
+      cache: true
+      cache-scope: relay-image
+      output: image
+      push: true # this workflow only triggers on push (main and tags)
+      sbom: true
+      set-meta-labels: true
+      meta-images: |
+        docker/compose-relay
+      # The relay tag consumers pull is the image CONTRACT major (v1), not a
+      # compose version: it moves only on compose releases so what users pull
+      # stays predictable, while every main push feeds the edge channel.
+      meta-tags: |
+        type=edge
+        type=raw,value=v1,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      meta-bake-target: meta-helper
+      registry-identities: |
+        - type: dockerhub
+          username: docker
+          connection_id: a295c8b7-54ab-4507-ac88-5c43003c73a5
+
   module-image:
     uses: docker/github-builder/.github/workflows/bake.yml@a492c6d04fd3315f67230809b44d60cc0acd50b3 # v1.16.0
     permissions:
