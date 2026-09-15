@@ -28,7 +28,7 @@ type progressFunc func(context.Context) error
 func Run(ctx context.Context, pf progressFunc, operation string, bus api.EventProcessor) error {
 	bus.Start(ctx, operation)
 	err := pf(ctx)
-	bus.Done(operation, err != nil)
+	bus.Done(operation, err == nil)
 	return err
 }
 
