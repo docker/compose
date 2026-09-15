@@ -209,6 +209,95 @@ services:
 	assert.Equal(t, len(envFiles), 1, "present optional env file should be added")
 }
 
+func Test_loadUnresolvedFile_short_port_mapping(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	composeContent := `name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+      - $PORT:80
+      - 8080:${TARGET_PORT:-8080}
+    mem_limit: ${MEM}
+    deploy:
+      replicas: ${REPLICAS}
+    healthcheck:
+      retries: ${RETRIES}
+    environment:
+      API_KEY: "$ENV_KEY"
+  worker:
+    image: alpine
+    environment:
+      - LIST_KEY=list_val
+`
+	assert.NilError(t, os.WriteFile(composePath, []byte(composeContent), 0o600))
+
+	project := &types.Project{
+		WorkingDir:   dir,
+		ComposeFiles: []string{composePath},
+	}
+
+	unresolved, err := loadUnresolvedFile(t.Context(), project, composePath)
+	assert.NilError(t, err)
+	assert.Assert(t, unresolved.Services["whoami"].Environment != nil)
+	assert.Equal(t, *unresolved.Services["whoami"].Environment["API_KEY"], "$ENV_KEY")
+	assert.Assert(t, unresolved.Services["worker"].Environment != nil)
+	assert.Equal(t, *unresolved.Services["worker"].Environment["LIST_KEY"], "list_val")
+}
+
+func Test_checkForSensitiveData_short_port_mapping(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	composeContent := `name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+    mem_limit: ${MEM}
+    deploy:
+      replicas: ${REPLICAS}
+    healthcheck:
+      retries: ${RETRIES}
+`
+	assert.NilError(t, os.WriteFile(composePath, []byte(composeContent), 0o600))
+
+	project := &types.Project{
+		WorkingDir:   dir,
+		ComposeFiles: []string{composePath},
+	}
+
+	svc := &composeService{}
+	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Equal(t, len(findings), 0)
+}
+
+func Test_checkForSensitiveData_list_form_secret(t *testing.T) {
+	dir := t.TempDir()
+	composePath := filepath.Join(dir, "compose.yaml")
+	composeContent := `name: test
+services:
+  web:
+    image: nginx
+    environment:
+      - AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+`
+	assert.NilError(t, os.WriteFile(composePath, []byte(composeContent), 0o600))
+
+	project := &types.Project{
+		WorkingDir:   dir,
+		ComposeFiles: []string{composePath},
+	}
+
+	svc := &composeService{}
+	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Assert(t, len(findings) > 0, "secret scanner must detect secrets in list-form environment entries")
+}
+
 func Test_checkForSensitiveData_optional_env_file_missing(t *testing.T) {
 	dir := t.TempDir()
 	project := &types.Project{
@@ -326,6 +415,27 @@ services:
     environment:
       DB_PASSWORD: "${DB_PASSWORD}"
       API_KEY: "$API_KEY"
+`,
+			},
+		},
+		{
+			name: "unresolved variables in ports, mem_limit, and replicas do not fail env check",
+			files: map[string]string{
+				"compose.yaml": `name: test
+services:
+  whoami:
+    image: traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+      - $PORT:80
+      - 8080:${TARGET_PORT:-8080}
+    mem_limit: ${MEM:-512m}
+    deploy:
+      replicas: ${REPLICAS:-2}
+    healthcheck:
+      retries: ${RETRIES:-3}
+    environment:
+      API_KEY: "$ENV_KEY"
 `,
 			},
 		},
