@@ -51,16 +51,14 @@ func TestPrepareRestartProject(t *testing.T) {
 			Name: "prj",
 			Services: types.Services{
 				"proxy": {
-					Name: "proxy",
-					DependsOn: types.DependsOnConfig{
+					Name: "proxy", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 						"web": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
-					},
+					}},
 				},
 				"web": {
-					Name: "web",
-					DependsOn: types.DependsOnConfig{
+					Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 						"db": {Condition: types.ServiceConditionStarted, Restart: false, Required: true},
-					},
+					}},
 				},
 				"db": {Name: "db"},
 			},

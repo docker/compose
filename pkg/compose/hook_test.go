@@ -87,8 +87,7 @@ func TestRunHook_ConsoleSize(t *testing.T) {
 			mockCli.EXPECT().Out().Return(streams.NewOut(tty)).AnyTimes()
 
 			service := types.ServiceConfig{
-				Name: "test",
-				Tty:  tc.tty,
+				Name: "test", WorkloadSpec: types.WorkloadSpec{Tty: tc.tty},
 			}
 			hook := types.ServiceHook{Command: []string{"echo", "hello"}}
 			ctr := container.Summary{ID: "container123"}
@@ -450,7 +449,7 @@ func TestRunHook_CopyError(t *testing.T) {
 	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	ctr := container.Summary{ID: "ctr-1"}
-	service := types.ServiceConfig{Name: "svc", Tty: false}
+	service := types.ServiceConfig{Name: "svc", WorkloadSpec: types.WorkloadSpec{Tty: false}}
 	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
 
 	mockAPI.EXPECT().
@@ -572,7 +571,7 @@ func TestRunHook_ExecInspectError(t *testing.T) {
 	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	ctr := container.Summary{ID: "ctr-1"}
-	service := types.ServiceConfig{Name: "svc", Tty: false}
+	service := types.ServiceConfig{Name: "svc", WorkloadSpec: types.WorkloadSpec{Tty: false}}
 	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
 
 	mockAPI.EXPECT().
