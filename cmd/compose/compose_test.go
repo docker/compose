@@ -17,10 +17,17 @@
 package compose
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	dockercli "github.com/docker/cli/cli"
+	"github.com/spf13/cobra"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/cmd/prompt"
 )
 
 func TestFilterServices(t *testing.T) {
@@ -52,4 +59,19 @@ func TestFilterServices(t *testing.T) {
 	assert.NilError(t, err)
 	_, err = p.GetService("zot")
 	assert.NilError(t, err)
+}
+
+// Ctrl+C at an interactive prompt surfaces as prompt.ErrInterrupt (raw mode
+// swallows the SIGINT): the command must exit with the same 130 status a real
+// SIGINT produces, not a generic failure.
+func TestAdaptCmdMapsPromptInterruptTo130(t *testing.T) {
+	run := AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+		return fmt.Errorf("prompting: %w", prompt.ErrInterrupt)
+	})
+	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
+	err := run(cmd, nil)
+	var status dockercli.StatusError
+	assert.Assert(t, errors.As(err, &status))
+	assert.Equal(t, status.StatusCode, 130)
 }

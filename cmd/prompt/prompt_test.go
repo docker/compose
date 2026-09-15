@@ -160,6 +160,47 @@ func TestUserConfirmSequential(t *testing.T) {
 	}
 }
 
+// Arrow keys arrive as raw escape sequences in raw mode: the whole sequence
+// must be swallowed — neither echoed nor taken as answer characters.
+func TestUserConfirmIgnoresArrowKeys(t *testing.T) {
+	ptmx, user := newTestUser(t)
+
+	done := make(chan struct {
+		answer bool
+		err    error
+	}, 1)
+	go func() {
+		answer, err := user.Confirm("Continue?", false)
+		done <- struct {
+			answer bool
+			err    error
+		}{answer, err}
+	}()
+
+	readUntil(t, ptmx, "Continue? [y/N]: ")
+
+	// Up arrow (CSI), Home in application mode (SS3), then a real answer.
+	_, err := ptmx.Write([]byte("\x1b[A\x1bOH y\r"))
+	assert.NilError(t, err)
+
+	select {
+	case result := <-done:
+		assert.NilError(t, result.err)
+		assert.Assert(t, result.answer, "the arrow-key bytes must not corrupt the answer")
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for prompt to return")
+	}
+}
+
+// Both backspace encodings erase: DEL (most terminals) and ^H (some
+// terminals, legacy Windows console).
+func TestReadLineBackspaceVariants(t *testing.T) {
+	var stdout bytes.Buffer
+	line, err := readLine(bufio.NewReader(strings.NewReader("nx\x7fy\x08o\r")), &stdout)
+	assert.NilError(t, err)
+	assert.Equal(t, line, "no")
+}
+
 func TestReadLineInterrupt(t *testing.T) {
 	var stdout bytes.Buffer
 
@@ -168,7 +209,7 @@ func TestReadLineInterrupt(t *testing.T) {
 		&stdout,
 	)
 
-	assert.ErrorIs(t, err, errInterrupt)
+	assert.ErrorIs(t, err, ErrInterrupt)
 	assert.Equal(t, stdout.String(), "\r\n")
 }
 
