@@ -42,7 +42,7 @@ func (s *composeService) Logs(
 		return err
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return s.logContainer(ctx, consumer, ctr, options)
