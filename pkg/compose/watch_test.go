@@ -316,23 +316,25 @@ func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
 	}})
 }
 
-// getWatchRules historically never excluded Dockerfile/compose files (see
-// #14117). The continuous loop matches absolute host paths, so the same
-// basename-only matcher initialSync used would miss them.
-func TestGetWatchRules_ExcludesDockerfileAndComposeFilesFromSync(t *testing.T) {
+// getWatchRules historically never excluded the service Dockerfile (see
+// #14117). The continuous loop matches absolute host paths, so a
+// basename-only matcher would miss them.
+func TestGetWatchRules_ExcludesDockerfileFromSync(t *testing.T) {
 	rules, err := getWatchRules(&types.DevelopConfig{
 		Watch: []types.Trigger{{
 			Path:   "/proj",
 			Action: types.WatchActionSync,
 			Target: "/app",
 		}},
-	}, types.ServiceConfig{Name: "svc"})
+	}, types.ServiceConfig{
+		Name:  "svc",
+		Build: &types.BuildConfig{Context: t.TempDir()},
+	})
 	assert.NilError(t, err)
 	assert.Equal(t, 1, len(rules))
 
-	for _, name := range []string{"Dockerfile", "compose.yaml", "docker-compose.yml", "compose.override.yml"} {
-		assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/"+name)) == nil, name)
-	}
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/Dockerfile")) == nil)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/compose.yaml")) != nil)
 
 	got := rules[0].Matches(watch.NewFileEvent("/proj/app.go"))
 	assert.DeepEqual(t, got, &sync.PathMapping{
@@ -354,6 +356,7 @@ func TestGetWatchRules_ExcludesCustomNamedDockerfileFromSync(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/docker/Dockerfile.prod")) == nil)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/Dockerfile")) != nil)
 	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/app.go")) != nil)
 }
 
