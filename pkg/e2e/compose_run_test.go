@@ -92,6 +92,26 @@ func TestComposeRunDeps(t *testing.T) {
 			ServiceNotCreated("service_b"))
 }
 
+func TestComposeRunNoRecreate(t *testing.T) {
+	// Regression test for https://github.com/docker/compose/issues/13769
+	// A dependency whose config-hash diverged is recreated by the default
+	// "diverged" policy — correct, but state-destroying for a database
+	// warmed up by a previous run. --no-recreate opts out and reuses the
+	// existing container as-is.
+	NewScenario(t, "run --no-recreate must reuse an existing dependency even when its configuration diverged").
+		Step("run creates and starts the dependency",
+			ComposeCmd("run", "task").WithEnv("TAG=one"),
+			StdoutContains("task done"),
+			ServiceState("dep", "running")).
+		Step("by default a diverged dependency is recreated",
+			ComposeCmd("run", "task").WithEnv("TAG=two", "COMPOSE_IGNORE_ORPHANS=True"),
+			Recreated("dep")).
+		Step("run --no-recreate reuses the diverged dependency as-is",
+			ComposeCmd("run", "--no-recreate", "task").WithEnv("TAG=three", "COMPOSE_IGNORE_ORPHANS=True"),
+			NotRecreated("dep"),
+			ServiceState("dep", "running"))
+}
+
 func TestComposeRunNotRequiredDeps(t *testing.T) {
 	NewScenario(t, "run must skip a dependency marked required: false when its profile is inactive").
 		Step("run executes the service without materializing the optional dependency",
