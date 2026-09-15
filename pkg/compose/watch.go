@@ -336,6 +336,11 @@ func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]
 		return nil, err
 	}
 
+	dockerFileIgnore, err := dockerFileIgnoreMatcher(service)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, trigger := range config.Watch {
 		ignore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
 		if err != nil {
@@ -352,15 +357,22 @@ func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]
 			}
 		}
 
+		ignores := []watch.PathMatcher{
+			dockerIgnores,
+			watch.EphemeralPathMatcher(),
+			dotGitIgnore,
+			ignore,
+		}
+		// Copy actions only: rebuild on the same tree must still fire.
+		switch trigger.Action {
+		case types.WatchActionSync, types.WatchActionSyncRestart, types.WatchActionSyncExec:
+			ignores = append(ignores, dockerFileIgnore)
+		}
+
 		rules = append(rules, watchRule{
 			Trigger: trigger,
 			include: include,
-			ignore: watch.NewCompositeMatcher(
-				dockerIgnores,
-				watch.EphemeralPathMatcher(),
-				dotGitIgnore,
-				ignore,
-			),
+			ignore:  watch.NewCompositeMatcher(ignores...),
 			service: service.Name,
 		})
 	}
@@ -793,6 +805,19 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 	}
 }
 
+// **/anchored so the matcher hits both initialSync's basenames and the
+// watch loop's absolute host paths.
+func dockerFileIgnoreMatcher(service types.ServiceConfig) (watch.PathMatcher, error) {
+	if service.Build == nil {
+		return watch.EmptyMatcher{}, nil
+	}
+	name := service.Build.Dockerfile
+	if name == "" {
+		name = "Dockerfile"
+	}
+	return watch.NewDockerPatternMatcher("/", []string{"**/" + filepath.Base(name)})
+}
+
 // Walks develop.watch.path and checks which files should be copied inside the container
 // ignores develop.watch.ignore, Dockerfile, compose files, bind mounted paths and .git
 func (s *composeService) initialSync(ctx context.Context, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
@@ -811,14 +836,14 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 		return err
 	}
 
-	// also exclude override compose files and any custom-named Dockerfile
-	dockerFilePatterns := append([]string{"Dockerfile"}, cli.DefaultFileNames...)
-	dockerFilePatterns = append(dockerFilePatterns, cli.DefaultOverrideFileNames...)
-	if service.Build != nil && service.Build.Dockerfile != "" {
-		dockerFilePatterns = append(dockerFilePatterns, filepath.Base(service.Build.Dockerfile))
+	dockerFileIgnore, err := dockerFileIgnoreMatcher(service)
+	if err != nil {
+		return err
 	}
 
-	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", dockerFilePatterns)
+	composeFiles := append([]string{}, cli.DefaultFileNames...)
+	composeFiles = append(composeFiles, cli.DefaultOverrideFileNames...)
+	composeFileIgnore, err := watch.NewDockerPatternMatcher("/", composeFiles)
 	if err != nil {
 		return err
 	}
@@ -828,6 +853,7 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 		watch.EphemeralPathMatcher(),
 		dotGitIgnore,
 		dockerFileIgnore,
+		composeFileIgnore,
 		triggerIgnore)
 
 	pathsToCopy, err := s.initialSyncFiles(service, trigger, ignoreInitialSync)
