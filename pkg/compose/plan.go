@@ -53,6 +53,10 @@ const (
 
 	// Provider operations
 	OpRunProvider OperationType = 30
+
+	// Hook operations. 40-42 are reserved for the start-phase operations
+	// (wait condition, pre_start run, post_start run).
+	OpCreateHookContainer OperationType = 43
 )
 
 // String returns the human-readable name of an OperationType.
@@ -82,6 +86,8 @@ func (o OperationType) String() string {
 		return "RenameContainer"
 	case OpRunProvider:
 		return "RunProvider"
+	case OpCreateHookContainer:
+		return "CreateHookContainer"
 	default:
 		return fmt.Sprintf("Unknown(%d)", int(o))
 	}
@@ -103,6 +109,7 @@ type Operation struct {
 	Volume       *types.VolumeConfig  // for volume operations
 	Timeout      *time.Duration       // for stop operations
 	CreateNodeID int                  // for OpRenameContainer: ID of the CreateContainer node whose result to rename
+	HookIndex    int                  // for OpCreateHookContainer: position of the hook in the service's hook list
 	// RemoveVolumes asks OpRemoveContainer to also remove the container's
 	// anonymous volumes — the imperative semantics for hook-runner containers.
 	RemoveVolumes bool

@@ -1280,10 +1280,13 @@ func TestReconcileContainers_StaleHookRunnersPurged(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
+	// The fresh runner (#4) waits for the replica create (live view final) and
+	// for both purges (its deterministic name must be free).
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
-[] -> #1 hook:app:stale:stale-a-id, RemoveContainer, stale pre_start hook container
-[] -> #2 hook:app:stale:stale-b-id, RemoveContainer, stale pre_start hook container
-[] -> #3 service:app:1, CreateContainer, no existing container
+[] -> #1 service:app:1, CreateContainer, no existing container
+[] -> #2 hook:app:stale:stale-a-id, RemoveContainer, stale pre_start hook container
+[] -> #3 hook:app:stale:stale-b-id, RemoveContainer, stale pre_start hook container
+[1,2,3] -> #4 hook:app:pre_start:0, CreateHookContainer, pre_start hook
 `)+"\n")
 
 	for _, n := range plan.Nodes {
@@ -1295,8 +1298,80 @@ func TestReconcileContainers_StaleHookRunnersPurged(t *testing.T) {
 	}
 }
 
-// A scale-0 service never reaches its pre_start hooks (the imperative start
-// path returns before them), so its stale runners are not purged either.
+// A cold start of a hooked service plans one runner per declared hook, chained
+// in declaration order after the replica create.
+func TestReconcileContainers_HookRunnersPlannedOnColdStart(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"app": {Name: "app", Scale: intPtr(1), PreStart: []types.ServiceHook{{}, {}}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName:    "myproject",
+		Containers:     map[string][]ObservedContainer{},
+		HookContainers: map[string][]ObservedContainer{},
+		Networks:       map[string][]ObservedNetwork{},
+		Volumes:        map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:app:1, CreateContainer, no existing container
+[1] -> #2 hook:app:pre_start:0, CreateHookContainer, pre_start hook
+[2] -> #3 hook:app:pre_start:1, CreateHookContainer, pre_start hook
+`)+"\n")
+
+	for _, n := range plan.Nodes {
+		if n.Operation.Type != OpCreateHookContainer {
+			continue
+		}
+		assert.Equal(t, n.Operation.Name, getHookContainerName("myproject", "app", n.Operation.HookIndex))
+	}
+}
+
+// A running replica whose config diverged is recreated, so it will not be
+// running when the start phase evaluates pre_start: the runner must be
+// planned. The observed-running gate applies to replicas that SURVIVE the
+// plan, not to the observation itself.
+func TestReconcileContainers_HookRunnersPlannedOnRecreate(t *testing.T) {
+	svc := types.ServiceConfig{Name: "app", Scale: intPtr(1), PreStart: []types.ServiceHook{{}}}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"app": svc},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"app": {{
+				ID: "c1", Number: 1, State: container.StateRunning, ConfigHash: "outdated",
+				Summary: container.Summary{
+					ID: "c1", State: container.StateRunning,
+					Labels: map[string]string{api.ServiceLabel: "app", api.ContainerNumberLabel: "1", api.ConfigHashLabel: "outdated"},
+				},
+			}},
+		},
+		HookContainers: map[string][]ObservedContainer{},
+		Networks:       map[string][]ObservedNetwork{},
+		Volumes:        map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	var hookCreates []*PlanNode
+	for _, n := range plan.Nodes {
+		if n.Operation.Type == OpCreateHookContainer {
+			hookCreates = append(hookCreates, n)
+		}
+	}
+	assert.Equal(t, len(hookCreates), 1, "recreated service must get its hook runner:\n%s", plan)
+}
+
+// A scale-0 service never reaches its pre_start hooks (the start phase
+// returns before them), so nothing is planned: no runner, no purge.
 func TestReconcileContainers_StaleHookRunnersKeptWhenScaleZero(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
@@ -1319,10 +1394,10 @@ func TestReconcileContainers_StaleHookRunnersKeptWhenScaleZero(t *testing.T) {
 	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan)
 }
 
-// A running replica gates pre_start off, so the stale runner stays: the
-// imperative purge lives inside the gated runPreStart call and would not run
-// either — a genuinely failed hook container stays retained for inspection as
-// long as its service is otherwise up.
+// A running replica surviving the plan gates pre_start off, so nothing is
+// planned for the hooks: no fresh runner, and the stale runner stays — a
+// genuinely failed hook container is retained for inspection as long as its
+// service is otherwise up.
 func TestReconcileContainers_StaleHookRunnersKeptWhenReplicaRunning(t *testing.T) {
 	svc := types.ServiceConfig{Name: "app", Scale: intPtr(1), PreStart: []types.ServiceHook{{}}}
 	hash := mustServiceHash(t, svc)

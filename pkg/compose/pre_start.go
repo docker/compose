@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -37,6 +38,14 @@ import (
 // so orphan containers from a previous failed run can be identified and removed
 // by a project+service+hook label filter.
 const preStartHookType = "pre_start"
+
+// getHookContainerName builds the deterministic name of a pre_start runner
+// container, e.g. "myproject-db-pre_start-0". A stable name makes the runner
+// an addressable resource of the reconciliation plan: repeated plans converge
+// on the same container instead of accumulating anonymous ones.
+func getHookContainerName(projectName, serviceName string, index int) string {
+	return strings.Join([]string{projectName, serviceName, preStartHookType, strconv.Itoa(index)}, api.Separator)
+}
 
 // lowestNumberedContainer returns the container with the lowest
 // com.docker.compose.container-number label, so pre_start always targets the
@@ -55,54 +64,85 @@ func lowestNumberedContainer(containers Containers) container.Summary {
 }
 
 // runPreStart executes the service's pre_start hooks sequentially, in declared
-// order. Each hook runs as an ephemeral container that shares the service
-// container's volumes via VolumesFrom and is attached to the same networks.
-// A non-zero exit gates service start.
+// order. Each hook runs in a runner container prepared by the reconciliation
+// plan (see planPreStartHookRunners) that shares the service container's
+// volumes via VolumesFrom and is attached to the same networks. A non-zero
+// exit gates service start.
+//
+// runPreStart never creates a runner itself: a declared hook without a fresh
+// runner is an error telling the user to reconcile — the runners were either
+// consumed by a previous start (e.g. `stop` then `start`) or never prepared.
 //
 // With per_replica: false (the only currently supported mode), the hook sees
 // the volumes of the first non-running replica only — anonymous volumes and
 // tmpfs mounts are per-replica and not shared. Use named volumes or bind
 // mounts for data the hook produces.
-func (s *composeService) runPreStart(ctx context.Context, project *types.Project, service types.ServiceConfig, ctr container.Summary, listener api.ContainerEventListener) error {
+func (s *composeService) runPreStart(ctx context.Context, project *types.Project, service types.ServiceConfig, listener api.ContainerEventListener) error {
 	// Validate every hook up front so an unsupported entry never triggers any I/O.
 	for i, hook := range service.PreStart {
 		if hook.PerReplica {
 			return fmt.Errorf("service %q pre_start[%d]: per_replica is not yet supported; remove per_replica or set it to false", service.Name, i)
 		}
 	}
-	// Remove any hook containers left behind by a previous failed run so they do
-	// not accumulate. Only one orphan can exist per service (failure gates the
-	// remaining hooks), but we clean the whole set in case the service definition
-	// changed between runs. Removal failures are non-fatal: they are logged so
-	// the operator can identify the stale container.
-	if err := s.removeOrphanPreStartContainers(ctx, project.Name, service.Name); err != nil {
-		logrus.Warnf("service %q: failed to remove stale pre_start hook containers: %v", service.Name, err)
+	runners, err := s.listPreStartRunners(ctx, project.Name, service.Name)
+	if err != nil {
+		return err
 	}
-	for i, hook := range service.PreStart {
-		created, err := s.createPreStartContainer(ctx, project, service, ctr, hook)
-		if err != nil {
-			return err
+	for i := range service.PreStart {
+		runner, ok := runners[i]
+		if !ok {
+			return fmt.Errorf("service %q pre_start[%d]: no hook runner container found — runners are prepared when the service is created and consumed when its hooks run; run %q to prepare them again",
+				service.Name, i, "docker compose up "+service.Name)
 		}
-		if err := s.execPreStartHook(ctx, service, i, created.ID, listener); err != nil {
+		if err := s.execPreStartHook(ctx, service, i, runner.ID, listener); err != nil {
 			return err
 		}
 		// Success: remove the hook container, mirroring the old AutoRemove behaviour
 		// (including its anonymous volumes). A removal failure is logged but does not
 		// gate service start — the hook already succeeded.
-		if _, removeErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); removeErr != nil {
-			logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s: %v", service.Name, i, created.ID, removeErr)
+		if _, removeErr := s.apiClient().ContainerRemove(ctx, runner.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); removeErr != nil {
+			logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s: %v", service.Name, i, runner.ID, removeErr)
 		}
 	}
 	return nil
+}
+
+// listPreStartRunners returns the service's created-state pre_start hook
+// runner containers, indexed by their HookIndexLabel. Runners in any other
+// state are ignored — a failed hook retained for inspection or an
+// old-generation container without an index label is not executable; only a
+// fresh runner prepared by the reconciliation plan is.
+func (s *composeService) listPreStartRunners(ctx context.Context, projectName, serviceName string) (map[int]container.Summary, error) {
+	f := projectFilter(projectName)
+	f.Add("label", serviceFilter(serviceName))
+	f.Add("label", hookFilter(preStartHookType))
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: f,
+	})
+	if err != nil {
+		return nil, err
+	}
+	runners := map[int]container.Summary{}
+	for _, ctr := range res.Items {
+		if ctr.State != container.StateCreated {
+			continue
+		}
+		index, err := strconv.Atoi(ctr.Labels[api.HookIndexLabel])
+		if err != nil {
+			continue
+		}
+		runners[index] = ctr
+	}
+	return runners, nil
 }
 
 // execPreStartHook starts an already-created hook container, streams its logs
 // and waits for its exit. It owns only execution-failure handling: a container
 // that never started or a run cancelled by the user is removed, a genuinely
 // failed hook is retained for post-mortem inspection. Removing the container
-// after a successful run is the caller's job — the container's lifecycle
-// belongs to whoever created it (the imperative runPreStart loop today, the
-// reconciliation plan once the executor runs hook nodes).
+// after a successful run is the caller's job — the runner was prepared by the
+// reconciliation plan and is consumed (removed) by runPreStart on success.
 func (s *composeService) execPreStartHook(
 	ctx context.Context, service types.ServiceConfig,
 	index int, containerID string, listener api.ContainerEventListener,
@@ -168,10 +208,16 @@ func (s *composeService) execPreStartHook(
 	return nil
 }
 
+// createPreStartContainer creates the runner container for the index-th
+// pre_start hook of service, named after getHookContainerName and stamped
+// with the hook labels so both the start phase (by index) and the purge (by
+// hook type) can find it. It only creates: the runner is left in created
+// state for the start phase to execute.
 func (s *composeService) createPreStartContainer(
 	ctx context.Context, project *types.Project, service types.ServiceConfig,
-	ctr container.Summary, hook types.ServiceHook,
+	ctr container.Summary, index int, name string,
 ) (client.ContainerCreateResult, error) {
+	hook := service.PreStart[index]
 	image := hook.Image
 	if image == "" {
 		image = api.GetImageNameOrDefault(service, project.Name)
@@ -188,10 +234,11 @@ func (s *composeService) createPreStartContainer(
 		// HookLabel also distinguishes hook containers from the real service
 		// container (which shares ProjectLabel and ServiceLabel).
 		Labels: map[string]string{
-			api.ProjectLabel: project.Name,
-			api.ServiceLabel: service.Name,
-			api.VersionLabel: api.ComposeVersion,
-			api.HookLabel:    preStartHookType,
+			api.ProjectLabel:   project.Name,
+			api.ServiceLabel:   service.Name,
+			api.VersionLabel:   api.ComposeVersion,
+			api.HookLabel:      preStartHookType,
+			api.HookIndexLabel: strconv.Itoa(index),
 		},
 	}
 	hostCfg := &container.HostConfig{
@@ -215,6 +262,7 @@ func (s *composeService) createPreStartContainer(
 	hostCfg.NetworkMode = networkMode
 
 	created, err := s.apiClient().ContainerCreate(ctx, client.ContainerCreateOptions{
+		Name:             name,
 		Config:           cfg,
 		HostConfig:       hostCfg,
 		NetworkingConfig: networkingConfig,
@@ -254,32 +302,6 @@ func (s *composeService) connectPreStartExtraNetworks(ctx context.Context, proje
 			EndpointConfig: eps,
 		}); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-// removeOrphanPreStartContainers finds and force-removes any hook containers
-// left behind by a previous failed run of this service's pre_start hooks.
-// Containers are identified by project + service + HookLabel=pre_start.
-// Removal failures are logged at warn level and do not abort the run.
-func (s *composeService) removeOrphanPreStartContainers(ctx context.Context, projectName, serviceName string) error {
-	f := projectFilter(projectName)
-	f.Add("label", serviceFilter(serviceName))
-	f.Add("label", hookFilter(preStartHookType))
-	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		All:     true,
-		Filters: f,
-	})
-	if err != nil {
-		return err
-	}
-	for _, ctr := range res.Items {
-		if _, removeErr := s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
-			Force:         true,
-			RemoveVolumes: true,
-		}); removeErr != nil {
-			logrus.Warnf("failed to remove stale pre_start hook container %s: %v", ctr.ID, removeErr)
 		}
 	}
 	return nil
