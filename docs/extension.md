@@ -66,19 +66,9 @@ JSON messages MUST include a `type` and a `message` attribute.
   ```json
   { "type": "publish-endpoint", "message": "80=localhost:49152" }
   ```
-  The provider does not need to know how containers reach its host: the relay translates a loopback (or
-  unspecified) upstream host into `host.docker.internal` — resolved through the `host-gateway` extra_host
-  Compose injects — while routable addresses pass through untouched.
-  When a provider publishes at least one endpoint, Compose deploys a **relay container** in place of the service:
-  a minimal TCP forwarder (`docker/compose-relay` — set `COMPOSE_RELAY_IMAGE` to pull the image from an internal
-  registry instead of Docker Hub) joining the networks of the services that depend on the
-  provider service, aliased with the service name. Consumers then reach the resource at the compose-native
-  address — `http://<service>:<container-port>` — with no injected variables involved. The relay is a regular
-  project container (standard compose labels, canonical `<project>-<service>-1` name), so `ps`, `logs`, `stop`
-  and `down` treat it as the service; it additionally carries the `com.docker.compose.relay` label identifying
-  its role, and process-level commands (`exec`, `cp`) refuse it. The relay is recreated when the published
-  endpoints change, and removed by `down` like any project container. TCP only; the message may be repeated,
-  one per port.
+  TCP only; the message may be repeated, one per port. When a provider publishes at least one endpoint, Compose
+  deploys a relay container in place of the service so that dependents reach the resource at the compose-native
+  address — see [Compose-native addressing with `publish-endpoint`](#compose-native-addressing-with-publish-endpoint).
 
 ## Requesting the service configuration
 
@@ -162,6 +152,47 @@ value is not deterministic.
 
 > __Note:__  The `compose up` provider command _MUST_ be idempotent. If resource is already running, the command _MUST_ set
 > the same environment variables to ensure consistent configuration of dependent services.
+
+### Compose-native addressing with `publish-endpoint`
+
+Environment-variable injection makes the consumer aware of the provider: the application has to read
+`DATABASE_URL` instead of connecting to `database` the way it would reach any container-backed service. When the
+provider's resource is reachable through a TCP endpoint, `publish-endpoint` removes that coupling: the provider
+declares where each port of the resource is actually reachable, and Compose deploys a **relay container** in
+place of the service. Dependents then connect to the compose-native address — `<service>:<container-port>`,
+e.g. `http://database:80` — with no injected variables involved, so the same application configuration works
+whether the service runs as a container or through a provider.
+
+```mermaid
+sequenceDiagram
+    participant Compose
+    participant Provider
+    participant resource as managed resource<br/>(provider's host)
+    participant relay as relay container<br/>network alias: database
+    participant app as app container
+
+    Compose->>Provider: compose up --project-name=xx "database"
+    Provider->>resource: provision, publish a port on the host
+    Provider--)Compose: json { "type": "publish-endpoint", "message": "80=localhost:49152" }
+    Provider-)Compose: EOF (command complete) exit 0
+    Compose->>relay: deploy on the dependents' networks,<br/>forwarding 80 → host.docker.internal:49152
+    Compose->>app: start
+    app->>relay: connect to database:80
+    relay->>resource: forward to host.docker.internal:49152
+```
+
+The provider reports each endpoint as seen from its own host — typically a port published on `localhost` — and
+does not need to know how containers reach that host: the relay translates a loopback (or unspecified) upstream
+host into `host.docker.internal` — resolved through the `host-gateway` extra_host Compose injects — while
+routable addresses pass through untouched.
+
+The relay is a minimal TCP forwarder (`docker/compose-relay` — set `COMPOSE_RELAY_IMAGE` to pull the image from
+an internal registry instead of Docker Hub) joining the networks of the services that depend on the provider
+service, aliased with the service name. It is a regular project container (standard compose labels, canonical
+`<project>-<service>-1` name), so `ps`, `logs`, `stop` and `down` treat it as the service; it additionally
+carries the `com.docker.compose.relay` label identifying its role, and process-level commands (`exec`, `cp`)
+refuse it. The relay is recreated when the published endpoints change, and removed by `down` like any project
+container.
 
 ## Down lifecycle
 
