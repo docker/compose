@@ -41,6 +41,10 @@ import (
 )
 
 const (
+	// OCI_REMOTE_ENABLED is the environment variable controlling support for
+	// OCI remote compose resources. Despite the EXPERIMENTAL name (kept for
+	// backward compatibility), the feature is enabled by default: the variable
+	// is effectively an opt-out, to be set to a falsy value to disable it.
 	OCI_REMOTE_ENABLED = "COMPOSE_EXPERIMENTAL_OCI_REMOTE"
 	OciPrefix          = "oci://"
 )
@@ -71,6 +75,8 @@ func validatePathInBase(base, unsafePath string) error {
 	return nil
 }
 
+// ociRemoteLoaderEnabled reports whether OCI remote resources are enabled.
+// Defaults to true when OCI_REMOTE_ENABLED is unset — see the constant doc.
 func ociRemoteLoaderEnabled() (bool, error) {
 	if v := os.Getenv(OCI_REMOTE_ENABLED); v != "" {
 		enabled, err := strconv.ParseBool(v)
