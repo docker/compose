@@ -64,7 +64,9 @@ func RequireEventuallyServiceState(t testing.TB, cli *CLI, service string, state
 		// --format=json prints one JSON object per line (NDJSON), not a
 		// single object or array: a scaled service, or a transient window
 		// during recreation where the old and new containers are both
-		// listed, means more than one line for the requested service.
+		// listed, means more than one line for the requested service — every
+		// one of them must reach the expected state, not just the first.
+		var found bool
 		for _, line := range strings.Split(strings.TrimSpace(psRes.Stdout()), "\n") {
 			if line == "" {
 				continue
@@ -76,9 +78,13 @@ func RequireEventuallyServiceState(t testing.TB, cli *CLI, service string, state
 			if svc, _ := entry["Service"].(string); !strings.EqualFold(svc, service) {
 				continue
 			}
-			if current, _ := entry["State"].(string); strings.EqualFold(current, state) {
-				return poll.Success()
+			found = true
+			if current, _ := entry["State"].(string); !strings.EqualFold(current, state) {
+				return poll.Continue("service %q not in state %q yet (got %q): %s", service, state, current, psRes.Stdout())
 			}
+		}
+		if found {
+			return poll.Success()
 		}
 		return poll.Continue("service %q not in state %q yet: %s", service, state, psRes.Stdout())
 	}
