@@ -1,0 +1,7 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    env_file:
+      - ./app.env
