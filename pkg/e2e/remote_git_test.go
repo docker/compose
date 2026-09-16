@@ -52,7 +52,10 @@ func serveGitRepo(t *testing.T, dir string) *gitRepo {
 	}
 	root := t.TempDir()
 	r := &gitRepo{t: t, work: dir, bare: filepath.Join(root, "repo.git")}
-	r.git(dir, "init", "-q", "-b", "main", ".")
+	// init then set HEAD explicitly: `git init -b` requires git >= 2.28,
+	// symbolic-ref names the initial branch on any version
+	r.git(dir, "init", "-q", ".")
+	r.git(dir, "symbolic-ref", "HEAD", "refs/heads/main")
 	r.git(dir, "add", "-A")
 	r.git(dir, "commit", "-q", "-m", "e2e fixture")
 	r.git(dir, "clone", "-q", "--bare", ".", r.bare)
@@ -78,6 +81,8 @@ func (r *gitRepo) Branch(name string, mutate func(dir string)) {
 	r.git(r.work, "add", "-A")
 	r.git(r.work, "commit", "-q", "-m", "branch "+name)
 	r.git(r.work, "push", "-q", r.bare, name)
+	// return to main so each Branch call cuts from the same base
+	r.git(r.work, "checkout", "-q", "main")
 }
 
 // git runs a git command against a fully isolated configuration: no user or
