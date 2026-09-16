@@ -94,3 +94,66 @@ func TestHelperProviderConfig(t *testing.T) {
 	}
 	os.Exit(0)
 }
+
+func TestExecutePlugin_MountsAndSecrets(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(mocks.NewMockAPIClient(mockCtrl)).AnyTimes()
+	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	assert.NilError(t, err)
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestHelperProviderMountsAndSecrets")
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+
+	service := types.ServiceConfig{
+		Name: "db",
+		Provider: &types.ServiceProviderConfig{
+			Type: "test-provider",
+		},
+	}
+	variables, err := svc.(*composeService).executePlugin(cmd, "up", service)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(variables.mounts), 2)
+	assert.Equal(t, variables.mounts[0].Source, "/host/path")
+	assert.Equal(t, variables.mounts[0].Target, "/container/path")
+	assert.Equal(t, variables.mounts[1].Source, "my-vol")
+	assert.Equal(t, variables.mounts[1].Target, "/data")
+
+	assert.Equal(t, len(variables.secrets), 2)
+	assert.Equal(t, variables.secrets[0].Source, "my_secret")
+	assert.Equal(t, variables.projectSecrets["my_secret"].File, "/tmp/secret1")
+	assert.Equal(t, variables.secrets[1].Source, "other_secret")
+	assert.Equal(t, variables.projectSecrets["other_secret"].File, "/tmp/secret2")
+}
+
+func TestHelperProviderMountsAndSecrets(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		t.Skip("helper process for TestExecutePlugin_MountsAndSecrets")
+	}
+	emit := func(msg JsonMessage) {
+		if err := json.NewEncoder(os.Stdout).Encode(msg); err != nil {
+			os.Exit(1)
+		}
+	}
+
+	// Mount string format
+	emit(JsonMessage{Type: MountType, Message: "/host/path:/container/path"})
+	// Mount object format
+	emit(JsonMessage{
+		Type: MountType,
+		Mount: &types.ServiceVolumeConfig{
+			Type:   "volume",
+			Source: "my-vol",
+			Target: "/data",
+		},
+	})
+
+	// Secret string format (source=file)
+	emit(JsonMessage{Type: SecretType, Message: "my_secret=/tmp/secret1"})
+	// Secret string format (source:file)
+	emit(JsonMessage{Type: SecretType, Message: "other_secret:/tmp/secret2"})
+
+	os.Exit(0)
+}
+

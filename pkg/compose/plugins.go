@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
@@ -40,8 +41,10 @@ import (
 )
 
 type JsonMessage struct {
-	Type    string `json:"type"`
-	Message string `json:"message,omitempty"`
+	Type    string                     `json:"type"`
+	Message string                     `json:"message,omitempty"`
+	Mount   *types.ServiceVolumeConfig `json:"mount,omitempty"`
+	Secret  *types.ServiceSecretConfig `json:"secret,omitempty"`
 }
 
 const (
@@ -50,6 +53,8 @@ const (
 	SetEnvType                = "setenv"
 	RawSetEnvType             = "rawsetenv"
 	DebugType                 = "debug"
+	MountType                 = "mount"
+	SecretType                = "secret"
 	providerMetadataDirectory = "compose/providers"
 
 	// GetServiceConfigType is a message the provider sends to receive, on
@@ -59,8 +64,11 @@ const (
 )
 
 type pluginVariables struct {
-	prefixed types.Mapping
-	raw      types.Mapping
+	prefixed       types.Mapping
+	raw            types.Mapping
+	mounts         []types.ServiceVolumeConfig
+	secrets        []types.ServiceSecretConfig
+	projectSecrets map[string]types.SecretConfig
 }
 
 var mux sync.Mutex
@@ -103,6 +111,20 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 					logrus.Warnf("provider %q overrides environment variable %q in service %q", service.Name, key, name)
 				}
 				s.Environment[key] = &val
+			}
+			if len(variables.mounts) > 0 {
+				s.Volumes = append(s.Volumes, variables.mounts...)
+			}
+			if len(variables.secrets) > 0 {
+				s.Secrets = append(s.Secrets, variables.secrets...)
+				for _, secret := range variables.secrets {
+					if projSecret, ok := variables.projectSecrets[secret.Source]; ok {
+						if project.Secrets == nil {
+							project.Secrets = make(types.Secrets)
+						}
+						project.Secrets[secret.Source] = projSecret
+					}
+				}
 			}
 			project.Services[name] = s
 		}
@@ -180,8 +202,9 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	defer func() { _ = stdout.Close() }()
 
 	variables := pluginVariables{
-		prefixed: types.Mapping{},
-		raw:      types.Mapping{},
+		prefixed:       types.Mapping{},
+		raw:            types.Mapping{},
+		projectSecrets: map[string]types.SecretConfig{},
 	}
 
 	for {
@@ -226,6 +249,42 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 			}()
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
+		case MountType:
+			if msg.Mount != nil {
+				variables.mounts = append(variables.mounts, *msg.Mount)
+			} else {
+				volume, err := format.ParseVolume(msg.Message)
+				if err != nil {
+					return pluginVariables{}, fmt.Errorf("invalid response from plugin (expected valid volume string): %s", msg.Message)
+				}
+				variables.mounts = append(variables.mounts, volume)
+			}
+		case SecretType:
+			if msg.Secret != nil {
+				variables.secrets = append(variables.secrets, *msg.Secret)
+				if msg.Secret.Source != "" && msg.Message != "" {
+					variables.projectSecrets[msg.Secret.Source] = types.SecretConfig{
+						Name: msg.Secret.Source,
+						File: msg.Message,
+					}
+				}
+			} else {
+				sep := "="
+				if !strings.Contains(msg.Message, "=") && strings.Contains(msg.Message, ":") {
+					sep = ":"
+				}
+				key, val, found := strings.Cut(msg.Message, sep)
+				if !found {
+					return pluginVariables{}, fmt.Errorf("invalid response from plugin (expected source=file or source:file): %s", msg.Message)
+				}
+				variables.secrets = append(variables.secrets, types.ServiceSecretConfig{
+					Source: key,
+				})
+				variables.projectSecrets[key] = types.SecretConfig{
+					Name: key,
+					File: val,
+				}
+			}
 		default:
 			return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Type)
 		}

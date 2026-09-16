@@ -103,3 +103,41 @@ func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
 			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
 			OutputContains("overrides environment variable"))
 }
+
+func TestProviderMountsAndSecrets(t *testing.T) {
+	tmpDir := t.TempDir()
+	mountDir := filepath.Join(tmpDir, "provider-data")
+	secretFile := filepath.Join(tmpDir, "provider-secret")
+	_ = os.MkdirAll(mountDir, 0o755)
+	_ = os.WriteFile(filepath.Join(mountDir, "hello"), []byte("hello from provider mount"), 0o644)
+	_ = os.WriteFile(secretFile, []byte("hello from provider secret"), 0o644)
+
+	// We need to create a test folder for the scenario to pick up the compose.yaml
+	scenarioDir := filepath.Join("testdata", "TestProviderMountsAndSecrets")
+	_ = os.MkdirAll(scenarioDir, 0o755)
+	yamlContent := fmt.Sprintf(`
+services:
+  db:
+    provider:
+      type: example-provider
+      options:
+        type: postgres
+        name: my_db
+        size: 10
+        mount: %s:/provider-data
+        secret: my_secret=%s
+  test:
+    image: alpine
+    depends_on:
+      - db
+    command: sh -c "cat /provider-data/hello && cat /run/secrets/my_secret"
+`, filepath.ToSlash(mountDir), filepath.ToSlash(secretFile))
+	_ = os.WriteFile(filepath.Join(scenarioDir, "compose.yaml"), []byte(yamlContent), 0o644)
+	defer os.RemoveAll(scenarioDir) // clean up
+
+	providerScenario(t, "a provider injecting mounts and secrets").
+		Step("the service sees both the mount and the secret",
+			ComposeCmd("up", "--build"),
+			OutputContains("hello from provider mount"),
+			OutputContains("hello from provider secret"))
+}
