@@ -122,6 +122,9 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 						if project.Secrets == nil {
 							project.Secrets = make(types.Secrets)
 						}
+						if existing, ok := project.Secrets[secret.Source]; ok && (existing.File != projSecret.File || existing.Environment != projSecret.Environment || existing.Name != projSecret.Name) {
+							logrus.Warnf("provider %q overrides secret %q in project", service.Name, secret.Source)
+						}
 						project.Secrets[secret.Source] = projSecret
 					}
 				}

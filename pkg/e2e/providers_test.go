@@ -133,7 +133,7 @@ services:
     command: sh -c "cat /provider-data/hello && cat /run/secrets/my_secret"
 `, filepath.ToSlash(mountDir), filepath.ToSlash(secretFile))
 	_ = os.WriteFile(filepath.Join(scenarioDir, "compose.yaml"), []byte(yamlContent), 0o644)
-	defer os.RemoveAll(scenarioDir) // clean up
+	defer func() { _ = os.RemoveAll(scenarioDir) }() // clean up
 
 	providerScenario(t, "a provider injecting mounts and secrets").
 		Step("the service sees both the mount and the secret",
