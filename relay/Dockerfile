@@ -16,9 +16,35 @@
 #   limitations under the License.
 
 ARG GO_VERSION=1.26.8
+ARG GOLANGCI_LINT_VERSION=v2.13.2
 
-FROM golang:${GO_VERSION}-alpine AS build
+FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
+
+FROM golang:${GO_VERSION}-alpine AS base
 WORKDIR /src
+
+FROM base AS build-base
+COPY go.mod ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+FROM build-base AS lint
+ENV GOLANGCI_LINT_CACHE=/cache/golangci-lint
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/cache/golangci-lint \
+    --mount=from=golangci-lint,source=/usr/bin/golangci-lint,target=/usr/bin/golangci-lint \
+    golangci-lint run ./...
+
+FROM build-base AS test
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg/mod \
+    go vet ./... && \
+    go test -v ./...
+
+FROM base AS build
 COPY go.mod main.go ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-w -s" -o /compose-relay .
 

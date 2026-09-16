@@ -53,7 +53,7 @@ group "default" {
 }
 
 group "validate" {
-  targets = ["lint", "vendor-validate", "license-validate", "mocks-validate"]
+  targets = ["lint", "vendor-validate", "license-validate", "mocks-validate", "relay-lint"]
 }
 
 target "lint" {
@@ -165,6 +165,22 @@ target "image-module-cross" {
     "windows/amd64",
     "windows/arm64",
   ]
+}
+
+// relay-lint and relay-test validate relay/'s own module (a separate go.mod:
+// go vet/lint/test from the repo root don't cover it). Self-contained build
+// context, so relay/ carries its own .golangci.yml rather than sharing the
+// root one, which isn't in scope for a "./relay" context.
+target "relay-lint" {
+  context = "./relay"
+  target  = "lint"
+  output  = ["type=cacheonly"]
+}
+
+target "relay-test" {
+  context = "./relay"
+  target  = "test"
+  output  = ["type=cacheonly"]
 }
 
 // relay-image is the local/dev build of the network relay compose deploys in

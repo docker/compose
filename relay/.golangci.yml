@@ -1,0 +1,77 @@
+version: "2"
+run:
+  concurrency: 2
+linters:
+  default: none
+  disable:
+    # gocognit deliberately replaced gocyclo — do not re-enable. Cyclomatic
+    # complexity charges a flat guard clause the same as a nested branch, so
+    # our fail-fast style accumulated //nolint suppressions on functions that
+    # are long but flat. Cognitive complexity penalizes nesting and barely
+    # charges early returns, keeping the signal on genuinely tangled code.
+    - gocyclo
+  enable:
+    - copyloopvar
+    - errcheck
+    - errorlint
+    - forbidigo
+    - gocognit
+    - gocritic
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - nolintlint
+    - perfsprint
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  settings:
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: 'context\.Background'
+          pkg: '^context$'
+          msg: "in tests, use t.Context() instead of context.Background()"
+        - pattern: 'context\.TODO'
+          pkg: '^context$'
+          msg: "in tests, use t.Context() instead of context.TODO()"
+    gocritic:
+      disabled-checks:
+        - paramTypeCombine
+        - unnamedResult
+        - whyNoLint
+      enabled-tags:
+        - diagnostic
+        - opinionated
+        - style
+    gocognit:
+      min-complexity: 30
+    lll:
+      line-length: 200
+    revive:
+      rules:
+        - name: package-comments
+          disabled: true
+  exclusions:
+    rules:
+      - path-except: '_test\.go'
+        linters:
+          - forbidigo
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+      custom-order: true

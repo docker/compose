@@ -59,7 +59,7 @@ func tcpPair(t *testing.T) (net.Conn, net.Conn) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	type accepted struct {
 		conn net.Conn
 		err  error
@@ -94,7 +94,7 @@ func silentUpstream(t *testing.T) net.Listener {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		_, _ = io.Copy(io.Discard, conn) // read the FIN, never answer, never close
 		time.Sleep(5 * time.Second)
 	}()
@@ -150,7 +150,7 @@ func TestForwardKeepsStreamingAfterHalfClose(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		// stream chunks for well past the idle grace, each within it
 		for range chunks {
 			time.Sleep(150 * time.Millisecond)
