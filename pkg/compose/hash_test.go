@@ -58,18 +58,7 @@ func TestServiceHashContinuity(t *testing.T) {
 	pinned, err := ServiceHash(svc)
 	assert.NilError(t, err)
 
-	o := svc
-	o.Build = nil
-	o.PullPolicy = ""
-	o.Scale = nil
-	if o.Deploy != nil {
-		deploy := *o.Deploy
-		deploy.Replicas = nil
-		o.Deploy = &deploy
-	}
-	o.DependsOn = nil
-	o.Profiles = nil
-	raw, err := json.Marshal(o)
+	raw, err := json.Marshal(trimServiceHashFields(svc))
 	assert.NilError(t, err)
 	legacy := digest.SHA256.FromBytes(raw).Encoded()
 	assert.Equal(t, pinned, legacy)
@@ -181,12 +170,21 @@ func TestServiceHashKeyOrderCoversStruct(t *testing.T) {
 				continue
 			}
 			if f.Anonymous && name == "" {
-				// encoding/json dereferences embedded pointers; match it
+				// encoding/json dereferences embedded pointers and promotes
+				// the exported fields of even an unexported struct embed;
+				// match it, and leave non-struct embeds (named types,
+				// interfaces) to the regular field handling below
 				ft := f.Type
 				if ft.Kind() == reflect.Pointer {
 					ft = ft.Elem()
 				}
-				walk(ft)
+				if ft.Kind() == reflect.Struct {
+					walk(ft)
+					continue
+				}
+			}
+			if !f.IsExported() {
+				// unexported fields never reach the JSON output
 				continue
 			}
 			if name == "" {
