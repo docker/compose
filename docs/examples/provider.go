@@ -40,8 +40,10 @@ func main() {
 }
 
 type options struct {
-	db   string
-	size int
+	db      string
+	size    int
+	mounts  []string
+	secrets []string
 }
 
 func composeCommand() *cobra.Command {
@@ -65,6 +67,8 @@ func composeCommand() *cobra.Command {
 	upCmd.Flags().IntVar(&options.size, "size", 10, "Database size in GB")
 	upCmd.Flags().String("name", "", "Name of the database to be created")
 	_ = upCmd.MarkFlagRequired("name")
+	upCmd.Flags().StringSliceVar(&options.mounts, "mount", nil, "Volume mount to inject (format: source:target)")
+	upCmd.Flags().StringSliceVar(&options.secrets, "secret", nil, "Secret to inject (format: name=file)")
 
 	downCmd := &cobra.Command{
 		Use:  "down",
@@ -121,6 +125,14 @@ func up(options options, args []string) {
 	}
 	fmt.Printf(`{ "type": "setenv", "message": "URL=https://magic.cloud/%s" }%s`, servicename, lineSeparator)
 	fmt.Printf(`{ "type": "rawsetenv", "message": "CLOUD_REGION=us-east-1" }%s`, lineSeparator)
+	for _, m := range options.mounts {
+		mountMsg, _ := json.Marshal(map[string]string{"type": "mount", "message": m})
+		fmt.Println(string(mountMsg))
+	}
+	for _, s := range options.secrets {
+		secretMsg, _ := json.Marshal(map[string]string{"type": "secret", "message": s})
+		fmt.Println(string(secretMsg))
+	}
 }
 
 func down(_ *cobra.Command, _ []string) {

@@ -79,9 +79,12 @@ func (exec *planExecutor) execRemoveVolume(ctx context.Context, op Operation) er
 func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNode) error {
 	op := node.Operation
 	service := *op.Service
+	if liveService, ok := exec.project.Services[op.Service.Name]; ok {
+		service = liveService
+	}
 	// Detach VolumesFrom from the source slice: resolveServiceReferences mutates
 	// entries in place, and the shallow struct copy still shares the backing array.
-	service.VolumesFrom = slices.Clone(op.Service.VolumesFrom)
+	service.VolumesFrom = slices.Clone(service.VolumesFrom)
 
 	// Resolve service references (network_mode, ipc, pid, volumes_from) to
 	// actual container IDs from the in-memory view, which already includes
@@ -96,9 +99,9 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 	labels := mergeLabels(service.Labels, service.CustomLabels)
 	if op.Inherited != nil {
 		// This is a recreate: add the replace label
-		replacedName := op.Service.ContainerName
+		replacedName := service.ContainerName
 		if replacedName == "" {
-			replacedName = fmt.Sprintf("%s%s%d", op.Service.Name, api.Separator, op.Number)
+			replacedName = fmt.Sprintf("%s%s%d", service.Name, api.Separator, op.Number)
 		}
 		labels = labels.Add(api.ContainerReplaceLabel, replacedName)
 	}
@@ -120,9 +123,9 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 	})
 
 	// Make the new container visible to subsequent execCreateContainer calls
-	// that resolve service references against op.Service.Name.
+	// that resolve service references against service.Name.
 	exec.containersMu.Lock()
-	exec.containersByService[op.Service.Name] = append(exec.containersByService[op.Service.Name], ctr)
+	exec.containersByService[service.Name] = append(exec.containersByService[service.Name], ctr)
 	exec.containersMu.Unlock()
 	return nil
 }
