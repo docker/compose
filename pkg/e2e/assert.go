@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -55,21 +56,31 @@ func RequireServiceState(t testing.TB, cli *CLI, service string, state string) {
 // other than this same `ps` state) must poll here rather than check once.
 func RequireEventuallyServiceState(t testing.TB, cli *CLI, service string, state string) {
 	t.Helper()
-	var last map[string]any
 	check := func(poll.LogT) poll.Result {
 		psRes := cli.RunDockerComposeCmdNoCheck(t, "ps", "--all", "--format=json", service)
-		var serviceState map[string]any
-		if err := json.Unmarshal([]byte(psRes.Stdout()), &serviceState); err != nil {
-			return poll.Continue("invalid `compose ps` JSON: command output: %s", psRes.Combined())
+		if psRes.ExitCode != 0 {
+			return poll.Continue("compose ps exited %d: %s", psRes.ExitCode, psRes.Combined())
 		}
-		last = serviceState
-		current, _ := serviceState["State"].(string)
-		if !strings.EqualFold(current, state) {
-			return poll.Continue("service %q not in state %q yet (got %q)", service, state, current)
+		// --format=json prints one JSON object per line (NDJSON), not a
+		// single object or array: a scaled service, or a transient window
+		// during recreation where the old and new containers are both
+		// listed, means more than one line for the requested service.
+		for _, line := range strings.Split(strings.TrimSpace(psRes.Stdout()), "\n") {
+			if line == "" {
+				continue
+			}
+			var entry map[string]any
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				return poll.Error(fmt.Errorf("invalid `compose ps` JSON line %q: %w", line, err))
+			}
+			if svc, _ := entry["Service"].(string); !strings.EqualFold(svc, service) {
+				continue
+			}
+			if current, _ := entry["State"].(string); strings.EqualFold(current, state) {
+				return poll.Success()
+			}
 		}
-		return poll.Success()
+		return poll.Continue("service %q not in state %q yet: %s", service, state, psRes.Stdout())
 	}
 	poll.WaitOn(t, check, poll.WithDelay(250*time.Millisecond), poll.WithTimeout(15*time.Second))
-
-	assert.Assert(t, is.Equal(service, last["Service"]), "Found ps output for unexpected service")
 }
