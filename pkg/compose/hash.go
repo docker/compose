@@ -19,7 +19,6 @@ package compose
 import (
 	"bytes"
 	"encoding/json"
-	"sort"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/opencontainers/go-digest"
@@ -144,9 +143,11 @@ var serviceHashKeyOrder = []string{
 	"pre_stop",
 }
 
-// ServiceHash computes the configuration hash for a service.
-func ServiceHash(o types.ServiceConfig) (string, error) {
-	// remove the Build config when generating the service hash
+// trimServiceHashFields removes the attributes deliberately excluded from the
+// service config-hash (build inputs, scaling knobs, dependency wiring). It is
+// the single definition of that exclusion set, shared with the continuity
+// test so the two cannot silently drift apart.
+func trimServiceHashFields(o types.ServiceConfig) types.ServiceConfig {
 	o.Build = nil
 	o.PullPolicy = ""
 	o.Scale = nil
@@ -157,6 +158,12 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	}
 	o.DependsOn = nil
 	o.Profiles = nil
+	return o
+}
+
+// ServiceHash computes the configuration hash for a service.
+func ServiceHash(o types.ServiceConfig) (string, error) {
+	o = trimServiceHashFields(o)
 
 	raw, err := json.Marshal(o)
 	if err != nil {
@@ -197,12 +204,7 @@ func pinRootKeyOrder(raw []byte, order []string) ([]byte, error) {
 			delete(root, key)
 		}
 	}
-	rest := make([]string, 0, len(root))
-	for key := range root {
-		rest = append(rest, key)
-	}
-	sort.Strings(rest)
-	for _, key := range rest {
+	for _, key := range sortedKeys(root) {
 		write(key, root[key])
 	}
 	buf.WriteByte('}')
