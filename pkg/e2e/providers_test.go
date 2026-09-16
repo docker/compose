@@ -125,6 +125,20 @@ func TestProviderPublishEndpoint(t *testing.T) {
 	assert.Assert(t, res.ExitCode != 0, "exec on a relay container must fail")
 	assert.Assert(t, strings.Contains(res.Combined(), "network relay"), res.Combined())
 
+	// The relay is a first-class project container, not just process-level
+	// commands' target: stop/start/restart must reach it like any other
+	// service's container, consistent with docs/extension.md ("ps, logs,
+	// stop and down treat it as the service").
+	s.Step("stop halts the relay container",
+		ComposeCmd("stop", "db"),
+		ServiceState("db", "exited"))
+	s.Step("start brings the relay container back",
+		ComposeCmd("start", "db"),
+		ServiceState("db", "running"))
+	s.Step("restart cycles the relay container",
+		ComposeCmd("restart", "db"),
+		ServiceState("db", "running"))
+
 	// The relay belongs to the provider service's deprovisioning: down must
 	// remove it along with the provider's resource, or the project network
 	// stays in use and its removal fails.
