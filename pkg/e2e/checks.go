@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -546,6 +547,53 @@ func ContainerEnv(service, name, value string) Check {
 				}
 				if !slices.Contains(env, name+"="+value) {
 					return fmt.Errorf("not in container %s environment: %v", c.Name, env)
+				}
+			}
+			return nil
+		},
+	}
+}
+
+// BindMountSource expects the service's bind mount at target to resolve to
+// exactly wantSource — pinning down which working directory a relative
+// volume path was resolved against (e.g. an explicit --project-directory,
+// as opposed to wherever the compose file itself was loaded from).
+func BindMountSource(service, target, wantSource string) Check {
+	return Check{
+		name: fmt.Sprintf("service %q mount %q resolves to %s", service, target, wantSource),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr.service(service)
+			if len(containers) == 0 {
+				return errors.New("service has no container")
+			}
+			wantAbs, err := filepath.Abs(wantSource)
+			if err != nil {
+				return err
+			}
+			for _, c := range containers {
+				res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "inspect", "--format", "{{json .Mounts}}", c.ID))
+				if res.ExitCode != 0 {
+					return fmt.Errorf("inspect failed: %s", res.Combined())
+				}
+				var mounts []struct {
+					Destination string
+					Source      string
+				}
+				if err := json.Unmarshal([]byte(strings.TrimSpace(res.Stdout())), &mounts); err != nil {
+					return err
+				}
+				found := false
+				for _, m := range mounts {
+					if m.Destination != target {
+						continue
+					}
+					found = true
+					if m.Source != wantAbs {
+						return fmt.Errorf("container %s mount %s resolves to %s, want %s", c.Name, target, m.Source, wantAbs)
+					}
+				}
+				if !found {
+					return fmt.Errorf("container %s has no mount at %s", c.Name, target)
 				}
 			}
 			return nil

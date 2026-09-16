@@ -91,3 +91,31 @@ func TestOciRemoteTagSelection(t *testing.T) {
 		ServiceState("app", "running"),
 		ContainerEnv("app", "FLAVOR", "v1"))
 }
+
+// TestOciRemoteProjectDirectory is the docker/compose#14224 repro: an
+// explicit --project-directory must resolve a relative volume path against
+// itself, not against the local copy compose downloaded the oci:// artifact
+// into (its self-contained-artifact default, otherwise correct for extends
+// and bundled env files, but not meant to override an explicit request).
+func TestOciRemoteProjectDirectory(t *testing.T) {
+	s := NewScenario(t, "--project-directory must resolve a relative volume path for an oci:// project, not the artifact's own download directory")
+	registry := startLocalRegistry(t, s)
+	ref := registry + "/remote-project-directory:v1"
+	s.Env("XDG_CACHE_HOME=" + t.TempDir())
+	s.Step("publish pushes the project to the registry",
+		ComposeCmd("publish", "--yes", "--insecure-registry", ref))
+
+	// distinct from both the anchored testdata copy and the artifact's own
+	// download cache, so a bind source under it can only come from
+	// --project-directory being honored
+	projectDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(projectDir, "data"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	s.FromRemote("oci://"+ref, "--insecure-registry", registry, "--project-directory", projectDir)
+	s.Step("up resolves the relative volume against --project-directory",
+		ComposeCmd("up", "-d", "--wait", "--yes").Within(60*time.Second),
+		ServiceState("app", "running"),
+		BindMountSource("app", "/data", filepath.Join(projectDir, "data")))
+}
