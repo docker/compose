@@ -23,6 +23,7 @@ package e2e
 // test-specific logic), and are named after the observable they assert.
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -516,6 +517,36 @@ func FileAbsent(path string) Check {
 				return errors.New("file still exists")
 			} else if !os.IsNotExist(err) {
 				return err
+			}
+			return nil
+		},
+	}
+}
+
+// ContainerEnv expects every container of the service to carry the given
+// environment variable with the exact value, as recorded in the container
+// config — the observable effect of `environment`, `env_file` or provider
+// injection, whatever the source of the model.
+func ContainerEnv(service, name, value string) Check {
+	return Check{
+		name: fmt.Sprintf("service %q containers have env %s=%s", service, name, value),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr.service(service)
+			if len(containers) == 0 {
+				return errors.New("service has no container")
+			}
+			for _, c := range containers {
+				res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "inspect", "--format", "{{json .Config.Env}}", c.ID))
+				if res.ExitCode != 0 {
+					return fmt.Errorf("inspect failed: %s", res.Combined())
+				}
+				var env []string
+				if err := json.Unmarshal([]byte(strings.TrimSpace(res.Stdout())), &env); err != nil {
+					return err
+				}
+				if !slices.Contains(env, name+"="+value) {
+					return fmt.Errorf("not in container %s environment: %v", c.Name, env)
+				}
 			}
 			return nil
 		},
