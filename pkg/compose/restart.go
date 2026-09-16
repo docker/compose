@@ -23,6 +23,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -45,6 +46,14 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		return err
 	}
 
+	// shared by every service so the dependency-order fan-out and the
+	// per-service container fan-out combined never exceed maxConcurrency
+	// concurrent per-container restarts (pre_stop hook, ContainerRestart,
+	// post_start hook) — a per-service bound alone allows as many
+	// independent services to run at once as the graph permits, each with
+	// its own maxConcurrency budget
+	limiter := newOptionalLimiter(s.maxConcurrency)
+
 	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		config := project.Services[service]
 		err := s.waitDependencies(ctx, project, service, config.DependsOn, containers, 0)
@@ -52,9 +61,13 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			return err
 		}
 
-		eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+		eg, ctx := errgroup.WithContext(ctx)
 		for _, ctr := range containers.filter(isService(service)) {
 			eg.Go(func() error {
+				if err := acquireSlot(ctx, limiter); err != nil {
+					return err
+				}
+				defer releaseSlot(limiter)
 				return s.restartContainer(ctx, project.Services[service], ctr, options)
 			})
 		}

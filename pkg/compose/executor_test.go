@@ -21,6 +21,7 @@ import (
 	"errors"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
@@ -40,14 +41,14 @@ func (noopEventProcessor) Start(_ context.Context, _ string) {}
 func (noopEventProcessor) On(_ ...api.Resource)              {}
 func (noopEventProcessor) Done(_ string, _ bool)             {}
 
-func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
+func newTestService(t *testing.T, opts ...Option) (*composeService, *mocks.MockAPIClient) {
 	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
-	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	svc, err := NewComposeService(cli, append([]Option{WithEventProcessor(noopEventProcessor{})}, opts...)...)
 	assert.NilError(t, err)
 	return svc.(*composeService), apiClient
 }
@@ -285,6 +286,64 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 
 	assert.Equal(t, len(exec.containersByService["web"]), 0,
 		"all removed containers should be dropped from the live view")
+}
+
+// TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain guards the
+// invariant run() relies on to stay deadlock-free once maxConcurrency bounds
+// the errgroup (see the comment on newLimitedErrgroup's call in run()):
+// plan.Nodes must stay topologically sorted, so a node's dependencies are
+// always already dispatched to eg.Go by the time the dispatch loop reaches
+// a dependent. With maxConcurrency=1, a multi-level dependency chain forces
+// strictly serial execution; if that invariant were ever broken (a node
+// added before a dependency it references), the dispatch loop would stall
+// forever waiting for a slot held by a goroutine itself waiting on a
+// not-yet-dispatched dependency — so this test would hang instead of
+// completing.
+func TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+
+	const depth = 3
+	ctrs := make([]container.Summary, depth)
+	for i := range ctrs {
+		ctrs[i] = container.Summary{
+			ID:    "c" + strconv.Itoa(i),
+			Names: []string{"/test-web-" + strconv.Itoa(i+1)},
+			Labels: map[string]string{
+				api.ServiceLabel:         "web",
+				api.ContainerNumberLabel: strconv.Itoa(i + 1),
+			},
+		}
+		apiClient.EXPECT().ContainerStop(gomock.Any(), ctrs[i].ID, gomock.Any()).
+			Return(client.ContainerStopResult{}, nil)
+	}
+
+	// A -> B -> C: each node depends on the previous one.
+	plan := &Plan{}
+	var last *PlanNode
+	for i := range ctrs {
+		var deps []*PlanNode
+		if last != nil {
+			deps = []*PlanNode{last}
+		}
+		last = plan.addNode(Operation{
+			Type:       OpStopContainer,
+			ResourceID: "service:web:" + strconv.Itoa(i+1),
+			Cause:      "chain",
+			Container:  &ctrs[i],
+		}, "", deps...)
+	}
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+
+	done := make(chan error, 1)
+	go func() { done <- exec.run(t.Context(), plan) }()
+
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("run() deadlocked: a bounded errgroup requires plan.Nodes to stay topologically sorted")
+	}
 }
 
 // TestExecutePlanRecreateVolume drives the destructive core of a volume

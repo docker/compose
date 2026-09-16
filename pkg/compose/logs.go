@@ -26,6 +26,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -42,10 +43,23 @@ func (s *composeService) Logs(
 		return err
 	}
 
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	var eg *errgroup.Group
+	// limiter bounds how many containers are connecting (ContainerInspect +
+	// opening ContainerLogs) at once, in follow mode only: the streams
+	// themselves run indefinitely once opened, so gating the whole call
+	// (like the non-follow case does) would pin every slot forever and
+	// starve the monitor and any later container, the same reason
+	// waitDependencies is excluded from the concurrency cap.
+	var limiter *semaphore.Weighted
+	if options.Follow {
+		eg, ctx = errgroup.WithContext(ctx)
+		limiter = newOptionalLimiter(s.maxConcurrency)
+	} else {
+		eg, ctx = newLimitedErrgroup(ctx, s.maxConcurrency)
+	}
 	for _, ctr := range containers {
 		eg.Go(func() error {
-			return s.logContainer(ctx, consumer, ctr, options)
+			return s.logContainer(ctx, limiter, consumer, ctr, options)
 		})
 	}
 
@@ -59,7 +73,7 @@ func (s *composeService) Logs(
 			monitor.withServices(options.Project.ServiceNames())
 		}
 		monitor.withListener(printer.HandleEvent)
-		monitor.withListener(s.followStartedContainersLogs(ctx, eg, consumer, options))
+		monitor.withListener(s.followStartedContainersLogs(ctx, eg, limiter, consumer, options))
 		eg.Go(func() error {
 			// pass ctx so monitor will immediately stop on SIGINT
 			return monitor.Start(ctx)
@@ -93,12 +107,16 @@ func (s *composeService) selectLogsContainers(ctx context.Context, projectName s
 
 // logContainer streams a container's logs, warning when its logging driver
 // doesn't support reading logs
-func (s *composeService) logContainer(ctx context.Context, consumer api.LogConsumer, ctr container.Summary, options api.LogOptions) error {
-	res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
-	if err != nil {
+func (s *composeService) logContainer(ctx context.Context, limiter *semaphore.Weighted, consumer api.LogConsumer, ctr container.Summary, options api.LogOptions) error {
+	if err := acquireSlot(ctx, limiter); err != nil {
 		return err
 	}
-	err = s.doLogContainer(ctx, consumer, getContainerNameWithoutProject(ctr), res.Container, options)
+	res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+	if err != nil {
+		releaseSlot(limiter)
+		return err
+	}
+	err = s.doLogContainer(ctx, limiter, consumer, getContainerNameWithoutProject(ctr), res.Container, options)
 	if errdefs.IsNotImplemented(err) {
 		logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
 		return nil
@@ -109,18 +127,28 @@ func (s *composeService) logContainer(ctx context.Context, consumer api.LogConsu
 // followStartedContainersLogs streams the logs of containers (re)started
 // while following, ignoring those whose logging driver doesn't support
 // reading logs
-func (s *composeService) followStartedContainersLogs(ctx context.Context, eg *errgroup.Group, consumer api.LogConsumer, options api.LogOptions) api.ContainerEventListener {
+func (s *composeService) followStartedContainersLogs(
+	ctx context.Context,
+	eg *errgroup.Group,
+	limiter *semaphore.Weighted,
+	consumer api.LogConsumer,
+	options api.LogOptions,
+) api.ContainerEventListener {
 	return func(event api.ContainerEvent) {
 		if event.Type != api.ContainerEventStarted {
 			return
 		}
 		eg.Go(func() error {
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
+			}
 			res, err := s.apiClient().ContainerInspect(ctx, event.ID, client.ContainerInspectOptions{})
 			if err != nil {
+				releaseSlot(limiter)
 				return err
 			}
 
-			err = s.doLogContainer(ctx, consumer, event.Source, res.Container, api.LogOptions{
+			err = s.doLogContainer(ctx, limiter, consumer, event.Source, res.Container, api.LogOptions{
 				Follow:     options.Follow,
 				Since:      res.Container.State.StartedAt,
 				Until:      options.Until,
@@ -136,7 +164,12 @@ func (s *composeService) followStartedContainersLogs(ctx context.Context, eg *er
 	}
 }
 
-func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {
+// doLogContainer opens the container's log stream and copies it to consumer
+// until it ends. The caller must have already acquired limiter's slot (see
+// acquireSlot); it is released here right after ContainerLogs returns, so a
+// long-lived --follow stream never keeps blocking new connections or the
+// monitor.
+func (s *composeService) doLogContainer(ctx context.Context, limiter *semaphore.Weighted, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {
 	r, err := s.apiClient().ContainerLogs(ctx, ctr.ID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -146,6 +179,7 @@ func (s *composeService) doLogContainer(ctx context.Context, consumer api.LogCon
 		Tail:       options.Tail,
 		Timestamps: options.Timestamps,
 	})
+	releaseSlot(limiter)
 	if err != nil {
 		return err
 	}

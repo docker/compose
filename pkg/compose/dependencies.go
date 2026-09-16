@@ -49,7 +49,13 @@ type graphTraversal struct {
 	targetServiceStatus         ServiceStatus
 	adjacentServiceStatusToSkip ServiceStatus
 
-	visitorFn      func(context.Context, string) error
+	visitorFn func(context.Context, string) error
+	// maxConcurrency bounds concurrent node (service) visits, not concurrent
+	// engine calls: it's only a correct proxy for --parallel when visitorFn
+	// makes exactly one engine call per node (e.g. build_classic.go). A
+	// visitor that fans out multiple engine calls per node — like restart's,
+	// one per container — needs its own call-level limiter shared across
+	// nodes instead (see restart.go), or this bound is too coarse to help.
 	maxConcurrency int
 }
 
