@@ -35,6 +35,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
@@ -169,6 +170,34 @@ func newLimitedErrgroup(ctx context.Context, maxConcurrency int) (*errgroup.Grou
 		eg.SetLimit(maxConcurrency)
 	}
 	return eg, ctx
+}
+
+// newOptionalLimiter returns a semaphore bounding concurrency to
+// maxConcurrency, or nil when maxConcurrency<=0 (unlimited). Use it, with
+// acquireSlot/releaseSlot, to gate only part of a goroutine's work — e.g. an
+// indefinite stream's opening call, not the stream itself — where
+// newLimitedErrgroup's whole-goroutine bound doesn't apply.
+func newOptionalLimiter(maxConcurrency int) *semaphore.Weighted {
+	if maxConcurrency <= 0 {
+		return nil
+	}
+	return semaphore.NewWeighted(int64(maxConcurrency))
+}
+
+// acquireSlot acquires a slot from limiter, or is a no-op when limiter is nil.
+func acquireSlot(ctx context.Context, limiter *semaphore.Weighted) error {
+	if limiter == nil {
+		return nil
+	}
+	return limiter.Acquire(ctx, 1)
+}
+
+// releaseSlot releases a slot acquired via acquireSlot, or is a no-op when
+// limiter is nil.
+func releaseSlot(limiter *semaphore.Weighted) {
+	if limiter != nil {
+		limiter.Release(1)
+	}
 }
 
 // WithDryRun configure Compose to run without actually applying changes
