@@ -148,6 +148,12 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 	}
 	if existing != nil {
 		if existing.Labels[api.RelayLabel] == identity {
+			// The identity only covers image+routes: a dependent service
+			// added on a new network after the relay is already up must
+			// still be connected, whether or not anything else changed.
+			if err := s.ensureRelayNetworks(ctx, project, existing, service, networkKeys); err != nil {
+				return err
+			}
 			switch existing.State {
 			case container.StateRunning, container.StateRestarting:
 				// Up to date; restarting means Docker is already recovering
@@ -193,6 +199,34 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 		return fmt.Errorf("start relay for service %s: %w", service.Name, err)
 	}
 	s.events.On(createdEvent("Relay " + name))
+	return nil
+}
+
+// ensureRelayNetworks connects an already up-to-date relay to any network in
+// networkKeys it isn't attached to yet. relayIdentity hashes image+routes
+// only, not network topology, so a service added later on a new network
+// leaves the relay's identity — and so the reuse decision in
+// ensureServiceRelay — unchanged; without this, the relay would silently
+// stay unreachable from that network's consumers.
+func (s *composeService) ensureRelayNetworks(ctx context.Context, project *types.Project, existing *container.Summary, service types.ServiceConfig, networkKeys []string) error {
+	connected := map[string]bool{}
+	if existing.NetworkSettings != nil {
+		for name := range existing.NetworkSettings.Networks {
+			connected[name] = true
+		}
+	}
+	for _, key := range networkKeys {
+		netName := project.Networks[key].Name
+		if connected[netName] {
+			continue
+		}
+		if _, err := s.apiClient().NetworkConnect(ctx, netName, client.NetworkConnectOptions{
+			Container:      existing.ID,
+			EndpointConfig: &network.EndpointSettings{Aliases: []string{service.Name}},
+		}); err != nil {
+			return fmt.Errorf("connect relay for service %s to network %s: %w", service.Name, netName, err)
+		}
+	}
 	return nil
 }
 

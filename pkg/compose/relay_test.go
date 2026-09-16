@@ -21,6 +21,9 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -127,6 +130,90 @@ func TestRelayNetworks(t *testing.T) {
 	// no consumer: fall back to the project default network
 	lonely := types.ServiceConfig{Name: "lonely", Provider: &types.ServiceProviderConfig{Type: "test"}}
 	assert.DeepEqual(t, relayNetworks(project, lonely), []string{"default"})
+}
+
+// relayIdentity only hashes image+routes: a dependent service added later on
+// a new network doesn't change it, so ensureRelayNetworks is what must catch
+// up the relay's network membership — connecting only the network it isn't
+// already on, leaving the one it has untouched.
+func TestEnsureRelayNetworksConnectsOnlyMissingNetworks(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	project := &types.Project{
+		Name: "p",
+		Networks: types.Networks{
+			"backend":  {Name: "p_backend"},
+			"frontend": {Name: "p_frontend"},
+		},
+	}
+	service := types.ServiceConfig{Name: "db", Provider: &types.ServiceProviderConfig{Type: "test"}}
+	existing := &container.Summary{
+		ID: "relay-1",
+		NetworkSettings: &container.NetworkSettingsSummary{
+			Networks: map[string]*network.EndpointSettings{
+				"p_backend": {},
+			},
+		},
+	}
+
+	apiMock.EXPECT().NetworkConnect(gomock.Any(), "p_frontend", client.NetworkConnectOptions{
+		Container:      "relay-1",
+		EndpointConfig: &network.EndpointSettings{Aliases: []string{"db"}},
+	}).Return(client.NetworkConnectResult{}, nil)
+
+	err = svc.ensureRelayNetworks(t.Context(), project, existing, service, []string{"backend", "frontend"})
+	assert.NilError(t, err)
+}
+
+// The #14224-class bug this guards: a running relay whose identity still
+// matches (image+routes unchanged) used to return early without ever
+// looking at network membership. A service added later on a new network
+// must still get the relay connected to it, without recreating the
+// container (no ContainerCreate/ContainerStart expected here).
+func TestEnsureServiceRelayConnectsMissingNetworkWithoutRecreating(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	project := &types.Project{
+		Name: "p",
+		Networks: types.Networks{
+			"backend":  {Name: "p_backend"},
+			"frontend": {Name: "p_frontend"},
+		},
+	}
+	db := types.ServiceConfig{Name: "db", Provider: &types.ServiceProviderConfig{Type: "test"}}
+	endpoints := map[int]string{80: "host.docker.internal:49152"}
+	identity := relayIdentity(relayRoutesSpec(endpoints))
+
+	existing := container.Summary{
+		ID:     "relay-1",
+		State:  container.StateRunning,
+		Labels: map[string]string{api.RelayLabel: identity},
+		NetworkSettings: &container.NetworkSettingsSummary{
+			Networks: map[string]*network.EndpointSettings{
+				"p_backend": {},
+			},
+		},
+	}
+
+	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{existing}}, nil)
+	apiMock.EXPECT().NetworkConnect(gomock.Any(), "p_frontend", client.NetworkConnectOptions{
+		Container:      "relay-1",
+		EndpointConfig: &network.EndpointSettings{Aliases: []string{"db"}},
+	}).Return(client.NetworkConnectResult{}, nil)
+
+	err = svc.ensureServiceRelay(t.Context(), project, db, endpoints, []string{"backend", "frontend"})
+	assert.NilError(t, err)
 }
 
 // Process-level commands refuse relay containers: there is no service
