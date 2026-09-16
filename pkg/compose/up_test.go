@@ -17,6 +17,9 @@
 package compose
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -101,4 +104,36 @@ func TestShouldFollowStartEvent(t *testing.T) {
 			assert.Equal(t, got, tt.want)
 		})
 	}
+}
+
+// TestAppendErrDropsCancellationAfterShutdown is the #13985 follow-up: once
+// our own shutdown has canceled globalCtx (monitor detecting termination,
+// SIGINT/SIGTERM, ...), a lingering goroutine (log/attach streaming) racing
+// that cancellation reports a context.Canceled error carrying no real
+// failure. appendErr must drop it instead of turning a clean exit into a
+// non-zero one, while still reporting any other, genuine error.
+func TestAppendErrDropsCancellationAfterShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	u := &upSession{globalCtx: ctx}
+
+	u.appendErr(errors.New("boom"))
+	assert.Equal(t, len(u.errs), 1)
+
+	cancel()
+
+	u.appendErr(fmt.Errorf("streaming logs: %w", context.Canceled))
+	assert.Equal(t, len(u.errs), 1, "a context-canceled error after our own shutdown must be dropped")
+
+	u.appendErr(errors.New("a real, unrelated failure"))
+	assert.Equal(t, len(u.errs), 2, "a genuine error occurring after shutdown must still be reported")
+}
+
+// TestAppendErrKeepsCancellationBeforeShutdown pins the guard on
+// globalCtx.Err(): a context.Canceled error must still be reported if it
+// didn't come from our own globalCtx being canceled.
+func TestAppendErrKeepsCancellationBeforeShutdown(t *testing.T) {
+	u := &upSession{globalCtx: t.Context()}
+
+	u.appendErr(context.Canceled)
+	assert.Equal(t, len(u.errs), 1)
 }

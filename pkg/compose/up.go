@@ -227,12 +227,23 @@ func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.U
 	return formatter.NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled, signalChan), kEvents, nil
 }
 
+// appendErr records err for the final report, unless it is nothing more than
+// fallout from our own shutdown: once u.globalCtx is canceled (monitor
+// detecting termination, SIGINT/SIGTERM, or an earlier setup failure), the
+// in-flight goroutines it carries (log/attach streaming in particular) get a
+// context.Canceled error that reports no real failure and must not turn a
+// clean exit into a non-zero one (#13985).
 func (u *upSession) appendErr(err error) {
-	if err != nil {
-		u.mu.Lock()
-		u.errs = append(u.errs, err)
-		u.mu.Unlock()
+	if err == nil {
+		return
 	}
+	if errors.Is(err, context.Canceled) && u.globalCtx.Err() != nil {
+		logrus.Debugf("ignoring canceled error after shutdown: %v", err)
+		return
+	}
+	u.mu.Lock()
+	u.errs = append(u.errs, err)
+	u.mu.Unlock()
 }
 
 // runEventLoop reacts to cancellation, SIGINT/SIGTERM and keyboard input until
