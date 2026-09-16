@@ -46,9 +46,19 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run is separate from main so that a listen failure returns instead of
+// exiting mid-setup: os.Exit from within main would skip the deferred
+// stop(), which is harmless in practice (the process is dying either way)
+// but flagged by the linter, so this shape avoids it for real.
+func run() error {
 	routes, err := parseRoutes(os.Getenv("RELAY_ROUTES"))
 	if err != nil {
-		log.Fatalf("RELAY_ROUTES: %v", err)
+		return fmt.Errorf("RELAY_ROUTES: %w", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -58,7 +68,7 @@ func main() {
 	for port, upstream := range routes {
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 		if err != nil {
-			log.Fatalf("listen :%d: %v", port, err)
+			return fmt.Errorf("listen :%d: %w", port, err)
 		}
 		log.Printf("relaying :%d -> %s", port, upstream)
 		wg.Add(1)
@@ -72,6 +82,7 @@ func main() {
 		}()
 	}
 	wg.Wait()
+	return nil
 }
 
 // parseRoutes decodes "port=host:port[,port=host:port...]".
@@ -98,7 +109,7 @@ func parseRoutes(spec string) (map[int]string, error) {
 		}
 		host, hostPort, err := net.SplitHostPort(upstream)
 		if err != nil {
-			return nil, fmt.Errorf("invalid upstream in route %q: %v", entry, err)
+			return nil, fmt.Errorf("invalid upstream in route %q: %w", entry, err)
 		}
 		if hostIsContainerLocal(host) {
 			upstream = net.JoinHostPort("host.docker.internal", hostPort)
@@ -167,7 +178,7 @@ type idleConn struct {
 
 func (c *idleConn) Read(p []byte) (int, error) {
 	if c.armed.Load() {
-		_ = c.Conn.SetReadDeadline(time.Now().Add(halfCloseIdleTimeout))
+		_ = c.SetReadDeadline(time.Now().Add(halfCloseIdleTimeout))
 	}
 	return c.Conn.Read(p)
 }
@@ -177,14 +188,14 @@ func (c *idleConn) Read(p []byte) (int, error) {
 // be served — that is the drain contract — and a cancelled context would make
 // DialContext fail instantly. The dialer timeout bounds the dial instead.
 func forward(downstream net.Conn, upstream string) {
-	defer downstream.Close()
+	defer func() { _ = downstream.Close() }()
 	dialer := net.Dialer{Timeout: 10 * time.Second}
 	up, err := dialer.Dial("tcp", upstream)
 	if err != nil {
 		log.Printf("dial %s: %v", upstream, err)
 		return
 	}
-	defer up.Close()
+	defer func() { _ = up.Close() }()
 
 	down := &idleConn{Conn: downstream}
 	upc := &idleConn{Conn: up}

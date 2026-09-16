@@ -33,6 +33,8 @@ jobs:
           - validate-headers
           - validate-docs
           - validate-mocks
+          - relay-lint
+          - relay-test
     steps:
       -
         name: Checkout
