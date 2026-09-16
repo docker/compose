@@ -81,8 +81,13 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 
 	t.Log("Waiting for containers to be in running state")
 	upOut.RequireEventuallyContains(t, "hello app")
-	RequireServiceState(t, c, "app", "running")
-	RequireServiceState(t, c, "dependency", "running")
+	// "hello app" comes from the log stream, an unsynchronized channel from
+	// the `ps` call below (a fresh ContainerList in a new process): the log
+	// line reaching this test is no guarantee the daemon-reported state has
+	// caught up yet, so poll for it instead of checking once (see
+	// RequireEventuallyServiceState).
+	RequireEventuallyServiceState(t, c, "app", "running")
+	RequireEventuallyServiceState(t, c, "dependency", "running")
 
 	t.Log("Simulating Ctrl-C")
 	assert.NilError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT),
