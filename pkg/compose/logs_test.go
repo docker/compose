@@ -18,16 +18,19 @@ package compose
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/events"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -217,6 +220,190 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 	assert.Assert(t, is.DeepEqual([]string{"hello c2"}, consumer.LogsForContainer("c2")))
 	assert.Assert(t, is.Len(consumer.LogsForContainer("c3"), 0))
 	assert.Assert(t, is.DeepEqual([]string{"hello c4"}, consumer.LogsForContainer("c4")))
+}
+
+// TestComposeService_Logs_FollowDoesNotStarveMonitor guards against a
+// regression where bounding the errgroup used for `--follow` log streams
+// (which never return) starved the monitor goroutine, submitted after them
+// to the same group: once maxConcurrency streams were open, the monitor
+// never started and later containers never appeared.
+func TestComposeService_Logs_FollowDoesNotStarveMonitor(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli, WithMaxConcurrency(1))
+	assert.NilError(t, err)
+
+	name := strings.ToLower(testProject)
+
+	api.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{
+			Items: []containerType.Summary{
+				testContainer("service", "c1", false),
+				testContainer("service", "c2", false),
+			},
+		}, nil).
+		Times(2) // selectLogsContainers, then the monitor's initialContainers
+
+	writers := make(map[string]*io.PipeWriter)
+	// opened only fires once a container's stream is actually established
+	// (post-semaphore, mid-copy): closing writers before that would race
+	// with the semaphore-gated open itself, closing a pipe nothing reads yet.
+	opened := make(chan struct{}, 2)
+	for _, id := range []string{"c1", "c2"} {
+		r, w := io.Pipe()
+		writers[id] = w
+		t.Cleanup(func() { _ = r.Close() })
+
+		api.EXPECT().
+			ContainerInspect(anyCancellableContext(), id, gomock.Any()).
+			Return(client.ContainerInspectResult{
+				Container: containerType.InspectResponse{
+					ID:     id,
+					Config: &containerType.Config{Tty: false},
+				},
+			}, nil)
+		// never closed on its own: simulates a `--follow` stream that stays
+		// open for the container's lifetime
+		api.EXPECT().ContainerLogs(anyCancellableContext(), id, gomock.Any()).
+			DoAndReturn(func(context.Context, string, client.ContainerLogsOptions) (io.ReadCloser, error) {
+				opened <- struct{}{}
+				return r, nil
+			})
+	}
+
+	started := make(chan struct{})
+	api.EXPECT().Events(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ client.EventsListOptions) client.EventsResult {
+			close(started)
+			return client.EventsResult{Messages: make(chan events.Message), Err: make(chan error)}
+		})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- tested.Logs(ctx, name, &testLogConsumer{}, compose.LogOptions{Follow: true})
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("monitor never started: follow-mode log streams starved the bounded errgroup")
+	}
+	for range 2 {
+		select {
+		case <-opened:
+		case <-time.After(5 * time.Second):
+			t.Fatal("not every container's log stream opened")
+		}
+	}
+
+	cancel()
+	for _, w := range writers {
+		_ = w.Close()
+	}
+	assert.NilError(t, <-done)
+}
+
+// TestComposeService_Logs_FollowLimitsConcurrentStreamOpens guards against a
+// regression where removing the concurrency bound entirely for `--follow`
+// (to stop it starving the monitor, see
+// TestComposeService_Logs_FollowDoesNotStarveMonitor) let an unbounded
+// number of ContainerLogs calls open at once. Opening a stream must still
+// respect maxConcurrency; only the (indefinite) copy that follows is exempt.
+func TestComposeService_Logs_FollowLimitsConcurrentStreamOpens(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli, WithMaxConcurrency(1))
+	assert.NilError(t, err)
+
+	name := strings.ToLower(testProject)
+
+	ids := []string{"c1", "c2", "c3"}
+	var containerItems []containerType.Summary
+	for _, id := range ids {
+		containerItems = append(containerItems, testContainer("service", id, false))
+	}
+	api.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: containerItems}, nil).
+		Times(2) // selectLogsContainers, then the monitor's initialContainers
+
+	for _, id := range ids {
+		api.EXPECT().
+			ContainerInspect(anyCancellableContext(), id, gomock.Any()).
+			Return(client.ContainerInspectResult{
+				Container: containerType.InspectResponse{
+					ID:     id,
+					Config: &containerType.Config{Tty: false},
+				},
+			}, nil)
+	}
+
+	var (
+		mu      sync.Mutex
+		current int
+		peak    int
+	)
+	writers := make(chan *io.PipeWriter, len(ids))
+	for _, id := range ids {
+		api.EXPECT().ContainerLogs(anyCancellableContext(), id, gomock.Any()).
+			DoAndReturn(func(context.Context, string, client.ContainerLogsOptions) (io.ReadCloser, error) {
+				mu.Lock()
+				current++
+				if current > peak {
+					peak = current
+				}
+				mu.Unlock()
+
+				time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+
+				mu.Lock()
+				current--
+				mu.Unlock()
+
+				r, w := io.Pipe()
+				writers <- w
+				return r, nil
+			})
+	}
+
+	started := make(chan struct{})
+	api.EXPECT().Events(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ client.EventsListOptions) client.EventsResult {
+			close(started)
+			return client.EventsResult{Messages: make(chan events.Message), Err: make(chan error)}
+		})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- tested.Logs(ctx, name, &testLogConsumer{}, compose.LogOptions{Follow: true})
+	}()
+
+	<-started
+	var openedWriters []*io.PipeWriter
+	for range ids {
+		select {
+		case w := <-writers:
+			openedWriters = append(openedWriters, w)
+		case <-time.After(5 * time.Second):
+			t.Fatal("not all follow-mode streams opened: maxConcurrency must bound the open burst, not the whole call")
+		}
+	}
+
+	cancel()
+	for _, w := range openedWriters {
+		_ = w.Close()
+	}
+	assert.NilError(t, <-done)
+	assert.Equal(t, peak, 1, "opening follow-mode log streams must be bounded by maxConcurrency")
 }
 
 type testLogConsumer struct {
