@@ -34,11 +34,22 @@ Docker Compose has clear rules for AI-assisted contributions:
   `make fmt` before submitting.
 
 - **Issues and discussions can use AI assistance but must have a full
-  human-in-the-loop.** This means that any content generated with AI
-  must have been reviewed _and edited_ by a human before submission.
-  AI is very good at being overly verbose and including noise that
-  distracts from the main point. Humans must do their research and
-  trim this down.
+  human-in-the-loop.** Any content generated with AI must be reviewed
+  _and edited_ by a human before submission - never post a raw agent
+  reply ("Excellent observation, thank you...") without reading and
+  rewriting it yourself. AI is very good at being overly verbose and
+  including noise that distracts from the main point; if there's
+  genuinely useful detail worth keeping, lead with a short summary and
+  put the rest in a collapsible `<details>` section instead of making
+  maintainers read a wall of text to figure out if something is
+  actionable.
+
+- **Don't add AI attribution to commit messages.** A
+  `Co-Authored-By: <AI tool>` trailer belongs on the commit only if a
+  human co-authored it; the tool you used to write the code isn't a
+  co-author. Disclose the AI tool and how it was used in the PR
+  description instead (see above) - the person opening the PR signs
+  off on and owns the commit regardless of what wrote it.
 
 - **A merged contribution is not a one-shot event.** If your change surfaces
   a regression, a follow-up review comment, or a question after merge, we

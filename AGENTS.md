@@ -45,6 +45,9 @@ All agents must conform to [AI_POLICY.md](AI_POLICY.md).
 
 ## Issue and PR Guidelines
 
+- Keep changes scoped to the task. If you're fixing a bug, fix the bug -
+  don't refactor unrelated code, fix unrelated typos, or reformat files you
+  didn't need to touch. Put unrelated improvements in a separate PR.
 - Never create an issue or pull request without the user's explicit instruction.
 - If a user asks you to create a pull request on their behalf, add a file named
   `AI_AGENT_DISCLOSURE.md` to the change containing the text below followed by
