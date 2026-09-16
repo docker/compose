@@ -17,6 +17,7 @@ start participating.
   - [Reporting other issues](#reporting-other-issues)
   - [Quick contribution tips and guidelines](#quick-contribution-tips-and-guidelines)
     - [AI-assisted contributions](#ai-assisted-contributions)
+    - [No contribution farming](#no-contribution-farming)
     - [Pull requests are always welcome](#pull-requests-are-always-welcome)
     - [Talking to other Docker users and contributors](#talking-to-other-docker-users-and-contributors)
     - [Conventions](#conventions)
@@ -94,6 +95,29 @@ ignore this policy may be banned from the repository.
 
 This is not an anti-AI stance - we use AI ourselves. This policy exists to maintain
 code quality and protect maintainer time. See [AI_POLICY.md](AI_POLICY.md) for details.
+
+### No contribution farming
+
+Contribution farming is forbidden. Do not submit pull requests in an attempt to
+inflate contribution counts, build a public portfolio or gain repository
+activity rather than to improve the project.
+
+Examples include:
+
+- opening pull requests without verifying the problem or testing the proposed
+  solution;
+- submitting unsolicited changes for problems that have not been reported;
+- splitting one logical change into multiple trivial pull requests without a
+  clear motivation;
+- submitting mechanical, cosmetic, generated, or speculative changes without a
+  concrete user or maintenance benefit.
+
+Maintainers may choose to close such submissions without detailed review or
+even ban contributors who repeatedly engage in this behavior.
+
+This rule is based on submission quality and behavior, not contributor
+experience or tool choice. First-time contributors and appropriately scoped
+small fixes are welcome when they address a real, verified problem or need.
 
 ### Pull requests are always welcome
 
