@@ -45,6 +45,8 @@ type Scenario struct {
 	intent   string
 	project  string
 	file     string
+	remote   string
+	rootArgs []string
 	env      []string
 	parallel bool
 	start    time.Time
@@ -253,6 +255,19 @@ func (s *Scenario) Env(kv ...string) *Scenario {
 	return s
 }
 
+// FromRemote switches the scenario's compose source to a remote reference
+// handled by compose's remote loaders — a git URL or an oci:// artifact —
+// with optional extra root flags (e.g. --insecure-registry) inserted before
+// the subcommand on every subsequent step. Steps executed before the switch
+// still run against the anchored testdata copy, which remains available
+// through Dir() as the local content the remote was built from (a repository
+// to commit, a project to publish).
+func (s *Scenario) FromRemote(source string, rootFlags ...string) *Scenario {
+	s.remote = source
+	s.rootArgs = rootFlags
+	return s
+}
+
 // Requires skips the scenario unless every requirement is met by the target
 // environment.
 func (s *Scenario) Requires(reqs ...Requirement) *Scenario {
@@ -324,10 +339,15 @@ func (s *Scenario) command(action Action) icmd.Cmd {
 	switch action.kind {
 	case kindCompose:
 		args := []string{}
-		if s.file != "" {
-			args = append(args, "-f", s.file)
+		file := s.file
+		if s.remote != "" {
+			file = s.remote
+		}
+		if file != "" {
+			args = append(args, "-f", file)
 		}
 		args = append(args, "--project-name", s.project)
+		args = append(args, s.rootArgs...)
 		args = append(args, action.args...)
 		cmd = s.cli.NewDockerComposeCmd(s.t, args...)
 	case kindDocker:

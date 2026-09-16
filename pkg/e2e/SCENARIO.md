@@ -56,6 +56,12 @@ Rules:
   `testdata` directory no test owns. Interpolate runtime values via `Env`.
 - **Regression tests link the issue** in a comment above the test, with a
   sentence on the failure mode being locked.
+- **Remote sources**: a scenario consuming its project through a remote
+  loader (a git URL, an `oci://` artifact) still anchors the content in
+  `testdata/<TestName>/`, builds the remote from that copy — `serveGitRepo`
+  serves it over in-process smart HTTP, a `publish` step pushes it to a local
+  registry — then switches with `FromRemote(source, rootFlags...)`. Steps
+  before the switch run against the local copy (e.g. the `publish` itself).
 
 ## Checks: observe real state
 
