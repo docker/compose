@@ -34,6 +34,8 @@ import (
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
@@ -149,11 +151,52 @@ func WithPrompt(prompt Prompt) Option {
 	}
 }
 
-// WithMaxConcurrency defines upper limit for concurrent operations against engine API
+// WithMaxConcurrency defines upper limit for concurrent operations against
+// engine API. A value <= 0 means unlimited.
 func WithMaxConcurrency(maxConcurrency int) Option {
 	return func(s *composeService) error {
 		s.maxConcurrency = maxConcurrency
 		return nil
+	}
+}
+
+// newLimitedErrgroup returns an errgroup.Group bounded to maxConcurrency
+// concurrent goroutines. maxConcurrency<=0 (including the Go zero-value)
+// leaves it unlimited, since errgroup.SetLimit(0) means "allow zero
+// goroutines", not "unlimited".
+func newLimitedErrgroup(ctx context.Context, maxConcurrency int) (*errgroup.Group, context.Context) {
+	eg, ctx := errgroup.WithContext(ctx)
+	if maxConcurrency > 0 {
+		eg.SetLimit(maxConcurrency)
+	}
+	return eg, ctx
+}
+
+// newOptionalLimiter returns a semaphore bounding concurrency to
+// maxConcurrency, or nil when maxConcurrency<=0 (unlimited). Use it, with
+// acquireSlot/releaseSlot, to gate only part of a goroutine's work — e.g. an
+// indefinite stream's opening call, not the stream itself — where
+// newLimitedErrgroup's whole-goroutine bound doesn't apply.
+func newOptionalLimiter(maxConcurrency int) *semaphore.Weighted {
+	if maxConcurrency <= 0 {
+		return nil
+	}
+	return semaphore.NewWeighted(int64(maxConcurrency))
+}
+
+// acquireSlot acquires a slot from limiter, or is a no-op when limiter is nil.
+func acquireSlot(ctx context.Context, limiter *semaphore.Weighted) error {
+	if limiter == nil {
+		return nil
+	}
+	return limiter.Acquire(ctx, 1)
+}
+
+// releaseSlot releases a slot acquired via acquireSlot, or is a no-op when
+// limiter is nil.
+func releaseSlot(limiter *semaphore.Weighted) {
+	if limiter != nil {
+		limiter.Release(1)
 	}
 }
 

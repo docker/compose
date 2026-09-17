@@ -366,7 +366,7 @@ func (u *upSession) streamContainerLogs(event api.ContainerEvent) error {
 		return err
 	}
 
-	err = u.doLogContainer(u.globalCtx, u.options.Start.Attach, event.Source, res.Container, api.LogOptions{
+	err = u.doLogContainer(u.globalCtx, nil, u.options.Start.Attach, event.Source, res.Container, api.LogOptions{
 		Follow: true,
 		Since:  res.Container.State.StartedAt,
 	})
