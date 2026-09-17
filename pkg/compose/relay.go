@@ -223,7 +223,11 @@ func (s *composeService) ensureRelayNetworks(ctx context.Context, project *types
 		if _, err := s.apiClient().NetworkConnect(ctx, netName, client.NetworkConnectOptions{
 			Container:      existing.ID,
 			EndpointConfig: &network.EndpointSettings{Aliases: []string{service.Name}},
-		}); err != nil {
+		}); err != nil && !errdefs.IsConflict(err) {
+			// a concurrent ensureServiceRelay run for another provider service
+			// may have connected it to this same network in the window since
+			// our ContainerList snapshot; the daemon's "endpoint already
+			// exists" is the desired state, not a failure
 			return fmt.Errorf("connect relay for service %s to network %s: %w", service.Name, netName, err)
 		}
 	}

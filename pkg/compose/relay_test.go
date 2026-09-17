@@ -132,6 +132,33 @@ func TestRelayNetworks(t *testing.T) {
 	assert.DeepEqual(t, relayNetworks(project, lonely), []string{"default"})
 }
 
+// ensureServiceRelay runs concurrently per provider service under the shared
+// project mutex released before Docker API work: another goroutine may
+// connect the relay to the same network in the window after our
+// ContainerList snapshot. The daemon's "endpoint already exists" for that
+// race is the desired state, not a failure.
+func TestEnsureRelayNetworksTreatsAlreadyConnectedAsSuccess(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	project := &types.Project{
+		Name:     "p",
+		Networks: types.Networks{"frontend": {Name: "p_frontend"}},
+	}
+	service := types.ServiceConfig{Name: "db", Provider: &types.ServiceProviderConfig{Type: "test"}}
+	existing := &container.Summary{ID: "relay-1"}
+
+	apiMock.EXPECT().NetworkConnect(gomock.Any(), "p_frontend", gomock.Any()).
+		Return(client.NetworkConnectResult{}, conflictError{})
+
+	err = svc.ensureRelayNetworks(t.Context(), project, existing, service, []string{"frontend"})
+	assert.NilError(t, err)
+}
+
 // relayIdentity only hashes image+routes: a dependent service added later on
 // a new network doesn't change it, so ensureRelayNetworks is what must catch
 // up the relay's network membership — connecting only the network it isn't
