@@ -7,28 +7,29 @@ the canonical format.
 
 ### Options
 
-| Name                      | Type     | Default | Description                                                                 |
-|:--------------------------|:---------|:--------|:----------------------------------------------------------------------------|
-| `--dry-run`               | `bool`   |         | Execute command in dry run mode                                             |
-| `--environment`           | `bool`   |         | Print environment used for interpolation.                                   |
-| `--format`                | `string` |         | Format the output. Values: [yaml \| json]                                   |
-| `--hash`                  | `string` |         | Print the service config hash, one per line.                                |
-| `--images`                | `bool`   |         | Print the image names, one per line.                                        |
-| `--lock-image-digests`    | `bool`   |         | Produces an override file with image digests                                |
-| `--models`                | `bool`   |         | Print the model names, one per line.                                        |
-| `--networks`              | `bool`   |         | Print the network names, one per line.                                      |
-| `--no-consistency`        | `bool`   |         | Don't check model consistency - warning: may produce invalid Compose output |
-| `--no-env-resolution`     | `bool`   |         | Don't resolve service env files                                             |
-| `--no-interpolate`        | `bool`   |         | Don't interpolate environment variables                                     |
-| `--no-normalize`          | `bool`   |         | Don't normalize compose model                                               |
-| `--no-path-resolution`    | `bool`   |         | Don't resolve file paths                                                    |
-| `-o`, `--output`          | `string` |         | Save to file (default to stdout)                                            |
-| `--profiles`              | `bool`   |         | Print the profile names, one per line.                                      |
-| `-q`, `--quiet`           | `bool`   |         | Only validate the configuration, don't print anything                       |
-| `--resolve-image-digests` | `bool`   |         | Pin image tags to digests                                                   |
-| `--services`              | `bool`   |         | Print the service names, one per line.                                      |
-| `--variables`             | `bool`   |         | Print model variables and default values.                                   |
-| `--volumes`               | `bool`   |         | Print the volume names, one per line.                                       |
+| Name                      | Type          | Default | Description                                                                                                                                  |
+|:--------------------------|:--------------|:--------|:---------------------------------------------------------------------------------------------------------------------------------------------|
+| `--dry-run`               | `bool`        |         | Execute command in dry run mode                                                                                                              |
+| `--environment`           | `bool`        |         | Print environment used for interpolation.                                                                                                    |
+| `--filter`                | `stringArray` |         | With --services, only print services matching a criteria=value expression ("profile=NAME", "label=KEY[=VALUE]"). Repeat to combine criteria. |
+| `--format`                | `string`      |         | Format the output. Values: [yaml \| json]                                                                                                    |
+| `--hash`                  | `string`      |         | Print the service config hash, one per line.                                                                                                 |
+| `--images`                | `bool`        |         | Print the image names, one per line.                                                                                                         |
+| `--lock-image-digests`    | `bool`        |         | Produces an override file with image digests                                                                                                 |
+| `--models`                | `bool`        |         | Print the model names, one per line.                                                                                                         |
+| `--networks`              | `bool`        |         | Print the network names, one per line.                                                                                                       |
+| `--no-consistency`        | `bool`        |         | Don't check model consistency - warning: may produce invalid Compose output                                                                  |
+| `--no-env-resolution`     | `bool`        |         | Don't resolve service env files                                                                                                              |
+| `--no-interpolate`        | `bool`        |         | Don't interpolate environment variables                                                                                                      |
+| `--no-normalize`          | `bool`        |         | Don't normalize compose model                                                                                                                |
+| `--no-path-resolution`    | `bool`        |         | Don't resolve file paths                                                                                                                     |
+| `-o`, `--output`          | `string`      |         | Save to file (default to stdout)                                                                                                             |
+| `--profiles`              | `bool`        |         | Print the profile names, one per line.                                                                                                       |
+| `-q`, `--quiet`           | `bool`        |         | Only validate the configuration, don't print anything                                                                                        |
+| `--resolve-image-digests` | `bool`        |         | Pin image tags to digests                                                                                                                    |
+| `--services`              | `bool`        |         | Print the service names, one per line.                                                                                                       |
+| `--variables`             | `bool`        |         | Print model variables and default values.                                                                                                    |
+| `--volumes`               | `bool`        |         | Print the volume names, one per line.                                                                                                        |
 
 
 <!---MARKER_GEN_END-->
