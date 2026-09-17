@@ -271,7 +271,14 @@ func (s *composeService) removeServiceRelay(ctx context.Context, projectName, se
 	}
 	eventID := "Relay " + getCanonicalContainerName(*existing)
 	s.events.On(removingEvent(eventID))
-	if _, err := s.apiClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
+	if existing.State == container.StateRemoving {
+		// the daemon is already removing it: a concurrent ContainerRemove
+		// fails with "removal already in progress", so wait for the name
+		// to free up instead
+		if err := s.waitRelayRemoved(ctx, projectName, serviceName); err != nil {
+			return err
+		}
+	} else if _, err := s.apiClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("remove stale relay for service %s: %w", serviceName, err)
 	}
 	s.events.On(removedEvent(eventID))
