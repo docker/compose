@@ -73,6 +73,11 @@ const (
 	// runPreStartHook so orphan hook containers from a previous failed run can
 	// be found and removed by project+service+hook label filters.
 	HookLabel = "com.docker.compose.hook"
+	// HookIndexLabel stores the position of the hook in its service's hook
+	// list (e.g. pre_start[2] → "2"), so the start phase can match each
+	// declared hook with the runner container the reconciliation plan
+	// prepared for it.
+	HookIndexLabel = "com.docker.compose.hook-index"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel

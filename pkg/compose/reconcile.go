@@ -688,6 +688,14 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	infraDeps := r.infrastructureDeps(service)
 
 	var lastNode *PlanNode
+	// containerNodes collects every node planned for this service's replicas,
+	// so the pre_start hook-runner creation below can wait for the executor's
+	// live container view to be final before resolving its target replica.
+	var containerNodes []*PlanNode
+	// keptRunning reports whether a running replica survives the plan
+	// untouched — the start phase will then skip pre_start, so no hook
+	// runner is needed.
+	keptRunning := false
 
 	// Process existing containers
 	for i, oc := range containers {
@@ -708,11 +716,13 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Cause:      "scale down",
 				Container:  &containers[i].Summary,
 			}, "", stopNode)
+			containerNodes = append(containerNodes, lastNode)
 			continue
 		}
 
 		if r.mustRecreate(service, expectedHash, parentRecreated, oc, strategy) {
 			lastNode = r.planRecreateContainer(service, &containers[i], infraDeps)
+			containerNodes = append(containerNodes, lastNode)
 			r.recreatedServices[service.Name] = true
 			continue
 		}
@@ -725,6 +735,9 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			// (start.go), which lists containers again and starts them in
 			// dependency order. Exited containers are deliberately left as-is
 			// here so that phase (or the user) decides.
+			if oc.State == container.StateRunning {
+				keptRunning = true
+			}
 		default:
 			// Any other state (paused, dead, ...): attempt to (re)start
 			lastNode = r.plan.addNode(Operation{
@@ -733,6 +746,10 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Cause:      "not running",
 				Container:  &containers[i].Summary,
 			}, "", infraDeps...)
+			containerNodes = append(containerNodes, lastNode)
+			// The replica is running once this op executes, so the start
+			// phase will skip pre_start for the service.
+			keptRunning = true
 		}
 	}
 
@@ -750,12 +767,64 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			Number:     number,
 			Name:       name,
 		}, "", infraDeps...)
+		containerNodes = append(containerNodes, lastNode)
 	}
+
+	r.planPreStartHookRunners(service, expected, keptRunning, containerNodes, infraDeps)
 
 	if lastNode != nil {
 		r.serviceNodes[service.Name] = lastNode
 	}
 	return nil
+}
+
+// planPreStartHookRunners plans the create-phase side of the pre_start hook
+// lifecycle. When the start phase is going to run the hooks — hooks declared,
+// a replica to start (scale > 0) and no running replica surviving the plan —
+// it purges every observed hook-runner container (leftovers of a previous run
+// that failed, or was never started) and creates one fresh runner per declared
+// hook. The start phase only executes runners prepared here; it never creates
+// one itself.
+//
+// Purges are best-effort (mirroring the historical imperative purge, which was
+// warn-only) but the creates depend on them: runner names are deterministic,
+// so a genuinely stuck old runner surfaces as a name conflict on the create.
+// The creates also depend on every replica node and on the infrastructure, so
+// the executor resolves the target replica (VolumesFrom) against a final live
+// view with networks in place. When a running replica survives the plan, the
+// start phase skips pre_start entirely: nothing is created, and a hook
+// container retained after a failure stays available for inspection.
+func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expectedScale int, keptRunning bool, containerNodes, infraDeps []*PlanNode) {
+	if len(service.PreStart) == 0 || expectedScale == 0 || keptRunning {
+		return
+	}
+	serviceCopy := service
+	deps := slices.Concat(containerNodes, infraDeps)
+	stale := slices.Clone(r.observed.HookContainers[service.Name])
+	slices.SortFunc(stale, func(a, b ObservedContainer) int { return strings.Compare(a.ID, b.ID) })
+	for i := range stale {
+		node := r.plan.addNode(Operation{
+			Type:          OpRemoveContainer,
+			ResourceID:    fmt.Sprintf("hook:%s:stale:%s", service.Name, stale[i].ID[:min(12, len(stale[i].ID))]),
+			Cause:         "stale pre_start hook container",
+			Service:       &serviceCopy,
+			Container:     &stale[i].Summary,
+			RemoveVolumes: true,
+			BestEffort:    true,
+		}, "")
+		deps = append(deps, node)
+	}
+	for i := range service.PreStart {
+		node := r.plan.addNode(Operation{
+			Type:       OpCreateHookContainer,
+			ResourceID: fmt.Sprintf("hook:%s:%s:%d", service.Name, preStartHookType, i),
+			Cause:      "pre_start hook",
+			Service:    &serviceCopy,
+			HookIndex:  i,
+			Name:       getHookContainerName(r.project.Name, service.Name, i),
+		}, "", deps...)
+		deps = []*PlanNode{node}
+	}
 }
 
 // mustRecreate decides whether oc must be recreated to match expected. The
