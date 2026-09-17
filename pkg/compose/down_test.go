@@ -676,6 +676,27 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: pre_stop has no process inside it to act on. No
+// ExecCreate expectation is set: per newStartTestService, gomock fails the
+// test if the hook still runs.
+func TestStopContainerSkipsPreStopForRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name:    "db",
+		PreStop: []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+	}
+	relay := serviceContainer("db", 1, container.StateRunning)
+	relay.Labels[compose.RelayLabel] = "abc123"
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+
+	err := svc.stopContainer(t.Context(), &service, relay, nil, nil)
+	assert.NilError(t, err)
+}
+
 // runningOneOff builds a RUNNING `compose run` container of the given service.
 func runningOneOff(service, id string) container.Summary {
 	c := testContainer(service, id, true)

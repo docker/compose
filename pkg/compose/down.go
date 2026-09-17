@@ -311,7 +311,7 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	eventName := getContainerProgressName(ctr)
 	s.events.On(newEvent(eventName, api.Working, api.StatusStopping))
 
-	if service != nil {
+	if service != nil && !isRelayContainer(ctr) {
 		for _, hook := range service.PreStop {
 			err := s.runHook(ctx, ctr, *service, hook, listener)
 			if err != nil {
