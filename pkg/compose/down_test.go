@@ -514,6 +514,34 @@ func TestEnsureImagesDown_ReportsDanglingImagesAsOneGroupedEvent(t *testing.T) {
 	})
 }
 
+// TestEnsureImagesDown_SilentWhenNoDanglingImagesRemoved guards #14219:
+// wrapping removeDanglingImages in removeResource emitted "Removed" on a
+// successful no-op.
+func TestEnsureImagesDown_SilentWhenNoDanglingImagesRemoved(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	rec := &capturingEvents{}
+	svcIface, err := NewComposeService(cli, WithEventProcessor(rec))
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "false"),
+	}).Return(client.ImageListResult{}, nil)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{}, nil)
+
+	ops, err := svc.ensureImagesDown(t.Context(), &types.Project{Name: "prj"}, compose.DownOptions{Images: "local"})
+	assert.NilError(t, err)
+	for _, op := range ops {
+		assert.NilError(t, op())
+	}
+	assert.Equal(t, len(rec.resources), 0)
+}
+
 // TestEnsureImagesDown_SparesDanglingImagesOfOrphanedServices guards a bug
 // caught in review: ImagesToPrune already spares a service's tagged image
 // when the service is no longer in the project and RemoveOrphans isn't set;
