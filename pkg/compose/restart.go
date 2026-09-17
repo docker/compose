@@ -105,12 +105,16 @@ func (s *composeService) prepareRestartProject(ctx context.Context, containers C
 }
 
 // restartContainer restarts a container, running its pre_stop and post_start
-// hooks around the restart
+// hooks around the restart — except for a relay, a shell-less scratch binary
+// standing in for the service: it has no process for a hook to act on.
 func (s *composeService) restartContainer(ctx context.Context, def types.ServiceConfig, ctr container.Summary, options api.RestartOptions) error {
-	for _, hook := range def.PreStop {
-		err := s.runHook(ctx, ctr, def, hook, nil)
-		if err != nil {
-			return err
+	relay := isRelayContainer(ctr)
+	if !relay {
+		for _, hook := range def.PreStop {
+			err := s.runHook(ctx, ctr, def, hook, nil)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	eventName := getContainerProgressName(ctr)
@@ -122,10 +126,12 @@ func (s *composeService) restartContainer(ctx context.Context, def types.Service
 		return err
 	}
 	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
-	for _, hook := range def.PostStart {
-		err := s.runHook(ctx, ctr, def, hook, nil)
-		if err != nil {
-			return err
+	if !relay {
+		for _, hook := range def.PostStart {
+			err := s.runHook(ctx, ctr, def, hook, nil)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

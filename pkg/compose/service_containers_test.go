@@ -776,6 +776,31 @@ func TestRuntimeAPIVersionRetriesOnTransientError(t *testing.T) {
 	assert.Equal(t, version, "1.44")
 }
 
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: post_start has no process inside it to act on. The
+// compose spec doesn't forbid declaring hooks on a provider: service, so
+// this must be guarded explicitly rather than assumed unreachable. No
+// ExecCreate expectation is set: per newStartTestService, gomock fails the
+// test if the hook still runs.
+func TestStartServiceContainerSkipsHooksForRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name: "db",
+		PostStart: []types.ServiceHook{
+			{Command: types.ShellCommand{"echo", "hi"}},
+		},
+	}
+	relay := serviceContainer("db", 1, container.StateCreated)
+	relay.Labels[api.RelayLabel] = "abc123"
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+
+	err := svc.startServiceContainer(t.Context(), &types.Project{}, service, relay, nil)
+	assert.NilError(t, err)
+}
+
 // TestWaitDependencyDeadline locks the timeout semantics of the dependency
 // wait: an expired deadline surfaces as "timeout waiting for dependencies",
 // while a plain user cancellation is not a wait failure.

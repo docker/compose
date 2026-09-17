@@ -257,6 +257,27 @@ func (s *composeService) waitRelayRemoved(ctx context.Context, projectName, serv
 	}
 }
 
+// removeServiceRelay removes a service's relay container, if any. Called
+// whenever an up finds the provider publishing no endpoint — whether it
+// never did, or a relay from an earlier up is now stale — so a relay that
+// still routes to an upstream the provider no longer serves doesn't linger.
+func (s *composeService) removeServiceRelay(ctx context.Context, projectName, serviceName string) error {
+	existing, err := s.findRelayContainer(ctx, projectName, serviceName)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return nil
+	}
+	eventID := "Relay " + getCanonicalContainerName(*existing)
+	s.events.On(removingEvent(eventID))
+	if _, err := s.apiClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
+		return fmt.Errorf("remove stale relay for service %s: %w", serviceName, err)
+	}
+	s.events.On(removedEvent(eventID))
+	return nil
+}
+
 // findRelayContainer returns the service's relay container, if any.
 func (s *composeService) findRelayContainer(ctx context.Context, projectName, serviceName string) (*container.Summary, error) {
 	f := projectFilter(projectName)
@@ -372,11 +393,20 @@ func (s *composeService) pullRelayImage(ctx context.Context) error {
 	return nil
 }
 
+// isRelayContainer reports whether a container is a service's network relay
+// rather than a regular instance of it: a static scratch-based binary with
+// no shell or service process, so anything expecting one to be there —
+// secrets/configs injection, lifecycle hooks, process-level commands — must
+// skip it.
+func isRelayContainer(ctr container.Summary) bool {
+	return ctr.Labels[api.RelayLabel] != ""
+}
+
 // checkRelayTarget refuses process-level operations on a relay container: it
 // stands in for the provider's resource on the network, but there is no
 // service process in it to act on.
 func checkRelayTarget(target container.Summary, serviceName, operation string) error {
-	if target.Labels[api.RelayLabel] == "" {
+	if !isRelayContainer(target) {
 		return nil
 	}
 	return fmt.Errorf("service %q is managed by a provider: its container is a network relay and does not support %s", serviceName, operation)
