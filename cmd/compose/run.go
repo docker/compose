@@ -241,6 +241,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 	flags.BoolVar(&buildOpts.quiet, "quiet-build", false, "Suppress progress output from the build process")
 	flags.BoolVar(&options.quietPull, "quiet-pull", false, "Pull without printing progress information")
 	flags.BoolVar(&createOpts.Build, "build", false, "Build image before starting container")
+	flags.BoolVar(&createOpts.noRecreate, "no-recreate", false, "If dependent containers already exist, don't recreate them, even if their configuration diverged")
 	flags.BoolVar(&options.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 
 	cmd.Flags().BoolVarP(&options.interactive, "interactive", "i", true, "Keep STDIN open even if not attached")
@@ -329,6 +330,11 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 			RemoveOrphans: options.removeOrphans,
 			IgnoreOrphans: options.ignoreOrphans,
 			QuietPull:     options.quietPull,
+			// Only the dependencies run starts are subject to a recreate
+			// policy (the one-off itself is always a fresh container), but
+			// their create sees them as targeted services — set both.
+			Recreate:             createOpts.recreateStrategy(),
+			RecreateDependencies: createOpts.dependenciesRecreateStrategy(),
 		},
 		Name:              options.name,
 		Service:           options.Service,
