@@ -89,8 +89,8 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 
 	// --service-ports and --publish are incompatible
 	if !options.servicePorts {
-		if len(target.Ports) > 0 {
-			logrus.Debug("Running service without ports exposed as --service-ports=false")
+		if len(target.Ports) > 0 && len(options.publish) == 0 {
+			logrus.Warnf("ports for service %q are not published by run; use --service-ports to map them to the host", target.Name)
 		}
 		target.Ports = []types.ServicePortConfig{}
 		for _, p := range options.publish {
