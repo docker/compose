@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
@@ -286,6 +287,45 @@ func TestRemoveServiceRelayNoopWhenNoneExists(t *testing.T) {
 	svc := tested.(*composeService)
 
 	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+
+	assert.NilError(t, svc.removeServiceRelay(t.Context(), "p", "db"))
+}
+
+// A concurrent up or down may have already removed the relay between
+// findRelayContainer and ContainerRemove: the desired outcome (relay gone) is
+// already achieved, so a not-found error must not fail the whole up.
+func TestRemoveServiceRelayIgnoresNotFound(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{{ID: "relay-1", Names: []string{"/p-db-1"}}},
+	}, nil)
+	apiMock.EXPECT().ContainerRemove(gomock.Any(), "relay-1", client.ContainerRemoveOptions{Force: true}).
+		Return(client.ContainerRemoveResult{}, errdefs.ErrNotFound.WithMessage("already removed"))
+
+	assert.NilError(t, svc.removeServiceRelay(t.Context(), "p", "db"))
+}
+
+// The daemon is already removing the relay (StateRemoving): a concurrent
+// ContainerRemove would fail with "removal already in progress", so
+// removeServiceRelay must wait for it instead, mirroring ensureServiceRelay.
+func TestRemoveServiceRelayWaitsWhenAlreadyRemoving(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	first := apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{{ID: "relay-1", Names: []string{"/p-db-1"}, State: container.StateRemoving}},
+	}, nil)
+	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil).After(first)
 
 	assert.NilError(t, svc.removeServiceRelay(t.Context(), "p", "db"))
 }
