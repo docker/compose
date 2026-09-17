@@ -555,21 +555,23 @@ func ContainerEnv(service, name, value string) Check {
 }
 
 // BindMountSource expects the service's bind mount at target to resolve to
-// exactly wantSource — pinning down which working directory a relative
-// volume path was resolved against (e.g. an explicit --project-directory,
-// as opposed to wherever the compose file itself was loaded from).
+// exactly wantSource (which must be absolute — this check pins down which
+// working directory a relative volume path was resolved against, e.g. an
+// explicit --project-directory, so a relative wantSource here would silently
+// compare against the wrong base: the test process's own cwd, not any
+// project directory).
 func BindMountSource(service, target, wantSource string) Check {
 	return Check{
 		name: fmt.Sprintf("service %q mount %q resolves to %s", service, target, wantSource),
 		fn: func(ctx *CheckContext) error {
+			if !filepath.IsAbs(wantSource) {
+				return fmt.Errorf("BindMountSource: wantSource must be absolute, got %q", wantSource)
+			}
 			containers := ctx.curr.service(service)
 			if len(containers) == 0 {
 				return errors.New("service has no container")
 			}
-			wantAbs, err := filepath.Abs(wantSource)
-			if err != nil {
-				return err
-			}
+			wantAbs := wantSource
 			for _, c := range containers {
 				res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "inspect", "--format", "{{json .Mounts}}", c.ID))
 				if res.ExitCode != 0 {
