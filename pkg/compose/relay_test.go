@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"context"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -274,6 +275,43 @@ func TestRemoveServiceRelayRemovesExisting(t *testing.T) {
 		Return(client.ContainerRemoveResult{}, nil)
 
 	assert.NilError(t, svc.removeServiceRelay(t.Context(), "p", "db"))
+}
+
+// The relay only dials out and forwards bytes: it gets none of Docker's
+// default capabilities except NET_BIND_SERVICE, kept because a route
+// commonly targets a privileged port the relay must still listen on.
+func TestCreateRelayContainerDropsCapabilities(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	project := &types.Project{
+		Name:     "p",
+		Networks: types.Networks{"default": {Name: "p_default"}},
+	}
+	db := types.ServiceConfig{Name: "db", Provider: &types.ServiceProviderConfig{Type: "test"}}
+
+	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{}, nil)
+
+	var got client.ContainerCreateOptions
+	apiMock.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			got = opts
+			return client.ContainerCreateResult{ID: "relay-1"}, nil
+		})
+	apiMock.EXPECT().ContainerStart(gomock.Any(), "relay-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+
+	endpoints := map[int]string{80: "host.docker.internal:49152"}
+	err = svc.ensureServiceRelay(t.Context(), project, db, endpoints, []string{"default"})
+	assert.NilError(t, err)
+
+	assert.DeepEqual(t, got.HostConfig.CapDrop, []string{"ALL"})
+	assert.DeepEqual(t, got.HostConfig.CapAdd, []string{"NET_BIND_SERVICE"})
 }
 
 // No relay ever existed for the service: nothing to do, and nothing calls
