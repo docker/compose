@@ -254,3 +254,38 @@ func TestCheckRelayTarget(t *testing.T) {
 	regular := container.Summary{Labels: map[string]string{api.ServiceLabel: "db"}}
 	assert.NilError(t, checkRelayTarget(regular, "db", "exec"))
 }
+
+// A provider publishing no endpoint on this up -- whether it never did, or a
+// relay from an earlier up is now stale -- must not leave a relay routing to
+// an upstream the provider no longer serves.
+func TestRemoveServiceRelayRemovesExisting(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{{ID: "relay-1", Names: []string{"/p-db-1"}}},
+	}, nil)
+	apiMock.EXPECT().ContainerRemove(gomock.Any(), "relay-1", client.ContainerRemoveOptions{Force: true}).
+		Return(client.ContainerRemoveResult{}, nil)
+
+	assert.NilError(t, svc.removeServiceRelay(t.Context(), "p", "db"))
+}
+
+// No relay ever existed for the service: nothing to do, and nothing calls
+// ContainerRemove (mockCtrl.Finish would fail an unexpected call anyway).
+func TestRemoveServiceRelayNoopWhenNoneExists(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+
+	assert.NilError(t, svc.removeServiceRelay(t.Context(), "p", "db"))
+}

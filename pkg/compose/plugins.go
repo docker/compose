@@ -131,6 +131,14 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	if deployRelay {
 		return s.ensureServiceRelay(ctx, project, service, variables.endpoints, networkKeys)
 	}
+	if command == "up" {
+		// The provider published no endpoint on this run — whether it never
+		// did, or stopped doing so since a previous up deployed a relay for
+		// it. Either way there is nothing to route to, so any relay left
+		// over from an earlier run must go: routing to whatever upstream it
+		// still holds would be silently wrong instead of just absent.
+		return s.removeServiceRelay(ctx, project.Name, service.Name)
+	}
 	return nil
 }
 

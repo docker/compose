@@ -617,11 +617,19 @@ func (s *composeService) startService(ctx context.Context,
 }
 
 func (s *composeService) startServiceContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, ctr container.Summary, listener api.ContainerEventListener) error {
-	if err := s.injectSecrets(ctx, project, service, ctr.ID); err != nil {
-		return err
-	}
-	if err := s.injectConfigs(ctx, project, service, ctr.ID); err != nil {
-		return err
+	// A relay stands in for the service on the network but is a static,
+	// shell-less scratch binary: secrets/configs injection and lifecycle
+	// hooks have no filesystem or process to act on inside it. The compose
+	// spec doesn't forbid declaring them on a provider: service, so this
+	// must be checked, not assumed unreachable.
+	relay := isRelayContainer(ctr)
+	if !relay {
+		if err := s.injectSecrets(ctx, project, service, ctr.ID); err != nil {
+			return err
+		}
+		if err := s.injectConfigs(ctx, project, service, ctr.ID); err != nil {
+			return err
+		}
 	}
 
 	eventName := getContainerProgressName(ctr)
@@ -633,9 +641,11 @@ func (s *composeService) startServiceContainer(ctx context.Context, project *typ
 		return err
 	}
 
-	for _, hook := range service.PostStart {
-		if err := s.runHook(ctx, ctr, service, hook, listener); err != nil {
-			return err
+	if !relay {
+		for _, hook := range service.PostStart {
+			if err := s.runHook(ctx, ctr, service, hook, listener); err != nil {
+				return err
+			}
 		}
 	}
 

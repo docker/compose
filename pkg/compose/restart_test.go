@@ -150,3 +150,25 @@ func TestRestartContainer_Order(t *testing.T) {
 		"Container prj-web-1: Started",
 	})
 }
+
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: pre_stop/post_start have no process inside it to act on.
+// No ExecCreate expectation is set: per newStartTestService, gomock fails
+// the test if either hook still runs.
+func TestRestartContainerSkipsHooksForRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name:      "db",
+		PreStop:   []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"warmup"}}},
+	}
+	relay := serviceContainer("db", 1, container.StateRunning)
+	relay.Labels[api.RelayLabel] = "abc123"
+
+	apiClient.EXPECT().ContainerRestart(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerRestartResult{}, nil)
+
+	err := svc.restartContainer(t.Context(), service, relay, api.RestartOptions{})
+	assert.NilError(t, err)
+}
