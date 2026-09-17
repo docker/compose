@@ -30,7 +30,6 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
-	"github.com/jonboulle/clockwork"
 	extensionclient "github.com/moby/extensions/client"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"

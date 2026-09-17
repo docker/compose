@@ -83,7 +83,7 @@ func jobTrigger(job types.JobConfig) (*jobsv0.Trigger, error) {
 	switch {
 	case job.Triggers == nil:
 		return nil, fmt.Errorf("job %q has no trigger", job.Name)
-	case job.Triggers.Manual:
+	case job.Triggers.Manual != nil && *job.Triggers.Manual:
 		return &jobsv0.Trigger{Manual: true}, nil
 	case len(job.Triggers.Schedule) == 1:
 		sc := job.Triggers.Schedule[0]
@@ -223,7 +223,7 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	if !ok {
 		return 0, fmt.Errorf("job %q not found", name)
 	}
-	if job.Triggers == nil || !job.Triggers.Manual {
+	if job.Triggers == nil || job.Triggers.Manual == nil || !*job.Triggers.Manual {
 		return 0, fmt.Errorf("job %q has no manual trigger, it cannot be run", name)
 	}
 

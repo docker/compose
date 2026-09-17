@@ -369,7 +369,7 @@ func manualJobNames(project *types.Project) []string {
 	jobs := project.AllJobs()
 	names := make([]string, 0, len(jobs))
 	for name, job := range jobs {
-		if job.Triggers != nil && job.Triggers.Manual {
+		if job.Triggers != nil && job.Triggers.Manual != nil && *job.Triggers.Manual {
 			names = append(names, name)
 		}
 	}
