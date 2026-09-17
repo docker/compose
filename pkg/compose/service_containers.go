@@ -602,8 +602,8 @@ func (s *composeService) startService(ctx context.Context,
 	// the only currently supported mode. Pick the replica with the lowest
 	// container-number so the choice is deterministic regardless of the order
 	// the daemon returns containers in.
-	if len(service.PreStart) > 0 && len(serviceContainers) == len(toStart) {
-		if err := s.runPreStart(ctx, project, service, lowestNumberedContainer(toStart), listener); err != nil {
+	if candidate := lowestNumberedContainer(toStart); len(service.PreStart) > 0 && len(serviceContainers) == len(toStart) && !isRelayContainer(candidate) {
+		if err := s.runPreStart(ctx, project, service, candidate, listener); err != nil {
 			return err
 		}
 	}
