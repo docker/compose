@@ -180,7 +180,7 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 			if err := s.waitRelayRemoved(ctx, project.Name, service.Name); err != nil {
 				return err
 			}
-		} else if _, err := s.apiClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
+		} else if _, err := s.apiClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
 			return fmt.Errorf("remove stale relay for service %s: %w", service.Name, err)
 		}
 	}
@@ -406,7 +406,7 @@ func (s *composeService) pullRelayImage(ctx context.Context) error {
 // secrets/configs injection, lifecycle hooks, process-level commands — must
 // skip it.
 func isRelayContainer(ctr container.Summary) bool {
-	return ctr.Labels[api.RelayLabel] != ""
+	return isRelay(ctr.Labels)
 }
 
 // checkRelayTarget refuses process-level operations on a relay container: it

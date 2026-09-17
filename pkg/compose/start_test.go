@@ -239,6 +239,29 @@ func TestStartService_PreStartOnLowestReplica(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: pre_start has no volumes or process inside it for the hook
+// container's VolumesFrom to share. No ContainerCreate expectation is set:
+// gomock fails the test if the hook still runs against the relay.
+func TestStartService_PreStartSkippedWhenLowestIsRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	project := &types.Project{Name: "prj"}
+	service := types.ServiceConfig{
+		Name:     "db",
+		PreStart: []types.ServiceHook{{Command: types.ShellCommand{"init"}}},
+	}
+	relay := serviceContainer("db", 1, container.StateExited)
+	relay.Labels[api.RelayLabel] = "abc123"
+	containers := Containers{relay}
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+
+	err := svc.startService(t.Context(), project, service, containers, nil, 0)
+	assert.NilError(t, err)
+}
+
 // TestStartServiceContainer_Order locks the per-container start sequence:
 // secret/config files are copied in before ContainerStart, post_start hooks
 // run after it, and the Started event is only emitted once the hooks are done.

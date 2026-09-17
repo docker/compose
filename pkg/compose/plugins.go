@@ -98,7 +98,8 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return nil
 	}
 
-	deployRelay := command == "up" && len(variables.endpoints) > 0
+	isUp := command == "up"
+	deployRelay := isUp && len(variables.endpoints) > 0
 
 	// project.Services is shared state mutated by every concurrent provider
 	// run: the env-var injection below writes it, and the relay's network
@@ -128,10 +129,10 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	}
 	mux.Unlock()
 
-	if deployRelay {
-		return s.ensureServiceRelay(ctx, project, service, variables.endpoints, networkKeys)
-	}
-	if command == "up" {
+	if isUp {
+		if deployRelay {
+			return s.ensureServiceRelay(ctx, project, service, variables.endpoints, networkKeys)
+		}
 		// The provider published no endpoint on this run — whether it never
 		// did, or stopped doing so since a previous up deployed a relay for
 		// it. Either way there is nothing to route to, so any relay left
