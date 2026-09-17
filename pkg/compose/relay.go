@@ -332,6 +332,13 @@ func (s *composeService) createRelayContainer(ctx context.Context, project *type
 		RestartPolicy: container.RestartPolicy{
 			Name: container.RestartPolicyUnlessStopped,
 		},
+		// The relay only dials out and forwards bytes: it needs none of
+		// Docker's default capabilities. NET_BIND_SERVICE is kept because a
+		// route commonly targets a privileged port (e.g. 80, 443) that the
+		// relay — running unprivileged as UID 65532 — must still be able to
+		// listen on inside its own container.
+		CapDrop: []string{"ALL"},
+		CapAdd:  []string{"NET_BIND_SERVICE"},
 	}
 
 	// First network at creation, remaining ones connected afterwards — the
