@@ -181,7 +181,8 @@ services:
 }
 
 func TestManualJobNames(t *testing.T) {
-	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: true}}
+	manualTrigger := true
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &manualTrigger}}
 	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
 		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
 	}}

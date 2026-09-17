@@ -23,7 +23,6 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
-	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-runewidth v0.0.30
 	github.com/mattn/go-shellwords v1.0.15
 	github.com/mitchellh/go-ps v1.0.0
@@ -137,5 +136,3 @@ exclude (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
-
-replace github.com/compose-spec/compose-go/v2 => github.com/ndeloof/compose-go/v2 v2.0.1-0.20260819150359-59f9907c1949
