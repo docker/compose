@@ -1,0 +1,20 @@
+services:
+  base:
+    profiles: ["disabled"]
+    image: e2e-additional-context-base:latest
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM alpine
+        RUN echo base > /base-marker
+
+  classroom:
+    profiles: ["classroom"]
+    image: e2e-additional-context-classroom:latest
+    build:
+      context: .
+      additional_contexts:
+        base: service:base
+      dockerfile_inline: |
+        FROM base
+        ENTRYPOINT ["sleep", "infinity"]
