@@ -1,0 +1,20 @@
+services:
+  data:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - shared:/shared
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes_from:
+      - data
+    depends_on:
+      data:
+        condition: service_started
+    pre_start:
+      - command: sh -c 'echo ready > /shared/marker'
+volumes:
+  shared:

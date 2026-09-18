@@ -1,0 +1,21 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    extra_hosts:
+      - "inherited-host:192.0.2.10"
+      - "shared-host:192.0.2.11"
+    pre_start:
+      # no extra_hosts declared: the service's entries are inherited
+      - command: sh -c 'grep inherited-host /etc/hosts'
+      # declared extra_hosts complete the inherited ones; entries for the
+      # same hostname accumulate, exactly like the compose file merge rules
+      - command: >
+          sh -c 'grep declared-host /etc/hosts &&
+                 grep inherited-host /etc/hosts &&
+                 grep "192.0.2.99.*shared-host" /etc/hosts &&
+                 grep "192.0.2.11.*shared-host" /etc/hosts'
+        extra_hosts:
+          - "declared-host:192.0.2.20"
+          - "shared-host:192.0.2.99"

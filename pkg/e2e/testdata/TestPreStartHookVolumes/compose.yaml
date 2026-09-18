@@ -1,0 +1,15 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data:ro
+    pre_start:
+      # the hook redeclares the volume read-write to prepare content the
+      # service will only ever read
+      - command: sh -c 'echo initialized > /data/init.txt'
+        volumes:
+          - data:/data:rw
+volumes:
+  data: {}

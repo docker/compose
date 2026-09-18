@@ -28,6 +28,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/google/go-cmp/cmp"
 	"github.com/moby/moby/api/types/registry"
@@ -121,10 +122,11 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: envPath, Required: true},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: envPath, Required: true},
+					},
 				},
 			},
 		},
@@ -214,10 +216,11 @@ func Test_checkForSensitiveData_optional_env_file_missing(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: filepath.Join(dir, "missing.env"), Required: false},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: filepath.Join(dir, "missing.env"), Required: false},
+					},
 				},
 			},
 		},
@@ -237,10 +240,11 @@ func Test_checkForSensitiveData_optional_env_file_present(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: envPath, Required: false},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: envPath, Required: false},
+					},
 				},
 			},
 		},
@@ -257,10 +261,11 @@ func Test_checkForSensitiveData_required_env_file_missing(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				EnvFiles: []types.EnvFile{
-					{Path: filepath.Join(dir, "missing.env"), Required: true},
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					EnvFiles: []types.EnvFile{
+						{Path: filepath.Join(dir, "missing.env"), Required: true},
+					},
 				},
 			},
 		},
@@ -537,6 +542,32 @@ services:
 				"unrelated": {"UNRELATED_SECRET"},
 			},
 		},
+		{
+			// Jobs carry environment/env_file like services: same leak
+			// surface, so they must be scanned too, not just project.Services.
+			name: "job literal on suspicious key is flagged like a service's",
+			files: map[string]string{
+				"compose.yaml": `name: test
+services:
+  web:
+    image: alpine
+jobs:
+  migrate:
+    image: alpine
+    environment:
+      DB_PASSWORD: toto
+    env_file:
+      - ./app.env
+    triggers:
+      manual: true
+`,
+				"app.env": "FOO=bar\n",
+			},
+			wantSuspicious: map[string][]string{
+				"migrate": {"DB_PASSWORD"},
+			},
+			wantEnvFile: []string{"migrate"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -622,7 +653,7 @@ services:
 	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, len(prompt.prompts), 1, "exactly one env-related prompt")
-	assert.Assert(t, strings.Contains(prompt.prompts[0], `service "db"`))
+	assert.Assert(t, strings.Contains(prompt.prompts[0], `"db"`))
 	assert.Assert(t, strings.Contains(prompt.prompts[0], "MYSQL_ROOT_PASSWORD"))
 }
 
@@ -703,13 +734,14 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	project := &types.Project{
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
-				Volumes: []types.ServiceVolumeConfig{
-					{
-						Type:   types.VolumeTypeBind,
-						Source: "/host/path",
-						Target: "/container/path",
+				Name: "web", ContainerSpec: types.ContainerSpec{
+					Image: "nginx",
+					Volumes: []types.ServiceVolumeConfig{
+						{
+							Type:   types.VolumeTypeBind,
+							Source: "/host/path",
+							Target: "/container/path",
+						},
 					},
 				},
 			},
@@ -747,11 +779,14 @@ func Test_generateImageDigestsOverride_resolvesDependentImages(t *testing.T) {
 		Name: "test",
 		Services: types.Services{
 			"app": types.ServiceConfig{
-				Name:     "app",
-				Image:    "nginx:latest",
-				PreStart: []types.ServiceHook{{Image: "hookimage:latest"}},
-				Volumes: []types.ServiceVolumeConfig{
-					{Type: types.VolumeTypeImage, Source: "someimage:latest", Target: "/data"},
+				Name: "app",
+
+				PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "hookimage:latest"}}}, ContainerSpec: types.ContainerSpec{
+					Image: "nginx:latest",
+
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "someimage:latest", Target: "/data"},
+					},
 				},
 			},
 		},
@@ -776,4 +811,144 @@ func Test_generateImageDigestsOverride_resolvesDependentImages(t *testing.T) {
 	override, err := tested.generateImageDigestsOverride(t.Context(), project)
 	assert.NilError(t, err)
 	assert.Assert(t, strings.Contains(string(override), "docker.io/library/nginx:latest@"+serviceDigest))
+}
+
+// generateImageDigestsOverride only walks project.Services natively: jobs
+// must be dressed as services to run through the exact same
+// WithImagesResolved resolution, then folded back — so the published
+// artifact is reproducible for jobs too, not just services.
+func Test_generateImageDigestsOverride_resolvesJobImages(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
+	tested := &composeService{dockerCli: cli}
+
+	const jobDigest = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	project := &types.Project{
+		Name: "test",
+		Jobs: types.Jobs{
+			"migrate": types.JobConfig{
+				Name:          "migrate",
+				ContainerSpec: types.ContainerSpec{Image: "migrate:latest"},
+			},
+		},
+	}
+
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/migrate:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: jobDigest}},
+		}, nil)
+
+	override, err := tested.generateImageDigestsOverride(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Assert(t, strings.Contains(string(override), "docker.io/library/migrate:latest@"+jobDigest))
+}
+
+// checkOnlyBuildSection must reject a job that only has a build section, the
+// same as a build-only service: neither can be published as-is.
+func Test_checkOnlyBuildSection_rejectsJobWithoutImage(t *testing.T) {
+	project := &types.Project{
+		Jobs: types.Jobs{
+			"migrate": types.JobConfig{
+				Name:         "migrate",
+				WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
+			},
+		},
+	}
+
+	svc := &composeService{}
+	ok, err := svc.checkOnlyBuildSection(project)
+	assert.Assert(t, !ok)
+	assert.ErrorContains(t, err, `"migrate"`)
+}
+
+func Test_checkOnlyBuildSection_acceptsJobWithImage(t *testing.T) {
+	project := &types.Project{
+		Jobs: types.Jobs{
+			"migrate": types.JobConfig{
+				Name:          "migrate",
+				ContainerSpec: types.ContainerSpec{Image: "migrate:latest"},
+				WorkloadSpec:  types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
+			},
+		},
+	}
+
+	svc := &composeService{}
+	ok, err := svc.checkOnlyBuildSection(project)
+	assert.NilError(t, err)
+	assert.Assert(t, ok)
+}
+
+// checkForBindMount must flag a job's bind mounts the same as a service's:
+// a bind mount references the local filesystem, meaningless once published.
+func Test_checkForBindMount_flagsJobBindMount(t *testing.T) {
+	project := &types.Project{
+		Jobs: types.Jobs{
+			"migrate": types.JobConfig{
+				Name: "migrate",
+				ContainerSpec: types.ContainerSpec{
+					Image: "migrate:latest",
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeBind, Source: "/host/data", Target: "/data"},
+						{Type: types.VolumeTypeVolume, Source: "named", Target: "/named"},
+					},
+				},
+			},
+		},
+	}
+
+	svc := &composeService{}
+	findings := svc.checkForBindMount(project)
+	assert.Equal(t, len(findings["migrate"]), 1)
+	assert.Equal(t, findings["migrate"][0].Source, "/host/data")
+}
+
+// checkForSensitiveData must scan a job's env files, same as a service's.
+func Test_checkForSensitiveData_jobEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, "secrets.env")
+	assert.NilError(t, os.WriteFile(envPath, []byte(`AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"`), 0o600))
+
+	project := &types.Project{
+		Jobs: types.Jobs{
+			"migrate": types.JobConfig{
+				Name: "migrate",
+				ContainerSpec: types.ContainerSpec{
+					Image:    "migrate:latest",
+					EnvFiles: []types.EnvFile{{Path: envPath, Required: false}},
+				},
+			},
+		},
+	}
+
+	svc := &composeService{}
+	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Assert(t, len(findings) > 0, "job env file should be scanned for secrets like a service's")
+}
+
+// pushApplicationIndex walks every service AND job image to reference them
+// in the application index manifest — a job's image must be part of the
+// published artifact just like a service's. Copying/pushing a real image
+// needs a live registry, out of reach for a unit test, but each image is
+// parsed as a docker reference before that: an invalid job image surfaces
+// its own parse error, proving the job loop is reached (a service-only walk
+// would report no error at all, or a different one from the valid service).
+func Test_pushApplicationIndex_walksJobImages(t *testing.T) {
+	// No services at all: if the job loop didn't feed into the same walk,
+	// there would be nothing to process and this would return nil, not the
+	// job's own reference error.
+	project := &types.Project{
+		Jobs: types.Jobs{
+			"migrate": types.JobConfig{Name: "migrate", ContainerSpec: types.ContainerSpec{Image: "Invalid/Image:Name"}},
+		},
+	}
+
+	named, err := reference.ParseNormalizedNamed("myorg/myapp:latest")
+	assert.NilError(t, err)
+
+	err = pushApplicationIndex(t.Context(), nil, named, v1.Descriptor{}, project)
+	assert.ErrorContains(t, err, "must be lowercase")
 }

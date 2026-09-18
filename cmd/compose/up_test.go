@@ -29,6 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -155,8 +156,7 @@ services:
 		WorkingDir: dir,
 		Services: types.Services{
 			"web": {
-				Name:  "web",
-				Image: "nginx",
+				Name: "web", ContainerSpec: types.ContainerSpec{Image: "nginx"},
 			},
 		},
 	}
@@ -178,4 +178,38 @@ services:
 	assert.Assert(t, strings.Contains(output, "LXKNS_ADDRESS"), output)
 	assert.Assert(t, strings.Contains(output, "LXKNS_PORT"), output)
 	assert.Assert(t, !strings.Contains(fmt.Sprint(err), "invalid ip address"), fmt.Sprint(err))
+}
+
+func TestRejectScheduledJobs(t *testing.T) {
+	yes := true
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
+	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
+		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+	}}
+
+	assert.NilError(t, rejectScheduledJobs(&types.Project{}))
+	assert.NilError(t, rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual}}))
+	// profile-disabled scheduled jobs don't block up
+	assert.NilError(t, rejectScheduledJobs(&types.Project{DisabledJobs: types.Jobs{"backup": scheduled}}))
+
+	err := rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": scheduled, "migrate": manual}})
+	assert.Error(t, err, "scheduled jobs are not supported in this version: backup, sync")
+}
+
+// warnIgnoredJobs must only name profile-enabled jobs: a job disabled by
+// profile selection isn't part of this invocation and up never reaching it
+// isn't worth a warning — unlike rejectScheduledJobs, which already gets
+// this right via project.Jobs.
+func TestWarnIgnoredJobs(t *testing.T) {
+	hook := logrustest.NewGlobal()
+
+	warnIgnoredJobs(&types.Project{
+		Jobs:         types.Jobs{"migrate": {}},
+		DisabledJobs: types.Jobs{"backup": {}},
+	})
+
+	assert.Equal(t, len(hook.AllEntries()), 1)
+	msg := hook.LastEntry().Message
+	assert.Assert(t, strings.Contains(msg, "migrate"), msg)
+	assert.Assert(t, !strings.Contains(msg, "backup"), msg)
 }

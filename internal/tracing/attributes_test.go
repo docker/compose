@@ -28,27 +28,27 @@ func TestProjectHash(t *testing.T) {
 		Name:       "fake-proj",
 		WorkingDir: "/tmp",
 		Services: map[string]types.ServiceConfig{
-			"foo": {Image: "fake-image"},
+			"foo": {ContainerSpec: types.ContainerSpec{Image: "fake-image"}},
 		},
 		DisabledServices: map[string]types.ServiceConfig{
-			"bar": {Image: "diff-image"},
+			"bar": {ContainerSpec: types.ContainerSpec{Image: "diff-image"}},
 		},
 	}
 	projB := &types.Project{
 		Name:       "fake-proj",
 		WorkingDir: "/tmp",
 		Services: map[string]types.ServiceConfig{
-			"foo": {Image: "fake-image"},
-			"bar": {Image: "diff-image"},
+			"foo": {ContainerSpec: types.ContainerSpec{Image: "fake-image"}},
+			"bar": {ContainerSpec: types.ContainerSpec{Image: "diff-image"}},
 		},
 	}
 	projC := &types.Project{
 		Name:       "fake-proj",
 		WorkingDir: "/tmp",
 		Services: map[string]types.ServiceConfig{
-			"foo": {Image: "fake-image"},
-			"bar": {Image: "diff-image"},
-			"baz": {Image: "yet-another-image"},
+			"foo": {ContainerSpec: types.ContainerSpec{Image: "fake-image"}},
+			"bar": {ContainerSpec: types.ContainerSpec{Image: "diff-image"}},
+			"baz": {ContainerSpec: types.ContainerSpec{Image: "yet-another-image"}},
 		},
 	}
 

@@ -38,17 +38,18 @@ func TestApplyPlatforms_InferFromRuntime(t *testing.T) {
 		return &types.Project{
 			Services: types.Services{
 				"test": {
-					Name:  "test",
-					Image: "foo",
-					Build: &types.BuildConfig{
+					Name: "test", ContainerSpec: types.ContainerSpec{
+						Image: "foo",
+
+						Platform: "alice/32",
+					}, WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
 						Context: ".",
 						Platforms: []string{
 							"linux/amd64",
 							"linux/arm64",
 							"alice/32",
 						},
-					},
-					Platform: "alice/32",
+					}},
 				},
 			},
 		}
@@ -75,15 +76,13 @@ func TestApplyPlatforms_DockerDefaultPlatform(t *testing.T) {
 			},
 			Services: types.Services{
 				"test": {
-					Name:  "test",
-					Image: "foo",
-					Build: &types.BuildConfig{
+					Name: "test", ContainerSpec: types.ContainerSpec{Image: "foo"}, WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
 						Context: ".",
 						Platforms: []string{
 							"linux/amd64",
 							"linux/arm64",
 						},
-					},
+					}},
 				},
 			},
 		}
@@ -110,15 +109,13 @@ func TestApplyPlatforms_UnsupportedPlatform(t *testing.T) {
 			},
 			Services: types.Services{
 				"test": {
-					Name:  "test",
-					Image: "foo",
-					Build: &types.BuildConfig{
+					Name: "test", ContainerSpec: types.ContainerSpec{Image: "foo"}, WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
 						Context: ".",
 						Platforms: []string{
 							"linux/amd64",
 							"linux/arm64",
 						},
-					},
+					}},
 				},
 			},
 		}
