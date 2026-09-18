@@ -255,7 +255,7 @@ func TestStartService_PreStartSkippedWhenLowestIsRelay(t *testing.T) {
 	project := &types.Project{Name: "prj"}
 	service := types.ServiceConfig{
 		Name:     "db",
-		PreStart: []types.ServiceHook{{Command: types.ShellCommand{"init"}}},
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
 	}
 	relay := serviceContainer("db", 1, container.StateExited)
 	relay.Labels[api.RelayLabel] = "abc123"
