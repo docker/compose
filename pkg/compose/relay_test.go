@@ -110,18 +110,18 @@ func TestRelayNetworks(t *testing.T) {
 		Services: types.Services{
 			"db": db,
 			"app": {
-				Name:      "app",
-				DependsOn: types.DependsOnConfig{"db": {}},
-				Networks:  map[string]*types.ServiceNetworkConfig{"backend": nil},
+				Name:          "app",
+				WorkloadSpec:  types.WorkloadSpec{DependsOn: types.DependsOnConfig{"db": {}}},
+				ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"backend": nil}},
 			},
 			"web": {
-				Name:      "web",
-				DependsOn: types.DependsOnConfig{"db": {}},
-				Networks:  map[string]*types.ServiceNetworkConfig{"frontend": nil, "backend": nil},
+				Name:          "web",
+				WorkloadSpec:  types.WorkloadSpec{DependsOn: types.DependsOnConfig{"db": {}}},
+				ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": nil, "backend": nil}},
 			},
 			"other": {
-				Name:     "other",
-				Networks: map[string]*types.ServiceNetworkConfig{"private": nil},
+				Name:          "other",
+				ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"private": nil}},
 			},
 		},
 		Networks: types.Networks{"default": {}, "backend": {}, "frontend": {}, "private": {}},
