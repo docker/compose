@@ -616,7 +616,9 @@ func TestBuildAdditionalContextDisabledService(t *testing.T) {
 		DockerCmd("image", "rm", "-f", "e2e-additional-context-base:latest").MayFail(),
 		DockerCmd("image", "rm", "-f", "e2e-additional-context-classroom:latest").MayFail()).
 		Step("up with only the classroom profile active builds base as a dependency but never starts it",
-			ComposeCmd("--profile", "classroom", "up", "-d"),
+			// --build: a stale image from a previous run must not let this
+			// step skip the build it exists to exercise.
+			ComposeCmd("--profile", "classroom", "up", "--build", "-d"),
 			ServiceState("classroom", "running"),
 			ImageExists("e2e-additional-context-base:latest"),
 			ServiceNotCreated("base"))
