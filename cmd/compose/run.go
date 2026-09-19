@@ -135,8 +135,9 @@ func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (t
 			value, ok := environment[k]
 			return value, ok
 		})
+		_ = f.Close()
 		if err != nil {
-			return nil, nil
+			return nil, fmt.Errorf("failed to parse env file %s: %w", file, err)
 		}
 		for k, v := range vars {
 			if _, ok := environment[k]; !ok {
