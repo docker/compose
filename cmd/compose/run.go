@@ -465,15 +465,21 @@ func materializeManualJob(project *types.Project, name string) (*types.Project, 
 	// run-to-completion container satisfying its declared condition),
 	// instead of dangling as an unresolvable name.
 	jobs := project.AllJobs()
-	materializeJobClosure(project, jobs, job, map[string]bool{name: true})
+	if err := materializeJobClosure(project, jobs, job, map[string]bool{name: true}); err != nil {
+		return nil, err
+	}
 	project.Services[name] = jobAsService(project, name, job)
 	return project, nil
 }
 
 // materializeJobClosure adds every job reachable through job-typed
 // depends_on edges to project.Services. seen carries the starting job and
-// guards against dependency cycles.
-func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.JobConfig, seen map[string]bool) {
+// guards against dependency cycles. manual: false is checked here too, not
+// just on the top-level run target: it declares a job harmful to trigger
+// outside its schedule, and pulling it in as a dependency is still the
+// user's run command causing that out-of-schedule execution, just one hop
+// removed.
+func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.JobConfig, seen map[string]bool) error {
 	for dep := range job.DependsOn {
 		if seen[dep] {
 			continue
@@ -483,9 +489,15 @@ func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.Jo
 		if !isJob {
 			continue
 		}
-		materializeJobClosure(project, jobs, depJob, seen)
+		if depJob.Triggers != nil && depJob.Triggers.Manual != nil && !*depJob.Triggers.Manual {
+			return fmt.Errorf("job %q is declared with manual: false, it cannot be triggered even as a dependency of another job", dep)
+		}
+		if err := materializeJobClosure(project, jobs, depJob, seen); err != nil {
+			return err
+		}
 		project.Services[dep] = jobAsService(project, dep, depJob)
 	}
+	return nil
 }
 
 // jobAsService materializes a job as a service for the one-off machinery: a
