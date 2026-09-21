@@ -578,6 +578,7 @@ func BindMountSource(service, target, wantSource string) Check {
 					return fmt.Errorf("inspect failed: %s", res.Combined())
 				}
 				var mounts []struct {
+					Type        string
 					Destination string
 					Source      string
 				}
@@ -586,6 +587,9 @@ func BindMountSource(service, target, wantSource string) Check {
 				}
 				found := false
 				for _, m := range mounts {
+					if m.Type != "bind" {
+						continue
+					}
 					if m.Destination != target {
 						continue
 					}
