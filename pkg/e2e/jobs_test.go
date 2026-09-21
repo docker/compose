@@ -82,3 +82,36 @@ func TestRunJobDependsOnManualFalseJob(t *testing.T) {
 			StderrContains(`job "sensitive" is declared with manual: false, it cannot be triggered even as a dependency`),
 			ServiceNotCreated("db"))
 }
+
+// A job is documented as run-only: create and start don't know how to
+// materialize one, so targeting either by a job's name must say so clearly
+// instead of surfacing compose-go's raw "no such service" selection error.
+func TestCreateRefusesJob(t *testing.T) {
+	NewScenario(t, "create must refuse a job by name, naming run as the right command").
+		Step("create fails naming the job",
+			ComposeCmd("create", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+			ServiceNotCreated("migrate"))
+}
+
+func TestStartRefusesJob(t *testing.T) {
+	NewScenario(t, "start must refuse a job by name, naming run as the right command").
+		Step("start fails naming the job",
+			ComposeCmd("start", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+			ServiceNotCreated("migrate"))
+}
+
+// When COMPOSE_PROJECT_NAME is set, start's underlying project-resolution
+// helper falls back to a label-driven, file-less project on any load
+// failure -- including "no such service" for a job -- instead of
+// surfacing it. Without an explicit job check on that path, start would
+// exit 0 having silently done nothing: a job that was never run has no
+// container for the label-driven fallback to find.
+func TestStartRefusesJobWithProjectNameEnv(t *testing.T) {
+	s := NewScenario(t, "start must still refuse a job by name when COMPOSE_PROJECT_NAME triggers the label-driven fallback")
+	s.Step("start fails naming the job, not silently exiting 0",
+		ComposeCmd("start", "migrate").WithEnv("COMPOSE_PROJECT_NAME="+s.Project()).MayFail(),
+		StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+		ServiceNotCreated("migrate"))
+}
