@@ -79,45 +79,39 @@ This section gives the experienced contributor some tips and guidelines.
 
 ### AI-assisted contributions
 
-Docker Compose has clear rules for AI-assisted contributions. **Read the full policy**: [AI_POLICY.md](AI_POLICY.md)
+Docker Compose follows the shared [Moby/Docker AI usage policy](https://github.com/moby/.github/blob/main/AI_POLICY.md),
+synced into [AI_POLICY.md](AI_POLICY.md) by an automated workflow. That file is
+a floor, not a ceiling - this section is where Compose tightens it.
 
 **Required for all AI-assisted PRs**:
 - **Disclose** the AI tool used (GitHub Copilot, Claude Code, ChatGPT, Cursor, etc.)
-- **Link to an approved issue** - only submit PRs for issues labeled `status/approved`
-- **Test thoroughly** - run `make test`, `make lint`, and relevant E2E tests
+- **Link to an approved issue** - only submit PRs for issues labeled `status/approved`;
+  drive-by PRs that don't reference one will be closed
+- **Test thoroughly** - run `make test`, `make lint`, `make fmt`, and relevant
+  E2E tests. Don't let AI write code for a platform or environment you don't
+  have access to test yourself
 - **Follow existing patterns** - read [AGENTS.md](AGENTS.md) and match nearby code
 - **Understand your code** - you must be able to explain every line
+- **Remove `AI_AGENT_DISCLOSURE.md` before opening the PR** - some agents create
+  this file as a checkpoint marking work that hasn't been independently reviewed
+  yet; review the change yourself, then delete it. An automated check blocks
+  merge while it's present
 - **Stick around** - a merge isn't the finish line; follow up on review comments
   and fix regressions afterwards
 
 **PRs that don't follow these rules will be closed.** Contributors who repeatedly
 ignore this policy may be banned from the repository.
 
-This is not an anti-AI stance - we use AI ourselves. This policy exists to maintain
-code quality and protect maintainer time. See [AI_POLICY.md](AI_POLICY.md) for details.
+If you're still learning, we encourage writing the code yourself rather than
+relying on AI - you'll get better feedback that way. See
+[AI_POLICY.md](AI_POLICY.md) for the full shared policy, including why this
+isn't an anti-AI stance.
 
 ### No contribution farming
 
-Contribution farming is forbidden. Do not submit pull requests in an attempt to
-inflate contribution counts, build a public portfolio or gain repository
-activity rather than to improve the project.
-
-Examples include:
-
-- opening pull requests without verifying the problem or testing the proposed
-  solution;
-- submitting unsolicited changes for problems that have not been reported;
-- splitting one logical change into multiple trivial pull requests without a
-  clear motivation;
-- submitting mechanical, cosmetic, generated, or speculative changes without a
-  concrete user or maintenance benefit.
-
-Maintainers may choose to close such submissions without detailed review or
-even ban contributors who repeatedly engage in this behavior.
-
-This rule is based on submission quality and behavior, not contributor
-experience or tool choice. First-time contributors and appropriately scoped
-small fixes are welcome when they address a real, verified problem or need.
+Contribution farming is forbidden - see [No contribution farming](AI_POLICY.md#no-contribution-farming)
+in AI_POLICY.md for what that covers and why. This applies regardless of
+whether AI was involved.
 
 ### Pull requests are always welcome
 

@@ -1,98 +1,115 @@
 # AI Usage Policy
 
-Docker Compose has clear rules for AI-assisted contributions:
+This is the shared AI usage policy for Moby and Docker open source projects.
+It sets the baseline for AI-assisted issues, pull requests, and discussion
+across repositories.
 
-- **All AI usage in any form must be disclosed.** You must state
-  the tool you used (e.g. GitHub Copilot, Claude Code, Cursor, ChatGPT)
-  along with the extent that the work was AI-assisted.
+- **Disclose AI usage.** Say what you used: Copilot, Claude Code, Cursor,
+  ChatGPT, whatever, and roughly how much of the work it did, in the issue
+  or PR description. If it's not disclosed and a maintainer suspects
+  otherwise, expect the issue or PR to get closed.
 
-- **If your AI agent created an `AI_AGENT_DISCLOSURE.md` file for you, that's
-  a checkpoint, not something to merge.** It states the change may not have
-  been independently reviewed or tested yet. Review the code yourself, then
-  remove the file before opening the PR. An automated check blocks merging
-  while it's present, precisely so this step can't be skipped.
+- **Skip the AI attribution trailer.** Disclosure belongs in the PR
+  description, not the commit message. Add a `Co-Authored-By:` trailer for a
+  human who actually worked on the change, not for the tool you used to
+  write it. Whoever opens the PR signs off on it and owns it, no matter what
+  wrote the first draft.
 
-- **Pull requests created in any way by AI can only be for approved issues.**
-  Only submit PRs for issues labeled `status/approved` by a maintainer.
-  Drive-by pull requests that do not reference an existing issue, or reference
-  issues not yet approved (e.g., `status/0-triage`), will be closed. If AI
-  isn't disclosed but a maintainer suspects its use, the PR will be closed.
-  If you want to work on an issue, wait for maintainer approval first.
+- **Review before you post.** Anything AI helped produce (an issue, a PR
+  description, a review reply, a code change) gets read and edited by a
+  human before it goes out. Using AI to draft a reply is fine, including to
+  bridge a language gap. Posting raw, unreviewed output isn't. Understand
+  it, check it's right, and own it before it goes out under your name.
 
-- **Pull requests created by AI must have been fully verified with
-  human testing.** AI must not create hypothetically correct code that
-  hasn't been tested. You must be able to explain every line of the
-  change yourself. You must run `make test`, `make lint`, and relevant
-  E2E tests locally. Importantly, you must not allow AI to write
-  code for platforms or environments you don't have access to manually
-  test on.
+- **Keep it short.** Lead with a plain-language summary of the problem or
+  change. If there's real detail worth keeping (logs, reasoning,
+  alternatives you tried), put it in a collapsible section instead of a
+  wall of text:
 
-- **Code must follow Docker Compose's existing patterns.** Before writing
-  code, read [AGENTS.md](AGENTS.md) and search for similar functionality
-  in the codebase. AI-generated code that ignores project conventions
-  (error handling, logging, testing patterns) will be rejected. Run
-  `make fmt` before submitting.
+  ```markdown
+  <details>
+  <summary>Details</summary>
 
-- **Issues and discussions can use AI assistance but must have a full
-  human-in-the-loop.** Any content generated with AI must be reviewed
-  _and edited_ by a human before submission - never post a raw agent
-  reply ("Excellent observation, thank you...") without reading and
-  rewriting it yourself. AI is very good at being overly verbose and
-  including noise that distracts from the main point; if there's
-  genuinely useful detail worth keeping, lead with a short summary and
-  put the rest in a collapsible `<details>` section instead of making
-  maintainers read a wall of text to figure out if something is
-  actionable.
+  ...supporting detail here...
 
-- **Don't add AI attribution to commit messages.** A
-  `Co-Authored-By: <AI tool>` trailer belongs on the commit only if a
-  human co-authored it; the tool you used to write the code isn't a
-  co-author. Disclose the AI tool and how it was used in the PR
-  description instead (see above) - the person opening the PR signs
-  off on and owns the commit regardless of what wrote it.
+  </details>
+  ```
 
-- **A merged contribution is not a one-shot event.** If your change surfaces
-  a regression, a follow-up review comment, or a question after merge, we
-  expect you to engage - fix it, or help us understand it. Landing a PR to
-  add a line to an open-source portfolio, with no intention of following up,
-  is not the kind of contribution we're looking for.
+  Some AI-written reports do contain useful detail; the point is to surface
+  the actionable part, not to strip the detail out.
 
-- **Contributors who repeatedly ignore this policy will have PRs closed
-  and may be banned from the repository.** We welcome developers at all
-  skill levels and are happy to help you learn. But if you're learning,
-  we encourage you to write code yourself rather than relying on AI—we'll
-  provide better feedback that way.
+- **Fix the bug, not the file.** Don't fold in drive-by refactoring, typo
+  fixes, or reformatting just because AI made them easy to generate. Spotted
+  something else worth fixing? Open it separately. Smaller diffs review
+  faster and carry less risk.
 
-These rules apply to all outside contributions. Maintainers may use AI
-tools at their discretion, applying the judgment earned through their
-contributions to the project.
+- **Landing the PR isn't the finish line.** If your change causes a
+  regression, or draws a follow-up question, show up for it. A PR that
+  exists to pad a contribution history, with no intent to follow through,
+  isn't the kind of contribution we want.
+
+- **Repeated violations have consequences.** Maintainers can close
+  submissions that ignore this policy, and repeat offenders get restricted
+  or banned.
+
+### No contribution farming
+
+Contribution farming is forbidden. Do not submit pull requests in an attempt
+to inflate contribution counts, build a public portfolio or gain repository
+activity rather than to improve the project.
+
+Examples include:
+
+- opening pull requests without verifying the problem or testing the
+  proposed solution;
+- submitting an AI-assisted pull request for a previously unreported problem
+  without first opening an issue, allowing maintainers to verify the need, and
+  receiving their approval to proceed;
+- splitting one logical change into multiple trivial pull requests without a
+  clear motivation;
+- submitting mechanical, cosmetic, generated, or speculative changes without
+  a concrete user or maintenance benefit.
+
+Maintainers may choose to close such submissions without detailed review or
+even ban contributors who repeatedly engage in this behavior.
+
+This rule is based on submission quality and behavior, not contributor
+experience or tool choice. First-time contributors and appropriately scoped
+small fixes are welcome when they address a real, verified problem or need.
+
+### Approved issues for AI-assisted PRs
+
+Some repos only accept AI-assisted PRs against an issue a maintainer has
+already triaged and approved: no speculative PRs built straight from an
+AI-generated idea. This policy doesn't mandate a specific label or workflow;
+repos are free to adopt it and tighten it, for example requiring a
+`status/approved` label before AI-assisted work starts. Check the repo's own
+`CONTRIBUTING.md` or `AGENTS.md` for what applies there.
+
+These rules apply to outside contributions. Maintainers can use their own
+judgment with AI tools, earned through their track record on the project.
 
 ## There are Humans Here
 
-Please remember that Docker Compose is maintained by humans.
+These projects are maintained by humans, on volunteer time.
 
-Every discussion, issue, and pull request is read and reviewed by
-humans. It is a point of interaction between people and their work.
-Approaching this with low-effort, unverified submissions is disrespectful
-and puts the burden of validation on maintainers who volunteer their time.
+Every issue and PR is read by a person, not a queue. A low-effort,
+unverified submission dumps the cost of validation onto whoever picks it up.
+AI doesn't change that: it just makes it easier to generate more of it,
+faster.
 
-In a perfect world, AI would produce high-quality, correct code every time.
-But that reality depends on the person using the AI. Today, we see too many
-contributions where AI-generated code hasn't been tested, doesn't follow
-project patterns, or solves problems that don't exist. Until this improves,
-we need clear rules to protect maintainer time.
+We're writing these rules because we're seeing AI-generated content that
+hasn't been checked, ignores project conventions, or solves a problem
+nobody has. Until that changes, we need something explicit to protect
+maintainer time.
 
 ## AI is Welcome Here
 
-Docker Compose is developed with AI assistance, and many maintainers use
-AI tools productively in their workflow. As a project, we welcome AI as
-a tool for those who use it responsibly!
+Plenty of maintainers on these projects use AI tools daily, and the
+projects themselves are built with AI assistance. This isn't an anti-AI
+policy.
 
-**Our reason for this policy is not an anti-AI stance**, but rather a
-response to the increase in low-quality AI-generated pull requests that
-don't address real user needs or follow project standards. It's about
-the quality of contributions, not the tools used to create them.
-
-This section exists to be transparent about the project's use of AI and
-to clarify that this policy targets contribution quality, not the use
-of AI tools themselves.
+It exists because of a rise in low-quality AI-generated contributions:
+ones that don't address a real need or follow project conventions. The
+target is contribution quality and accountability, not the tool that
+produced it.

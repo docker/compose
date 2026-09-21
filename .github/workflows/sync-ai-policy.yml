@@ -1,0 +1,36 @@
+name: Sync AI_POLICY.md
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Update AI_POLICY.md
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download shared AI usage policy
+        run: curl -fSL -o AI_POLICY.md https://raw.githubusercontent.com/moby/.github/main/AI_POLICY.md
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          title: Sync AI_POLICY.md from moby/.github
+          body: >-
+            Updates AI_POLICY.md to the current version of the shared
+            [moby/.github AI usage policy](https://github.com/moby/.github/blob/main/AI_POLICY.md).
+            Compose-specific additions live in CONTRIBUTING.md and AGENTS.md,
+            not in this file.
+          signoff: true
+          branch: sync-ai-policy
