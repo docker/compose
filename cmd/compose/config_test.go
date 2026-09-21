@@ -39,6 +39,7 @@ func TestResolveImageDigests(t *testing.T) {
 		serviceDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		hookDigest    = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 		volumeDigest  = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		builderDigest = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 	)
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -60,7 +61,9 @@ func TestResolveImageDigests(t *testing.T) {
 					map[string]any{"type": "image", "source": "someimage:latest", "target": "/data"},
 					// already digested: must NOT trigger any registry call and must be kept as-is
 					map[string]any{"type": "image", "source": "docker.io/library/pinned@" + testDigest, "target": "/pinned"},
-					// source referencing another service: locally built image, must be kept as-is
+					// happens to share its name with the "builder" service below: a type=image
+					// volume source is always a plain docker image reference (compose-go#929),
+					// never an implicit reference to another service, so it still gets resolved
 					map[string]any{"type": "image", "source": "builder", "target": "/built"},
 					map[string]any{"type": "bind", "source": "/host", "target": "/bind"},
 					"./data:/short",
@@ -91,6 +94,10 @@ func TestResolveImageDigests(t *testing.T) {
 		Return(client.DistributionInspectResult{
 			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: hookDigest}},
 		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/builder:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: builderDigest}},
+		}, nil)
 
 	err := resolveImageDigests(t.Context(), cli, model)
 	assert.NilError(t, err)
@@ -105,7 +112,7 @@ func TestResolveImageDigests(t *testing.T) {
 	volumes := service["volumes"].([]any)
 	assert.Equal(t, volumes[0].(map[string]any)["source"], "docker.io/library/someimage:latest@"+volumeDigest)
 	assert.Equal(t, volumes[1].(map[string]any)["source"], "docker.io/library/pinned@"+testDigest)
-	assert.Equal(t, volumes[2].(map[string]any)["source"], "builder")
+	assert.Equal(t, volumes[2].(map[string]any)["source"], "docker.io/library/builder:latest@"+builderDigest)
 	assert.Equal(t, volumes[3].(map[string]any)["source"], "/host")
 	assert.Equal(t, volumes[4], "./data:/short")
 	assert.Equal(t, services["builder"].(map[string]any)["image"], "docker.io/library/pinned@"+testDigest)

@@ -403,8 +403,8 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 
 func resolveServiceImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) error {
 	// create a pseudo-project so we can rely on WithImagesResolved to resolve images,
-	// pre_start hook images and `type: image` volume sources, keyed by actual service
-	// names so sources referencing another service are detected as such and kept unresolved
+	// pre_start hook images and `type: image` volume sources, keyed by the actual
+	// service names so the resolved digests can be folded back into the raw model below
 	p := &types.Project{
 		Services: types.Services{},
 	}
