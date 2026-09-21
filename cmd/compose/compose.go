@@ -254,6 +254,16 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 
 		p, _, err := o.ToProject(ctx, dockerCli, backend, services, skipUnsupportedAttributesWarning, cli.WithDiscardEnvFile, cli.WithoutEnvironmentResolution)
 		if err != nil {
+			// a service name among services can genuinely be a declared job:
+			// every caller of projectOrName treats it as run-only and has
+			// nothing to act on for it, so report that clearly instead of
+			// either the raw "no such service" below or, worse, silently
+			// falling back to the label-driven project next -- a job that
+			// was never run left no container behind for that fallback to
+			// find, so it would otherwise look like a successful no-op.
+			if jobErr, replaced := jobTargetErr(ctx, dockerCli, o, services, err); replaced {
+				return nil, "", jobErr
+			}
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
 				return nil, envProjectName, nil

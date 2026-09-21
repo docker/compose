@@ -86,6 +86,9 @@ func TestRunJobDependsOnManualFalseJob(t *testing.T) {
 // A job is documented as run-only: create and start don't know how to
 // materialize one, so targeting either by a job's name must say so clearly
 // instead of surfacing compose-go's raw "no such service" selection error.
+// The same refusal is shared by every other service-targeting command
+// through projectOrName -- see TestStopRefusesJob and
+// TestDownRefusesJobWithProjectNameEnv below.
 func TestCreateRefusesJob(t *testing.T) {
 	NewScenario(t, "create must refuse a job by name, naming run as the right command").
 		Step("create fails naming the job",
@@ -102,16 +105,39 @@ func TestStartRefusesJob(t *testing.T) {
 			ServiceNotCreated("migrate"))
 }
 
-// When COMPOSE_PROJECT_NAME is set, start's underlying project-resolution
-// helper falls back to a label-driven, file-less project on any load
-// failure -- including "no such service" for a job -- instead of
-// surfacing it. Without an explicit job check on that path, start would
-// exit 0 having silently done nothing: a job that was never run has no
-// container for the label-driven fallback to find.
+// When COMPOSE_PROJECT_NAME is set, projectOrName falls back to a
+// label-driven, file-less project on any load failure -- including "no
+// such service" for a job -- instead of surfacing it. Without an explicit
+// job check on that path, start would exit 0 having silently done
+// nothing: a job that was never run has no container for the
+// label-driven fallback to find.
 func TestStartRefusesJobWithProjectNameEnv(t *testing.T) {
 	s := NewScenario(t, "start must still refuse a job by name when COMPOSE_PROJECT_NAME triggers the label-driven fallback")
 	s.Step("start fails naming the job, not silently exiting 0",
 		ComposeCmd("start", "migrate").WithEnv("COMPOSE_PROJECT_NAME="+s.Project()).MayFail(),
+		StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+		ServiceNotCreated("migrate"))
+}
+
+// projectOrName is shared by every service-targeting command besides
+// run/create/start (stop, kill, pause/unpause, logs, rm, down, ps,
+// events): the same job refusal applies to all of them. stop stands in
+// for that whole family here.
+func TestStopRefusesJob(t *testing.T) {
+	NewScenario(t, "stop must refuse a job by name, naming run as the right command").
+		Step("stop fails naming the job",
+			ComposeCmd("stop", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+			ServiceNotCreated("migrate"))
+}
+
+// Same COMPOSE_PROJECT_NAME fallback as TestStartRefusesJobWithProjectNameEnv,
+// exercised through a second projectOrName caller (down) to confirm the fix
+// lives in the shared helper, not duplicated per command.
+func TestDownRefusesJobWithProjectNameEnv(t *testing.T) {
+	s := NewScenario(t, "down must still refuse a job by name when COMPOSE_PROJECT_NAME triggers the label-driven fallback")
+	s.Step("down fails naming the job, not silently exiting 0",
+		ComposeCmd("down", "migrate").WithEnv("COMPOSE_PROJECT_NAME="+s.Project()).MayFail(),
 		StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
 		ServiceNotCreated("migrate"))
 }
