@@ -18,6 +18,8 @@ package compose
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -152,4 +154,58 @@ func TestIsNoSuchServiceErr(t *testing.T) {
 	assert.Assert(t, isNoSuchServiceErr(errors.New("no such service: migrate")))
 	assert.Assert(t, !isNoSuchServiceErr(errors.New("interpolation error: bad substitution")))
 	assert.Assert(t, !isNoSuchServiceErr(errors.New("include: remote resource fetch failed")))
+}
+
+// jobTargetErrFixture writes a project declaring one service and one job,
+// for jobTargetErr to reload unselected against.
+func jobTargetErrFixture(t *testing.T) *ProjectOptions {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "compose.yaml")
+	content := `
+name: test
+services:
+  web:
+    image: alpine
+jobs:
+  migrate:
+    image: alpine
+    triggers:
+      manual: true
+`
+	assert.NilError(t, os.WriteFile(path, []byte(content), 0o644))
+	return &ProjectOptions{ConfigPaths: []string{path}}
+}
+
+func TestJobTargetErr(t *testing.T) {
+	opts := jobTargetErrFixture(t)
+
+	t.Run("a job name in the error is replaced with a clear message", func(t *testing.T) {
+		err, replaced := jobTargetErr(t.Context(), nil, opts, []string{"migrate"}, errors.New("no such service: migrate"))
+		assert.Assert(t, replaced)
+		assert.Error(t, err, `job "migrate" can only be triggered with "docker compose run"`)
+	})
+
+	t.Run("a real typo among several targets keeps its own error, not a same-invocation job's", func(t *testing.T) {
+		// "migrate" is a declared job and present in names, but the error
+		// names "typo" -- the actual selection failure -- not "migrate":
+		// only "typo" may be reported on, and it isn't a job, so the
+		// original error must survive unreplaced.
+		original := errors.New("no such service: typo")
+		err, replaced := jobTargetErr(t.Context(), nil, opts, []string{"typo", "migrate"}, original)
+		assert.Assert(t, !replaced)
+		assert.Equal(t, err, original)
+	})
+
+	t.Run("the job is still recognized regardless of its position in names", func(t *testing.T) {
+		err, replaced := jobTargetErr(t.Context(), nil, opts, []string{"web", "migrate"}, errors.New("no such service: migrate"))
+		assert.Assert(t, replaced)
+		assert.Error(t, err, `job "migrate" can only be triggered with "docker compose run"`)
+	})
+
+	t.Run("a non-job, non-selection error is returned unchanged", func(t *testing.T) {
+		original := errors.New("interpolation error: bad substitution")
+		err, replaced := jobTargetErr(t.Context(), nil, opts, []string{"migrate"}, original)
+		assert.Assert(t, !replaced)
+		assert.Equal(t, err, original)
+	})
 }
