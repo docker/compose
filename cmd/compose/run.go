@@ -291,8 +291,10 @@ func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose,
 		// it, so the env resolution below sees the job like any selected
 		// service (its env_file resolves; unrelated services' env_file still
 		// doesn't need to exist). A target that is not a declared job keeps
-		// the original, precise selection error.
-		unselected, _, uerr := p.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes, composecli.WithoutEnvironmentResolution)
+		// the original, precise selection error. The first load above already
+		// warned about unsupported attributes; skip it here so a target that
+		// turns out to be a plain typo doesn't get the same warnings twice.
+		unselected, _, uerr := p.ToProject(ctx, dockerCli, backend, nil, skipUnsupportedAttributesWarning, composecli.WithoutEnvironmentResolution)
 		if uerr != nil {
 			return nil, err
 		}
