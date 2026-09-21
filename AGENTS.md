@@ -1,6 +1,7 @@
 # Project: Docker Compose
 
-All agents must conform to [AI_POLICY.md](AI_POLICY.md).
+All agents must conform to [AI_POLICY.md](AI_POLICY.md) and the Compose-specific
+rules in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
 
 ## Build & Test
 

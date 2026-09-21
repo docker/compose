@@ -6,7 +6,7 @@
 
 <!-- Use "Fixes #1234" or "Addresses #1234". For minor fixes (typos, small
      doc changes), explain why the change is needed instead. AI-assisted PRs
-     must reference an approved issue - see AI_POLICY.md. -->
+     must reference an approved issue - see CONTRIBUTING.md#ai-assisted-contributions. -->
 
 Fixes #
 
@@ -27,12 +27,12 @@ Fixes #
 - [ ] Linting passes: `make lint`
 - [ ] Code formatted: `make fmt`
 - [ ] Manually tested (describe):
-- [ ] I've reviewed the code myself and removed `AI_AGENT_DISCLOSURE.md` if my agent added it
 
 ## AI Tool Used (if applicable)
 
 <!-- If you used AI coding assistance, disclose it here: which tool, and the
-     extent the work was AI-assisted. See AI_POLICY.md for details. -->
+     extent the work was AI-assisted. See CONTRIBUTING.md#ai-assisted-contributions
+     for details. -->
 <!-- If not applicable, you can delete this section -->
 
 AI Tool:
