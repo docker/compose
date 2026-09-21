@@ -54,6 +54,9 @@ func startCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Back
 func runStart(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts startOptions, services []string) error {
 	project, name, err := opts.projectOrName(ctx, dockerCli, services...)
 	if err != nil {
+		if jobErr, replaced := jobTargetErr(ctx, dockerCli, opts.ProjectOptions, services, err); replaced {
+			return jobErr
+		}
 		return err
 	}
 	// a label-reconstructed project (no compose file) declares no jobs;
