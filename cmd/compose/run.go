@@ -322,6 +322,34 @@ func isNoSuchServiceErr(err error) bool {
 	return strings.Contains(err.Error(), "no such service")
 }
 
+// jobTargetErr recognizes an otherwise-raw compose-go selection error as
+// targeting a declared job: unlike run, create and start don't materialize
+// jobs — targeting one with either is run-only by design — so on a match it
+// only returns a clearer error message (replaced=true), never falls
+// through to acting on the job. names is the caller's original
+// (unselected-by-profile) argument list, checked as-is against
+// project.AllJobs() the same way run's own fallback resolves a job name.
+func jobTargetErr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions, names []string, err error) (jobErr error, replaced bool) {
+	if err == nil || len(names) == 0 || !isNoSuchServiceErr(err) {
+		return err, false
+	}
+	backend, berr := compose.NewComposeService(dockerCli)
+	if berr != nil {
+		return err, false
+	}
+	unselected, _, uerr := p.ToProject(ctx, dockerCli, backend, nil, skipUnsupportedAttributesWarning, composecli.WithoutEnvironmentResolution)
+	if uerr != nil {
+		return err, false
+	}
+	jobs := unselected.AllJobs()
+	for _, name := range names {
+		if _, ok := jobs[name]; ok {
+			return fmt.Errorf("job %q can only be triggered with \"docker compose run\"", name), true
+		}
+	}
+	return err, false
+}
+
 func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
 	project, err := options.apply(project)
 	if err != nil {
