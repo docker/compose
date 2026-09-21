@@ -60,6 +60,16 @@ func TestMaterializeManualJob(t *testing.T) {
 					ContainerSpec: types.ContainerSpec{Image: "deployer"},
 					WorkloadSpec:  types.WorkloadSpec{DependsOn: types.DependsOnConfig{"prep": {Condition: types.ServiceConditionCompletedSuccessfully, Required: true}}},
 				},
+				"sensitive": {
+					Name:     "sensitive",
+					Triggers: &types.TriggerConfig{Manual: &no, Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}},
+				},
+				"escalate": {
+					Name:          "escalate",
+					Triggers:      &types.TriggerConfig{Manual: &yes},
+					ContainerSpec: types.ContainerSpec{Image: "escalator"},
+					WorkloadSpec:  types.WorkloadSpec{DependsOn: types.DependsOnConfig{"sensitive": {Condition: types.ServiceConditionCompletedSuccessfully, Required: true}}},
+				},
 			},
 		}
 	}
@@ -121,6 +131,14 @@ func TestMaterializeManualJob(t *testing.T) {
 	t.Run("manual: false explicitly forbids manual execution", func(t *testing.T) {
 		_, err := materializeManualJob(base(), "rotation")
 		assert.Error(t, err, `job "rotation" is declared with manual: false, it cannot be run manually`)
+	})
+
+	// depends_on doesn't change who caused the execution or when: pulling in
+	// a manual: false job as a dependency of a manually-run job is still the
+	// run command triggering it out of schedule, one hop removed.
+	t.Run("manual: false also blocks the job when pulled in transitively", func(t *testing.T) {
+		_, err := materializeManualJob(base(), "escalate")
+		assert.Error(t, err, `job "sensitive" is declared with manual: false, it cannot be triggered even as a dependency of another job`)
 	})
 }
 

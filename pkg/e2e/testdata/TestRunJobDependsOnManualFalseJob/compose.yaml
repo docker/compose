@@ -1,0 +1,23 @@
+services:
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+jobs:
+  sensitive:
+    image: alpine
+    command: sh -c 'echo "sensitive ran"'
+    triggers:
+      manual: false
+      schedule:
+        - cron: "0 3 * * *"
+  deploy:
+    image: alpine
+    command: sh -c 'echo "deploy done"'
+    triggers:
+      manual: true
+    depends_on:
+      db:
+        condition: service_started
+      sensitive:
+        condition: service_completed_successfully

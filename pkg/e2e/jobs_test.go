@@ -69,3 +69,16 @@ func TestRunJobDependsOnJob(t *testing.T) {
 			OutputContains("deploy done"),
 			ServiceState("db", "running"))
 }
+
+// manual: false declares a job harmful to trigger outside its schedule.
+// depends_on doesn't change who caused the execution or when: pulling the
+// job in as a dependency of a manually-run job is still the run command
+// causing that out-of-schedule execution, one hop removed, so it must be
+// refused too — before anything else in the closure is created.
+func TestRunJobDependsOnManualFalseJob(t *testing.T) {
+	NewScenario(t, "a job depending on a manual: false job must refuse to run, before creating anything").
+		Step("run fails naming the manual: false dependency",
+			ComposeCmd("run", "--rm", "deploy").MayFail(),
+			StderrContains(`job "sensitive" is declared with manual: false, it cannot be triggered even as a dependency`),
+			ServiceNotCreated("db"))
+}
