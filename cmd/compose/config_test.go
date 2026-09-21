@@ -130,6 +130,61 @@ func TestResolveImageDigestsWithoutServices(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A job's image and `type: image` volume sources must resolve the same way a
+// service's do -- jobs share the same build-and-publish surface, and
+// resolveImageDigests originally only walked model["services"].
+func TestResolveImageDigestsWithJobs(t *testing.T) {
+	const (
+		serviceDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		jobDigest     = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+		jobVolDigest  = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+	)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
+
+	model := map[string]any{
+		"services": map[string]any{
+			"web": map[string]any{"image": "nginx:latest"},
+		},
+		"jobs": map[string]any{
+			"migrate": map[string]any{
+				"image": "migrate:latest",
+				"volumes": []any{
+					map[string]any{"type": "image", "source": "migrate-data:latest", "target": "/data"},
+				},
+			},
+		},
+	}
+
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/nginx:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: serviceDigest}},
+		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/migrate:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: jobDigest}},
+		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/migrate-data:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: jobVolDigest}},
+		}, nil)
+
+	err := resolveImageDigests(t.Context(), cli, model)
+	assert.NilError(t, err)
+
+	service := model["services"].(map[string]any)["web"].(map[string]any)
+	assert.Equal(t, service["image"], "docker.io/library/nginx:latest@"+serviceDigest)
+
+	job := model["jobs"].(map[string]any)["migrate"].(map[string]any)
+	assert.Equal(t, job["image"], "docker.io/library/migrate:latest@"+jobDigest)
+	volumes := job["volumes"].([]any)
+	assert.Equal(t, volumes[0].(map[string]any)["source"], "docker.io/library/migrate-data:latest@"+jobVolDigest)
+}
+
 func TestImagesOnly(t *testing.T) {
 	project := &types.Project{
 		Name: "test",
