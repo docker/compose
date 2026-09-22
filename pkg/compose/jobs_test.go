@@ -21,7 +21,66 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"gotest.tools/v3/assert"
+
+	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
 )
+
+func TestJobTrigger(t *testing.T) {
+	yes, no := true, false
+
+	t.Run("no triggers declared is refused", func(t *testing.T) {
+		_, err := jobTrigger(types.JobConfig{Name: "migrate"})
+		assert.Error(t, err, `job "migrate" has no trigger`)
+	})
+
+	t.Run("manual:true translates to a Manual trigger", func(t *testing.T) {
+		trigger, err := jobTrigger(types.JobConfig{Name: "migrate", Triggers: &types.TriggerConfig{Manual: &yes}})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, trigger, &jobsv0.Trigger{Manual: true})
+	})
+
+	t.Run("manual:false alone (no schedule) is refused: it has no trigger left", func(t *testing.T) {
+		_, err := jobTrigger(types.JobConfig{Name: "migrate", Triggers: &types.TriggerConfig{Manual: &no}})
+		assert.Error(t, err, `job "migrate" has no trigger`)
+	})
+
+	t.Run("a single schedule translates to a Schedule trigger", func(t *testing.T) {
+		trigger, err := jobTrigger(types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{
+			Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *", Timezone: "UTC"}},
+		}})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, trigger, &jobsv0.Trigger{Schedule: &jobsv0.ScheduleTrigger{Cron: "0 3 * * *", Timezone: "UTC"}})
+	})
+
+	t.Run("more than one schedule is refused", func(t *testing.T) {
+		_, err := jobTrigger(types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{
+			Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}, {Cron: "0 4 * * *"}},
+		}})
+		assert.Error(t, err, `job "backup" declares 2 schedules, exactly one is supported`)
+	})
+
+	// A job declaring both manual:true and a schedule used to silently lose
+	// the schedule: the switch checked Manual before Schedule, so
+	// registerScheduledJobs would still select the job (HasSchedule doesn't
+	// look at Manual) but jobTrigger built a Manual-only Trigger, dropping
+	// the cron with no error and no warning anywhere.
+	t.Run("manual:true together with a schedule is refused, not silently resolved to Manual", func(t *testing.T) {
+		_, err := jobTrigger(types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{
+			Manual:   &yes,
+			Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+		}})
+		assert.Error(t, err, `job "backup" declares both manual:true and a schedule, exactly one is supported`)
+	})
+
+	t.Run("manual:false together with a schedule keeps the schedule", func(t *testing.T) {
+		trigger, err := jobTrigger(types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{
+			Manual:   &no,
+			Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+		}})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, trigger, &jobsv0.Trigger{Schedule: &jobsv0.ScheduleTrigger{Cron: "0 3 * * *"}})
+	})
+}
 
 func TestHasSchedule(t *testing.T) {
 	assert.Assert(t, !HasSchedule(types.JobConfig{}))
