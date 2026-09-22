@@ -18,9 +18,12 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http/httputil"
 	"os"
 	"os/exec"
 	"slices"
@@ -86,9 +89,86 @@ func composeCommand() *cobra.Command {
 		Args: cobra.ExactArgs(1),
 	}
 
-	c.AddCommand(upCmd, downCmd, stopCmd)
-	c.AddCommand(metadataCommand(upCmd, downCmd, stopCmd))
+	// pull is the image-distribution command: compose invokes it during the
+	// image phase (up) and on `docker compose pull`, passing the identity of
+	// the service image and the state of the local daemon cache. None of its
+	// flags is required: they are injected by compose, not declared by the
+	// user under provider.options.
+	pullCmd := &cobra.Command{
+		Use:  "pull",
+		Run:  pull,
+		Args: cobra.ExactArgs(1),
+	}
+	pullCmd.Flags().String("image", "", "Image reference as compose resolved it")
+	pullCmd.Flags().String("digest", "", "Image ID in the local daemon cache, when present")
+	pullCmd.Flags().String("created", "", "Creation time of the local cache entry, when present")
+	pullCmd.Flags().String("source", "", "Authority verdict: local (sync from the daemon) or registry (resolve upstream)")
+	pullCmd.Flags().String("policy", "", "missing (a usable version suffices) or always (ensure freshness)")
+
+	c.AddCommand(upCmd, downCmd, stopCmd, pullCmd)
+	c.AddCommand(metadataCommand(upCmd, downCmd, stopCmd, pullCmd))
 	return c
+}
+
+// pull demonstrates the image-distribution contract. A real provider would
+// compare the announced digest/created with its bookkeeping and either
+// resolve the reference upstream (source=registry) or request the local
+// bytes (source=local). This demo requests the stream whenever
+// PROVIDER_PULL_MARKER is set, hashes it, and records the outcome there.
+func pull(cmd *cobra.Command, args []string) {
+	image, _ := cmd.Flags().GetString("image")
+	digest, _ := cmd.Flags().GetString("digest")
+	created, _ := cmd.Flags().GetString("created")
+	source, _ := cmd.Flags().GetString("source")
+	policy, _ := cmd.Flags().GetString("policy")
+
+	emit := func(kind, message string) {
+		payload, _ := json.Marshal(map[string]string{"type": kind, "message": message})
+		fmt.Println(string(payload))
+	}
+	emit("info", fmt.Sprintf("ensuring image %s (source=%s, policy=%s)", image, source, policy))
+
+	marker := os.Getenv("PROVIDER_PULL_MARKER")
+	if marker == "" {
+		// nothing to synchronize in the demo: a real registry-sourced provider
+		// would pull the reference upstream here
+		return
+	}
+
+	// Request the image bytes from the local daemon. The answer is one JSON
+	// line, then — unless it carries an error — the tar as an HTTP/1.1
+	// chunked body (readable with any stock chunked reader), whose zero
+	// chunk marks a COMPLETE transfer.
+	request, _ := json.Marshal(map[string]string{"type": "get-image", "message": image})
+	fmt.Println(string(request))
+
+	stdin := bufio.NewReader(os.Stdin)
+	line, err := stdin.ReadString('\n')
+	if err != nil {
+		emit("error", "reading image-stream announce: "+err.Error())
+		os.Exit(1)
+	}
+	var announce struct {
+		Encoding string `json:"encoding"`
+		Error    string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(line), &announce); err != nil || announce.Error != "" || announce.Encoding != "chunked" {
+		emit("error", fmt.Sprintf("image stream unavailable: %q (err %v)", line, err))
+		os.Exit(1)
+	}
+	h := sha256.New()
+	n, err := io.Copy(h, httputil.NewChunkedReader(stdin))
+	if err != nil {
+		emit("error", "image stream truncated: "+err.Error())
+		os.Exit(1)
+	}
+	record := fmt.Sprintf("image=%s digest=%s created=%s source=%s policy=%s sha256=%x bytes=%d\n",
+		image, digest, created, source, policy, h.Sum(nil), n)
+	if err := os.WriteFile(marker, []byte(record), 0o600); err != nil {
+		emit("error", "writing marker: "+err.Error())
+		os.Exit(1)
+	}
+	emit("info", fmt.Sprintf("image received (%d bytes)", n))
 }
 
 // serveDemoCommand is the detached helper process behind the
@@ -288,23 +368,27 @@ func stop(_ *cobra.Command, _ []string) {
 	}
 }
 
-func metadataCommand(upCmd, downCmd, stopCmd *cobra.Command) *cobra.Command {
+func metadataCommand(upCmd, downCmd, stopCmd, pullCmd *cobra.Command) *cobra.Command {
 	return &cobra.Command{
 		Use: "metadata",
 		Run: func(cmd *cobra.Command, _ []string) {
-			metadata(upCmd, downCmd, stopCmd)
+			metadata(upCmd, downCmd, stopCmd, pullCmd)
 		},
 		Args: cobra.NoArgs,
 	}
 }
 
-func metadata(upCmd, downCmd, stopCmd *cobra.Command) {
+func metadata(upCmd, downCmd, stopCmd, pullCmd *cobra.Command) {
 	metadata := ProviderMetadata{}
 	metadata.Description = "Manage services on AwesomeCloud"
 	metadata.Up = commandParameters(upCmd)
 	metadata.Down = commandParameters(downCmd)
 	stopParams := commandParameters(stopCmd)
 	metadata.Stop = &stopParams
+	// like stop, declaring the pull block is what opts the provider into
+	// image distribution
+	pullParams := commandParameters(pullCmd)
+	metadata.Pull = &pullParams
 	jsonMetadata, err := json.Marshal(metadata)
 	if err != nil {
 		panic(err)
@@ -332,6 +416,7 @@ type ProviderMetadata struct {
 	Up          CommandMetadata  `json:"up"`
 	Down        CommandMetadata  `json:"down"`
 	Stop        *CommandMetadata `json:"stop,omitempty"`
+	Pull        *CommandMetadata `json:"pull,omitempty"`
 }
 
 type CommandMetadata struct {

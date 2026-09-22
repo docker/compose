@@ -56,6 +56,24 @@ func TestProviderStopHook(t *testing.T) {
 			FileExists(marker))
 }
 
+func TestProviderImagePull(t *testing.T) {
+	// The example provider's pull subcommand requests the image bytes with a
+	// get-image message and records what it received (digest facts, sha256,
+	// size) at PROVIDER_PULL_MARKER.
+	marker := filepath.Join(t.TempDir(), "example-provider-pull-marker")
+	s := providerScenario(t, "a provider-backed service with a build must get the built image distributed to the provider")
+	s.Env("PROVIDER_PULL_MARKER=" + marker)
+	s.Step("up builds the image and streams it to the provider with the local-authority verdict",
+		ComposeCmd("up", "-d"),
+		FileContains(marker, "source=local"),
+		FileContains(marker, "policy=missing"),
+		FileContains(marker, "sha256="),
+		FileContains(marker, "digest=sha256:")).
+		Step("pull re-invokes the provider under the freshness contract",
+			ComposeCmd("pull"),
+			FileContains(marker, "policy=always"))
+}
+
 func TestDependsOnMultipleProviders(t *testing.T) {
 	providerScenario(t, "a service depending on several providers must receive each provider's variables").
 		Step("the service sees both providers' URLs",
