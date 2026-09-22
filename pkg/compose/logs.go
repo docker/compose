@@ -164,7 +164,14 @@ func newRunEndTracker() *runEndTracker {
 	return &runEndTracker{ends: map[string]int64{}}
 }
 
-// Observe records exit events (other event types are ignored).
+// Observe records exit events (other event types are ignored). An exit
+// carrying no timestamp is deliberately dropped rather than patched with the
+// local clock: the anchor is compared by the DAEMON against its own
+// container-log timestamps, so substituting our clock would trade a
+// hypothetical daemon quirk for real clock-skew mis-anchoring. Dropping it
+// merely degrades that container to the logsSinceLastRun fallback — the
+// exact pre-tracker behavior, imperfect only for a run fast enough to have
+// finished again by inspection time.
 func (t *runEndTracker) Observe(e api.ContainerEvent) {
 	if e.Type != api.ContainerEventExited || e.Time == 0 {
 		return
