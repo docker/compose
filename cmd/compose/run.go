@@ -277,11 +277,6 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 // their containers.
 func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, p *ProjectOptions, service string) (*types.Project, error) {
 	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, warnUnsupportedAttributes, composecli.WithoutEnvironmentResolution)
-	if err != nil && strings.Contains(err.Error(), "no such service") {
-		// the run target may be a job, which the service selector cannot
-		// resolve: reload unselected and let materializeManualJob decide
-		project, _, err = p.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes, composecli.WithoutEnvironmentResolution)
-	}
 	if err != nil {
 		// The run target may be a job — invisible to the service selector.
 		// Only retry unselected for that specific selection failure: any
