@@ -1,0 +1,9 @@
+services:
+  db:
+    build:
+      context: .
+    provider:
+      type: example-provider
+      options:
+        type: mysql
+        name: myDB
