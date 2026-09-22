@@ -597,6 +597,7 @@ func BindMountSource(service, target, wantSource string) Check {
 					if m.Source != wantAbs {
 						return fmt.Errorf("container %s mount %s resolves to %s, want %s", c.Name, target, m.Source, wantAbs)
 					}
+					break
 				}
 				if !found {
 					return fmt.Errorf("container %s has no mount at %s", c.Name, target)
