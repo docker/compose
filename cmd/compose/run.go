@@ -364,6 +364,17 @@ func jobTargetErr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions,
 	return err, false
 }
 
+// jobTargetErrOr applies jobTargetErr's translation to err when it matches,
+// and returns err unchanged otherwise — the wrap every caller loading a
+// project outside WithServices/projectOrName's own centralized handling
+// (build, pull, push) needs around its own selection error.
+func jobTargetErrOr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions, names []string, err error) error {
+	if jobErr, replaced := jobTargetErr(ctx, dockerCli, p, names, err); replaced {
+		return jobErr
+	}
+	return err
+}
+
 func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
 	project, err := options.apply(project)
 	if err != nil {
