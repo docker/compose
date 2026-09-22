@@ -571,7 +571,6 @@ func BindMountSource(service, target, wantSource string) Check {
 			if len(containers) == 0 {
 				return errors.New("service has no container")
 			}
-			wantAbs := wantSource
 			for _, c := range containers {
 				res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "inspect", "--format", "{{json .Mounts}}", c.ID))
 				if res.ExitCode != 0 {
@@ -594,8 +593,8 @@ func BindMountSource(service, target, wantSource string) Check {
 						continue
 					}
 					found = true
-					if m.Source != wantAbs {
-						return fmt.Errorf("container %s mount %s resolves to %s, want %s", c.Name, target, m.Source, wantAbs)
+					if m.Source != wantSource {
+						return fmt.Errorf("container %s mount %s resolves to %s, want %s", c.Name, target, m.Source, wantSource)
 					}
 					break
 				}
