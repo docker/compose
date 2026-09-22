@@ -294,7 +294,10 @@ func runUp(
 	}
 
 	if upOptions.noStart {
-		return backend.Create(ctx, project, create)
+		return backend.Up(ctx, project, api.UpOptions{
+			Create: create,
+			Start:  api.StartOptions{Project: project, NoStart: true},
+		})
 	}
 
 	var consumer api.LogConsumer

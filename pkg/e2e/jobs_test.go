@@ -37,6 +37,17 @@ func TestUpRegistersScheduledJobs(t *testing.T) {
 			Eventually(ServiceState("backup", "exited"), 90*time.Second))
 }
 
+// --no-start's own path (Create, then registerScheduledJobs, then return
+// before Start) must still register scheduled jobs: it used to bypass Up
+// entirely by calling Create directly, silently skipping registration.
+func TestUpNoStartRegistersScheduledJobs(t *testing.T) {
+	NewScenario(t, "up --no-start must still register a project's scheduled jobs with the engine").
+		Step("up --no-start creates but never starts web, yet the schedule still fires on its own",
+			ComposeCmd("up", "--no-start"),
+			ServiceState("web", "created"),
+			Eventually(ServiceState("backup", "exited"), 90*time.Second))
+}
+
 // A job runs through `compose run` exactly like a service would: its
 // declared dependencies start first, its output and exit flow back. Per the
 // spec, manual execution is always available — scheduled jobs included —
