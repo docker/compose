@@ -297,6 +297,14 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	if err := s.waitDependencies(ctx, project, name, svc.DependsOn, observed, 0); err != nil {
 		return 0, err
 	}
+	// A job may reference a sibling service or job — volumes_from, or
+	// service:-scoped network_mode/ipc/pid — exactly like a service run
+	// would; the daemon knows nothing about compose service names, so these
+	// must resolve to live container IDs before the spec reaches it.
+	if err := s.resolveRunServiceReferences(ctx, project.Name, &svc); err != nil {
+		return 0, err
+	}
+	project.Services[name] = svc
 	spec, err := s.buildJobSpec(ctx, project, svc, job, options.UseNetworkAliases)
 	if err != nil {
 		return 0, err
