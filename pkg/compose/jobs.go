@@ -82,6 +82,8 @@ func jobTrigger(job types.JobConfig) (*jobsv0.Trigger, error) {
 	switch {
 	case job.Triggers == nil:
 		return nil, fmt.Errorf("job %q has no trigger", job.Name)
+	case job.Triggers.Manual != nil && *job.Triggers.Manual && len(job.Triggers.Schedule) > 0:
+		return nil, fmt.Errorf("job %q declares both manual:true and a schedule, exactly one is supported", job.Name)
 	case job.Triggers.Manual != nil && *job.Triggers.Manual:
 		return &jobsv0.Trigger{Manual: true}, nil
 	case len(job.Triggers.Schedule) == 1:
