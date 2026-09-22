@@ -117,11 +117,23 @@ func (s *composeService) buildJobSpec(ctx context.Context, project *types.Projec
 	// be set here on the container spec itself so run containers stay visible
 	// to the rest of Compose's tooling (ps, label-scoped listings) exactly
 	// like any other service container.
+	//
+	// This set is computed here, not taken from svc.CustomLabels: svc is
+	// materialized differently depending on the caller (RunJob's
+	// materializeManualJob vs registerScheduledJobs' scopedProjectForJob),
+	// and the engine's Create is idempotent on the full spec — a caller that
+	// under-populated CustomLabels would make the same job's spec differ
+	// depending on how it was triggered, turning a harmless re-registration
+	// into a spurious "job has changed" conflict.
 	cfgs, err := s.getCreateConfigs(ctx, project, svc, 1, nil, createOptions{
 		UseNetworkAliases: useNetworkAliases,
-		Labels: mergeLabels(svc.Labels, svc.CustomLabels, types.Labels{
-			api.ProjectLabel: project.Name,
-			api.ServiceLabel: job.Name,
+		Labels: mergeLabels(svc.Labels, types.Labels{
+			api.ProjectLabel:     project.Name,
+			api.ServiceLabel:     job.Name,
+			api.VersionLabel:     api.ComposeVersion,
+			api.WorkingDirLabel:  project.WorkingDir,
+			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+			api.OneoffLabel:      "False",
 		}),
 	})
 	if err != nil {
@@ -322,6 +334,17 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 		return 0, err
 	}
 	applyRunOptions(project, &svc, options)
+	// Tty/StdinOpen/ContainerName are not among the overrides RunJob's own
+	// doc comment on api.Compose documents as supported: a job has no
+	// interactive attach, and the jobs API assigns the run container's
+	// identity itself. Restoring them to the job's own declared values (not
+	// the run invocation's terminal-detected defaults) keeps the spec sent
+	// to Create/CreateAndRun stable across invocations — otherwise a job
+	// already registered by `up`, or run twice from different contexts
+	// (piped vs interactive shell), spuriously conflicts on SpecHash.
+	svc.Tty = job.Tty
+	svc.StdinOpen = job.StdinOpen
+	svc.ContainerName = ""
 	project.Services[name] = svc
 
 	observed, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
@@ -348,28 +371,22 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	if err != nil {
 		return 0, err
 	}
-	reply, err := jc.CreateAndRun(ctx, &jobsv0.CreateAndRunRequest{
-		Name: engineJobName(project, name),
-		Spec: spec,
-	})
-	if err := jobsv0.MapError(err); err != nil {
-		if errdefs.IsAlreadyExists(err) {
-			return 0, jobChangedErr(name, "run")
-		}
+	created, err := s.createJobRun(ctx, jc, project, name, job, spec)
+	if err != nil {
 		return 0, err
 	}
 
 	logsDone := make(chan struct{})
 	go func() {
 		defer close(logsDone)
-		if err := s.streamJobLogs(ctx, reply.Run.ContainerID); err != nil && ctx.Err() == nil {
+		if err := s.streamJobLogs(ctx, created.ContainerID); err != nil && ctx.Err() == nil {
 			logrus.Debugf("job %q: log stream ended: %v", name, err)
 		}
 	}()
 
 	waited, err := jc.Wait(ctx, &jobsv0.WaitRequest{
-		JobRef: reply.Job.ID,
-		RunRef: reply.Run.ID,
+		JobRef: created.JobID,
+		RunRef: created.ID,
 	})
 	<-logsDone
 	if err := jobsv0.MapError(err); err != nil {
@@ -392,6 +409,47 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	default:
 		return 1, fmt.Errorf("job %q run %s ended in unexpected state %q", name, run.ID, run.State)
 	}
+}
+
+// createJobRun starts name's Run on the engine, routed on the job's
+// declared trigger rather than on how compose happens to invoke it: the
+// engine's CreateAndRun refuses a schedule-trigger spec outright
+// ("create-and-run serves manual jobs only"), because registering a cron
+// must never imply an immediate run. A manual-trigger job (the opt-out
+// default included) is still created and run atomically via CreateAndRun.
+// A scheduled job is instead Created — idempotent on SpecHash, a no-op if
+// `up` already registered the identical spec, arming the schedule if not —
+// then explicitly Run with Reschedule: false, so the manual fire adds to
+// the cron cadence instead of replacing its next occurrence.
+func (s *composeService) createJobRun(ctx context.Context, jc jobsv0.Jobs, project *types.Project, name string, job types.JobConfig, spec *jobsv0.JobSpec) (*jobsv0.Run, error) {
+	engineName := engineJobName(project, name)
+	if !HasSchedule(job) {
+		reply, err := jc.CreateAndRun(ctx, &jobsv0.CreateAndRunRequest{
+			Name: engineName,
+			Spec: spec,
+		})
+		if err := jobsv0.MapError(err); err != nil {
+			if errdefs.IsAlreadyExists(err) {
+				return nil, jobChangedErr(name, "run")
+			}
+			return nil, err
+		}
+		return reply.Run, nil
+	}
+
+	if _, err := jc.Create(ctx, &jobsv0.CreateRequest{Name: engineName, Spec: spec}); err != nil {
+		if err := jobsv0.MapError(err); err != nil {
+			if errdefs.IsAlreadyExists(err) {
+				return nil, jobChangedErr(name, "run")
+			}
+			return nil, err
+		}
+	}
+	reply, err := jc.Run(ctx, &jobsv0.RunRequest{JobRef: engineName, Reschedule: false})
+	if err := jobsv0.MapError(err); err != nil {
+		return nil, err
+	}
+	return reply.Run, nil
 }
 
 // streamJobLogs follows a job Run's container logs from the start, exactly

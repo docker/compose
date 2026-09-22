@@ -37,6 +37,24 @@ func TestUpRegistersScheduledJobs(t *testing.T) {
 			Eventually(ServiceState("backup", "exited"), 90*time.Second))
 }
 
+// run must build the exact same spec `up` already registered a scheduled
+// job with: CreateAndRun refuses schedule-trigger jobs outright, so run
+// routes through Create (idempotent on SpecHash) then Run instead. A run
+// invocation carries CLI/terminal-context defaults (Tty, StdinOpen,
+// ContainerName) that up's own registration never does — if those leaked
+// into the spec sent to Create, this would spuriously conflict with the
+// job up already registered, even though nothing in the compose file
+// changed.
+func TestRunAlreadyRegisteredScheduledJob(t *testing.T) {
+	NewScenario(t, "run must not conflict with a scheduled job up already registered with the identical spec").
+		Step("up registers the scheduled job",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		Step("run fires it manually without a SpecHash conflict",
+			ComposeCmd("run", "--rm", "backup"),
+			OutputContains("backup-ran"))
+}
+
 // --no-start's own path (Create, then registerScheduledJobs, then return
 // before Start) must still register scheduled jobs: it used to bypass Up
 // entirely by calling Create directly, silently skipping registration.
