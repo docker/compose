@@ -486,8 +486,8 @@ func materializeManualJob(project *types.Project, name string) (*types.Project, 
 	if !ok {
 		return project, nil
 	}
-	if job.Triggers != nil && job.Triggers.Manual != nil && !*job.Triggers.Manual {
-		return nil, fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
+	if compose.ManualTriggerDisabled(job) {
+		return nil, compose.ManualTriggerDisabledErr(name)
 	}
 	project, err := project.WithSelectedJob(name)
 	if err != nil {
@@ -523,7 +523,7 @@ func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.Jo
 		if !isJob {
 			continue
 		}
-		if depJob.Triggers != nil && depJob.Triggers.Manual != nil && !*depJob.Triggers.Manual {
+		if compose.ManualTriggerDisabled(depJob) {
 			return fmt.Errorf("job %q is declared with manual: false, it cannot be triggered even as a dependency of another job", dep)
 		}
 		if err := materializeJobClosure(project, jobs, depJob, seen); err != nil {

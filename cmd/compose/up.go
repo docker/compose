@@ -364,14 +364,20 @@ func warnIgnoredJobs(project *types.Project) {
 	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
 }
 
-// manualJobNames returns the sorted names of the project's manual-trigger jobs.
+// manualJobNames returns the sorted names of the project's jobs that up
+// leaves untouched: a job with a schedule is registered with the engine
+// (see pkg/compose Up), so only jobs without one wait for an explicit
+// `compose run <job>` trigger — unless they opt out with `manual: false`.
 func manualJobNames(project *types.Project) []string {
-	jobs := project.AllJobs()
-	names := make([]string, 0, len(jobs))
-	for name, job := range jobs {
-		if job.Triggers != nil && job.Triggers.Manual != nil && *job.Triggers.Manual {
-			names = append(names, name)
+	names := make([]string, 0, len(project.Jobs))
+	for name, job := range project.Jobs {
+		if compose.HasSchedule(job) {
+			continue
 		}
+		if compose.ManualTriggerDisabled(job) {
+			continue
+		}
+		names = append(names, name)
 	}
 	sort.Strings(names)
 	return names
