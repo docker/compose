@@ -26,6 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
@@ -71,13 +72,16 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 // them, the collected errors, and the application exit status.
 type upSession struct {
 	*composeService
-	project   *types.Project
-	options   api.UpOptions
-	printer   logPrinter
-	watcher   *Watcher
-	menu      *formatter.LogKeyboard
-	globalCtx context.Context
-	cancel    context.CancelFunc
+	project *types.Project
+	options api.UpOptions
+	printer logPrinter
+	// logStreams counts the in-flight re-attach log streams so shutdown can
+	// drain them before tearing the context down — see the monitor wrapper.
+	logStreams sync.WaitGroup
+	watcher    *Watcher
+	menu       *formatter.LogKeyboard
+	globalCtx  context.Context
+	cancel     context.CancelFunc
 
 	signalChan   chan os.Signal
 	isTerminated atomic.Bool
@@ -178,6 +182,24 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 
 	u.eg.Go(func() error {
 		err := monitor.Start(globalCtx)
+		// The monitor returning means every watched container is gone for
+		// good — an events-channel fact. The last run's log lines may still
+		// be in flight on their own connections, and canceling now would
+		// drop them: the exit notice would outrun the output that preceded
+		// it. The containers having exited, every follow stream terminates
+		// on its own at EOF — give them a bounded window to drain before
+		// the context comes down (immediately skipped when the context is
+		// already canceled, e.g. Ctrl-C).
+		drained := make(chan struct{})
+		go func() {
+			u.logStreams.Wait()
+			close(drained)
+		}()
+		select {
+		case <-drained:
+		case <-time.After(logStreamDrainTimeout):
+		case <-globalCtx.Done():
+		}
 		// cancel the global context to terminate signal-handler goroutines
 		cancel()
 		u.appendErr(err)
@@ -348,6 +370,13 @@ func (u *upSession) captureExitCodeFrom() api.ContainerEventListener {
 
 // followStartedContainers streams logs of containers (re)started after `up`,
 // so they are followed like the initially attached ones.
+//
+// logStreamDrainTimeout bounds the shutdown drain of these streams: EOF is
+// guaranteed once the containers exited, the bound only protects against a
+// wedged daemon holding the connection open. A variable so tests can shrink
+// it.
+var logStreamDrainTimeout = 5 * time.Second
+
 func (u *upSession) followStartedContainers(attached []string) api.ContainerEventListener {
 	runEnds := newRunEndTracker()
 	return func(event api.ContainerEvent) {
@@ -359,7 +388,11 @@ func (u *upSession) followStartedContainers(attached []string) api.ContainerEven
 		// later, a fast run's own exit could already be recorded and the log
 		// window would drop the whole run.
 		since := runEnds.Since(event.ID)
+		// counted before the goroutine starts so the shutdown drain can never
+		// miss a stream dispatched but not yet running
+		u.logStreams.Add(1)
 		u.eg.Go(func() error {
+			defer u.logStreams.Done()
 			u.appendErr(u.streamContainerLogs(event, since))
 			return nil
 		})
