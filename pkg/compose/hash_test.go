@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/opencontainers/go-digest"
 	"gotest.tools/v3/assert"
 )
 
@@ -45,52 +44,36 @@ func serviceConfig(replicas int) types.ServiceConfig {
 	}
 }
 
-// TestServiceHashContinuity proves the pinned serializer reproduces the
-// historical bytes: while compose-go's struct order still matches the frozen
-// list — true on this branch's compose-go — the pinned hash and the plain
-// struct-marshal hash are byte-identical. The compose-go upgrade that first
-// reorders the struct (the container-spec layering) deletes this test in the
-// same commit: from that point the frozen list carries continuity alone,
-// locked by TestHashGoldenValues.
-func TestServiceHashContinuity(t *testing.T) {
-	svc := richServiceFixture()
-	pinned, err := ServiceHash(svc)
-	assert.NilError(t, err)
-
-	raw, err := json.Marshal(trimServiceHashFields(svc))
-	assert.NilError(t, err)
-	legacy := digest.SHA256.FromBytes(raw).Encoded()
-	assert.Equal(t, pinned, legacy)
-	t.Logf("GOLDEN service=%s", pinned)
-}
-
 func richServiceFixture() types.ServiceConfig {
 	replicas := 3
-	return types.ServiceConfig{
-		Name:        "web",
-		Image:       "nginx:latest",
-		Command:     types.ShellCommand{"nginx", "-g", "daemon off;"},
-		User:        "nobody",
-		Tty:         true,
-		StdinOpen:   true,
-		Restart:     types.RestartPolicyAlways,
-		Environment: types.MappingWithEquals{"A": strPtr("1"), "B": nil},
-		Labels:      types.Labels{"com.example": "v"},
-		Annotations: types.Mapping{"note": "x"},
-		CapAdd:      []string{"NET_ADMIN"},
-		ExtraHosts:  types.HostsList{"alpha": []string{"10.0.0.1"}},
-		Deploy:      &types.DeployConfig{Replicas: &replicas},
-		Ports: []types.ServicePortConfig{
-			{Target: 80, Published: "8080", Protocol: "tcp"},
-		},
-		HealthCheck: &types.HealthCheckConfig{
-			Test: types.HealthCheckTest{"CMD", "true"},
-		},
-		Volumes: []types.ServiceVolumeConfig{
-			{Type: types.VolumeTypeVolume, Source: "data", Target: "/data"},
-		},
-		Networks: map[string]*types.ServiceNetworkConfig{"default": nil},
+	// built by assignment: most of these are fields promoted from the
+	// embedded ContainerSpec since the compose-go layering, which struct
+	// literals cannot set before go1.27
+	var svc types.ServiceConfig
+	svc.Name = "web"
+	svc.Image = "nginx:latest"
+	svc.Command = types.ShellCommand{"nginx", "-g", "daemon off;"}
+	svc.User = "nobody"
+	svc.Tty = true
+	svc.StdinOpen = true
+	svc.Restart = types.RestartPolicyAlways
+	svc.Environment = types.MappingWithEquals{"A": strPtr("1"), "B": nil}
+	svc.Labels = types.Labels{"com.example": "v"}
+	svc.Annotations = types.Mapping{"note": "x"}
+	svc.CapAdd = []string{"NET_ADMIN"}
+	svc.ExtraHosts = types.HostsList{"alpha": []string{"10.0.0.1"}}
+	svc.Deploy = &types.DeployConfig{Replicas: &replicas}
+	svc.Ports = []types.ServicePortConfig{
+		{Target: 80, Published: "8080", Protocol: "tcp"},
 	}
+	svc.HealthCheck = &types.HealthCheckConfig{
+		Test: types.HealthCheckTest{"CMD", "true"},
+	}
+	svc.Volumes = []types.ServiceVolumeConfig{
+		{Type: types.VolumeTypeVolume, Source: "data", Target: "/data"},
+	}
+	svc.Networks = map[string]*types.ServiceNetworkConfig{"default": nil}
+	return svc
 }
 
 func strPtr(s string) *string { return &s }

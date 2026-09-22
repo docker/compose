@@ -141,6 +141,10 @@ var serviceHashKeyOrder = []string{
 	"pre_start",
 	"post_start",
 	"pre_stop",
+	// appended when the compose-go container-spec layering exposed it (the
+	// merge order made the fallback place it here already: listing it is a
+	// no-op for every hash, it only freezes the position)
+	"pull_refresh_after",
 }
 
 // trimServiceHashFields removes the attributes deliberately excluded from the
