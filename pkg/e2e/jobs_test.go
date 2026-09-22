@@ -102,6 +102,15 @@ func TestCreateRefusesJob(t *testing.T) {
 			ServiceNotCreated("migrate"))
 }
 
+// up shares WithServices with create: the same translation must apply there too.
+func TestUpRefusesJob(t *testing.T) {
+	NewScenario(t, "up must refuse a job by name, naming run as the right command").
+		Step("up fails naming the job",
+			ComposeCmd("up", "-d", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+			ServiceNotCreated("migrate"))
+}
+
 func TestStartRefusesJob(t *testing.T) {
 	NewScenario(t, "start must refuse a job by name, naming run as the right command").
 		Step("start fails naming the job",
