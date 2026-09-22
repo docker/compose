@@ -106,6 +106,48 @@ func TestShouldFollowStartEvent(t *testing.T) {
 	}
 }
 
+// TestIsLateStarter is a follow-up to #14140's on-exit-only fix (glours'
+// review on that PR): stopOnFirstExit's own sweep isn't the only path that
+// can race a service still climbing the dependency graph on its
+// uncancelable context -- a graceful Ctrl+C/SIGTERM teardown does too, and
+// arrives with u.isTerminated already true regardless of which path set it.
+// isLateStarter must gate on that shared flag, not on which listener
+// happened to trigger termination.
+func TestIsLateStarter(t *testing.T) {
+	tests := []struct {
+		name       string
+		event      api.ContainerEvent
+		terminated bool
+		want       bool
+	}{
+		{
+			name:       "a container starting before termination is not a late starter",
+			event:      api.ContainerEvent{Type: api.ContainerEventStarted},
+			terminated: false,
+			want:       false,
+		},
+		{
+			name:       "a non-start event after termination is not a late starter",
+			event:      api.ContainerEvent{Type: api.ContainerEventExited},
+			terminated: true,
+			want:       false,
+		},
+		{
+			name:       "a container starting after termination is a late starter",
+			event:      api.ContainerEvent{Type: api.ContainerEventStarted},
+			terminated: true,
+			want:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isLateStarter(tt.event, tt.terminated)
+			assert.Equal(t, got, tt.want)
+		})
+	}
+}
+
 // TestAppendErrDropsCancellationAfterShutdown is the #13985 follow-up: once
 // our own shutdown has canceled globalCtx (monitor detecting termination,
 // SIGINT/SIGTERM, ...), a lingering goroutine (log/attach streaming) racing

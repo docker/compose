@@ -161,6 +161,12 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 	}
 	monitor.withListener(u.printer.HandleEvent)
 
+	// Termination -- on-exit cascade or a graceful Ctrl+C/SIGTERM teardown --
+	// stops the application via a one-shot listing (see stopApplication):
+	// registered unconditionally, regardless of the on-exit policy, since a
+	// graceful teardown always runs it and a container whose start was
+	// already in flight when that listing happened comes up after it.
+	monitor.withListener(u.stopLateStarters())
 	if options.Start.OnExit != api.CascadeIgnore {
 		monitor.withListener(u.stopOnFirstExit())
 	}
@@ -276,8 +282,10 @@ func (u *upSession) runEventLoop(ctx context.Context, kEvents <-chan keyboard.Ke
 	gracefulTeardown := func() {
 		first = false
 		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Gracefully Stopping... press Ctrl+C again to force"))
-		u.stopApplication()
+		// set before stopApplication's listing so stopLateStarters is armed
+		// no later than the sweep it must catch stragglers for.
 		u.isTerminated.Store(true)
+		u.stopApplication()
 	}
 
 	for {
@@ -344,15 +352,6 @@ func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
 	once := true
 	return func(event api.ContainerEvent) {
 		if !once {
-			// The abort races the start phase, which runs on a deliberately
-			// uncancelable context (SIGTERM management): a container whose
-			// start was in flight when the application was swept comes up
-			// AFTER the stop, and would keep the session alive until its
-			// natural end. The events stream reveals such late starters —
-			// stop each one as it appears.
-			if event.Type == api.ContainerEventStarted {
-				u.stopLateStarter(event.Service)
-			}
 			return
 		}
 		if event.Type != api.ContainerEventExited {
@@ -364,12 +363,41 @@ func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
 		once = false
 		u.exitCode = event.ExitCode
 		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
+		// set before stopApplication's listing so stopLateStarters is armed
+		// no later than the sweep it must catch stragglers for.
+		u.isTerminated.Store(true)
 		u.stopApplication()
 	}
 }
 
-// stopLateStarter stops one service started after the on-exit abort swept the
-// application — see stopOnFirstExit.
+// stopLateStarters stops any service that starts after termination has begun
+// — the on-exit cascade above or a graceful Ctrl+C/SIGTERM teardown
+// (runEventLoop) — both of which stop the application via stopApplication's
+// one-shot listing. Either start phase (the initial one, or one still
+// climbing the dependency graph on its deliberately uncancelable context)
+// can race that listing: a container whose start was already in flight comes
+// up after the sweep and would otherwise keep the session alive until its
+// natural end. The events stream reveals such late starters — stop each one
+// as it appears, for as long as termination is underway.
+func (u *upSession) stopLateStarters() api.ContainerEventListener {
+	return func(event api.ContainerEvent) {
+		if !isLateStarter(event, u.isTerminated.Load()) {
+			return
+		}
+		u.stopLateStarter(event.Service)
+	}
+}
+
+// isLateStarter reports whether event is a container starting after
+// termination has begun — the on-exit cascade or a graceful Ctrl+C/SIGTERM
+// teardown, either of which sets terminated true before its one-shot stop
+// listing — and so must be caught and stopped: see stopLateStarters.
+func isLateStarter(event api.ContainerEvent, terminated bool) bool {
+	return terminated && event.Type == api.ContainerEventStarted
+}
+
+// stopLateStarter stops one service started after termination swept the
+// application — see stopLateStarters.
 func (u *upSession) stopLateStarter(service string) {
 	u.eg.Go(func() error {
 		err := u.stop(context.WithoutCancel(u.globalCtx), u.project.Name, api.StopOptions{
