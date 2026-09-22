@@ -160,7 +160,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 
 	// Only ensure image exists for the target service, dependencies were already handled by startDependencies
 	buildOpts := prepareBuildOptions(options)
-	if err := s.ensureImagesExists(ctx, project, buildOpts, options.QuietPull); err != nil { // all dependencies already checked, but might miss service img
+	if err := s.ensureImagesExists(ctx, project, buildOpts, options.QuietPull, false); err != nil { // all dependencies already checked, but might miss service img
 		return prepareRunResult{}, err
 	}
 

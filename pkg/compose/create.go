@@ -80,7 +80,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull)
+	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull, options.SkipProviders)
 	if err != nil {
 		return err
 	}
