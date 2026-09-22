@@ -210,10 +210,15 @@ func doTest(t *testing.T, svcName string) {
 	}
 
 	t.Logf("Writing to a file until Compose watch is up and running")
+	// Cold start covers the whole pipeline before the first sync can land:
+	// image pull/build, container start, watcher initialization. On a loaded
+	// CI runner that regularly exceeds poll.WaitOn's default 10s budget —
+	// only this bootstrap loop gets the large timeout, every later step
+	// keeps the sharp default so a real sync regression still fails fast.
 	poll.WaitOn(t, func(t poll.LogT) poll.Result {
 		writeDataFile("hello.txt", "hello world")
 		return checkFileContents("/app/data/hello.txt", "hello world")(t)
-	}, poll.WithDelay(time.Second))
+	}, poll.WithDelay(time.Second), poll.WithTimeout(2*time.Minute))
 
 	t.Logf("Modifying file contents")
 	writeDataFile("hello.txt", "hello watch")
