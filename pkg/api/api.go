@@ -373,6 +373,10 @@ type StartOptions struct {
 	// NavigationMenu enables the keyboard menu of Up's foreground session;
 	// ignored by Start.
 	NavigationMenu bool
+	// NoStart makes Up create and register the project (containers, scheduled
+	// jobs) without starting anything — `up --no-start`'s mode switch.
+	// Ignored by Start.
+	NoStart bool
 }
 
 type Cascade int
