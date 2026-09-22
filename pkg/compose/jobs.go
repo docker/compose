@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -153,18 +152,46 @@ func (s *composeService) buildJobSpec(ctx context.Context, project *types.Projec
 // sortedJobNames returns the sorted names of a project's jobs, optionally
 // restricted to those matching keep.
 func sortedJobNames(jobs types.Jobs, keep func(types.JobConfig) bool) []string {
-	names := make([]string, 0, len(jobs))
+	if keep == nil {
+		return sortedMapKeys(jobs)
+	}
+	filtered := make(types.Jobs, len(jobs))
 	for name, job := range jobs {
-		if keep == nil || keep(job) {
-			names = append(names, name)
+		if keep(job) {
+			filtered[name] = job
 		}
 	}
-	sort.Strings(names)
-	return names
+	return sortedMapKeys(filtered)
 }
 
-func hasSchedule(job types.JobConfig) bool {
+// jobChangedErr reports that the engine already has a job of this name with
+// a different spec: re-running the same verb won't reconcile it, only
+// `down` removing it first will.
+func jobChangedErr(name, verb string) error {
+	return fmt.Errorf("job %q has changed: run `docker compose down` to remove it, then `%s` again", name, verb)
+}
+
+// HasSchedule reports whether a job declares a schedule trigger — the
+// predicate `up` uses to register it with the engine instead of warning
+// that it waits for `docker compose run`.
+func HasSchedule(job types.JobConfig) bool {
 	return job.Triggers != nil && len(job.Triggers.Schedule) > 0
+}
+
+// ManualTriggerDisabled reports whether a job explicitly opts out of manual
+// triggering with `triggers.manual: false`. Per the spec, every job accepts
+// `docker compose run` regardless of its automated triggers unless it opts
+// out this way — this is the single source of truth for that rule, shared
+// by every layer that materializes or runs a job manually.
+func ManualTriggerDisabled(job types.JobConfig) bool {
+	return job.Triggers != nil && job.Triggers.Manual != nil && !*job.Triggers.Manual
+}
+
+// ManualTriggerDisabledErr reports that name was declared with
+// `manual: false` and so cannot be run manually — the error every caller
+// of ManualTriggerDisabled raises on that condition.
+func ManualTriggerDisabledErr(name string) error {
+	return fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
 }
 
 // registerScheduledJobs registers the project's scheduled jobs with the
@@ -178,7 +205,7 @@ func hasSchedule(job types.JobConfig) bool {
 // risking those services being picked up by the real service-reconciliation
 // loop needs more than this diff's scope.
 func (s *composeService) registerScheduledJobs(ctx context.Context, project *types.Project) error {
-	names := sortedJobNames(project.Jobs, hasSchedule)
+	names := sortedJobNames(project.Jobs, HasSchedule)
 	if len(names) == 0 {
 		return nil
 	}
@@ -205,7 +232,7 @@ func (s *composeService) registerScheduledJobs(ctx context.Context, project *typ
 		})
 		err = jobsv0.MapError(err)
 		if errdefs.IsAlreadyExists(err) {
-			return fmt.Errorf("job %q has changed: run `docker compose down` to remove it, then `up` again", name)
+			return jobChangedErr(name, "up")
 		}
 		if err != nil {
 			return err
@@ -223,8 +250,8 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	if !ok {
 		return 0, fmt.Errorf("job %q not found", name)
 	}
-	if job.Triggers == nil || job.Triggers.Manual == nil || !*job.Triggers.Manual {
-		return 0, fmt.Errorf("job %q has no manual trigger, it cannot be run", name)
+	if ManualTriggerDisabled(job) {
+		return 0, ManualTriggerDisabledErr(name)
 	}
 
 	// materializeManualJob already put the job into project.Services, so it
@@ -244,13 +271,9 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	}
 	// The job's own image build (if any) is scoped to just this job, unlike
 	// startDependencies' unscoped Build above which may also build other
-	// services the job depends on.
-	var buildOpts *api.BuildOptions
-	if options.Build != nil {
-		bo := *options.Build
-		bo.Services = []string{name}
-		buildOpts = &bo
-	}
+	// services the job depends on. RunJob is always called with name ==
+	// options.Service, so this is the same scoping prepareRun uses.
+	buildOpts := prepareBuildOptions(options)
 	if err := s.ensureImagesExists(ctx, project, buildOpts, options.QuietPull); err != nil {
 		return 0, err
 	}
@@ -287,7 +310,7 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	})
 	if err := jobsv0.MapError(err); err != nil {
 		if errdefs.IsAlreadyExists(err) {
-			return 0, fmt.Errorf("job %q has changed: run `docker compose down` to remove it, then `run` again", name)
+			return 0, jobChangedErr(name, "run")
 		}
 		return 0, err
 	}
