@@ -122,3 +122,46 @@ func TestManualTriggerDisabledErr(t *testing.T) {
 	assert.Error(t, ManualTriggerDisabledErr("rotation"),
 		`job "rotation" is declared with manual: false, it cannot be run manually`)
 }
+
+// scopedProjectForJob is what lets registerScheduledJobs run a scheduled
+// job through the same useAPISocket/ensureImagesExists/ensureModels passes
+// a manually-run job gets for free from materializeManualJob — without the
+// job ever joining the real project.Services the reconciliation loop
+// iterates over.
+func TestScopedProjectForJob(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": {Name: "db", ContainerSpec: types.ContainerSpec{Image: "postgres"}},
+		},
+		Jobs: types.Jobs{
+			"backup": {
+				Name:          "backup",
+				Extensions:    types.Extensions{"x-team": "platform"},
+				ContainerSpec: types.ContainerSpec{Image: "backup-tool"},
+			},
+		},
+	}
+	job := project.Jobs["backup"]
+
+	scoped := scopedProjectForJob(project, "backup", job)
+
+	t.Run("the job is materialized into the scoped copy's Services", func(t *testing.T) {
+		svc, err := scoped.GetService("backup")
+		assert.NilError(t, err)
+		assert.Equal(t, svc.Image, "backup-tool")
+		assert.Equal(t, svc.Extensions["x-team"], "platform")
+	})
+
+	t.Run("existing services are carried over", func(t *testing.T) {
+		svc, err := scoped.GetService("db")
+		assert.NilError(t, err)
+		assert.Equal(t, svc.Image, "postgres")
+	})
+
+	t.Run("the real project.Services is never mutated", func(t *testing.T) {
+		_, ok := project.Services["backup"]
+		assert.Assert(t, !ok, "the job must not leak into the shared project's Services")
+		assert.Equal(t, len(project.Services), 1)
+	})
+}

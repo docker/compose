@@ -29,6 +29,7 @@ import (
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
 	jobspb "github.com/docker/compose/v5/internal/jobsapi/protogen"
@@ -196,16 +197,35 @@ func ManualTriggerDisabledErr(name string) error {
 	return fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
 }
 
+// scopedProjectForJob returns a shallow copy of project with name's job
+// materialized into a fresh Services map, so a scheduled job can run
+// through the same project-wide normalization passes (useAPISocket,
+// ensureImagesExists, ensureModels) that a manually-run job gets for free
+// once materializeManualJob puts it into the real project.Services — see
+// jobAsService in cmd/compose/run.go for that path. The copy is throwaway:
+// callers must discard it once they've read back the resolved
+// ServiceConfig, so the job never joins the project the real
+// service-reconciliation loop (create/start) iterates over.
+func scopedProjectForJob(project *types.Project, name string, job types.JobConfig) *types.Project {
+	scoped := *project
+	services := make(types.Services, len(project.Services)+1)
+	for n, svc := range project.Services {
+		services[n] = svc
+	}
+	services[name] = types.ServiceConfig{
+		Name:          name,
+		Profiles:      job.Profiles,
+		Extensions:    job.Extensions,
+		ContainerSpec: job.ContainerSpec,
+		WorkloadSpec:  job.WorkloadSpec,
+	}
+	scoped.Services = services
+	return &scoped
+}
+
 // registerScheduledJobs registers the project's scheduled jobs with the
 // engine. Create is idempotent on SpecHash: re-applying the same spec on a
 // later `up` is a no-op, which is what makes `up` safely re-runnable.
-//
-// Known gap: unlike RunJob, a scheduled job never joins project.Services, so
-// it isn't seen by the project-wide use_api_socket / models: normalization
-// passes (pkg/compose/apiSocket.go, pkg/compose/model.go) — a scheduled job
-// declaring either is silently missing that setup. Fixing this without
-// risking those services being picked up by the real service-reconciliation
-// loop needs more than this diff's scope.
 func (s *composeService) registerScheduledJobs(ctx context.Context, project *types.Project) error {
 	names := sortedJobNames(project.Jobs, HasSchedule)
 	if len(names) == 0 {
@@ -216,31 +236,45 @@ func (s *composeService) registerScheduledJobs(ctx context.Context, project *typ
 	if err != nil {
 		return err
 	}
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, name := range names {
-		job := project.Jobs[name]
-		svc := types.ServiceConfig{
-			Name:          name,
-			Profiles:      job.Profiles,
-			ContainerSpec: job.ContainerSpec,
-			WorkloadSpec:  job.WorkloadSpec,
-		}
-		spec, err := s.buildJobSpec(ctx, project, svc, job, false)
-		if err != nil {
+		eg.Go(func() error {
+			job := project.Jobs[name]
+			scoped, err := s.useAPISocket(scopedProjectForJob(project, name, job))
+			if err != nil {
+				return err
+			}
+			// Without this, a scheduled job declaring only `build:` (no
+			// `image:`) registers successfully here and then fails, every
+			// time its schedule fires, because the image was never built —
+			// silently, since up's own auto-build only ever scoped to
+			// project.ServiceNames() (see pkg/compose/build.go).
+			if err := s.ensureImagesExists(ctx, scoped, &api.BuildOptions{Services: []string{name}}, false); err != nil {
+				return err
+			}
+			if err := s.ensureModels(ctx, scoped, false); err != nil {
+				return err
+			}
+			svc, err := scoped.GetService(name)
+			if err != nil {
+				return err
+			}
+			spec, err := s.buildJobSpec(ctx, scoped, svc, job, false)
+			if err != nil {
+				return err
+			}
+			_, err = jc.Create(ctx, &jobsv0.CreateRequest{
+				Name: engineJobName(project, name),
+				Spec: spec,
+			})
+			err = jobsv0.MapError(err)
+			if errdefs.IsAlreadyExists(err) {
+				return jobChangedErr(name, "up")
+			}
 			return err
-		}
-		_, err = jc.Create(ctx, &jobsv0.CreateRequest{
-			Name: engineJobName(project, name),
-			Spec: spec,
 		})
-		err = jobsv0.MapError(err)
-		if errdefs.IsAlreadyExists(err) {
-			return jobChangedErr(name, "up")
-		}
-		if err != nil {
-			return err
-		}
 	}
-	return nil
+	return eg.Wait()
 }
 
 // RunJob triggers a manual-trigger job's Run on the engine, following the
