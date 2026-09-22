@@ -343,7 +343,19 @@ func (u *upSession) killApplication() {
 func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
 	once := true
 	return func(event api.ContainerEvent) {
-		if !once || event.Type != api.ContainerEventExited {
+		if !once {
+			// The abort races the start phase, which runs on a deliberately
+			// uncancelable context (SIGTERM management): a container whose
+			// start was in flight when the application was swept comes up
+			// AFTER the stop, and would keep the session alive until its
+			// natural end. The events stream reveals such late starters —
+			// stop each one as it appears.
+			if event.Type == api.ContainerEventStarted {
+				u.stopLateStarter(event.Service)
+			}
+			return
+		}
+		if event.Type != api.ContainerEventExited {
 			return
 		}
 		if u.options.Start.OnExit == api.CascadeFail && event.ExitCode == 0 {
@@ -354,6 +366,19 @@ func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
 		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
 		u.stopApplication()
 	}
+}
+
+// stopLateStarter stops one service started after the on-exit abort swept the
+// application — see stopOnFirstExit.
+func (u *upSession) stopLateStarter(service string) {
+	u.eg.Go(func() error {
+		err := u.stop(context.WithoutCancel(u.globalCtx), u.project.Name, api.StopOptions{
+			Services: []string{service},
+			Project:  u.project,
+		}, u.printer.HandleEvent)
+		u.appendErr(err)
+		return nil
+	})
 }
 
 // captureExitCodeFrom captures the exit code of the first container to exit
