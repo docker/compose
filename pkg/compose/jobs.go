@@ -434,10 +434,26 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 		return 0, err
 	}
 
+	running, err := jc.Wait(ctx, &jobsv0.WaitRequest{
+		JobRef:    created.JobID,
+		RunRef:    created.ID,
+		Condition: jobsv0.WaitConditionRunning,
+	})
+	if err := jobsv0.MapError(err); err != nil {
+		return 0, err
+	}
+	containerID := created.ContainerID
+	if running.Run != nil {
+		containerID = running.Run.ContainerID
+	}
+
 	logsDone := make(chan struct{})
 	go func() {
 		defer close(logsDone)
-		if err := s.streamJobLogs(ctx, created.ContainerID, svc.Tty); err != nil && ctx.Err() == nil {
+		if containerID == "" {
+			return
+		}
+		if err := s.streamJobLogs(ctx, containerID, svc.Tty); err != nil && ctx.Err() == nil {
 			logrus.Debugf("job %q: log stream ended: %v", name, err)
 		}
 	}()
@@ -452,6 +468,9 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	}
 
 	run := waited.Run
+	if run == nil {
+		return 1, fmt.Errorf("job %q: Wait returned no run", name)
+	}
 	switch run.State {
 	case jobsv0.RunStateSucceeded:
 		return 0, nil
@@ -489,6 +508,9 @@ func (s *composeService) createJobRun(ctx context.Context, jc jobsv0.Jobs, proje
 		if err := mapAlreadyExists(err, name, "run"); err != nil {
 			return nil, err
 		}
+		if reply.Run == nil {
+			return nil, fmt.Errorf("job %q: engine returned no run", name)
+		}
 		return reply.Run, nil
 	}
 
@@ -499,6 +521,9 @@ func (s *composeService) createJobRun(ctx context.Context, jc jobsv0.Jobs, proje
 	reply, err := jc.Run(ctx, &jobsv0.RunRequest{JobRef: engineName, Reschedule: false})
 	if err := jobsv0.MapError(err); err != nil {
 		return nil, err
+	}
+	if reply.Run == nil {
+		return nil, fmt.Errorf("job %q: engine returned no run", name)
 	}
 	return reply.Run, nil
 }
