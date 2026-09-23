@@ -59,7 +59,39 @@ const (
 	// its stdin, one JSON line holding the resolved canonical configuration
 	// of the service it manages — answered from the in-memory model.
 	GetServiceConfigType = "get-service-config"
+
+	// GetRelayInfoType is a message the provider sends to receive, on its
+	// stdin, one JSON line describing the project networks the relay
+	// standing in for this service would join, with each network's gateway
+	// address. Only meaningful for a provider running its service LOCALLY:
+	// the gateway is an address the host owns on the network's bridge, so
+	// an endpoint bound to it is reachable from the relay without being
+	// exposed on the LAN. A provider backing the service with a remote
+	// resource has no use for it.
+	GetRelayInfoType = "get-relay-info"
+
+	// ComposeProviderMessagesEnv announces to the provider process, as a
+	// comma-separated list, every message type this compose accepts on the
+	// provider's stdout — so a provider can adapt to the compose it runs
+	// under instead of emitting a message that would fail the command
+	// (an unknown message type is a protocol error by design: a provider
+	// REQUIRING an unsupported message must fail rather than degrade
+	// silently).
+	ComposeProviderMessagesEnv = "COMPOSE_PROVIDER_MESSAGES"
 )
+
+// providerMessageTypes is the COMPOSE_PROVIDER_MESSAGES value: every message
+// type executePlugin's loop accepts. Keep in sync with its switch.
+var providerMessageTypes = strings.Join([]string{
+	ErrorType,
+	InfoType,
+	SetEnvType,
+	RawSetEnvType,
+	DebugType,
+	PublishEndpointType,
+	GetServiceConfigType,
+	GetRelayInfoType,
+}, ",")
 
 type pluginVariables struct {
 	prefixed types.Mapping
@@ -89,7 +121,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return nil
 	}
 
-	variables, err := s.executePlugin(cmd, command, service)
+	variables, err := s.executePlugin(ctx, project, cmd, command, service)
 	if err != nil {
 		return err
 	}
@@ -159,7 +191,7 @@ func parseEndpointMessage(message string) (int, string, error) {
 	return port, upstream, nil
 }
 
-func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) {
+func (s *composeService) executePlugin(ctx context.Context, project *types.Project, cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) {
 	var action string
 	switch command {
 	case "up":
@@ -243,47 +275,8 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		if err != nil {
 			return pluginVariables{}, err
 		}
-		switch msg.Type {
-		case ErrorType:
-			s.events.On(newEvent(service.Name, api.Error, firstLine(msg.Message)))
-			return pluginVariables{}, errors.New(msg.Message)
-		case InfoType:
-			s.events.On(newEvent(service.Name, api.Working, firstLine(msg.Message)))
-		case SetEnvType:
-			key, val, found := strings.Cut(msg.Message, "=")
-			if !found {
-				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Message)
-			}
-			variables.prefixed[key] = val
-		case RawSetEnvType:
-			key, val, found := strings.Cut(msg.Message, "=")
-			if !found {
-				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Message)
-			}
-			variables.raw[key] = val
-		case GetServiceConfigType:
-			payload, err := json.Marshal(service)
-			if err != nil {
-				return pluginVariables{}, fmt.Errorf("failed to answer get-service-config: %w", err)
-			}
-			payload = append(payload, '\n')
-			answers.Add(1)
-			go func() {
-				defer answers.Done()
-				stdinMu.Lock()
-				defer stdinMu.Unlock()
-				_, _ = stdin.Write(payload)
-			}()
-		case PublishEndpointType:
-			port, upstream, err := parseEndpointMessage(msg.Message)
-			if err != nil {
-				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %w", err)
-			}
-			variables.endpoints[port] = upstream
-		case DebugType:
-			logrus.Debugf("%s: %s", service.Name, msg.Message)
-		default:
-			return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Type)
+		if err := s.handlePluginMessage(ctx, project, service, msg, &variables, stdin, &stdinMu, &answers); err != nil {
+			return pluginVariables{}, err
 		}
 	}
 
@@ -302,6 +295,79 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		s.events.On(stoppedEvent(service.Name))
 	}
 	return variables, nil
+}
+
+// handlePluginMessage processes one provider message, mutating variables in
+// place; a returned error is terminal for the run (the provider is killed
+// and the command fails). An unknown message type IS such an error: a
+// provider requiring a message this compose does not support must fail
+// loudly, not degrade silently — providers adapt through the
+// COMPOSE_PROVIDER_MESSAGES announcement instead.
+func (s *composeService) handlePluginMessage(ctx context.Context, project *types.Project, service types.ServiceConfig, msg JsonMessage,
+	variables *pluginVariables, stdin io.WriteCloser, stdinMu *sync.Mutex, answers *sync.WaitGroup,
+) error {
+	switch msg.Type {
+	case ErrorType:
+		s.events.On(newEvent(service.Name, api.Error, firstLine(msg.Message)))
+		return errors.New(msg.Message)
+	case InfoType:
+		s.events.On(newEvent(service.Name, api.Working, firstLine(msg.Message)))
+	case SetEnvType:
+		key, val, found := strings.Cut(msg.Message, "=")
+		if !found {
+			return fmt.Errorf("invalid message from plugin: %s", msg.Message)
+		}
+		variables.prefixed[key] = val
+	case RawSetEnvType:
+		key, val, found := strings.Cut(msg.Message, "=")
+		if !found {
+			return fmt.Errorf("invalid message from plugin: %s", msg.Message)
+		}
+		variables.raw[key] = val
+	case GetServiceConfigType:
+		payload, err := json.Marshal(service)
+		if err != nil {
+			return fmt.Errorf("failed to answer get-service-config: %w", err)
+		}
+		answerProvider(stdin, stdinMu, answers, payload)
+	case GetRelayInfoType:
+		// resolved lazily, on request only: the network inspects cost
+		// nothing to providers that never ask (remote-resource providers),
+		// and the networks exist by the time an up runs
+		payload, err := json.Marshal(s.relayInfo(ctx, project, service))
+		if err != nil {
+			return fmt.Errorf("failed to answer get-relay-info: %w", err)
+		}
+		answerProvider(stdin, stdinMu, answers, payload)
+	case PublishEndpointType:
+		port, upstream, err := parseEndpointMessage(msg.Message)
+		if err != nil {
+			return fmt.Errorf("invalid message from plugin: %w", err)
+		}
+		variables.endpoints[port] = upstream
+	case DebugType:
+		logrus.Debugf("%s: %s", service.Name, msg.Message)
+	default:
+		return fmt.Errorf("invalid message from plugin: %s", msg.Type)
+	}
+	return nil
+}
+
+// answerProvider dispatches one JSON-line answer to the provider's stdin
+// from its own goroutine: writing a payload larger than the OS pipe buffer
+// from the read loop would deadlock against a provider that emits stdout
+// before draining its stdin. The mutex keeps individual writes atomic; a
+// write failure is not reported — a provider missing its answer reads EOF
+// once stdin closes.
+func answerProvider(stdin io.WriteCloser, stdinMu *sync.Mutex, answers *sync.WaitGroup, payload []byte) {
+	payload = append(payload, '\n')
+	answers.Add(1)
+	go func() {
+		defer answers.Done()
+		stdinMu.Lock()
+		defer stdinMu.Unlock()
+		_, _ = stdin.Write(payload)
+	}()
 }
 
 func (s *composeService) getPluginBinaryPath(provider string) (path string, err error) {
@@ -359,6 +425,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 	if err != nil {
 		return nil, err
 	}
+	cmd.Env = append(cmd.Env, ComposeProviderMessagesEnv+"="+providerMessageTypes)
 	return cmd, nil
 }
 

@@ -125,6 +125,71 @@ func relayNetworks(project *types.Project, service types.ServiceConfig) []string
 	return keys
 }
 
+// relayInfoAnswer is the get-relay-info reply: the project networks the
+// relay standing in for the provider service would join, each with the
+// address the HOST owns on that network — its gateway. A provider running
+// its service locally can bind that address: reachable from the relay
+// (same-bridge local delivery), yet not exposed on the LAN. Networks whose
+// gateway cannot be resolved are still listed, gateway omitted.
+type relayInfoAnswer struct {
+	Networks []relayNetworkInfo `json:"networks"`
+}
+
+type relayNetworkInfo struct {
+	// Name is the concrete engine-level network name.
+	Name string `json:"name"`
+	// Gateway is the address the provider's host owns that the relay can
+	// reach on this network: the network's IPv4 gateway on a standalone
+	// engine, the host's own loopback under Docker Desktop — whose proxy
+	// dials host-process endpoints through 127.0.0.1, making it factually
+	// the gateway to the host from the relay's vantage point. Empty when
+	// unresolved (network not created yet, driver without a host-owned
+	// gateway, IPv6-only).
+	Gateway string `json:"gateway,omitempty"`
+}
+
+// relayInfo assembles the get-relay-info answer for one provider service:
+// the same network selection the relay deployment uses (relayNetworks),
+// resolved for the address a locally-run endpoint should bind. Compose owns
+// the platform knowledge — the provider just binds what is announced.
+// Best-effort by design: a provider must treat a missing gateway as "bind
+// elsewhere".
+func (s *composeService) relayInfo(ctx context.Context, project *types.Project, service types.ServiceConfig) relayInfoAnswer {
+	answer := relayInfoAnswer{Networks: []relayNetworkInfo{}}
+	// project.Services is shared state mutated by concurrent provider runs
+	// (the env-var injection in runPlugin writes it under mux): the network
+	// selection reads it, so it belongs under the same mutex. The Docker
+	// API inspects below do not — holding the lock across them would stall
+	// every concurrent provider on the slowest inspect.
+	mux.Lock()
+	names := make([]string, 0)
+	for _, key := range relayNetworks(project, service) {
+		names = append(names, project.Networks[key].Name)
+	}
+	mux.Unlock()
+	// Under Docker Desktop the networks (and their gateways) live inside
+	// the VM: unreachable AND unbindable from the provider's host. The
+	// address a host process binds to be reached from the relay is the
+	// host's own loopback, so that is what gets announced. Detection
+	// errors fall through to the inspect path — best-effort.
+	desktopActive, _ := s.isDesktopIntegrationActive(ctx)
+	for _, name := range names {
+		info := relayNetworkInfo{Name: name}
+		if desktopActive {
+			info.Gateway = "127.0.0.1"
+		} else if inspected, err := s.apiClient().NetworkInspect(ctx, name, client.NetworkInspectOptions{}); err == nil {
+			for _, cfg := range inspected.Network.IPAM.Config {
+				if cfg.Gateway.IsValid() && cfg.Gateway.Is4() {
+					info.Gateway = cfg.Gateway.String()
+					break
+				}
+			}
+		}
+		answer.Networks = append(answer.Networks, info)
+	}
+	return answer
+}
+
 // ensureServiceRelay converges the relay container standing in for a provider
 // service that published endpoints: consumers reach the provider's resource
 // at the compose-native address (http://<service>:<port>) through it. The
