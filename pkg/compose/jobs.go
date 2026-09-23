@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -116,25 +117,14 @@ func (s *composeService) buildJobSpec(ctx context.Context, project *types.Projec
 	// container (see jobsv0.JobSpec.Labels godoc): project/service labels must
 	// be set here on the container spec itself so run containers stay visible
 	// to the rest of Compose's tooling (ps, label-scoped listings) exactly
-	// like any other service container.
-	//
-	// This set is computed here, not taken from svc.CustomLabels: svc is
-	// materialized differently depending on the caller (RunJob's
-	// materializeManualJob vs registerScheduledJobs' scopedProjectForJob),
-	// and the engine's Create is idempotent on the full spec — a caller that
-	// under-populated CustomLabels would make the same job's spec differ
-	// depending on how it was triggered, turning a harmless re-registration
-	// into a spurious "job has changed" conflict.
+	// like any other service container. svc.CustomLabels is trustworthy here
+	// because JobAsService is the single place both materialization paths
+	// (RunJob's cmd-layer materializeManualJob and registerScheduledJobs'
+	// scopedProjectForJob) build it — the same job's spec no longer differs
+	// depending on how it was triggered.
 	cfgs, err := s.getCreateConfigs(ctx, project, svc, 1, nil, createOptions{
 		UseNetworkAliases: useNetworkAliases,
-		Labels: mergeLabels(svc.Labels, types.Labels{
-			api.ProjectLabel:     project.Name,
-			api.ServiceLabel:     job.Name,
-			api.VersionLabel:     api.ComposeVersion,
-			api.WorkingDirLabel:  project.WorkingDir,
-			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
-			api.OneoffLabel:      "False",
-		}),
+		Labels:            mergeLabels(svc.Labels, svc.CustomLabels),
 	})
 	if err != nil {
 		return nil, err
@@ -186,6 +176,17 @@ func jobChangedErr(name, verb string) error {
 	return fmt.Errorf("job %q has changed: run `docker compose down` to remove it, then `%s` again", name, verb)
 }
 
+// mapAlreadyExists maps err through jobsv0.MapError, translating an
+// AlreadyExists (the engine already has name registered with a different
+// spec) into jobChangedErr instead of the raw engine error.
+func mapAlreadyExists(err error, name, verb string) error {
+	err = jobsv0.MapError(err)
+	if errdefs.IsAlreadyExists(err) {
+		return jobChangedErr(name, verb)
+	}
+	return err
+}
+
 // HasSchedule reports whether a job declares a schedule trigger — the
 // predicate `up` uses to register it with the engine instead of warning
 // that it waits for `docker compose run`.
@@ -209,29 +210,88 @@ func ManualTriggerDisabledErr(name string) error {
 	return fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
 }
 
-// scopedProjectForJob returns a shallow copy of project with name's job
-// materialized into a fresh Services map, so a scheduled job can run
-// through the same project-wide normalization passes (useAPISocket,
-// ensureImagesExists, ensureModels) that a manually-run job gets for free
-// once materializeManualJob puts it into the real project.Services — see
-// jobAsService in cmd/compose/run.go for that path. The copy is throwaway:
-// callers must discard it once they've read back the resolved
-// ServiceConfig, so the job never joins the project the real
-// service-reconciliation loop (create/start) iterates over.
-func scopedProjectForJob(project *types.Project, name string, job types.JobConfig) *types.Project {
-	scoped := *project
-	services := make(types.Services, len(project.Services)+1)
-	for n, svc := range project.Services {
-		services[n] = svc
-	}
-	services[name] = types.ServiceConfig{
+// JobAsService materializes a job as a service for the one-off machinery: a
+// job is a ContainerSpec+WorkloadSpec, the same layers a service is made of.
+// It carries the standard custom labels the loader stamps on every service —
+// materialization happens after loading, so without them the containers
+// created for the job would be invisible to every label-driven path: start
+// would silently skip them, ps/down would not see them, and the dependency
+// wait would report the job as a missing dependency. Exported as the single
+// source of truth both materialization paths (cmd/compose/run.go's
+// materializeManualJob for a manual run, scopedProjectForJob below for a
+// scheduled registration) share, so the same job's spec doesn't differ
+// depending on how it was triggered.
+func JobAsService(project *types.Project, name string, job types.JobConfig) types.ServiceConfig {
+	svc := types.ServiceConfig{
 		Name:          name,
 		Profiles:      job.Profiles,
 		Extensions:    job.Extensions,
 		ContainerSpec: job.ContainerSpec,
 		WorkloadSpec:  job.WorkloadSpec,
 	}
+	svc.CustomLabels = types.Labels{
+		api.ProjectLabel:     project.Name,
+		api.ServiceLabel:     name,
+		api.VersionLabel:     api.ComposeVersion,
+		api.WorkingDirLabel:  project.WorkingDir,
+		api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+		api.OneoffLabel:      "False",
+	}
+	return svc
+}
+
+// scopedProjectForJob returns a shallow copy of project with name's job
+// materialized into a fresh Services map, so a scheduled job can run
+// through the same project-wide normalization passes (useAPISocket,
+// ensureImagesExists, ensureModels) that a manually-run job gets for free
+// once materializeManualJob puts it into the real project.Services. The
+// copy is throwaway: callers must discard it once they've read back the
+// resolved ServiceConfig, so the job never joins the project the real
+// service-reconciliation loop (create/start) iterates over.
+//
+// Configs, and each service's Environment/CustomLabels/Volumes/Configs,
+// also get their own copy: registerScheduledJobs calls this concurrently
+// for every scheduled job, and the normalization passes above mutate those
+// fields in place across every service in the project, not just the job
+// being registered — useAPISocket writes project.Configs["#apisocket"],
+// service.Environment["DOCKER_CONFIG"], and appends to service.Volumes and
+// service.Configs; ensureModels' SetModelVariables writes
+// service.Environment for any service with a models: reference; and
+// ensureImagesExists writes service.CustomLabels (via Labels.Add, which
+// mutates its receiver) and, through resolveImageVolumes, service.Volumes
+// elements in place for any `type: image` volume. A plain struct copy of
+// ServiceConfig leaves all of these aliased to the real project's, so two
+// jobs registering concurrently would both write into the same map or
+// backing array — a data race.
+func scopedProjectForJob(project *types.Project, name string, job types.JobConfig) *types.Project {
+	scoped := *project
+	services := make(types.Services, len(project.Services)+1)
+	for n, svc := range project.Services {
+		env := make(types.MappingWithEquals, len(svc.Environment))
+		for k, v := range svc.Environment {
+			env[k] = v
+		}
+		svc.Environment = env
+
+		labels := make(types.Labels, len(svc.CustomLabels))
+		for k, v := range svc.CustomLabels {
+			labels[k] = v
+		}
+		svc.CustomLabels = labels
+
+		svc.Volumes = append([]types.ServiceVolumeConfig{}, svc.Volumes...)
+		svc.Configs = append([]types.ServiceConfigObjConfig{}, svc.Configs...)
+
+		services[n] = svc
+	}
+	services[name] = JobAsService(project, name, job)
 	scoped.Services = services
+
+	configs := make(types.Configs, len(project.Configs))
+	for n, cfg := range project.Configs {
+		configs[n] = cfg
+	}
+	scoped.Configs = configs
 	return &scoped
 }
 
@@ -249,6 +309,7 @@ func (s *composeService) registerScheduledJobs(ctx context.Context, project *typ
 		return err
 	}
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(s.maxConcurrency)
 	for _, name := range names {
 		eg.Go(func() error {
 			job := project.Jobs[name]
@@ -279,11 +340,7 @@ func (s *composeService) registerScheduledJobs(ctx context.Context, project *typ
 				Name: engineJobName(project, name),
 				Spec: spec,
 			})
-			err = jobsv0.MapError(err)
-			if errdefs.IsAlreadyExists(err) {
-				return jobChangedErr(name, "up")
-			}
-			return err
+			return mapAlreadyExists(err, name, "up")
 		})
 	}
 	return eg.Wait()
@@ -334,18 +391,20 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 		return 0, err
 	}
 	applyRunOptions(project, &svc, options)
-	// Tty/StdinOpen/ContainerName are not among the overrides RunJob's own
-	// doc comment on api.Compose documents as supported: a job has no
-	// interactive attach, and the jobs API assigns the run container's
-	// identity itself. Restoring them to the job's own declared values (not
-	// the run invocation's terminal-detected defaults) keeps the spec sent
-	// to Create/CreateAndRun stable across invocations — otherwise a job
-	// already registered by `up`, or run twice from different contexts
-	// (piped vs interactive shell), spuriously conflicts on SpecHash.
+	// A job has no run-assigned container name: the jobs API owns the run
+	// container's identity itself. But two independent layers inject
+	// CLI/terminal-context defaults into the service before RunJob ever
+	// sees it — prepareRun's own Tty/StdinOpen overrides don't apply here,
+	// yet cmd/compose/run.go's runOptions.apply still sets
+	// target.Tty/StdinOpen from the terminal before materializing the job.
+	// Left in place, that leaks into the spec sent to the engine and
+	// spuriously conflicts (SpecHash mismatch) with the identical spec `up`
+	// already registered for a scheduled job. Restore the job's own
+	// declared values (set correctly by JobAsService for both
+	// materialization paths) rather than the terminal's.
 	svc.Tty = job.Tty
 	svc.StdinOpen = job.StdinOpen
 	svc.ContainerName = ""
-	project.Services[name] = svc
 
 	observed, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
@@ -361,7 +420,6 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	if err := s.resolveRunServiceReferences(ctx, project.Name, &svc); err != nil {
 		return 0, err
 	}
-	project.Services[name] = svc
 	spec, err := s.buildJobSpec(ctx, project, svc, job, options.UseNetworkAliases)
 	if err != nil {
 		return 0, err
@@ -379,7 +437,7 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	logsDone := make(chan struct{})
 	go func() {
 		defer close(logsDone)
-		if err := s.streamJobLogs(ctx, created.ContainerID); err != nil && ctx.Err() == nil {
+		if err := s.streamJobLogs(ctx, created.ContainerID, svc.Tty); err != nil && ctx.Err() == nil {
 			logrus.Debugf("job %q: log stream ended: %v", name, err)
 		}
 	}()
@@ -428,22 +486,15 @@ func (s *composeService) createJobRun(ctx context.Context, jc jobsv0.Jobs, proje
 			Name: engineName,
 			Spec: spec,
 		})
-		if err := jobsv0.MapError(err); err != nil {
-			if errdefs.IsAlreadyExists(err) {
-				return nil, jobChangedErr(name, "run")
-			}
+		if err := mapAlreadyExists(err, name, "run"); err != nil {
 			return nil, err
 		}
 		return reply.Run, nil
 	}
 
-	if _, err := jc.Create(ctx, &jobsv0.CreateRequest{Name: engineName, Spec: spec}); err != nil {
-		if err := jobsv0.MapError(err); err != nil {
-			if errdefs.IsAlreadyExists(err) {
-				return nil, jobChangedErr(name, "run")
-			}
-			return nil, err
-		}
+	_, err := jc.Create(ctx, &jobsv0.CreateRequest{Name: engineName, Spec: spec})
+	if err := mapAlreadyExists(err, name, "run"); err != nil {
+		return nil, err
 	}
 	reply, err := jc.Run(ctx, &jobsv0.RunRequest{JobRef: engineName, Reschedule: false})
 	if err := jobsv0.MapError(err); err != nil {
@@ -453,8 +504,11 @@ func (s *composeService) createJobRun(ctx context.Context, jc jobsv0.Jobs, proje
 }
 
 // streamJobLogs follows a job Run's container logs from the start, exactly
-// like `docker logs -f`, until the container stops producing output.
-func (s *composeService) streamJobLogs(ctx context.Context, containerID string) error {
+// like `docker logs -f`, until the container stops producing output. tty
+// must match the container's own Tty setting: with a tty allocated, the
+// daemon returns a single raw stream instead of the stdout/stderr-framed
+// stream stdcopy expects (see doLogContainer in logs.go for the same split).
+func (s *composeService) streamJobLogs(ctx context.Context, containerID string, tty bool) error {
 	r, err := s.apiClient().ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -464,7 +518,11 @@ func (s *composeService) streamJobLogs(ctx context.Context, containerID string) 
 		return err
 	}
 	defer r.Close() //nolint:errcheck
-	_, err = stdcopy.StdCopy(s.stdout(), s.stderr(), r)
+	if tty {
+		_, err = io.Copy(s.stdout(), r)
+	} else {
+		_, err = stdcopy.StdCopy(s.stdout(), s.stderr(), r)
+	}
 	return err
 }
 
