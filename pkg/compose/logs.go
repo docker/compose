@@ -107,18 +107,29 @@ func (s *composeService) selectLogsContainers(ctx context.Context, projectName s
 	return containers, nil
 }
 
+// inspectWithSlot acquires limiter's slot, then inspects the container,
+// releasing the slot on error since no caller reaches doLogContainer (which
+// owns the slot from here on) in that case.
+func (s *composeService) inspectWithSlot(ctx context.Context, limiter *semaphore.Weighted, id string) (container.InspectResponse, error) {
+	if err := acquireSlot(ctx, limiter); err != nil {
+		return container.InspectResponse{}, err
+	}
+	res, err := s.apiClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+	if err != nil {
+		releaseSlot(limiter)
+		return container.InspectResponse{}, err
+	}
+	return res.Container, nil
+}
+
 // logContainer streams a container's logs, warning when its logging driver
 // doesn't support reading logs
 func (s *composeService) logContainer(ctx context.Context, limiter *semaphore.Weighted, consumer api.LogConsumer, ctr container.Summary, options api.LogOptions) error {
-	if err := acquireSlot(ctx, limiter); err != nil {
-		return err
-	}
-	res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+	res, err := s.inspectWithSlot(ctx, limiter, ctr.ID)
 	if err != nil {
-		releaseSlot(limiter)
 		return err
 	}
-	err = s.doLogContainer(ctx, limiter, consumer, getContainerNameWithoutProject(ctr), res.Container, options)
+	err = s.doLogContainer(ctx, limiter, consumer, getContainerNameWithoutProject(ctr), res, options)
 	if errdefs.IsNotImplemented(err) {
 		logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
 		return nil
@@ -148,19 +159,15 @@ func (s *composeService) followStartedContainersLogs(
 		// would drop the whole run.
 		since := runEnds.Since(event.ID)
 		eg.Go(func() error {
-			if err := acquireSlot(ctx, limiter); err != nil {
-				return err
-			}
-			res, err := s.apiClient().ContainerInspect(ctx, event.ID, client.ContainerInspectOptions{})
+			res, err := s.inspectWithSlot(ctx, limiter, event.ID)
 			if err != nil {
-				releaseSlot(limiter)
 				return err
 			}
 			if since == "" {
-				since = logsSinceLastRun(res.Container)
+				since = logsSinceLastRun(res)
 			}
 
-			err = s.doLogContainer(ctx, limiter, consumer, event.Source, res.Container, api.LogOptions{
+			err = s.doLogContainer(ctx, limiter, consumer, event.Source, res, api.LogOptions{
 				Follow:     options.Follow,
 				Since:      since,
 				Until:      options.Until,
