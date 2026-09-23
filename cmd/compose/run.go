@@ -450,7 +450,7 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 			if err != nil {
 				errMsg = err.Error()
 			}
-			return cli.StatusError{StatusCode: exitCode, Status: errMsg}
+			return cli.StatusError{StatusCode: exitCode, Status: errMsg, Cause: err}
 		}
 		return err
 	}
