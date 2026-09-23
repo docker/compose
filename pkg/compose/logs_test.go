@@ -344,27 +344,14 @@ func TestComposeService_Logs_FollowLimitsConcurrentStreamOpens(t *testing.T) {
 			}, nil)
 	}
 
-	var (
-		mu      sync.Mutex
-		current int
-		peak    int
-	)
+	tracker := &peakConcurrencyTracker{}
 	writers := make(chan *io.PipeWriter, len(ids))
 	for _, id := range ids {
 		api.EXPECT().ContainerLogs(anyCancellableContext(), id, gomock.Any()).
 			DoAndReturn(func(context.Context, string, client.ContainerLogsOptions) (io.ReadCloser, error) {
-				mu.Lock()
-				current++
-				if current > peak {
-					peak = current
-				}
-				mu.Unlock()
-
+				tracker.enter()
 				time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
-
-				mu.Lock()
-				current--
-				mu.Unlock()
+				tracker.leave()
 
 				r, w := io.Pipe()
 				writers <- w
@@ -403,7 +390,7 @@ func TestComposeService_Logs_FollowLimitsConcurrentStreamOpens(t *testing.T) {
 		_ = w.Close()
 	}
 	assert.NilError(t, <-done)
-	assert.Equal(t, peak, 1, "opening follow-mode log streams must be bounded by maxConcurrency")
+	assert.Equal(t, tracker.Peak(), 1, "opening follow-mode log streams must be bounded by maxConcurrency")
 }
 
 type testLogConsumer struct {

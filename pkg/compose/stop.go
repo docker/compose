@@ -48,6 +48,13 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		options.Services = project.ServiceNames()
 	}
 
+	// shared by every service so the dependency-order fan-out and the
+	// per-service container fan-out combined never exceed maxConcurrency
+	// concurrent container stops — a per-service bound alone allows as many
+	// independent services to run at once as the graph permits, each with
+	// its own maxConcurrency budget (same fix as restart.go)
+	limiter := newOptionalLimiter(s.maxConcurrency)
+
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		if !slices.Contains(options.Services, service) {
 			return nil
@@ -57,7 +64,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		// deployed when it published endpoints — and the plugin's own stop
 		// hook (if any) only concerns the provider's resource, so the
 		// container is stopped the same way as for any other service.
-		if err := s.stopContainers(ctx, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout, event); err != nil {
+		if err := s.stopContainers(ctx, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout, event, limiter); err != nil {
 			return err
 		}
 		if serv.Provider != nil {

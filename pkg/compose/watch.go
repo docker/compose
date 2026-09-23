@@ -197,7 +197,9 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	if err != nil {
 		return nil, err
 	}
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	// exactly one goroutine is ever submitted to eg (below); the real
+	// --parallel bound for watch is handleWatchBatch's per-batch fan-out.
+	eg, ctx := errgroup.WithContext(ctx)
 
 	var (
 		rules []watchRule

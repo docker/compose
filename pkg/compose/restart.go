@@ -23,7 +23,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -61,17 +60,9 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			return err
 		}
 
-		eg, ctx := errgroup.WithContext(ctx)
-		for _, ctr := range containers.filter(isService(service)) {
-			eg.Go(func() error {
-				if err := acquireSlot(ctx, limiter); err != nil {
-					return err
-				}
-				defer releaseSlot(limiter)
-				return s.restartContainer(ctx, project.Services[service], ctr, options)
-			})
-		}
-		return eg.Wait()
+		return forEachContainerWithLimiter(ctx, limiter, containers.filter(isService(service)), func(ctx context.Context, ctr container.Summary) error {
+			return s.restartContainer(ctx, project.Services[service], ctr, options)
+		})
 	})
 }
 

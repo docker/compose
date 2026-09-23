@@ -20,10 +20,12 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -115,6 +117,53 @@ func serviceContainer(service string, num int, state container.ContainerState) c
 			api.ContainerNumberLabel: strconv.Itoa(num),
 		},
 	}
+}
+
+// TestStart_ConcurrencyIsBoundedAcrossServices guards against the same
+// per-service budget leak fixed on restart.go/down.go/stop.go:
+// InDependencyOrder dispatches independent services concurrently, and
+// startService's own per-container loop is sequential, so a missing
+// node-level maxConcurrency option left the dispatch itself unbounded.
+// ContainerStart is serialized process-wide by startMx regardless of this
+// bound, so the injected-secret copy (which isn't) is used as the observable
+// signal instead.
+func TestStart_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+
+	const numServices = 4
+	project := &types.Project{Name: "prj", Services: types.Services{}, Secrets: types.Secrets{}}
+	var containers []container.Summary
+	for i := range numServices {
+		name := fmt.Sprintf("svc%d", i)
+		secretName := fmt.Sprintf("secret%d", i)
+		project.Secrets[secretName] = types.SecretConfig{Name: secretName, Content: "shh"}
+		project.Services[name] = types.ServiceConfig{
+			Name:          name,
+			ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: secretName}}},
+		}
+		containers = append(containers, testContainer(name, fmt.Sprintf("c%d", i), false))
+	}
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: containers}, nil)
+
+	tracker := &peakConcurrencyTracker{}
+	apiClient.EXPECT().CopyToContainer(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+			tracker.enter()
+			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+			tracker.leave()
+			return client.CopyToContainerResult{}, nil
+		}).
+		Times(numServices)
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).
+		Times(numServices)
+
+	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project}, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, tracker.Peak(), 1, "start must never dispatch more than maxConcurrency services concurrently")
 }
 
 func TestStartService_AlreadyRunningIsSilent(t *testing.T) {

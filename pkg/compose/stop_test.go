@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -65,4 +66,33 @@ func TestStopTimeout(t *testing.T) {
 		Timeout: &timeout,
 	})
 	assert.NilError(t, err)
+}
+
+// TestStop_ConcurrencyIsBoundedAcrossServices guards against the same
+// per-service budget leak fixed on restart.go and down.go: InReverseDependencyOrder
+// dispatches independent services concurrently, so a limiter created fresh
+// inside stopContainers for each service visit would let each one spend its
+// own maxConcurrency budget at the same time.
+func TestStop_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+
+	const numServices = 4
+	project, containers := nIndependentServiceContainers(numServices)
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: containers}, nil)
+
+	tracker := &peakConcurrencyTracker{}
+	apiClient.EXPECT().ContainerStop(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStopOptions) (client.ContainerStopResult, error) {
+			tracker.enter()
+			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+			tracker.leave()
+			return client.ContainerStopResult{}, nil
+		}).
+		Times(numServices)
+
+	err := svc.stop(t.Context(), "prj", compose.StopOptions{Project: project}, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, tracker.Peak(), 1, "stop must never run more than maxConcurrency ContainerStop calls at once")
 }

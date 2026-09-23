@@ -19,7 +19,9 @@ package compose
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,6 +42,51 @@ type noopEventProcessor struct{}
 func (noopEventProcessor) Start(_ context.Context, _ string) {}
 func (noopEventProcessor) On(_ ...api.Resource)              {}
 func (noopEventProcessor) Done(_ string, _ bool)             {}
+
+// peakConcurrencyTracker records the highest number of overlapping
+// enter()/leave() pairs seen, used to assert a --parallel bound was honored.
+type peakConcurrencyTracker struct {
+	mu      sync.Mutex
+	current int
+	peak    int
+}
+
+func (t *peakConcurrencyTracker) enter() {
+	t.mu.Lock()
+	t.current++
+	if t.current > t.peak {
+		t.peak = t.current
+	}
+	t.mu.Unlock()
+}
+
+func (t *peakConcurrencyTracker) leave() {
+	t.mu.Lock()
+	t.current--
+	t.mu.Unlock()
+}
+
+func (t *peakConcurrencyTracker) Peak() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.peak
+}
+
+// nIndependentServiceContainers builds n services with no depends_on between
+// them — so InDependencyOrder/InReverseDependencyOrder dispatches them
+// concurrently — plus one non-oneoff container per service, used to assert a
+// limiter shared across service visits (see TestDown/TestStop
+// ConcurrencyIsBoundedAcrossServices).
+func nIndependentServiceContainers(n int) (*types.Project, []container.Summary) {
+	project := &types.Project{Name: "prj", Services: types.Services{}}
+	var containers []container.Summary
+	for i := range n {
+		name := fmt.Sprintf("svc%d", i)
+		project.Services[name] = types.ServiceConfig{Name: name}
+		containers = append(containers, testContainer(name, fmt.Sprintf("c%d", i), false))
+	}
+	return project, containers
+}
 
 func newTestService(t *testing.T, opts ...Option) (*composeService, *mocks.MockAPIClient) {
 	t.Helper()

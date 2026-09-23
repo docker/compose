@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -94,8 +95,15 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
+	// shared by every service so the dependency-order fan-out and the
+	// per-service container fan-out combined never exceed maxConcurrency
+	// concurrent container removals — a per-service bound alone allows as
+	// many independent services to run at once as the graph permits, each
+	// with its own maxConcurrency budget (same fix as restart.go)
+	limiter := newOptionalLimiter(s.maxConcurrency)
+
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		return s.downService(ctx, project, containers, options, service)
+		return s.downService(ctx, project, containers, options, service, limiter)
 	}, WithRootNodesAndDown(options.Services))
 	if err != nil {
 		return err
@@ -103,7 +111,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	orphans := containers.filter(isOrphaned(project))
 	if options.RemoveOrphans && len(orphans) > 0 {
-		err := s.removeContainers(ctx, orphans, nil, options.Timeout, false)
+		err := s.removeContainers(ctx, orphans, nil, options.Timeout, false, limiter)
 		if err != nil {
 			return err
 		}
@@ -334,24 +342,30 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	return nil
 }
 
-func (s *composeService) stopContainers(ctx context.Context, serv *types.ServiceConfig, containers []containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
-	for _, ctr := range containers {
-		eg.Go(func() error {
-			return s.stopContainer(ctx, serv, ctr, timeout, listener)
-		})
-	}
-	return eg.Wait()
+func (s *composeService) stopContainers(
+	ctx context.Context,
+	serv *types.ServiceConfig,
+	containers []containerType.Summary,
+	timeout *time.Duration,
+	listener api.ContainerEventListener,
+	limiter *semaphore.Weighted,
+) error {
+	return forEachContainerWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+		return s.stopContainer(ctx, serv, ctr, timeout, listener)
+	})
 }
 
-func (s *composeService) removeContainers(ctx context.Context, containers []containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
-	for _, ctr := range containers {
-		eg.Go(func() error {
-			return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
-		})
-	}
-	return eg.Wait()
+func (s *composeService) removeContainers(
+	ctx context.Context,
+	containers []containerType.Summary,
+	service *types.ServiceConfig,
+	timeout *time.Duration,
+	volumes bool,
+	limiter *semaphore.Weighted,
+) error {
+	return forEachContainerWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+		return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
+	})
 }
 
 func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
@@ -381,10 +395,10 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 // own project containers — the relay deployed when it published endpoints —
 // and the plugin only removes the provider's own resource, so the containers
 // go first, mirroring up, which provisions the resource before the relay.
-func (s *composeService) downService(ctx context.Context, project *types.Project, containers Containers, options api.DownOptions, service string) error {
+func (s *composeService) downService(ctx context.Context, project *types.Project, containers Containers, options api.DownOptions, service string, limiter *semaphore.Weighted) error {
 	serv := project.Services[service]
 	serviceContainers := containers.filter(isService(service))
-	if err := s.removeContainers(ctx, serviceContainers, &serv, options.Timeout, options.Volumes); err != nil {
+	if err := s.removeContainers(ctx, serviceContainers, &serv, options.Timeout, options.Volumes, limiter); err != nil {
 		return err
 	}
 	if serv.Provider != nil {

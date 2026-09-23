@@ -17,11 +17,13 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
@@ -96,6 +98,41 @@ func TestDown(t *testing.T) {
 
 	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{})
 	assert.NilError(t, err)
+}
+
+// TestDown_ConcurrencyIsBoundedAcrossServices guards against the same
+// per-service budget leak fixed on restart.go and stop.go:
+// InReverseDependencyOrder dispatches independent services concurrently, so
+// a limiter created fresh inside removeContainers for each service visit
+// would let each one spend its own maxConcurrency budget at the same time.
+func TestDown_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+
+	const numServices = 4
+	project, containers := nIndependentServiceContainers(numServices)
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: containers}, nil)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{}, nil) // removePreStartHookContainers lookup
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(client.ContainerStopResult{}, nil).
+		Times(numServices)
+
+	tracker := &peakConcurrencyTracker{}
+	apiClient.EXPECT().ContainerRemove(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			tracker.enter()
+			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+			tracker.leave()
+			return client.ContainerRemoveResult{}, nil
+		}).
+		Times(numServices)
+
+	err := svc.down(t.Context(), "prj", compose.DownOptions{Project: project})
+	assert.NilError(t, err)
+	assert.Equal(t, tracker.Peak(), 1, "down must never run more than maxConcurrency ContainerRemove calls at once")
 }
 
 func TestDownWithGivenServices(t *testing.T) {
