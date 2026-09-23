@@ -508,7 +508,7 @@ func materializeManualJob(project *types.Project, name string) (*types.Project, 
 	if err := materializeJobClosure(project, jobs, job, map[string]bool{name: true}); err != nil {
 		return nil, err
 	}
-	project.Services[name] = jobAsService(project, name, job)
+	project.Services[name] = compose.JobAsService(project, name, job)
 	return project, nil
 }
 
@@ -535,33 +535,7 @@ func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.Jo
 		if err := materializeJobClosure(project, jobs, depJob, seen); err != nil {
 			return err
 		}
-		project.Services[dep] = jobAsService(project, dep, depJob)
+		project.Services[dep] = compose.JobAsService(project, dep, depJob)
 	}
 	return nil
-}
-
-// jobAsService materializes a job as a service for the one-off machinery: a
-// job is a ContainerSpec+WorkloadSpec, the same layers a service is made of.
-// It carries the standard custom labels the loader stamps on every service —
-// materialization happens after loading, so without them the containers
-// created for a dependency job would be invisible to every label-driven
-// path: start would silently skip them, ps/down would not see them, and the
-// dependency wait would report the job as a missing dependency.
-func jobAsService(project *types.Project, name string, job types.JobConfig) types.ServiceConfig {
-	svc := types.ServiceConfig{
-		Name:          name,
-		Profiles:      job.Profiles,
-		Extensions:    job.Extensions,
-		ContainerSpec: job.ContainerSpec,
-		WorkloadSpec:  job.WorkloadSpec,
-	}
-	svc.CustomLabels = types.Labels{
-		api.ProjectLabel:     project.Name,
-		api.ServiceLabel:     name,
-		api.VersionLabel:     api.ComposeVersion,
-		api.WorkingDirLabel:  project.WorkingDir,
-		api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
-		api.OneoffLabel:      "False",
-	}
-	return svc
 }
