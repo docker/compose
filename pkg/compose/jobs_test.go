@@ -135,7 +135,14 @@ func TestScopedProjectForJob(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
 		Services: types.Services{
-			"db": {Name: "db", ContainerSpec: types.ContainerSpec{Image: "postgres"}},
+			"db": {
+				Name: "db",
+				ContainerSpec: types.ContainerSpec{
+					Image:        "postgres",
+					Environment:  types.MappingWithEquals{"FOO": strPtr("original")},
+					CustomLabels: types.Labels{"original": "label"},
+				},
+			},
 		},
 		Jobs: types.Jobs{
 			"backup": {
@@ -143,6 +150,9 @@ func TestScopedProjectForJob(t *testing.T) {
 				Extensions:    types.Extensions{"x-team": "platform"},
 				ContainerSpec: types.ContainerSpec{Image: "backup-tool"},
 			},
+		},
+		Configs: types.Configs{
+			"cfg": {Content: "original"},
 		},
 	}
 	job := project.Jobs["backup"]
@@ -166,6 +176,31 @@ func TestScopedProjectForJob(t *testing.T) {
 		_, ok := project.Services["backup"]
 		assert.Assert(t, !ok, "the job must not leak into the shared project's Services")
 		assert.Equal(t, len(project.Services), 1)
+	})
+
+	t.Run("Configs is its own map, not shared with the real project", func(t *testing.T) {
+		scoped.Configs["new"] = types.ConfigObjConfig{Content: "added"}
+		_, ok := project.Configs["new"]
+		assert.Assert(t, !ok, "writing to the scoped copy's Configs must not be visible on the shared project — registerScheduledJobs runs this concurrently per job")
+		assert.Equal(t, project.Configs["cfg"].Content, "original")
+	})
+
+	t.Run("a carried-over service's Environment is its own map, not shared with the real project", func(t *testing.T) {
+		svc, err := scoped.GetService("db")
+		assert.NilError(t, err)
+		svc.Environment["FOO"] = strPtr("mutated")
+		// useAPISocket/ensureModels write into a job's scoped Environment map
+		// concurrently with other jobs' registration — it must not be the
+		// shared project's map.
+		assert.Equal(t, *project.Services["db"].Environment["FOO"], "original")
+	})
+
+	t.Run("a carried-over service's CustomLabels is its own map, not shared with the real project", func(t *testing.T) {
+		svc, err := scoped.GetService("db")
+		assert.NilError(t, err)
+		svc.CustomLabels["new"] = "added"
+		_, ok := project.Services["db"].CustomLabels["new"]
+		assert.Assert(t, !ok, "ensureImagesExists writes into a job's scoped CustomLabels map (via Labels.Add) concurrently with other jobs' registration — it must not be the shared project's map")
 	})
 }
 
