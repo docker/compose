@@ -168,7 +168,7 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	}
 
 	opts.All = true // do not drop resources as build may involve some dependencies by additional_contexts
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}

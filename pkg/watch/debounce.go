@@ -18,7 +18,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/pkg/utils"
@@ -30,7 +29,7 @@ const QuietPeriod = 500 * time.Millisecond
 // channel.
 //
 // The returned channel is closed when the debouncer is stopped via context cancellation or by closing the input channel.
-func BatchDebounceEvents(ctx context.Context, clock clockwork.Clock, input <-chan FileEvent) <-chan []FileEvent {
+func BatchDebounceEvents(ctx context.Context, input <-chan FileEvent) <-chan []FileEvent {
 	out := make(chan []FileEvent)
 	go func() {
 		defer close(out)
@@ -49,13 +48,13 @@ func BatchDebounceEvents(ctx context.Context, clock clockwork.Clock, input <-cha
 			seen = utils.Set[FileEvent]{}
 		}
 
-		t := clock.NewTicker(QuietPeriod)
+		t := time.NewTicker(QuietPeriod)
 		defer t.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-t.Chan():
+			case <-t.C:
 				flushEvents()
 			case e, ok := <-input:
 				if !ok {

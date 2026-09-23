@@ -32,6 +32,19 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 		return 0, err
 	}
 	if len(containers) == 0 {
+		// The condition wait observes — container no longer running — may
+		// already hold: a target that exited between up and this listing (a
+		// fast run, or a service long finished) is a SATISFIED wait, not an
+		// error; ContainerWait below returns its recorded exit code
+		// immediately. The second listing runs only when no container is
+		// running so a stale exited one-off can never short-circuit a wait
+		// that has live containers to observe.
+		containers, err = s.getContainers(ctx, projectName, oneOffInclude, true, options.Services...)
+		if err != nil {
+			return 0, err
+		}
+	}
+	if len(containers) == 0 {
 		return 0, fmt.Errorf("no containers for project %q", projectName)
 	}
 

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -138,7 +139,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 			up.resolveNavigationMenu(dockerCli)
 
 			if !p.All && len(project.Services) == 0 {
-				return fmt.Errorf("no service selected")
+				return errors.New("no service selected")
 			}
 
 			return runUp(ctx, dockerCli, backendOptions, create, up, build, project, services)
@@ -188,41 +189,41 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 
 func validateFlags(up *upOptions, create *createOptions) error {
 	if up.waitTimeout < 0 {
-		return fmt.Errorf("--wait-timeout must be a non-negative integer")
+		return errors.New("--wait-timeout must be a non-negative integer")
 	}
 	if up.exitCodeFrom != "" && !up.cascadeFail {
 		up.cascadeStop = true
 	}
 	if up.cascadeStop && up.cascadeFail {
-		return fmt.Errorf("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
+		return errors.New("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
 	}
 	if up.wait {
 		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
-			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
+			return errors.New("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
 		}
 		up.Detach = true
 	}
 	if create.Build && create.noBuild {
-		return fmt.Errorf("--build and --no-build are incompatible")
+		return errors.New("--build and --no-build are incompatible")
 	}
 	if up.Detach && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0 || up.watch) {
 		if up.wait {
-			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
+			return errors.New("--wait cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
 		} else {
-			return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
+			return errors.New("--detach cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
 		}
 	}
 	if create.noInherit && create.noRecreate {
-		return fmt.Errorf("--no-recreate and --renew-anon-volumes are incompatible")
+		return errors.New("--no-recreate and --renew-anon-volumes are incompatible")
 	}
 	if create.forceRecreate && create.noRecreate {
-		return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+		return errors.New("--force-recreate and --no-recreate are incompatible")
 	}
 	if create.recreateDeps && create.noRecreate {
-		return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
+		return errors.New("--always-recreate-deps and --no-recreate are incompatible")
 	}
 	if create.noBuild && up.watch {
-		return fmt.Errorf("--no-build and --watch are incompatible")
+		return errors.New("--no-build and --watch are incompatible")
 	}
 	return nil
 }
@@ -240,6 +241,11 @@ func runUp(
 	if err := checksForRemoteStack(ctx, dockerCli, project, buildOptions, createOptions.AssumeYes, []string{}); err != nil {
 		return err
 	}
+
+	if err := rejectScheduledJobs(project); err != nil {
+		return err
+	}
+	warnIgnoredJobs(project)
 
 	err := createOptions.Apply(project)
 	if err != nil {
@@ -348,4 +354,36 @@ func runUp(
 			NavigationMenu: upOptions.navigationMenu && display.Mode != display.ModePlain && dockerCli.In().IsTerminal(),
 		},
 	})
+}
+
+// warnIgnoredJobs names the declared jobs up will not act on: manual jobs
+// wait for an explicit `compose run <job>` trigger.
+func warnIgnoredJobs(project *types.Project) {
+	jobs := project.Jobs
+	if len(jobs) == 0 {
+		return
+	}
+	names := make([]string, 0, len(jobs))
+	for name := range jobs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
+}
+
+// rejectScheduledJobs refuses to bring a project up when it declares active
+// scheduled jobs: silently not scheduling them would break the user's
+// expectations, unlike manual jobs which simply wait for an explicit trigger.
+func rejectScheduledJobs(project *types.Project) error {
+	names := make([]string, 0, len(project.Jobs))
+	for name, job := range project.Jobs {
+		if job.Triggers != nil && len(job.Triggers.Schedule) > 0 {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	sort.Strings(names)
+	return fmt.Errorf("scheduled jobs are not supported in this version: %s", strings.Join(names, ", "))
 }

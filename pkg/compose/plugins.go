@@ -23,9 +23,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -41,7 +43,7 @@ import (
 
 type JsonMessage struct {
 	Type    string `json:"type"`
-	Message string `json:"message"`
+	Message string `json:"message,omitempty"`
 }
 
 const (
@@ -50,12 +52,23 @@ const (
 	SetEnvType                = "setenv"
 	RawSetEnvType             = "rawsetenv"
 	DebugType                 = "debug"
+	PublishEndpointType       = "publish-endpoint"
 	providerMetadataDirectory = "compose/providers"
+
+	// GetServiceConfigType is a message the provider sends to receive, on
+	// its stdin, one JSON line holding the resolved canonical configuration
+	// of the service it manages — answered from the in-memory model.
+	GetServiceConfigType = "get-service-config"
 )
 
 type pluginVariables struct {
 	prefixed types.Mapping
 	raw      types.Mapping
+	// endpoints are "port=host:port" publish-endpoint messages: container
+	// port the consumers know, mapped to where the provider's resource
+	// actually listens. When present, compose deploys a relay container
+	// under the service's name on the consumers' networks.
+	endpoints map[int]string
 }
 
 var mux sync.Mutex
@@ -85,8 +98,16 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return nil
 	}
 
+	isUp := command == "up"
+	deployRelay := isUp && len(variables.endpoints) > 0
+
+	// project.Services is shared state mutated by every concurrent provider
+	// run: the env-var injection below writes it, and the relay's network
+	// selection reads it — both belong under the mutex. The Docker API work
+	// in ensureServiceRelay does not: holding the lock across it would make
+	// every concurrent provider wait on the slowest one (image pull
+	// included), so the relay is deployed after the lock is released.
 	mux.Lock()
-	defer mux.Unlock()
 	for name, s := range project.Services {
 		if _, ok := s.DependsOn[service.Name]; ok {
 			prefix := strings.ToUpper(service.Name) + "_"
@@ -102,7 +123,40 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 			project.Services[name] = s
 		}
 	}
+	var networkKeys []string
+	if deployRelay {
+		networkKeys = relayNetworks(project, service)
+	}
+	mux.Unlock()
+
+	if isUp {
+		if deployRelay {
+			return s.ensureServiceRelay(ctx, project, service, variables.endpoints, networkKeys)
+		}
+		// The provider published no endpoint on this run — whether it never
+		// did, or stopped doing so since a previous up deployed a relay for
+		// it. Either way there is nothing to route to, so any relay left
+		// over from an earlier run must go: routing to whatever upstream it
+		// still holds would be silently wrong instead of just absent.
+		return s.removeServiceRelay(ctx, project.Name, service.Name)
+	}
 	return nil
+}
+
+// parseEndpointMessage decodes a publish-endpoint payload: "80=host:port".
+func parseEndpointMessage(message string) (int, string, error) {
+	portPart, upstream, found := strings.Cut(message, "=")
+	if !found {
+		return 0, "", fmt.Errorf("publish-endpoint %q: want port=host:port", message)
+	}
+	port, err := strconv.Atoi(portPart)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, "", fmt.Errorf("publish-endpoint %q: invalid port", message)
+	}
+	if _, _, err := net.SplitHostPort(upstream); err != nil {
+		return 0, "", fmt.Errorf("publish-endpoint %q: invalid endpoint: %w", message, err)
+	}
+	return port, upstream, nil
 }
 
 func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service types.ServiceConfig) (pluginVariables, error) {
@@ -125,18 +179,59 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 	if err != nil {
 		return pluginVariables{}, err
 	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return pluginVariables{}, err
+	}
+	// Answers are written from their own goroutine: writing a config larger
+	// than the OS pipe buffer from the read loop would deadlock against a
+	// provider that emits stdout before draining its stdin. Every answer is
+	// the same serialized service, so completion order is irrelevant; the
+	// mutex keeps individual writes atomic. Write failures are not reported
+	// from here — a provider missing its answer reads EOF once stdin closes.
+	var stdinMu sync.Mutex
+	var answers sync.WaitGroup
+	processExited := false
+	// Closing stdin on exit unblocks a provider waiting for a response the
+	// loop will never produce (e.g. a request emitted after an error). An
+	// answer dispatched but not yet written must land before the close —
+	// but only once the process has exited can a write not block forever
+	// (a dead peer turns it into EPIPE); on error paths the provider may
+	// still be alive and not reading, so close first to error the write
+	// out instead of hanging the wait.
+	defer func() {
+		if processExited {
+			answers.Wait()
+			_ = stdin.Close()
+		} else {
+			_ = stdin.Close()
+			answers.Wait()
+		}
+	}()
 
 	err = cmd.Start()
 	if err != nil {
 		return pluginVariables{}, err
 	}
+	// Error paths return before the normal cmd.Wait below and would leave
+	// the provider as a zombie (and possibly running): reap it — kill
+	// first, as it may be misbehaving or blocked, which also errors out
+	// any in-flight answer write. Runs before the stdin/answers defer
+	// above (LIFO).
+	defer func() {
+		if !processExited {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+	}()
 
 	decoder := json.NewDecoder(stdout)
 	defer func() { _ = stdout.Close() }()
 
 	variables := pluginVariables{
-		prefixed: types.Mapping{},
-		raw:      types.Mapping{},
+		prefixed:  types.Mapping{},
+		raw:       types.Mapping{},
+		endpoints: map[int]string{},
 	}
 
 	for {
@@ -157,23 +252,43 @@ func (s *composeService) executePlugin(cmd *exec.Cmd, command string, service ty
 		case SetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
-				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Message)
 			}
 			variables.prefixed[key] = val
 		case RawSetEnvType:
 			key, val, found := strings.Cut(msg.Message, "=")
 			if !found {
-				return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Message)
+				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Message)
 			}
 			variables.raw[key] = val
+		case GetServiceConfigType:
+			payload, err := json.Marshal(service)
+			if err != nil {
+				return pluginVariables{}, fmt.Errorf("failed to answer get-service-config: %w", err)
+			}
+			payload = append(payload, '\n')
+			answers.Add(1)
+			go func() {
+				defer answers.Done()
+				stdinMu.Lock()
+				defer stdinMu.Unlock()
+				_, _ = stdin.Write(payload)
+			}()
+		case PublishEndpointType:
+			port, upstream, err := parseEndpointMessage(msg.Message)
+			if err != nil {
+				return pluginVariables{}, fmt.Errorf("invalid message from plugin: %w", err)
+			}
+			variables.endpoints[port] = upstream
 		case DebugType:
 			logrus.Debugf("%s: %s", service.Name, msg.Message)
 		default:
-			return pluginVariables{}, fmt.Errorf("invalid response from plugin: %s", msg.Type)
+			return pluginVariables{}, fmt.Errorf("invalid message from plugin: %s", msg.Type)
 		}
 	}
 
 	err = cmd.Wait()
+	processExited = true
 	if err != nil {
 		s.events.On(errorEvent(service.Name, err.Error()))
 		return pluginVariables{}, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
@@ -228,7 +343,7 @@ func (s *composeService) setupPluginCommand(ctx context.Context, project *types.
 		return nil, err
 	}
 
-	args := []string{"compose", fmt.Sprintf("--project-name=%s", project.Name), command}
+	args := []string{"compose", "--project-name=" + project.Name, command}
 	for k, v := range provider.Options {
 		for _, value := range v {
 			if _, ok := currentCommandMetadata.GetParameter(k); commandMetadataIsEmpty || ok {

@@ -19,12 +19,13 @@ package compose
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/goleak"
@@ -50,9 +51,11 @@ func newPreStartTestServiceWithVersion(t *testing.T, apiVersion string) (*compos
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
 		Return(client.PingResult{APIVersion: apiVersion}, nil).AnyTimes()
 	apiClient.EXPECT().ClientVersion().Return(apiVersion).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 	return tested.(*composeService), apiClient
@@ -91,12 +94,12 @@ func TestPreStart_SuccessTwoHooksInOrder(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"echo", "first"}},
-			{Image: "alpine", Command: types.ShellCommand{"echo", "second"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "first"}}},
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "second"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -134,12 +137,12 @@ func TestPreStart_FirstHookFailsStopsExecution(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"false"}},
-			{Image: "alpine", Command: types.ShellCommand{"echo", "never"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"false"}}},
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "never"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -164,11 +167,11 @@ func TestPreStart_PerReplicaRejected(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}, PerReplica: true},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{PerReplica: true, ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -184,8 +187,8 @@ func TestPreStart_ImageFallsBackToBuiltImage(t *testing.T) {
 	// Service with no explicit image (build-only); hook image also empty.
 	service := types.ServiceConfig{
 		Name: "web",
-		PreStart: []types.ServiceHook{
-			{Command: types.ShellCommand{"echo", "hi"}},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"echo", "hi"}}},
 		},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
@@ -215,11 +218,11 @@ func TestPreStart_ExplicitHookImageUsed(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "service-image:latest",
-		PreStart: []types.ServiceHook{
-			{Image: "custom-hook-image:1.2.3", Command: types.ShellCommand{"echo"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "custom-hook-image:1.2.3", Command: types.ShellCommand{"echo"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "service-image:latest"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -248,11 +251,11 @@ func TestPreStart_VolumesFromServiceContainer(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -285,23 +288,76 @@ func TestPreStart_VolumesFromServiceContainer(t *testing.T) {
 	assert.Equal(t, gotLabels[api.HookLabel], preStartHookType)
 }
 
+// A pre_start hook is a full container specification, resolved by
+// compose-go at load time: attributes the hook doesn't override — including
+// security-sensitive ones — are inherited from the service in the model
+// itself. createPreStartContainer must forward the hook's resolved spec as
+// faithfully as a service container's own create path does; a regression
+// here would silently run hook containers with weaker isolation than the
+// service they act on.
+func TestPreStart_SecuritySensitiveFieldsHonored(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name: "web",
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{
+				Image:       "alpine",
+				Command:     types.ShellCommand{"true"},
+				Privileged:  true,
+				CapAdd:      []string{"SYS_ADMIN"},
+				CapDrop:     []string{"ALL"},
+				SecurityOpt: []string{"no-new-privileges"},
+				ReadOnly:    true,
+				Sysctls:     types.Mapping{"net.ipv4.ip_forward": "1"},
+			}},
+		},
+	}
+	ctr := container.Summary{ID: "service-ctr-id"}
+
+	var got client.ContainerCreateOptions
+	scan := expectEmptyOrphanScan(apiClient)
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			got = opts
+			return client.ContainerCreateResult{ID: "hook-1"}, nil
+		}).After(scan)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil)
+	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0))
+	expectSuccessRemove(apiClient, "hook-1")
+
+	err := tested.runPreStart(t.Context(), project, service, ctr, func(api.ContainerEvent) {})
+	assert.NilError(t, err)
+	assert.Assert(t, got.HostConfig.Privileged, "Privileged must be honored")
+	assert.DeepEqual(t, got.HostConfig.CapAdd, []string{"SYS_ADMIN"})
+	assert.DeepEqual(t, got.HostConfig.CapDrop, []string{"ALL"})
+	assert.DeepEqual(t, got.HostConfig.SecurityOpt, []string{"no-new-privileges"})
+	assert.Assert(t, got.HostConfig.ReadonlyRootfs, "ReadonlyRootfs must be honored")
+	assert.DeepEqual(t, got.HostConfig.Sysctls, map[string]string{"net.ipv4.ip_forward": "1"})
+}
+
 func TestPreStart_ContainerCreateFailurePropagates(t *testing.T) {
 	tested, apiClient := newPreStartTestService(t)
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "missing:latest", Command: types.ShellCommand{"true"}},
-			{Image: "alpine", Command: types.ShellCommand{"never"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "missing:latest", Command: types.ShellCommand{"true"}}},
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"never"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
 	scan := expectEmptyOrphanScan(apiClient)
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
-		Return(client.ContainerCreateResult{}, fmt.Errorf("no such image: missing:latest")).After(scan)
+		Return(client.ContainerCreateResult{}, errors.New("no such image: missing:latest")).After(scan)
 
 	err := tested.runPreStart(t.Context(), project, service, ctr, func(api.ContainerEvent) {})
 	assert.ErrorContains(t, err, "no such image")
@@ -312,11 +368,11 @@ func TestPreStart_ContainerStartFailurePropagates(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -328,7 +384,7 @@ func TestPreStart_ContainerStartFailurePropagates(t *testing.T) {
 	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
 		Return(emptyLogs(), nil).After(wait1)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, fmt.Errorf("daemon: container start failed")).After(logs1)
+		Return(client.ContainerStartResult{}, errors.New("daemon: container start failed")).After(logs1)
 	// AutoRemove never fires when start fails, so the hook must drop the ghost
 	// container explicitly. This is distinct from the success-path removal
 	// (RemoveVolumes:true) — the never-started container has no logs to preserve.
@@ -350,11 +406,11 @@ func TestPreStart_WaitResultPreferredOverNilError(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
-		},
+		Name: "web",
+
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+		}, ContainerSpec: types.ContainerSpec{Image: "alpine"},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
 
@@ -404,7 +460,7 @@ func TestWaitPreStart_RaceRealErrorAndResult(t *testing.T) {
 		resultC := make(chan container.WaitResponse, 1)
 		errC := make(chan error, 1)
 		resultC <- container.WaitResponse{StatusCode: 0}
-		errC <- fmt.Errorf("daemon: connection lost")
+		errC <- errors.New("daemon: connection lost")
 		waitRes := client.ContainerWaitResult{Result: resultC, Error: errC}
 		err := waitPreStart(t.Context(), "web", 0, waitRes)
 		assert.ErrorContains(t, err, "connection lost")
@@ -434,10 +490,10 @@ func TestPreStart_DetachedModeAttachesLogs(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
@@ -466,10 +522,10 @@ func TestPreStart_FailureIncludesTail(t *testing.T) {
 
 	project := &types.Project{Name: "demo"}
 	service := types.ServiceConfig{
-		Name:  "db",
-		Image: "postgres",
-		PreStart: []types.ServiceHook{
-			{Image: "postgres", Command: types.ShellCommand{"migrate"}},
+		Name:          "db",
+		ContainerSpec: types.ContainerSpec{Image: "postgres"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "postgres", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "service-ctr-id"}
@@ -510,10 +566,10 @@ func TestPreStart_SuccessRemovesContainer(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -549,10 +605,10 @@ func TestPreStart_FailureRetainsContainer(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"migrate"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -588,10 +644,10 @@ func TestPreStart_CancellationRemovesContainer(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"long-running-op"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"long-running-op"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -634,10 +690,10 @@ func TestPreStart_RemovesOrphanBeforeRun(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"migrate"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -671,10 +727,10 @@ func TestPreStart_SuccessRemoveFailureIsNonFatal(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -691,7 +747,7 @@ func TestPreStart_SuccessRemoveFailureIsNonFatal(t *testing.T) {
 	// Simulate a removal failure.
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("already removed"))
+		Return(client.ContainerRemoveResult{}, errors.New("already removed"))
 
 	// The hook succeeded; the service must start even if removal failed.
 	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
@@ -763,10 +819,10 @@ func TestPreStart_StreamLogsError_NilListener(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -778,7 +834,7 @@ func TestPreStart_StreamLogsError_NilListener(t *testing.T) {
 		Return(waitResultExit(0))
 	// ContainerLogs fails; nil listener → no warning event, done closed immediately.
 	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(nil, fmt.Errorf("logs: connection refused"))
+		Return(nil, errors.New("logs: connection refused"))
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil)
 	expectSuccessRemove(apiClient, "hook-1")
@@ -795,10 +851,10 @@ func TestPreStart_StreamLogsError_WithListener(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -809,7 +865,7 @@ func TestPreStart_StreamLogsError_WithListener(t *testing.T) {
 	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0))
 	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(nil, fmt.Errorf("logs: daemon unavailable"))
+		Return(nil, errors.New("logs: daemon unavailable"))
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil)
 	expectSuccessRemove(apiClient, "hook-1")
@@ -838,13 +894,15 @@ func TestPreStart_OldAPIVersion(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+			},
 		},
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -878,11 +936,13 @@ func TestPreStart_ConnectExtraNetworksSuccess(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
 	}
 
@@ -907,17 +967,19 @@ func TestPreStart_ConnectExtraNetworksFails(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
 	}
 
 	apiClient.EXPECT().
 		NetworkConnect(gomock.Any(), "proj_extra", gomock.Any()).
-		Return(client.NetworkConnectResult{}, fmt.Errorf("network not found"))
+		Return(client.NetworkConnectResult{}, errors.New("network not found"))
 
 	err := tested.connectPreStartExtraNetworks(t.Context(), project, service, "ctr-id", "proj_default")
 	assert.ErrorContains(t, err, "network not found")
@@ -931,10 +993,10 @@ func TestPreStart_ContainerStartFailureAndRemoveFails(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -947,10 +1009,10 @@ func TestPreStart_ContainerStartFailureAndRemoveFails(t *testing.T) {
 	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
 		Return(emptyLogs(), nil)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, fmt.Errorf("start failed")).After(logs1)
+		Return(client.ContainerStartResult{}, errors.New("start failed")).After(logs1)
 	// Both the start AND the cleanup removal fail.
 	apiClient.EXPECT().ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("removal failed")).After(start1)
+		Return(client.ContainerRemoveResult{}, errors.New("removal failed")).After(start1)
 
 	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
 	// The original start error must be returned, not the removal error.
@@ -965,17 +1027,17 @@ func TestPreStart_OrphanScanFails(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
 
 	// ContainerList fails → Warnf in runPreStart; hook still proceeds.
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{}, fmt.Errorf("daemon unavailable"))
+		Return(client.ContainerListResult{}, errors.New("daemon unavailable"))
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil)
 	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
@@ -998,10 +1060,10 @@ func TestPreStart_OrphanRemovalFails(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1012,7 +1074,7 @@ func TestPreStart_OrphanRemovalFails(t *testing.T) {
 		Return(client.ContainerListResult{Items: []container.Summary{orphan}}, nil)
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "orphan-123", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("permission denied"))
+		Return(client.ContainerRemoveResult{}, errors.New("permission denied"))
 	// Hook still runs and succeeds.
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil)
@@ -1042,14 +1104,26 @@ func TestPreStart_OldAPINetworkConnectFails(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		PreStart: []types.PreStartHook{
+			// the loader resolves the hook spec against the service at load
+			// time: a directly-constructed hook mimics that resolved form,
+			// networks included
+			{ContainerSpec: types.ContainerSpec{
+				Image:   "alpine",
+				Command: types.ShellCommand{"true"},
+				Networks: map[string]*types.ServiceNetworkConfig{
+					"default": nil,
+					"extra":   nil,
+				},
+			}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1059,7 +1133,7 @@ func TestPreStart_OldAPINetworkConnectFails(t *testing.T) {
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil).After(scan)
 	// NetworkConnect for the secondary network fails.
 	apiClient.EXPECT().NetworkConnect(gomock.Any(), "proj_extra", gomock.Any()).
-		Return(client.NetworkConnectResult{}, fmt.Errorf("network not found"))
+		Return(client.NetworkConnectResult{}, errors.New("network not found"))
 	// The never-started container is cleaned up (Force:true).
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
@@ -1082,14 +1156,26 @@ func TestPreStart_OldAPINetworkConnectAndRemoveFails(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		Networks: map[string]*types.ServiceNetworkConfig{
-			"default": nil,
-			"extra":   nil,
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Networks: map[string]*types.ServiceNetworkConfig{
+				"default": nil,
+				"extra":   nil,
+			},
 		},
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		PreStart: []types.PreStartHook{
+			// the loader resolves the hook spec against the service at load
+			// time: a directly-constructed hook mimics that resolved form,
+			// networks included
+			{ContainerSpec: types.ContainerSpec{
+				Image:   "alpine",
+				Command: types.ShellCommand{"true"},
+				Networks: map[string]*types.ServiceNetworkConfig{
+					"default": nil,
+					"extra":   nil,
+				},
+			}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1098,11 +1184,11 @@ func TestPreStart_OldAPINetworkConnectAndRemoveFails(t *testing.T) {
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
 		Return(client.ContainerCreateResult{ID: "hook-1"}, nil).After(scan)
 	apiClient.EXPECT().NetworkConnect(gomock.Any(), "proj_extra", gomock.Any()).
-		Return(client.NetworkConnectResult{}, fmt.Errorf("network not found"))
+		Return(client.NetworkConnectResult{}, errors.New("network not found"))
 	// Cleanup removal also fails → Warnf; original error is still returned.
 	apiClient.EXPECT().
 		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("removal also failed"))
+		Return(client.ContainerRemoveResult{}, errors.New("removal also failed"))
 
 	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
 	assert.ErrorContains(t, err, "network not found")
@@ -1119,16 +1205,19 @@ func TestPreStart_RuntimeAPIVersionError(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	// the merged-spec create path reads the CLI config and daemon host
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 	s := tested.(*composeService)
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "web",
-		Image: "alpine",
-		PreStart: []types.ServiceHook{
-			{Image: "alpine", Command: types.ShellCommand{"true"}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1139,7 +1228,7 @@ func TestPreStart_RuntimeAPIVersionError(t *testing.T) {
 	// createPreStartContainer calls RuntimeAPIVersion → Ping fails.
 	apiClient.EXPECT().
 		Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
-		Return(client.PingResult{}, fmt.Errorf("daemon unreachable"))
+		Return(client.PingResult{}, errors.New("daemon unreachable"))
 
 	err = s.runPreStart(t.Context(), project, service, ctr, nil)
 	assert.ErrorContains(t, err, "daemon unreachable")
@@ -1153,10 +1242,10 @@ func TestPreStart_FailureStdoutOnlyTail(t *testing.T) {
 
 	project := &types.Project{Name: "proj"}
 	service := types.ServiceConfig{
-		Name:  "db",
-		Image: "postgres",
-		PreStart: []types.ServiceHook{
-			{Image: "postgres", Command: types.ShellCommand{"migrate"}},
+		Name:          "db",
+		ContainerSpec: types.ContainerSpec{Image: "postgres"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "postgres", Command: types.ShellCommand{"migrate"}}},
 		},
 	}
 	ctr := container.Summary{ID: "svc-ctr"}
@@ -1178,4 +1267,46 @@ func TestPreStart_FailureStdoutOnlyTail(t *testing.T) {
 	assert.ErrorContains(t, err, "pre_start[0]")
 	// Stdout fallback: no stderr → stdout content appears in the error.
 	assert.ErrorContains(t, err, "schema mismatch")
+}
+
+// TestPreStart_HookLabelsMerged locks the "every ContainerSpec attribute"
+// contract for labels: a label declared on (or inherited by) the hook lands
+// on the hook container, with the runtime identification set winning on
+// conflicts.
+func TestPreStart_HookLabelsMerged(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "proj"}
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{
+				Command: types.ShellCommand{"true"},
+				Labels:  types.Labels{"telemetry": "on", api.ServiceLabel: "spoofed"},
+			}},
+		},
+	}
+	ctr := container.Summary{ID: "svc-ctr"}
+
+	var gotLabels map[string]string
+	scan := expectEmptyOrphanScan(apiClient)
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ any, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			gotLabels = opts.Config.Labels
+			return client.ContainerCreateResult{ID: "hook-1"}, nil
+		}).After(scan)
+	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0))
+	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+	expectSuccessRemove(apiClient, "hook-1")
+
+	err := tested.runPreStart(t.Context(), project, service, ctr, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, gotLabels["telemetry"], "on", "hook-declared labels must reach the container")
+	assert.Equal(t, gotLabels[api.ServiceLabel], "web", "the runtime identification set wins on conflicts")
+	assert.Equal(t, gotLabels[api.HookLabel], "pre_start")
 }

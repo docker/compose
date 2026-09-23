@@ -19,6 +19,7 @@ package remote
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -49,7 +50,7 @@ const (
 func validatePathInBase(base, unsafePath string) error {
 	// Reject paths with path separators regardless of OS
 	if strings.ContainsAny(unsafePath, "\\/") {
-		return fmt.Errorf("invalid OCI artifact")
+		return errors.New("invalid OCI artifact")
 	}
 
 	// Join the base with the untrusted path
@@ -64,7 +65,7 @@ func validatePathInBase(base, unsafePath string) error {
 
 	// Check if the target directory is the same as base directory
 	if cleanTargetDir != cleanBase {
-		return fmt.Errorf("invalid OCI artifact")
+		return errors.New("invalid OCI artifact")
 	}
 
 	return nil

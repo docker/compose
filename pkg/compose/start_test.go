@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
@@ -89,6 +90,10 @@ func newStartTestService(t *testing.T) (*composeService, *mocks.MockAPIClient, *
 	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
 		Return(client.PingResult{APIVersion: "1.44"}, nil).AnyTimes()
 	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
+	// the generic pre_start inheritance goes through getCreateConfigs, which
+	// reads the CLI configuration and the daemon host
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 
 	rec := &recordingEventProcessor{}
 	svc, err := NewComposeService(cli, WithEventProcessor(rec))
@@ -164,7 +169,7 @@ func TestStartService_StartsOnlyStoppedReplicas(t *testing.T) {
 	project := &types.Project{Name: "prj"}
 	service := types.ServiceConfig{
 		Name:     "web",
-		PreStart: []types.ServiceHook{{Command: types.ShellCommand{"init"}}},
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
 	}
 	running := serviceContainer("web", 1, container.StateRunning)
 	stopped := serviceContainer("web", 2, container.StateExited)
@@ -194,13 +199,14 @@ func TestStartService_PreStartOnLowestReplica(t *testing.T) {
 
 	project := &types.Project{Name: "prj"}
 	service := types.ServiceConfig{
-		Name:     "web",
-		Image:    "alpine",
-		PreStart: []types.ServiceHook{{Command: types.ShellCommand{"init"}}},
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart:      []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
 	}
-	// Listed out of order on purpose: replica 2 first.
+
 	replica2 := serviceContainer("web", 2, container.StateExited)
 	replica1 := serviceContainer("web", 1, container.StateExited)
+	// Listed out of order on purpose: replica 2 first.
 	containers := Containers{replica2, replica1}
 
 	// runPreStart sweeps orphan hook containers from any previous failed run
@@ -239,6 +245,29 @@ func TestStartService_PreStartOnLowestReplica(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: pre_start has no volumes or process inside it for the hook
+// container's VolumesFrom to share. No ContainerCreate expectation is set:
+// gomock fails the test if the hook still runs against the relay.
+func TestStartService_PreStartSkippedWhenLowestIsRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	project := &types.Project{Name: "prj"}
+	service := types.ServiceConfig{
+		Name:     "db",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	relay := serviceContainer("db", 1, container.StateExited)
+	relay.Labels[api.RelayLabel] = "abc123"
+	containers := Containers{relay}
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+
+	err := svc.startService(t.Context(), project, service, containers, nil, 0)
+	assert.NilError(t, err)
+}
+
 // TestStartServiceContainer_Order locks the per-container start sequence:
 // secret/config files are copied in before ContainerStart, post_start hooks
 // run after it, and the Started event is only emitted once the hooks are done.
@@ -253,9 +282,9 @@ func TestStartServiceContainer_Order(t *testing.T) {
 		},
 	}
 	service := types.ServiceConfig{
-		Name:      "web",
-		Secrets:   []types.ServiceSecretConfig{{Source: "token"}},
-		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}},
+		Name: "web",
+
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}}, ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "token"}}},
 	}
 	ctr := serviceContainer("web", 1, container.StateExited)
 
@@ -327,10 +356,9 @@ func TestStartServiceContainer_FailedPostStart(t *testing.T) {
 func TestGetDependencyCondition(t *testing.T) {
 	oneShot := types.ServiceConfig{Name: "migrate"}
 	web := types.ServiceConfig{
-		Name: "web",
-		DependsOn: types.DependsOnConfig{
+		Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 			"migrate": {Condition: types.ServiceConditionCompletedSuccessfully},
-		},
+		}},
 	}
 	project := &types.Project{
 		Name:     "prj",

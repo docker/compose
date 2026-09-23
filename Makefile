@@ -118,6 +118,10 @@ cross: ## Compile the CLI for linux, darwin and windows
 test: ## Run unit tests
 	$(BUILDX_CMD) bake test
 
+.PHONY: relay-test
+relay-test: ## Run unit tests for the relay/ module
+	$(BUILDX_CMD) bake relay-test
+
 .PHONY: cache-clear
 cache-clear: ## Clear the builder cache
 	$(BUILDX_CMD) prune --force --filter type=exec.cachemount --filter=unused-for=24h
@@ -125,6 +129,10 @@ cache-clear: ## Clear the builder cache
 .PHONY: lint
 lint: ## run linter(s)
 	$(BUILDX_CMD) bake lint
+
+.PHONY: relay-lint
+relay-lint: ## run linter(s) for the relay/ module
+	$(BUILDX_CMD) bake relay-lint
 
 .PHONY: fmt
 fmt:
@@ -165,7 +173,7 @@ validate-mocks: ## Validate pkg/mocks is up-to-date with the mocked interfaces
 
 validate: validate-go-mod validate-headers validate-docs validate-mocks  ## Validate sources
 
-pre-commit: validate check-dependencies lint build test e2e-compose
+pre-commit: validate check-dependencies lint relay-lint build test relay-test e2e-compose
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:

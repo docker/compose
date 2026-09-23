@@ -18,26 +18,108 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
-	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/poll"
 )
 
-// RequireServiceState ensures that the container is in the expected state
-// (running or exited).
+// RequireServiceState ensures that the container reaches the expected state
+// (running or exited). The daemon reports state transitions asynchronously
+// from everything else a test can observe (a container whose logs already
+// flowed may still be listed under its previous state for a moment), so the
+// check polls `compose ps` until the state converges instead of asserting on
+// a single snapshot.
 func RequireServiceState(t testing.TB, cli *CLI, service string, state string) {
 	t.Helper()
-	psRes := cli.RunDockerComposeCmd(t, "ps", "--all", "--format=json", service)
-	var serviceState map[string]any
-	assert.NilError(t, json.Unmarshal([]byte(psRes.Stdout()), &serviceState),
-		"Invalid `compose ps` JSON: command output: %s",
-		psRes.Combined())
+	poll.WaitOn(t, func(poll.LogT) poll.Result {
+		// NoCheck: a non-zero `compose ps` is a transient state here (the
+		// project may not be registered yet) — and the asserting variant
+		// would t.FailNow() from the poll goroutine, which terminates it via
+		// runtime.Goexit without reporting: the poll would hang until its
+		// opaque timeout instead of surfacing the actual failure below.
+		psRes := cli.RunDockerComposeCmdNoCheck(t, "ps", "--all", "--format=json", service)
+		if psRes.ExitCode != 0 {
+			return poll.Continue("`compose ps %s` exited %d: %s", service, psRes.ExitCode, psRes.Combined())
+		}
+		out := strings.TrimSpace(psRes.Stdout())
+		if out == "" {
+			// The container is not registered yet (creation in progress):
+			// transient, keep polling.
+			return poll.Continue("service %q has no `compose ps` entry yet", service)
+		}
+		// --format=json emits one JSON object per line, and a service can
+		// briefly list two containers mid-transition (the old one being
+		// removed, its replacement being created). Succeed as soon as one
+		// entry of the target service reaches the expected state; everything
+		// short of malformed JSON is a transient condition to retry, not a
+		// hard failure — hard-failing on those is the exact race this helper
+		// exists to absorb.
+		var seen []string
+		for line := range strings.SplitSeq(out, "\n") {
+			var entry map[string]any
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				return poll.Error(fmt.Errorf("invalid `compose ps` JSON: %w: command output: %s", err, psRes.Combined()))
+			}
+			if name, _ := entry["Service"].(string); name != service {
+				// ps was invoked filtered on the service name; a foreign or
+				// incomplete entry is transient noise.
+				continue
+			}
+			current, _ := entry["State"].(string)
+			if strings.EqualFold(state, current) {
+				return poll.Success()
+			}
+			seen = append(seen, current)
+		}
+		return poll.Continue("service %q is %v, expected %q", service, seen, state)
+	}, poll.WithTimeout(15*time.Second), poll.WithDelay(200*time.Millisecond))
+}
 
-	assert.Assert(t, is.Equal(service, serviceState["Service"]), "Found ps output for unexpected service")
-	assert.Assert(t, is.Equal(strings.ToLower(state), strings.ToLower(serviceState["State"].(string))),
-		"Service %q (%s) not in expected state",
-		service, serviceState["Name"],
-	)
+// RequireEventuallyServiceState polls `compose ps` until the service reaches
+// the expected state, instead of checking once.
+//
+// `compose ps` makes a fresh ContainerList call to the daemon, an entirely
+// different channel than a container's log stream: an application log line
+// already relayed to a caller is no guarantee the daemon-reported state
+// has caught up yet by the time that caller turns around and calls `ps` in a
+// new process. Callers observing readiness through a log line (or any signal
+// other than this same `ps` state) must poll here rather than check once.
+func RequireEventuallyServiceState(t testing.TB, cli *CLI, service string, state string) {
+	t.Helper()
+	check := func(poll.LogT) poll.Result {
+		psRes := cli.RunDockerComposeCmdNoCheck(t, "ps", "--all", "--format=json", service)
+		if psRes.ExitCode != 0 {
+			return poll.Continue("compose ps exited %d: %s", psRes.ExitCode, psRes.Combined())
+		}
+		// --format=json prints one JSON object per line (NDJSON), not a
+		// single object or array: a scaled service, or a transient window
+		// during recreation where the old and new containers are both
+		// listed, means more than one line for the requested service — every
+		// one of them must reach the expected state, not just the first.
+		var found bool
+		for _, line := range strings.Split(strings.TrimSpace(psRes.Stdout()), "\n") {
+			if line == "" {
+				continue
+			}
+			var entry map[string]any
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				return poll.Error(fmt.Errorf("invalid `compose ps` JSON line %q: %w", line, err))
+			}
+			if svc, _ := entry["Service"].(string); !strings.EqualFold(svc, service) {
+				continue
+			}
+			found = true
+			if current, _ := entry["State"].(string); !strings.EqualFold(current, state) {
+				return poll.Continue("service %q not in state %q yet (got %q): %s", service, state, current, psRes.Stdout())
+			}
+		}
+		if found {
+			return poll.Success()
+		}
+		return poll.Continue("service %q not in state %q yet: %s", service, state, psRes.Stdout())
+	}
+	poll.WaitOn(t, check, poll.WithDelay(250*time.Millisecond), poll.WithTimeout(15*time.Second))
 }

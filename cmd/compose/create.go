@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -30,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -63,16 +65,25 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.pullChanged = cmd.Flags().Changed("pull")
 			if opts.Build && opts.noBuild {
-				return fmt.Errorf("--build and --no-build are incompatible")
+				return errors.New("--build and --no-build are incompatible")
 			}
 			if opts.forceRecreate && opts.noRecreate {
-				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+				return errors.New("--force-recreate and --no-recreate are incompatible")
 			}
 			return nil
 		}),
-		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
-			return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
-		}),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
+				return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
+			})(cmd, args)
+			if jobErr, replaced := jobTargetErr(cmd.Context(), dockerCli, p, args, err); replaced {
+				if display.Mode == display.ModeJSON {
+					return makeJSONError(jobErr)
+				}
+				return jobErr
+			}
+			return err
+		},
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
@@ -97,6 +108,11 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 }
 
 func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
+	// same contract as up: an active scheduled job is refused before any
+	// resource is created — silently not scheduling would break expectations
+	if err := rejectScheduledJobs(project); err != nil {
+		return err
+	}
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}

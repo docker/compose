@@ -601,6 +601,29 @@ func TestBuildDependentImageWithProfile(t *testing.T) {
 			OutputContains("secret-build-test Built"))
 }
 
+// A service reachable only as another service's additional_contexts build
+// dependency must still build even when its own profile is inactive: it's
+// referenced for its image, not started as a workload. Regression test for
+// docker/compose#14223 — currently fails at project load ("declares unknown
+// service base as additional contexts base"): compose-go's consistency check
+// rejects an additional_contexts target that's disabled by profile, before
+// the build path (which already special-cases DisabledServices, see
+// addBuildDependencies) ever runs. Fixed by compose-spec/compose-go#931;
+// this test stays red until that dependency bump lands.
+func TestBuildAdditionalContextDisabledService(t *testing.T) {
+	s := NewScenario(t, "a build-only service reachable only via additional_contexts must build with its profile inactive, and never start")
+	s.Defer(
+		DockerCmd("image", "rm", "-f", "e2e-additional-context-base:latest").MayFail(),
+		DockerCmd("image", "rm", "-f", "e2e-additional-context-classroom:latest").MayFail()).
+		Step("up with only the classroom profile active builds base as a dependency but never starts it",
+			// --build: a stale image from a previous run must not let this
+			// step skip the build it exists to exercise.
+			ComposeCmd("--profile", "classroom", "up", "--build", "-d"),
+			ServiceState("classroom", "running"),
+			ImageExists("e2e-additional-context-base:latest"),
+			ServiceNotCreated("base"))
+}
+
 func TestBuildTLS(t *testing.T) {
 	t.Helper()
 

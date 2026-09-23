@@ -94,12 +94,15 @@ func DescriptorForEnvFile(path string, content []byte) v1.Descriptor {
 	}
 }
 
-func PushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion) (v1.Descriptor, error) {
+// PushManifest pushes the manifest for a Compose OCI artifact. The returned
+// bool reports whether the push fell back from OCI 1.1 to OCI 1.0; it is
+// only meaningful when err == nil.
+func PushManifest(ctx context.Context, resolver remotes.Resolver, named reference.Named, layers []v1.Descriptor, ociVersion api.OCIVersion) (v1.Descriptor, bool, error) {
 	// Check if we need an extra empty layer for the manifest config
 	if ociVersion == api.OCIVersion1_1 || ociVersion == "" {
 		err := push(ctx, resolver, named, v1.DescriptorEmptyJSON)
 		if err != nil {
-			return v1.Descriptor{}, err
+			return v1.Descriptor{}, false, err
 		}
 	}
 	// prepare to push the manifest by pushing the layers
@@ -107,25 +110,26 @@ func PushManifest(ctx context.Context, resolver remotes.Resolver, named referenc
 	for i := range layers {
 		layerDescriptors[i] = layers[i]
 		if err := push(ctx, resolver, named, layers[i]); err != nil {
-			return v1.Descriptor{}, err
+			return v1.Descriptor{}, false, err
 		}
 	}
 
 	if ociVersion != "" {
 		// if a version was explicitly specified, use it
-		return createAndPushManifest(ctx, resolver, named, layerDescriptors, ociVersion)
+		descriptor, err := createAndPushManifest(ctx, resolver, named, layerDescriptors, ociVersion)
+		return descriptor, false, err
 	}
 
 	// try to push in the OCI 1.1 format but fallback to OCI 1.0 on 4xx errors
-	// (other than auth) since it's most likely the result of the registry not
-	// having support
+	// (other than auth) since it's most likely the result of the registry
+	// rejecting the OCI 1.1 request
 	descriptor, err := createAndPushManifest(ctx, resolver, named, layerDescriptors, api.OCIVersion1_1)
 	var pushErr pusherrors.ErrUnexpectedStatus
 	if errors.As(err, &pushErr) && isNonAuthClientError(pushErr.StatusCode) {
-		// TODO(milas): show a warning here (won't work with logrus)
-		return createAndPushManifest(ctx, resolver, named, layerDescriptors, api.OCIVersion1_0)
+		descriptor, err = createAndPushManifest(ctx, resolver, named, layerDescriptors, api.OCIVersion1_0)
+		return descriptor, true, err
 	}
-	return descriptor, err
+	return descriptor, false, err
 }
 
 func push(ctx context.Context, resolver remotes.Resolver, ref reference.Named, descriptor v1.Descriptor) error {

@@ -26,6 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
@@ -71,13 +72,16 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 // them, the collected errors, and the application exit status.
 type upSession struct {
 	*composeService
-	project   *types.Project
-	options   api.UpOptions
-	printer   logPrinter
-	watcher   *Watcher
-	menu      *formatter.LogKeyboard
-	globalCtx context.Context
-	cancel    context.CancelFunc
+	project *types.Project
+	options api.UpOptions
+	printer logPrinter
+	// logStreams counts the in-flight re-attach log streams so shutdown can
+	// drain them before tearing the context down — see the monitor wrapper.
+	logStreams sync.WaitGroup
+	watcher    *Watcher
+	menu       *formatter.LogKeyboard
+	globalCtx  context.Context
+	cancel     context.CancelFunc
 
 	signalChan   chan os.Signal
 	isTerminated atomic.Bool
@@ -157,6 +161,12 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 	}
 	monitor.withListener(u.printer.HandleEvent)
 
+	// Termination -- on-exit cascade or a graceful Ctrl+C/SIGTERM teardown --
+	// stops the application via a one-shot listing (see stopApplication):
+	// registered unconditionally, regardless of the on-exit policy, since a
+	// graceful teardown always runs it and a container whose start was
+	// already in flight when that listing happened comes up after it.
+	monitor.withListener(u.stopLateStarters())
 	if options.Start.OnExit != api.CascadeIgnore {
 		monitor.withListener(u.stopOnFirstExit())
 	}
@@ -178,6 +188,24 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 
 	u.eg.Go(func() error {
 		err := monitor.Start(globalCtx)
+		// The monitor returning means every watched container is gone for
+		// good — an events-channel fact. The last run's log lines may still
+		// be in flight on their own connections, and canceling now would
+		// drop them: the exit notice would outrun the output that preceded
+		// it. The containers having exited, every follow stream terminates
+		// on its own at EOF — give them a bounded window to drain before
+		// the context comes down (immediately skipped when the context is
+		// already canceled, e.g. Ctrl-C).
+		drained := make(chan struct{})
+		go func() {
+			u.logStreams.Wait()
+			close(drained)
+		}()
+		select {
+		case <-drained:
+		case <-time.After(logStreamDrainTimeout):
+		case <-globalCtx.Done():
+		}
 		// cancel the global context to terminate signal-handler goroutines
 		cancel()
 		u.appendErr(err)
@@ -227,12 +255,23 @@ func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.U
 	return formatter.NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled, signalChan), kEvents, nil
 }
 
+// appendErr records err for the final report, unless it is nothing more than
+// fallout from our own shutdown: once u.globalCtx is canceled (monitor
+// detecting termination, SIGINT/SIGTERM, or an earlier setup failure), the
+// in-flight goroutines it carries (log/attach streaming in particular) get a
+// context.Canceled error that reports no real failure and must not turn a
+// clean exit into a non-zero one (#13985).
 func (u *upSession) appendErr(err error) {
-	if err != nil {
-		u.mu.Lock()
-		u.errs = append(u.errs, err)
-		u.mu.Unlock()
+	if err == nil {
+		return
 	}
+	if errors.Is(err, context.Canceled) && u.globalCtx.Err() != nil {
+		logrus.Debugf("ignoring canceled error after shutdown: %v", err)
+		return
+	}
+	u.mu.Lock()
+	u.errs = append(u.errs, err)
+	u.mu.Unlock()
 }
 
 // runEventLoop reacts to cancellation, SIGINT/SIGTERM and keyboard input until
@@ -243,8 +282,10 @@ func (u *upSession) runEventLoop(ctx context.Context, kEvents <-chan keyboard.Ke
 	gracefulTeardown := func() {
 		first = false
 		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Gracefully Stopping... press Ctrl+C again to force"))
-		u.stopApplication()
+		// set before stopApplication's listing so stopLateStarters is armed
+		// no later than the sweep it must catch stragglers for.
 		u.isTerminated.Store(true)
+		u.stopApplication()
 	}
 
 	for {
@@ -310,7 +351,10 @@ func (u *upSession) killApplication() {
 func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
 	once := true
 	return func(event api.ContainerEvent) {
-		if !once || event.Type != api.ContainerEventExited {
+		if !once {
+			return
+		}
+		if event.Type != api.ContainerEventExited {
 			return
 		}
 		if u.options.Start.OnExit == api.CascadeFail && event.ExitCode == 0 {
@@ -319,8 +363,50 @@ func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
 		once = false
 		u.exitCode = event.ExitCode
 		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
+		// set before stopApplication's listing so stopLateStarters is armed
+		// no later than the sweep it must catch stragglers for.
+		u.isTerminated.Store(true)
 		u.stopApplication()
 	}
+}
+
+// stopLateStarters stops any service that starts after termination has begun
+// — the on-exit cascade above or a graceful Ctrl+C/SIGTERM teardown
+// (runEventLoop) — both of which stop the application via stopApplication's
+// one-shot listing. Either start phase (the initial one, or one still
+// climbing the dependency graph on its deliberately uncancelable context)
+// can race that listing: a container whose start was already in flight comes
+// up after the sweep and would otherwise keep the session alive until its
+// natural end. The events stream reveals such late starters — stop each one
+// as it appears, for as long as termination is underway.
+func (u *upSession) stopLateStarters() api.ContainerEventListener {
+	return func(event api.ContainerEvent) {
+		if !isLateStarter(event, u.isTerminated.Load()) {
+			return
+		}
+		u.stopLateStarter(event.Service)
+	}
+}
+
+// isLateStarter reports whether event is a container starting after
+// termination has begun — the on-exit cascade or a graceful Ctrl+C/SIGTERM
+// teardown, either of which sets terminated true before its one-shot stop
+// listing — and so must be caught and stopped: see stopLateStarters.
+func isLateStarter(event api.ContainerEvent, terminated bool) bool {
+	return terminated && event.Type == api.ContainerEventStarted
+}
+
+// stopLateStarter stops one service started after termination swept the
+// application — see stopLateStarters.
+func (u *upSession) stopLateStarter(service string) {
+	u.eg.Go(func() error {
+		err := u.stop(context.WithoutCancel(u.globalCtx), u.project.Name, api.StopOptions{
+			Services: []string{service},
+			Project:  u.project,
+		}, u.printer.HandleEvent)
+		u.appendErr(err)
+		return nil
+	})
 }
 
 // captureExitCodeFrom captures the exit code of the first container to exit
@@ -337,27 +423,47 @@ func (u *upSession) captureExitCodeFrom() api.ContainerEventListener {
 
 // followStartedContainers streams logs of containers (re)started after `up`,
 // so they are followed like the initially attached ones.
+//
+// logStreamDrainTimeout bounds the shutdown drain of these streams: EOF is
+// guaranteed once the containers exited, the bound only protects against a
+// wedged daemon holding the connection open. A variable so tests can shrink
+// it.
+var logStreamDrainTimeout = 5 * time.Second
+
 func (u *upSession) followStartedContainers(attached []string) api.ContainerEventListener {
+	runEnds := newRunEndTracker()
 	return func(event api.ContainerEvent) {
+		runEnds.Observe(event)
 		if !shouldFollowStartEvent(event, attached, u.options.Start.AttachTo) {
 			return
 		}
+		// Captured synchronously — see followStartedContainersLogs: read any
+		// later, a fast run's own exit could already be recorded and the log
+		// window would drop the whole run.
+		since := runEnds.Since(event.ID)
+		// counted before the goroutine starts so the shutdown drain can never
+		// miss a stream dispatched but not yet running
+		u.logStreams.Add(1)
 		u.eg.Go(func() error {
-			u.appendErr(u.streamContainerLogs(event))
+			defer u.logStreams.Done()
+			u.appendErr(u.streamContainerLogs(event, since))
 			return nil
 		})
 	}
 }
 
-func (u *upSession) streamContainerLogs(event api.ContainerEvent) error {
+func (u *upSession) streamContainerLogs(event api.ContainerEvent, since string) error {
 	res, err := u.apiClient().ContainerInspect(u.globalCtx, event.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return err
 	}
+	if since == "" {
+		since = logsSinceLastRun(res.Container)
+	}
 
 	err = u.doLogContainer(u.globalCtx, u.options.Start.Attach, event.Source, res.Container, api.LogOptions{
 		Follow: true,
-		Since:  res.Container.State.StartedAt,
+		Since:  since,
 	})
 	if errdefs.IsNotImplemented(err) {
 		// container may be configured with logging_driver: none

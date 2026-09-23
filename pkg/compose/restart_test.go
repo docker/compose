@@ -51,16 +51,14 @@ func TestPrepareRestartProject(t *testing.T) {
 			Name: "prj",
 			Services: types.Services{
 				"proxy": {
-					Name: "proxy",
-					DependsOn: types.DependsOnConfig{
+					Name: "proxy", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 						"web": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
-					},
+					}},
 				},
 				"web": {
-					Name: "web",
-					DependsOn: types.DependsOnConfig{
+					Name: "web", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 						"db": {Condition: types.ServiceConditionStarted, Restart: false, Required: true},
-					},
+					}},
 				},
 				"db": {Name: "db"},
 			},
@@ -149,4 +147,26 @@ func TestRestartContainer_Order(t *testing.T) {
 		"Container prj-web-1: Restarting",
 		"Container prj-web-1: Started",
 	})
+}
+
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: pre_stop/post_start have no process inside it to act on.
+// No ExecCreate expectation is set: per newStartTestService, gomock fails
+// the test if either hook still runs.
+func TestRestartContainerSkipsHooksForRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name:      "db",
+		PreStop:   []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"warmup"}}},
+	}
+	relay := serviceContainer("db", 1, container.StateRunning)
+	relay.Labels[api.RelayLabel] = "abc123"
+
+	apiClient.EXPECT().ContainerRestart(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerRestartResult{}, nil)
+
+	err := svc.restartContainer(t.Context(), service, relay, api.RestartOptions{})
+	assert.NilError(t, err)
 }

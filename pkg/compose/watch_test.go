@@ -21,12 +21,13 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
-	"github.com/jonboulle/clockwork"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
@@ -75,87 +76,81 @@ func (s stdLogger) Status(containerName, msg string) {
 }
 
 func TestWatch_Sync(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	cli := mocks.NewMockCli(mockCtrl)
-	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
-	apiClient := mocks.NewMockAPIClient(mockCtrl)
-	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
-		Items: []container.Summary{
-			testContainer("test", "123", false),
-		},
-	}, nil).AnyTimes()
-	// we expect the image to be pruned
-	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: make(client.Filters).
-			Add("dangling", "true").
-			Add("label", api.ProjectLabel+"=myProjectName"),
-	}).Return(client.ImageListResult{
-		Items: []image.Summary{
-			{ID: "123"},
-			{ID: "456"},
-		},
-	}, nil).Times(1)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "123", client.ImageRemoveOptions{}).Times(1)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "456", client.ImageRemoveOptions{}).Times(1)
-	//
-	cli.EXPECT().Client().Return(apiClient).AnyTimes()
-
-	ctx, cancelFunc := context.WithCancel(t.Context())
-	t.Cleanup(cancelFunc)
-
-	proj := types.Project{
-		Name: "myProjectName",
-		Services: types.Services{
-			"test": {
-				Name: "test",
+	synctest.Test(t, func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		cli := mocks.NewMockCli(mockCtrl)
+		cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+			Items: []container.Summary{
+				testContainer("test", "123", false),
 			},
-		},
-	}
+		}, nil).AnyTimes()
+		// we expect the image to be pruned
+		apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+			Filters: make(client.Filters).
+				Add("dangling", "true").
+				Add("label", api.ProjectLabel+"=myProjectName"),
+		}).Return(client.ImageListResult{
+			Items: []image.Summary{
+				{ID: "123"},
+				{ID: "456"},
+			},
+		}, nil).Times(1)
+		apiClient.EXPECT().ImageRemove(gomock.Any(), "123", client.ImageRemoveOptions{}).Times(1)
+		apiClient.EXPECT().ImageRemove(gomock.Any(), "456", client.ImageRemoveOptions{}).Times(1)
+		//
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
-	watcher := testWatcher{
-		events: make(chan watch.FileEvent),
-		errors: make(chan error),
-	}
-
-	syncer := newFakeSyncer()
-	clock := clockwork.NewFakeClock()
-	go func() {
-		service := composeService{
-			dockerCli:      cli,
-			clock:          clock,
-			maxConcurrency: -1,
+		proj := types.Project{
+			Name: "myProjectName",
+			Services: types.Services{
+				"test": {
+					Name: "test",
+				},
+			},
 		}
-		rules, err := getWatchRules(&types.DevelopConfig{
-			Watch: []types.Trigger{
-				{
-					Path:   "/sync",
-					Action: "sync",
-					Target: "/work",
-					Ignore: []string{"ignore"},
-				},
-				{
-					Path:   "/rebuild",
-					Action: "rebuild",
-				},
-			},
-		}, types.ServiceConfig{Name: "test"})
-		assert.NilError(t, err)
 
-		err = service.watchEvents(ctx, &proj, api.WatchOptions{
-			Build: &api.BuildOptions{},
-			LogTo: stdLogger{},
-			Prune: true,
-		}, watcher, syncer, rules)
-		assert.NilError(t, err)
-	}()
+		watcher := testWatcher{
+			events: make(chan watch.FileEvent),
+			errors: make(chan error),
+		}
 
-	watcher.Events() <- watch.NewFileEvent("/sync/changed")
-	watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
-	err := clock.BlockUntilContext(ctx, 3)
-	assert.NilError(t, err)
-	clock.Advance(watch.QuietPeriod)
-	select {
-	case actual := <-syncer.synced:
+		syncer := newFakeSyncer()
+		go func() {
+			service := composeService{
+				dockerCli:      cli,
+				maxConcurrency: -1,
+			}
+			rules, err := getWatchRules(&types.DevelopConfig{
+				Watch: []types.Trigger{
+					{
+						Path:   "/sync",
+						Action: "sync",
+						Target: "/work",
+						Ignore: []string{"ignore"},
+					},
+					{
+						Path:   "/rebuild",
+						Action: "rebuild",
+					},
+				},
+			}, types.ServiceConfig{Name: "test"})
+			assert.NilError(t, err)
+
+			err = service.watchEvents(t.Context(), &proj, api.WatchOptions{
+				Build: &api.BuildOptions{},
+				LogTo: stdLogger{},
+				Prune: true,
+			}, watcher, syncer, rules)
+			assert.NilError(t, err)
+		}()
+
+		watcher.Events() <- watch.NewFileEvent("/sync/changed")
+		watcher.Events() <- watch.NewFileEvent("/sync/changed/sub")
+		time.Sleep(watch.QuietPeriod)
+		synctest.Wait()
+		actual := <-syncer.synced
 		expected := []*sync.PathMapping{
 			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 			{HostPath: "/sync/changed/sub", ContainerPath: "/work/changed/sub"},
@@ -164,22 +159,78 @@ func TestWatch_Sync(t *testing.T) {
 			return cmp.Compare(a.HostPath, b.HostPath)
 		})
 		assert.DeepEqual(t, expected, actual)
-	case <-time.After(100 * time.Millisecond):
-		t.Error("timeout")
+
+		// The rebuild triggered by "/rebuild" now runs asynchronously, so it no
+		// longer blocks the sync of "/sync/changed" from the same batch.
+		// synctest.Wait() only returns once the rebuild's goroutine has
+		// settled (it runs to completion here, exercising the mocked
+		// ImageList/ImageRemove prune calls), so the mock expectations above
+		// are already satisfied by the time we get here.
+		watcher.Events() <- watch.NewFileEvent("/rebuild")
+		watcher.Events() <- watch.NewFileEvent("/sync/changed")
+		time.Sleep(watch.QuietPeriod)
+		synctest.Wait()
+		actual = <-syncer.synced
+		expected = []*sync.PathMapping{
+			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
+		}
+		assert.DeepEqual(t, expected, actual)
+	})
+}
+
+// A rebuild running in the background from an earlier batch must not be
+// raced by a plain restart of the same service triggered by a later batch:
+// the restart is folded into the scheduler instead — the stale run is
+// interrupted and a fresh rebuild (recreate + start, the restart intent)
+// converges on a context snapshot taken after the change.
+func TestHandleWatchBatch_RestartDuringInFlightRebuildConverges(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
+	// A correctly folded restart never touches the Docker client at all.
+	cli.EXPECT().Client().Times(0)
+	service := composeService{dockerCli: cli}
+
+	proj := types.Project{
+		Name: "myProjectName",
+		Services: types.Services{
+			"test": {Name: "test"},
+		},
 	}
 
-	watcher.Events() <- watch.NewFileEvent("/rebuild")
-	watcher.Events() <- watch.NewFileEvent("/sync/changed")
-	err = clock.BlockUntilContext(ctx, 4)
+	rules, err := getWatchRules(&types.DevelopConfig{
+		Watch: []types.Trigger{
+			{Path: "/restart", Action: "restart"},
+		},
+	}, types.ServiceConfig{Name: "test"})
 	assert.NilError(t, err)
-	clock.Advance(watch.QuietPeriod)
-	select {
-	case batch := <-syncer.synced:
-		t.Fatalf("received unexpected events: %v", batch)
-	case <-time.After(100 * time.Millisecond):
-		// expected
-	}
-	// TODO: there's not a great way to assert that the rebuild attempt happened
+
+	var runs int32
+	started := make(chan struct{}, 2)
+	release := make(chan error)
+	scheduler := newRebuildScheduler(t.Context(), func(ctx context.Context, _ []string) error {
+		n := atomic.AddInt32(&runs, 1)
+		started <- struct{}{}
+		if n == 1 {
+			// the stale run only ever ends by interruption
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return <-release
+	})
+	scheduler.Request([]string{"test"}) // simulate a rebuild still running from an earlier batch
+	<-started
+
+	err = service.handleWatchBatch(t.Context(), &proj, api.WatchOptions{LogTo: stdLogger{}},
+		[]watch.FileEvent{watch.NewFileEvent("/restart")}, rules, newFakeSyncer(), scheduler)
+	assert.NilError(t, err)
+
+	// the trailing rebuild starting at all proves the stale run was
+	// interrupted and the restart folded into a fresh rebuild
+	<-started
+	release <- nil
+	scheduler.Wait()
+	assert.Equal(t, atomic.LoadInt32(&runs), int32(2))
 }
 
 type fakeSyncer struct {
@@ -229,8 +280,7 @@ func TestInitialSyncFilesRegularFile(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir},
+		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, types.Trigger{
 		Path:   hostFile,
 		Target: "/app/test.txt",
@@ -254,8 +304,8 @@ func TestInitialSync_ExcludesDockerfileAndComposeFiles(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir},
+		Name:         "svc",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, types.Trigger{
 		Path:   hostDir,
 		Target: "/app",
@@ -280,8 +330,8 @@ func TestInitialSync_ExcludesCustomNamedDockerfile(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir, Dockerfile: "Dockerfile.prod"},
+		Name:         "svc",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir, Dockerfile: "Dockerfile.prod"}},
 	}, types.Trigger{
 		Path:   hostDir,
 		Target: "/app",
@@ -309,8 +359,8 @@ func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
 	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
-		Name:  "svc",
-		Build: &types.BuildConfig{Context: hostDir, Dockerfile: "docker/Dockerfile.prod"},
+		Name:         "svc",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir, Dockerfile: "docker/Dockerfile.prod"}},
 	}, types.Trigger{
 		Path:   hostDir,
 		Target: "/app",

@@ -282,7 +282,7 @@ func (c *CLI) BaseEnvironment() []string {
 		_, filename, _, _ := runtime.Caller(0)
 		root := filepath.Join(filepath.Dir(filename), "..", "..")
 		coverdir = filepath.Join(root, coverdir)
-		env = append(env, fmt.Sprintf("GOCOVERDIR=%s", coverdir))
+		env = append(env, "GOCOVERDIR="+coverdir)
 	}
 	return env
 }

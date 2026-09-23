@@ -59,6 +59,39 @@ JSON messages MUST include a `type` and a `message` attribute.
 - `setenv`: Lets the plugin tell Compose how dependent services can access the created resource. The variable is automatically prefixed with the service name. See next section for further details.
 - `rawsetenv`: Same as `setenv`, but the variable is injected as-is without the service name prefix. Useful when applications require exact variable names that cannot be altered.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
+- `get-service-config`: Asks Compose for the resolved configuration of the service the provider manages. See next section.
+- `publish-endpoint`: Declares where a network endpoint of the provider's resource is actually reachable. The
+  message is `"<container-port>=<host>:<port>"` — the port consumers know on the left, the real location on the
+  right, as seen FROM THE PROVIDER'S HOST (typically a port published on the host):
+  ```json
+  { "type": "publish-endpoint", "message": "80=localhost:49152" }
+  ```
+  TCP only; the message may be repeated, one per port. When a provider publishes at least one endpoint, Compose
+  deploys a relay container in place of the service so that dependents reach the resource at the compose-native
+  address — see [Compose-native addressing with `publish-endpoint`](#compose-native-addressing-with-publish-endpoint).
+
+## Requesting the service configuration
+
+A provider can ask the running Compose process for the resolved definition of the service it manages —
+the exact model Compose is executing, not a re-resolution. The request is a regular JSON line on `stdout`:
+```json
+{ "type": "get-service-config" }
+```
+
+Compose answers on the provider's `stdin` with one JSON line: the resolved, canonical JSON of the service —
+the same shape as this service's entry in `docker compose config --format json`, after interpolation and
+normalization:
+```json
+{ "image": "mysql:8", "environment": { "...": "..." } }
+```
+
+There is no parameter: a provider can only obtain the definition of its own service. The message can be sent
+several times; each occurrence is answered with one line.
+
+Compose versions that predate this message treat it as a protocol error and abort the command, and never
+write anything to the provider's `stdin` (the provider reads EOF). A provider that requires the service
+configuration should treat EOF as "this Compose version does not support provider requests" and report an
+actionable error; a provider that can operate without it should simply not send the message.
 
 ```mermaid
 sequenceDiagram
@@ -119,6 +152,47 @@ value is not deterministic.
 
 > __Note:__  The `compose up` provider command _MUST_ be idempotent. If resource is already running, the command _MUST_ set
 > the same environment variables to ensure consistent configuration of dependent services.
+
+### Compose-native addressing with `publish-endpoint`
+
+Environment-variable injection makes the consumer aware of the provider: the application has to read
+`DATABASE_URL` instead of connecting to `database` the way it would reach any container-backed service. When the
+provider's resource is reachable through a TCP endpoint, `publish-endpoint` removes that coupling: the provider
+declares where each port of the resource is actually reachable, and Compose deploys a **relay container** in
+place of the service. Dependents then connect to the compose-native address — `<service>:<container-port>`,
+e.g. `http://database:80` — with no injected variables involved, so the same application configuration works
+whether the service runs as a container or through a provider.
+
+```mermaid
+sequenceDiagram
+    participant Compose
+    participant Provider
+    participant resource as managed resource<br/>(provider's host)
+    participant relay as relay container<br/>network alias: database
+    participant app as app container
+
+    Compose->>Provider: compose up --project-name=xx "database"
+    Provider->>resource: provision, publish a port on the host
+    Provider--)Compose: json { "type": "publish-endpoint", "message": "80=localhost:49152" }
+    Provider-)Compose: EOF (command complete) exit 0
+    Compose->>relay: deploy on the dependents' networks,<br/>forwarding 80 → host.docker.internal:49152
+    Compose->>app: start
+    app->>relay: connect to database:80
+    relay->>resource: forward to host.docker.internal:49152
+```
+
+The provider reports each endpoint as seen from its own host — typically a port published on `localhost` — and
+does not need to know how containers reach that host: the relay translates a loopback (or unspecified) upstream
+host into `host.docker.internal` — resolved through the `host-gateway` extra_host Compose injects — while
+routable addresses pass through untouched.
+
+The relay is a minimal TCP forwarder (`docker/compose-relay` — set `COMPOSE_RELAY_IMAGE` to pull the image from
+an internal registry instead of Docker Hub) joining the networks of the services that depend on the provider
+service, aliased with the service name. It is a regular project container (standard compose labels, canonical
+`<project>-<service>-1` name), so `ps`, `logs`, `stop` and `down` treat it as the service; it additionally
+carries the `com.docker.compose.relay` label identifying its role, and process-level commands (`exec`, `cp`)
+refuse it. The relay is recreated when the published endpoints change, and removed by `down` like any project
+container.
 
 ## Down lifecycle
 

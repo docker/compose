@@ -120,7 +120,7 @@ func absPatterns(absRoot string, patterns []string) []string {
 		}
 		absPattern := pPath
 		if isExclusion {
-			absPattern = fmt.Sprintf("!%s", pPath)
+			absPattern = "!" + pPath
 		}
 		absPatterns = append(absPatterns, absPattern)
 	}

@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -155,7 +156,7 @@ func networkAttachedContainer(t *testing.T, svc types.ServiceConfig, id string) 
 // network is removed then recreated, and the same containers are reconnected —
 // not recreated.
 func TestReconcileNetworks_Diverged(t *testing.T) {
-	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}}
 	project := &types.Project{
 		Name:     "myproject",
 		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
@@ -188,7 +189,7 @@ func TestReconcileNetworks_Diverged(t *testing.T) {
 // recreated (by reconcileContainers), with the reconnect ordered before the old
 // container's removal so they don't race.
 func TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer(t *testing.T) {
-	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}}
 	project := &types.Project{
 		Name:     "myproject",
 		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
@@ -231,14 +232,12 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 		},
 		Services: types.Services{
 			"web": {
-				Name:     "web",
-				Scale:    intPtr(1),
-				Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}},
+				Name:  "web",
+				Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}},
 			},
 			"api": {
-				Name:     "api",
-				Scale:    intPtr(1),
-				Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}},
+				Name:  "api",
+				Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}},
 			},
 		},
 	}
@@ -280,7 +279,7 @@ func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 // migration), so a network still in use by non-Compose containers cannot block a
 // rename.
 func TestReconcileNetworks_Renamed(t *testing.T) {
-	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}}
 	project := &types.Project{
 		Name:     "myproject",
 		Networks: types.Networks{"frontend": {Name: "myproject_frontend_v2", Driver: "overlay"}},
@@ -430,9 +429,8 @@ func divergedVolumeProject(t *testing.T, count, scale int) (*types.Project, *Obs
 	for s := 0; s < count; s++ {
 		name := fmt.Sprintf("db%d", s)
 		svc := types.ServiceConfig{
-			Name:    name,
-			Scale:   intPtr(scale),
-			Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+			Name:  name,
+			Scale: intPtr(scale), ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}},
 		}
 		project.Services[name] = svc
 		hash := mustServiceHash(t, svc)
@@ -511,7 +509,7 @@ func TestReconcileVolumes_DivergedPromptMessage(t *testing.T) {
 func TestReconcileVolumes_DivergedPromptError(t *testing.T) {
 	project, observed := divergedVolumeProject(t, 1, 1)
 
-	boom := func(_ string, _ bool) (bool, error) { return false, fmt.Errorf("boom") }
+	boom := func(_ string, _ bool) (bool, error) { return false, errors.New("boom") }
 	_, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), boom)
 	assert.ErrorContains(t, err, "boom")
 }
@@ -568,11 +566,10 @@ func TestReconcileVolumes_DivergedConfirmedSharedContainer(t *testing.T) {
 	vol2 := types.VolumeConfig{Name: "myproject_data2", Driver: "local"}
 	svc := types.ServiceConfig{
 		Name:  "db",
-		Scale: intPtr(1),
-		Volumes: []types.ServiceVolumeConfig{
+		Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{
 			{Source: "data1", Type: "volume"},
 			{Source: "data2", Type: "volume"},
-		},
+		}},
 	}
 	project := &types.Project{
 		Name:     "myproject",
@@ -619,8 +616,8 @@ func TestReconcileVolumes_DivergedConfirmedSharedContainer(t *testing.T) {
 func TestReconcileVolumes_DivergedPartialConfirm(t *testing.T) {
 	vol1 := types.VolumeConfig{Name: "myproject_data1", Driver: "local"}
 	vol2 := types.VolumeConfig{Name: "myproject_data2", Driver: "local"}
-	svc1 := types.ServiceConfig{Name: "db1", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data1", Type: "volume"}}}
-	svc2 := types.ServiceConfig{Name: "db2", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data2", Type: "volume"}}}
+	svc1 := types.ServiceConfig{Name: "db1", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data1", Type: "volume"}}}}
+	svc2 := types.ServiceConfig{Name: "db2", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data2", Type: "volume"}}}}
 	project := &types.Project{
 		Name:     "myproject",
 		Volumes:  types.Volumes{"data1": vol1, "data2": vol2},
@@ -679,17 +676,22 @@ func TestReconcileVolumes_DivergedPartialConfirm(t *testing.T) {
 func TestReconcileVolumes_DivergedCascadesToDependent(t *testing.T) {
 	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
 	owner := types.ServiceConfig{
-		Name:    "owner",
-		Image:   "alpine",
-		Scale:   intPtr(1),
-		Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+		Name: "owner",
+
+		Scale: intPtr(1), ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+
+			Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+		},
 	}
 	dependent := types.ServiceConfig{
-		Name:        "dependent",
-		Image:       "alpine",
-		Scale:       intPtr(1),
-		VolumesFrom: []string{"owner"},
-		DependsOn:   types.DependsOnConfig{"owner": {Condition: types.ServiceConditionStarted, Restart: true, Required: true}},
+		Name: "dependent",
+
+		Scale: intPtr(1), ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+
+			VolumesFrom: []string{"owner"},
+		}, WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{"owner": {Condition: types.ServiceConditionStarted, Restart: true, Required: true}}},
 	}
 	project := &types.Project{
 		Name:     "myproject",
@@ -747,19 +749,24 @@ func TestReconcileVolumes_DivergedCascadesToDependent(t *testing.T) {
 func TestReconcileVolumes_DivergedVolumesFromRemovedBeforeVolume(t *testing.T) {
 	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
 	owner := types.ServiceConfig{
-		Name:    "owner",
-		Image:   "alpine",
-		Scale:   intPtr(1),
-		Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+		Name: "owner",
+
+		Scale: intPtr(1), ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+
+			Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}},
+		},
 	}
 	// consumer inherits owner's mounts (including data) but never declares the
 	// volume itself.
 	consumer := types.ServiceConfig{
-		Name:        "consumer",
-		Image:       "alpine",
-		Scale:       intPtr(1),
-		VolumesFrom: []string{"owner"},
-		DependsOn:   types.DependsOnConfig{"owner": {Condition: types.ServiceConditionStarted, Required: true}},
+		Name: "consumer",
+
+		Scale: intPtr(1), ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+
+			VolumesFrom: []string{"owner"},
+		}, WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{"owner": {Condition: types.ServiceConditionStarted, Required: true}}},
 	}
 	project := &types.Project{
 		Name:     "myproject",
@@ -830,7 +837,7 @@ func TestReconcileVolumes_UnmanagedMatchReused(t *testing.T) {
 		Name:    "myproject",
 		Volumes: types.Volumes{"data": {Name: "myproject_data", Driver: "local"}},
 		Services: types.Services{
-			"db": {Name: "db", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}},
+			"db": {Name: "db", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}}},
 		},
 	}
 	dbHash := mustServiceHash(t, project.Services["db"])
@@ -893,7 +900,7 @@ func TestReconcileVolumes_RenamedMigratesContainers(t *testing.T) {
 		Name:    "myproject",
 		Volumes: types.Volumes{"data": {Name: "myproject_data_v2", Driver: "local"}},
 		Services: types.Services{
-			"db": {Name: "db", Scale: intPtr(1), Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}},
+			"db": {Name: "db", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}}},
 		},
 	}
 	dbHash := mustServiceHash(t, project.Services["db"])
@@ -1257,10 +1264,9 @@ func TestReconcileContainers_DependsOnChain(t *testing.T) {
 			"db": {Name: "db", Scale: intPtr(1)},
 			"web": {
 				Name:  "web",
-				Scale: intPtr(1),
-				DependsOn: types.DependsOnConfig{
+				Scale: intPtr(1), WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 					"db": {Condition: types.ServiceConditionStarted},
-				},
+				}},
 			},
 		},
 	}
@@ -1295,10 +1301,9 @@ func TestReconcileContainers_DependsOnScaleDown(t *testing.T) {
 			"db": svc,
 			"web": {
 				Name:  "web",
-				Scale: intPtr(1),
-				DependsOn: types.DependsOnConfig{
+				Scale: intPtr(1), WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 					"db": {Condition: types.ServiceConditionStarted},
-				},
+				}},
 			},
 		},
 	}
@@ -1427,8 +1432,8 @@ func TestReconcileContainers_ServiceReference_NoRecreate(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			parent := types.ServiceConfig{Name: "parent", Image: "alpine", Scale: intPtr(1)}
-			dependent := types.ServiceConfig{Name: "dependent", Image: "alpine", Scale: intPtr(1)}
+			parent := types.ServiceConfig{Name: "parent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+			dependent := types.ServiceConfig{Name: "dependent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Image: "alpine"}}
 			tc.mutate(&dependent)
 			project := &types.Project{
 				Name:     "myproject",
@@ -1449,10 +1454,11 @@ func TestReconcileContainers_ServiceReference_NoRecreate(t *testing.T) {
 // produces for namespace-sharing services, so planStopDependents fires too —
 // the test also asserts the resulting Stop is not duplicated.
 func TestReconcileContainers_NamespaceParentRecreated_CascadesToDependent(t *testing.T) {
-	parent := types.ServiceConfig{Name: "parent", Image: "alpine", Scale: intPtr(1)}
+	parent := types.ServiceConfig{Name: "parent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Image: "alpine"}}
 	dependent := types.ServiceConfig{
-		Name: "dependent", Image: "alpine", Scale: intPtr(1), NetworkMode: "service:parent",
-		DependsOn: types.DependsOnConfig{"parent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true}},
+		Name: "dependent", Scale: intPtr(1),
+		ContainerSpec: types.ContainerSpec{Image: "alpine", NetworkMode: "service:parent"},
+		WorkloadSpec:  types.WorkloadSpec{DependsOn: types.DependsOnConfig{"parent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true}}},
 	}
 	project := &types.Project{
 		Name:     "myproject",
@@ -1478,17 +1484,20 @@ func TestReconcileContainers_NamespaceParentRecreated_CascadesToDependent(t *tes
 // non-matching parent: a dependent sharing namespace with two parents must
 // cascade-recreate when either parent is scheduled for recreation.
 func TestReconcileContainers_MultipleParents_EitherTriggersCascade(t *testing.T) {
-	netParent := types.ServiceConfig{Name: "netparent", Image: "alpine", Scale: intPtr(1)}
-	volParent := types.ServiceConfig{Name: "volparent", Image: "alpine", Scale: intPtr(1)}
+	netParent := types.ServiceConfig{Name: "netparent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	volParent := types.ServiceConfig{Name: "volparent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Image: "alpine"}}
 	dependent := types.ServiceConfig{
-		Name: "dependent", Image: "alpine", Scale: intPtr(1),
-		NetworkMode: "service:netparent",
-		VolumesFrom: []string{"volparent"},
-		// Mirrors what compose-go's normalizer injects for namespace-sharing
-		// references, so the dependency graph orders parents before dependent.
-		DependsOn: types.DependsOnConfig{
-			"netparent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
-			"volparent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
+		Name: "dependent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{
+			Image:       "alpine",
+			NetworkMode: "service:netparent",
+			VolumesFrom: []string{"volparent"},
+		}, WorkloadSpec: types.WorkloadSpec{
+			// Mirrors what compose-go's normalizer injects for namespace-sharing
+			// references, so the dependency graph orders parents before dependent.
+			DependsOn: types.DependsOnConfig{
+				"netparent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
+				"volparent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true},
+			},
 		},
 	}
 	project := &types.Project{
@@ -1547,10 +1556,11 @@ func TestReconcileContainers_MultipleParents_EitherTriggersCascade(t *testing.T)
 // TestReconcileContainers_RegularDependsOn_NoCascade ensures the cascade fires
 // only for namespace/volume-sharing dependencies, not for plain depends_on.
 func TestReconcileContainers_RegularDependsOn_NoCascade(t *testing.T) {
-	parent := types.ServiceConfig{Name: "parent", Image: "alpine", Scale: intPtr(1)}
+	parent := types.ServiceConfig{Name: "parent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Image: "alpine"}}
 	dependent := types.ServiceConfig{
-		Name: "dependent", Image: "alpine", Scale: intPtr(1),
-		DependsOn: types.DependsOnConfig{"parent": {Condition: types.ServiceConditionStarted, Restart: true}},
+		Name: "dependent", Scale: intPtr(1),
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		WorkloadSpec:  types.WorkloadSpec{DependsOn: types.DependsOnConfig{"parent": {Condition: types.ServiceConditionStarted, Restart: true}}},
 	}
 	project := &types.Project{
 		Name:     "myproject",

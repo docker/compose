@@ -31,10 +31,9 @@ func TestFilterServices(t *testing.T) {
 				Links: []string{"bar"},
 			},
 			"bar": {
-				Name: "bar",
-				DependsOn: map[string]types.ServiceDependency{
+				Name: "bar", WorkloadSpec: types.WorkloadSpec{DependsOn: map[string]types.ServiceDependency{
 					"zot": {},
-				},
+				}},
 			},
 			"zot": {
 				Name: "zot",
@@ -52,4 +51,29 @@ func TestFilterServices(t *testing.T) {
 	assert.NilError(t, err)
 	_, err = p.GetService("zot")
 	assert.NilError(t, err)
+}
+
+// projectOrName backs every service-targeting command except run/create
+// (down, stop, kill, pause, unpause, logs, rm, ps, events, start, ...): a
+// job target must be refused the same way regardless of which of them is
+// used, and the refusal must not be masked by the COMPOSE_PROJECT_NAME
+// fallback below it.
+func TestProjectOrNameRefusesJob(t *testing.T) {
+	opts := jobTargetErrFixture(t)
+
+	t.Run("a job target is refused with a clear error", func(t *testing.T) {
+		_, _, err := opts.projectOrName(t.Context(), nil, "migrate")
+		assert.Error(t, err, `job "migrate" can only be triggered with "docker compose run"`)
+	})
+
+	t.Run("COMPOSE_PROJECT_NAME must not mask the refusal behind a silent fallback", func(t *testing.T) {
+		t.Setenv("COMPOSE_PROJECT_NAME", "test")
+		_, _, err := opts.projectOrName(t.Context(), nil, "migrate")
+		assert.Error(t, err, `job "migrate" can only be triggered with "docker compose run"`)
+	})
+
+	t.Run("a real typo among several targets keeps its own error, not a same-invocation job's", func(t *testing.T) {
+		_, _, err := opts.projectOrName(t.Context(), nil, "typo", "migrate")
+		assert.ErrorContains(t, err, "no such service: typo")
+	})
 }

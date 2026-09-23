@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"slices"
@@ -82,7 +83,7 @@ func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) 
 	dockerModel, err := manager.GetPlugin("model", s.dockerCli, &cobra.Command{})
 	if err != nil {
 		if errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("'models' support requires Docker Model plugin")
+			return nil, errors.New("'models' support requires Docker Model plugin")
 		}
 		return nil, err
 	}

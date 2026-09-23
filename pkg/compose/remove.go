@@ -80,7 +80,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 		return api.ErrNoResources
 	}
 
-	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
+	msg := "Going to remove " + strings.Join(names, ", ")
 	if options.Force {
 		_, _ = fmt.Fprintln(s.stdout(), msg)
 	} else {

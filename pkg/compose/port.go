@@ -26,18 +26,27 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Port(ctx context.Context, projectName string, serviceName string, port uint16, options api.PortOptions) (string, int, error) {
+func (s *composeService) Ports(ctx context.Context, projectName string, serviceName string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
 	projectName = strings.ToLower(projectName)
 	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, serviceName, options.Index)
 	if err != nil {
-		return "", 0, err
+		return nil, err
 	}
-	for _, p := range ctr.Ports {
-		if p.PrivatePort == port && p.Type == options.Protocol {
-			return p.IP.String(), int(p.PublicPort), nil
+
+	var publishers api.PortPublishers
+	for _, p := range containerPublishers(ctr) {
+		if options.Protocol != "" && p.Protocol != options.Protocol {
+			continue
 		}
+		if port != 0 && p.TargetPort != int(port) {
+			continue
+		}
+		publishers = append(publishers, p)
 	}
-	return "", 0, portNotFoundError(options.Protocol, port, ctr)
+	if port != 0 && len(publishers) == 0 {
+		return nil, portNotFoundError(options.Protocol, port, ctr)
+	}
+	return publishers, nil
 }
 
 func portNotFoundError(protocol string, port uint16, ctr container.Summary) error {

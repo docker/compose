@@ -17,16 +17,21 @@
 package prompt
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
+	"unicode"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/docker/cli/cli/streams"
 
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
 //go:generate mockgen -destination=./prompt_mock.go -self_package "github.com/docker/compose/v5/pkg/prompt" -package=prompt . UI
+
+var errInterrupt = errors.New("interrupt")
 
 // UI - prompt user input
 type UI interface {
@@ -35,56 +40,84 @@ type UI interface {
 
 func NewPrompt(stdin *streams.In, stdout *streams.Out) UI {
 	if stdin.IsTerminal() {
-		return User{stdin: streamsFileReader{stdin}, stdout: streamsFileWriter{stdout}}
+		return User{stdin: stdin, reader: bufio.NewReader(stdin), stdout: stdout}
 	}
 	return Pipe{stdin: stdin, stdout: stdout}
 }
 
 // User - in a terminal
 type User struct {
-	stdout streamsFileWriter
-	stdin  streamsFileReader
-}
-
-// adapt streams.Out to terminal.FileWriter
-type streamsFileWriter struct {
-	stream *streams.Out
-}
-
-func (s streamsFileWriter) Write(p []byte) (n int, err error) {
-	return s.stream.Write(p)
-}
-
-func (s streamsFileWriter) Fd() uintptr {
-	return s.stream.FD()
-}
-
-// adapt streams.In to terminal.FileReader
-type streamsFileReader struct {
-	stream *streams.In
-}
-
-func (s streamsFileReader) Read(p []byte) (n int, err error) {
-	return s.stream.Read(p)
-}
-
-func (s streamsFileReader) Fd() uintptr {
-	return s.stream.FD()
+	stdout io.Writer
+	stdin  *streams.In
+	reader *bufio.Reader
 }
 
 // Confirm asks for yes or no input
 func (u User) Confirm(message string, defaultValue bool) (bool, error) {
-	qs := &survey.Confirm{
-		Message: message,
-		Default: defaultValue,
+	if err := u.stdin.SetRawTerminal(); err != nil {
+		return false, err
 	}
-	var b bool
-	err := survey.AskOne(qs, &b, func(options *survey.AskOptions) error {
-		options.Stdio.In = u.stdin
-		options.Stdio.Out = u.stdout
-		return nil
-	})
-	return b, err
+	defer u.stdin.RestoreTerminal()
+
+	prompt := " [y/N]: "
+	if defaultValue {
+		prompt = " [Y/n]: "
+	}
+
+	for {
+		_, _ = fmt.Fprint(u.stdout, message+prompt)
+
+		answer, err := readLine(u.reader, u.stdout)
+		if err != nil {
+			return false, err
+		}
+
+		switch strings.ToLower(strings.TrimSpace(answer)) {
+		case "":
+			return defaultValue, nil
+		case "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		}
+	}
+}
+
+func readLine(in io.RuneReader, out io.Writer) (string, error) {
+	var line []rune
+
+	for {
+		ch, _, err := in.ReadRune()
+		if err != nil {
+			return "", err
+		}
+
+		switch ch {
+		case 3: // Ctrl+C
+			_, _ = fmt.Fprint(out, "\r\n")
+			return "", errInterrupt
+
+		case 4: // Ctrl+D
+			return "", io.EOF
+
+		case '\r', '\n':
+			_, _ = fmt.Fprint(out, "\r\n")
+			return string(line), nil
+
+		case 127: // Backspace
+			if len(line) > 0 {
+				line = line[:len(line)-1]
+				_, _ = fmt.Fprint(out, "\b \b")
+			}
+
+		default:
+			if unicode.IsControl(ch) {
+				continue
+			}
+			line = append(line, ch)
+			_, _ = fmt.Fprintf(out, "%c", ch)
+		}
+	}
 }
 
 // Pipe - aggregates prompt methods

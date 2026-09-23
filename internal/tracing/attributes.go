@@ -19,8 +19,8 @@ package tracing
 import (
 	"context"
 	"crypto/sha256"
+	hex "encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -192,5 +192,5 @@ func projectHash(p *types.Project) (string, bool) {
 		return "", false
 	}
 	d := sha256.Sum256(projData)
-	return fmt.Sprintf("%x", d), true
+	return hex.EncodeToString(d[:]), true
 }

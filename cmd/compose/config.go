@@ -63,9 +63,11 @@ type configOptions struct {
 	lockImageDigests    bool
 }
 
+// ToProject always warns: every config subcommand renders the resolved
+// model to the user, so any unsupported-attribute finding is relevant here.
 func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
 	po = append(po, o.toProjectOptionsFns()...)
-	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, backend, services, po...)
+	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes, po...)
 	return project, err
 }
 
@@ -260,7 +262,7 @@ func imagesOnly(project *types.Project) *types.Project {
 	digests := types.Services{}
 	for name, config := range project.Services {
 		service := types.ServiceConfig{
-			Image: config.Image,
+			ContainerSpec: types.ContainerSpec{Image: config.Image},
 		}
 		for _, vol := range config.Volumes {
 			if vol.Type == types.VolumeTypeImage {
@@ -269,7 +271,22 @@ func imagesOnly(project *types.Project) *types.Project {
 		}
 		digests[name] = service
 	}
-	project = &types.Project{Services: digests}
+	var jobDigests types.Jobs
+	if len(project.Jobs) > 0 {
+		jobDigests = types.Jobs{}
+	}
+	for name, config := range project.Jobs {
+		job := types.JobConfig{
+			ContainerSpec: types.ContainerSpec{Image: config.Image},
+		}
+		for _, vol := range config.Volumes {
+			if vol.Type == types.VolumeTypeImage {
+				job.Volumes = append(job.Volumes, vol)
+			}
+		}
+		jobDigests[name] = job
+	}
+	project = &types.Project{Services: digests, Jobs: jobDigests}
 	return project
 }
 
@@ -333,10 +350,10 @@ func warnModelHooksNotLockable(model map[string]any) {
 	}
 }
 
-// lockModel removes from model all attributes but service images and `type: image` volumes
+// lockModel removes from model all attributes but service/job images and `type: image` volumes
 func lockModel(model map[string]any) {
 	for key, e := range model {
-		if key != "services" {
+		if key != "services" && key != "jobs" {
 			delete(model, key)
 			continue
 		}
@@ -365,17 +382,33 @@ func lockModel(model map[string]any) {
 }
 
 func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) error {
+	_, hasServices := model["services"].(map[string]any)
+	_, hasJobs := model["jobs"].(map[string]any)
+	if !hasServices && !hasJobs {
+		// both are optional at the top level of the compose model
+		return nil
+	}
+	if hasServices {
+		if err := resolveServiceImageDigests(ctx, dockerCli, model); err != nil {
+			return err
+		}
+	}
+	if hasJobs {
+		if err := resolveJobImageDigests(ctx, dockerCli, model); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func resolveServiceImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) error {
 	// create a pseudo-project so we can rely on WithImagesResolved to resolve images,
-	// pre_start hook images and `type: image` volume sources, keyed by actual service
-	// names so sources referencing another service are detected as such and kept unresolved
+	// pre_start hook images and `type: image` volume sources, keyed by the actual
+	// service names so the resolved digests can be folded back into the raw model below
 	p := &types.Project{
 		Services: types.Services{},
 	}
-	services, ok := model["services"].(map[string]any)
-	if !ok {
-		// services is optional at the top level of the compose model
-		return nil
-	}
+	services := model["services"].(map[string]any)
 	for name, s := range services {
 		service := s.(map[string]any)
 		config := types.ServiceConfig{}
@@ -384,7 +417,7 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 		}
 		for _, hook := range preStartHooks(service) {
 			image, _ := hook["image"].(string)
-			config.PreStart = append(config.PreStart, types.ServiceHook{Image: image})
+			config.PreStart = append(config.PreStart, types.PreStartHook{ContainerSpec: types.ContainerSpec{Image: image}})
 		}
 		for _, volume := range imageVolumes(service) {
 			source, _ := volume["source"].(string)
@@ -415,6 +448,50 @@ func resolveImageDigests(ctx context.Context, dockerCli command.Cli, model map[s
 			}
 		}
 		for i, volume := range imageVolumes(service) {
+			if source := config.Volumes[i].Source; source != "" {
+				volume["source"] = source
+			}
+		}
+	}
+	return nil
+}
+
+// resolveJobImageDigests mirrors resolveServiceImageDigests for model["jobs"].
+// WithImagesResolved only walks a project's Services, so jobs are dressed as
+// services in their own pseudo-project -- keyed by job name, which can't
+// collide with an actual service since the two are never mixed here -- then
+// the resolved digests are folded back into the raw job models.
+func resolveJobImageDigests(ctx context.Context, dockerCli command.Cli, model map[string]any) error {
+	jobsAsServices := &types.Project{Services: types.Services{}}
+	jobs := model["jobs"].(map[string]any)
+	for name, j := range jobs {
+		job := j.(map[string]any)
+		config := types.ServiceConfig{}
+		if image, ok := job["image"].(string); ok {
+			config.Image = image
+		}
+		for _, volume := range imageVolumes(job) {
+			source, _ := volume["source"].(string)
+			config.Volumes = append(config.Volumes, types.ServiceVolumeConfig{
+				Type:   types.VolumeTypeImage,
+				Source: source,
+			})
+		}
+		jobsAsServices.Services[name] = config
+	}
+
+	jobsAsServices, err := jobsAsServices.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
+	if err != nil {
+		return err
+	}
+
+	for name, j := range jobs {
+		job := j.(map[string]any)
+		config := jobsAsServices.Services[name]
+		if config.Image != "" {
+			job["image"] = config.Image
+		}
+		for i, volume := range imageVolumes(job) {
 			if source := config.Volumes[i].Source; source != "" {
 				volume["source"] = source
 			}
@@ -646,6 +723,13 @@ func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOpti
 	for _, s := range project.Services {
 		_, _ = fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(s, project.Name))
 		for _, img := range api.GetDependentImages(s, project.Name) {
+			_, _ = fmt.Fprintln(dockerCli.Out(), img)
+		}
+	}
+	for name, j := range project.Jobs {
+		job := types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: j.Image}}
+		_, _ = fmt.Fprintln(dockerCli.Out(), api.GetImageNameOrDefault(job, project.Name))
+		for _, img := range api.GetDependentImages(job, project.Name) {
 			_, _ = fmt.Fprintln(dockerCli.Out(), img)
 		}
 	}

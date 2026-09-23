@@ -157,7 +157,20 @@ func TestAttachRestart(t *testing.T) {
 				debug)
 	}, 4*time.Minute, 2*time.Second)
 
-	assert.Equal(t, strings.Count(res.Stdout(), "failing-1  | world"), 3, res.Combined())
+	// The "exited" status above comes from the /events stream; the "world"
+	// log line comes from a separate, unsynchronized /logs?follow=1
+	// connection (pkg/compose/up.go's followStartedContainers). Nothing
+	// orders one relative to the other, so the last restart's log line can
+	// still be in flight the instant the 3rd "exited" is observed above —
+	// wait for it instead of counting it immediately.
+	// On failure, dump the daemon's own view of the container log: it
+	// discriminates a line compose failed to relay (present below, absent
+	// above) from a line the daemon itself never captured.
+	c.WaitForCondition(t, func() (bool, string) {
+		daemonView := icmd.RunCmd(c.NewDockerCmd(t, "logs", "attach-restart-failing-1")).Combined()
+		return strings.Count(res.Stdout(), "failing-1  | world") == 3,
+			fmt.Sprintf("'failing-1  | world' not found 3 times in : \n%s\ndaemon log view:\n%s\n", res.Combined(), daemonView)
+	}, 30*time.Second, 1*time.Second)
 }
 
 func TestInitContainer(t *testing.T) {
@@ -203,11 +216,11 @@ func TestConfig(t *testing.T) {
 		OutputContains(fmt.Sprintf(`name: %s
 services:
   nginx:
+    networks:
+      default: null
     build:
       context: %s
       dockerfile: Dockerfile
-    networks:
-      default: null
 networks:
   default:
     name: %s_default

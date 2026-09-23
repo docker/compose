@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +75,12 @@ type ProjectLoadOptions struct {
 	// All registered listeners will be notified of events.
 	// This is optional - pass nil or empty slice if not needed.
 	LoadListeners []LoadListener
+
+	// OnUnsupportedAttribute, when set, is invoked once during loading with
+	// every compose-file attribute detected as unsupported by this runtime
+	// outside Swarm mode. Detection only runs when this is set; leave nil to
+	// skip it entirely (e.g. for name-only project resolution).
+	OnUnsupportedAttribute func([]UnsupportedAttribute)
 
 	OCI OCIOptions
 }
@@ -136,8 +144,8 @@ type Compose interface {
 	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
 	// Events executes the equivalent to a `compose events`
 	Events(ctx context.Context, projectName string, options EventsOptions) error
-	// Port executes the equivalent to a `compose port`
-	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
+	// Ports executes the equivalent to a `compose port`
+	Ports(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (PortPublishers, error)
 	// Publish executes the equivalent to a `compose publish`
 	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
 	// Images executes the equivalent of a `compose images`
@@ -161,7 +169,25 @@ type Compose interface {
 	// Volumes executes the equivalent to a `docker volume ls`
 	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
 	// LoadProject loads and validates a Compose project from configuration files.
+	// Set ProjectLoadOptions.OnUnsupportedAttribute to also be notified of
+	// compose-file attributes accepted by the schema but not honored by this
+	// runtime outside Swarm mode.
 	LoadProject(ctx context.Context, options ProjectLoadOptions) (*types.Project, error)
+}
+
+// UnsupportedAttribute reports a compose-file attribute that is accepted by
+// the schema but has no effect on this runtime outside Swarm mode.
+type UnsupportedAttribute struct {
+	Service string // service name; empty for project-scoped attributes
+	Path    string // dotted attribute path, e.g. "deploy.update_config.failure_action"
+	Reason  string // one-line human-readable explanation, ready to print as-is
+}
+
+func (u UnsupportedAttribute) String() string {
+	if u.Service == "" {
+		return fmt.Sprintf("%s: %s", u.Path, u.Reason)
+	}
+	return fmt.Sprintf("service %q: %s: %s", u.Service, u.Path, u.Reason)
 }
 
 type VolumesOptions struct {
@@ -580,6 +606,15 @@ type PortPublisher struct {
 	TargetPort    int
 	PublishedPort int
 	Protocol      string
+}
+
+func (p PortPublisher) String() string {
+	return fmt.Sprintf("%d/%s -> %s", p.TargetPort, p.Protocol, p.HostPort())
+}
+
+// HostPort renders the host-side address the port is published on
+func (p PortPublisher) HostPort() string {
+	return net.JoinHostPort(p.URL, strconv.Itoa(p.PublishedPort))
 }
 
 // ContainerSummary hold high-level description of a container

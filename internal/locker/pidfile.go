@@ -17,7 +17,6 @@
 package locker
 
 import (
-	"fmt"
 	"path/filepath"
 )
 
@@ -30,6 +29,6 @@ func NewPidfile(projectName string) (*Pidfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := filepath.Join(run, fmt.Sprintf("%s.pid", projectName))
+	path := filepath.Join(run, projectName+".pid")
 	return &Pidfile{path: path}, nil
 }

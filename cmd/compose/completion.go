@@ -47,7 +47,7 @@ func completeServiceNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 
 		// only service names are needed, so skip environment resolution: a missing
 		// env_file must not prevent completion
-		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil, skipUnsupportedAttributesWarning, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -95,7 +95,7 @@ func completeProfileNames(dockerCli command.Cli, p *ProjectOptions) validArgsFn 
 
 		// only profile names are needed, so skip environment resolution: a missing
 		// env_file must not prevent completion
-		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+		project, _, err := p.ToProject(cmd.Context(), dockerCli, backend, nil, skipUnsupportedAttributesWarning, cli.WithoutEnvironmentResolution)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

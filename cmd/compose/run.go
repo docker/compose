@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -71,6 +72,11 @@ type runOptions struct {
 }
 
 func (options runOptions) apply(project *types.Project) (*types.Project, error) {
+	project, err := materializeManualJob(project, options.Service)
+	if err != nil {
+		return nil, err
+	}
+
 	if options.noDeps {
 		var err error
 		project, err = project.WithSelectedServices([]string{options.Service}, types.IgnoreDependencies)
@@ -83,7 +89,6 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	if err != nil {
 		return nil, err
 	}
-
 	target.Tty = !options.noTty
 	target.StdinOpen = options.interactive
 
@@ -168,7 +173,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				options.Command = args[1:]
 			}
 			if len(options.publish) > 0 && options.servicePorts {
-				return fmt.Errorf("--service-ports and --publish are incompatible")
+				return errors.New("--service-ports and --publish are incompatible")
 			}
 			if cmd.Flags().Changed("entrypoint") {
 				command, err := shellwords.Parse(options.entrypoint)
@@ -179,7 +184,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 			}
 			if cmd.Flags().Changed("tty") {
 				if cmd.Flags().Changed("no-tty") {
-					return fmt.Errorf("--tty and --no-tty can't be used together")
+					return errors.New("--tty and --no-tty can't be used together")
 				} else {
 					options.noTty = !ttyFlag
 				}
@@ -271,9 +276,35 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 // dependencies started by run, so hashing a different value would recreate
 // their containers.
 func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose, p *ProjectOptions, service string) (*types.Project, error) {
-	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, composecli.WithoutEnvironmentResolution)
+	project, _, err := p.ToProject(ctx, dockerCli, backend, []string{service}, warnUnsupportedAttributes, composecli.WithoutEnvironmentResolution)
 	if err != nil {
-		return nil, err
+		// The run target may be a job — invisible to the service selector.
+		// Only retry unselected for that specific selection failure: any
+		// other load error (a bad include:, an interpolation error, ...)
+		// would only be duplicated by a second full load — remote include:
+		// fetches and unsupported-attribute warnings included — before
+		// falling through to the same, still correct, error anyway.
+		if !isNoSuchServiceErr(err) {
+			return nil, err
+		}
+		// Reload unselected, materialize the job as a service, and narrow to
+		// it, so the env resolution below sees the job like any selected
+		// service (its env_file resolves; unrelated services' env_file still
+		// doesn't need to exist). A target that is not a declared job keeps
+		// the original, precise selection error. The first load above already
+		// warned about unsupported attributes; skip it here so a target that
+		// turns out to be a plain typo doesn't get the same warnings twice.
+		unselected, _, uerr := p.ToProject(ctx, dockerCli, backend, nil, skipUnsupportedAttributesWarning, composecli.WithoutEnvironmentResolution)
+		if uerr != nil {
+			return nil, err
+		}
+		if _, isJob := unselected.AllJobs()[service]; !isJob {
+			return nil, err
+		}
+		project, err = materializeManualJob(unselected, service)
+		if err != nil {
+			return nil, err
+		}
 	}
 	project, err = project.WithServicesEnvironmentResolved(true)
 	if err != nil {
@@ -282,6 +313,55 @@ func runProject(ctx context.Context, dockerCli command.Cli, backend api.Compose,
 	// platform resolution and validation happen later through
 	// createOptions.Apply, which runRun always invokes
 	return project, nil
+}
+
+// isNoSuchServiceErr reports whether err is compose-go's selection failure
+// for a service/job name that isn't part of the (possibly narrowed)
+// project — as opposed to any other project-load error.
+func isNoSuchServiceErr(err error) bool {
+	return strings.Contains(err.Error(), "no such service")
+}
+
+// unselectedJobs reloads the project without service selection and returns
+// its full (profile-enabled and -disabled) job set, or ok=false if that
+// reload itself fails — the caller then has only the original error to
+// fall back on.
+func unselectedJobs(ctx context.Context, dockerCli command.Cli, p *ProjectOptions) (jobs types.Jobs, ok bool) {
+	backend, err := compose.NewComposeService(dockerCli)
+	if err != nil {
+		return nil, false
+	}
+	unselected, _, err := p.ToProject(ctx, dockerCli, backend, nil, skipUnsupportedAttributesWarning, composecli.WithoutEnvironmentResolution)
+	if err != nil {
+		return nil, false
+	}
+	return unselected.AllJobs(), true
+}
+
+// jobTargetErr recognizes an otherwise-raw compose-go selection error as
+// targeting a declared job: unlike run, create and start don't materialize
+// jobs — targeting one with either is run-only by design — so on a match it
+// only returns a clearer error message (replaced=true), never falls
+// through to acting on the job. names is the caller's original
+// (unselected-by-profile) argument list.
+func jobTargetErr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions, names []string, err error) (jobErr error, replaced bool) {
+	if err == nil || len(names) == 0 || !isNoSuchServiceErr(err) {
+		return err, false
+	}
+	jobs, ok := unselectedJobs(ctx, dockerCli, p)
+	if !ok {
+		return err, false
+	}
+	// names is the full [SERVICE...] argument list, but err only ever names
+	// the one target compose-go's selection actually failed on: match that
+	// specific name, not any job name that happens to also be in names,
+	// or a real typo among several targets gets misreported as the job.
+	for _, name := range names {
+		if _, isJob := jobs[name]; isJob && strings.Contains(err.Error(), "no such service: "+name) {
+			return fmt.Errorf("job %q can only be triggered with \"docker compose run\"", name), true
+		}
+	}
+	return err, false
 }
 
 func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
@@ -303,7 +383,7 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 	for _, s := range options.labels {
 		key, val, ok := strings.Cut(s, "=")
 		if !ok {
-			return fmt.Errorf("label must be set as KEY=VALUE")
+			return errors.New("label must be set as KEY=VALUE")
 		}
 		labels[key] = val
 	}
@@ -365,4 +445,97 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
+}
+
+// materializeManualJob lets run target a job exactly like a service: per the
+// spec, any job can be triggered manually regardless of its automated
+// triggers, unless it explicitly opts out with `triggers.manual: false`.
+// A job is a ContainerSpec+WorkloadSpec — the same layers a service is made
+// of — so it materializes as a service for the one-off machinery: its
+// profile is activated and the project narrowed to its dependencies by
+// WithSelectedJob, then the job joins Services under its own name.
+func materializeManualJob(project *types.Project, name string) (*types.Project, error) {
+	// jobs and services share the depends_on namespace but not their own: a
+	// service with the target's name wins — it is what the service selector
+	// resolved — and a job already materialized must not be re-materialized
+	// (it would shed whatever resolution ran on it since).
+	if _, exists := project.Services[name]; exists {
+		return project, nil
+	}
+	job, ok := project.AllJobs()[name]
+	if !ok {
+		return project, nil
+	}
+	if job.Triggers != nil && job.Triggers.Manual != nil && !*job.Triggers.Manual {
+		return nil, fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
+	}
+	project, err := project.WithSelectedJob(name)
+	if err != nil {
+		return nil, err
+	}
+	// A job may depend on other jobs: materialize the whole job closure so
+	// every depends_on reference resolves to a service — the dependency job
+	// runs through the exact machinery a service dependency does (a
+	// run-to-completion container satisfying its declared condition),
+	// instead of dangling as an unresolvable name.
+	jobs := project.AllJobs()
+	if err := materializeJobClosure(project, jobs, job, map[string]bool{name: true}); err != nil {
+		return nil, err
+	}
+	project.Services[name] = jobAsService(project, name, job)
+	return project, nil
+}
+
+// materializeJobClosure adds every job reachable through job-typed
+// depends_on edges to project.Services. seen carries the starting job and
+// guards against dependency cycles. manual: false is checked here too, not
+// just on the top-level run target: it declares a job harmful to trigger
+// outside its schedule, and pulling it in as a dependency is still the
+// user's run command causing that out-of-schedule execution, just one hop
+// removed.
+func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.JobConfig, seen map[string]bool) error {
+	for dep := range job.DependsOn {
+		if seen[dep] {
+			continue
+		}
+		seen[dep] = true
+		depJob, isJob := jobs[dep]
+		if !isJob {
+			continue
+		}
+		if depJob.Triggers != nil && depJob.Triggers.Manual != nil && !*depJob.Triggers.Manual {
+			return fmt.Errorf("job %q is declared with manual: false, it cannot be triggered even as a dependency of another job", dep)
+		}
+		if err := materializeJobClosure(project, jobs, depJob, seen); err != nil {
+			return err
+		}
+		project.Services[dep] = jobAsService(project, dep, depJob)
+	}
+	return nil
+}
+
+// jobAsService materializes a job as a service for the one-off machinery: a
+// job is a ContainerSpec+WorkloadSpec, the same layers a service is made of.
+// It carries the standard custom labels the loader stamps on every service —
+// materialization happens after loading, so without them the containers
+// created for a dependency job would be invisible to every label-driven
+// path: start would silently skip them, ps/down would not see them, and the
+// dependency wait would report the job as a missing dependency.
+func jobAsService(project *types.Project, name string, job types.JobConfig) types.ServiceConfig {
+	svc := types.ServiceConfig{
+		Name:          name,
+		Profiles:      job.Profiles,
+		Extensions:    job.Extensions,
+		ContainerSpec: job.ContainerSpec,
+		WorkloadSpec:  job.WorkloadSpec,
+	}
+	svc.CustomLabels = types.Labels{
+		api.ProjectLabel:     project.Name,
+		api.ServiceLabel:     name,
+		api.VersionLabel:     api.ComposeVersion,
+		api.WorkingDirLabel:  project.WorkingDir,
+		api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+		api.OneoffLabel:      "False",
+	}
+	return svc
 }

@@ -19,8 +19,8 @@ package compose
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
@@ -133,7 +133,7 @@ func runExec(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	}
 	exitCode, err := backend.Exec(ctx, projectName, execOpts)
 	if exitCode != 0 {
-		errMsg := fmt.Sprintf("exit status %d", exitCode)
+		errMsg := "exit status " + strconv.Itoa(exitCode)
 		if err != nil && err.Error() != "" {
 			errMsg = err.Error()
 		}

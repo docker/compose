@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -247,13 +249,12 @@ func TestWaitDependencies(t *testing.T) {
 		replicas := 0
 		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
 			"app": {
-				Name: "app",
-				DependsOn: types.DependsOnConfig{
+				Name: "app", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
 					"disabled": {
 						Condition: ServiceConditionRunningOrHealthy,
 						Required:  true,
 					},
-				},
+				}},
 			},
 			"disabled": {
 				Name:   "disabled",
@@ -485,15 +486,14 @@ func TestCreateMobyContainer(t *testing.T) {
 	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
 
 	service := types.ServiceConfig{
-		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
+		Name: "test", ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{
 			"a": {
 				Priority: 10,
 			},
 			"b": {
 				Priority: 100,
 			},
-		},
+		}},
 	}
 	project := types.Project{
 		Name: "bork",
@@ -584,11 +584,10 @@ func TestCreateMobyContainerLegacyAPI(t *testing.T) {
 	apiClient.EXPECT().ClientVersion().Return("1.43").AnyTimes()
 
 	service := types.ServiceConfig{
-		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
+		Name: "test", ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{
 			"a": {Priority: 10},
 			"b": {Priority: 100},
-		},
+		}},
 	}
 	project := types.Project{
 		Name: "bork",
@@ -673,11 +672,10 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 	apiClient.EXPECT().ClientVersion().Return("1.43").AnyTimes()
 
 	service := types.ServiceConfig{
-		Name: "test",
-		Networks: map[string]*types.ServiceNetworkConfig{
+		Name: "test", ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{
 			"a": {Priority: 10},
 			"b": {Priority: 100},
-		},
+		}},
 	}
 	project := types.Project{
 		Name: "bork",
@@ -694,7 +692,7 @@ func TestCreateMobyContainerLegacyAPI_NetworkConnectFailure(t *testing.T) {
 		Return(client.ContainerCreateResult{ID: "an-id"}, nil)
 
 	// NetworkConnect fails
-	connectErr := fmt.Errorf("network connect failed")
+	connectErr := errors.New("network connect failed")
 	apiClient.EXPECT().NetworkConnect(gomock.Any(), gomock.Eq("a-moby-name"), gomock.Any()).
 		Return(client.NetworkConnectResult{}, connectErr)
 
@@ -774,6 +772,31 @@ func TestRuntimeAPIVersionRetriesOnTransientError(t *testing.T) {
 	assert.Equal(t, version, "1.44")
 }
 
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: post_start has no process inside it to act on. The
+// compose spec doesn't forbid declaring hooks on a provider: service, so
+// this must be guarded explicitly rather than assumed unreachable. No
+// ExecCreate expectation is set: per newStartTestService, gomock fails the
+// test if the hook still runs.
+func TestStartServiceContainerSkipsHooksForRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name: "db",
+		PostStart: []types.ServiceHook{
+			{Command: types.ShellCommand{"echo", "hi"}},
+		},
+	}
+	relay := serviceContainer("db", 1, container.StateCreated)
+	relay.Labels[api.RelayLabel] = "abc123"
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+
+	err := svc.startServiceContainer(t.Context(), &types.Project{}, service, relay, nil)
+	assert.NilError(t, err)
+}
+
 // TestWaitDependencyDeadline locks the timeout semantics of the dependency
 // wait: an expired deadline surfaces as "timeout waiting for dependencies",
 // while a plain user cancellation is not a wait failure.
@@ -811,5 +834,23 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		cancel()
 		err := tested.(*composeService).waitDependencies(ctx, &project, "app", dependencies, containers, 0)
 		assert.NilError(t, err)
+	})
+
+	// Regression guard for the runtime fallback warning on waitDependency's
+	// default branch — see the comment on that branch for why it must stay.
+	t.Run("unsupported condition warns and returns without waiting", func(t *testing.T) {
+		hook := logrustest.NewGlobal()
+		unsupportedDeps := types.DependsOnConfig{
+			"db": {Condition: "some_future_condition", Required: true},
+		}
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", unsupportedDeps, containers, 2*time.Second)
+		assert.NilError(t, err)
+
+		var messages []string
+		for _, e := range hook.AllEntries() {
+			messages = append(messages, e.Message)
+		}
+		joined := strings.Join(messages, "\n")
+		assert.Assert(t, strings.Contains(joined, `service "app": unsupported depends_on condition "some_future_condition"`), joined)
 	})
 }

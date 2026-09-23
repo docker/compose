@@ -17,8 +17,6 @@
 package compose
 
 import (
-	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -27,8 +25,6 @@ import (
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -43,6 +39,7 @@ func TestResolveImageDigests(t *testing.T) {
 		serviceDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		hookDigest    = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 		volumeDigest  = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		builderDigest = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 	)
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -64,7 +61,9 @@ func TestResolveImageDigests(t *testing.T) {
 					map[string]any{"type": "image", "source": "someimage:latest", "target": "/data"},
 					// already digested: must NOT trigger any registry call and must be kept as-is
 					map[string]any{"type": "image", "source": "docker.io/library/pinned@" + testDigest, "target": "/pinned"},
-					// source referencing another service: locally built image, must be kept as-is
+					// happens to share its name with the "builder" service below: a type=image
+					// volume source is always a plain docker image reference (compose-go#929),
+					// never an implicit reference to another service, so it still gets resolved
 					map[string]any{"type": "image", "source": "builder", "target": "/built"},
 					map[string]any{"type": "bind", "source": "/host", "target": "/bind"},
 					"./data:/short",
@@ -95,6 +94,10 @@ func TestResolveImageDigests(t *testing.T) {
 		Return(client.DistributionInspectResult{
 			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: hookDigest}},
 		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/builder:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: builderDigest}},
+		}, nil)
 
 	err := resolveImageDigests(t.Context(), cli, model)
 	assert.NilError(t, err)
@@ -109,7 +112,7 @@ func TestResolveImageDigests(t *testing.T) {
 	volumes := service["volumes"].([]any)
 	assert.Equal(t, volumes[0].(map[string]any)["source"], "docker.io/library/someimage:latest@"+volumeDigest)
 	assert.Equal(t, volumes[1].(map[string]any)["source"], "docker.io/library/pinned@"+testDigest)
-	assert.Equal(t, volumes[2].(map[string]any)["source"], "builder")
+	assert.Equal(t, volumes[2].(map[string]any)["source"], "docker.io/library/builder:latest@"+builderDigest)
 	assert.Equal(t, volumes[3].(map[string]any)["source"], "/host")
 	assert.Equal(t, volumes[4], "./data:/short")
 	assert.Equal(t, services["builder"].(map[string]any)["image"], "docker.io/library/pinned@"+testDigest)
@@ -134,19 +137,77 @@ func TestResolveImageDigestsWithoutServices(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A job's image and `type: image` volume sources must resolve the same way a
+// service's do -- jobs share the same build-and-publish surface, and
+// resolveImageDigests originally only walked model["services"].
+func TestResolveImageDigestsWithJobs(t *testing.T) {
+	const (
+		serviceDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		jobDigest     = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+		jobVolDigest  = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+	)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
+
+	model := map[string]any{
+		"services": map[string]any{
+			"web": map[string]any{"image": "nginx:latest"},
+		},
+		"jobs": map[string]any{
+			"migrate": map[string]any{
+				"image": "migrate:latest",
+				"volumes": []any{
+					map[string]any{"type": "image", "source": "migrate-data:latest", "target": "/data"},
+				},
+			},
+		},
+	}
+
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/nginx:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: serviceDigest}},
+		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/migrate:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: jobDigest}},
+		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/migrate-data:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: jobVolDigest}},
+		}, nil)
+
+	err := resolveImageDigests(t.Context(), cli, model)
+	assert.NilError(t, err)
+
+	service := model["services"].(map[string]any)["web"].(map[string]any)
+	assert.Equal(t, service["image"], "docker.io/library/nginx:latest@"+serviceDigest)
+
+	job := model["jobs"].(map[string]any)["migrate"].(map[string]any)
+	assert.Equal(t, job["image"], "docker.io/library/migrate:latest@"+jobDigest)
+	volumes := job["volumes"].([]any)
+	assert.Equal(t, volumes[0].(map[string]any)["source"], "docker.io/library/migrate-data:latest@"+jobVolDigest)
+}
+
 func TestImagesOnly(t *testing.T) {
 	project := &types.Project{
 		Name: "test",
 		Services: types.Services{
 			"test": types.ServiceConfig{
-				Name:    "test",
-				Image:   "docker.io/library/nginx@" + testDigest,
-				Command: types.ShellCommand{"echo", "hello"},
+				Name: "test",
+
 				// hooks can't be overridden element-wise on merge, so the lock must not carry them
-				PreStart: []types.ServiceHook{{Image: "docker.io/library/hookimage@" + testDigest}},
-				Volumes: []types.ServiceVolumeConfig{
-					{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
-					{Type: types.VolumeTypeBind, Source: "/host", Target: "/bind"},
+				PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "docker.io/library/hookimage@" + testDigest}}}, ContainerSpec: types.ContainerSpec{
+					Image:   "docker.io/library/nginx@" + testDigest,
+					Command: types.ShellCommand{"echo", "hello"},
+
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
+						{Type: types.VolumeTypeBind, Source: "/host", Target: "/bind"},
+					},
 				},
 			},
 		},
@@ -158,9 +219,11 @@ func TestImagesOnly(t *testing.T) {
 	assert.DeepEqual(t, locked, &types.Project{
 		Services: types.Services{
 			"test": types.ServiceConfig{
-				Image: "docker.io/library/nginx@" + testDigest,
-				Volumes: []types.ServiceVolumeConfig{
-					{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
+				ContainerSpec: types.ContainerSpec{
+					Image: "docker.io/library/nginx@" + testDigest,
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
+					},
 				},
 			},
 		},
@@ -168,47 +231,37 @@ func TestImagesOnly(t *testing.T) {
 }
 
 func TestWarnHooksNotLockable(t *testing.T) {
-	hook := logrustest.NewGlobal()
-	logrus.SetOutput(io.Discard)
-	defer func() {
-		logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
-		logrus.SetOutput(os.Stderr)
-	}()
-
-	warnHooksNotLockable(&types.Project{
-		Services: types.Services{
-			"with-hook-image": types.ServiceConfig{PreStart: []types.ServiceHook{{Image: "alpine:latest"}}},
-			"inline-hook":     types.ServiceConfig{PreStart: []types.ServiceHook{{Command: types.ShellCommand{"echo"}}}},
-			"without-hook":    types.ServiceConfig{},
-		},
+	messages := captureWarnings(t, func() {
+		warnHooksNotLockable(&types.Project{
+			Services: types.Services{
+				"with-hook-image": types.ServiceConfig{PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "alpine:latest"}}}},
+				"inline-hook":     types.ServiceConfig{PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"echo"}}}}},
+				"without-hook":    types.ServiceConfig{},
+			},
+		})
 	})
 
-	assert.Equal(t, len(hook.Entries), 1)
-	assert.Assert(t, strings.Contains(hook.Entries[0].Message, `service "with-hook-image"`))
+	assert.Equal(t, len(messages), 1)
+	assert.Assert(t, strings.Contains(messages[0], `service "with-hook-image"`))
 }
 
 func TestWarnModelHooksNotLockable(t *testing.T) {
-	hook := logrustest.NewGlobal()
-	logrus.SetOutput(io.Discard)
-	defer func() {
-		logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
-		logrus.SetOutput(os.Stderr)
-	}()
-
-	warnModelHooksNotLockable(map[string]any{
-		"services": map[string]any{
-			"with-hook-image": map[string]any{
-				"pre_start": []any{map[string]any{"image": "alpine:latest"}},
+	messages := captureWarnings(t, func() {
+		warnModelHooksNotLockable(map[string]any{
+			"services": map[string]any{
+				"with-hook-image": map[string]any{
+					"pre_start": []any{map[string]any{"image": "alpine:latest"}},
+				},
+				"inline-hook": map[string]any{
+					"pre_start": []any{map[string]any{"command": "echo"}},
+				},
+				"without-hook": map[string]any{"image": "nginx"},
 			},
-			"inline-hook": map[string]any{
-				"pre_start": []any{map[string]any{"command": "echo"}},
-			},
-			"without-hook": map[string]any{"image": "nginx"},
-		},
+		})
 	})
 
-	assert.Equal(t, len(hook.Entries), 1)
-	assert.Assert(t, strings.Contains(hook.Entries[0].Message, `service "with-hook-image"`))
+	assert.Equal(t, len(messages), 1)
+	assert.Assert(t, strings.Contains(messages[0], `service "with-hook-image"`))
 }
 
 func TestLockModel(t *testing.T) {

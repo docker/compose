@@ -73,7 +73,7 @@ func runViz(ctx context.Context, dockerCli command.Cli, backendOptions *BackendO
 		return err
 	}
 
-	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil)
+	project, _, err := opts.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes)
 	if err != nil {
 		return err
 	}

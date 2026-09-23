@@ -61,7 +61,7 @@ func (ke *KeyboardError) printError(height int, info string) {
 func (ke *KeyboardError) addError(prefix string, err error) {
 	ke.timeStart = time.Now()
 
-	prefix = ansiColor(CYAN, fmt.Sprintf("%s →", prefix), BOLD)
+	prefix = ansiColor(CYAN, prefix+" →", BOLD)
 	errorString := fmt.Sprintf("%s  %s", prefix, err.Error())
 
 	ke.err = errors.New(errorString)
@@ -210,10 +210,10 @@ func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Pro
 	go func() {
 		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui", tracing.SpanOptions{},
 			func(ctx context.Context) error {
-				link := fmt.Sprintf("docker-desktop://dashboard/apps/%s", project.Name)
+				link := "docker-desktop://dashboard/apps/" + project.Name
 				err := open.Run(link)
 				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop")
+					err = errors.New("could not open Docker Desktop")
 					lk.keyboardError("View", err)
 				}
 				return err
@@ -228,10 +228,10 @@ func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Proje
 	go func() {
 		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/composeview", tracing.SpanOptions{},
 			func(ctx context.Context) error {
-				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s", project.Name)
+				link := "docker-desktop://dashboard/docker-compose/" + project.Name
 				err := open.Run(link)
 				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop Compose UI")
+					err = errors.New("could not open Docker Desktop Compose UI")
 					lk.keyboardError("View Config", err)
 				}
 				return err
@@ -264,7 +264,7 @@ func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Proje
 				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
 				err := open.Run(link)
 				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop Compose UI")
+					err = errors.New("could not open Docker Desktop Compose UI")
 					lk.keyboardError("Watch Docs", err)
 				}
 				return err

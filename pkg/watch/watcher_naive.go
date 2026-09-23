@@ -19,6 +19,7 @@
 package watch
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -301,7 +302,7 @@ func newWatcher(paths []string) (Notify, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		if strings.Contains(err.Error(), "too many open files") && runtime.GOOS == "linux" {
-			return nil, fmt.Errorf("hit OS limits creating a watcher.\n" +
+			return nil, errors.New("hit OS limits creating a watcher.\n" +
 				"Run 'sysctl fs.inotify.max_user_instances' to check your inotify limits.\n" +
 				"To raise them, run 'sudo sysctl fs.inotify.max_user_instances=1024'")
 		}

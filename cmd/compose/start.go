@@ -56,6 +56,12 @@ func runStart(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	if err != nil {
 		return err
 	}
+	if project != nil {
+		// with a file, refuse active scheduled jobs like up and create do
+		if err := rejectScheduledJobs(project); err != nil {
+			return err
+		}
+	}
 
 	var timeout time.Duration
 	if opts.waitTimeout > 0 {

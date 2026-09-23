@@ -53,7 +53,7 @@ group "default" {
 }
 
 group "validate" {
-  targets = ["lint", "vendor-validate", "license-validate", "mocks-validate"]
+  targets = ["lint", "vendor-validate", "license-validate", "mocks-validate", "relay-lint"]
 }
 
 target "lint" {
@@ -164,5 +164,48 @@ target "image-module-cross" {
     "linux/arm64",
     "windows/amd64",
     "windows/arm64",
+  ]
+}
+
+// relay-lint and relay-test validate relay/'s own module (a separate go.mod:
+// go vet/lint/test from the repo root don't cover it). Self-contained build
+// context, so relay/ carries its own .golangci.yml rather than sharing the
+// root one, which isn't in scope for a "./relay" context.
+target "relay-lint" {
+  context = "./relay"
+  target  = "lint"
+  output  = ["type=cacheonly"]
+}
+
+target "relay-test" {
+  context = "./relay"
+  target  = "test"
+  output  = ["type=cacheonly"]
+}
+
+// relay-image is the local/dev build of the network relay compose deploys in
+// place of a provider service that published endpoints (see relay/). The tag
+// matches the runtime default (COMPOSE_RELAY_IMAGE overrides it).
+target "relay-image" {
+  context = "./relay"
+  tags = ["docker/compose-relay:v1"]
+}
+
+// relay-image-cross is the CI publication target: tags and labels come from
+// the workflow through meta-helper, platforms cover every linux platform the
+// compose binary ships for — the relay runs as a container on the engine, so
+// darwin/windows binaries make no sense for it.
+target "relay-image-cross" {
+  inherits = ["meta-helper"]
+  context = "./relay"
+  output = ["type=image"]
+  platforms = [
+    "linux/amd64",
+    "linux/arm/v6",
+    "linux/arm/v7",
+    "linux/arm64",
+    "linux/ppc64le",
+    "linux/riscv64",
+    "linux/s390x",
   ]
 }

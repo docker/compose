@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -294,11 +295,11 @@ func TestDownRemoveImages(t *testing.T) {
 			Name: strings.ToLower(testProject),
 			Services: types.Services{
 				"local-anonymous":     {Name: "local-anonymous"},
-				"local-named":         {Name: "local-named", Image: "local-named-image"},
-				"remote":              {Name: "remote", Image: "remote-image"},
-				"remote-tagged":       {Name: "remote-tagged", Image: "registry.example.com/remote-image-tagged:v1.0"},
+				"local-named":         {Name: "local-named", ContainerSpec: types.ContainerSpec{Image: "local-named-image"}},
+				"remote":              {Name: "remote", ContainerSpec: types.ContainerSpec{Image: "remote-image"}},
+				"remote-tagged":       {Name: "remote-tagged", ContainerSpec: types.ContainerSpec{Image: "registry.example.com/remote-image-tagged:v1.0"}},
 				"no-images-anonymous": {Name: "no-images-anonymous"},
-				"no-images-named":     {Name: "no-images-named", Image: "missing-named-image"},
+				"no-images-named":     {Name: "no-images-named", ContainerSpec: types.ContainerSpec{Image: "missing-named-image"}},
 			},
 		},
 	}
@@ -530,7 +531,7 @@ func TestEnsureImagesDown_SparesDanglingImagesOfOrphanedServices(t *testing.T) {
 	project := &types.Project{
 		Name: "prj",
 		Services: types.Services{
-			"web": {Name: "web", Image: "web-image"},
+			"web": {Name: "web", ContainerSpec: types.ContainerSpec{Image: "web-image"}},
 		},
 	}
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
@@ -569,7 +570,7 @@ func TestEnsureImagesDown_RemoveOrphansAlsoTakesDanglingImages(t *testing.T) {
 	project := &types.Project{
 		Name: "prj",
 		Services: types.Services{
-			"web": {Name: "web", Image: "web-image"},
+			"web": {Name: "web", ContainerSpec: types.ContainerSpec{Image: "web-image"}},
 		},
 	}
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
@@ -669,9 +670,30 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	// Removal fails — Down must still return nil.
 	api.EXPECT().ContainerRemove(gomock.Any(), "hook-2",
 		client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, fmt.Errorf("daemon busy"))
+		Return(client.ContainerRemoveResult{}, errors.New("daemon busy"))
 
 	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{})
+	assert.NilError(t, err)
+}
+
+// A relay stands in for the service on the network but is a shell-less
+// scratch binary: pre_stop has no process inside it to act on. No
+// ExecCreate expectation is set: per newStartTestService, gomock fails the
+// test if the hook still runs.
+func TestStopContainerSkipsPreStopForRelay(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name:    "db",
+		PreStop: []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+	}
+	relay := serviceContainer("db", 1, container.StateRunning)
+	relay.Labels[compose.RelayLabel] = "abc123"
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), relay.ID, gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+
+	err := svc.stopContainer(t.Context(), &service, relay, nil, nil)
 	assert.NilError(t, err)
 }
 

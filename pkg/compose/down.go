@@ -96,13 +96,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		serv := project.Services[service]
-		if serv.Provider != nil {
-			return s.runPlugin(ctx, project, serv, "down")
-		}
-		serviceContainers := containers.filter(isService(service))
-		err := s.removeContainers(ctx, serviceContainers, &serv, options.Timeout, options.Volumes)
-		return err
+		return s.downService(ctx, project, containers, options, service)
 	}, WithRootNodesAndDown(options.Services))
 	if err != nil {
 		return err
@@ -232,7 +226,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		return nil
 	}
 
-	eventName := fmt.Sprintf("Network %s", name)
+	eventName := "Network " + name
 	s.events.On(removingEvent(eventName))
 
 	var found int
@@ -277,7 +271,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 }
 
 func (s *composeService) removeVolume(ctx context.Context, id string) error {
-	resource := fmt.Sprintf("Volume %s", id)
+	resource := "Volume " + id
 
 	_, err := s.apiClient().VolumeInspect(ctx, id, client.VolumeInspectOptions{})
 	if errdefs.IsNotFound(err) {
@@ -317,7 +311,7 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	eventName := getContainerProgressName(ctr)
 	s.events.On(newEvent(eventName, api.Working, api.StatusStopping))
 
-	if service != nil {
+	if service != nil && !isRelayContainer(ctr) {
 		for _, hook := range service.PreStop {
 			err := s.runHook(ctx, ctr, *service, hook, listener)
 			if err != nil {
@@ -381,6 +375,22 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 		return err
 	}
 	s.events.On(removedEvent(eventName))
+	return nil
+}
+
+// downService removes one service's containers. A provider service may still
+// own project containers — the relay deployed when it published endpoints —
+// and the plugin only removes the provider's own resource, so the containers
+// go first, mirroring up, which provisions the resource before the relay.
+func (s *composeService) downService(ctx context.Context, project *types.Project, containers Containers, options api.DownOptions, service string) error {
+	serv := project.Services[service]
+	serviceContainers := containers.filter(isService(service))
+	if err := s.removeContainers(ctx, serviceContainers, &serv, options.Timeout, options.Volumes); err != nil {
+		return err
+	}
+	if serv.Provider != nil {
+		return s.runPlugin(ctx, project, serv, "down")
+	}
 	return nil
 }
 

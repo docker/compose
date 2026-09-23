@@ -53,9 +53,16 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 			return nil
 		}
 		serv := project.Services[service]
+		// a provider service may still own a project container — the relay
+		// deployed when it published endpoints — and the plugin's own stop
+		// hook (if any) only concerns the provider's resource, so the
+		// container is stopped the same way as for any other service.
+		if err := s.stopContainers(ctx, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout, event); err != nil {
+			return err
+		}
 		if serv.Provider != nil {
 			return s.runPlugin(ctx, project, serv, "stop")
 		}
-		return s.stopContainers(ctx, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout, event)
+		return nil
 	})
 }

@@ -1,0 +1,27 @@
+services:
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+jobs:
+  migrate:
+    image: alpine
+    command: sh -c 'echo "migration done"'
+    triggers:
+      manual: true
+    depends_on:
+      db:
+        condition: service_started
+  backup:
+    image: alpine
+    command: echo backup
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"
+  rotation:
+    image: alpine
+    command: echo rotation
+    triggers:
+      manual: false
+      schedule:
+        - cron: "0 3 1 * *"

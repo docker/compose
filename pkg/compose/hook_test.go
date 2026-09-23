@@ -22,7 +22,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -87,8 +87,7 @@ func TestRunHook_ConsoleSize(t *testing.T) {
 			mockCli.EXPECT().Out().Return(streams.NewOut(tty)).AnyTimes()
 
 			service := types.ServiceConfig{
-				Name: "test",
-				Tty:  tc.tty,
+				Name: "test", WorkloadSpec: types.WorkloadSpec{Tty: tc.tty},
 			}
 			hook := types.ServiceHook{Command: []string{"echo", "hello"}}
 			ctr := container.Summary{ID: "container123"}
@@ -450,7 +449,7 @@ func TestRunHook_CopyError(t *testing.T) {
 	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	ctr := container.Summary{ID: "ctr-1"}
-	service := types.ServiceConfig{Name: "svc", Tty: false}
+	service := types.ServiceConfig{Name: "svc", WorkloadSpec: types.WorkloadSpec{Tty: false}}
 	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
 
 	mockAPI.EXPECT().
@@ -460,7 +459,7 @@ func TestRunHook_CopyError(t *testing.T) {
 	// Build a pipe whose read side immediately returns a hard error, simulating
 	// an I/O failure mid-stream rather than a clean EOF.
 	pr, pw := io.Pipe()
-	_ = pw.CloseWithError(fmt.Errorf("simulated I/O failure"))
+	_ = pw.CloseWithError(errors.New("simulated I/O failure"))
 
 	// Use net.Pipe() only for the Conn field (Close); reads come from pr.
 	serverConn, clientConn := net.Pipe()
@@ -524,7 +523,7 @@ func TestRunHook_ExecCreateError(t *testing.T) {
 
 	mockAPI.EXPECT().
 		ExecCreate(gomock.Any(), "ctr-1", gomock.Any()).
-		Return(client.ExecCreateResult{}, fmt.Errorf("exec create failed"))
+		Return(client.ExecCreateResult{}, errors.New("exec create failed"))
 
 	s, err := NewComposeService(mockCli)
 	assert.NilError(t, err)
@@ -552,7 +551,7 @@ func TestRunHook_ExecAttachError(t *testing.T) {
 		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
 	mockAPI.EXPECT().
 		ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecAttachResult{}, fmt.Errorf("exec attach failed"))
+		Return(client.ExecAttachResult{}, errors.New("exec attach failed"))
 
 	s, err := NewComposeService(mockCli)
 	assert.NilError(t, err)
@@ -572,7 +571,7 @@ func TestRunHook_ExecInspectError(t *testing.T) {
 	mockCli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
 
 	ctr := container.Summary{ID: "ctr-1"}
-	service := types.ServiceConfig{Name: "svc", Tty: false}
+	service := types.ServiceConfig{Name: "svc", WorkloadSpec: types.WorkloadSpec{Tty: false}}
 	hook := types.ServiceHook{Command: types.ShellCommand{"true"}}
 
 	mockAPI.EXPECT().
@@ -590,7 +589,7 @@ func TestRunHook_ExecInspectError(t *testing.T) {
 
 	mockAPI.EXPECT().
 		ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecInspectResult{}, fmt.Errorf("inspect failed"))
+		Return(client.ExecInspectResult{}, errors.New("inspect failed"))
 
 	s, err := NewComposeService(mockCli)
 	assert.NilError(t, err)

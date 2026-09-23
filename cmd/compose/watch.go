@@ -72,7 +72,7 @@ func runWatch(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 		return err
 	}
 
-	project, _, err := watchOpts.ToProject(ctx, dockerCli, backend, services, cli.WithoutEnvironmentResolution)
+	project, _, err := watchOpts.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
