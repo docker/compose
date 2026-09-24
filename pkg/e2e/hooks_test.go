@@ -106,6 +106,22 @@ func TestPreStartHookInError(t *testing.T) {
 			ServiceState("sample", "created"))
 }
 
+// A retained runner from a failed run must not block the next one: it is a
+// stale hook container the reconciler has to observe and purge before
+// creating a fresh one under the same deterministic name, or the second up
+// fails with a container-name conflict instead of recovering.
+func TestPreStartHookRetryAfterFailureSucceeds(t *testing.T) {
+	s := NewScenario(t, "up must recover from a previously failed hook by purging its stale runner")
+	s.Step("first up fails on the hook",
+		ComposeCmd("up", "-d").MayFail(),
+		ExitCode(1),
+		OutputContains("pre_start"),
+		ServiceState("sample", "created")).
+		Step("second up purges the stale runner and succeeds",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("sample", "running"))
+}
+
 func TestPreStartHookBuildInheritance(t *testing.T) {
 	s := NewScenario(t, "a pre_start hook without an image must run on the service's built image")
 	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-sample")).

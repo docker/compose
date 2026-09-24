@@ -598,7 +598,7 @@ func (s *composeService) startService(ctx context.Context,
 		return errNoContainerToStart(service.Name)
 	}
 
-	serviceContainers := containers.filter(isService(service.Name), isNotOneOff)
+	serviceContainers := containers.filter(isService(service.Name), isNotOneOff, isNotHookContainer)
 	toStart := serviceContainers.filter(isNotRunning)
 	if len(toStart) == 0 {
 		return nil

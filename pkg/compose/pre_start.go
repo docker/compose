@@ -100,6 +100,7 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 	// Validate every hook up front so an unsupported entry never triggers any I/O.
 	for i, hook := range service.PreStart {
 		if hook.PerReplica {
+			// per_replica is not yet supported: docker/compose#14259.
 			return fmt.Errorf("service %q pre_start[%d]: per_replica is not yet supported; remove per_replica or set it to false", service.Name, i)
 		}
 	}

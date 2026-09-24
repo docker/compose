@@ -147,6 +147,36 @@ type ObservedVolume struct {
 
 // collectObservedState queries the Docker daemon for all resources belonging to
 // the given project and returns a structured snapshot.
+// mergeHookContainers appends the pre_start hook runner containers to raw.
+// Runners deliberately carry no ConfigHashLabel (kept invisible to ps/start's
+// default listing, which requires it -- see createPreStartContainer) -- so
+// getContainers' filters never return them, and they must be listed
+// separately, by project+hook label alone, or the classification loop never
+// sees them: stale runners would never be purged, and the next deterministic
+// create would fail with a name conflict against the one left behind. The
+// extra round-trip is only paid when the model declares pre_start hooks at
+// all. Accepted corner: a runner whose service left the model is only
+// classified (and swept by --remove-orphans) while some remaining service
+// still declares pre_start hooks -- `down` removes it by hook label
+// regardless (see removePreStartHookContainers).
+func (s *composeService) mergeHookContainers(ctx context.Context, project *types.Project, raw Containers) (Containers, error) {
+	hasPreStartHooks := false
+	for _, svc := range project.Services {
+		if len(svc.PreStart) > 0 {
+			hasPreStartHooks = true
+			break
+		}
+	}
+	if !hasPreStartHooks {
+		return raw, nil
+	}
+	hookRaw, err := s.getHookContainers(ctx, project.Name)
+	if err != nil {
+		return nil, err
+	}
+	return append(raw, hookRaw...), nil
+}
+
 // The project model is used to classify containers by service and to identify
 // orphans, and to scope network/volume queries to declared resources.
 func (s *composeService) collectObservedState(ctx context.Context, project *types.Project) (*ObservedState, error) {
@@ -164,6 +194,10 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	// FINISHED ones are classified as orphans below (see isOrphaned), so `up`
 	// can warn about them and `--remove-orphans` can clean them up.
 	raw, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return nil, err
+	}
+	raw, err = s.mergeHookContainers(ctx, project, raw)
 	if err != nil {
 		return nil, err
 	}
