@@ -265,6 +265,9 @@ func serveDemo(bindAddr string) (string, error) {
 	addr, err := bufio.NewReader(stdout).ReadString('\n')
 	watchdog.Stop()
 	if err != nil {
+		// the subprocess outlives this function so nothing else calls
+		// Wait() to close the pipe's read end: release it here
+		_ = stdout.Close()
 		return "", fmt.Errorf("bind %s: endpoint did not come up: %w", bindAddr, err)
 	}
 	return addr, nil
