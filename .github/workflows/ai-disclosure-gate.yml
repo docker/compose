@@ -13,6 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     name: AI disclosure gate
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       - name: Block merge while AI_AGENT_DISCLOSURE.md is present
         env:
           GH_TOKEN: ${{ github.token }}

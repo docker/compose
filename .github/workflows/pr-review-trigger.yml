@@ -22,6 +22,14 @@ jobs:
     if: github.event.pull_request.head.repo.fork && github.event.sender.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       - name: Save event context
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}

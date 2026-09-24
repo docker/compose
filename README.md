@@ -14,6 +14,7 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/docker/compose/ci.yml?label=ci&logo=github&style=flat-square)](https://github.com/docker/compose/actions?query=workflow%3Aci)
 [![Codecov](https://codecov.io/gh/docker/compose/branch/main/graph/badge.svg?token=HP3K4Y4ctu)](https://codecov.io/gh/docker/compose)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/docker/compose/badge)](https://api.securityscorecards.dev/projects/github.com/docker/compose)
+[![Protected by Tracebit Community Edition](https://github.com/tracebit-com/tracebit-community-action/blob/main/assets/badges/tracebit-badge-compact.svg?raw=1)](https://community.tracebit.com/supplychainattacks)
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
 Docker Compose is a tool for running multi-container applications on Docker

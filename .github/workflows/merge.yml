@@ -23,6 +23,14 @@ jobs:
     outputs:
       repo-slug: ${{ env.REPO_SLUG }}
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       # FIXME: can't use env object in reusable workflow inputs: https://github.com/orgs/community/discussions/26671
       - run: echo "Exposing env vars for reusable workflow"
 
@@ -105,5 +113,3 @@ jobs:
         - type: dockerhub
           username: docker
           connection_id: a295c8b7-54ab-4507-ac88-5c43003c73a5
-
- 

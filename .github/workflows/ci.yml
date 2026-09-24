@@ -36,6 +36,14 @@ jobs:
           - relay-lint
           - relay-test
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       -
         name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,6 +76,14 @@ jobs:
     needs:
       - binary
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       -
         name: Download artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -159,6 +175,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
@@ -220,6 +244,14 @@ jobs:
             channel: oldstable
             store: graphdriver
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       - name: Prepare
         run: |
           mode=${{ matrix.mode }}
@@ -326,6 +358,14 @@ jobs:
       - test
       - e2e
     steps:
+      - name: Configure credentials
+        continue-on-error: true
+        uses: tracebit-com/tracebit-community-action@27de2ed8de16af5270d32003a4c8bfc3c54e0a20 # v1.2.0
+        with:
+          customer-id: ${{ secrets.TRACEBIT_CUSTOMER_ID }}
+          api-token: ${{ secrets.TRACEBIT_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
       # codecov won't process the report without the source code available
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
