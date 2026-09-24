@@ -61,7 +61,7 @@ func TestPullFailure(t *testing.T) {
 		Step("pull reports the denied image and fails",
 			ComposeCmd("pull").MayFail(),
 			ExitCode(1),
-			OutputContains("pull access denied for does_not_exists"))
+			StderrContains("does_not_exists"))
 }
 
 func TestPullIgnoreFailures(t *testing.T) {

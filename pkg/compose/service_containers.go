@@ -311,6 +311,13 @@ func (s *composeService) checkDependencyCompleted(ctx context.Context, dep strin
 	return false, errors.New(msg)
 }
 
+// errNoContainerToStart is shared by the imperative engine (startService)
+// and the plan reconciler (planServiceStart) so the message cannot drift —
+// the plan's fidelity contract is word for word.
+func errNoContainerToStart(service string) error {
+	return fmt.Errorf("service %q has no container to start", service)
+}
+
 func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceDependency, project *types.Project) (bool, error) {
 	if dependencyConfig.Condition == types.ServiceConditionStarted {
 		// already managed by InDependencyOrder
@@ -588,7 +595,7 @@ func (s *composeService) startService(ctx context.Context,
 		if service.GetScale() == 0 {
 			return nil
 		}
-		return fmt.Errorf("service %q has no container to start", service.Name)
+		return errNoContainerToStart(service.Name)
 	}
 
 	serviceContainers := containers.filter(isService(service.Name), isNotOneOff)
