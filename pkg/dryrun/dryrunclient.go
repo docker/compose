@@ -47,10 +47,13 @@ var _ client.APIClient = &DryRunClient{}
 
 // DryRunClient implements APIClient by delegating to implementation functions. This allows lazy init and per-method overrides
 type DryRunClient struct {
-	apiClient  client.APIClient
-	containers []containerType.Summary
-	execs      sync.Map
-	configFile *configfile.ConfigFile
+	apiClient client.APIClient
+	// containers caches the project's containers: seeded once from the real
+	// daemon (containersSeeded), then extended with every faked creation.
+	containers       []containerType.Summary
+	containersSeeded bool
+	execs            sync.Map
+	configFile       *configfile.ConfigFile
 }
 
 type execDetails struct {
@@ -182,20 +185,24 @@ func (d *DryRunClient) ContainerKill(ctx context.Context, container string, opti
 func (d *DryRunClient) ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error) {
 	caller := getCallingFunction()
 	switch caller {
-	case "start":
+	case "getContainers":
+		// Seed the cache from the real daemon on first use, then keep
+		// answering from it: containers faked by ContainerCreate must stay
+		// visible to the start flow, which lists through getContainers.
+		// Seeding is tracked independently of the cache's length — a faked
+		// creation may land before the first listing, and must not mask the
+		// daemon's real containers.
+		if !d.containersSeeded {
+			res, err := d.apiClient.ContainerList(ctx, options)
+			if err != nil {
+				return client.ContainerListResult{}, err
+			}
+			d.containersSeeded = true
+			d.containers = append(d.containers, res.Items...)
+		}
 		return client.ContainerListResult{
 			Items: d.containers,
 		}, nil
-	case "getContainers":
-		if len(d.containers) == 0 {
-			res, err := d.apiClient.ContainerList(ctx, options)
-			if err == nil {
-				d.containers = res.Items
-			}
-			return client.ContainerListResult{
-				Items: d.containers,
-			}, err
-		}
 	case "listPreStartRunners":
 		// Hook runners created under dry-run exist only in the cache: answer
 		// from it, honoring the caller's label filters (project, service,
