@@ -95,11 +95,8 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	// shared by every service so the dependency-order fan-out and the
-	// per-service container fan-out combined never exceed maxConcurrency
-	// concurrent container removals — a per-service bound alone allows as
-	// many independent services to run at once as the graph permits, each
-	// with its own maxConcurrency budget (same fix as restart.go)
+	// shared across services — see restart.go's newOptionalLimiter comment
+	// for why a per-service limiter alone isn't enough.
 	limiter := newOptionalLimiter(s.maxConcurrency)
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {

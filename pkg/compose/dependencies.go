@@ -141,10 +141,11 @@ func (t *graphTraversal) visit(ctx context.Context, g *Graph) error {
 		return nil
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	limit := 0
 	if t.maxConcurrency > 0 {
-		eg.SetLimit(t.maxConcurrency + 1)
+		limit = t.maxConcurrency + 1
 	}
+	eg, ctx := newLimitedErrgroup(ctx, limit)
 	nodeCh := make(chan *Vertex, expect)
 	defer close(nodeCh)
 	// nodeCh need to allow n=expect writers while reader goroutine could have returner after ctx.Done

@@ -114,6 +114,7 @@ func (s *composeService) inspectWithSlot(ctx context.Context, limiter *semaphore
 	if err := acquireSlot(ctx, limiter); err != nil {
 		return container.InspectResponse{}, err
 	}
+	defer panicSafeReleaseSlot(limiter)
 	res, err := s.apiClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		releaseSlot(limiter)
@@ -257,16 +258,24 @@ func logsSinceLastRun(ctr container.InspectResponse) string {
 // long-lived --follow stream never keeps blocking new connections or the
 // monitor.
 func (s *composeService) doLogContainer(ctx context.Context, limiter *semaphore.Weighted, consumer api.LogConsumer, name string, ctr container.InspectResponse, options api.LogOptions) error {
-	r, err := s.apiClient().ContainerLogs(ctx, ctr.ID, client.ContainerLogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Follow:     options.Follow,
-		Since:      options.Since,
-		Until:      options.Until,
-		Tail:       options.Tail,
-		Timestamps: options.Timestamps,
-	})
-	releaseSlot(limiter)
+	// Scoped to a closure so panicSafeReleaseSlot's defer only guards the
+	// acquire-to-release window: releaseSlot below is unconditional once
+	// ContainerLogs returns, so a panic during the copy loop that follows
+	// must not re-trigger it and release the same slot twice.
+	r, err := func() (io.ReadCloser, error) {
+		defer panicSafeReleaseSlot(limiter)
+		r, err := s.apiClient().ContainerLogs(ctx, ctr.ID, client.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     options.Follow,
+			Since:      options.Since,
+			Until:      options.Until,
+			Tail:       options.Tail,
+			Timestamps: options.Timestamps,
+		})
+		releaseSlot(limiter)
+		return r, err
+	}()
 	if err != nil {
 		return err
 	}

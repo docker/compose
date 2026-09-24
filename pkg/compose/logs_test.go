@@ -33,6 +33,7 @@ import (
 	"github.com/moby/moby/api/types/events"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
+	"golang.org/x/sync/semaphore"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 
@@ -391,6 +392,106 @@ func TestComposeService_Logs_FollowLimitsConcurrentStreamOpens(t *testing.T) {
 	}
 	assert.NilError(t, <-done)
 	assert.Equal(t, tracker.Peak(), 1, "opening follow-mode log streams must be bounded by maxConcurrency")
+}
+
+// TestDoLogContainer_ReleasesSlotOnPanic guards against a semaphore slot leak:
+// doLogContainer releases limiter's slot right after ContainerLogs returns
+// rather than via defer (so a --follow stream doesn't pin it for its whole
+// lifetime, see TestComposeService_Logs_FollowDoesNotStarveMonitor). A panic
+// inside ContainerLogs must still release it, or the effective concurrency
+// limit drops by one for the rest of the process.
+func TestDoLogContainer_ReleasesSlotOnPanic(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	limiter := semaphore.NewWeighted(1)
+	assert.NilError(t, limiter.Acquire(t.Context(), 1)) // simulates the slot logContainer would have acquired via acquireSlot
+
+	api.EXPECT().ContainerLogs(anyCancellableContext(), "c1", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerLogsOptions) (io.ReadCloser, error) {
+			panic("boom")
+		})
+
+	func() {
+		defer func() { recover() }() //nolint:errcheck
+		_ = svc.doLogContainer(t.Context(), limiter, &testLogConsumer{}, "c1", containerType.InspectResponse{ID: "c1"}, compose.LogOptions{})
+	}()
+
+	assert.Assert(t, limiter.TryAcquire(1), "slot must be released even when ContainerLogs panics")
+}
+
+// panicReader panics on every Read, simulating a corrupted-stream panic
+// happening after doLogContainer's slot has already been released.
+type panicReader struct{}
+
+func (panicReader) Read([]byte) (int, error) {
+	panic("boom-copy")
+}
+
+// TestDoLogContainer_CopyPanicDoesNotDoubleReleaseSlot guards against a
+// double-release: doLogContainer's slot-release guard must only cover the
+// acquire-to-release window around ContainerLogs, not the copy loop that
+// follows. A panic after that point must propagate unmodified, not trigger a
+// second releaseSlot on an already-released semaphore (which would either
+// panic on its own — masking the real panic — or silently corrupt the
+// semaphore's count).
+func TestDoLogContainer_CopyPanicDoesNotDoubleReleaseSlot(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	limiter := semaphore.NewWeighted(1)
+	assert.NilError(t, limiter.Acquire(t.Context(), 1)) // simulates the slot logContainer would have acquired via acquireSlot
+
+	api.EXPECT().ContainerLogs(anyCancellableContext(), "c1", gomock.Any()).
+		Return(io.NopCloser(panicReader{}), nil)
+
+	var recovered any
+	func() {
+		defer func() { recovered = recover() }()
+		_ = svc.doLogContainer(t.Context(), limiter, &testLogConsumer{}, "c1", containerType.InspectResponse{ID: "c1", Config: &containerType.Config{Tty: true}}, compose.LogOptions{})
+	}()
+
+	assert.Equal(t, recovered, "boom-copy", "the copy-loop panic must propagate unmodified, not be replaced by a semaphore double-release panic")
+	assert.Assert(t, limiter.TryAcquire(1), "slot must have been released exactly once, right after ContainerLogs returned")
+}
+
+// TestInspectWithSlot_ReleasesSlotOnPanic guards against the same semaphore
+// slot leak as TestDoLogContainer_ReleasesSlotOnPanic, one function earlier
+// in the acquire/release chain: inspectWithSlot only releases its slot via an
+// explicit, non-deferred call on the error path (success transfers ownership
+// to doLogContainer). A panic inside ContainerInspect must still release it.
+func TestInspectWithSlot_ReleasesSlotOnPanic(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	limiter := semaphore.NewWeighted(1)
+
+	api.EXPECT().ContainerInspect(anyCancellableContext(), "c1", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+			panic("boom")
+		})
+
+	func() {
+		defer func() { recover() }() //nolint:errcheck
+		_, _ = svc.inspectWithSlot(t.Context(), limiter, "c1")
+	}()
+
+	assert.Assert(t, limiter.TryAcquire(1), "slot must be released even when ContainerInspect panics")
 }
 
 type testLogConsumer struct {
