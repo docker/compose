@@ -177,6 +177,94 @@ func TestHelperProviderRelayInfo(t *testing.T) {
 	os.Exit(0)
 }
 
+// TestExecutePlugin_GetRelayInfoUnresolvedGateway covers relayInfo's
+// best-effort contract (relay.go): when a network's gateway cannot be
+// resolved — the inspect itself fails, or the IPAM config carries no valid
+// IPv4 gateway — the network is still listed, Gateway simply left empty,
+// rather than dropped or defaulted to something wrong.
+func TestExecutePlugin_GetRelayInfoUnresolvedGateway(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(apiClient *mocks.MockAPIClient)
+	}{
+		{
+			name: "NetworkInspect fails",
+			setup: func(apiClient *mocks.MockAPIClient) {
+				apiClient.EXPECT().NetworkInspect(gomock.Any(), "proj_backend", gomock.Any()).
+					Return(client.NetworkInspectResult{}, notFoundError{})
+			},
+		},
+		{
+			name: "IPAM config has an IPv6-only gateway",
+			setup: func(apiClient *mocks.MockAPIClient) {
+				inspect := client.NetworkInspectResult{}
+				inspect.Network.Name = "proj_backend"
+				inspect.Network.IPAM.Config = []network.IPAMConfig{
+					// IPv6-only: valid address, but cfg.Gateway.Is4() is false
+					{Gateway: netip.MustParseAddr("fe80::1")},
+				}
+				apiClient.EXPECT().NetworkInspect(gomock.Any(), "proj_backend", gomock.Any()).
+					Return(inspect, nil)
+			},
+		},
+		{
+			name: "IPAM config has no gateway at all",
+			setup: func(apiClient *mocks.MockAPIClient) {
+				inspect := client.NetworkInspectResult{}
+				inspect.Network.Name = "proj_backend"
+				inspect.Network.IPAM.Config = []network.IPAMConfig{
+					// zero-value Gateway: cfg.Gateway.IsValid() is false
+					{},
+				}
+				apiClient.EXPECT().NetworkInspect(gomock.Any(), "proj_backend", gomock.Any()).
+					Return(inspect, nil)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			cli := mocks.NewMockCli(mockCtrl)
+			apiClient := mocks.NewMockAPIClient(mockCtrl)
+			cli.EXPECT().Client().Return(apiClient).AnyTimes()
+			svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+			assert.NilError(t, err)
+
+			// standalone engine: falls through to the NetworkInspect path
+			apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(client.SystemInfoResult{}, nil)
+			tc.setup(apiClient)
+
+			app := types.ServiceConfig{Name: "app"}
+			app.DependsOn = types.DependsOnConfig{"db": types.ServiceDependency{}}
+			app.Networks = map[string]*types.ServiceNetworkConfig{"backend": nil}
+			project := &types.Project{
+				Name: "proj",
+				Networks: types.Networks{
+					"backend": types.NetworkConfig{Name: "proj_backend"},
+				},
+				Services: types.Services{
+					"db":  {Name: "db", Provider: &types.ServiceProviderConfig{Type: "fake"}},
+					"app": app,
+				},
+			}
+			service := project.Services["db"]
+
+			cmd := exec.Command(os.Args[0], "-test.run=TestHelperProviderRelayInfo")
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+
+			variables, err := svc.(*composeService).executePlugin(t.Context(), project, cmd, "up", service)
+			assert.NilError(t, err)
+			// exactly the two expected vars: nothing silently dropped from the answer
+			assert.Equal(t, len(variables.prefixed), 2)
+			// the network is still announced...
+			assert.Equal(t, variables.prefixed["RELAY_NETWORK"], "proj_backend")
+			// ...but with no gateway to bind to
+			assert.Equal(t, variables.prefixed["RELAY_GATEWAY"], "")
+		})
+	}
+}
+
 // Under Docker Desktop the networks live inside the VM: get-relay-info
 // announces the host's own loopback — the address a host process binds to be
 // reached through the Desktop proxy — and never inspects the networks.
