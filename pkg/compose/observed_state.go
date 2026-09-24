@@ -174,7 +174,20 @@ func (s *composeService) mergeHookContainers(ctx context.Context, project *types
 	if err != nil {
 		return nil, err
 	}
-	return append(raw, hookRaw...), nil
+	// A legacy runner created before this ConfigHashLabel exclusion existed
+	// (or by an older compose version) can still carry the label, and so
+	// already be present in raw: append only the IDs raw doesn't already
+	// have, or it would be classified -- and scheduled for removal -- twice.
+	seen := make(map[string]bool, len(raw))
+	for _, ctr := range raw {
+		seen[ctr.ID] = true
+	}
+	for _, ctr := range hookRaw {
+		if !seen[ctr.ID] {
+			raw = append(raw, ctr)
+		}
+	}
+	return raw, nil
 }
 
 // The project model is used to classify containers by service and to identify

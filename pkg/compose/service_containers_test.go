@@ -292,6 +292,24 @@ func TestWaitDependencies(t *testing.T) {
 		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, nil, 0)
 		assert.Error(t, err, "app is missing dependency db")
 	})
+	t.Run("a dependency's pre_start hook runner does not count as the dependency being present", func(t *testing.T) {
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"db": {Name: "db", Scale: intPtr(1), PreStart: []types.PreStartHook{{}}},
+		}}
+		dependencies := types.DependsOnConfig{
+			"db": {Condition: ServiceConditionRunningOrHealthy, Required: true},
+		}
+		// Only a retained hook runner exists (e.g. its own success removal is
+		// still in flight, or it failed and was kept for inspection) — no
+		// real "db" replica container.
+		containers := Containers{{
+			ID:     "db-hook-runner",
+			Names:  []string{"/db-hook-runner"},
+			Labels: map[string]string{api.ServiceLabel: "db", api.HookLabel: "pre_start"},
+		}}
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0)
+		assert.Error(t, err, "app is missing dependency db")
+	})
 	t.Run("missing optional dependency is only a warning", func(t *testing.T) {
 		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
 			"db": {Name: "db", Scale: intPtr(1)},

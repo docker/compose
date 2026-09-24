@@ -96,13 +96,24 @@ func lowestNumberedContainer(containers Containers) container.Summary {
 // the volumes of the first non-running replica only — anonymous volumes and
 // tmpfs mounts are per-replica and not shared. Use named volumes or bind
 // mounts for data the hook produces.
-func (s *composeService) runPreStart(ctx context.Context, project *types.Project, service types.ServiceConfig, listener api.ContainerEventListener) error {
-	// Validate every hook up front so an unsupported entry never triggers any I/O.
+// perReplicaHookIndex returns the index of the first pre_start hook declaring
+// per_replica: true, or -1. per_replica is not yet supported
+// (docker/compose#14259): runPreStart rejects the whole service up front on
+// it, and planPreStartHookRunners plans no runner for such a service — the
+// two sides of one co-invariant, sharing this single predicate.
+func perReplicaHookIndex(service types.ServiceConfig) int {
 	for i, hook := range service.PreStart {
 		if hook.PerReplica {
-			// per_replica is not yet supported: docker/compose#14259.
-			return fmt.Errorf("service %q pre_start[%d]: per_replica is not yet supported; remove per_replica or set it to false", service.Name, i)
+			return i
 		}
+	}
+	return -1
+}
+
+func (s *composeService) runPreStart(ctx context.Context, project *types.Project, service types.ServiceConfig, listener api.ContainerEventListener) error {
+	// Validate up front so an unsupported entry never triggers any I/O.
+	if i := perReplicaHookIndex(service); i >= 0 {
+		return fmt.Errorf("service %q pre_start[%d]: per_replica is not yet supported; remove per_replica or set it to false", service.Name, i)
 	}
 	runners, err := s.listPreStartRunners(ctx, project.Name, service.Name)
 	if err != nil {
@@ -121,8 +132,10 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 		}
 		// Success: remove the hook container, mirroring the old AutoRemove behaviour
 		// (including its anonymous volumes). A removal failure is logged but does not
-		// gate service start — the hook already succeeded.
-		if _, removeErr := s.apiClient().ContainerRemove(ctx, runner.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); removeErr != nil {
+		// gate service start — the hook already succeeded. context.WithoutCancel, like
+		// the cancellation-cleanup path above: a cancellation landing in the narrow
+		// window between the hook's success and this call must not abort the removal.
+		if _, removeErr := s.apiClient().ContainerRemove(context.WithoutCancel(ctx), runner.ID, client.ContainerRemoveOptions{RemoveVolumes: true}); removeErr != nil {
 			logrus.Warnf("service %q pre_start[%d]: failed to remove hook container %s: %v", service.Name, i, runner.ID, removeErr)
 		}
 	}
@@ -274,6 +287,11 @@ func (s *composeService) createPreStartContainer(
 		return client.ContainerCreateResult{}, err
 	}
 	cfgs, err := s.getCreateConfigs(ctx, project, hookService, 0, nil, createOptions{
+		// hook runners have no spec-drift concept and must stay invisible to
+		// ps/start's default listing and to down's normal teardown path, both
+		// of which filter on ConfigHashLabel's mere presence (see
+		// removePreStartHookContainers)
+		NoConfigHash: true,
 		// AutoRemove is intentionally false: a failed hook container is
 		// retained so the operator can inspect its logs. execPreStartHook
 		// removes it explicitly on success, and the orphan sweep catches
@@ -299,12 +317,6 @@ func (s *composeService) createPreStartContainer(
 	if err != nil {
 		return client.ContainerCreateResult{}, err
 	}
-	// getCreateConfigs unconditionally stamps a ConfigHashLabel (service
-	// containers use it to detect spec drift) -- a hook runner has no such
-	// concept and must stay invisible to ps/start's default listing and to
-	// down's normal teardown path, both of which filter on this label's mere
-	// presence (see removePreStartHookContainers).
-	delete(cfgs.Container.Labels, api.ConfigHashLabel)
 	// Mounts inherit from the live service container: volumes_from carries
 	// its anonymous and image volumes too. The hook's own mounts, already in
 	// the host config from the merged spec, take precedence on shared
