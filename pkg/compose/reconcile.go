@@ -885,6 +885,17 @@ func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expect
 	if keptRunning {
 		return
 	}
+	for _, hook := range service.PreStart {
+		if hook.PerReplica {
+			// per_replica is not yet supported (docker/compose#14259):
+			// runPreStart validates every hook up front and rejects the
+			// whole service before executing any of them (see runPreStart).
+			// Planning creates here would only orphan runners that can
+			// never run — nothing to prepare until the hook declares
+			// per_replica: false.
+			return
+		}
+	}
 	serviceCopy := service
 	deps := slices.Concat(containerNodes, infraDeps)
 	stale := slices.Clone(r.observed.HookContainers[service.Name])

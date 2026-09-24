@@ -96,7 +96,9 @@ func TestCollectObservedState(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
 		Services: types.Services{
-			"web": {Name: "web"},
+			// web declares a hook: the separate runner listing only fires
+			// when some service declares pre_start at all
+			"web": {Name: "web", PreStart: []types.PreStartHook{{}}},
 			"db":  {Name: "db"},
 		},
 		Networks: types.Networks{
@@ -160,6 +162,14 @@ func TestCollectObservedState(t *testing.T) {
 					api.OneoffLabel:  "True",
 				},
 			},
+		},
+	}, nil)
+
+	// Mock ContainerList for getHookContainers: hook runners carry no
+	// ConfigHashLabel, so they are listed separately (see
+	// collectObservedState) via a project+hook-label filter alone.
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{
 			{
 				// Stale lifecycle-hook runner (a previous run failed before
 				// removing it): neither a replica (it has no container-number
@@ -335,6 +345,8 @@ func TestSelectNetwork(t *testing.T) {
 func collectByNameDiscovery(t *testing.T, project *types.Project, inspect func(apiClient *mocks.MockAPIClient)) (*ObservedState, error) {
 	t.Helper()
 	svc, apiClient := newTestService(t)
+	// hook-less projects: getHookContainers is gated off, only getContainers
+	// lists (see mergeHookContainers)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
 	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)

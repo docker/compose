@@ -57,6 +57,23 @@ func (s *composeService) getContainers(ctx context.Context, projectName string, 
 	return containers, nil
 }
 
+// getHookContainers returns every pre_start hook runner container in the
+// project, in any state. Hook runners deliberately carry no ConfigHashLabel
+// (see createPreStartContainer), so they are invisible to getContainers'
+// default filters and must be listed by project+hook label alone.
+func (s *composeService) getHookContainers(ctx context.Context, projectName string) (Containers, error) {
+	f := projectFilter(projectName)
+	f.Add("label", hookFilter(preStartHookType))
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: f,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return Containers(res.Items), nil
+}
+
 // getContainersByService returns all non-oneoff containers for the project, grouped by service name.
 func (s *composeService) getContainersByService(ctx context.Context, projectName string) (map[string]Containers, error) {
 	all, err := s.getContainers(ctx, projectName, oneOffExclude, true)
@@ -168,6 +185,14 @@ func isOrphaned(project *types.Project) containerPredicate {
 func isNotOneOff(c container.Summary) bool {
 	v, ok := c.Labels[api.OneoffLabel]
 	return !ok || v == "False"
+}
+
+// isNotHookContainer excludes pre_start hook runners: they carry the same
+// project/service labels as a real replica (and no one-off label either)
+// while being none -- starting one, or counting it as a surviving replica,
+// is always wrong.
+func isNotHookContainer(c container.Summary) bool {
+	return c.Labels[api.HookLabel] == ""
 }
 
 func isNotRunning(c container.Summary) bool {

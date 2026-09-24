@@ -1422,6 +1422,41 @@ func TestReconcileContainers_HookRunnersPlannedOnColdStart(t *testing.T) {
 	}
 }
 
+// per_replica is not yet supported (docker/compose#14259): runPreStart
+// validates every declared hook up front and rejects the whole service
+// before executing any of them, so planning creates for it here would only
+// orphan runners that can never run. No hook runner is planned for such a
+// service, even for its other, otherwise-valid hooks.
+func TestReconcileContainers_HookRunnersNotPlannedWhenPerReplica(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"app": {
+				Name:  "app",
+				Scale: intPtr(1),
+				PreStart: []types.PreStartHook{
+					{},
+					{PerReplica: true},
+				},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName:    "myproject",
+		Containers:     map[string][]ObservedContainer{},
+		HookContainers: map[string][]ObservedContainer{},
+		Networks:       map[string][]ObservedNetwork{},
+		Volumes:        map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:app:1, CreateContainer, no existing container
+`)+"\n")
+}
+
 // A running replica whose config diverged is recreated, so it will not be
 // running when the start phase evaluates pre_start: the runner must be
 // planned. The observed-running gate applies to replicas that SURVIVE the
