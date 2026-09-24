@@ -818,7 +818,15 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			// dependency order. Exited containers are deliberately left as-is
 			// here so that phase (or the user) decides.
 			if oc.State == container.StateRunning {
-				keptRunning = true
+				// Observed state is a snapshot from before this plan ran: a
+				// container reported running here may already be scheduled
+				// to stop elsewhere in the plan (a network recreate, a
+				// restart: true dependency cascade, ...) via stoppedByPlan.
+				// It will not be running by the time the start phase
+				// evaluates pre_start, so it does not count as kept.
+				if _, alreadyStopped := r.stoppedByPlan[oc.ID]; !alreadyStopped {
+					keptRunning = true
+				}
 			}
 		default:
 			// Any other state (paused, dead, ...): attempt to (re)start
@@ -885,17 +893,6 @@ func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expect
 	if keptRunning {
 		return
 	}
-	for _, hook := range service.PreStart {
-		if hook.PerReplica {
-			// per_replica is not yet supported (docker/compose#14259):
-			// runPreStart validates every hook up front and rejects the
-			// whole service before executing any of them (see runPreStart).
-			// Planning creates here would only orphan runners that can
-			// never run — nothing to prepare until the hook declares
-			// per_replica: false.
-			return
-		}
-	}
 	serviceCopy := service
 	deps := slices.Concat(containerNodes, infraDeps)
 	stale := slices.Clone(r.observed.HookContainers[service.Name])
@@ -916,6 +913,17 @@ func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expect
 		// No replica will start, so there is no hook to prepare — but the
 		// stale-runner purge above already ran: scaling a service down to
 		// zero must not leave runners of the prior generation behind.
+		return
+	}
+	if perReplicaHookIndex(service) >= 0 {
+		// per_replica is not yet supported (docker/compose#14259):
+		// runPreStart validates every hook up front and rejects the whole
+		// service before executing any of them. Planning creates here would
+		// only orphan runners that can never run — nothing to prepare until
+		// the hook declares per_replica: false. The stale-runner purge
+		// above still runs unconditionally: a user switching a hook to
+		// per_replica: true must not be left with runners from a prior,
+		// non-per_replica generation accumulating forever.
 		return
 	}
 	for i := range service.PreStart {

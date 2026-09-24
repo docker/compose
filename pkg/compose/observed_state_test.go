@@ -269,6 +269,43 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, vol.ConfigHash, "volhash1")
 }
 
+// TestCollectObservedState_LegacyHookRunnerNotDuplicated covers a runner
+// created before the ConfigHashLabel exclusion existed (or by an older
+// compose version): it still carries the label, so it matches getContainers'
+// own filters and is present in BOTH ContainerList responses. It must be
+// classified exactly once, or the reconciler would schedule two removals for
+// the same ID (docker-agent review on #14221).
+func TestCollectObservedState_LegacyHookRunnerNotDuplicated(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{Name: "myproject", Services: types.Services{
+		"web": {Name: "web", PreStart: []types.PreStartHook{{}}},
+	}}
+
+	legacyRunner := container.Summary{
+		ID:    "legacy-hook-1",
+		State: container.StateExited,
+		Labels: map[string]string{
+			api.ServiceLabel:    "web",
+			api.ProjectLabel:    "myproject",
+			api.HookLabel:       "pre_start",
+			api.ConfigHashLabel: "stale-legacy-hash",
+		},
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{legacyRunner},
+	}, nil)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{legacyRunner},
+	}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Equal(t, len(state.HookContainers["web"]), 1, "the legacy runner must be classified exactly once")
+	assert.Equal(t, len(state.Containers["web"]), 0, "a hook runner must never be classified as a replica")
+}
+
 // TestCollectObservedState_AggregatesDuplicateLabels verifies that two live
 // volumes (or networks) sharing the same compose label are both recorded, with
 // no premature choice — the reconciler resolves the conflict later.

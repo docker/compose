@@ -1457,6 +1457,42 @@ func TestReconcileContainers_HookRunnersNotPlannedWhenPerReplica(t *testing.T) {
 `)+"\n")
 }
 
+// per_replica blocking the create loop (above) must not also block the
+// stale-runner purge: a user switching a hook to per_replica: true must not
+// be left with runners from a prior, non-per_replica generation
+// accumulating forever (docker-agent review on #14221).
+func TestReconcileContainers_StaleHookRunnersPurgedEvenWhenPerReplica(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"app": {
+				Name:  "app",
+				Scale: intPtr(1),
+				PreStart: []types.PreStartHook{
+					{PerReplica: true},
+				},
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		HookContainers: map[string][]ObservedContainer{
+			"app": {{ID: "stale-id", Summary: container.Summary{ID: "stale-id"}}},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:app:1, CreateContainer, no existing container
+[] -> #2 hook:app:stale:stale-id, RemoveContainer, stale pre_start hook container
+`)+"\n")
+}
+
 // A running replica whose config diverged is recreated, so it will not be
 // running when the start phase evaluates pre_start: the runner must be
 // planned. The observed-running gate applies to replicas that SURVIVE the
@@ -1749,6 +1785,42 @@ func TestReconcileContainers_NamespaceParentRecreated_CascadesToDependent(t *tes
 	// One Stop per container — planStopDependents must not duplicate the Stop
 	// emitted by planRecreateContainer for the dependent.
 	assert.Equal(t, strings.Count(planStr, "service:dependent:1, StopContainer"), 1, "duplicate Stop for dependent:\n%s", planStr)
+}
+
+// TestReconcileContainers_HookRunnerPlannedWhenCascadeStopsRunningReplica
+// verifies that a replica reported running in the observed-state snapshot,
+// but already scheduled for a stop elsewhere in the plan (here, a
+// restart: true depends_on cascade off a recreated parent), is not counted
+// as "kept running": it will not actually be running by the time the start
+// phase evaluates pre_start, so a fresh runner must still be planned
+// (docker-agent review on #14221 — the observed state is a snapshot from
+// before this plan ran, and stoppedByPlan is the source of truth for what
+// survives it).
+func TestReconcileContainers_HookRunnerPlannedWhenCascadeStopsRunningReplica(t *testing.T) {
+	parent := types.ServiceConfig{Name: "parent", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	dependent := types.ServiceConfig{
+		Name: "dependent", Scale: intPtr(1),
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		WorkloadSpec: types.WorkloadSpec{
+			DependsOn: types.DependsOnConfig{"parent": {Condition: types.ServiceConditionStarted, Restart: true, Required: true}},
+		},
+		PreStart: []types.PreStartHook{{}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"parent": parent, "dependent": dependent},
+	}
+	observed := parentDependentObserved(t, parent, dependent)
+	observed.Containers["parent"][0].ConfigHash = "stale_parent_hash"
+	observed.Containers["parent"][0].Summary.Labels[api.ConfigHashLabel] = "stale_parent_hash"
+	observed.HookContainers = map[string][]ObservedContainer{}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	planStr := plan.String()
+	assert.Assert(t, strings.Contains(planStr, "service:dependent:1, StopContainer"), "dependent must be stopped by the cascade:\n%s", planStr)
+	assert.Assert(t, strings.Contains(planStr, "hook:dependent:pre_start:0, CreateHookContainer"), "a runner must still be planned for the stopped-by-cascade dependent:\n%s", planStr)
 }
 
 // TestReconcileContainers_MultipleParents_EitherTriggersCascade guards
