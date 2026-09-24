@@ -200,6 +200,18 @@ func releaseSlot(limiter *semaphore.Weighted) {
 	}
 }
 
+// panicSafeReleaseSlot is deferred by callers that release a slot earlier
+// than function exit on the success path (see inspectWithSlot and
+// doLogContainer) to avoid leaking it if the guarded call panics before
+// reaching that point. It is a no-op unless the deferring goroutine is
+// unwinding from a panic, in which case it releases the slot and re-panics.
+func panicSafeReleaseSlot(limiter *semaphore.Weighted) {
+	if p := recover(); p != nil {
+		releaseSlot(limiter)
+		panic(p)
+	}
+}
+
 // forEachContainerWithLimiter runs fn concurrently for each container,
 // bounded by limiter. Unlike newLimitedErrgroup, limiter is built by the
 // caller and can be shared across several concurrently-dispatched calls
