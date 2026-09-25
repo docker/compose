@@ -740,19 +740,19 @@ func TestEnsureImagesDown_PartialRemovalFailureStaysVisibleAlongsideRemoved(t *t
 		Filters: projectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:ok"},
-		{ID: "sha256:in-use"},
+		{ID: "sha256:fails"},
 	}}, nil)
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:ok", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, nil)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
-		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used by a container"))
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
 
 	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
 	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
 
 	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
 	opErr := ops[1]()
-	assert.ErrorContains(t, opErr, "sha256:in-use")
+	assert.ErrorContains(t, opErr, "sha256:fails")
 
 	assert.Equal(t, len(rec.resources), 2)
 	assert.Equal(t, rec.resources[0].ID, "Dangling images")
@@ -760,7 +760,38 @@ func TestEnsureImagesDown_PartialRemovalFailureStaysVisibleAlongsideRemoved(t *t
 	assert.Equal(t, rec.resources[1].ID, "Dangling images")
 	assert.Equal(t, rec.resources[1].Text, "Removed")
 	assert.Equal(t, rec.resources[1].Status, compose.Warning)
-	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "sha256:in-use")
+	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "sha256:fails")
+}
+
+// TestEnsureImagesDown_TotalRemovalFailureReportsPlainError guards the fix
+// suggested in review: when NO eligible dangling image actually gets
+// removed (every one hits a real error), the "Removed" label must not be
+// shown at all — claiming "Removed" when nothing was would be dishonest —
+// a plain error is reported instead.
+func TestEnsureImagesDown_TotalRemovalFailureReportsPlainError(t *testing.T) {
+	apiClient, svc, rec, project := newDanglingImagesFixture(t)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:fails"},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
+
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
+
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	opErr := ops[1]()
+	assert.ErrorContains(t, opErr, "sha256:fails")
+
+	assert.Equal(t, len(rec.resources), 2)
+	assert.Equal(t, rec.resources[0].ID, "Dangling images")
+	assert.Equal(t, rec.resources[0].Text, "Removing")
+	assert.Equal(t, rec.resources[1].ID, "Dangling images")
+	assert.Equal(t, rec.resources[1].Status, compose.Error)
+	assert.Equal(t, rec.resources[1].Text, compose.StatusError)
+	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "sha256:fails")
 }
 
 // TestDownRemovesRetainedPreStartHookContainers verifies that compose down finds and
