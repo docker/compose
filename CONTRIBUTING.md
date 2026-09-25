@@ -16,6 +16,8 @@ start participating.
   - [Reporting security issues](#reporting-security-issues)
   - [Reporting other issues](#reporting-other-issues)
   - [Quick contribution tips and guidelines](#quick-contribution-tips-and-guidelines)
+    - [AI-assisted contributions](#ai-assisted-contributions)
+    - [No contribution farming](#no-contribution-farming)
     - [Pull requests are always welcome](#pull-requests-are-always-welcome)
     - [Talking to other Docker users and contributors](#talking-to-other-docker-users-and-contributors)
     - [Conventions](#conventions)
@@ -66,7 +68,7 @@ When sending lengthy log files, consider posting them as a gist
 Don't forget to remove sensitive data from your log files before posting (you
 can replace those parts with "REDACTED").
 
-_Note:_ 
+_Note:_
 Maintainers might request additional information to diagnose an issue,
 if initial reporter doesn't answer within a reasonable delay (a few weeks),
 issue will be closed.
@@ -74,6 +76,42 @@ issue will be closed.
 ## Quick contribution tips and guidelines
 
 This section gives the experienced contributor some tips and guidelines.
+
+### AI-assisted contributions
+
+Docker Compose follows the shared [Moby/Docker AI usage policy](https://github.com/moby/.github/blob/main/AI_POLICY.md),
+synced into [AI_POLICY.md](AI_POLICY.md) by an automated workflow. That file is
+a floor, not a ceiling - this section is where Compose tightens it.
+
+**Required for all AI-assisted PRs**:
+- **Disclose** the AI tool used (GitHub Copilot, Claude Code, ChatGPT, Cursor, etc.)
+- **Link to an approved issue** - only submit PRs for issues labeled `status/approved`;
+  drive-by PRs that don't reference one will be closed
+- **Test thoroughly** - run `make test`, `make lint`, `make fmt`, and relevant
+  E2E tests. Don't let AI write code for a platform or environment you don't
+  have access to test yourself
+- **Follow existing patterns** - read [AGENTS.md](AGENTS.md) and match nearby code
+- **Understand your code** - you must be able to explain every line
+- **Remove `AI_AGENT_DISCLOSURE.md` before opening the PR** - some agents create
+  this file as a checkpoint marking work that hasn't been independently reviewed
+  yet; review the change yourself, then delete it. An automated check blocks
+  merge while it's present
+- **Stick around** - a merge isn't the finish line; follow up on review comments
+  and fix regressions afterwards
+
+**PRs that don't follow these rules will be closed.** Contributors who repeatedly
+ignore this policy may be banned from the repository.
+
+If you're still learning, we encourage writing the code yourself rather than
+relying on AI - you'll get better feedback that way. See
+[AI_POLICY.md](AI_POLICY.md) for the full shared policy, including why this
+isn't an anti-AI stance.
+
+### No contribution farming
+
+Contribution farming is forbidden - see [No contribution farming](AI_POLICY.md#no-contribution-farming)
+in AI_POLICY.md for what that covers and why. This applies regardless of
+whether AI was involved.
 
 ### Pull requests are always welcome
 
@@ -151,7 +189,9 @@ run `golangci-lint run ./...` or `make lint` before committing. Most editors
 have plug-ins that apply formatting automatically.
 
 Pull request descriptions should be as clear as possible and include a reference
-to all the issues that they address.
+to all the issues that they address. Explain both **what** changed and **why**
+the change was necessary. If you used AI assistance, include a disclosure
+(see [AI_POLICY.md](AI_POLICY.md)).
 
 We recommend following the [conventional commits](https://www.conventionalcommits.org/)
 format (`type(scope): summary`, e.g. `fix(watch): handle symlinked directories`)
