@@ -30,7 +30,10 @@ the resource(s) needed to run a service.
 If `provider.type` doesn't resolve into any of those, Compose will report an error and interrupt the `up` command.
 
 To be a valid Compose extension, provider command *MUST* accept a `compose` command (which can be hidden)
-with subcommands `up` and `down`. It *MAY* additionally implement a `stop` subcommand to support `docker compose stop`.
+with subcommands `up` and `down`. It *MAY* additionally implement a `stop` subcommand to support `docker compose stop`,
+and a `pull` subcommand to take part in image distribution (see [Image distribution](#image-distribution)).
+Optional subcommands are declared through the provider metadata: the presence of the command block is what
+opts the provider in.
 
 ## Up lifecycle
 
@@ -120,6 +123,68 @@ sequenceDiagram
     Provider-)Compose: EOF (command complete) exit 0
     Compose-)Shell: service started
 ```
+
+## Image distribution
+
+A provider-backed service can declare `build` or `image` like any other service; the image then has to reach
+the provider's runtime, which may be nowhere near the local daemon. Providers opt into image distribution by
+declaring a `pull` block in their `metadata` output — like `stop`, the presence of the block is the
+declaration of support. Providers without it keep managing images on their own during `up`.
+
+When the provider declares `pull`, Compose invokes it during the image phase of `up` (after any build) and on
+`docker compose pull`:
+
+```console
+awesomecloud compose --project-name <NAME> pull --image=<ref> --source=<verdict> --policy=<policy> [--digest=<id> --created=<time>] "database"
+```
+
+- `--image`: the image reference as Compose resolved it (the `image` attribute, or `<project>-<service>` for a
+  build-only service).
+- `--digest` / `--created`: the state of the **local daemon cache**, present only when the image exists there.
+  They describe the cache, they are not instructions: persist them as the bookkeeping keys of what you ingest —
+  the digest as identity test, `created` as the ordering fallback for a backend that cannot preserve digests.
+  Beware that reproducible builds can freeze `created`, so a comparable digest always wins over it.
+- `--source` is the authority verdict, computed by Compose from the model and the invocation (`pull_policy`,
+  `--build`, what the current run just built), so providers never re-implement that arbitration:
+  - `local`: the desired state is the local daemon's image. Compare your bookkeeping with the announced
+    digest/created; when they differ, request the bytes with `get-image`.
+  - `registry`: resolve the reference upstream — this includes the common workflow where `build` is only the
+    recipe CI uses to publish the image that consumers pull. The local facts are an optimization, never an
+    obligation.
+- `--policy`:
+  - `missing` (the `up` path): a usable version present in your runtime suffices;
+  - `always` (`docker compose pull`): ensure your runtime holds the latest version of the authority.
+
+### Requesting the image bytes
+
+During `pull`, the provider can ask Compose for the image content with a regular JSON line on `stdout`
+(`platform` is optional and narrows a multi-platform image):
+
+```json
+{ "type": "get-image", "message": "<image ref>", "platform": "linux/arm64" }
+```
+
+Compose answers on the provider's `stdin` with one JSON line:
+
+```json
+{ "type": "image-stream", "encoding": "chunked", "media-type": "application/x-tar" }
+```
+
+followed — unless the line carries an `error` field instead — by the image tar encoded as HTTP/1.1 chunked
+data (RFC 9112 §7.1): every block of data prefixed by its length, terminated by the zero-length chunk. Unlike
+an HTTP message there is no trailer section nor final CRLF — the next byte after the zero chunk belongs to the
+next stdin answer. Length-prefixed framing needs no in-band delimiter (any byte value can appear inside a tar), and
+any language's stock chunked-body reader consumes it — Go providers can use `httputil.NewChunkedReader`. A
+stream that ends without the terminating zero chunk was aborted and must be discarded — Compose closes the
+answer channel after an aborted transfer, so the truncation is always observable as EOF. The tar is what
+`docker image save` produces: feed it to `docker load` or whatever your runtime ingests.
+
+As during `stop`, any `setenv`, `rawsetenv` or `publish-endpoint` message emitted during `pull` is accepted
+but ignored: dependent services are not being configured in this phase.
+
+The stream is exclusive on `stdin` for its whole duration — the chunked body must be contiguous, so answers to
+any other request emitted meanwhile are delivered after it. Drain the announced stream completely before
+expecting another answer.
 
 ## Connection to a service managed by a provider
 
@@ -307,6 +372,9 @@ The expected JSON output format is:
         "type": "string"
       }
     ]
+  },
+  "pull": {
+    "parameters": []
   }
 }
 ```
@@ -315,6 +383,9 @@ The top elements are:
 - `up`: Object describing the parameters accepted by the `up` command
 - `down`: Object describing the parameters accepted by the `down` command
 - `stop`: Object describing the parameters accepted by the `stop` command (optional)
+- `pull`: Object describing the parameters accepted by the `pull` command (optional — declaring the block is
+  what opts the provider into [image distribution](#image-distribution); the flags Compose injects need not be
+  listed)
 
 And for each command parameter, you should include the following properties:
 - `name`: The parameter name (without `--` prefix)

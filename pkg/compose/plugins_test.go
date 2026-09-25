@@ -97,6 +97,25 @@ func TestProviderMetadata_StopAbsent(t *testing.T) {
 	assert.Assert(t, metadata.Stop == nil, "Stop should be nil when absent from JSON")
 }
 
+func TestProviderMetadata_PullAbsent(t *testing.T) {
+	raw := `{"description":"x","up":{"parameters":[]},"down":{"parameters":[]}}`
+
+	var metadata ProviderMetadata
+	err := json.Unmarshal([]byte(raw), &metadata)
+	assert.NilError(t, err)
+	assert.Assert(t, metadata.Pull == nil, "Pull should be nil when absent from JSON")
+}
+
+func TestProviderMetadata_PullPresent(t *testing.T) {
+	raw := `{"pull":{"parameters":[{"name":"registry"}]}}`
+
+	var metadata ProviderMetadata
+	err := json.Unmarshal([]byte(raw), &metadata)
+	assert.NilError(t, err)
+	assert.Assert(t, metadata.Pull != nil, "Pull should be non-nil when key present")
+	assert.Equal(t, metadata.Pull.Parameters[0].Name, "registry")
+}
+
 func TestProviderMetadata_StopAdvertisedWithoutParameters(t *testing.T) {
 	raw := `{"stop":{"parameters":null}}`
 

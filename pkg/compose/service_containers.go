@@ -585,7 +585,6 @@ func (s *composeService) startService(ctx context.Context,
 	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}
-
 	err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, containers, timeout)
 	if err != nil {
 		return err
@@ -593,6 +592,13 @@ func (s *composeService) startService(ctx context.Context,
 
 	if len(containers) == 0 {
 		if service.GetScale() == 0 {
+			return nil
+		}
+		if service.Provider != nil {
+			// a provider-backed service usually has no container of its own
+			// (it gets one — the relay — only when the provider published
+			// endpoints), so a project made only of provider services
+			// legitimately reaches the start phase with no container at all
 			return nil
 		}
 		return errNoContainerToStart(service.Name)
