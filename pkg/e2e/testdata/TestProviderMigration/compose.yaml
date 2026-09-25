@@ -1,0 +1,5 @@
+services:
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
