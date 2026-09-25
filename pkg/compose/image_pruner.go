@@ -163,7 +163,7 @@ func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, 
 // keep, in parallel, tolerating individual failures so one bad image
 // doesn't abort the rest. Shared by down --rmi and watch --prune, which
 // differ only in what keep spares.
-func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]string, error) {
+func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool, onRemoving func()) ([]string, error) {
 	res, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
 		Filters: projectFilter(projectName).Add("dangling", "true"),
 	})
@@ -171,14 +171,27 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 		return nil, err
 	}
 
+	var toRemove []image.Summary
+	for _, img := range res.Items {
+		if !keep(img) {
+			toRemove = append(toRemove, img)
+		}
+	}
+
+	if len(toRemove) == 0 {
+		return nil, nil
+	}
+
+	if onRemoving != nil {
+		onRemoving()
+	}
+
 	var mu sync.Mutex
 	var removed []string
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(s.maxConcurrency)
-	for _, img := range res.Items {
-		if keep(img) {
-			continue
-		}
+	for _, img := range toRemove {
+		img := img // capture loop variable
 		eg.Go(func() error {
 			if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
 				logrus.Debugf("failed to remove dangling image %s: %v", img.ID, err)

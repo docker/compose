@@ -188,10 +188,19 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 			return err != nil
 		}
 		ops = append(ops, func() error {
-			return s.removeResource("Dangling images", func() error {
-				_, err := s.removeDanglingImages(ctx, project.Name, keep)
-				return err
+			started := false
+			removed, err := s.removeDanglingImages(ctx, project.Name, keep, func() {
+				started = true
+				s.events.On(newEvent("Dangling images", api.Working, "Removing"))
 			})
+			if started && err == nil {
+				if len(removed) > 0 {
+					s.events.On(newEvent("Dangling images", api.Done, "Removed"))
+				} else {
+					s.events.On(newEvent("Dangling images", api.Done, "Warning: No resource found to remove"))
+				}
+			}
+			return err
 		})
 	}
 	return ops, nil

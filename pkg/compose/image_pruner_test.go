@@ -53,9 +53,12 @@ func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 	// no expectation for "sha256:keep" — a call to ImageRemove for it fails the test
 
 	keep := func(img image.Summary) bool { return img.ID == "sha256:keep" }
-	removed, err := svc.removeDanglingImages(t.Context(), "prj", keep)
+	onRemovingCalled := false
+	onRemoving := func() { onRemovingCalled = true }
+	removed, err := svc.removeDanglingImages(t.Context(), "prj", keep, onRemoving)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, removed, []string{"sha256:removed"})
+	assert.Assert(t, onRemovingCalled, "onRemoving should have been called")
 }
 
 // TestRemoveDanglingImages_NoneFound guards that an empty dangling-image
@@ -73,7 +76,22 @@ func TestRemoveDanglingImages_NoneFound(t *testing.T) {
 		Filters: projectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
-	removed, err := svc.removeDanglingImages(t.Context(), "prj", func(image.Summary) bool { return false })
+	onRemovingCalled := false
+	onRemoving := func() { onRemovingCalled = true }
+	removed, err := svc.removeDanglingImages(t.Context(), "prj", func(image.Summary) bool { return false }, onRemoving)
 	assert.NilError(t, err)
 	assert.Equal(t, len(removed), 0)
+	assert.Assert(t, !onRemovingCalled, "onRemoving should not have been called")
+
+	// Also test when there are images but all are kept
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:kept-dangling"},
+	}}, nil)
+
+	removed, err = svc.removeDanglingImages(t.Context(), "prj", func(image.Summary) bool { return true }, onRemoving)
+	assert.NilError(t, err)
+	assert.Equal(t, len(removed), 0)
+	assert.Assert(t, !onRemovingCalled, "onRemoving should not have been called")
 }
