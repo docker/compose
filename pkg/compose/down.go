@@ -218,9 +218,18 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 // silent skip. A listing failure surfaces under the "Dangling images" label
 // as a plain error rather than the normal Removing/Removed progression,
 // since at that point we don't know whether it would have been a no-op or
-// a real removal. A removal failure keeps the "Removed" label only if at
-// least one image actually got removed — with the error visible alongside
-// it, not replacing it — otherwise it's reported as a plain error too.
+// a real removal.
+//
+// A removal failure keeps the "Removed" label only if at least one image
+// actually got removed — with the error visible alongside it, not
+// replacing it — otherwise it's reported as a plain error. removeImages
+// also tolerates images that are already gone or still in use without
+// that being an error, so a nil error here doesn't mean every image was
+// actually removed either: stillInUse (a real, not-yet-achieved goal) is
+// checked separately from alreadyGone (as good as removed), the same
+// distinction removeResource already makes per tagged image, so this
+// aggregate report doesn't collapse the two like removeImages' own return
+// values would if only `removed` were consulted.
 func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName string, keep func(image.Summary) bool) error {
 	eventID := "Dangling images"
 	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
@@ -233,17 +242,33 @@ func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName
 	}
 
 	s.events.On(removingEvent(eventID))
-	removed, err := s.removeImages(ctx, eligible)
-	if err != nil {
-		if len(removed) == 0 {
-			s.events.On(errorEvent(eventID, err.Error()))
-		} else {
-			s.events.On(newEvent(eventID, api.Warning, "Removed", err.Error()))
+	removed, stillInUse, _, err := s.removeImages(ctx, eligible)
+	switch {
+	case err != nil:
+		details := err.Error()
+		if len(stillInUse) > 0 {
+			details = fmt.Sprintf("%s; %d image(s) still in use", details, len(stillInUse))
 		}
-		return err
+		if len(removed) == 0 {
+			s.events.On(errorEvent(eventID, details))
+		} else {
+			s.events.On(newEvent(eventID, api.Warning, "Removed", details))
+		}
+	case len(stillInUse) > 0 && len(removed) == 0:
+		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use"))
+	case len(stillInUse) > 0:
+		s.events.On(newEvent(eventID, api.Warning, "Removed",
+			fmt.Sprintf("%d image(s) still in use", len(stillInUse))))
+	case len(removed) == 0:
+		// every eligible image was already gone by the time we got to it:
+		// we already emitted "Removing", so this needs a terminal event
+		// too, not silence — same wording removeResource uses for a
+		// not-found tagged image.
+		s.events.On(newEvent(eventID, api.Done, "Warning: No resource found to remove"))
+	default:
+		s.events.On(removedEvent(eventID))
 	}
-	s.events.On(removedEvent(eventID))
-	return nil
+	return err
 }
 
 func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project) []downOp {

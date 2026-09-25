@@ -633,8 +633,8 @@ func TestEnsureImagesDown_RemoveOrphansAlsoTakesDanglingImages(t *testing.T) {
 // newDanglingImagesFixture sets up a composeService with a capturing event
 // recorder and a bare "prj" project, and stubs the tagged-image listing
 // (ImagesToPrune's own query) as empty so the tests below can focus solely
-// on the dangling-images op. Shared by the three tests guarding the fix for
-// #14219.
+// on the dangling-images op. Shared by the tests below guarding the fix
+// for #14219.
 func newDanglingImagesFixture(t *testing.T) (*mocks.MockAPIClient, *composeService, *capturingEvents, *types.Project) {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
@@ -792,6 +792,176 @@ func TestEnsureImagesDown_TotalRemovalFailureReportsPlainError(t *testing.T) {
 	assert.Equal(t, rec.resources[1].Status, compose.Error)
 	assert.Equal(t, rec.resources[1].Text, compose.StatusError)
 	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "sha256:fails")
+}
+
+// TestEnsureImagesDown_TotalFailureAlsoMentionsStillInUse guards the mirror
+// gap found in review of the merged err!=nil case: when NOTHING was removed
+// (a plain error is reported, same as TotalRemovalFailureReportsPlainError)
+// but the batch also has a still-in-use image alongside the genuine
+// failure, that still-in-use count must not be silently dropped just
+// because the removed==0 path reports through errorEvent instead of the
+// Warning+"Removed" path.
+func TestEnsureImagesDown_TotalFailureAlsoMentionsStillInUse(t *testing.T) {
+	apiClient, svc, rec, project := newDanglingImagesFixture(t)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:in-use"},
+		{ID: "sha256:fails"},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used by a container"))
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
+
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
+
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	opErr := ops[1]()
+	assert.ErrorContains(t, opErr, "sha256:fails")
+
+	assert.Equal(t, len(rec.resources), 2)
+	assert.Equal(t, rec.resources[0].ID, "Dangling images")
+	assert.Equal(t, rec.resources[0].Text, "Removing")
+	assert.Equal(t, rec.resources[1].ID, "Dangling images")
+	assert.Equal(t, rec.resources[1].Status, compose.Error)
+	assert.Equal(t, rec.resources[1].Text, compose.StatusError)
+	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "sha256:fails")
+	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "1 image(s) still in use")
+}
+
+// TestEnsureImagesDown_AllEligibleStillInUseDoesNotClaimRemoved guards a
+// regression caught by review after the Conflict-tolerance fix landed: when
+// every eligible dangling image is tolerated as still in use (or already
+// gone), removeImages returns (nil, nil) — no error — so a naive `if err !=
+// nil` guard alone would fall through and report a false "Removed" even
+// though nothing was. The op must report the terminal state honestly
+// instead, without leaving the earlier "Removing" event stuck unresolved.
+func TestEnsureImagesDown_AllEligibleStillInUseDoesNotClaimRemoved(t *testing.T) {
+	apiClient, svc, rec, project := newDanglingImagesFixture(t)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:in-use"},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used by a container"))
+
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
+
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	assert.NilError(t, ops[1]())
+
+	assert.Equal(t, len(rec.resources), 2)
+	assert.Equal(t, rec.resources[0].ID, "Dangling images")
+	assert.Equal(t, rec.resources[0].Text, "Removing")
+	assert.Equal(t, rec.resources[1].ID, "Dangling images")
+	assert.Equal(t, rec.resources[1].Status, compose.Warning)
+	assert.Equal(t, rec.resources[1].Text, "Resource is still in use")
+}
+
+// TestEnsureImagesDown_MixedRemovedAndStillInUseKeepsBothVisible guards a
+// second regression caught by the same review pass: when the batch is
+// mixed — one image actually removed, another still in use, no genuine
+// error — the earlier fix's `len(removed) == 0` guard alone can't see the
+// still-in-use one either (removed is non-empty), so it would fall through
+// to a plain "Removed" and hide that one image never actually went away.
+func TestEnsureImagesDown_MixedRemovedAndStillInUseKeepsBothVisible(t *testing.T) {
+	apiClient, svc, rec, project := newDanglingImagesFixture(t)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:removed"},
+		{ID: "sha256:in-use"},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:removed", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used by a container"))
+
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
+
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	assert.NilError(t, ops[1]())
+
+	assert.Equal(t, len(rec.resources), 2)
+	assert.Equal(t, rec.resources[0].ID, "Dangling images")
+	assert.Equal(t, rec.resources[0].Text, "Removing")
+	assert.Equal(t, rec.resources[1].ID, "Dangling images")
+	assert.Equal(t, rec.resources[1].Status, compose.Warning)
+	assert.Equal(t, rec.resources[1].Text, "Removed")
+	assert.Equal(t, rec.resources[1].Details, "1 image(s) still in use")
+}
+
+// TestEnsureImagesDown_PartialFailureAlsoMentionsStillInUse guards a gap
+// found in review of the switch above: when a genuine failure AND a
+// still-in-use image both occur in the same batch (with at least one
+// image actually removed), the `err != nil` branch fires first and must
+// not silently drop the still-in-use count the way a naive "just show
+// err.Error()" would — both facts belong in the same message.
+func TestEnsureImagesDown_PartialFailureAlsoMentionsStillInUse(t *testing.T) {
+	apiClient, svc, rec, project := newDanglingImagesFixture(t)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:removed"},
+		{ID: "sha256:in-use"},
+		{ID: "sha256:fails"},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:removed", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used by a container"))
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
+
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
+
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	opErr := ops[1]()
+	assert.ErrorContains(t, opErr, "sha256:fails")
+
+	assert.Equal(t, len(rec.resources), 2)
+	assert.Equal(t, rec.resources[0].ID, "Dangling images")
+	assert.Equal(t, rec.resources[0].Text, "Removing")
+	assert.Equal(t, rec.resources[1].ID, "Dangling images")
+	assert.Equal(t, rec.resources[1].Status, compose.Warning)
+	assert.Equal(t, rec.resources[1].Text, "Removed")
+	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "sha256:fails")
+	assert.ErrorContains(t, errors.New(rec.resources[1].Details), "1 image(s) still in use")
+}
+
+// TestEnsureImagesDown_AllEligibleAlreadyGoneReportsNoResourceFound guards a
+// third combination the same review pass flagged: when every eligible
+// image turns out to already be gone (a benign race, not a conflict), the
+// aggregate must say so accurately — not "Resource is still in use", which
+// would be factually wrong for an image that no longer exists at all.
+func TestEnsureImagesDown_AllEligibleAlreadyGoneReportsNoResourceFound(t *testing.T) {
+	apiClient, svc, rec, project := newDanglingImagesFixture(t)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:already-gone"},
+	}}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:already-gone", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrNotFound.WithMessage("already removed"))
+
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
+
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	assert.NilError(t, ops[1]())
+
+	assert.Equal(t, len(rec.resources), 2)
+	assert.Equal(t, rec.resources[0].ID, "Dangling images")
+	assert.Equal(t, rec.resources[0].Text, "Removing")
+	assert.Equal(t, rec.resources[1].ID, "Dangling images")
+	assert.Equal(t, rec.resources[1].Status, compose.Done)
+	assert.Equal(t, rec.resources[1].Text, "Warning: No resource found to remove")
 }
 
 // TestDownRemovesRetainedPreStartHookContainers verifies that compose down finds and
