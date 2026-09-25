@@ -117,11 +117,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	ops := s.ensureNetworksDown(ctx, project)
 
 	if options.Images != "" {
-		imgOps, err := s.ensureImagesDown(ctx, project, options)
-		if err != nil {
-			return err
-		}
-		ops = append(ops, imgOps...)
+		ops = append(ops, s.ensureImagesDown(ctx, project, options)...)
 	}
 
 	if options.Volumes {
@@ -154,29 +150,18 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) ([]downOp, error) {
-	imagePruner := NewImagePruner(s.apiClient(), project)
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) []downOp {
 	pruneOpts := ImagePruneOptions{
 		Mode:          ImagePruneMode(options.Images),
 		RemoveOrphans: options.RemoveOrphans,
 	}
-	images, err := imagePruner.ImagesToPrune(ctx, pruneOpts)
-	if err != nil {
-		return nil, err
-	}
 
 	var ops []downOp
-	for i := range images {
-		img := images[i]
-		ops = append(ops, func() error {
-			return s.removeResource("Image "+img, func() error {
-				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
-				return err
-			})
-		})
-	}
-
 	if pruneOpts.Mode != ImagePruneNone {
+		ops = append(ops, func() error {
+			return s.removeTaggedImagesOp(ctx, project, pruneOpts)
+		})
+
 		// mirrors ImagesToPrune's own orphan check: a dangling image from a
 		// service no longer in the project must be spared unless
 		// RemoveOrphans is set, same as that service's tagged image is.
@@ -192,7 +177,34 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 			return s.removeDanglingImagesOp(ctx, projectName, keep)
 		})
 	}
-	return ops, nil
+	return ops
+}
+
+// removeTaggedImagesOp computes the project's tagged images to prune and
+// removes them, deferring the listing (which itself calls the daemon and
+// can fail) to when the op actually runs, for the same reason
+// removeDanglingImagesOp does: a listing failure here must not abort
+// sibling down ops (network, volumes, dangling images), since — unlike
+// this op — they've already been scheduled onto the same errgroup by the
+// time `ensureImagesDown` used to fail synchronously.
+func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *types.Project, pruneOpts ImagePruneOptions) error {
+	images, err := NewImagePruner(s.apiClient(), project).ImagesToPrune(ctx, pruneOpts)
+	if err != nil {
+		s.events.On(errorEvent(api.ResourceCompose, err.Error()))
+		return err
+	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+	for i := range images {
+		img := images[i]
+		eg.Go(func() error {
+			return s.removeResource("Image "+img, func() error {
+				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
+				return err
+			})
+		})
+	}
+	return eg.Wait()
 }
 
 // removeDanglingImagesOp lists a project's dangling images and removes those
