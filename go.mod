@@ -27,6 +27,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.15
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.33.0
+	github.com/moby/extensions v0.0.0-20260826001921-d37867cb107f
 	github.com/moby/go-archive v0.3.3
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
@@ -54,6 +55,7 @@ require (
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
 	google.golang.org/grpc v1.83.2
+	google.golang.org/protobuf v1.36.12
 	gotest.tools/v3 v3.5.2
 	tags.cncf.io/container-device-interface v1.1.1
 )
@@ -123,7 +125,6 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5 // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
 

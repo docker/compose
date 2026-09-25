@@ -30,11 +30,13 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
+	extensionclient "github.com/moby/extensions/client"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
 )
@@ -213,6 +215,11 @@ type composeService struct {
 	dryRun         bool
 
 	runtimeAPIVersion runtimeVersionCache
+
+	jobsGRPCOnce  sync.Once
+	jobsExtClient *extensionclient.Client
+	jobsAPI       jobsv0.Jobs
+	jobsAPIErr    error
 }
 
 // Close releases any connections/resources held by the underlying clients.
@@ -223,6 +230,9 @@ func (s *composeService) Close() error {
 	var errs []error
 	if s.dockerCli != nil {
 		errs = append(errs, s.apiClient().Close())
+	}
+	if s.jobsExtClient != nil {
+		errs = append(errs, s.jobsExtClient.Close())
 	}
 	return errors.Join(errs...)
 }
