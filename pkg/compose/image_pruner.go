@@ -175,8 +175,10 @@ func (s *composeService) danglingImages(ctx context.Context, projectName string)
 
 // removeImages removes the given images in parallel, tolerating individual
 // failures so one bad image doesn't abort the rest: an image already gone
-// (a benign race with something else removing it concurrently) is treated
-// as a no-op, counted neither as removed nor as failed; any other removal
+// (a benign race with something else removing it concurrently) or still in
+// use is treated as a no-op, counted neither as removed nor as failed —
+// same tolerance removeResource already gives a tagged image still in use
+// ("Resource is still in use" warning, not an error); any other removal
 // error is joined into err so callers reporting failures to the user keep
 // the actual daemon error instead of just an image ID.
 func (s *composeService) removeImages(ctx context.Context, images []image.Summary) (removed []string, err error) {
@@ -190,6 +192,12 @@ func (s *composeService) removeImages(ctx context.Context, images []image.Summar
 				if errdefs.IsNotFound(err) {
 					// already gone, e.g. removed concurrently by something else
 					logrus.Debugf("dangling image %s already removed: %v", img.ID, err)
+					return nil
+				}
+				if errdefs.IsConflict(err) {
+					// still in use: the same benign skip the tagged-image
+					// path reports via removeResource's conflict branch
+					logrus.Debugf("dangling image %s still in use: %v", img.ID, err)
 					return nil
 				}
 				mu.Lock()
@@ -207,10 +215,11 @@ func (s *composeService) removeImages(ctx context.Context, images []image.Summar
 	return removed, errors.Join(errs...)
 }
 
-// removeDanglingImages lists a project's dangling images and removes those
-// not spared by keep. Shared by down --rmi and watch --prune, which differ
-// only in what keep spares.
-func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]string, error) {
+// eligibleDanglingImages lists a project's dangling images and filters out
+// those spared by keep. Shared by down --rmi (which also needs the list
+// itself, to decide whether there's anything to report) and watch --prune,
+// so the two don't drift apart.
+func (s *composeService) eligibleDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]image.Summary, error) {
 	images, err := s.danglingImages(ctx, projectName)
 	if err != nil {
 		return nil, err
@@ -221,6 +230,17 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 		if !keep(img) {
 			eligible = append(eligible, img)
 		}
+	}
+	return eligible, nil
+}
+
+// removeDanglingImages lists a project's dangling images and removes those
+// not spared by keep. Shared by down --rmi and watch --prune, which differ
+// only in what keep spares.
+func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]string, error) {
+	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
+	if err != nil {
+		return nil, err
 	}
 	return s.removeImages(ctx, eligible)
 }

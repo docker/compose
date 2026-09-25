@@ -195,6 +195,7 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(s.maxConcurrency)
 	for i := range images {
 		img := images[i]
 		eg.Go(func() error {
@@ -214,33 +215,31 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 // them).
 //
 // It stays silent when there's nothing to remove, mirroring removeNetwork's
-// silent skip. A listing failure is reported as a visible error without the
-// "Dangling images" label, since at that point we don't know whether it
-// would have been a no-op or a real removal. A partial removal failure
-// keeps the "Removed" label — some images did get removed — and adds the
-// error as a visible warning alongside it rather than replacing it.
+// silent skip. A listing failure surfaces under the "Dangling images" label
+// as a plain error rather than the normal Removing/Removed progression,
+// since at that point we don't know whether it would have been a no-op or
+// a real removal. A removal failure keeps the "Removed" label only if at
+// least one image actually got removed — with the error visible alongside
+// it, not replacing it — otherwise it's reported as a plain error too.
 func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName string, keep func(image.Summary) bool) error {
 	eventID := "Dangling images"
-	images, err := s.danglingImages(ctx, projectName)
+	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
 	if err != nil {
 		s.events.On(errorEvent(eventID, err.Error()))
 		return err
-	}
-
-	var eligible []image.Summary
-	for _, img := range images {
-		if !keep(img) {
-			eligible = append(eligible, img)
-		}
 	}
 	if len(eligible) == 0 {
 		return nil
 	}
 
 	s.events.On(removingEvent(eventID))
-	_, err = s.removeImages(ctx, eligible)
+	removed, err := s.removeImages(ctx, eligible)
 	if err != nil {
-		s.events.On(newEvent(eventID, api.Warning, "Removed", err.Error()))
+		if len(removed) == 0 {
+			s.events.On(errorEvent(eventID, err.Error()))
+		} else {
+			s.events.On(newEvent(eventID, api.Warning, "Removed", err.Error()))
+		}
 		return err
 	}
 	s.events.On(removedEvent(eventID))
