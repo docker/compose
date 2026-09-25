@@ -78,20 +78,22 @@ func resolveServiceReferences(service *types.ServiceConfig, containersByService 
 
 func resolveVolumeFrom(service *types.ServiceConfig, containersByService map[string]Containers) error {
 	for i, vol := range service.VolumesFrom {
-		spec := strings.Split(vol, ":")
-		if len(spec) == 0 {
+		if ref, ok := strings.CutPrefix(vol, types.ContainerPrefix); ok {
+			// container:<name>[:ro|:rw] - the engine accepts <name>[:mode] as-is
+			service.VolumesFrom[i] = ref
 			continue
 		}
-		if spec[0] == "container" {
-			service.VolumesFrom[i] = spec[1]
-			continue
-		}
-		name := spec[0]
+		name, mode, hasMode := strings.Cut(vol, ":")
 		dependencies := containersByService[name]
 		if len(dependencies) == 0 {
 			return fmt.Errorf("cannot share volume with service %s: container missing", name)
 		}
-		service.VolumesFrom[i] = dependencies.sorted()[0].ID
+		resolved := dependencies.sorted()[0].ID
+		if hasMode {
+			// keep the access mode (ro/rw) the user declared
+			resolved += ":" + mode
+		}
+		service.VolumesFrom[i] = resolved
 	}
 	return nil
 }

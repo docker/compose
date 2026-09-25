@@ -854,3 +854,19 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		assert.Assert(t, strings.Contains(joined, `service "app": unsupported depends_on condition "some_future_condition"`), joined)
 	})
 }
+
+func TestResolveVolumeFromKeepsAccessMode(t *testing.T) {
+	containersByService := map[string]Containers{
+		"db": {{ID: "db-ctr-id", Labels: map[string]string{api.ContainerNumberLabel: "1"}}},
+	}
+	service := types.ServiceConfig{
+		Name: "app",
+		ContainerSpec: types.ContainerSpec{
+			VolumesFrom: []string{"db:ro", "container:external:ro", "db:rw", "db", "container:other"},
+		},
+	}
+
+	err := resolveVolumeFrom(&service, containersByService)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, service.VolumesFrom, []string{"db-ctr-id:ro", "external:ro", "db-ctr-id:rw", "db-ctr-id", "other"})
+}
