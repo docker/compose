@@ -174,14 +174,18 @@ func (s *composeService) danglingImages(ctx context.Context, projectName string)
 }
 
 // removeImages removes the given images in parallel, tolerating individual
-// failures so one bad image doesn't abort the rest: an image already gone
+// failures so one bad image doesn't abort the rest. An image already gone
 // (a benign race with something else removing it concurrently) or still in
-// use is treated as a no-op, counted neither as removed nor as failed —
-// same tolerance removeResource already gives a tagged image still in use
-// ("Resource is still in use" warning, not an error); any other removal
-// error is joined into err so callers reporting failures to the user keep
-// the actual daemon error instead of just an image ID.
-func (s *composeService) removeImages(ctx context.Context, images []image.Summary) (removed []string, err error) {
+// use is never joined into err — same tolerance removeResource already
+// gives a tagged image in either situation (its own distinct, correctly
+// worded event, not an error) — but the two are returned in separate
+// buckets, not folded into removed: "already gone" reached the goal same
+// as an actual removal, "still in use" did not, and a caller aggregating
+// several images needs to tell those apart to report the batch honestly
+// (see removeDanglingImagesOp). Any other removal error is joined into err
+// so callers reporting failures to the user keep the actual daemon error
+// instead of just an image ID.
+func (s *composeService) removeImages(ctx context.Context, images []image.Summary) (removed, stillInUse, alreadyGone []string, err error) {
 	var mu sync.Mutex
 	var errs []error
 	eg, ctx := errgroup.WithContext(ctx)
@@ -189,20 +193,21 @@ func (s *composeService) removeImages(ctx context.Context, images []image.Summar
 	for _, img := range images {
 		eg.Go(func() error {
 			if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
-				if errdefs.IsNotFound(err) {
+				mu.Lock()
+				defer mu.Unlock()
+				switch {
+				case errdefs.IsNotFound(err):
 					// already gone, e.g. removed concurrently by something else
 					logrus.Debugf("dangling image %s already removed: %v", img.ID, err)
-					return nil
-				}
-				if errdefs.IsConflict(err) {
+					alreadyGone = append(alreadyGone, img.ID)
+				case errdefs.IsConflict(err):
 					// still in use: the same benign skip the tagged-image
 					// path reports via removeResource's conflict branch
 					logrus.Debugf("dangling image %s still in use: %v", img.ID, err)
-					return nil
+					stillInUse = append(stillInUse, img.ID)
+				default:
+					errs = append(errs, fmt.Errorf("image %s: %w", img.ID, err))
 				}
-				mu.Lock()
-				errs = append(errs, fmt.Errorf("image %s: %w", img.ID, err))
-				mu.Unlock()
 				return nil
 			}
 			mu.Lock()
@@ -212,7 +217,7 @@ func (s *composeService) removeImages(ctx context.Context, images []image.Summar
 		})
 	}
 	_ = eg.Wait() // errgroup is only used for fan-out here; goroutines never return an error
-	return removed, errors.Join(errs...)
+	return removed, stillInUse, alreadyGone, errors.Join(errs...)
 }
 
 // eligibleDanglingImages lists a project's dangling images and filters out
@@ -242,7 +247,8 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 	if err != nil {
 		return nil, err
 	}
-	return s.removeImages(ctx, eligible)
+	removed, _, _, err := s.removeImages(ctx, eligible)
+	return removed, err
 }
 
 // unlabeledLocalImages are images that match the implicit naming convention
