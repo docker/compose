@@ -468,6 +468,48 @@ func prepareMocks(mockCtrl *gomock.Controller) (*mocks.MockAPIClient, *mocks.Moc
 	return api, cli
 }
 
+// TestEnsureImagesDown_TaggedImageListingFailureStaysVisibleWithoutAbortingDown
+// guards the sibling fix to #14219 found during review: ImagesToPrune's own
+// listing call used to run synchronously inside ensureImagesDown and abort
+// it on failure, before down() ever scheduled the network/volume ops it had
+// already built — the same hazard class fixed for dangling images.
+// ensureImagesDown can no longer return an error at all (enforced by its
+// signature), so a listing failure can only surface once
+// removeTaggedImagesOp actually runs as one of down's concurrently
+// scheduled ops, and it must not prevent the sibling dangling-images op
+// from running fine on its own.
+func TestEnsureImagesDown_TaggedImageListingFailureStaysVisibleWithoutAbortingDown(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	rec := &capturingEvents{}
+	svcIface, err := NewComposeService(cli, WithEventProcessor(rec))
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{Name: "prj"}
+	listErr := errors.New("connection refused")
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "false"),
+	}).Return(client.ImageListResult{}, listErr)
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "true"),
+	}).Return(client.ImageListResult{}, nil)
+
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
+
+	opErr := ops[0]()
+	assert.Error(t, opErr, listErr.Error())
+	assert.NilError(t, ops[1]()) // dangling-images op is independent, still runs fine
+
+	assert.Equal(t, len(rec.resources), 1)
+	assert.Equal(t, rec.resources[0].ID, compose.ResourceCompose)
+	assert.Equal(t, rec.resources[0].Status, compose.Error)
+	assert.Equal(t, rec.resources[0].Details, listErr.Error())
+}
+
 // TestEnsureImagesDown_ReportsDanglingImagesAsOneGroupedEvent guards that
 // dangling-image removal is reported as a single grouped event regardless
 // of count, instead of one row per meaningless raw image ID.
@@ -498,8 +540,7 @@ func TestEnsureImagesDown_ReportsDanglingImagesAsOneGroupedEvent(t *testing.T) {
 
 	// RemoveOrphans:true bypasses the per-service keep check so this test
 	// stays focused on the single-grouped-event behavior.
-	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
-	assert.NilError(t, err)
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
 	for _, op := range ops {
 		assert.NilError(t, op())
 	}
@@ -548,8 +589,7 @@ func TestEnsureImagesDown_SparesDanglingImagesOfOrphanedServices(t *testing.T) {
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:web-dangling", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, nil)
 
-	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local"})
-	assert.NilError(t, err)
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local"})
 	for _, op := range ops {
 		assert.NilError(t, op())
 	}
@@ -584,8 +624,7 @@ func TestEnsureImagesDown_RemoveOrphansAlsoTakesDanglingImages(t *testing.T) {
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:orphan-dangling", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, nil)
 
-	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
-	assert.NilError(t, err)
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
 	for _, op := range ops {
 		assert.NilError(t, op())
 	}
@@ -622,9 +661,8 @@ func TestEnsureImagesDown_NoDanglingImagesToRemove(t *testing.T) {
 		Filters: projectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
-	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
-	assert.NilError(t, err)
-	assert.Equal(t, len(ops), 1)
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
 	for _, op := range ops {
 		assert.NilError(t, op())
 	}
@@ -646,9 +684,8 @@ func TestEnsureImagesDown_AllDanglingImagesSparedStaysSilent(t *testing.T) {
 	}}, nil)
 	// no ImageRemove expectation — a call for the spared image fails the test
 
-	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local"})
-	assert.NilError(t, err)
-	assert.Equal(t, len(ops), 1)
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local"})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
 	for _, op := range ops {
 		assert.NilError(t, op())
 	}
@@ -674,11 +711,11 @@ func TestEnsureImagesDown_DanglingListFailureStaysVisibleWithoutAbortingDown(t *
 	// ensureImagesDown itself must not fail: the listing error is only
 	// surfaced when the returned op actually runs, same as every other
 	// down op, so it can't block ops collected/scheduled around it.
-	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
-	assert.NilError(t, err)
-	assert.Equal(t, len(ops), 1)
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
 
-	opErr := ops[0]()
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	opErr := ops[1]()
 	assert.Error(t, opErr, listErr.Error())
 
 	events := make([]string, len(rec.resources))
@@ -710,11 +747,11 @@ func TestEnsureImagesDown_PartialRemovalFailureStaysVisibleAlongsideRemoved(t *t
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used by a container"))
 
-	ops, err := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
-	assert.NilError(t, err)
-	assert.Equal(t, len(ops), 1)
+	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true})
+	assert.Equal(t, len(ops), 2) // tagged-images op + dangling-images op
 
-	opErr := ops[0]()
+	assert.NilError(t, ops[0]()) // tagged-images op: nothing to prune, trivially succeeds
+	opErr := ops[1]()
 	assert.ErrorContains(t, opErr, "sha256:in-use")
 
 	assert.Equal(t, len(rec.resources), 2)
