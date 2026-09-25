@@ -1,0 +1,20 @@
+services:
+  core:
+    image: alpine
+    labels:
+      tier: backend
+
+  worker:
+    image: alpine
+    profiles:
+      - workers
+    labels:
+      tier: backend
+
+  monitor:
+    image: alpine
+    profiles:
+      - monitoring
+      - workers
+    labels:
+      tier: ops
