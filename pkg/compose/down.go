@@ -187,14 +187,52 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 			_, err := project.GetService(img.Labels[api.ServiceLabel])
 			return err != nil
 		}
+		projectName := project.Name
 		ops = append(ops, func() error {
-			return s.removeResource("Dangling images", func() error {
-				_, err := s.removeDanglingImages(ctx, project.Name, keep)
-				return err
-			})
+			return s.removeDanglingImagesOp(ctx, projectName, keep)
 		})
 	}
 	return ops, nil
+}
+
+// removeDanglingImagesOp lists a project's dangling images and removes those
+// not spared by keep, deferring both the listing and the removal to when the
+// op actually runs so a failure here can't abort the rest of `down` (this op
+// runs concurrently with the other resource-removal ops, same as any of
+// them).
+//
+// It stays silent when there's nothing to remove, mirroring removeNetwork's
+// silent skip. A listing failure is reported as a visible error without the
+// "Dangling images" label, since at that point we don't know whether it
+// would have been a no-op or a real removal. A partial removal failure
+// keeps the "Removed" label — some images did get removed — and adds the
+// error as a visible warning alongside it rather than replacing it.
+func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName string, keep func(image.Summary) bool) error {
+	eventID := "Dangling images"
+	images, err := s.danglingImages(ctx, projectName)
+	if err != nil {
+		s.events.On(errorEvent(eventID, err.Error()))
+		return err
+	}
+
+	var eligible []image.Summary
+	for _, img := range images {
+		if !keep(img) {
+			eligible = append(eligible, img)
+		}
+	}
+	if len(eligible) == 0 {
+		return nil
+	}
+
+	s.events.On(removingEvent(eventID))
+	_, err = s.removeImages(ctx, eligible)
+	if err != nil {
+		s.events.On(newEvent(eventID, api.Warning, "Removed", err.Error()))
+		return err
+	}
+	s.events.On(removedEvent(eventID))
+	return nil
 }
 
 func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project) []downOp {
