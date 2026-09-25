@@ -106,6 +106,22 @@ func TestPreStartHookInError(t *testing.T) {
 			ServiceState("sample", "created"))
 }
 
+// A retained runner from a failed run must not block the next one: it is a
+// stale hook container the reconciler has to observe and purge before
+// creating a fresh one under the same deterministic name, or the second up
+// fails with a container-name conflict instead of recovering.
+func TestPreStartHookRetryAfterFailureSucceeds(t *testing.T) {
+	s := NewScenario(t, "up must recover from a previously failed hook by purging its stale runner")
+	s.Step("first up fails on the hook",
+		ComposeCmd("up", "-d").MayFail(),
+		ExitCode(1),
+		OutputContains("pre_start"),
+		ServiceState("sample", "created")).
+		Step("second up purges the stale runner and succeeds",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("sample", "running"))
+}
+
 func TestPreStartHookBuildInheritance(t *testing.T) {
 	s := NewScenario(t, "a pre_start hook without an image must run on the service's built image")
 	s.Defer(DockerCmd("image", "rm", "-f", s.Project()+"-sample")).
@@ -198,6 +214,39 @@ func TestPreStartHookNotReRunOnScaleUp(t *testing.T) {
 		Step("still exactly one token",
 			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
 			OutputContains("1 /mnt/tokens.txt"))
+}
+
+func TestPreStartHookCreateThenStart(t *testing.T) {
+	s := NewScenario(t, "create must prepare the pre_start runners so a later start executes them")
+	s.Step("create leaves the service created, hooks not yet run",
+		ComposeCmd("create"),
+		ServiceState("sample", "created")).
+		Step("nothing in the volume before start",
+			probeVolume(s, "sh", "-c", "wc -l < /mnt/tokens.txt || echo missing"),
+			OutputContains("missing")).
+		Step("start runs the hook then the service",
+			ComposeCmd("start"),
+			ServiceState("sample", "running")).
+		Step("the hook ran exactly once",
+			probeVolume(s, "wc", "-l", "/mnt/tokens.txt"),
+			OutputContains("1 /mnt/tokens.txt"))
+}
+
+func TestPreStartHookStopThenStartFails(t *testing.T) {
+	NewScenario(t, "start after stop must fail on a hooked service: the runners were consumed, only a reconciliation (up) prepares new ones").
+		Step("up runs the hook and starts the service",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second)).
+		Step("stop leaves the service exited",
+			ComposeCmd("stop"),
+			ServiceState("sample", "exited")).
+		Step("start fails, pointing at the reconciliation command",
+			ComposeCmd("start").MayFail(),
+			ExitCode(1),
+			OutputContains("pre_start[0]"),
+			OutputContains("docker compose up")).
+		Step("up prepares fresh runners and recovers",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("sample", "running"))
 }
 
 func TestPreStartHookRunsOnceForScaledService(t *testing.T) {

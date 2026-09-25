@@ -1,0 +1,11 @@
+services:
+  sample:
+    image: alpine
+    command: sh -c 'sleep 30'
+    volumes:
+      - data:/mnt
+    pre_start:
+      - image: alpine
+        command: sh -c 'test -f /mnt/marker && exit 0 || { touch /mnt/marker; exit 17; }'
+volumes:
+  data:

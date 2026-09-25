@@ -47,10 +47,13 @@ var _ client.APIClient = &DryRunClient{}
 
 // DryRunClient implements APIClient by delegating to implementation functions. This allows lazy init and per-method overrides
 type DryRunClient struct {
-	apiClient  client.APIClient
-	containers []containerType.Summary
-	execs      sync.Map
-	configFile *configfile.ConfigFile
+	apiClient client.APIClient
+	// containers caches the project's containers: seeded once from the real
+	// daemon (containersSeeded), then extended with every faked creation.
+	containers       []containerType.Summary
+	containersSeeded bool
+	execs            sync.Map
+	configFile       *configfile.ConfigFile
 }
 
 type execDetails struct {
@@ -95,6 +98,20 @@ func (d *DryRunClient) resolve(ctx context.Context, ref string) error {
 	return err
 }
 
+// matchesLabelFilters reports whether labels satisfy every requested
+// "key" or "key=value" label filter, mirroring the daemon's label filtering
+// for the faked containers the cache serves.
+func matchesLabelFilters(labels map[string]string, wanted map[string]bool) bool {
+	for f := range wanted {
+		k, v, hasValue := strings.Cut(f, "=")
+		actual, ok := labels[k]
+		if !ok || (hasValue && actual != v) {
+			return false
+		}
+	}
+	return true
+}
+
 func getCallingFunction() string {
 	pc, _, _, _ := runtime.Caller(2)
 	fullName := runtime.FuncForPC(pc).Name()
@@ -122,6 +139,9 @@ func (d *DryRunClient) ContainerCreate(ctx context.Context, options client.Conta
 		ID:     options.Name,
 		Names:  []string{options.Name},
 		Labels: options.Config.Labels,
+		// a container just created is in created state; listings that
+		// filter on state (listPreStartRunners) must see the faked ones
+		State: containerType.StateCreated,
 		HostConfig: struct {
 			NetworkMode string            `json:",omitempty"`
 			Annotations map[string]string `json:",omitempty"`
@@ -165,20 +185,38 @@ func (d *DryRunClient) ContainerKill(ctx context.Context, container string, opti
 func (d *DryRunClient) ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error) {
 	caller := getCallingFunction()
 	switch caller {
-	case "start":
+	case "getContainers":
+		// Seed the cache from the real daemon on first use, then keep
+		// answering from it: containers faked by ContainerCreate must stay
+		// visible to the start flow, which lists through getContainers.
+		// Seeding is tracked independently of the cache's length — a faked
+		// creation may land before the first listing, and must not mask the
+		// daemon's real containers.
+		if !d.containersSeeded {
+			res, err := d.apiClient.ContainerList(ctx, options)
+			if err != nil {
+				return client.ContainerListResult{}, err
+			}
+			d.containersSeeded = true
+			d.containers = append(d.containers, res.Items...)
+		}
 		return client.ContainerListResult{
 			Items: d.containers,
 		}, nil
-	case "getContainers":
-		if len(d.containers) == 0 {
-			res, err := d.apiClient.ContainerList(ctx, options)
-			if err == nil {
-				d.containers = res.Items
+	case "listPreStartRunners":
+		// Hook runners created under dry-run exist only in the cache: answer
+		// from it, honoring the caller's label filters (project, service,
+		// hook type). The status=created filter is implicit — every faked
+		// container is in created state by construction, and a real runner
+		// seeded into the cache in any other state is discarded by the
+		// caller's own state check.
+		var items []containerType.Summary
+		for _, ctr := range d.containers {
+			if matchesLabelFilters(ctr.Labels, options.Filters["label"]) {
+				items = append(items, ctr)
 			}
-			return client.ContainerListResult{
-				Items: d.containers,
-			}, err
 		}
+		return client.ContainerListResult{Items: items}, nil
 	}
 	return d.apiClient.ContainerList(ctx, options)
 }

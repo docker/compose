@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
@@ -46,6 +47,8 @@ func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
 	cli := mocks.NewMockCli(mockCtrl)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 
 	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
 	assert.NilError(t, err)
@@ -174,6 +177,38 @@ func emptyObservedState(project string) *ObservedState {
 // Goes through newPlanExecutor + run (i.e. the same code path executePlan
 // uses in production) so the test exercises the errgroup, done-channel
 // wiring and group tracker — not a hand-rolled loop over executeNode.
+// A best-effort removal failure (stale pre_start hook runner purge) is
+// warn-only: the plan carries on, and the removal passes RemoveVolumes so the
+// runner's anonymous volumes go with it — the imperative purge semantics.
+func TestExecutePlanBestEffortRemoveContainerFailureTolerated(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	ctr := container.Summary{
+		ID:     "hook1",
+		Names:  []string{"/some-hook-runner"},
+		Labels: map[string]string{api.ServiceLabel: "web"},
+	}
+
+	apiClient.EXPECT().ContainerRemove(gomock.Any(), "hook1", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, opts client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			assert.Assert(t, opts.RemoveVolumes, "hook-runner purge must drop anonymous volumes")
+			return client.ContainerRemoveResult{}, errors.New("device or resource busy")
+		})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:          OpRemoveContainer,
+		ResourceID:    "hook:web:stale:hook1",
+		Cause:         "stale pre_start hook container",
+		Container:     &ctr,
+		RemoveVolumes: true,
+		BestEffort:    true,
+	}, "")
+
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), plan)
+	assert.NilError(t, err)
+}
+
 func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
@@ -486,3 +521,83 @@ type conflictError struct{}
 
 func (conflictError) Error() string { return "conflict" }
 func (conflictError) Conflict()     {}
+
+// TestExecutePlanCreateHookContainer verifies the hook-runner create op: the
+// target replica is resolved from the executor's live view (lowest
+// container-number, mirroring what the start phase hands the hooks) and the
+// runner is created under the deterministic name carried by the operation.
+func TestExecutePlanCreateHookContainer(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: "1.44"}, nil).AnyTimes()
+	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
+
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "test",
+		Containers: map[string][]ObservedContainer{
+			"web": {
+				// Deliberately listed out of order: replica 2 first.
+				{ID: "c2", Summary: container.Summary{ID: "c2", Labels: map[string]string{api.ContainerNumberLabel: "2"}}},
+				{ID: "c1", Summary: container.Summary{ID: "c1", Labels: map[string]string{api.ContainerNumberLabel: "1"}}},
+			},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	var gotOpts client.ContainerCreateOptions
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			gotOpts = opts
+			return client.ContainerCreateResult{ID: "hook-1"}, nil
+		})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateHookContainer,
+		ResourceID: "hook:web:pre_start:0",
+		Cause:      "pre_start hook",
+		Service:    &service,
+		HookIndex:  0,
+		Name:       getHookContainerName("test", "web", 0),
+	}, "")
+
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, observed, plan)
+	assert.NilError(t, err)
+	assert.Equal(t, gotOpts.Name, "test-web-pre_start-0")
+	assert.DeepEqual(t, gotOpts.HostConfig.VolumesFrom, []string{"c1"})
+	assert.Equal(t, gotOpts.Config.Labels[api.HookIndexLabel], "0")
+}
+
+// TestExecutePlanCreateHookContainerNoReplica: a hook-create node scheduled
+// with no replica in the live view is an internal planning error — the
+// reconciler guarantees the node depends on the replica's create.
+func TestExecutePlanCreateHookContainerNoReplica(t *testing.T) {
+	svc, _ := newTestService(t)
+
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart:      []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateHookContainer,
+		ResourceID: "hook:web:pre_start:0",
+		Cause:      "pre_start hook",
+		Service:    &service,
+		HookIndex:  0,
+		Name:       getHookContainerName("test", "web", 0),
+	}, "")
+
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), plan)
+	assert.ErrorContains(t, err, `no "web" container`)
+}

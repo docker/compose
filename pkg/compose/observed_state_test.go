@@ -96,7 +96,9 @@ func TestCollectObservedState(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
 		Services: types.Services{
-			"web": {Name: "web"},
+			// web declares a hook: the separate runner listing only fires
+			// when some service declares pre_start at all
+			"web": {Name: "web", PreStart: []types.PreStartHook{{}}},
 			"db":  {Name: "db"},
 		},
 		Networks: types.Networks{
@@ -163,6 +165,41 @@ func TestCollectObservedState(t *testing.T) {
 		},
 	}, nil)
 
+	// Mock ContainerList for getHookContainers: hook runners carry no
+	// ConfigHashLabel, so they are listed separately (see
+	// collectObservedState) via a project+hook-label filter alone.
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{
+			{
+				// Stale lifecycle-hook runner (a previous run failed before
+				// removing it): neither a replica (it has no container-number
+				// label and must not read as number 0) nor a one-off —
+				// classified apart so the reconciler can plan its purge.
+				ID:    "c5",
+				Names: []string{"/hook-runner"},
+				State: container.StateExited,
+				Labels: map[string]string{
+					api.ServiceLabel: "web",
+					api.ProjectLabel: "myproject",
+					api.HookLabel:    "pre_start",
+				},
+			},
+			{
+				// Hook runner whose service left the model: nothing plans
+				// purges for an unknown service, so it must keep flowing to
+				// the orphan path --remove-orphans cleans.
+				ID:    "c6",
+				Names: []string{"/old-hook-runner"},
+				State: container.StateExited,
+				Labels: map[string]string{
+					api.ServiceLabel: "old",
+					api.ProjectLabel: "myproject",
+					api.HookLabel:    "pre_start",
+				},
+			},
+		},
+	}, nil)
+
 	// Mock NetworkList
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{
 		Items: []network.Summary{
@@ -202,11 +239,20 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, len(state.Containers["db"]), 1)
 	assert.Equal(t, state.Containers["db"][0].ID, "c2")
 
-	// Orphans: only the model-absent service "old". The running one-off c4 is
-	// absent everywhere — not in the "web" bucket (asserted above: 1 replica),
-	// not an orphan: up leaves live `compose run` sessions alone.
-	assert.Equal(t, len(state.Orphans), 1)
+	// The hook runner is classified apart — not a "web" replica (asserted
+	// above: 1 replica), not an orphan
+	assert.Equal(t, len(state.HookContainers["web"]), 1)
+	assert.Equal(t, state.HookContainers["web"][0].ID, "c5")
+
+	// Orphans: the model-absent service "old" — its replica AND its hook
+	// runner (c6), which must not hide in HookContainers where nothing would
+	// ever purge it. The running one-off c4 is absent everywhere — not in the
+	// "web" bucket (asserted above: 1 replica), not an orphan: up leaves live
+	// `compose run` sessions alone.
+	assert.Equal(t, len(state.Orphans), 2)
 	assert.Equal(t, state.Orphans[0].ID, "c3")
+	assert.Equal(t, state.Orphans[1].ID, "c6")
+	assert.Equal(t, len(state.HookContainers["old"]), 0)
 
 	// Networks
 	assert.Equal(t, len(state.Networks), 1)
@@ -221,6 +267,43 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, vol.Name, "myproject_data")
 	assert.Equal(t, vol.Driver, "local")
 	assert.Equal(t, vol.ConfigHash, "volhash1")
+}
+
+// TestCollectObservedState_LegacyHookRunnerNotDuplicated covers a runner
+// created before the ConfigHashLabel exclusion existed (or by an older
+// compose version): it still carries the label, so it matches getContainers'
+// own filters and is present in BOTH ContainerList responses. It must be
+// classified exactly once, or the reconciler would schedule two removals for
+// the same ID (docker-agent review on #14221).
+func TestCollectObservedState_LegacyHookRunnerNotDuplicated(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{Name: "myproject", Services: types.Services{
+		"web": {Name: "web", PreStart: []types.PreStartHook{{}}},
+	}}
+
+	legacyRunner := container.Summary{
+		ID:    "legacy-hook-1",
+		State: container.StateExited,
+		Labels: map[string]string{
+			api.ServiceLabel:    "web",
+			api.ProjectLabel:    "myproject",
+			api.HookLabel:       "pre_start",
+			api.ConfigHashLabel: "stale-legacy-hash",
+		},
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{legacyRunner},
+	}, nil)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{legacyRunner},
+	}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project)
+	assert.NilError(t, err)
+	assert.Equal(t, len(state.HookContainers["web"]), 1, "the legacy runner must be classified exactly once")
+	assert.Equal(t, len(state.Containers["web"]), 0, "a hook runner must never be classified as a replica")
 }
 
 // TestCollectObservedState_AggregatesDuplicateLabels verifies that two live
@@ -299,6 +382,8 @@ func TestSelectNetwork(t *testing.T) {
 func collectByNameDiscovery(t *testing.T, project *types.Project, inspect func(apiClient *mocks.MockAPIClient)) (*ObservedState, error) {
 	t.Helper()
 	svc, apiClient := newTestService(t)
+	// hook-less projects: getHookContainers is gated off, only getContainers
+	// lists (see mergeHookContainers)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
 	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
