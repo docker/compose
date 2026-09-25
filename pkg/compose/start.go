@@ -62,6 +62,10 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	}
 	containers := Containers(res.Items)
 
+	// the node-level bound is a correct proxy for --parallel here, unlike
+	// restart/down/stop: startService starts a service's containers in a
+	// plain sequential loop, so one engine-call burst per node is all this
+	// traversal ever dispatches concurrently.
 	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
@@ -69,6 +73,8 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 
 		return s.startService(ctx, project, service, containers, listener, options.WaitTimeout)
+	}, func(traversal *graphTraversal) {
+		traversal.maxConcurrency = s.maxConcurrency
 	})
 	if err != nil {
 		return err

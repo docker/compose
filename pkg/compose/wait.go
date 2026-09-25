@@ -48,6 +48,9 @@ func (s *composeService) Wait(ctx context.Context, projectName string, options a
 		return 0, fmt.Errorf("no containers for project %q", projectName)
 	}
 
+	// ContainerWait blocks until the container exits, so it must not be
+	// bound by --parallel: capping concurrency here would serialize waits
+	// that are meant to run together (same rationale as waitDependencies).
 	eg, waitCtx := errgroup.WithContext(ctx)
 	var statusCode int64
 	for _, ctr := range containers {
