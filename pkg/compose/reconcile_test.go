@@ -183,6 +183,83 @@ func TestReconcileNetworks_Diverged(t *testing.T) {
 `)+"\n")
 }
 
+// A service migrated from regular replicas to a provider must have its old
+// containers condemned by the plan: they are neither converged (a provider
+// service has no replicas) nor orphaned (the service is still in the model),
+// yet they hold the canonical container name the relay takes over and the
+// service's network alias. The relay itself is the provider service's
+// legitimate container and must be left alone.
+func TestReconcileService_ProviderMigrationRemovesStaleReplicas(t *testing.T) {
+	db := types.ServiceConfig{Name: "db", Provider: &types.ServiceProviderConfig{Type: "test"}}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db},
+	}
+	stale := ObservedContainer{
+		ID: "old-db", Number: 1, State: container.StateRunning, ConfigHash: "prehash",
+		Summary: container.Summary{
+			ID: "old-db", State: container.StateRunning,
+			Labels: map[string]string{
+				api.ServiceLabel:         "db",
+				api.ContainerNumberLabel: "1",
+				api.ConfigHashLabel:      "prehash",
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"db": {stale}},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	// the provider run deploys the relay under the canonical name: it must
+	// depend on the removal that frees it
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, StopContainer, service is now provider-backed
+[1] -> #2 service:db:1, RemoveContainer, service is now provider-backed
+[2] -> #3 provider:db, RunProvider, provider service
+`)+"\n")
+}
+
+// An up-to-date relay container observed for a provider service is NOT the
+// plan's to touch: ensureServiceRelay converges it during the provider run.
+func TestReconcileService_ProviderRelayLeftAlone(t *testing.T) {
+	db := types.ServiceConfig{Name: "db", Provider: &types.ServiceProviderConfig{Type: "test"}}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db},
+	}
+	relay := ObservedContainer{
+		ID: "relay-db", Number: 1, State: container.StateRunning, ConfigHash: "relay-identity",
+		Summary: container.Summary{
+			ID: "relay-db", State: container.StateRunning,
+			Labels: map[string]string{
+				api.ServiceLabel:         "db",
+				api.ContainerNumberLabel: "1",
+				api.ConfigHashLabel:      "relay-identity",
+				api.RelayLabel:           "relay-identity",
+			},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"db": {relay}},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 provider:db, RunProvider, provider service
+`)+"\n")
+}
+
 // TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer verifies the
 // entangled case: when a container attached to a diverged network also has its
 // own config changed, it is both reconnected (by the network recreate) and
