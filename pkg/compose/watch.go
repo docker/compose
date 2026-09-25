@@ -788,7 +788,7 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 		_, ok := builtIDs[img.ID]
 		return ok
 	}
-	if _, err := s.removeDanglingImages(ctx, projectName, keep); err != nil {
+	if _, err := s.removeDanglingImages(ctx, projectName, keep, nil); err != nil {
 		logrus.Debugf("Failed to list images: %v", err)
 	}
 }
