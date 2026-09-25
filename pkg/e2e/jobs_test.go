@@ -141,3 +141,21 @@ func TestDownRefusesJobWithProjectNameEnv(t *testing.T) {
 		StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
 		ServiceNotCreated("migrate"))
 }
+
+// restart and wait don't pass their service arguments to projectOrName (see
+// runRestart/runWait), so jobTargetErr never sees them there -- the refusal
+// for these two instead comes from validateServiceNames itself recognizing
+// project.AllJobs(). A separate code path, so it needs its own coverage.
+func TestRestartRefusesJob(t *testing.T) {
+	NewScenario(t, "restart must refuse a job by name, naming run as the right command").
+		Step("restart fails naming the job",
+			ComposeCmd("restart", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`))
+}
+
+func TestWaitRefusesJob(t *testing.T) {
+	NewScenario(t, "wait must refuse a job by name, naming run as the right command").
+		Step("wait fails naming the job",
+			ComposeCmd("wait", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`))
+}
