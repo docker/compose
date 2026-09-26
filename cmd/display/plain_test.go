@@ -17,41 +17,27 @@
 package display
 
 import (
-	"context"
-	"fmt"
-	"io"
+	"bytes"
+	"strings"
+	"testing"
+
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func Plain(out io.Writer, dryRun bool) api.EventProcessor {
-	return &plainWriter{
-		out:    out,
-		dryRun: dryRun,
-	}
+func TestPlain_DryRun(t *testing.T) {
+	var out bytes.Buffer
+	ep := Plain(&out, true)
+	ep.On(api.Resource{ID: "service1", Text: api.StatusCreating})
+
+	assert.Assert(t, strings.Contains(out.String(), DRYRUN_PREFIX))
 }
 
-type plainWriter struct {
-	out    io.Writer
-	dryRun bool
-}
+func TestPlain_NotDryRun(t *testing.T) {
+	var out bytes.Buffer
+	ep := Plain(&out, false)
+	ep.On(api.Resource{ID: "service1", Text: api.StatusCreating})
 
-func (p *plainWriter) Start(ctx context.Context, operation string) {
-}
-
-func (p *plainWriter) Event(e api.Resource) {
-	prefix := ""
-	if p.dryRun {
-		prefix = DRYRUN_PREFIX
-	}
-	_, _ = fmt.Fprintln(p.out, prefix, e.ID, e.Text, e.Details)
-}
-
-func (p *plainWriter) On(events ...api.Resource) {
-	for _, e := range events {
-		p.Event(e)
-	}
-}
-
-func (p *plainWriter) Done(_ string, _ bool) {
+	assert.Assert(t, !strings.Contains(out.String(), DRYRUN_PREFIX))
 }
