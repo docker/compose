@@ -107,6 +107,26 @@ func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
 			OutputContains("overrides environment variable"))
 }
 
+func TestProviderMigration(t *testing.T) {
+	// Regression: migrating an already-deployed service to a provider left
+	// its replica standing — neither converged (provider services have no
+	// replicas) nor orphaned (the service is still in the model) — and the
+	// relay creation then failed with a name conflict on the canonical
+	// container name the replica still held.
+	relayImage := "compose-relay-e2e"
+	s := providerScenario(t, "migrating a deployed service to a provider must replace its replica with the relay")
+	s.CLI().RunCmd(t, "docker", "build", "-t", relayImage, "../../relay")
+	s.Env("PROVIDER_DEMO_ENDPOINT=1", "COMPOSE_RELAY_IMAGE="+relayImage)
+	s.Step("the service first runs as a regular container",
+		ComposeCmd("up", "-d"),
+		ServiceState("db", "running"))
+	s.FromFile("migrated.yaml")
+	s.Step("up after the migration replaces the replica with the relay, reachable at the compose-native address",
+		ComposeCmd("up"),
+		Recreated("db"),
+		OutputContains("test-1  | hello from provider"))
+}
+
 func TestProviderPublishEndpoint(t *testing.T) {
 	// The example provider stands up a real endpoint on the host and
 	// publishes it; compose deploys a relay under the service's name, so the

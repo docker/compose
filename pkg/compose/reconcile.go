@@ -720,6 +720,40 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	if service.Provider != nil {
 		serviceCopy := service
 		deps := r.infrastructureDeps(service)
+		// A service migrated from replicas to a provider leaves its old
+		// containers behind: not converged (a provider service has no
+		// replicas to converge) and not orphaned (the service is still in
+		// the model). They must go before the provider's relay stands in:
+		// the relay takes over the service's canonical container name and
+		// its network alias, so a leftover replica is both a name conflict
+		// at relay creation and a competing DNS entry serving stale
+		// traffic. The relay itself (RelayLabel) is the provider service's
+		// legitimate container and is left alone — converged by
+		// ensureServiceRelay, not by the plan.
+		for i := range r.observed.Containers[service.Name] {
+			oc := &r.observed.Containers[service.Name][i]
+			if isRelayContainer(oc.Summary) {
+				continue
+			}
+			resID := serviceReplicaID(service.Name, oc.Number)
+			stopNode := r.plan.addNode(Operation{
+				Type:       OpStopContainer,
+				ResourceID: resID,
+				Cause:      "service is now provider-backed",
+				Container:  &oc.Summary,
+				Timeout:    r.options.Timeout,
+			}, "")
+			removeNode := r.plan.addNode(Operation{
+				Type:       OpRemoveContainer,
+				ResourceID: resID,
+				Cause:      "service is now provider-backed",
+				Container:  &oc.Summary,
+			}, "", stopNode)
+			r.removedByPlan[resID] = true
+			// the provider run deploys the relay: the canonical name must
+			// be free by then
+			deps = append(deps, removeNode)
+		}
 		node := r.plan.addNode(Operation{
 			Type:       OpRunProvider,
 			ResourceID: "provider:" + service.Name,

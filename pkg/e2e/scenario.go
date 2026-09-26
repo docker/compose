@@ -268,6 +268,25 @@ func (s *Scenario) FromRemote(source string, rootFlags ...string) *Scenario {
 	return s
 }
 
+// FromFile switches the scenario's compose file to another file of the
+// anchored project directory — for scenarios whose intent is a model
+// migration: steps before the switch ran the initial model, steps after it
+// run the migrated one, against the same project.
+func (s *Scenario) FromFile(name string) *Scenario {
+	s.t.Helper()
+	if s.file == "" {
+		s.t.Fatal("FromFile requires an anchored testdata directory")
+	}
+	file := filepath.Join(filepath.Dir(s.file), name)
+	if _, err := os.Stat(file); err != nil {
+		s.t.Fatalf("FromFile(%q): %v", name, err)
+	}
+	s.remote = ""
+	s.rootArgs = nil
+	s.file = file
+	return s
+}
+
 // Requires skips the scenario unless every requirement is met by the target
 // environment.
 func (s *Scenario) Requires(reqs ...Requirement) *Scenario {

@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -161,47 +162,45 @@ func up(options options, args []string) {
 	// When asked to, stand up a real endpoint on the host and publish it, so
 	// compose deploys a relay and consumers reach it as http://<service>:80.
 	if os.Getenv("PROVIDER_DEMO_ENDPOINT") != "" {
+		// Bind the address compose announces (get-relay-info): compose
+		// owns the platform knowledge — the network's gateway on a
+		// standalone engine, the host's loopback under Docker Desktop —
+		// so the endpoint is reachable from the relay without exposing
+		// the port on the LAN (see docs/extension.md, "Binding a local
+		// endpoint for the relay"). The wildcard remains the fallback
+		// when no gateway is announced (compose without get-relay-info,
+		// exotic network driver).
+		bindAddr := "0.0.0.0:0"
+		if gateway := relayGateway(responses); gateway != "" {
+			bindAddr = gateway + ":0"
+		}
 		// The subprocess binds the port itself and reports the resulting
 		// address on its stdout; only then is the endpoint published. This
 		// avoids the two races of a pre-reserved port: another process
 		// grabbing it between release and re-bind, and publish-endpoint
 		// pointing at a server that is not listening yet.
-		// All interfaces, not loopback: on a plain Linux engine host-gateway
-		// is the bridge IP, which cannot reach a host loopback bind.
-		server := exec.Command(os.Args[0], "serve-demo", "0.0.0.0:0")
-		stdout, err := server.StdoutPipe()
+		addr, err := serveDemo(bindAddr)
 		if err != nil {
 			fmt.Printf(`{ "type": "error", "message": "demo endpoint: %v" }%s`, err, lineSeparator)
 			return
 		}
-		if err := server.Start(); err != nil {
-			fmt.Printf(`{ "type": "error", "message": "demo endpoint: %v" }%s`, err, lineSeparator)
-			return
-		}
-		// A crashed subprocess closes the pipe (EOF below); a hung one would
-		// block the read forever, so kill it after a deadline — the read then
-		// fails with EOF and lands on the same error path.
-		watchdog := time.AfterFunc(30*time.Second, func() { _ = server.Process.Kill() })
-		addr, err := bufio.NewReader(stdout).ReadString('\n')
-		watchdog.Stop()
+		// The endpoint is announced as bound: a gateway-bound address is
+		// routable and reaches the relay untouched; the wildcard is
+		// announced as seen from THIS process's host — the relay
+		// translates loopback/host-relative into the container-visible
+		// name.
+		host, port, err := net.SplitHostPort(strings.TrimSpace(addr))
 		if err != nil {
-			fmt.Printf(`{ "type": "error", "message": "demo endpoint did not come up: %v" }%s`, err, lineSeparator)
+			msg, _ := json.Marshal(map[string]string{"type": "error", "message": fmt.Sprintf("demo endpoint reported an invalid address %q: %v", strings.TrimSpace(addr), err)})
+			fmt.Println(string(msg))
 			return
 		}
-		// The subprocess deliberately outlives this invocation — it IS the
-		// provisioned resource the relay forwards to, and consumers connect
-		// through it only after up has returned, so reaping it here would
-		// tear the endpoint down before anyone reached it. Its lifetime is
-		// its own: it exits by itself after three minutes (serve-demo), the
-		// way a real provider's resource outlives the provider CLI run. No
-		// Wait() and no zombie either: this process exits within seconds, so
-		// the subprocess is long re-parented to init — which reaps it — when
-		// its three minutes are up.
-		//
-		// the endpoint is announced as seen from THIS process's host —
-		// the relay translates loopback into the container-visible name
-		_, port, _ := net.SplitHostPort(strings.TrimSpace(addr))
-		fmt.Printf(`{ "type": "publish-endpoint", "message": "80=localhost:%s" }%s`, port, lineSeparator)
+		endpoint := "localhost:" + port
+		if ip := net.ParseIP(host); ip != nil && !ip.IsLoopback() && !ip.IsUnspecified() {
+			endpoint = net.JoinHostPort(host, port)
+		}
+		msg, _ := json.Marshal(map[string]string{"type": "publish-endpoint", "message": "80=" + endpoint})
+		fmt.Println(string(msg))
 	}
 
 	for i := 0; i < options.size; i += 10 {
@@ -210,6 +209,68 @@ func up(options options, args []string) {
 	}
 	fmt.Printf(`{ "type": "setenv", "message": "URL=https://magic.cloud/%s" }%s`, servicename, lineSeparator)
 	fmt.Printf(`{ "type": "rawsetenv", "message": "CLOUD_REGION=us-east-1" }%s`, lineSeparator)
+}
+
+// relayGateway asks compose (get-relay-info) for the gateway of a network
+// the relay will join, when the running compose announces support for the
+// message (COMPOSE_PROVIDER_MESSAGES) — empty otherwise, or when no gateway
+// resolved: the caller falls back to another bind address.
+func relayGateway(responses *json.Decoder) string {
+	if !slices.Contains(strings.Split(os.Getenv("COMPOSE_PROVIDER_MESSAGES"), ","), "get-relay-info") {
+		return ""
+	}
+	fmt.Printf(`{ "type": "get-relay-info", "message": "" }%s`, lineSeparator)
+	var answer struct {
+		Networks []struct {
+			Gateway string `json:"gateway"`
+		} `json:"networks"`
+	}
+	if err := responses.Decode(&answer); err != nil {
+		return ""
+	}
+	for _, network := range answer.Networks {
+		if network.Gateway != "" {
+			return network.Gateway
+		}
+	}
+	return ""
+}
+
+// serveDemo spawns the serve-demo subprocess on the given address and
+// returns the bound address it reported. The subprocess deliberately
+// outlives this invocation — it IS the provisioned resource the relay
+// forwards to, and consumers connect through it only after up has returned,
+// so reaping it here would tear the endpoint down before anyone reached it.
+// Its lifetime is its own: it exits by itself after three minutes
+// (serve-demo), the way a real provider's resource outlives the provider CLI
+// run. No Wait() and no zombie either: this process exits within seconds, so
+// the subprocess is long re-parented to init — which reaps it — when its
+// three minutes are up.
+func serveDemo(bindAddr string) (string, error) {
+	server := exec.Command(os.Args[0], "serve-demo", bindAddr)
+	stdout, err := server.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	if err := server.Start(); err != nil {
+		// Start never succeeded, so Wait will never run and close the
+		// pipe's read end: release it here
+		_ = stdout.Close()
+		return "", err
+	}
+	// A failed bind exits the subprocess and closes the pipe (EOF below).
+	// A hung subprocess would block the read forever, so kill it after a
+	// deadline — the read then fails with EOF and lands on the same path.
+	watchdog := time.AfterFunc(30*time.Second, func() { _ = server.Process.Kill() })
+	addr, err := bufio.NewReader(stdout).ReadString('\n')
+	watchdog.Stop()
+	if err != nil {
+		// the subprocess outlives this function so nothing else calls
+		// Wait() to close the pipe's read end: release it here
+		_ = stdout.Close()
+		return "", fmt.Errorf("bind %s: endpoint did not come up: %w", bindAddr, err)
+	}
+	return addr, nil
 }
 
 func down(_ *cobra.Command, _ []string) {

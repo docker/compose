@@ -49,6 +49,12 @@ awesomecloud compose --project-name <NAME> up --type=mysql --size=256 "database"
 
 Providers can interact with Compose using `stdout` as a channel, sending JSON line delimited messages.
 JSON messages MUST include a `type` and a `message` attribute.
+
+An unknown message type fails the command: a provider that requires a message the running Compose does not
+support must fail loudly rather than degrade silently. To let a provider adapt instead, Compose announces the
+message types it accepts in the `COMPOSE_PROVIDER_MESSAGES` environment variable of the provider process, as a
+comma-separated list (e.g. `error,info,setenv,rawsetenv,debug,publish-endpoint,get-service-config,get-relay-info`):
+check membership before emitting an optional message.
 ```json
 { "type": "info", "message": "preparing mysql ..." }
 ```
@@ -60,6 +66,10 @@ JSON messages MUST include a `type` and a `message` attribute.
 - `rawsetenv`: Same as `setenv`, but the variable is injected as-is without the service name prefix. Useful when applications require exact variable names that cannot be altered.
 - `debug`: Those messages could help debugging the provider, but are not rendered to the user by default. They are rendered when Compose is started with `--verbose` flag.
 - `get-service-config`: Asks Compose for the resolved configuration of the service the provider manages. See next section.
+- `get-relay-info`: Asks Compose what address a locally-run endpoint should bind so the relay deployed for this
+  service can reach it — Compose owns the platform knowledge, the provider just binds what is announced. Only
+  meaningful for a provider running its service **locally**; a provider backing the service with a remote
+  resource never needs it. See [Binding a local endpoint for the relay](#binding-a-local-endpoint-for-the-relay).
 - `publish-endpoint`: Declares where a network endpoint of the provider's resource is actually reachable. The
   message is `"<container-port>=<host>:<port>"` — the port consumers know on the left, the real location on the
   right, as seen FROM THE PROVIDER'S HOST (typically a port published on the host):
@@ -193,6 +203,34 @@ service, aliased with the service name. It is a regular project container (stand
 carries the `com.docker.compose.relay` label identifying its role, and process-level commands (`exec`, `cp`)
 refuse it. The relay is recreated when the published endpoints change, and removed by `down` like any project
 container.
+
+### Binding a local endpoint for the relay
+
+A provider that runs its service **on the local host** has to pick the address its endpoint binds, and on a
+standalone Linux engine no address is both relay-reachable and off the LAN by default: `host.docker.internal`
+resolves there to the bridge gateway, which a loopback-only listener cannot accept, while the wildcard exposes
+the port on every host interface. (Docker Desktop has no such dilemma — its proxy reaches the host's loopback.)
+
+`get-relay-info` resolves this: the provider asks, and Compose answers with one JSON line listing the networks
+the relay would join — the dependents' networks, as selected for the relay deployment — each with the address a
+locally-run endpoint should bind so the relay can reach it:
+
+```json
+{ "type": "get-relay-info" }
+```
+
+```json
+{"networks":[{"name":"myproject_default","gateway":"172.18.0.1"}]}
+```
+
+Compose owns the platform knowledge behind that address: on a standalone engine it is the network's gateway —
+an address the provider's host owns on that network's bridge, reachable from the relay (and from local
+containers) but not from the LAN; under Docker Desktop it is `127.0.0.1` — the network lives inside the VM,
+and the host's own loopback is, factually, where a host process is reached through the Desktop proxy. The
+provider simply binds the announced gateway and publishes the endpoint exactly as bound: a routable address
+passes to the relay untouched, a loopback one is announced as `localhost` (translated to
+`host.docker.internal`). The `gateway` field may be absent when it cannot be resolved (exotic network drivers,
+IPv6-only IPAM): fall back to a bind of your choice. Best-effort by design.
 
 ## Down lifecycle
 
