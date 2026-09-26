@@ -316,9 +316,6 @@ func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
 	}})
 }
 
-// getWatchRules historically never excluded the service Dockerfile (see
-// #14117). The continuous loop matches absolute host paths, so a
-// basename-only matcher would miss them.
 func TestGetWatchRules_ExcludesDockerfileFromSync(t *testing.T) {
 	rules, err := getWatchRules(&types.DevelopConfig{
 		Watch: []types.Trigger{{
@@ -328,13 +325,15 @@ func TestGetWatchRules_ExcludesDockerfileFromSync(t *testing.T) {
 		}},
 	}, types.ServiceConfig{
 		Name:  "svc",
-		Build: &types.BuildConfig{Context: t.TempDir()},
+		Build: &types.BuildConfig{Context: "/proj"},
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 1, len(rules))
 
 	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/Dockerfile")) == nil)
-	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/compose.yaml")) != nil)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/docs/Dockerfile")) != nil)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/compose.yaml")) == nil)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/docs/compose.yaml")) != nil)
 
 	got := rules[0].Matches(watch.NewFileEvent("/proj/app.go"))
 	assert.DeepEqual(t, got, &sync.PathMapping{
@@ -352,10 +351,11 @@ func TestGetWatchRules_ExcludesCustomNamedDockerfileFromSync(t *testing.T) {
 		}},
 	}, types.ServiceConfig{
 		Name:  "svc",
-		Build: &types.BuildConfig{Context: t.TempDir(), Dockerfile: "docker/Dockerfile.prod"},
+		Build: &types.BuildConfig{Context: "/proj", Dockerfile: "docker/Dockerfile.prod"},
 	})
 	assert.NilError(t, err)
 	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/docker/Dockerfile.prod")) == nil)
+	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/other/Dockerfile.prod")) != nil)
 	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/Dockerfile")) != nil)
 	assert.Assert(t, rules[0].Matches(watch.NewFileEvent("/proj/app.go")) != nil)
 }
@@ -369,7 +369,7 @@ func TestGetWatchRules_CopyActionsExcludeDockerfile(t *testing.T) {
 		},
 	}, types.ServiceConfig{
 		Name:  "svc",
-		Build: &types.BuildConfig{Context: t.TempDir()},
+		Build: &types.BuildConfig{Context: "/proj"},
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, 3, len(rules))
