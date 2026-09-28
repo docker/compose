@@ -82,6 +82,18 @@ func TestWait_NoContainersAtAll(t *testing.T) {
 	assert.Equal(t, *allCalls, 1)
 }
 
+// TestWait_DryRunNotSupported: dry-run refuses immediately, without
+// listing containers.
+func TestWait_DryRunNotSupported(t *testing.T) {
+	tested, _, runningCalls, allCalls := waitTestService(t, nil, nil)
+	tested.(*composeService).dryRun = true
+
+	_, err := tested.Wait(t.Context(), "proj", api.WaitOptions{})
+	assert.ErrorContains(t, err, "not supported in dry-run mode")
+	assert.Equal(t, *runningCalls, 0)
+	assert.Equal(t, *allCalls, 0)
+}
+
 // TestWait_RunningContainersSkipFallback: with a running container to
 // observe, the fallback listing never runs — a stale exited one-off cannot
 // short-circuit the wait.
