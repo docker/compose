@@ -565,6 +565,12 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 }
 
 func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
+	if s.dryRun {
+		// dry-run never actually starts the dependency's container, so it
+		// can never observe a real "exited" state: simulate immediate
+		// success instead of polling forever.
+		return true, 0, nil
+	}
 	for _, ctr := range containers {
 		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {

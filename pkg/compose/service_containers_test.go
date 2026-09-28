@@ -342,6 +342,24 @@ func TestWaitDependencies(t *testing.T) {
 		}, nil)
 		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0))
 	})
+	t.Run("dry-run completes service_completed_successfully immediately", func(t *testing.T) {
+		tested.(*composeService).dryRun = true
+
+		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+			"init": {Name: "init", Scale: intPtr(1)},
+		}}
+		dependencies := types.DependsOnConfig{
+			"init": {Condition: types.ServiceConditionCompletedSuccessfully, Required: true},
+		}
+		containers := Containers{{
+			ID:     "init-ctr",
+			Names:  []string{"/init-ctr"},
+			Labels: map[string]string{api.ServiceLabel: "init"},
+		}}
+		// no ContainerInspect expectation: dry-run must not inspect a
+		// container that was never created.
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0))
+	})
 }
 
 func TestIsServiceHealthy(t *testing.T) {
