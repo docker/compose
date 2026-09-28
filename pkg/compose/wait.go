@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/moby/moby/client"
@@ -27,6 +28,12 @@ import (
 )
 
 func (s *composeService) Wait(ctx context.Context, projectName string, options api.WaitOptions) (int64, error) {
+	if s.dryRun {
+		// dry-run never starts a real container, so there is nothing for
+		// wait to observe: refuse upfront instead of racing the fake API
+		// client into a misleading "no containers" error.
+		return 0, errors.New("wait is not supported in dry-run mode")
+	}
 	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false, options.Services...)
 	if err != nil {
 		return 0, err
