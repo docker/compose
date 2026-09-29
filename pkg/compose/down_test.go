@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -510,6 +511,70 @@ func TestEnsureImagesDown_TaggedImageListingFailureStaysVisibleWithoutAbortingDo
 	assert.Equal(t, rec.resources[0].Details, listErr.Error())
 }
 
+// liveCtx matches a context.Context argument only if it hasn't been
+// canceled, to catch a shared errgroup ctx getting canceled by a sibling
+// goroutine's failure and silently masking later calls that would run fine
+// with an unmocked API client (which does check ctx and would fail them
+// with "context canceled" instead of ever reaching the daemon).
+type liveCtx struct{}
+
+func (liveCtx) Matches(x any) bool {
+	ctx, ok := x.(context.Context)
+	return ok && ctx.Err() == nil
+}
+
+func (liveCtx) String() string {
+	return "is a non-canceled context"
+}
+
+// TestRemoveTaggedImagesOp_ContinuesAfterOneImageFails guards a regression
+// caught in review: removeTaggedImagesOp used to share its errgroup's
+// derived ctx with every image removal via errgroup.WithContext, so a real
+// failure on one image canceled that ctx and made every image still queued
+// behind it fail with "context canceled" instead of actually being
+// attempted, unlike the independent per-image ops it replaced.
+func TestRemoveTaggedImagesOp_ContinuesAfterOneImageFails(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	rec := &capturingEvents{}
+	svcIface, err := NewComposeService(cli, WithEventProcessor(rec), WithMaxConcurrency(1))
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{Name: "prj"}
+	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+		Filters: projectFilter("prj").Add("dangling", "false"),
+	}).Return(client.ImageListResult{Items: []image.Summary{
+		{ID: "sha256:aaa", RepoTags: []string{"repo/a:latest"}},
+		{ID: "sha256:bbb", RepoTags: []string{"repo/b:latest"}},
+		{ID: "sha256:ccc", RepoTags: []string{"repo/c:latest"}},
+	}}, nil)
+	daemonErr := errors.New("i/o timeout")
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "repo/a:latest", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, daemonErr)
+	apiClient.EXPECT().ImageRemove(liveCtx{}, "repo/b:latest", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+	apiClient.EXPECT().ImageRemove(liveCtx{}, "repo/c:latest", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+
+	opErr := svc.removeTaggedImagesOp(t.Context(), project, ImagePruneOptions{Mode: ImagePruneLocal, RemoveOrphans: true})
+	assert.ErrorContains(t, opErr, daemonErr.Error())
+
+	events := make([]string, len(rec.resources))
+	for i, e := range rec.resources {
+		events[i] = e.ID + ": " + e.Text
+	}
+	assert.DeepEqual(t, events, []string{
+		"Image repo/a:latest: Removing",
+		"Image repo/b:latest: Removing",
+		"Image repo/b:latest: Removed",
+		"Image repo/c:latest: Removing",
+		"Image repo/c:latest: Removed",
+	})
+}
+
 // TestEnsureImagesDown_ReportsDanglingImagesAsOneGroupedEvent guards that
 // dangling-image removal is reported as a single grouped event regardless
 // of count, instead of one row per meaningless raw image ID.
@@ -860,6 +925,7 @@ func TestEnsureImagesDown_AllEligibleStillInUseDoesNotClaimRemoved(t *testing.T)
 	assert.Equal(t, rec.resources[1].ID, "Dangling images")
 	assert.Equal(t, rec.resources[1].Status, compose.Warning)
 	assert.Equal(t, rec.resources[1].Text, "Resource is still in use")
+	assert.Equal(t, rec.resources[1].Details, "1 image(s) still in use")
 }
 
 // TestEnsureImagesDown_MixedRemovedAndStillInUseKeepsBothVisible guards a

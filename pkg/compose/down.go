@@ -162,15 +162,11 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 			return s.removeTaggedImagesOp(ctx, project, pruneOpts)
 		})
 
-		// mirrors ImagesToPrune's own orphan check: a dangling image from a
-		// service no longer in the project must be spared unless
-		// RemoveOrphans is set, same as that service's tagged image is.
+		// a dangling image from a service no longer in the project must be
+		// spared unless RemoveOrphans is set, same as that service's tagged
+		// image is (imageBelongsToKnownService is ImagesToPrune's own check).
 		keep := func(img image.Summary) bool {
-			if options.RemoveOrphans {
-				return false
-			}
-			_, err := project.GetService(img.Labels[api.ServiceLabel])
-			return err != nil
+			return !imageBelongsToKnownService(project, options.RemoveOrphans, img)
 		}
 		projectName := project.Name
 		ops = append(ops, func() error {
@@ -194,7 +190,7 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 		return err
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	var eg errgroup.Group
 	eg.SetLimit(s.maxConcurrency)
 	for i := range images {
 		img := images[i]
@@ -223,13 +219,11 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 // A removal failure keeps the "Removed" label only if at least one image
 // actually got removed — with the error visible alongside it, not
 // replacing it — otherwise it's reported as a plain error. removeImages
-// also tolerates images that are already gone or still in use without
-// that being an error, so a nil error here doesn't mean every image was
-// actually removed either: stillInUse (a real, not-yet-achieved goal) is
-// checked separately from alreadyGone (as good as removed), the same
-// distinction removeResource already makes per tagged image, so this
-// aggregate report doesn't collapse the two like removeImages' own return
-// values would if only `removed` were consulted.
+// also tolerates images that are already gone or still in use without that
+// being an error, so a nil error here doesn't mean every image was actually
+// removed either: stillInUse (a real, not-yet-achieved goal) is checked
+// separately, the same distinction removeResource already makes per tagged
+// image (an already-gone image simply isn't counted in either bucket).
 func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName string, keep func(image.Summary) bool) error {
 	eventID := "Dangling images"
 	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
@@ -242,12 +236,16 @@ func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName
 	}
 
 	s.events.On(removingEvent(eventID))
-	removed, stillInUse, _, err := s.removeImages(ctx, eligible)
+	removed, stillInUse, err := s.removeImages(ctx, eligible)
+	var stillInUseNote string
+	if len(stillInUse) > 0 {
+		stillInUseNote = fmt.Sprintf("%d image(s) still in use", len(stillInUse))
+	}
 	switch {
 	case err != nil:
 		details := err.Error()
-		if len(stillInUse) > 0 {
-			details = fmt.Sprintf("%s; %d image(s) still in use", details, len(stillInUse))
+		if stillInUseNote != "" {
+			details = fmt.Sprintf("%s; %s", details, stillInUseNote)
 		}
 		if len(removed) == 0 {
 			s.events.On(errorEvent(eventID, details))
@@ -255,10 +253,9 @@ func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName
 			s.events.On(newEvent(eventID, api.Warning, "Removed", details))
 		}
 	case len(stillInUse) > 0 && len(removed) == 0:
-		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use"))
+		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use", stillInUseNote))
 	case len(stillInUse) > 0:
-		s.events.On(newEvent(eventID, api.Warning, "Removed",
-			fmt.Sprintf("%d image(s) still in use", len(stillInUse))))
+		s.events.On(newEvent(eventID, api.Warning, "Removed", stillInUseNote))
 	case len(removed) == 0:
 		// every eligible image was already gone by the time we got to it:
 		// we already emitted "Removing", so this needs a terminal event
@@ -361,6 +358,15 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 	})
 }
 
+// classifyRemovalError reports whether a resource-removal error is a benign
+// "still in use" (Conflict) or "already gone" (NotFound) condition, as
+// opposed to a genuine failure that must be surfaced. Shared by
+// removeResource (single resource) and removeImages (a batch), so the two
+// can't independently drift on what counts as tolerable.
+func classifyRemovalError(err error) (stillInUse, alreadyGone bool) {
+	return errdefs.IsConflict(err), errdefs.IsNotFound(err)
+}
+
 // removeResource emits a "Removing" progress event, calls op, then emits the appropriate
 // completion event based on the error: nil→Removed, conflict→still-in-use warning, not-found→gone warning.
 func (s *composeService) removeResource(eventID string, op func() error) error {
@@ -370,11 +376,12 @@ func (s *composeService) removeResource(eventID string, op func() error) error {
 		s.events.On(newEvent(eventID, api.Done, "Removed"))
 		return nil
 	}
-	if errdefs.IsConflict(err) {
+	stillInUse, alreadyGone := classifyRemovalError(err)
+	if stillInUse {
 		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use"))
 		return nil
 	}
-	if errdefs.IsNotFound(err) {
+	if alreadyGone {
 		s.events.On(newEvent(eventID, api.Done, "Warning: No resource found to remove"))
 		return nil
 	}
