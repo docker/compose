@@ -70,14 +70,14 @@ func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 	assert.ErrorContains(t, err, "permission denied")
 }
 
-// TestRemoveImages_BucketsAlreadyGoneSeparatelyFromStillInUse guards a
-// regression caught by review: an image already gone (goal achieved) and
-// an image still in use (goal NOT achieved) must land in distinct return
-// buckets, not be folded together — a caller aggregating several images
-// (removeDanglingImagesOp) needs the distinction to report the batch
-// honestly instead of collapsing both into "removed" or into one generic
-// tolerance.
-func TestRemoveImages_BucketsAlreadyGoneSeparatelyFromStillInUse(t *testing.T) {
+// TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved guards a
+// regression caught by review: an image still in use (goal NOT achieved)
+// must land in its own return bucket, not be folded into removed — a caller
+// aggregating several images (removeDanglingImagesOp) needs the distinction
+// to report the batch honestly. An already-gone image reaches the goal like
+// an actual removal and a genuine failure is joined into err, so neither is
+// exercised here beyond not corrupting the removed/stillInUse buckets.
+func TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -101,10 +101,9 @@ func TestRemoveImages_BucketsAlreadyGoneSeparatelyFromStillInUse(t *testing.T) {
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
 
-	removed, stillInUse, alreadyGone, err := svc.removeImages(t.Context(), images)
+	removed, stillInUse, err := svc.removeImages(t.Context(), images)
 	assert.DeepEqual(t, removed, []string{"sha256:removed"})
 	assert.DeepEqual(t, stillInUse, []string{"sha256:in-use"})
-	assert.DeepEqual(t, alreadyGone, []string{"sha256:already-gone"})
 	assert.ErrorContains(t, err, "sha256:fails")
 	assert.ErrorContains(t, err, "permission denied")
 }
