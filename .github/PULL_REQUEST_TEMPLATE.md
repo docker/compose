@@ -1,8 +1,8 @@
-## What This PR Does
+## What this PR does
 
 <!-- Briefly describe what this PR accomplishes -->
 
-## Related Issue
+## Related issue
 
 <!-- Use "Fixes #1234" or "Addresses #1234". For minor fixes (typos, small
      doc changes), explain why the change is needed instead. AI-assisted PRs
@@ -10,7 +10,7 @@
 
 Fixes #
 
-## Changes Made
+## Changes made
 
 <!-- List specific changes with brief explanations -->
 
@@ -18,7 +18,7 @@ Fixes #
 -
 -
 
-## Testing Done
+## Testing done
 
 <!-- Check all that apply and describe what you tested -->
 
@@ -28,7 +28,7 @@ Fixes #
 - [ ] Code formatted: `make fmt`
 - [ ] Manually tested (describe):
 
-## AI Tool Used (if applicable)
+## AI tool used (if applicable)
 
 <!-- If you used AI coding assistance, disclose it here: which tool, and the
      extent the work was AI-assisted. See CONTRIBUTING.md#ai-assisted-contributions
@@ -37,7 +37,7 @@ Fixes #
 
 AI Tool:
 
-## Additional Context
+## Additional context
 
 <!-- Any additional information reviewers should know -->
 
