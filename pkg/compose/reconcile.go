@@ -450,11 +450,14 @@ func (r *reconciler) reconcileVolumes() error {
 			continue
 		}
 		var disposable bool
-		if _, err := desired.Extensions.Get("x-disposable", &disposable); err != nil {
-			return err
+		if _, decodeErr := desired.Extensions.Get("x-disposable", &disposable); decodeErr != nil {
+			logrus.Warnf("volume %q: ignoring malformed x-disposable extension: %s", desired.Name, decodeErr)
+			disposable = false
 		}
 		confirmed := disposable
-		if !disposable {
+		if disposable {
+			logrus.Infof("volume %q: recreating without confirmation (x-disposable)", desired.Name)
+		} else {
 			confirmed, err = r.prompt(
 				fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", desired.Name),
 				false)
