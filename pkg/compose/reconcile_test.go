@@ -582,6 +582,21 @@ func TestReconcileVolumes_DivergedPromptMessage(t *testing.T) {
 	assert.Equal(t, rec.messages[0], `Volume "myproject_data" exists but doesn't match configuration in compose file. Recreate (data will be lost)?`)
 }
 
+// TestReconcileVolumes_DivergedDisposable verifies that a volume tagged with
+// the experimental x-disposable extension is recreated without ever
+// consulting the prompt.
+func TestReconcileVolumes_DivergedDisposable(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+	vol := project.Volumes["data"]
+	vol.Extensions = types.Extensions{"x-disposable": true}
+	project.Volumes["data"] = vol
+
+	// noPrompt panics if consulted, proving x-disposable short-circuits it.
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, !plan.IsEmpty(), "expected the disposable volume to be recreated")
+}
+
 // TestReconcileVolumes_DivergedPromptError propagates a prompt failure.
 func TestReconcileVolumes_DivergedPromptError(t *testing.T) {
 	project, observed := divergedVolumeProject(t, 1, 1)
