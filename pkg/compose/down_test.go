@@ -506,7 +506,7 @@ func TestEnsureImagesDown_TaggedImageListingFailureStaysVisibleWithoutAbortingDo
 	assert.NilError(t, ops[1]()) // dangling-images op is independent, still runs fine
 
 	assert.Equal(t, len(rec.resources), 1)
-	assert.Equal(t, rec.resources[0].ID, compose.ResourceCompose)
+	assert.Equal(t, rec.resources[0].ID, "Tagged images")
 	assert.Equal(t, rec.resources[0].Status, compose.Error)
 	assert.Equal(t, rec.resources[0].Details, listErr.Error())
 }
