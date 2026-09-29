@@ -18,8 +18,10 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -186,22 +188,30 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *types.Project, pruneOpts ImagePruneOptions) error {
 	images, err := NewImagePruner(s.apiClient(), project).ImagesToPrune(ctx, pruneOpts)
 	if err != nil {
-		s.events.On(errorEvent(api.ResourceCompose, err.Error()))
+		s.events.On(errorEvent("Tagged images", err.Error()))
 		return err
 	}
 
+	var mu sync.Mutex
+	var errs []error
 	var eg errgroup.Group
 	eg.SetLimit(s.maxConcurrency)
 	for i := range images {
 		img := images[i]
 		eg.Go(func() error {
-			return s.removeResource("Image "+img, func() error {
+			if err := s.removeResource("Image "+img, func() error {
 				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
 				return err
-			})
+			}); err != nil {
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+			}
+			return nil
 		})
 	}
-	return eg.Wait()
+	_ = eg.Wait() // errgroup is only used for fan-out here; goroutines never return an error
+	return errors.Join(errs...)
 }
 
 // removeDanglingImagesOp lists a project's dangling images and removes those
