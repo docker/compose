@@ -210,7 +210,7 @@ func (containers Containers) filter(predicates ...containerPredicate) Containers
 }
 
 // forEachContainerConcurrent runs fn for every container concurrently and
-// waits for all goroutines. Use forEachContainerWithLimiter (compose.go)
+// waits for all goroutines. Use forEachWithLimiter (compose.go)
 // instead when the concurrency budget must be shared across several
 // concurrently-dispatched calls, e.g. one per service visited by
 // InDependencyOrder.

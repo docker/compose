@@ -53,14 +53,19 @@ type Tar struct {
 	client LowLevelClient
 
 	projectName string
+	// maxConcurrency bounds concurrent per-container sync calls. <=0
+	// (including the Go zero-value) leaves it unlimited, since
+	// errgroup.SetLimit(0) means "allow zero goroutines", not "unlimited".
+	maxConcurrency int
 }
 
 var _ Syncer = &Tar{}
 
-func NewTar(projectName string, client LowLevelClient) *Tar {
+func NewTar(projectName string, client LowLevelClient, maxConcurrency int) *Tar {
 	return &Tar{
-		projectName: projectName,
-		client:      client,
+		projectName:    projectName,
+		client:         client,
+		maxConcurrency: maxConcurrency,
 	}
 }
 
@@ -93,7 +98,9 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 		errs  = make([]error, 0, len(containers)*2) // max 2 errs per container
 	)
 
-	eg.SetLimit(16) // arbitrary limit, adjust to taste :D
+	if t.maxConcurrency > 0 {
+		eg.SetLimit(t.maxConcurrency)
+	}
 	for i := range containers {
 		containerID := containers[i].ID
 		tarReader := tarArchive(pathsToCopy, keepImpliedDirectories)

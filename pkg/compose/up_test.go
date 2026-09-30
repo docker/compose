@@ -20,8 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
+	"time"
 
+	containerType "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+	"go.uber.org/mock/gomock"
+	"golang.org/x/sync/errgroup"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -178,4 +185,46 @@ func TestAppendErrKeepsCancellationBeforeShutdown(t *testing.T) {
 
 	u.appendErr(context.Canceled)
 	assert.Equal(t, len(u.errs), 1)
+}
+
+// TestStreamContainerLogs_ConcurrencyIsBounded guards a regression flagged
+// in review: streamContainerLogs (attaches logs for containers that start
+// after up's initial attach, e.g. via depends_on/restart/watch rebuilds)
+// used to call ContainerInspect directly and pass nil to doLogContainer, so
+// unlike `compose logs --follow` it never shared --parallel's budget
+// bounding concurrent log-open calls.
+func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+
+	tracker := &peakConcurrencyTracker{}
+	for _, id := range []string{"c1", "c2"} {
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), id, gomock.Any()).
+			DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+				tracker.enter()
+				time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+				tracker.leave()
+				return client.ContainerInspectResult{
+					Container: containerType.InspectResponse{
+						ID:     id,
+						Config: &containerType.Config{Tty: false},
+						State:  &containerType.State{},
+					},
+				}, nil
+			})
+		apiClient.EXPECT().ContainerLogs(gomock.Any(), id, gomock.Any()).
+			Return(io.NopCloser(strings.NewReader("")), nil)
+	}
+
+	u := &upSession{
+		composeService: svc,
+		globalCtx:      t.Context(),
+		logOpenLimiter: newOptionalLimiter(1),
+		options:        api.UpOptions{Start: api.StartOptions{Attach: &testLogConsumer{}}},
+	}
+
+	var eg errgroup.Group
+	eg.Go(func() error { return u.streamContainerLogs(api.ContainerEvent{ID: "c1", Service: "web"}, "") })
+	eg.Go(func() error { return u.streamContainerLogs(api.ContainerEvent{ID: "c2", Service: "web"}, "") })
+	assert.NilError(t, eg.Wait())
+	assert.Equal(t, tracker.Peak(), 1, "streamContainerLogs must share --parallel's budget for concurrent log-attach opens")
 }

@@ -101,7 +101,7 @@ func TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved(t *testing.T) {
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
 
-	removed, stillInUse, err := svc.removeImages(t.Context(), images)
+	removed, stillInUse, err := svc.removeImages(t.Context(), images, nil)
 	assert.DeepEqual(t, removed, []string{"sha256:removed"})
 	assert.DeepEqual(t, stillInUse, []string{"sha256:in-use"})
 	assert.ErrorContains(t, err, "sha256:fails")
