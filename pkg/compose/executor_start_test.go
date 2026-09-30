@@ -435,3 +435,74 @@ func TestExecutePlanMissingRequiredDependencyFailsSilently(t *testing.T) {
 	assert.ErrorContains(t, err, "missing dependency db")
 	assert.Equal(t, len(recorder.byID), 0, "a missing-dependency failure must not emit a spurious event")
 }
+
+// TestExecutePlanFailedPreStartGatesStart is a regression test for a race in
+// run()'s DAG walk: a node's done-channel closes (unblocking its dependents)
+// strictly before errgroup cancels its derived context on that same error —
+// the close happens synchronously inside the failing node's goroutine, ctx
+// cancellation only after it returns. A dependent blocked in run()'s
+// `select { case <-done[dep.ID]: ...; case <-ctx.Done(): ... }` therefore
+// always sees its dependency's done-channel ready first, deterministically,
+// regardless of whether that dependency failed for a genuine reason or was
+// itself cancelled.
+//
+// execCreateHookContainer already guards against this with a leading
+// ctx.Err() check; this test pins the same guard on execStartContainer's
+// enriched branch: when OpRunPreStart fails for a real reason (here: no hook
+// runner container found — never a context cancellation), the OpStartContainer
+// depending on it must not call ContainerStart. No ContainerStart expectation
+// is registered below: an unexpected call fails the test.
+func TestExecutePlanFailedPreStartGatesStart(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{
+		Name:     "web",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	project := &types.Project{Name: "test", Services: types.Services{"web": service}}
+
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		Return(client.ContainerCreateResult{ID: "new-id"}, nil)
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "new-id", gomock.Any()).
+		Return(client.ContainerInspectResult{Container: container.InspectResponse{
+			ID:              "new-id",
+			Name:            "/test-web-1",
+			Config:          &container.Config{},
+			NetworkSettings: &container.NetworkSettings{},
+		}}, nil)
+	// Both the pre_start drift-check and the hook-runner scan list no
+	// container: no replica is running, and no runner was prepared for the
+	// declared hook — runPreStart fails with "no hook runner container
+	// found", a genuine error, not a cancellation.
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{}, nil).Times(2)
+	// No ContainerStart expectation: registering one here would hide the
+	// bug by silently accepting the call this test exists to forbid.
+
+	plan := &Plan{}
+	create := plan.addNode(Operation{
+		Type:       OpCreateContainer,
+		ResourceID: "service:web:1",
+		Cause:      "no existing container",
+		Service:    &service,
+		Name:       "test-web-1",
+		Number:     1,
+	}, "")
+	preStart := plan.addNode(Operation{
+		Type:         OpRunPreStart,
+		ResourceID:   "service:web:1",
+		Cause:        "pre_start hooks",
+		Service:      &service,
+		CreateNodeID: create.ID,
+	}, "start:web:1", create)
+	plan.addNode(Operation{
+		Type:         OpStartContainer,
+		ResourceID:   "service:web:1",
+		Cause:        "start",
+		Service:      &service,
+		CreateNodeID: create.ID,
+	}, "start:web:1", preStart)
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
+	assert.ErrorContains(t, err, "no hook runner container found")
+}
