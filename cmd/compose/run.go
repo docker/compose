@@ -364,6 +364,17 @@ func jobTargetErr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions,
 	return err, false
 }
 
+// jobTargetErrOr applies jobTargetErr's translation to err when it matches,
+// and returns err unchanged otherwise — the wrap every caller loading a
+// project outside WithServices/projectOrName's own centralized handling
+// (build, pull, push) needs around its own selection error.
+func jobTargetErrOr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions, names []string, err error) error {
+	if jobErr, replaced := jobTargetErr(ctx, dockerCli, p, names, err); replaced {
+		return jobErr
+	}
+	return err
+}
+
 func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
 	project, err := options.apply(project)
 	if err != nil {
@@ -429,6 +440,21 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		Index:             0,
 	}
 
+	if _, ok := project.AllJobs()[options.Service]; ok {
+		if options.name != "" {
+			logrus.Warnf("--name has no effect on a job: the engine names its run containers itself")
+		}
+		exitCode, err := backend.RunJob(ctx, project, options.Service, runOpts)
+		if exitCode != 0 {
+			errMsg := ""
+			if err != nil {
+				errMsg = err.Error()
+			}
+			return cli.StatusError{StatusCode: exitCode, Status: errMsg, Cause: err}
+		}
+		return err
+	}
+
 	for name, service := range project.Services {
 		if name == options.Service {
 			service.StdinOpen = options.interactive
@@ -466,8 +492,8 @@ func materializeManualJob(project *types.Project, name string) (*types.Project, 
 	if !ok {
 		return project, nil
 	}
-	if job.Triggers != nil && job.Triggers.Manual != nil && !*job.Triggers.Manual {
-		return nil, fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
+	if compose.ManualTriggerDisabled(job) {
+		return nil, compose.ManualTriggerDisabledErr(name)
 	}
 	project, err := project.WithSelectedJob(name)
 	if err != nil {
@@ -482,7 +508,7 @@ func materializeManualJob(project *types.Project, name string) (*types.Project, 
 	if err := materializeJobClosure(project, jobs, job, map[string]bool{name: true}); err != nil {
 		return nil, err
 	}
-	project.Services[name] = jobAsService(project, name, job)
+	project.Services[name] = compose.JobAsService(project, name, job)
 	return project, nil
 }
 
@@ -503,39 +529,13 @@ func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.Jo
 		if !isJob {
 			continue
 		}
-		if depJob.Triggers != nil && depJob.Triggers.Manual != nil && !*depJob.Triggers.Manual {
+		if compose.ManualTriggerDisabled(depJob) {
 			return fmt.Errorf("job %q is declared with manual: false, it cannot be triggered even as a dependency of another job", dep)
 		}
 		if err := materializeJobClosure(project, jobs, depJob, seen); err != nil {
 			return err
 		}
-		project.Services[dep] = jobAsService(project, dep, depJob)
+		project.Services[dep] = compose.JobAsService(project, dep, depJob)
 	}
 	return nil
-}
-
-// jobAsService materializes a job as a service for the one-off machinery: a
-// job is a ContainerSpec+WorkloadSpec, the same layers a service is made of.
-// It carries the standard custom labels the loader stamps on every service —
-// materialization happens after loading, so without them the containers
-// created for a dependency job would be invisible to every label-driven
-// path: start would silently skip them, ps/down would not see them, and the
-// dependency wait would report the job as a missing dependency.
-func jobAsService(project *types.Project, name string, job types.JobConfig) types.ServiceConfig {
-	svc := types.ServiceConfig{
-		Name:          name,
-		Profiles:      job.Profiles,
-		Extensions:    job.Extensions,
-		ContainerSpec: job.ContainerSpec,
-		WorkloadSpec:  job.WorkloadSpec,
-	}
-	svc.CustomLabels = types.Labels{
-		api.ProjectLabel:     project.Name,
-		api.ServiceLabel:     name,
-		api.VersionLabel:     api.ComposeVersion,
-		api.WorkingDirLabel:  project.WorkingDir,
-		api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
-		api.OneoffLabel:      "False",
-	}
-	return svc
 }

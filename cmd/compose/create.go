@@ -31,7 +31,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -72,18 +71,9 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 			}
 			return nil
 		}),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			err := p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
-				return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
-			})(cmd, args)
-			if jobErr, replaced := jobTargetErr(cmd.Context(), dockerCli, p, args, err); replaced {
-				if display.Mode == display.ModeJSON {
-					return makeJSONError(jobErr)
-				}
-				return jobErr
-			}
-			return err
-		},
+		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
+			return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
+		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
@@ -108,11 +98,6 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 }
 
 func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
-	// same contract as up: an active scheduled job is refused before any
-	// resource is created — silently not scheduling would break expectations
-	if err := rejectScheduledJobs(project); err != nil {
-		return err
-	}
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}
