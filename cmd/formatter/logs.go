@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/buger/goterm"
 	"github.com/moby/moby/client/pkg/jsonmessage"
+	"github.com/morikuni/aec"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -131,7 +131,7 @@ func (l *logConsumer) write(w io.Writer, container, message string) {
 
 func (l *logConsumer) Status(container, msg string) {
 	p := l.getPresenter(container)
-	s := p.colors(fmt.Sprintf("%s%s %s\n", goterm.RESET_LINE, container, msg))
+	s := p.colors(fmt.Sprintf("\r%s%s %s\n", aec.EraseLine(aec.EraseModes.Tail), container, msg))
 	l.stdout.Write([]byte(s)) //nolint:errcheck
 }
 
