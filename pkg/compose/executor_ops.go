@@ -144,10 +144,19 @@ func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) 
 		return err
 	}
 
-	// A dependency's done-channel also closes on failure: when a preceding
-	// node of this replica's chain (a wait, pre_start) failed and canceled
-	// the run, bail out on the cancellation instead of starting a container
-	// whose pre_start hook just failed — same race as execCreateHookContainer.
+	// A dependency's done-channel closes (unblocking this node) before
+	// errgroup cancels ctx on that same dependency's error — cancel() only
+	// runs after the failing goroutine returns, close(done[...]) runs inside
+	// it. This check narrows that window (same guard as
+	// execCreateHookContainer) but cannot close it: a preceding node of this
+	// replica's chain (a wait, pre_start) can fail for a genuine reason a
+	// moment before this goroutine observes ctx.Err(), still nil, and starts
+	// a container whose pre_start hook just failed. The structural fix —
+	// carrying each node's success/failure through what dependents wait on,
+	// instead of inferring it from ctx.Err() — is tracked as its own brick of
+	// the executor lot (#14081, see the epic's "failed-dependency semantics"
+	// comment); every per-operation ctx.Err() guard here, including this one,
+	// is an interim narrowing, not the fix.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -270,10 +279,11 @@ func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) err
 // execRunPostStart runs the service's post_start hooks against the replica
 // the start chain just brought up.
 func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) error {
-	// Same race as execCreateHookContainer/execStartContainer: a failed
-	// StartContainer's done-channel closes before errgroup's ctx is
-	// canceled, so this must not run post_start against a container that
-	// never actually started.
+	// Same interim narrowing as execStartContainer's guard above, not a full
+	// fix (see its comment): a failed StartContainer's done-channel closes
+	// before errgroup's ctx is canceled, so a narrow window remains where
+	// this could still run post_start against a container whose start just
+	// failed for a genuine reason.
 	if err := ctx.Err(); err != nil {
 		return err
 	}

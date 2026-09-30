@@ -438,16 +438,16 @@ func TestExecutePlanMissingRequiredDependencyFailsSilently(t *testing.T) {
 
 // TestExecutePlanFailedPreStartGatesStart is a regression test for a race in
 // run()'s DAG walk: a node's done-channel closes (unblocking its dependents)
-// strictly before errgroup cancels its derived context on that same error —
-// the close happens synchronously inside the failing node's goroutine, ctx
-// cancellation only after it returns. A dependent blocked in run()'s
-// `select { case <-done[dep.ID]: ...; case <-ctx.Done(): ... }` therefore
-// always sees its dependency's done-channel ready first, deterministically,
-// regardless of whether that dependency failed for a genuine reason or was
-// itself cancelled.
+// inside the failing node's own goroutine, strictly before errgroup calls
+// cancel() on that goroutine's returned error — cancel() only runs after it
+// returns. A dependent unblocked from `<-done[dep.ID]` can therefore observe
+// ctx.Err() == nil for a brief window even though its dependency just failed
+// for a genuine reason, not a cancellation.
 //
-// execCreateHookContainer already guards against this with a leading
-// ctx.Err() check; this test pins the same guard on execStartContainer's
+// execCreateHookContainer already narrows this with a leading ctx.Err()
+// check (it cannot close the window — see the guard's comment in
+// execStartContainer for why this is deferred to a dedicated executor-lot
+// fix, #14081); this test pins the same narrowing on execStartContainer's
 // enriched branch: when OpRunPreStart fails for a real reason (here: no hook
 // runner container found — never a context cancellation), the OpStartContainer
 // depending on it must not call ContainerStart. No ContainerStart expectation
