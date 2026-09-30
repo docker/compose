@@ -99,6 +99,64 @@ func TestHelperProviderConfig(t *testing.T) {
 	os.Exit(0)
 }
 
+// TestExecutePlugin_GetServiceConfigResolvesBuildOnlyImage is a regression
+// test: a service declaring only build: (no image:) must still answer
+// get-service-config with a non-empty image — the name the image phase
+// built and tagged (api.GetImageNameOrDefault), not the YAML-declared
+// service.Image, which compose-go never fills in for this case. A provider
+// consuming a build-only service (e.g. a sandbox provider building its own
+// runtime image) otherwise sees an empty "image" field and rejects the
+// service outright. The build directive itself must NOT be forwarded: a
+// provider has no builder to run it against, only an image identity to run.
+func TestExecutePlugin_GetServiceConfigResolvesBuildOnlyImage(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(mocks.NewMockAPIClient(mockCtrl)).AnyTimes()
+	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	assert.NilError(t, err)
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestHelperProviderConfigImage")
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+
+	service := types.ServiceConfig{
+		Name:         "api",
+		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
+		Provider: &types.ServiceProviderConfig{
+			Type: "sbx",
+		},
+	}
+	variables, err := svc.(*composeService).executePlugin(t.Context(), &types.Project{Name: "proj"}, cmd, "up", service)
+	assert.NilError(t, err)
+	assert.Equal(t, variables.prefixed["IMAGE"], "proj-api")
+	assert.Equal(t, variables.prefixed["HAS_BUILD"], "false")
+}
+
+// TestHelperProviderConfigImage is not a test: it is the fake provider
+// process spawned by TestExecutePlugin_GetServiceConfigResolvesBuildOnlyImage.
+func TestHelperProviderConfigImage(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		t.Skip("helper process for TestExecutePlugin_GetServiceConfigResolvesBuildOnlyImage")
+	}
+	responses := json.NewDecoder(os.Stdin)
+	emit := func(msg JsonMessage) {
+		if err := json.NewEncoder(os.Stdout).Encode(msg); err != nil {
+			os.Exit(1)
+		}
+	}
+	emit(JsonMessage{Type: GetServiceConfigType})
+	var config struct {
+		Image string          `json:"image"`
+		Build json.RawMessage `json:"build"`
+	}
+	if err := responses.Decode(&config); err != nil {
+		emit(JsonMessage{Type: ErrorType, Message: fmt.Sprintf("reading service config: %v", err)})
+		os.Exit(0)
+	}
+	emit(JsonMessage{Type: SetEnvType, Message: "IMAGE=" + config.Image})
+	emit(JsonMessage{Type: SetEnvType, Message: fmt.Sprintf("HAS_BUILD=%t", config.Build != nil)})
+	os.Exit(0)
+}
+
 // TestExecutePlugin_GetRelayInfo runs executePlugin against a fake provider
 // (this test binary re-executed, see TestHelperProviderRelayInfo): the
 // get-relay-info message must be answered with one JSON line naming the
