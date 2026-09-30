@@ -416,7 +416,18 @@ func (s *composeService) handlePluginMessage(
 		}
 		variables.raw[key] = val
 	case GetServiceConfigType:
-		payload, err := json.Marshal(service)
+		// service.Image is the YAML-declared value: empty for a build-only
+		// service (compose-go never fills it in — see api.GetImageNameOrDefault's
+		// own callers throughout this package). The provider only ever sees
+		// this response, never the model compose builds internally, so it
+		// must get the resolved name, the same one the image phase built and
+		// tagged — never the build directive itself: a provider has no
+		// builder to run it against, and by the time it asks, the image
+		// phase has already built and tagged the image this config now names.
+		resolved := service
+		resolved.Image = api.GetImageNameOrDefault(service, project.Name)
+		resolved.Build = nil
+		payload, err := json.Marshal(resolved)
 		if err != nil {
 			return fmt.Errorf("failed to answer get-service-config: %w", err)
 		}
