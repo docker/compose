@@ -297,7 +297,7 @@ func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 		Container:  &oldCtr,
 	}, "", stopNode)
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed, nil)
 	assert.NilError(t, exec.run(t.Context(), plan))
 
 	assert.Equal(t, len(exec.containersByService["web"]), 0,
@@ -363,7 +363,7 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 		}, "", stop)
 	}
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed, nil)
 	assert.NilError(t, exec.run(t.Context(), plan))
 
 	assert.Equal(t, len(exec.containersByService["web"]), 0,
@@ -412,7 +412,7 @@ func TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain(t *testing.T) {
 		}, "", deps...)
 	}
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
 
 	done := make(chan error, 1)
 	go func() { done <- exec.run(t.Context(), plan) }()
@@ -481,7 +481,7 @@ func TestExecutePlanIndependentNodeNotSerializedBehindADependencyWait(t *testing
 		Type: OpStopContainer, ResourceID: "service:app:1", Cause: "unrelated", Container: &independent,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
 
 	done := make(chan error, 1)
 	go func() { done <- exec.run(t.Context(), plan) }()
@@ -674,7 +674,7 @@ func TestExecutePlanCreateNetworkConflictIsSuccess(t *testing.T) {
 func TestExecRemoveNetworkBestEffort(t *testing.T) {
 	newExec := func(t *testing.T) (*planExecutor, *mocks.MockAPIClient) {
 		svc, apiClient := newTestService(t)
-		return svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")), apiClient
+		return svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil), apiClient
 	}
 
 	t.Run("best-effort ignores conflict", func(t *testing.T) {

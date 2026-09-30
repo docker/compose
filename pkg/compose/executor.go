@@ -23,6 +23,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // planExecutor executes a reconciliation Plan by walking the DAG and performing
@@ -32,6 +34,13 @@ type planExecutor struct {
 	compose *composeService
 	project *types.Project
 	pctx    *reconciliationContext
+
+	// listener streams pre_start/post_start hook logs, exactly like the
+	// imperative start path. nil until an attached caller wires one in (the
+	// interactive-up convergence, a later lot of #14081) — every caller today
+	// passes nil, so hook execution stays silent, matching today's detached
+	// behavior.
+	listener api.ContainerEventListener
 
 	// containersByService is a live view used to resolve service references
 	// (network_mode: service:x, volumes_from, ipc, pid) without a daemon
@@ -68,17 +77,24 @@ func (pc *reconciliationContext) get(nodeID int) operationResult {
 // executePlan walks the plan DAG, executing nodes in parallel where possible
 // while respecting dependency edges. It emits progress events and handles
 // group-based event aggregation for composite operations like recreate.
+//
+// No caller threads a hook-log listener through here yet: create() (its only
+// caller) plans no start-phase operations today. newPlanExecutor takes one
+// directly for that reason — it is what the interactive-up convergence (a
+// later lot of #14081) will call once it needs to stream pre_start/post_start
+// hook logs into an attached session.
 func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *Plan) error {
-	return s.newPlanExecutor(project, observed).run(ctx, plan)
+	return s.newPlanExecutor(project, observed, nil).run(ctx, plan)
 }
 
 // newPlanExecutor constructs a planExecutor seeded from the observed state.
 // Split out from executePlan so tests can inspect the executor's live state
 // (e.g. the containersByService cache) after running a plan.
-func (s *composeService) newPlanExecutor(project *types.Project, observed *ObservedState) *planExecutor {
+func (s *composeService) newPlanExecutor(project *types.Project, observed *ObservedState, listener api.ContainerEventListener) *planExecutor {
 	return &planExecutor{
 		compose:             s,
 		project:             project,
+		listener:            listener,
 		pctx:                &reconciliationContext{results: map[int]operationResult{}},
 		containersByService: observed.containersByService(),
 	}
@@ -174,6 +190,12 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 		return exec.execRenameContainer(ctx, node)
 	case OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
+	case OpWaitCondition:
+		return exec.execWaitCondition(ctx, op)
+	case OpRunPreStart:
+		return exec.execRunPreStart(ctx, op)
+	case OpRunPostStart:
+		return exec.execRunPostStart(ctx, op)
 	case OpRunProvider:
 		return exec.compose.runPlugin(ctx, exec.project, *op.Service, "up")
 	default:
