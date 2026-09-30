@@ -370,17 +370,14 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 		"all removed containers should be dropped from the live view")
 }
 
-// TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain guards the
-// invariant run() relies on to stay deadlock-free once maxConcurrency bounds
-// the errgroup (see the comment on newLimitedErrgroup's call in run()):
-// plan.Nodes must stay topologically sorted, so a node's dependencies are
-// always already dispatched to eg.Go by the time the dispatch loop reaches
-// a dependent. With maxConcurrency=1, a multi-level dependency chain forces
-// strictly serial execution; if that invariant were ever broken (a node
-// added before a dependency it references), the dispatch loop would stall
-// forever waiting for a slot held by a goroutine itself waiting on a
-// not-yet-dispatched dependency — so this test would hang instead of
-// completing.
+// TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain guards that a
+// multi-level dependency chain still executes serially under
+// maxConcurrency=1 and completes rather than deadlocking. run() dispatches
+// every node's goroutine unconditionally and only acquires a concurrency
+// slot around the actual executeNode call (see run()'s comment), so this no
+// longer depends on plan.Nodes staying topologically sorted -- a goroutine
+// blocked on <-done[dep.ID] holds no slot for its dependency to starve on,
+// however plan.Nodes is ordered.
 func TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain(t *testing.T) {
 	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
 
@@ -424,7 +421,91 @@ func TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain(t *testing.T) {
 	case err := <-done:
 		assert.NilError(t, err)
 	case <-time.After(5 * time.Second):
-		t.Fatal("run() deadlocked: a bounded errgroup requires plan.Nodes to stay topologically sorted")
+		t.Fatal("run() deadlocked on a serial dependency chain under maxConcurrency=1")
+	}
+}
+
+// TestExecutePlanIndependentNodeNotSerializedBehindADependencyWait guards
+// that a node with no unmet dependencies can run concurrently with an
+// unrelated node that's still waiting on its own dependency, instead of
+// being starved behind it. Before run() acquired its concurrency slot only
+// around executeNode, a waiting node's goroutine held its slot for the whole
+// wait, so on a wide/shallow DAG an independent, ready node could be blocked
+// from even dispatching until the waiter's chain finished -- the two
+// ContainerStop calls below could never overlap under the old behavior,
+// since the independent node's slot only freed once the dependency chain's
+// own goroutine (holding the other slot for its entire wait) had returned.
+func TestExecutePlanIndependentNodeNotSerializedBehindADependencyWait(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(2))
+
+	slow := container.Summary{ID: "c-slow", Names: []string{"/test-web-1"}, Labels: map[string]string{
+		api.ServiceLabel: "web", api.ContainerNumberLabel: "1",
+	}}
+	waiter := container.Summary{ID: "c-waiter", Names: []string{"/test-web-2"}, Labels: map[string]string{
+		api.ServiceLabel: "web", api.ContainerNumberLabel: "2",
+	}}
+	independent := container.Summary{ID: "c-independent", Names: []string{"/test-app-1"}, Labels: map[string]string{
+		api.ServiceLabel: "app", api.ContainerNumberLabel: "1",
+	}}
+
+	// slow blocks mid-call until the test releases it, so the assertion below
+	// is a deterministic happens-before check, not a timing race.
+	slowStarted := make(chan struct{})
+	slowRelease := make(chan struct{})
+	apiClient.EXPECT().ContainerStop(gomock.Any(), slow.ID, gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStopOptions) (client.ContainerStopResult, error) {
+			close(slowStarted)
+			<-slowRelease
+			return client.ContainerStopResult{}, nil
+		})
+	apiClient.EXPECT().ContainerStop(gomock.Any(), waiter.ID, gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+
+	independentStarted := make(chan struct{})
+	apiClient.EXPECT().ContainerStop(gomock.Any(), independent.ID, gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStopOptions) (client.ContainerStopResult, error) {
+			close(independentStarted)
+			return client.ContainerStopResult{}, nil
+		})
+
+	// slow -> waiter (waiter depends on slow); independent has no deps and
+	// shares no resource with either.
+	plan := &Plan{}
+	slowNode := plan.addNode(Operation{
+		Type: OpStopContainer, ResourceID: "service:web:1", Cause: "chain", Container: &slow,
+	}, "")
+	plan.addNode(Operation{
+		Type: OpStopContainer, ResourceID: "service:web:2", Cause: "chain", Container: &waiter,
+	}, "", slowNode)
+	plan.addNode(Operation{
+		Type: OpStopContainer, ResourceID: "service:app:1", Cause: "unrelated", Container: &independent,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+
+	done := make(chan error, 1)
+	go func() { done <- exec.run(t.Context(), plan) }()
+
+	select {
+	case <-slowStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("slow node never started")
+	}
+
+	select {
+	case <-independentStarted:
+		// the independent node ran while slow is still blocked -- it wasn't
+		// serialized behind the dependency chain's wait.
+	case <-time.After(2 * time.Second):
+		t.Fatal("independent node never started while the slow node (holding the other slot) was still running -- it was serialized behind the dependency chain")
+	}
+	close(slowRelease)
+
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("run() did not complete after releasing the slow node")
 	}
 }
 

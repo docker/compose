@@ -29,6 +29,7 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -59,17 +60,22 @@ type ImagePruneOptions struct {
 
 // ImagePruner handles image removal during Compose `down` operations.
 type ImagePruner struct {
-	client         client.ImageAPIClient
-	project        *types.Project
-	maxConcurrency int
+	client  client.ImageAPIClient
+	project *types.Project
+	// limiter bounds concurrent engine calls, shared with the rest of the
+	// down op set so tagged- and dangling-image removal (which run as two
+	// independent, concurrently-dispatched ops) don't each spend their own
+	// full budget on top of one another.
+	limiter *semaphore.Weighted
 }
 
-// NewImagePruner creates an ImagePruner object for a project.
-func NewImagePruner(imageClient client.ImageAPIClient, project *types.Project, maxConcurrency int) *ImagePruner {
+// NewImagePruner creates an ImagePruner object for a project. limiter may be
+// nil, meaning unbounded.
+func NewImagePruner(imageClient client.ImageAPIClient, project *types.Project, limiter *semaphore.Weighted) *ImagePruner {
 	return &ImagePruner{
-		client:         imageClient,
-		project:        project,
-		maxConcurrency: maxConcurrency,
+		client:  imageClient,
+		project: project,
+		limiter: limiter,
 	}
 }
 
@@ -175,37 +181,36 @@ func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, 
 // removal, so it's simply not counted against either bucket. Any other
 // removal error is joined into err so callers reporting failures to the
 // user keep the actual daemon error instead of just an image ID.
-func (s *composeService) removeImages(ctx context.Context, images []image.Summary) (removed, stillInUse []string, err error) {
+func (s *composeService) removeImages(ctx context.Context, images []image.Summary, limiter *semaphore.Weighted) (removed, stillInUse []string, err error) {
 	var mu sync.Mutex
 	var errs []error
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
-	for _, img := range images {
-		eg.Go(func() error {
-			if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
-				mu.Lock()
-				defer mu.Unlock()
-				imgStillInUse, alreadyGone := classifyRemovalError(err)
-				switch {
-				case alreadyGone:
-					// e.g. removed concurrently by something else
-					logrus.Debugf("dangling image %s already removed: %v", img.ID, err)
-				case imgStillInUse:
-					// the same benign skip the tagged-image path reports via
-					// removeResource's conflict branch
-					logrus.Debugf("dangling image %s still in use: %v", img.ID, err)
-					stillInUse = append(stillInUse, img.ID)
-				default:
-					errs = append(errs, fmt.Errorf("image %s: %w", img.ID, err))
-				}
-				return nil
-			}
+	// as in removeTaggedImagesOp, a single image failure must not cancel the
+	// shared errgroup ctx, so fn always returns nil and collects into the
+	// buckets below instead.
+	_ = forEachWithLimiter(ctx, limiter, images, func(ctx context.Context, img image.Summary) error {
+		if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
 			mu.Lock()
 			defer mu.Unlock()
-			removed = append(removed, img.ID)
+			imgStillInUse, alreadyGone := classifyRemovalError(err)
+			switch {
+			case alreadyGone:
+				// e.g. removed concurrently by something else
+				logrus.Debugf("dangling image %s already removed: %v", img.ID, err)
+			case imgStillInUse:
+				// the same benign skip the tagged-image path reports via
+				// removeResource's conflict branch
+				logrus.Debugf("dangling image %s still in use: %v", img.ID, err)
+				stillInUse = append(stillInUse, img.ID)
+			default:
+				errs = append(errs, fmt.Errorf("image %s: %w", img.ID, err))
+			}
 			return nil
-		})
-	}
-	_ = eg.Wait() // errgroup is only used for fan-out here; goroutines never return an error
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		removed = append(removed, img.ID)
+		return nil
+	})
 	return removed, stillInUse, errors.Join(errs...)
 }
 
@@ -238,7 +243,7 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 	if err != nil {
 		return nil, err
 	}
-	removed, _, err := s.removeImages(ctx, eligible)
+	removed, _, err := s.removeImages(ctx, eligible, newOptionalLimiter(s.maxConcurrency))
 	return removed, err
 }
 
@@ -273,23 +278,19 @@ func (p *ImagePruner) filterImagesByExistence(ctx context.Context, imageNames []
 	var mu sync.Mutex
 	var ret []string
 
-	eg, ctx := newLimitedErrgroup(ctx, p.maxConcurrency)
-	for _, img := range imageNames {
-		eg.Go(func() error {
-			_, err := p.client.ImageInspect(ctx, img)
-			if errdefs.IsNotFound(err) {
-				// err on the side of caution: only skip if we successfully
-				// queried the API and got back a definitive "not exists"
-				return nil
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			ret = append(ret, img)
+	err := forEachWithLimiter(ctx, p.limiter, imageNames, func(ctx context.Context, img string) error {
+		_, err := p.client.ImageInspect(ctx, img)
+		if errdefs.IsNotFound(err) {
+			// err on the side of caution: only skip if we successfully
+			// queried the API and got back a definitive "not exists"
 			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		ret = append(ret, img)
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 

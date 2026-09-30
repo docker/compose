@@ -212,22 +212,22 @@ func panicSafeReleaseSlot(limiter *semaphore.Weighted) {
 	}
 }
 
-// forEachContainerWithLimiter runs fn concurrently for each container,
-// bounded by limiter. Unlike newLimitedErrgroup, limiter is built by the
-// caller and can be shared across several concurrently-dispatched calls
-// (e.g. one per service visited by InDependencyOrder), so the combined
+// forEachWithLimiter runs fn concurrently for each item, bounded by limiter.
+// Unlike newLimitedErrgroup, limiter is built by the caller and can be
+// shared across several concurrently-dispatched calls (e.g. one per service
+// visited by InDependencyOrder, or one per sibling down op), so the combined
 // concurrency across all of them never exceeds the configured budget.
 // Use forEachContainerConcurrent (containers.go) instead when the call is
 // standalone and doesn't need to share its budget with any other call.
-func forEachContainerWithLimiter(ctx context.Context, limiter *semaphore.Weighted, containers []container.Summary, fn func(context.Context, container.Summary) error) error {
+func forEachWithLimiter[T any](ctx context.Context, limiter *semaphore.Weighted, items []T, fn func(context.Context, T) error) error {
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, ctr := range containers {
+	for _, item := range items {
 		eg.Go(func() error {
 			if err := acquireSlot(ctx, limiter); err != nil {
 				return err
 			}
 			defer releaseSlot(limiter)
-			return fn(ctx, ctr)
+			return fn(ctx, item)
 		})
 	}
 	return eg.Wait()

@@ -60,7 +60,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			return err
 		}
 
-		return forEachContainerWithLimiter(ctx, limiter, containers.filter(isService(service)), func(ctx context.Context, ctr container.Summary) error {
+		return forEachWithLimiter(ctx, limiter, containers.filter(isService(service)), func(ctx context.Context, ctr container.Summary) error {
 			return s.restartContainer(ctx, project.Services[service], ctr, options)
 		})
 	})

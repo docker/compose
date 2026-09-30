@@ -30,6 +30,7 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -120,28 +121,35 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	ops := s.ensureNetworksDown(ctx, project)
+	ops := s.ensureNetworksDown(ctx, project, limiter)
 
 	if options.Images != "" {
-		ops = append(ops, s.ensureImagesDown(ctx, project, options)...)
+		ops = append(ops, s.ensureImagesDown(ctx, project, options, limiter)...)
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, project)...)
+		ops = append(ops, s.ensureVolumesDown(ctx, project, limiter)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
 		logrus.Warnf("Warning: No resource found to remove for project %q.", projectName)
 	}
 
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	// ops dispatch itself is intentionally unbounded: each op already gates
+	// its own engine call(s) on the shared limiter (network/volume ops
+	// directly, image ops internally via their own forEachWithLimiter call),
+	// so bounding this dispatch too on the same limiter would have an op
+	// hold a slot for its own fan-out to acquire from -- deadlocking once
+	// enough ops are in flight to exhaust it (see
+	// TestDown_NetworkAndImageRemovalShareConcurrencyBudget).
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, op := range ops {
 		eg.Go(op)
 	}
 	return eg.Wait()
 }
 
-func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project) []downOp {
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, limiter *semaphore.Weighted) []downOp {
 	var ops []downOp
 	for _, vol := range project.Volumes {
 		if vol.External {
@@ -149,6 +157,10 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 		}
 		volumeName := vol.Name
 		ops = append(ops, func() error {
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
+			}
+			defer releaseSlot(limiter)
 			return s.removeVolume(ctx, volumeName)
 		})
 	}
@@ -156,7 +168,7 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) []downOp {
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, limiter *semaphore.Weighted) []downOp {
 	pruneOpts := ImagePruneOptions{
 		Mode:          ImagePruneMode(options.Images),
 		RemoveOrphans: options.RemoveOrphans,
@@ -165,7 +177,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 	var ops []downOp
 	if pruneOpts.Mode != ImagePruneNone {
 		ops = append(ops, func() error {
-			return s.removeTaggedImagesOp(ctx, project, pruneOpts)
+			return s.removeTaggedImagesOp(ctx, project, pruneOpts, limiter)
 		})
 
 		// a dangling image from a service no longer in the project must be
@@ -176,7 +188,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 		}
 		projectName := project.Name
 		ops = append(ops, func() error {
-			return s.removeDanglingImagesOp(ctx, projectName, keep)
+			return s.removeDanglingImagesOp(ctx, projectName, keep, limiter)
 		})
 	}
 	return ops
@@ -189,8 +201,12 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 // sibling down ops (network, volumes, dangling images), since — unlike
 // this op — they've already been scheduled onto the same errgroup by the
 // time `ensureImagesDown` used to fail synchronously.
-func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *types.Project, pruneOpts ImagePruneOptions) error {
-	images, err := NewImagePruner(s.apiClient(), project, s.maxConcurrency).ImagesToPrune(ctx, pruneOpts)
+//
+// limiter is shared with the rest of down's ops (see down()'s comment) so
+// this op's fan-out doesn't spend its own full maxConcurrency budget on top
+// of removeDanglingImagesOp's, which runs concurrently with it.
+func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *types.Project, pruneOpts ImagePruneOptions, limiter *semaphore.Weighted) error {
+	images, err := NewImagePruner(s.apiClient(), project, limiter).ImagesToPrune(ctx, pruneOpts)
 	if err != nil {
 		s.events.On(errorEvent("Tagged images", err.Error()))
 		return err
@@ -198,22 +214,21 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 
 	var mu sync.Mutex
 	var errs []error
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
-	for i := range images {
-		img := images[i]
-		eg.Go(func() error {
-			if err := s.removeResource("Image "+img, func() error {
-				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
-				return err
-			}); err != nil {
-				mu.Lock()
-				errs = append(errs, err)
-				mu.Unlock()
-			}
-			return nil
-		})
-	}
-	_ = eg.Wait() // errgroup is only used for fan-out here; goroutines never return an error
+	// forEachWithLimiter's own error handling isn't used here since a single
+	// image failure must not cancel the shared errgroup ctx (see
+	// TestRemoveTaggedImagesOp_ContinuesAfterOneImageFails) -- every failure
+	// is collected instead, so fn itself always returns nil.
+	_ = forEachWithLimiter(ctx, limiter, images, func(ctx context.Context, img string) error {
+		if err := s.removeResource("Image "+img, func() error {
+			_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
+			return err
+		}); err != nil {
+			mu.Lock()
+			errs = append(errs, err)
+			mu.Unlock()
+		}
+		return nil
+	})
 	return errors.Join(errs...)
 }
 
@@ -237,7 +252,7 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 // removed either: stillInUse (a real, not-yet-achieved goal) is checked
 // separately, the same distinction removeResource already makes per tagged
 // image (an already-gone image simply isn't counted in either bucket).
-func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName string, keep func(image.Summary) bool) error {
+func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName string, keep func(image.Summary) bool, limiter *semaphore.Weighted) error {
 	eventID := "Dangling images"
 	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
 	if err != nil {
@@ -249,7 +264,7 @@ func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName
 	}
 
 	s.events.On(removingEvent(eventID))
-	removed, stillInUse, err := s.removeImages(ctx, eligible)
+	removed, stillInUse, err := s.removeImages(ctx, eligible, limiter)
 	var stillInUseNote string
 	if len(stillInUse) > 0 {
 		stillInUseNote = fmt.Sprintf("%d image(s) still in use", len(stillInUse))
@@ -281,7 +296,7 @@ func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName
 	return err
 }
 
-func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project) []downOp {
+func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, limiter *semaphore.Weighted) []downOp {
 	var ops []downOp
 	for key, n := range project.Networks {
 		if n.External {
@@ -291,6 +306,10 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 		networkKey := key
 		idOrName := n.Name
 		ops = append(ops, func() error {
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
+			}
+			defer releaseSlot(limiter)
 			return s.removeNetwork(ctx, networkKey, project.Name, idOrName)
 		})
 	}
@@ -437,7 +456,7 @@ func (s *composeService) stopContainers(
 	listener api.ContainerEventListener,
 	limiter *semaphore.Weighted,
 ) error {
-	return forEachContainerWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+	return forEachWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
 		return s.stopContainer(ctx, serv, ctr, timeout, listener)
 	})
 }
@@ -450,7 +469,7 @@ func (s *composeService) removeContainers(
 	volumes bool,
 	limiter *semaphore.Weighted,
 ) error {
-	return forEachContainerWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+	return forEachWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
 		return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
 	})
 }

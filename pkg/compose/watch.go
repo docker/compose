@@ -129,7 +129,7 @@ func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syn
 		return nil, errors.New("no available sync implementation")
 	}
 
-	return sync.NewTar(project.Name, tarDockerClient{s: s}), nil
+	return sync.NewTar(project.Name, tarDockerClient{s: s}, s.maxConcurrency), nil
 }
 
 func (s *composeService) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) error {

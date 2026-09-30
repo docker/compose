@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"golang.org/x/sync/errgroup"
 )
 
 // planExecutor executes a reconciliation Plan by walking the DAG and performing
@@ -101,13 +102,14 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
 
-	// Each node's goroutine occupies its concurrency slot for the entire wait
-	// below, not just its own work, so a small maxConcurrency can serialize
-	// more than a caller might expect on a wide/shallow DAG. Forward progress
-	// is still guaranteed: plan.Nodes is topologically sorted, so a node's
-	// dependencies were always already dispatched to eg.Go by the time this
-	// loop reaches it.
-	eg, ctx := newLimitedErrgroup(ctx, exec.compose.maxConcurrency)
+	// Every node's goroutine is dispatched unconditionally, so one waiting on
+	// a dependency never occupies a concurrency slot -- only the actual
+	// executeNode call does, via the semaphore below. This also means
+	// deadlock-freedom no longer depends on plan.Nodes staying topologically
+	// sorted: a goroutine blocked on <-done[dep.ID] holds no slot for a
+	// still-pending dependency to be starved on.
+	eg, ctx := errgroup.WithContext(ctx)
+	limiter := newOptionalLimiter(exec.compose.maxConcurrency)
 	for _, node := range plan.Nodes {
 		eg.Go(func() error {
 			// Wait for all dependencies
@@ -118,6 +120,11 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 					return ctx.Err()
 				}
 			}
+
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
+			}
+			defer releaseSlot(limiter)
 
 			// Emit group start event if this is the first node of a group
 			groups.onNodeStart(node, events)
