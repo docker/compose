@@ -211,26 +211,75 @@ standalone Linux engine no address is both relay-reachable and off the LAN by de
 resolves there to the bridge gateway, which a loopback-only listener cannot accept, while the wildcard exposes
 the port on every host interface. (Docker Desktop has no such dilemma — its proxy reaches the host's loopback.)
 
-`get-relay-info` resolves this: the provider asks, and Compose answers with one JSON line listing the networks
-the relay would join — the dependents' networks, as selected for the relay deployment — each with the address a
-locally-run endpoint should bind so the relay can reach it:
+`get-relay-info` resolves this: sending it is itself the provider's declaration that it binds locally, and
+Compose reacts by creating a **dedicated relay-link network** — an `internal:true` bridge, scoped to this one
+provider service, joined by nothing but the relay container — then answers with one JSON line naming it
+alongside the address a locally-run endpoint should bind so the relay can reach it:
 
 ```json
 { "type": "get-relay-info" }
 ```
 
 ```json
-{"networks":[{"name":"myproject_default","gateway":"172.18.0.1"}]}
+{"networks":[{"name":"myproject_database_relay","gateway":"172.20.0.1"}]}
 ```
 
-Compose owns the platform knowledge behind that address: on a standalone engine it is the network's gateway —
-an address the provider's host owns on that network's bridge, reachable from the relay (and from local
-containers) but not from the LAN; under Docker Desktop it is `127.0.0.1` — the network lives inside the VM,
-and the host's own loopback is, factually, where a host process is reached through the Desktop proxy. The
-provider simply binds the announced gateway and publishes the endpoint exactly as bound: a routable address
-passes to the relay untouched, a loopback one is announced as `localhost` (translated to
+A provider backing a remote resource (an Amazon RDS instance, say) has no local endpoint to bind and simply
+never sends `get-relay-info`: no relay-link network is created for it, and its `publish-endpoint` reports the
+remote resource's own address unchanged.
+
+```mermaid
+sequenceDiagram
+    participant Compose
+    participant Provider
+    participant net as relay-link network<br/>(internal, per-service)
+    participant relay as relay container
+
+    rect rgb(235, 245, 255)
+    note over Compose,net: Provider running its service locally
+    Compose->>Provider: compose up --project-name=xx "database"
+    Provider->>Compose: json { "type": "get-relay-info" }
+    Compose->>net: create (or reuse) the dedicated<br/>relay-link network for "database"
+    Compose--)Provider: json {"networks":[{"name":"myproject_database_relay",<br/>"gateway":"172.20.0.1"}]}
+    Provider->>Provider: bind local endpoint to 172.20.0.1
+    Provider--)Compose: json { "type": "publish-endpoint",<br/>"message": "80=172.20.0.1:49152" }
+    Compose->>relay: deploy, join dependents' networks<br/>AND the relay-link network
+    end
+```
+
+```mermaid
+sequenceDiagram
+    participant Compose
+    participant Provider
+    participant resource as remote resource<br/>(e.g. Amazon RDS)
+    participant relay as relay container
+
+    rect rgb(255, 245, 235)
+    note over Compose,resource: Provider backing a remote resource
+    Compose->>Provider: compose up --project-name=xx "database"
+    Provider->>resource: provision
+    note over Provider: no local endpoint to bind:<br/>get-relay-info is never sent
+    Provider--)Compose: json { "type": "publish-endpoint",<br/>"message": "80=resource.example.com:5432" }
+    Compose->>relay: deploy, join dependents' networks only<br/>(no relay-link network created)
+    end
+```
+
+Compose owns the platform knowledge behind the announced address: on a standalone engine it is the relay-link
+network's IPv4 gateway — an address the provider's host owns on that dedicated bridge, reachable from the relay
+(same-bridge local delivery) but joined by nothing else, so never reachable from the LAN or from a project's own
+service networks; under Docker Desktop it is `127.0.0.1` — the network lives inside the VM, and the host's own
+loopback is, factually, where a host process is reached through the Desktop proxy, so no dedicated network is
+created there. The provider simply binds the announced gateway and publishes the endpoint exactly as bound: a
+routable address passes to the relay untouched, a loopback one is announced as `localhost` (translated to
 `host.docker.internal`). The `gateway` field may be absent when it cannot be resolved (exotic network drivers,
-IPv6-only IPAM): fall back to a bind of your choice. Best-effort by design.
+IPv6-only IPAM): fall back to a bind of your choice. Best-effort by design. The relay-link network is removed
+along with the relay container when the service stops publishing endpoints, and by `down` like any other
+project resource.
+
+The `name` field is an opaque identifier, not a promise that a Docker network by that name exists: under Docker
+Desktop it is the literal string `"desktop"`, which no `docker network inspect` or `NetworkConnect` call will
+ever resolve. A provider must use it only for logging, never as an engine-level network reference — `gateway` is
+the only field it needs to bind and publish correctly.
 
 ## Down lifecycle
 

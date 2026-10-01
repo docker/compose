@@ -95,6 +95,11 @@ func TestDown(t *testing.T) {
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "def456", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
 
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
+
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
 
 	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{})
@@ -116,6 +121,11 @@ func TestDown_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
 		Return(client.ContainerListResult{Items: containers}, nil)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
 		Return(client.ContainerListResult{}, nil) // removePreStartHookContainers lookup
+
+	// no relay-link network for this project (no provider service involved)
+	apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter("prj").Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	apiClient.EXPECT().ContainerStop(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(client.ContainerStopResult{}, nil).
@@ -165,6 +175,11 @@ func TestDown_ImagePruningSharesConcurrencyBudgetAcrossOps(t *testing.T) {
 		{ID: "sha256:dangling1"},
 		{ID: "sha256:dangling2"},
 	}}, nil)
+
+	// no relay-link network for this project (no provider service involved)
+	apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter("prj").Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	tracker := &peakConcurrencyTracker{}
 	apiClient.EXPECT().ImageRemove(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -238,6 +253,11 @@ func TestDown_NetworkAndImageRemovalShareConcurrencyBudget(t *testing.T) {
 	apiClient.EXPECT().NetworkRemove(gomock.Any(), "net1", gomock.Any()).
 		Return(client.NetworkRemoveResult{}, nil)
 
+	// no relay-link network for this project (no provider service involved)
+	apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter("prj").Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
+
 	err := svc.down(t.Context(), "prj", compose.DownOptions{Project: project, Images: "local", RemoveOrphans: true})
 	assert.NilError(t, err)
 	assert.Assert(t, tracker.Peak() <= 2, "network- and image-removal ops must share the same concurrency budget, got peak %d", tracker.Peak())
@@ -285,6 +305,11 @@ func TestDownWithGivenServices(t *testing.T) {
 	}}, nil)
 	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkInspectResult{Network: network.Inspect{Network: network.Network{ID: "abc123"}}}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
+
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt("service1")).Return(client.ContainerListResult{}, nil)
 
@@ -389,6 +414,11 @@ func TestDownRemoveOrphans(t *testing.T) {
 	}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
 
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
+
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
 
 	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})
@@ -424,6 +454,11 @@ func TestDownRemoveVolumes(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(client.ContainerRemoveResult{}, nil)
 
 	api.EXPECT().VolumeRemove(gomock.Any(), "myProject_volume", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
+
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
 
@@ -505,6 +540,12 @@ func TestDownRemoveImages(t *testing.T) {
 		Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{RepoTags: []string{"registry.example.com/remote-image-tagged:v1.0"}}}, nil).
 		AnyTimes()
 
+	// no relay-link network for this project (no provider service involved);
+	// down() runs twice in this test (--rmi=local then --rmi=all)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil).AnyTimes()
+
 	localImagesToBeRemoved := []string{
 		"testproject-local-anonymous:latest",
 		"local-named-image:latest",
@@ -579,6 +620,11 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
 
 	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1:latest", client.ImageRemoveOptions{}).Return(client.ImageRemoveResult{}, nil)
+
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
 
@@ -1200,6 +1246,10 @@ func TestDownRemovesRetainedPreStartHookContainers(t *testing.T) {
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
 		Filters: projectFilter(strings.ToLower(testProject)),
 	}).Return(client.NetworkListResult{}, nil)
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	// Hook container scan finds one retained pre_start container.
 	hookCtr := container.Summary{
@@ -1241,6 +1291,10 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	}).Return(client.VolumeListResult{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
 		Filters: projectFilter(strings.ToLower(testProject)),
+	}).Return(client.NetworkListResult{}, nil)
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	// Hook scan finds one container.
