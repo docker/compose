@@ -49,6 +49,12 @@ const (
 	// whether an existing relay can be kept on the next up. Commands that
 	// act on a service's process (exec, ...) refuse relay containers.
 	RelayLabel = "com.docker.compose.relay"
+	// RelayNetworkLabel marks the dedicated bridge network created for one
+	// provider-managed service's relay link — the sole channel between the
+	// relay container and the provider's own runtime (see get-relay-info).
+	// Never a project's user-declared network, and never joined by any
+	// dependent or sibling container: only the relay connects to it.
+	RelayNetworkLabel = "com.docker.compose.relay-network"
 	// SlugLabel stores unique slug used for one-off container identity
 	SlugLabel = "com.docker.compose.slug"
 	// ImageDigestLabel stores digest of the container image used to run service

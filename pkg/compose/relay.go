@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -125,12 +126,14 @@ func relayNetworks(project *types.Project, service types.ServiceConfig) []string
 	return keys
 }
 
-// relayInfoAnswer is the get-relay-info reply: the project networks the
-// relay standing in for the provider service would join, each with the
-// address the HOST owns on that network — its gateway. A provider running
-// its service locally can bind that address: reachable from the relay
-// (same-bridge local delivery), yet not exposed on the LAN. Networks whose
-// gateway cannot be resolved are still listed, gateway omitted.
+// relayInfoAnswer is the get-relay-info reply: the network the relay
+// reaches the provider's own runtime through, with the address the HOST owns
+// on it — its gateway. A provider running its service locally can bind that
+// address: reachable from the relay (same-bridge local delivery), and —
+// unlike a project's own bridge networks, which every service on them can
+// also reach — joined by nothing else. A single entry, or none when it
+// could not be resolved (see ensureRelayLinkNetwork): a provider must treat
+// that as "bind elsewhere".
 type relayInfoAnswer struct {
 	Networks []relayNetworkInfo `json:"networks"`
 }
@@ -139,55 +142,199 @@ type relayNetworkInfo struct {
 	// Name is the concrete engine-level network name.
 	Name string `json:"name"`
 	// Gateway is the address the provider's host owns that the relay can
-	// reach on this network: the network's IPv4 gateway on a standalone
-	// engine, the host's own loopback under Docker Desktop — whose proxy
-	// dials host-process endpoints through 127.0.0.1, making it factually
-	// the gateway to the host from the relay's vantage point. Empty when
-	// unresolved (network not created yet, driver without a host-owned
-	// gateway, IPv6-only).
+	// reach on this network: the dedicated relay-link network's IPv4
+	// gateway on a standalone engine, the host's own loopback under Docker
+	// Desktop — whose proxy dials host-process endpoints through
+	// 127.0.0.1, making it factually the gateway to the host from the
+	// relay's vantage point. Empty when unresolved (network not created
+	// yet, driver without a host-owned gateway, IPv6-only).
 	Gateway string `json:"gateway,omitempty"`
 }
 
 // relayInfo assembles the get-relay-info answer for one provider service:
-// the same network selection the relay deployment uses (relayNetworks),
-// resolved for the address a locally-run endpoint should bind. Compose owns
-// the platform knowledge — the provider just binds what is announced.
-// Best-effort by design: a provider must treat a missing gateway as "bind
-// elsewhere".
+// the dedicated relay-link network (ensureRelayLinkNetwork) — never one of
+// the project's own bridge networks, which every other service attached to
+// them could also reach — resolved for the address a locally-run endpoint
+// should bind. Compose owns the platform knowledge — the provider just
+// binds what is announced. Best-effort by design: a provider must treat a
+// missing gateway as "bind elsewhere".
 func (s *composeService) relayInfo(ctx context.Context, project *types.Project, service types.ServiceConfig) relayInfoAnswer {
 	answer := relayInfoAnswer{Networks: []relayNetworkInfo{}}
-	// project.Services is shared state mutated by concurrent provider runs
-	// (the env-var injection in runPlugin writes it under mux): the network
-	// selection reads it, so it belongs under the same mutex. The Docker
-	// API inspects below do not — holding the lock across them would stall
-	// every concurrent provider on the slowest inspect.
-	mux.Lock()
-	names := make([]string, 0)
-	for _, key := range relayNetworks(project, service) {
-		names = append(names, project.Networks[key].Name)
-	}
-	mux.Unlock()
 	// Under Docker Desktop the networks (and their gateways) live inside
-	// the VM: unreachable AND unbindable from the provider's host. The
-	// address a host process binds to be reached from the relay is the
-	// host's own loopback, so that is what gets announced. Detection
-	// errors fall through to the inspect path — best-effort.
-	desktopActive, _ := s.isDesktopIntegrationActive(ctx)
-	for _, name := range names {
-		info := relayNetworkInfo{Name: name}
-		if desktopActive {
-			info.Gateway = "127.0.0.1"
-		} else if inspected, err := s.apiClient().NetworkInspect(ctx, name, client.NetworkInspectOptions{}); err == nil {
-			for _, cfg := range inspected.Network.IPAM.Config {
-				if cfg.Gateway.IsValid() && cfg.Gateway.Is4() {
-					info.Gateway = cfg.Gateway.String()
-					break
-				}
-			}
-		}
-		answer.Networks = append(answer.Networks, info)
+	// the VM: unreachable AND unbindable from the provider's host, and a
+	// dedicated bridge network would be no more exclusive than any other —
+	// every network's gateway is, from the host's side, just the Desktop
+	// proxy's own loopback. The address a host process binds to be reached
+	// from the relay is that loopback, so that is what gets announced;
+	// there is nothing to create. Detection errors fall through to the
+	// dedicated-network path — best-effort.
+	if desktopActive, _ := s.isDesktopIntegrationActive(ctx); desktopActive {
+		answer.Networks = append(answer.Networks, relayNetworkInfo{Name: "desktop", Gateway: "127.0.0.1"})
+		return answer
 	}
+	name, gateway, err := s.ensureRelayLinkNetwork(ctx, project, service)
+	if err != nil {
+		logrus.Warnf("relay link network for service %q: %v", service.Name, err)
+		return answer
+	}
+	if name == "" {
+		// removed concurrently right after being created (see
+		// ensureRelayLinkNetwork): best-effort, no entry to give — the
+		// provider's next get-relay-info retries the whole thing
+		return answer
+	}
+	answer.Networks = append(answer.Networks, relayNetworkInfo{Name: name, Gateway: gateway})
 	return answer
+}
+
+// relayLinkNetworkName is the deterministic name of the dedicated network
+// created for one provider service's relay link — the sole channel between
+// the relay container and the provider's own runtime. Never a project's
+// user-declared network: distinguishing it structurally rules out any name
+// collision with one, and keeps its lifecycle independent of the project's
+// own declared topology (it lives and dies with the service's relay, not
+// with `up`/`down` of the whole project).
+func relayLinkNetworkName(projectName, serviceName string) string {
+	return fmt.Sprintf("%s_%s_relay", projectName, serviceName)
+}
+
+// findRelayLinkNetwork looks up a service's dedicated relay link network
+// without creating it: get-relay-info (ensureRelayLinkNetwork, below) is the
+// only place that ever creates one, because sending that message is itself
+// the provider's declaration that it binds locally and needs the address —
+// docs/extension.md: "Only meaningful for a provider running its service
+// locally; a provider backing the service with a remote resource never
+// needs it." A provider that publishes an endpoint without ever asking
+// (a remote resource, e.g. an RDS instance) must never get one conjured
+// for it just because it happened to publish something.
+func (s *composeService) findRelayLinkNetwork(ctx context.Context, projectName, serviceName string) (name string, ok bool, err error) {
+	name = relayLinkNetworkName(projectName, serviceName)
+	filters := projectFilter(projectName).Add("label", serviceFilter(serviceName)).Add("label", api.RelayNetworkLabel)
+	existing, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
+	if err != nil {
+		return "", false, fmt.Errorf("list relay link network for service %s: %w", serviceName, err)
+	}
+	return name, len(existing.Items) > 0, nil
+}
+
+// ensureRelayLinkNetwork converges the dedicated bridge network one provider
+// service's relay link binds to: created on first get-relay-info request,
+// reused across every later one, and carrying no traffic other than the
+// relay reaching the provider's runtime. Unlike relayNetworks (the
+// dependents' networks the relay joins to expose the compose-native
+// alias), nothing else is ever attached to this one — not a dependent, not
+// a sibling project container — so the answer has exactly one,
+// unambiguous, exclusive gateway to give.
+//
+// Called only from relayInfo, in response to the provider's own
+// get-relay-info request — see findRelayLinkNetwork for why creation must
+// stay gated on that signal, not on endpoints merely being published.
+//
+// internal: true — the network never needs, or gets, outbound connectivity;
+// its only job is carrying the relay's own traffic to the address the
+// provider binds. Docker still assigns it a host-owned gateway address like
+// any other bridge network regardless of the internal flag.
+func (s *composeService) ensureRelayLinkNetwork(ctx context.Context, project *types.Project, service types.ServiceConfig) (name string, gateway string, err error) {
+	name, ok, err := s.findRelayLinkNetwork(ctx, project.Name, service.Name)
+	if err != nil {
+		return "", "", err
+	}
+	if ok {
+		gw, err := s.relayLinkNetworkGateway(ctx, name)
+		switch {
+		case err == nil:
+			return name, gw, nil
+		case errdefs.IsNotFound(err):
+			// removed concurrently between the list above and this inspect
+			// (e.g. a same-service up that just decided to stop publishing):
+			// fall through to create it, same as if it had never existed
+		default:
+			return "", "", err
+		}
+	}
+
+	if _, err := s.apiClient().NetworkCreate(ctx, name, client.NetworkCreateOptions{
+		Labels: map[string]string{
+			api.ProjectLabel:      project.Name,
+			api.ServiceLabel:      service.Name,
+			api.RelayNetworkLabel: "true",
+		},
+		Driver:   "bridge",
+		Internal: true,
+	}); err != nil {
+		if !errdefs.IsConflict(err) {
+			return "", "", fmt.Errorf("create relay link network for service %s: %w", service.Name, err)
+		}
+		// a concurrent up for the same service creating it first is not a
+		// failure — same tolerance createNetwork already has for a
+		// project's own declared networks. But the deterministic name can
+		// also collide with an unrelated, unlabeled network (e.g. a user
+		// declaring networks: {<service>_relay: {}}): re-check by label
+		// before inspecting by name, so a name clash is never mistaken for
+		// the relay's own network and adopted into the isolation boundary.
+		if _, ok, err := s.findRelayLinkNetwork(ctx, project.Name, service.Name); err != nil {
+			return "", "", err
+		} else if !ok {
+			return "", "", fmt.Errorf("create relay link network for service %s: a network named %q already exists and is not a relay link network", service.Name, name)
+		}
+	}
+
+	gw, err := s.relayLinkNetworkGateway(ctx, name)
+	switch {
+	case err == nil:
+		return name, gw, nil
+	case errdefs.IsNotFound(err):
+		// removed concurrently between the create (won or lost to a
+		// conflict) and this inspect, e.g. a concurrent down: best-effort,
+		// same as the ok+NotFound case above — the provider's next
+		// get-relay-info retries the whole thing
+		return "", "", nil
+	default:
+		return "", "", err
+	}
+}
+
+func (s *composeService) relayLinkNetworkGateway(ctx context.Context, idOrName string) (string, error) {
+	inspected, err := s.apiClient().NetworkInspect(ctx, idOrName, client.NetworkInspectOptions{})
+	if err != nil {
+		return "", fmt.Errorf("inspect relay link network %s: %w", idOrName, err)
+	}
+	for _, cfg := range inspected.Network.IPAM.Config {
+		if cfg.Gateway.IsValid() && cfg.Gateway.Is4() {
+			return cfg.Gateway.String(), nil
+		}
+	}
+	return "", nil
+}
+
+// removeRelayLinkNetwork removes a service's relay link network, if any —
+// the counterpart to ensureRelayLinkNetwork, called wherever the service's
+// relay itself is torn down (see removeServiceRelay) so the network never
+// outlives the relay it exists for. Every caller removes the relay container
+// first, so the network is not expected to still have endpoints attached —
+// but the daemon disconnects them asynchronously, so a ContainerRemove that
+// already returned can still race NetworkRemove here; this tolerates that
+// (errdefs.IsConflict) the same way ensureRelayLinkNetworksDown does for the
+// down path, besides the network already being gone (errdefs.IsNotFound).
+func (s *composeService) removeRelayLinkNetwork(ctx context.Context, projectName, serviceName string) error {
+	filters := projectFilter(projectName).Add("label", serviceFilter(serviceName)).Add("label", api.RelayNetworkLabel)
+	existing, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
+	if err != nil {
+		return fmt.Errorf("list relay link network for service %s: %w", serviceName, err)
+	}
+	for _, n := range existing.Items {
+		if _, err := s.apiClient().NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
+			if errdefs.IsConflict(err) {
+				logrus.Warnf("relay link network %s still has active endpoints, skipping removal", n.Name)
+				continue
+			}
+			return fmt.Errorf("remove relay link network for service %s: %w", serviceName, err)
+		}
+	}
+	return nil
 }
 
 // ensureServiceRelay converges the relay container standing in for a provider
@@ -207,6 +354,30 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 	identity := relayIdentity(routes)
 	name := getContainerName(project.Name, service, 1)
 
+	if len(networkKeys) == 0 {
+		logrus.Warnf("service %q published endpoints but no service depends on it and the project has no default network; skipping relay", service.Name)
+		// a relay from a previous up (dependents have since dropped to zero)
+		// must not linger with stale network attachments, and an earlier
+		// get-relay-info in this same up may have speculatively created the
+		// link network before this outcome was known — removeServiceRelay
+		// clears both.
+		return s.removeServiceRelay(ctx, project.Name, service.Name)
+	}
+
+	// Only FOUND, never created here: a dedicated network exists only when
+	// the provider itself asked for one via get-relay-info (relayInfo owns
+	// creation — see findRelayLinkNetwork), which is the provider's own
+	// declaration that it binds locally. A provider backing the service
+	// with a remote resource (an RDS instance, say) can publish an endpoint
+	// without ever asking, and must get no network conjured for it just
+	// because it did — nothing on its side would ever use one.
+	linkNetwork := ""
+	if linkName, ok, err := s.findRelayLinkNetwork(ctx, project.Name, service.Name); err != nil {
+		return err
+	} else if ok {
+		linkNetwork = linkName
+	}
+
 	existing, err := s.findRelayContainer(ctx, project.Name, service.Name)
 	if err != nil {
 		return err
@@ -216,7 +387,7 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 			// The identity only covers image+routes: a dependent service
 			// added on a new network after the relay is already up must
 			// still be connected, whether or not anything else changed.
-			if err := s.ensureRelayNetworks(ctx, project, existing, service, networkKeys); err != nil {
+			if err := s.ensureRelayNetworks(ctx, project, existing, service, networkKeys, linkNetwork); err != nil {
 				return err
 			}
 			switch existing.State {
@@ -250,13 +421,8 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 		}
 	}
 
-	if len(networkKeys) == 0 {
-		logrus.Warnf("service %q published endpoints but no service depends on it and the project has no default network; skipping relay", service.Name)
-		return nil
-	}
-
 	s.events.On(creatingEvent("Relay " + name))
-	id, err := s.createRelayContainer(ctx, project, service, name, routes, identity, networkKeys)
+	id, err := s.createRelayContainer(ctx, project, service, name, routes, identity, networkKeys, linkNetwork)
 	if err != nil {
 		return err
 	}
@@ -268,12 +434,15 @@ func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.
 }
 
 // ensureRelayNetworks connects an already up-to-date relay to any network in
-// networkKeys it isn't attached to yet. relayIdentity hashes image+routes
-// only, not network topology, so a service added later on a new network
-// leaves the relay's identity — and so the reuse decision in
-// ensureServiceRelay — unchanged; without this, the relay would silently
-// stay unreachable from that network's consumers.
-func (s *composeService) ensureRelayNetworks(ctx context.Context, project *types.Project, existing *container.Summary, service types.ServiceConfig, networkKeys []string) error {
+// networkKeys it isn't attached to yet, plus linkNetwork (empty under
+// Desktop — see ensureServiceRelay) without a service alias: nothing
+// addresses the relay by name there, it exists purely so the relay can
+// reach the provider. relayIdentity hashes image+routes only, not network
+// topology, so a service added later on a new network leaves the relay's
+// identity — and so the reuse decision in ensureServiceRelay — unchanged;
+// without this, the relay would silently stay unreachable from that
+// network's consumers (or, for linkNetwork, from the provider itself).
+func (s *composeService) ensureRelayNetworks(ctx context.Context, project *types.Project, existing *container.Summary, service types.ServiceConfig, networkKeys []string, linkNetwork string) error {
 	connected := map[string]bool{}
 	if existing.NetworkSettings != nil {
 		for name := range existing.NetworkSettings.Networks {
@@ -296,7 +465,63 @@ func (s *composeService) ensureRelayNetworks(ctx context.Context, project *types
 			return fmt.Errorf("connect relay for service %s to network %s: %w", service.Name, netName, err)
 		}
 	}
+	if linkNetwork != "" && !connected[linkNetwork] {
+		if _, err := s.apiClient().NetworkConnect(ctx, linkNetwork, client.NetworkConnectOptions{
+			Container: existing.ID,
+		}); err != nil && !errdefs.IsConflict(err) {
+			return fmt.Errorf("connect relay for service %s to its relay link network: %w", service.Name, err)
+		}
+	}
 	return nil
+}
+
+// ensureRelayLinkNetworksDown returns down ops removing every provider
+// service's relay link network — down.go's counterpart to
+// ensureRelayLinkNetwork: removeServiceRelay's own network cleanup only
+// runs when a later `up` decides a relay is no longer needed, a path a
+// full `down` never takes (the relay container itself is swept by the
+// generic per-service container removal instead), so without this the
+// dedicated network would outlive the relay it was created for.
+// Looked up directly by label — not by walking project.Services and
+// checking Provider — because a project reconstructed from live containers
+// (getProjectWithResources, the path a `down` without an explicit compose
+// file takes) never repopulates Provider: nothing in a container's own
+// labels says its service declared one, so a per-service check here would
+// silently skip every service and leak the network on every such down —
+// the common case, not an edge one.
+func (s *composeService) ensureRelayLinkNetworksDown(ctx context.Context, project *types.Project) []downOp {
+	return []downOp{func() error {
+		filters := projectFilter(project.Name).Add("label", api.RelayNetworkLabel)
+		networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
+		if err != nil {
+			return fmt.Errorf("list relay link networks for project %s: %w", project.Name, err)
+		}
+		var errs []error
+		for _, n := range networks.Items {
+			// one project can have several provider services, each with its
+			// own relay-link network: a transient inspect/remove failure on
+			// one must not leave the rest unprocessed, unlike a single
+			// return would.
+			inspected, err := s.apiClient().NetworkInspect(ctx, n.ID, client.NetworkInspectOptions{})
+			if errdefs.IsNotFound(err) {
+				continue
+			}
+			if err != nil {
+				errs = append(errs, fmt.Errorf("inspect relay link network %s: %w", n.Name, err))
+				continue
+			}
+			if len(inspected.Network.Containers) > 0 {
+				// the daemon's async disconnect of the just-removed relay
+				// container hasn't caught up yet; a later down retries
+				logrus.Warnf("relay link network %s is still in use, skipping removal", n.Name)
+				continue
+			}
+			if _, err := s.apiClient().NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil && !errdefs.IsNotFound(err) {
+				errs = append(errs, fmt.Errorf("remove relay link network %s: %w", n.Name, err))
+			}
+		}
+		return errors.Join(errs...)
+	}}
 }
 
 // waitRelayRemoved polls until the service's relay container is gone, giving
@@ -331,22 +556,28 @@ func (s *composeService) removeServiceRelay(ctx context.Context, projectName, se
 	if err != nil {
 		return err
 	}
-	if existing == nil {
-		return nil
-	}
-	eventID := "Relay " + getCanonicalContainerName(*existing)
-	s.events.On(removingEvent(eventID))
-	if existing.State == container.StateRemoving {
-		// the daemon is already removing it: a concurrent ContainerRemove
-		// fails with "removal already in progress", so wait for the name
-		// to free up instead
-		if err := s.waitRelayRemoved(ctx, projectName, serviceName); err != nil {
-			return err
+	if existing != nil {
+		eventID := "Relay " + getCanonicalContainerName(*existing)
+		s.events.On(removingEvent(eventID))
+		if existing.State == container.StateRemoving {
+			// the daemon is already removing it: a concurrent ContainerRemove
+			// fails with "removal already in progress", so wait for the name
+			// to free up instead
+			if err := s.waitRelayRemoved(ctx, projectName, serviceName); err != nil {
+				return err
+			}
+		} else if _, err := s.apiClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("remove stale relay for service %s: %w", serviceName, err)
 		}
-	} else if _, err := s.apiClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("remove stale relay for service %s: %w", serviceName, err)
+		s.events.On(removedEvent(eventID))
 	}
-	s.events.On(removedEvent(eventID))
+	// Attempted even when no relay container exists: get-relay-info can
+	// create the link network speculatively (a provider may ask before
+	// deciding whether to publish an endpoint), leaving it orphaned if the
+	// relay itself never got deployed.
+	if err := s.removeRelayLinkNetwork(ctx, projectName, serviceName); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -368,7 +599,9 @@ func (s *composeService) findRelayContainer(ctx context.Context, projectName, se
 	return &result.Items[0], nil
 }
 
-func (s *composeService) createRelayContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name, routes, identity string, networkKeys []string) (string, error) {
+func (s *composeService) createRelayContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
+	name, routes, identity string, networkKeys []string, linkNetwork string,
+) (string, error) {
 	labels := types.Labels{
 		api.ProjectLabel:         project.Name,
 		api.ServiceLabel:         service.Name,
@@ -452,6 +685,17 @@ func (s *composeService) createRelayContainer(ctx context.Context, project *type
 				logrus.Warnf("removing half-connected relay %s: %v", name, rmErr)
 			}
 			return "", fmt.Errorf("connect relay for service %s to network %s: %w", service.Name, netName, err)
+		}
+	}
+	if linkNetwork != "" {
+		// no alias: nothing addresses the relay by name on this network, it
+		// exists purely so the relay can reach the provider (see
+		// ensureRelayLinkNetwork).
+		if _, err := s.apiClient().NetworkConnect(ctx, linkNetwork, client.NetworkConnectOptions{Container: created.ID}); err != nil {
+			if _, rmErr := s.apiClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true}); rmErr != nil {
+				logrus.Warnf("removing half-connected relay %s: %v", name, rmErr)
+			}
+			return "", fmt.Errorf("connect relay for service %s to its relay link network: %w", service.Name, err)
 		}
 	}
 	return created.ID, nil

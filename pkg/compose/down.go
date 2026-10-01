@@ -122,6 +122,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	ops := s.ensureNetworksDown(ctx, project, limiter)
+	ops = append(ops, s.ensureRelayLinkNetworksDown(ctx, project)...)
 
 	if options.Images != "" {
 		ops = append(ops, s.ensureImagesDown(ctx, project, options, limiter)...)

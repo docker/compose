@@ -543,6 +543,12 @@ func (s *composeService) actualNetworks(ctx context.Context, projectName string)
 
 	actual := types.Networks{}
 	for _, net := range networks.Items {
+		if _, ok := net.Labels[api.RelayNetworkLabel]; ok {
+			// a provider service's dedicated relay link, never a project's
+			// own declared network: it carries no NetworkLabel key at all,
+			// which would otherwise fold it into a bogus Networks[""] entry
+			continue
+		}
 		actual[net.Labels[api.NetworkLabel]] = types.NetworkConfig{
 			Name:   net.Name,
 			Driver: net.Driver,
