@@ -1,15 +1,12 @@
 services:
   test:
     build:
-      dockerfile_inline: FROM alpine
-    command: ping localhost
-    volumes:
-      - /data
+      dockerfile_inline: |
+        FROM nginx
+        RUN mkdir /data/
     develop:
       watch:
         - path: .
-          target: /data
-          action: sync+exec
-          exec:
-            command: echo "SUCCESS"
+          target: /data/
+          action: sync
           x-initialSync: true
