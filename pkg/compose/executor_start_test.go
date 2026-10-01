@@ -211,6 +211,26 @@ func TestExecRunPreStart_SkipsWhenReplicaAlreadyRunning(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// TestExecRunPreStart_BailsOutWhenContextCanceled pins the same interim
+// narrowing execStartContainer and execRunPostStart carry: once ctx is
+// canceled (a sibling node failed), the node must neither touch the daemon
+// nor run hooks. No ContainerList expectation is registered: an unexpected
+// call fails the test.
+func TestExecRunPreStart_BailsOutWhenContextCanceled(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{
+		Name:     "web",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	err := exec.execRunPreStart(ctx, Operation{Service: &service})
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
 // TestExecRunPostStart_RunsHookAndStreamsToListener verifies that
 // execRunPostStart resolves the replica the start chain just brought up and
 // runs its post_start hooks, forwarding their output to the listener the
