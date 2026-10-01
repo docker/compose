@@ -550,25 +550,40 @@ func TestWatchIncludes(t *testing.T) {
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")
 }
 
-func TestCheckWarningXInitialSyn(t *testing.T) {
+// TestWatchLegacyXInitialSync checks that the deprecated x-initialSync extension
+// still triggers an initial sync, now that compose-go promotes it to the
+// official initial_sync attribute at load time instead of leaving it as an
+// extension for compose to interpret. A file already present before `up --watch`
+// starts must show up in the container without any subsequent filesystem event.
+func TestWatchLegacyXInitialSync(t *testing.T) {
 	c := NewCLI(t)
-	const projectName = "test_watch_warn_initial_syn"
+	const projectName = "test_watch_legacy_initial_sync"
 
 	defer c.cleanupWithDown(t, projectName)
 
 	tmpdir := t.TempDir()
 	composeFilePath := filepath.Join(tmpdir, "compose.yaml")
 	CopyFile(t, filepath.Join("fixtures", "watch", "x-initialSync.yaml"), composeFilePath)
-	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "--verbose", "up", "--watch")
+	assert.NilError(t, os.WriteFile(filepath.Join(tmpdir, "preexisting.txt"), []byte("preexisting"), 0o600))
+
+	cmd := c.NewDockerComposeCmd(t, "-p", projectName, "-f", composeFilePath, "up", "--watch")
 	buffer := bytes.NewBuffer(nil)
 	cmd.Stdout = buffer
 	watch := icmd.StartCmd(cmd)
 
 	poll.WaitOn(t, func(l poll.LogT) poll.Result {
-		if strings.Contains(watch.Combined(), "x-initialSync is DEPRECATED, please use the official `initial_sync` attribute") {
+		if strings.Contains(watch.Stdout(), "Attaching to ") {
 			return poll.Success()
 		}
 		return poll.Continue("%v", watch.Stdout())
+	})
+
+	poll.WaitOn(t, func(l poll.LogT) poll.Result {
+		cat := c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "exec", "test", "cat", "/data/preexisting.txt")
+		if strings.Contains(cat.Stdout(), "preexisting") {
+			return poll.Success()
+		}
+		return poll.Continue("%v", cat.Combined())
 	})
 
 	c.RunDockerComposeCmdNoCheck(t, "-p", projectName, "kill", "-s", "9")

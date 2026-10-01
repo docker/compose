@@ -33,7 +33,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
 	ccli "github.com/docker/cli/cli/command/container"
-	"github.com/go-viper/mapstructure/v2"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
@@ -206,15 +205,7 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 		paths []string
 	)
 	for serviceName, service := range project.Services {
-		config, err := loadDevelopmentConfig(service, project)
-		if err != nil {
-			return nil, err
-		}
-
-		if service.Develop != nil {
-			config = service.Develop
-		}
-
+		config := service.Develop
 		if config == nil {
 			continue
 		}
@@ -307,19 +298,10 @@ func (s *composeService) watchTriggerPaths(ctx context.Context, service types.Se
 	return paths, nil
 }
 
-// initialSyncRequested tells whether a sync trigger requests an initial sync,
-// honoring the DEPRECATED x-initialSync extension attribute
+// initialSyncRequested tells whether a sync trigger requests an initial sync.
+// compose-go promotes the legacy x-initialSync extension into InitialSync at load time.
 func initialSyncRequested(trigger types.Trigger) bool {
-	if trigger.InitialSync {
-		return true
-	}
-	var legacyInitialSync bool
-	success, err := trigger.Extensions.Get("x-initialSync", &legacyInitialSync)
-	if err == nil && success && legacyInitialSync {
-		logrus.Warnf("x-initialSync is DEPRECATED, please use the official `initial_sync` attribute\n")
-		return true
-	}
-	return false
+	return trigger.InitialSync
 }
 
 func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]watchRule, error) {
@@ -428,47 +410,6 @@ func (s *composeService) watchEvents(ctx context.Context, project *types.Project
 			logrus.Debugf("batch complete: duration[%s] count[%d]", time.Since(start), len(batch))
 		}
 	}
-}
-
-func loadDevelopmentConfig(service types.ServiceConfig, project *types.Project) (*types.DevelopConfig, error) {
-	var config types.DevelopConfig
-	y, ok := service.Extensions["x-develop"]
-	if !ok {
-		return nil, nil
-	}
-	logrus.Warnf("x-develop is DEPRECATED, please use the official `develop` attribute")
-	err := mapstructure.Decode(y, &config)
-	if err != nil {
-		return nil, err
-	}
-	baseDir, err := filepath.EvalSymlinks(project.WorkingDir)
-	if err != nil {
-		return nil, fmt.Errorf("resolving symlink for %q: %w", project.WorkingDir, err)
-	}
-
-	for i, trigger := range config.Watch {
-		if !filepath.IsAbs(trigger.Path) {
-			trigger.Path = filepath.Join(baseDir, trigger.Path)
-		}
-		if p, err := filepath.EvalSymlinks(trigger.Path); err == nil {
-			// this might fail because the path doesn't exist, etc.
-			trigger.Path = p
-		}
-		trigger.Path = filepath.Clean(trigger.Path)
-		if trigger.Path == "" {
-			return nil, errors.New("watch rules MUST define a path")
-		}
-
-		if trigger.Action == types.WatchActionRebuild && service.Build == nil {
-			return nil, fmt.Errorf("service %s doesn't have a build section, can't apply %s on watch", types.WatchActionRebuild, service.Name)
-		}
-		if trigger.Action == types.WatchActionSyncExec && len(trigger.Exec.Command) == 0 {
-			return nil, fmt.Errorf("can't watch with action %q on service %s without a command", types.WatchActionSyncExec, service.Name)
-		}
-
-		config.Watch[i] = trigger
-	}
-	return &config, nil
 }
 
 func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolumeConfig) bool {
