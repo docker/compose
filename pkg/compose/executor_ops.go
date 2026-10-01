@@ -265,6 +265,15 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 // accepts — skips a second, redundant run of the hooks rather than erroring
 // on runners already consumed.
 func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) error {
+	// Same interim narrowing as execStartContainer's guard (see its
+	// comment), not a full fix: this node hangs off the replica's create
+	// node, whose done-channel closes before errgroup's ctx is canceled when
+	// that create fails for a genuine reason, so a narrow window remains
+	// where pre_start hooks could still run against the runner containers.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	running, err := exec.compose.getContainers(ctx, exec.project.Name, oneOffExclude, false, op.Service.Name)
 	if err != nil {
 		return err
