@@ -5,6 +5,10 @@ updates:
     directory: /
     cooldown:
       default-days: 7
+      exclude:
+        - github.com/compose-spec/*
+        - github.com/docker/*
+        - github.com/moby/*
     ignore:
       - dependency-name: github.com/docker/buildx
         update-types:
