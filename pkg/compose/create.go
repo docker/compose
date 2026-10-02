@@ -406,6 +406,11 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		dnsIPs = append(dnsIPs, dnsIP)
 	}
 
+	// Same ordering requirement as ToMobyEnv: AsList's map iteration order
+	// is random, and this ends up in the job spec hash.
+	extraHosts := service.ExtraHosts.AsList(":")
+	slices.Sort(extraHosts)
+
 	hostConfig := container.HostConfig{
 		AutoRemove:     options.AutoRemove,
 		Annotations:    service.Annotations,
@@ -428,7 +433,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		DNS:            dnsIPs,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
-		ExtraHosts:     service.ExtraHosts.AsList(":"),
+		ExtraHosts:     extraHosts,
 		SecurityOpt:    securityOpts,
 		StorageOpt:     service.StorageOpt,
 		UsernsMode:     container.UsernsMode(service.UserNSMode),
@@ -838,6 +843,11 @@ func toUlimits(m map[string]*types.UlimitsConfig) []*container.Ulimit {
 			Soft: int64(soft),
 		})
 	}
+	// Same ordering requirement as ToMobyEnv: m is a map, so iteration
+	// order is random, and this ends up in the job spec hash.
+	slices.SortFunc(ulimits, func(a, b *container.Ulimit) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 	return ulimits
 }
 
@@ -1184,6 +1194,12 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	for _, v := range mounts {
 		values = append(values, v)
 	}
+	// Same ordering requirement as ToMobyEnv: mounts is keyed by target
+	// path, so iteration order is random, and this ends up in the job
+	// spec hash.
+	slices.SortFunc(values, func(a, b mount.Mount) int {
+		return strings.Compare(a.Target, b.Target)
+	})
 	return values, nil
 }
 

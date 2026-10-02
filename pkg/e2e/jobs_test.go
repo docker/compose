@@ -76,6 +76,9 @@ func TestRunManualJob(t *testing.T) {
 			ComposeCmd("run", "--rm", "migrate"),
 			OutputContains("migration done"),
 			ServiceState("db", "running")).
+		Step("re-running the same manual job with several env vars must not conflict on spec hash",
+			ComposeCmd("run", "--rm", "migrate"),
+			OutputContains("migration done")).
 		Step("a scheduled job without explicit opt-out can be run manually",
 			ComposeCmd("run", "--rm", "backup"),
 			OutputContains("backup")).
