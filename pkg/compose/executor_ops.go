@@ -173,8 +173,8 @@ func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) 
 	}
 
 	startMx.Lock()
+	defer startMx.Unlock()
 	_, err = exec.compose.apiClient().ContainerStart(ctx, id, client.ContainerStartOptions{})
-	startMx.Unlock()
 	return err
 }
 
