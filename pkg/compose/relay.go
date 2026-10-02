@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -34,6 +33,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -131,15 +131,22 @@ func relayNetworks(project *types.Project, service types.ServiceConfig) []string
 // on it — its gateway. A provider running its service locally can bind that
 // address: reachable from the relay (same-bridge local delivery), and —
 // unlike a project's own bridge networks, which every service on them can
-// also reach — joined by nothing else. A single entry, or none when it
-// could not be resolved (see ensureRelayLinkNetwork): a provider must treat
-// that as "bind elsewhere".
+// also reach — joined by nothing else. That is isolation by network
+// membership, not network-level unreachability: the gateway is an address
+// of the host itself, so a local container able to route to it can still
+// reach a listener bound there by IP. Binding ONLY this address is what
+// keeps the endpoint off loopback and every LAN-facing address. A single
+// entry, or none when it could not be resolved (see ensureRelayLinkNetwork):
+// a provider must treat that as "bind elsewhere".
 type relayInfoAnswer struct {
 	Networks []relayNetworkInfo `json:"networks"`
 }
 
 type relayNetworkInfo struct {
-	// Name is the concrete engine-level network name.
+	// Name is the engine-level name of the dedicated relay-link network on a
+	// standalone engine. Under Docker Desktop it is the placeholder
+	// "desktop": no such network exists there, so it is only meaningful
+	// for logging, never as an engine-level network reference.
 	Name string `json:"name"`
 	// Gateway is the address the provider's host owns that the relay can
 	// reach on this network: the dedicated relay-link network's IPv4
@@ -208,13 +215,30 @@ func relayLinkNetworkName(projectName, serviceName string) string {
 // (a remote resource, e.g. an RDS instance) must never get one conjured
 // for it just because it happened to publish something.
 func (s *composeService) findRelayLinkNetwork(ctx context.Context, projectName, serviceName string) (name string, ok bool, err error) {
-	name = relayLinkNetworkName(projectName, serviceName)
-	filters := projectFilter(projectName).Add("label", serviceFilter(serviceName)).Add("label", api.RelayNetworkLabel)
+	existing, err := s.listRelayLinkNetworks(ctx, projectName, serviceName)
+	if err != nil {
+		return "", false, err
+	}
+	return relayLinkNetworkName(projectName, serviceName), len(existing) > 0, nil
+}
+
+// listRelayLinkNetworks lists the relay-link networks of one provider
+// service, or of every provider service of the project when serviceName is
+// empty. Selection is by label alone — the one criterion that still holds
+// for a project reconstructed from live containers.
+func (s *composeService) listRelayLinkNetworks(ctx context.Context, projectName, serviceName string) ([]network.Summary, error) {
+	filters := projectFilter(projectName).Add("label", api.RelayNetworkLabel)
+	if serviceName != "" {
+		filters = filters.Add("label", serviceFilter(serviceName))
+	}
 	existing, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
 	if err != nil {
-		return "", false, fmt.Errorf("list relay link network for service %s: %w", serviceName, err)
+		if serviceName == "" {
+			return nil, fmt.Errorf("list relay link networks for project %s: %w", projectName, err)
+		}
+		return nil, fmt.Errorf("list relay link network for service %s: %w", serviceName, err)
 	}
-	return name, len(existing.Items) > 0, nil
+	return existing.Items, nil
 }
 
 // ensureRelayLinkNetwork converges the dedicated bridge network one provider
@@ -224,7 +248,7 @@ func (s *composeService) findRelayLinkNetwork(ctx context.Context, projectName, 
 // dependents' networks the relay joins to expose the compose-native
 // alias), nothing else is ever attached to this one — not a dependent, not
 // a sibling project container — so the answer has exactly one,
-// unambiguous, exclusive gateway to give.
+// unambiguous gateway to give, on a network nothing else is a member of.
 //
 // Called only from relayInfo, in response to the provider's own
 // get-relay-info request — see findRelayLinkNetwork for why creation must
@@ -310,30 +334,44 @@ func (s *composeService) relayLinkNetworkGateway(ctx context.Context, idOrName s
 // removeRelayLinkNetwork removes a service's relay link network, if any —
 // the counterpart to ensureRelayLinkNetwork, called wherever the service's
 // relay itself is torn down (see removeServiceRelay) so the network never
-// outlives the relay it exists for. Every caller removes the relay container
-// first, so the network is not expected to still have endpoints attached —
-// but the daemon disconnects them asynchronously, so a ContainerRemove that
-// already returned can still race NetworkRemove here; this tolerates that
-// (errdefs.IsConflict) the same way ensureRelayLinkNetworksDown does for the
-// down path, besides the network already being gone (errdefs.IsNotFound).
+// outlives the relay it exists for.
 func (s *composeService) removeRelayLinkNetwork(ctx context.Context, projectName, serviceName string) error {
-	filters := projectFilter(projectName).Add("label", serviceFilter(serviceName)).Add("label", api.RelayNetworkLabel)
-	existing, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
+	existing, err := s.listRelayLinkNetworks(ctx, projectName, serviceName)
 	if err != nil {
-		return fmt.Errorf("list relay link network for service %s: %w", serviceName, err)
+		return err
 	}
-	for _, n := range existing.Items {
-		if _, err := s.apiClient().NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil {
-			if errdefs.IsNotFound(err) {
-				continue
-			}
-			if errdefs.IsConflict(err) {
-				logrus.Warnf("relay link network %s still has active endpoints, skipping removal", n.Name)
-				continue
-			}
-			return fmt.Errorf("remove relay link network for service %s: %w", serviceName, err)
+	for _, n := range existing {
+		if err := s.removeRelayLinkNetworkByID(ctx, n); err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+// removeRelayLinkNetworkByID is the single place a relay-link network is
+// removed, shared by the up path (removeRelayLinkNetwork) and the down path
+// (ensureRelayLinkNetworksDown). Every caller removes the relay container
+// first, but the daemon disconnects its endpoints asynchronously, so a
+// ContainerRemove that already returned can still race NetworkRemove: a
+// conflict (errdefs.IsConflict) is tolerated, left for a later up/down to
+// retry, as is the network already being gone (errdefs.IsNotFound).
+func (s *composeService) removeRelayLinkNetworkByID(ctx context.Context, n network.Summary) error {
+	eventName := "Network " + n.Name
+	s.events.On(removingEvent(eventName))
+	if _, err := s.apiClient().NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil {
+		switch {
+		case errdefs.IsNotFound(err):
+			s.events.On(newEvent(eventName, api.Warning, "No resource found to remove"))
+			return nil
+		case errdefs.IsConflict(err):
+			s.events.On(newEvent(eventName, api.Warning, "Resource is still in use"))
+			return nil
+		default:
+			s.events.On(errorEvent(eventName, err.Error()))
+			return fmt.Errorf("remove relay link network %s: %w", n.Name, err)
+		}
+	}
+	s.events.On(removedEvent(eventName))
 	return nil
 }
 
@@ -488,40 +526,26 @@ func (s *composeService) ensureRelayNetworks(ctx context.Context, project *types
 // file takes) never repopulates Provider: nothing in a container's own
 // labels says its service declared one, so a per-service check here would
 // silently skip every service and leak the network on every such down —
-// the common case, not an edge one.
-func (s *composeService) ensureRelayLinkNetworksDown(ctx context.Context, project *types.Project) []downOp {
-	return []downOp{func() error {
-		filters := projectFilter(project.Name).Add("label", api.RelayNetworkLabel)
-		networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
-		if err != nil {
-			return fmt.Errorf("list relay link networks for project %s: %w", project.Name, err)
-		}
-		var errs []error
-		for _, n := range networks.Items {
-			// one project can have several provider services, each with its
-			// own relay-link network: a transient inspect/remove failure on
-			// one must not leave the rest unprocessed, unlike a single
-			// return would.
-			inspected, err := s.apiClient().NetworkInspect(ctx, n.ID, client.NetworkInspectOptions{})
-			if errdefs.IsNotFound(err) {
-				continue
+// the common case, not an edge one. One op per network, each gated on the
+// shared limiter like its siblings.
+func (s *composeService) ensureRelayLinkNetworksDown(ctx context.Context, project *types.Project, limiter *semaphore.Weighted) []downOp {
+	networks, err := s.listRelayLinkNetworks(ctx, project.Name, "")
+	if err != nil {
+		// surfaced by the op rather than aborting down: the rest of the
+		// project's cleanup is independent of this lookup
+		return []downOp{func() error { return err }}
+	}
+	ops := make([]downOp, 0, len(networks))
+	for _, n := range networks {
+		ops = append(ops, func() error {
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
 			}
-			if err != nil {
-				errs = append(errs, fmt.Errorf("inspect relay link network %s: %w", n.Name, err))
-				continue
-			}
-			if len(inspected.Network.Containers) > 0 {
-				// the daemon's async disconnect of the just-removed relay
-				// container hasn't caught up yet; a later down retries
-				logrus.Warnf("relay link network %s is still in use, skipping removal", n.Name)
-				continue
-			}
-			if _, err := s.apiClient().NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil && !errdefs.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("remove relay link network %s: %w", n.Name, err))
-			}
-		}
-		return errors.Join(errs...)
-	}}
+			defer releaseSlot(limiter)
+			return s.removeRelayLinkNetworkByID(ctx, n)
+		})
+	}
+	return ops
 }
 
 // waitRelayRemoved polls until the service's relay container is gone, giving

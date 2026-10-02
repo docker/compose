@@ -266,8 +266,12 @@ sequenceDiagram
 
 Compose owns the platform knowledge behind the announced address: on a standalone engine it is the relay-link
 network's IPv4 gateway — an address the provider's host owns on that dedicated bridge, reachable from the relay
-(same-bridge local delivery) but joined by nothing else, so never reachable from the LAN or from a project's own
-service networks; under Docker Desktop it is `127.0.0.1` — the network lives inside the VM, and the host's own
+(same-bridge local delivery) and joined by nothing else: no other container is a member of that network, and none
+of the project's service networks includes it. This is isolation by network membership, not network-level
+unreachability: the gateway is an address of the host itself, so a local container that can route to it can
+still reach a listener bound there by IP. What keeps the endpoint off loopback and off every LAN-facing address
+is the provider binding **only** the announced gateway — never a wildcard or any other address. Under Docker
+Desktop the announced address is `127.0.0.1` — the network lives inside the VM, and the host's own
 loopback is, factually, where a host process is reached through the Desktop proxy, so no dedicated network is
 created there. The provider simply binds the announced gateway and publishes the endpoint exactly as bound: a
 routable address passes to the relay untouched, a loopback one is announced as `localhost` (translated to

@@ -53,7 +53,10 @@ const (
 	// provider-managed service's relay link — the sole channel between the
 	// relay container and the provider's own runtime (see get-relay-info).
 	// Never a project's user-declared network, and never joined by any
-	// dependent or sibling container: only the relay connects to it.
+	// dependent or sibling container: only the relay connects to it. That is
+	// isolation by network membership, not network-level unreachability: the
+	// gateway is a host address, reachable by IP from any local container
+	// that can route to it.
 	RelayNetworkLabel = "com.docker.compose.relay-network"
 	// SlugLabel stores unique slug used for one-off container identity
 	SlugLabel = "com.docker.compose.slug"
