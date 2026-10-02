@@ -416,6 +416,10 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 // hash (e.g. created by an older Compose) is left untouched: without a
 // recorded hash there is no reliable way to tell configuration drift apart
 // from deliberate manual setup, and volumes carry data.
+//
+// A volume tagged with the experimental x-disposable extension skips the
+// confirmation prompt: the author asserts recreating it never loses data
+// that matters, so the divergence is treated as confirmed.
 func (r *reconciler) reconcileVolumes() error {
 	var diverged []string
 	for _, key := range sortedKeys(r.project.Volumes) {
@@ -451,11 +455,21 @@ func (r *reconciler) reconcileVolumes() error {
 			r.resolvedVolumes[key] = observed
 			continue
 		}
-		confirmed, err := r.prompt(
-			fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", desired.Name),
-			false)
-		if err != nil {
-			return err
+		var disposable bool
+		if _, decodeErr := desired.Extensions.Get("x-disposable", &disposable); decodeErr != nil {
+			logrus.Warnf("volume %q: ignoring malformed x-disposable extension: %s", desired.Name, decodeErr)
+			disposable = false
+		}
+		confirmed := disposable
+		if disposable {
+			logrus.Infof("volume %q: recreating without confirmation (x-disposable)", desired.Name)
+		} else {
+			confirmed, err = r.prompt(
+				fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", desired.Name),
+				false)
+			if err != nil {
+				return err
+			}
 		}
 		if confirmed {
 			diverged = append(diverged, key)
