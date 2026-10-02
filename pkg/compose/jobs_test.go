@@ -301,3 +301,49 @@ func TestCreateJobRun(t *testing.T) {
 		assert.Equal(t, len(fake.runCalls), 0, "Run must not be attempted after a Create conflict")
 	})
 }
+
+// TestBuildJobSpecIsDeterministic guards against the spec hash churning
+// across invocations when a job declares several environment variables:
+// buildJobSpec marshals the container spec as JSON and sends it to the
+// engine, which identifies the job by a hash of that payload, so any
+// map-to-slice conversion that doesn't sort its output (Env, Ulimits,
+// ExtraHosts, mounts) makes every other `up`/`run` fail with
+// `job "..." has changed`.
+func TestBuildJobSpecIsDeterministic(t *testing.T) {
+	s, _ := newPreStartTestService(t)
+	project := &types.Project{Name: "myproject"}
+	svc := types.ServiceConfig{
+		Name: "backup",
+		ContainerSpec: types.ContainerSpec{
+			Image: "alpine",
+			Environment: types.MappingWithEquals{
+				"A": strPtr("1"), "B": strPtr("2"), "C": strPtr("3"), "D": strPtr("4"),
+				"E": strPtr("5"), "F": strPtr("6"), "G": strPtr("7"), "H": strPtr("8"),
+			},
+			Ulimits: map[string]*types.UlimitsConfig{
+				"nofile": {Soft: 1024, Hard: 2048},
+				"nproc":  {Single: 100},
+			},
+			ExtraHosts: types.HostsList{
+				"a.example.com": []string{"10.0.0.1"},
+				"b.example.com": []string{"10.0.0.2"},
+			},
+			Volumes: []types.ServiceVolumeConfig{
+				{Type: types.VolumeTypeVolume, Target: "/var/a"},
+				{Type: types.VolumeTypeVolume, Target: "/var/b"},
+			},
+		},
+	}
+	manual := true
+	job := types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{Manual: &manual}}
+
+	first, err := s.buildJobSpec(t.Context(), project, svc, job, false)
+	assert.NilError(t, err)
+
+	msg := "job spec must be byte-identical across invocations, or the engine's spec hash churns and up/run intermittently fail with \"has changed\""
+	for i := 0; i < 100; i++ {
+		spec, err := s.buildJobSpec(t.Context(), project, svc, job, false)
+		assert.NilError(t, err)
+		assert.Equal(t, string(spec.ContainerSpec), string(first.ContainerSpec), msg)
+	}
+}
