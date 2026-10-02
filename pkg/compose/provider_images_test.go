@@ -137,6 +137,53 @@ func TestStreamImageTo_SaveError(t *testing.T) {
 	assert.Equal(t, announce.Encoding, "")
 }
 
+// TestStreamImageTo_SuccessAnnounceWriteFailureAborts: when the write of the
+// success announce itself fails, the channel is broken regardless of
+// whether the provider received anything — the caller must close stdin
+// (via streamAbortedError) rather than leave the provider blocked reading a
+// line that was never delivered.
+func TestStreamImageTo_SuccessAnnounceWriteFailureAborts(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	assert.NilError(t, err)
+	s := svc.(*composeService)
+
+	apiClient.EXPECT().ImageSave(gomock.Any(), []string{"proj-app"}).
+		Return(fakeImageSaveResult{io.NopCloser(bytes.NewReader([]byte("tar")))}, nil)
+
+	err = s.streamImageTo(t.Context(), failingWriter{errors.New("broken pipe")}, "proj-app", "")
+	var aborted *streamAbortedError
+	assert.Assert(t, errors.As(err, &aborted), "want *streamAbortedError, got %T: %v", err, err)
+}
+
+// TestStreamImageTo_ErrorAnnounceWriteFailureAborts: same reasoning on the
+// error-announce path — if ImageSave fails AND the resulting error line
+// cannot be written either, the provider gets no error to read and must be
+// unblocked by closing stdin.
+func TestStreamImageTo_ErrorAnnounceWriteFailureAborts(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	assert.NilError(t, err)
+	s := svc.(*composeService)
+
+	apiClient.EXPECT().ImageSave(gomock.Any(), []string{"proj-app"}).
+		Return(nil, errors.New("no such image"))
+
+	err = s.streamImageTo(t.Context(), failingWriter{errors.New("broken pipe")}, "proj-app", "")
+	var aborted *streamAbortedError
+	assert.Assert(t, errors.As(err, &aborted), "want *streamAbortedError, got %T: %v", err, err)
+}
+
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
 type fakeImageSaveResult struct{ io.ReadCloser }
 
 // TestExecutePlugin_GetImage runs the pull command against a fake provider

@@ -344,12 +344,13 @@ const imageStreamChunkSize = 1024 * 1024
 // was aborted: the provider must discard it.
 // When the image cannot be exported, the announce line carries an error
 // instead and no stream follows.
-// streamAbortedError marks a streamImageTo failure that happened after the
-// success announce was already sent: the chunked body is now incomplete and
-// the channel cannot be resynchronized. A failure before the announce (an
-// invalid platform, an ImageSave error) is reported as a plain error
-// instead — the channel is still intact, nothing has been promised to the
-// provider yet.
+// streamAbortedError marks a streamImageTo failure that leaves the channel
+// unresynchronizable: either the chunked body was left incomplete after the
+// success announce, or a write to w itself failed (the pipe is broken,
+// whatever was or wasn't delivered). A failure to prepare the image (an
+// invalid platform, an ImageSave error) whose error announce write
+// succeeded is reported as a plain error instead — the channel is intact
+// and the provider has a well-formed error line to read.
 type streamAbortedError struct {
 	err error
 }
@@ -371,20 +372,24 @@ func (s *composeService) streamImageTo(ctx context.Context, w io.Writer, ref, pl
 	if platform != "" {
 		p, err := platforms.Parse(platform)
 		if err != nil {
-			_ = announce(imageStreamAnswer{Type: ImageStreamType, Error: fmt.Sprintf("invalid platform %q: %s", platform, err)})
+			if werr := announce(imageStreamAnswer{Type: ImageStreamType, Error: fmt.Sprintf("invalid platform %q: %s", platform, err)}); werr != nil {
+				return &streamAbortedError{werr}
+			}
 			return err
 		}
 		opts = append(opts, client.ImageSaveWithPlatforms(p))
 	}
 	tar, err := s.apiClient().ImageSave(ctx, []string{ref}, opts...)
 	if err != nil {
-		_ = announce(imageStreamAnswer{Type: ImageStreamType, Error: err.Error()})
+		if werr := announce(imageStreamAnswer{Type: ImageStreamType, Error: err.Error()}); werr != nil {
+			return &streamAbortedError{werr}
+		}
 		return err
 	}
 	defer func() { _ = tar.Close() }()
 
 	if err := announce(imageStreamAnswer{Type: ImageStreamType, Encoding: "chunked", MediaType: "application/x-tar"}); err != nil {
-		return err
+		return &streamAbortedError{err}
 	}
 	cw := httputil.NewChunkedWriter(w)
 	if _, err := io.CopyBuffer(cw, struct{ io.Reader }{tar}, make([]byte, imageStreamChunkSize)); err != nil {
