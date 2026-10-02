@@ -69,6 +69,9 @@ func (s *composeService) ensureProviderImages(ctx context.Context, project *type
 		if service.Provider == nil {
 			continue
 		}
+		if service.Image == "" && service.Build == nil {
+			continue // pure resource provider: nothing to distribute
+		}
 		image := api.GetImageNameOrDefault(service, project.Name)
 		_, justBuilt := built[image]
 		source := providerImageSource(service, justBuilt)
@@ -109,7 +112,7 @@ func providerImageSource(service types.ServiceConfig, justBuilt bool) string {
 
 func (s *composeService) runProviderPull(ctx context.Context, project *types.Project, service types.ServiceConfig, image, source, policy string) error {
 	args := []string{"--image=" + image, "--source=" + source, "--policy=" + policy}
-	if digest, created, ok := s.localImageFacts(ctx, image); ok {
+	if digest, created, ok := s.localImageFacts(ctx, image, service.Platform); ok {
 		args = append(args, "--digest="+digest)
 		if created != "" {
 			args = append(args, "--created="+created)
@@ -119,14 +122,29 @@ func (s *composeService) runProviderPull(ctx context.Context, project *types.Pro
 }
 
 // localImageFacts reports the state of the local daemon cache for ref: the
-// image ID and its creation time. These describe the cache, they are not
-// instructions — the provider persists them as the bookkeeping keys of what
-// it ingested (digest as identity test, created as the ordering fallback for
-// backends that cannot preserve digests).
-func (s *composeService) localImageFacts(ctx context.Context, ref string) (digest, created string, ok bool) {
-	inspected, err := s.apiClient().ImageInspect(ctx, ref)
+// image's canonical content digest and its creation time. These describe the
+// cache, they are not instructions — the provider persists them as the
+// bookkeeping keys of what it ingested (digest as identity test, created as
+// the ordering fallback for backends that cannot preserve digests).
+//
+// The digest goes through the manifest-aware localContentDigest, not the raw
+// inspect ID: under BuildKit provenance attestations, the raw ID changes on
+// every build even when the runnable image content didn't (see
+// images.go:279-291, #13636), which would make the provider re-sync on every
+// up for no reason — defeating the "identity test" docs/extension.md
+// documents --digest as.
+func (s *composeService) localImageFacts(ctx context.Context, ref, platform string) (digest, created string, ok bool) {
+	opts, err := s.imageInspectOptions(ctx)
 	if err != nil {
 		return "", "", false
 	}
-	return inspected.ID, inspected.Created, true
+	inspected, err := s.apiClient().ImageInspect(ctx, ref, opts...)
+	if err != nil {
+		return "", "", false
+	}
+	id, _, err := localContentDigest(inspected, platform)
+	if err != nil {
+		return "", "", false
+	}
+	return id, inspected.Created, true
 }
