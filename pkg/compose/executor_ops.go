@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -127,11 +128,185 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 	return nil
 }
 
+// execStartContainer starts a container. A bare operation (no Service —
+// today only the create phase's exceptional-state restart of a paused/dead
+// container) is a plain ContainerStart. A start-phase operation (Service set)
+// performs the full service start — secret/config injection right before
+// ContainerStart — mirroring startServiceContainer; its target resolves
+// either from the observed container or, for a replica the plan itself
+// creates, from the CreateContainer node's result (the same mechanism
+// OpRenameContainer already uses).
 func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) error {
+	if op.Service == nil {
+		startMx.Lock()
+		defer startMx.Unlock()
+		_, err := exec.compose.apiClient().ContainerStart(ctx, op.Container.ID, client.ContainerStartOptions{})
+		return err
+	}
+
+	// A dependency's done-channel closes (unblocking this node) before
+	// errgroup cancels ctx on that same dependency's error — cancel() only
+	// runs after the failing goroutine returns, close(done[...]) runs inside
+	// it. This check narrows that window (same guard as
+	// execCreateHookContainer) but cannot close it: a preceding node of this
+	// replica's chain (a wait, pre_start) can fail for a genuine reason a
+	// moment before this goroutine observes ctx.Err(), still nil, and starts
+	// a container whose pre_start hook just failed. The structural fix —
+	// carrying each node's success/failure through what dependents wait on,
+	// instead of inferring it from ctx.Err() — is tracked as its own brick of
+	// the executor lot (#14081, see the epic's "failed-dependency semantics"
+	// comment); every per-operation ctx.Err() guard here, including this one,
+	// is an interim narrowing, not the fix.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	id, err := exec.resolveContainerID(op)
+	if err != nil {
+		return err
+	}
+	if err := exec.compose.injectSecrets(ctx, exec.project, *op.Service, id); err != nil {
+		return err
+	}
+	if err := exec.compose.injectConfigs(ctx, exec.project, *op.Service, id); err != nil {
+		return err
+	}
+
 	startMx.Lock()
 	defer startMx.Unlock()
-	_, err := exec.compose.apiClient().ContainerStart(ctx, op.Container.ID, client.ContainerStartOptions{})
+	_, err = exec.compose.apiClient().ContainerStart(ctx, id, client.ContainerStartOptions{})
 	return err
+}
+
+// resolveContainerID returns the ID of the container an operation targets:
+// the observed container when the reconciler already had one, otherwise the
+// result of the CreateContainer node it references.
+func (exec *planExecutor) resolveContainerID(op Operation) (string, error) {
+	if op.Container != nil {
+		return op.Container.ID, nil
+	}
+	res := exec.pctx.get(op.CreateNodeID)
+	if res.ContainerID == "" {
+		return "", fmt.Errorf("internal: no materialized container for %s", op.ResourceID)
+	}
+	return res.ContainerID, nil
+}
+
+// resolveContainerSummary is resolveContainerID plus the rest of the
+// container.Summary that hook execution (runHook) needs — preferring the
+// observed container, falling back to the live view populated by the create
+// node execCreateContainer already ran (a dependency of every start-phase
+// node targeting that replica).
+func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summary, error) {
+	if op.Container != nil {
+		return *op.Container, nil
+	}
+	id, err := exec.resolveContainerID(op)
+	if err != nil {
+		return container.Summary{}, err
+	}
+	exec.containersMu.Lock()
+	defer exec.containersMu.Unlock()
+	for _, c := range exec.containersByService[op.Service.Name] {
+		if c.ID == id {
+			return c, nil
+		}
+	}
+	return container.Summary{ID: id, Names: []string{"/" + exec.pctx.get(op.CreateNodeID).ContainerName}}, nil
+}
+
+// execWaitCondition polls the dependency service named by the operation
+// until it satisfies the declared depends_on condition or the context ends —
+// the plan-side equivalent of one waitDependencies edge, reusing the exact
+// same polling primitive (waitDependency) and per-condition checks the
+// imperative engine uses, so events and error messages cannot drift between
+// the two. required: false dependencies are marked BestEffort by the
+// reconciler: a missing dependency or a failed/timed-out condition is then a
+// warning, not a plan failure — matching waitDependencies' own
+// optional-dependency handling.
+//
+// Unlike waitDependencies, this applies no deadline of its own: nothing
+// produces one yet (no ReconcileOptions field feeds a per-wait timeout the
+// way api.CreateOptions.WaitTimeout does today). A future caller needing that
+// — e.g. `up --wait` once it runs on the plan — wraps ctx before executing
+// the plan, or adds a Timeout to the operation for execWaitCondition to wrap
+// here.
+func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) error {
+	s := exec.compose
+	exec.containersMu.Lock()
+	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
+	exec.containersMu.Unlock()
+
+	config := types.ServiceDependency{Condition: op.Condition, Required: !op.BestEffort}
+
+	if len(waitingFor) == 0 {
+		if config.Required {
+			return fmt.Errorf("missing dependency %s", op.Name)
+		}
+		logrus.Warnf("missing dependency %s", op.Name)
+		return nil
+	}
+
+	s.events.On(containerEvents(waitingFor, waiting)...)
+	// The wait node is shared across every dependent awaiting the same
+	// (dependency, condition) pair (see waitConditionNode), so no single
+	// requester name would be accurate; op.ResourceID identifies the wait
+	// itself instead. waitDependency only ever reads this for one
+	// practically unreachable log line (an unsupported depends_on condition,
+	// filtered out before a plan is ever built).
+	return s.waitDependency(ctx, op.ResourceID, op.Name, config, waitingFor)
+}
+
+// execRunPreStart runs the service's pre_start hooks against the runner
+// containers the create phase prepared (see execCreateHookContainer). The
+// "once per service, no replica running at observation" rule is a plan-time
+// decision; this re-checks the daemon first so a replica started in the
+// window between observation and execution — the drift the plan design
+// accepts — skips a second, redundant run of the hooks rather than erroring
+// on runners already consumed.
+func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) error {
+	// Same interim narrowing as execStartContainer's guard (see its
+	// comment), not a full fix: this node hangs off the replica's create
+	// node, whose done-channel closes before errgroup's ctx is canceled when
+	// that create fails for a genuine reason, so a narrow window remains
+	// where pre_start hooks could still run against the runner containers.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	running, err := exec.compose.getContainers(ctx, exec.project.Name, oneOffExclude, false, op.Service.Name)
+	if err != nil {
+		return err
+	}
+	if len(running) > 0 {
+		logrus.Debugf("skipping pre_start hooks of service %s: a replica is already running", op.Service.Name)
+		return nil
+	}
+	return exec.compose.runPreStart(ctx, exec.project, *op.Service, exec.listener)
+}
+
+// execRunPostStart runs the service's post_start hooks against the replica
+// the start chain just brought up.
+func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) error {
+	// Same interim narrowing as execStartContainer's guard above, not a full
+	// fix (see its comment): a failed StartContainer's done-channel closes
+	// before errgroup's ctx is canceled, so a narrow window remains where
+	// this could still run post_start against a container whose start just
+	// failed for a genuine reason.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	ctr, err := exec.resolveContainerSummary(op)
+	if err != nil {
+		return err
+	}
+	for _, hook := range op.Service.PostStart {
+		if err := exec.compose.runHook(ctx, ctr, *op.Service, hook, exec.listener); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) error {
