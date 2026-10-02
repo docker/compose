@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
+	"golang.org/x/sync/semaphore"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -344,6 +345,25 @@ func TestRemoveRelayLinkNetworkToleratesActiveEndpointsConflict(t *testing.T) {
 	assert.NilError(t, svc.removeRelayLinkNetwork(t.Context(), "p", "db"))
 }
 
+// The network disappearing between the list and the remove (a concurrent
+// down) is the desired end state, not a failure.
+func TestRemoveRelayLinkNetworkToleratesAlreadyGone(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{
+		Items: []network.Summary{{Network: network.Network{ID: "net-1", Name: "p_db_relay"}}},
+	}, nil)
+	apiMock.EXPECT().NetworkRemove(gomock.Any(), "net-1", gomock.Any()).
+		Return(client.NetworkRemoveResult{}, errdefs.ErrNotFound)
+
+	assert.NilError(t, svc.removeRelayLinkNetwork(t.Context(), "p", "db"))
+}
+
 // ensureRelayLinkNetworksDown removes every provider service's relay link
 // network on a full `down` — the path relay container removal itself
 // already takes generically (matched by ServiceLabel), but that a project's
@@ -377,60 +397,79 @@ func TestEnsureRelayLinkNetworksDown(t *testing.T) {
 	}).Return(client.NetworkListResult{
 		Items: []network.Summary{{Network: network.Network{ID: "net-1", Name: "p_db_relay"}}},
 	}, nil)
-	apiMock.EXPECT().NetworkInspect(gomock.Any(), "net-1", gomock.Any()).
-		Return(client.NetworkInspectResult{Network: network.Inspect{Network: network.Network{Name: "p_db_relay"}}}, nil)
 	apiMock.EXPECT().NetworkRemove(gomock.Any(), "net-1", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
 
-	ops := svc.ensureRelayLinkNetworksDown(t.Context(), project)
+	ops := svc.ensureRelayLinkNetworksDown(t.Context(), project, nil)
 	assert.Equal(t, len(ops), 1)
 	for _, op := range ops {
 		assert.NilError(t, op())
 	}
+}
+
+// With no relay-link network there is no op at all, so down's "No resource
+// found to remove" warning stays reachable for a project with nothing else.
+func TestEnsureRelayLinkNetworksDownNoNetworkNoOp(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+
+	assert.Equal(t, len(svc.ensureRelayLinkNetworksDown(t.Context(), &types.Project{Name: "p"}, nil)), 0)
+}
+
+// A failing lookup must not abort down's other cleanup: it comes back as an
+// op carrying the error, run alongside the rest.
+func TestEnsureRelayLinkNetworksDownSurfacesListError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).
+		Return(client.NetworkListResult{}, errors.New("daemon unavailable"))
+
+	ops := svc.ensureRelayLinkNetworksDown(t.Context(), &types.Project{Name: "p"}, nil)
+	assert.Equal(t, len(ops), 1)
+	assert.ErrorContains(t, ops[0](), "daemon unavailable")
 }
 
 // A network whose relay container removal hasn't been reflected by the
 // daemon's async disconnect yet must be left in place, not fail the whole
 // down — a later down retries and finds it gone.
-func TestEnsureRelayLinkNetworksDownSkipsStillInUse(t *testing.T) {
+func TestEnsureRelayLinkNetworksDownToleratesStillInUse(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	apiMock, cli := prepareMocks(mockCtrl)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 	svc := tested.(*composeService)
-
-	project := &types.Project{Name: "p"}
 
 	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{
 		Items: []network.Summary{{Network: network.Network{ID: "net-1", Name: "p_db_relay"}}},
 	}, nil)
-	apiMock.EXPECT().NetworkInspect(gomock.Any(), "net-1", gomock.Any()).Return(client.NetworkInspectResult{
-		Network: network.Inspect{
-			Network: network.Network{Name: "p_db_relay"},
-			Containers: map[string]network.EndpointResource{
-				"relay-1": {Name: "p-db-1"},
-			},
-		},
-	}, nil)
+	apiMock.EXPECT().NetworkRemove(gomock.Any(), "net-1", gomock.Any()).
+		Return(client.NetworkRemoveResult{}, conflictError{})
 
-	ops := svc.ensureRelayLinkNetworksDown(t.Context(), project)
+	ops := svc.ensureRelayLinkNetworksDown(t.Context(), &types.Project{Name: "p"}, nil)
 	assert.Equal(t, len(ops), 1)
-	for _, op := range ops {
-		assert.NilError(t, op())
-	}
+	assert.NilError(t, ops[0]())
 }
 
-// A transient inspect failure on one project's relay-link network must not
-// stop the others from being cleaned up: each is independent.
-func TestEnsureRelayLinkNetworksDownContinuesPastInspectError(t *testing.T) {
+// One op per network: a failure removing one relay-link network must not
+// stop the others from being cleaned up.
+func TestEnsureRelayLinkNetworksDownOpsAreIndependent(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	apiMock, cli := prepareMocks(mockCtrl)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 	svc := tested.(*composeService)
-
-	project := &types.Project{Name: "p"}
 
 	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{
 		Items: []network.Summary{
@@ -438,17 +477,39 @@ func TestEnsureRelayLinkNetworksDownContinuesPastInspectError(t *testing.T) {
 			{Network: network.Network{ID: "net-2", Name: "p_cache_relay"}},
 		},
 	}, nil)
-	apiMock.EXPECT().NetworkInspect(gomock.Any(), "net-1", gomock.Any()).
-		Return(client.NetworkInspectResult{}, errors.New("transient daemon error"))
-	apiMock.EXPECT().NetworkInspect(gomock.Any(), "net-2", gomock.Any()).
-		Return(client.NetworkInspectResult{Network: network.Inspect{Network: network.Network{Name: "p_cache_relay"}}}, nil)
+	apiMock.EXPECT().NetworkRemove(gomock.Any(), "net-1", gomock.Any()).
+		Return(client.NetworkRemoveResult{}, errors.New("transient daemon error"))
 	apiMock.EXPECT().NetworkRemove(gomock.Any(), "net-2", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
 
-	ops := svc.ensureRelayLinkNetworksDown(t.Context(), project)
+	ops := svc.ensureRelayLinkNetworksDown(t.Context(), &types.Project{Name: "p"}, nil)
+	assert.Equal(t, len(ops), 2)
+	assert.ErrorContains(t, ops[0](), "transient daemon error")
+	assert.NilError(t, ops[1]())
+}
+
+// Like its siblings, every relay-link network removal gates itself on the
+// shared down limiter: with no slot available, the op never reaches the
+// engine.
+func TestEnsureRelayLinkNetworksDownHonorsLimiter(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	apiMock, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := tested.(*composeService)
+
+	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{
+		Items: []network.Summary{{Network: network.Network{ID: "net-1", Name: "p_db_relay"}}},
+	}, nil)
+
+	limiter := semaphore.NewWeighted(1)
+	assert.NilError(t, limiter.Acquire(t.Context(), 1))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	ops := svc.ensureRelayLinkNetworksDown(ctx, &types.Project{Name: "p"}, limiter)
 	assert.Equal(t, len(ops), 1)
-	for _, op := range ops {
-		assert.ErrorContains(t, op(), "transient daemon error")
-	}
+	assert.ErrorIs(t, ops[0](), context.Canceled)
 }
 
 // ensureServiceRelay runs concurrently per provider service under the shared
@@ -635,7 +696,9 @@ func TestEnsureServiceRelayRemovesExistingWhenNoDependents(t *testing.T) {
 	}, nil)
 	apiMock.EXPECT().ContainerRemove(gomock.Any(), "relay-1", client.ContainerRemoveOptions{Force: true}).
 		Return(client.ContainerRemoveResult{}, nil)
-	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiMock.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter("p").Add("label", serviceFilter("db")).Add("label", api.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	err = svc.ensureServiceRelay(t.Context(), project, db, endpoints, nil)
 	assert.NilError(t, err)
@@ -671,7 +734,9 @@ func TestRemoveServiceRelayRemovesExisting(t *testing.T) {
 		Return(client.ContainerRemoveResult{}, nil)
 	// removeServiceRelay always also tries the relay-link network, even
 	// when nothing is left connected to it.
-	apiMock.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiMock.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter("p").Add("label", serviceFilter("db")).Add("label", api.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
 
 	assert.NilError(t, svc.removeServiceRelay(t.Context(), "p", "db"))
 }
