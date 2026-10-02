@@ -132,12 +132,14 @@ func relayNetworks(project *types.Project, service types.ServiceConfig) []string
 // address: reachable from the relay (same-bridge local delivery), and —
 // unlike a project's own bridge networks, which every service on them can
 // also reach — joined by nothing else. That is isolation by network
-// membership, not network-level unreachability: the gateway is an address
-// of the host itself, so a local container able to route to it can still
-// reach a listener bound there by IP. Binding ONLY this address is what
-// keeps the endpoint off loopback and every LAN-facing address. A single
-// entry, or none when it could not be resolved (see ensureRelayLinkNetwork):
-// a provider must treat that as "bind elsewhere".
+// membership, not something the address alone enforces: the gateway is an
+// address of the host itself, and a plain bind restricts by destination
+// address, not by arrival interface, so a local container able to route to
+// it can still reach the listener by IP. A provider keeps the endpoint
+// relay-only by binding ONLY this address and pinning the socket to the
+// bridge's own interface (SO_BINDTODEVICE on Linux). A single entry, or
+// none when it could not be resolved (see ensureRelayLinkNetwork): a
+// provider must treat that as "bind elsewhere".
 type relayInfoAnswer struct {
 	Networks []relayNetworkInfo `json:"networks"`
 }
