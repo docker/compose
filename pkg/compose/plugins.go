@@ -344,6 +344,19 @@ const imageStreamChunkSize = 1024 * 1024
 // was aborted: the provider must discard it.
 // When the image cannot be exported, the announce line carries an error
 // instead and no stream follows.
+// streamAbortedError marks a streamImageTo failure that happened after the
+// success announce was already sent: the chunked body is now incomplete and
+// the channel cannot be resynchronized. A failure before the announce (an
+// invalid platform, an ImageSave error) is reported as a plain error
+// instead — the channel is still intact, nothing has been promised to the
+// provider yet.
+type streamAbortedError struct {
+	err error
+}
+
+func (e *streamAbortedError) Error() string { return e.err.Error() }
+func (e *streamAbortedError) Unwrap() error { return e.err }
+
 func (s *composeService) streamImageTo(ctx context.Context, w io.Writer, ref, platform string) error {
 	announce := func(a imageStreamAnswer) error {
 		payload, err := json.Marshal(a)
@@ -375,14 +388,17 @@ func (s *composeService) streamImageTo(ctx context.Context, w io.Writer, ref, pl
 	}
 	cw := httputil.NewChunkedWriter(w)
 	if _, err := io.CopyBuffer(cw, struct{ io.Reader }{tar}, make([]byte, imageStreamChunkSize)); err != nil {
-		return err
+		return &streamAbortedError{err}
 	}
 	// ChunkedWriter.Close writes the zero-length chunk, which ends the
 	// stream. Unlike an HTTP message there is deliberately no trailer
 	// section nor final CRLF: a stock chunked reader stops at the zero
 	// chunk without consuming either, and leftover bytes would corrupt the
 	// next JSON answer a provider requesting several images reads.
-	return cw.Close()
+	if err := cw.Close(); err != nil {
+		return &streamAbortedError{err}
+	}
+	return nil
 }
 
 // handlePluginMessage processes one provider message, mutating variables in
@@ -462,13 +478,21 @@ func (s *composeService) handlePluginMessage(
 			defer stdinMu.Unlock()
 			if err := s.streamImageTo(ctx, stdin, ref, platform); err != nil {
 				logrus.Warnf("provider %q: get-image %q: %v", service.Name, ref, err)
-				// A failure after the success announce leaves the stream
-				// without its terminating chunk, and the channel cannot be
-				// resynchronized (any byte would read as chunk data).
-				// Closing stdin makes the truncation observable — the
-				// provider gets EOF mid-chunk and discards, instead of
-				// blocking forever on a stream nobody will finish.
-				_ = stdin.Close()
+				// A failure before the success announce (invalid platform,
+				// ImageSave error) is a clean, well-formed error line: the
+				// channel is intact, and closing stdin here would needlessly
+				// kill any other independent get-image request in the same
+				// pull invocation. Only a failure after the success
+				// announce leaves the stream without its terminating chunk,
+				// with the channel unable to be resynchronized (any byte
+				// would read as chunk data) — streamImageTo reports that
+				// case as a *streamAbortedError so closing stdin here makes
+				// the truncation observable, instead of blocking forever on
+				// a stream nobody will finish.
+				var aborted *streamAbortedError
+				if errors.As(err, &aborted) {
+					_ = stdin.Close()
+				}
 			}
 		}()
 	case PublishEndpointType:
