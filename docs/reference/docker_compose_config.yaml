@@ -18,6 +18,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: filter
+      value_type: stringArray
+      default_value: '[]'
+      description: |
+        With --services, only print services matching a criteria=value expression ("profile=NAME", "label=KEY[=VALUE]"). Repeat to combine criteria.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: format
       value_type: string
       description: 'Format the output. Values: [yaml | json]'
