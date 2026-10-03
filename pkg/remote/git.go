@@ -180,16 +180,36 @@ func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gi
 			}
 			return fmt.Errorf("failed to access repository at %s:\n %s", ref.Remote, out)
 		}
-		if len(out) < 40 {
-			return fmt.Errorf("unexpected git command output: %q", string(out))
+		sha, err := matchLsRemoteRef(string(out), ref.Ref)
+		if err != nil {
+			return err
 		}
-		sha := string(out[:40])
 		if !commitSHA.MatchString(sha) {
 			return fmt.Errorf("invalid commit sha %q", sha)
 		}
 		ref.Ref = sha
 	}
 	return nil
+}
+
+// matchLsRemoteRef picks the sha of the ref named `name` in `git ls-remote` output.
+// ls-remote matches its pattern against the tail of every ref name, so asking
+// for "main" also lists refs like "refs/heads/feature/main", sorted before
+// "refs/heads/main". Pick the exact match, using git's own lookup order.
+func matchLsRemoteRef(out, name string) (string, error) {
+	shas := map[string]string{}
+	for line := range strings.Lines(out) {
+		sha, refName, ok := strings.Cut(strings.TrimSpace(line), "\t")
+		if ok {
+			shas[refName] = sha
+		}
+	}
+	for _, candidate := range []string{name, "refs/" + name, "refs/tags/" + name, "refs/heads/" + name} {
+		if sha, ok := shas[candidate]; ok {
+			return sha, nil
+		}
+	}
+	return "", fmt.Errorf("unexpected git command output: %q", out)
 }
 
 func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil.GitRef) error {
