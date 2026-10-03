@@ -1,9 +1,5 @@
 # Contributing to Docker
 
-Want to hack on Docker? Awesome!  We have a contributor's guide that explains
-[setting up a Docker development environment and the contribution
-process](https://docs.docker.com/contribute/).
-
 This page contains information about reporting issues as well as some tips and
 guidelines useful to experienced open source contributors. Finally, make sure
 you read our [community guidelines](#docker-community-guidelines) before you
