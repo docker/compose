@@ -25,9 +25,10 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func JSON(out io.Writer) api.EventProcessor {
+func JSON(out io.Writer, dryRun bool) api.EventProcessor {
 	return &jsonWriter{
-		out: out,
+		out:    out,
+		dryRun: dryRun,
 	}
 }
 
