@@ -32,9 +32,9 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli"
 	"github.com/eiannone/keyboard"
-	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/internal/desktop"
@@ -82,6 +82,10 @@ type upSession struct {
 	menu       *formatter.LogKeyboard
 	globalCtx  context.Context
 	cancel     context.CancelFunc
+	// logOpenLimiter bounds concurrent log-attach opens from
+	// followStartedContainers, the same footgun --parallel closes for
+	// `compose logs --follow` (see doLogContainer).
+	logOpenLimiter *semaphore.Weighted
 
 	signalChan   chan os.Signal
 	isTerminated atomic.Bool
@@ -136,6 +140,7 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 		menu:           navigationMenu,
 		globalCtx:      globalCtx,
 		cancel:         cancel,
+		logOpenLimiter: newOptionalLimiter(s.maxConcurrency),
 		signalChan:     signalChan,
 	}
 
@@ -453,15 +458,15 @@ func (u *upSession) followStartedContainers(attached []string) api.ContainerEven
 }
 
 func (u *upSession) streamContainerLogs(event api.ContainerEvent, since string) error {
-	res, err := u.apiClient().ContainerInspect(u.globalCtx, event.ID, client.ContainerInspectOptions{})
+	ctr, err := u.inspectWithSlot(u.globalCtx, u.logOpenLimiter, event.ID)
 	if err != nil {
 		return err
 	}
 	if since == "" {
-		since = logsSinceLastRun(res.Container)
+		since = logsSinceLastRun(ctr)
 	}
 
-	err = u.doLogContainer(u.globalCtx, u.options.Start.Attach, event.Source, res.Container, api.LogOptions{
+	err = u.doLogContainer(u.globalCtx, u.logOpenLimiter, u.options.Start.Attach, event.Source, ctr, api.LogOptions{
 		Follow: true,
 		Since:  since,
 	})

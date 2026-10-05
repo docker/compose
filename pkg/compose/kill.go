@@ -56,7 +56,7 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		return api.ErrNoResources
 	}
 
-	return forEachContainerConcurrent(ctx, containers, func(ctx context.Context, ctr container.Summary) error {
+	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		eventName := getContainerProgressName(ctr)
 		s.events.On(newEvent(eventName, api.Working, api.StatusKilling))
 		_, err := s.apiClient().ContainerKill(ctx, ctr.ID, client.ContainerKillOptions{

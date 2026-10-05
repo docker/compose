@@ -102,7 +102,14 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
 
+	// Every node's goroutine is dispatched unconditionally, so one waiting on
+	// a dependency never occupies a concurrency slot -- only the actual
+	// executeNode call does, via the semaphore below. This also means
+	// deadlock-freedom no longer depends on plan.Nodes staying topologically
+	// sorted: a goroutine blocked on <-done[dep.ID] holds no slot for a
+	// still-pending dependency to be starved on.
 	eg, ctx := errgroup.WithContext(ctx)
+	limiter := newOptionalLimiter(exec.compose.maxConcurrency)
 	for _, node := range plan.Nodes {
 		eg.Go(func() error {
 			// Wait for all dependencies
@@ -113,6 +120,11 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 					return ctx.Err()
 				}
 			}
+
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
+			}
+			defer releaseSlot(limiter)
 
 			// Emit group start event if this is the first node of a group
 			groups.onNodeStart(node, events)
@@ -160,6 +172,8 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 		return exec.execRemoveContainer(ctx, op)
 	case OpRenameContainer:
 		return exec.execRenameContainer(ctx, node)
+	case OpCreateHookContainer:
+		return exec.execCreateHookContainer(ctx, node)
 	case OpRunProvider:
 		return exec.compose.runPlugin(ctx, exec.project, *op.Service, "up")
 	default:

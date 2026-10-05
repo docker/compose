@@ -173,7 +173,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			continue
 		}
 
-		waitingFor := containers.filter(isService(dep), isNotOneOff)
+		waitingFor := containers.filter(isService(dep), isNotOneOff, isNotHookContainer)
 		s.events.On(containerEvents(waitingFor, waiting)...)
 		if len(waitingFor) == 0 {
 			if config.Required {
@@ -565,6 +565,12 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 }
 
 func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
+	if s.dryRun {
+		// dry-run never actually starts the dependency's container, so it
+		// can never observe a real "exited" state: simulate immediate
+		// success instead of polling forever.
+		return true, 0, nil
+	}
 	for _, ctr := range containers {
 		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
@@ -585,7 +591,6 @@ func (s *composeService) startService(ctx context.Context,
 	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}
-
 	err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, containers, timeout)
 	if err != nil {
 		return err
@@ -595,10 +600,17 @@ func (s *composeService) startService(ctx context.Context,
 		if service.GetScale() == 0 {
 			return nil
 		}
+		if service.Provider != nil {
+			// a provider-backed service usually has no container of its own
+			// (it gets one — the relay — only when the provider published
+			// endpoints), so a project made only of provider services
+			// legitimately reaches the start phase with no container at all
+			return nil
+		}
 		return errNoContainerToStart(service.Name)
 	}
 
-	serviceContainers := containers.filter(isService(service.Name), isNotOneOff)
+	serviceContainers := containers.filter(isService(service.Name), isNotOneOff, isNotHookContainer)
 	toStart := serviceContainers.filter(isNotRunning)
 	if len(toStart) == 0 {
 		return nil
@@ -606,11 +618,12 @@ func (s *composeService) startService(ctx context.Context,
 
 	// pre_start runs once per service, only when no replica is already running
 	// (e.g. initial up, force-recreate, or spec change). per_replica: false is
-	// the only currently supported mode. Pick the replica with the lowest
-	// container-number so the choice is deterministic regardless of the order
-	// the daemon returns containers in.
+	// the only currently supported mode. The hooks execute in runner containers
+	// prepared by the reconciliation plan. Pick the replica with the lowest
+	// container-number so the choice is deterministic regardless of the
+	// order the daemon returns containers in.
 	if candidate := lowestNumberedContainer(toStart); len(service.PreStart) > 0 && len(serviceContainers) == len(toStart) && !isRelayContainer(candidate) {
-		if err := s.runPreStart(ctx, project, service, candidate, listener); err != nil {
+		if err := s.runPreStart(ctx, project, service, listener); err != nil {
 			return err
 		}
 	}

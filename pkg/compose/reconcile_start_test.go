@@ -155,11 +155,12 @@ func TestPlanStart_HooksAndReplicaChain(t *testing.T) {
 	assert.Equal(t, plan.String(), strings.TrimSpace(`
 [] -> #1 service:app:1, CreateContainer, no existing container
 [] -> #2 service:app:2, CreateContainer, no existing container
-[1] -> #3 service:app:1, RunPreStart, pre_start hooks [start:app:1] {start}
-[3] -> #4 service:app:1, StartContainer, start [start:app:1] {start}
-[4] -> #5 service:app:1, RunPostStart, post_start hooks [start:app:1] {start}
-[2,5] -> #6 service:app:2, StartContainer, start [start:app:2] {start}
-[6] -> #7 service:app:2, RunPostStart, post_start hooks [start:app:2] {start}
+[1,2] -> #3 hook:app:pre_start:0, CreateHookContainer, pre_start hook
+[1,3] -> #4 service:app:1, RunPreStart, pre_start hooks [start:app:1] {start}
+[4] -> #5 service:app:1, StartContainer, start [start:app:1] {start}
+[5] -> #6 service:app:1, RunPostStart, post_start hooks [start:app:1] {start}
+[2,6] -> #7 service:app:2, StartContainer, start [start:app:2] {start}
+[7] -> #8 service:app:2, RunPostStart, post_start hooks [start:app:2] {start}
 `)+"\n")
 }
 

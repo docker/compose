@@ -22,7 +22,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"gotest.tools/v3/assert"
@@ -31,6 +33,7 @@ import (
 
 // fakeLowLevelClient records calls made to it for test assertions.
 type fakeLowLevelClient struct {
+	mu         sync.Mutex
 	containers []container.Summary
 	execCmds   [][]string
 	untarCount int
@@ -38,6 +41,9 @@ type fakeLowLevelClient struct {
 	untarErrs []error
 	// untarHeaders[i] holds the headers the i-th Untar call received, by entry name
 	untarHeaders []map[string]tar.Header
+	// onUntar, when set, is invoked at the start of every Untar call --
+	// used to observe how many run concurrently.
+	onUntar func()
 }
 
 func (f *fakeLowLevelClient) ContainersForService(_ context.Context, _ string, _ string) ([]container.Summary, error) {
@@ -50,6 +56,9 @@ func (f *fakeLowLevelClient) Exec(_ context.Context, _ string, cmd []string, _ i
 }
 
 func (f *fakeLowLevelClient) Untar(_ context.Context, _ string, reader io.ReadCloser) error {
+	if f.onUntar != nil {
+		f.onUntar()
+	}
 	headers := map[string]tar.Header{}
 	tr := tar.NewReader(reader)
 	for {
@@ -62,6 +71,9 @@ func (f *fakeLowLevelClient) Untar(_ context.Context, _ string, reader io.ReadCl
 		}
 		headers[header.Name] = *header
 	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.untarHeaders = append(f.untarHeaders, headers)
 
 	f.untarCount++
@@ -79,7 +91,7 @@ func TestSync_ExistingPath(t *testing.T) {
 	client := &fakeLowLevelClient{
 		containers: []container.Summary{{ID: "ctr1"}},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: existingFile, ContainerPath: "/app/exists.txt"},
@@ -94,7 +106,7 @@ func TestSync_NonExistentPath(t *testing.T) {
 	client := &fakeLowLevelClient{
 		containers: []container.Summary{{ID: "ctr1"}},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: "/no/such/file", ContainerPath: "/app/gone.txt"},
@@ -128,7 +140,7 @@ func TestSync_StatPermissionError(t *testing.T) {
 	client := &fakeLowLevelClient{
 		containers: []container.Summary{{ID: "ctr1"}},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: targetFile, ContainerPath: "/app/secret.txt"},
@@ -140,6 +152,88 @@ func TestSync_StatPermissionError(t *testing.T) {
 	assert.Equal(t, len(client.execCmds), 0, "should not attempt delete on stat error")
 }
 
+// syncConcurrencyTracker records the highest number of overlapping
+// enter()/leave() pairs seen, used to assert Sync's concurrency bound.
+type syncConcurrencyTracker struct {
+	mu      sync.Mutex
+	current int
+	peak    int
+}
+
+func (t *syncConcurrencyTracker) enter() {
+	t.mu.Lock()
+	t.current++
+	if t.current > t.peak {
+		t.peak = t.current
+	}
+	t.mu.Unlock()
+}
+
+func (t *syncConcurrencyTracker) leave() {
+	t.mu.Lock()
+	t.current--
+	t.mu.Unlock()
+}
+
+func (t *syncConcurrencyTracker) Peak() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.peak
+}
+
+// TestSync_ConcurrencyIsBounded guards internal/sync/tar.go's own fan-out:
+// it used to hardcode eg.SetLimit(16) regardless of --parallel, the same
+// class of gap fixed everywhere else in this repo for bulk engine calls.
+func TestSync_ConcurrencyIsBounded(t *testing.T) {
+	tracker := &syncConcurrencyTracker{}
+	client := &fakeLowLevelClient{
+		containers: []container.Summary{{ID: "ctr1"}, {ID: "ctr2"}, {ID: "ctr3"}},
+		onUntar: func() {
+			tracker.enter()
+			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+			tracker.leave()
+		},
+	}
+	syncer := NewTar("proj", client, 1)
+
+	tmpDir := t.TempDir()
+	existingFile := filepath.Join(tmpDir, "exists.txt")
+	assert.NilError(t, os.WriteFile(existingFile, []byte("data"), 0o644))
+
+	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
+		{HostPath: existingFile, ContainerPath: "/app/exists.txt"},
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, tracker.Peak(), 1, "Sync must never run more than maxConcurrency Untar calls at once")
+}
+
+// TestSync_ZeroMaxConcurrencyIsUnlimited guards the errgroup.SetLimit(0)
+// footgun: 0 is maxConcurrency's Go zero-value, and SetLimit(0) means "allow
+// zero goroutines", not "unlimited" -- which would deadlock Sync forever.
+func TestSync_ZeroMaxConcurrencyIsUnlimited(t *testing.T) {
+	client := &fakeLowLevelClient{
+		containers: []container.Summary{{ID: "ctr1"}, {ID: "ctr2"}},
+	}
+	syncer := NewTar("proj", client, 0)
+
+	tmpDir := t.TempDir()
+	existingFile := filepath.Join(tmpDir, "exists.txt")
+	assert.NilError(t, os.WriteFile(existingFile, []byte("data"), 0o644))
+
+	done := make(chan error, 1)
+	go func() {
+		done <- syncer.Sync(t.Context(), "svc", []*PathMapping{
+			{HostPath: existingFile, ContainerPath: "/app/exists.txt"},
+		})
+	}()
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Sync deadlocked with maxConcurrency=0")
+	}
+}
+
 func TestSync_MixedPaths(t *testing.T) {
 	tmpDir := t.TempDir()
 	existingFile := filepath.Join(tmpDir, "keep.txt")
@@ -148,7 +242,7 @@ func TestSync_MixedPaths(t *testing.T) {
 	client := &fakeLowLevelClient{
 		containers: []container.Summary{{ID: "ctr1"}},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: existingFile, ContainerPath: "/app/keep.txt"},
@@ -170,7 +264,7 @@ func TestSync_PopulatedDirectoryKeepsItsHeader(t *testing.T) {
 	client := &fakeLowLevelClient{
 		containers: []container.Summary{{ID: "ctr1"}},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: filepath.Join(tmpDir, "sub"), ContainerPath: "/app/sub"},
@@ -198,7 +292,7 @@ func TestSync_RetriesWithoutImpliedDirectoriesWhenCopyFails(t *testing.T) {
 		containers: []container.Summary{{ID: "ctr1"}},
 		untarErrs:  []error{errors.New(`cannot overwrite non-directory "/app/sub" with directory "/"`)},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: filepath.Join(tmpDir, "sub"), ContainerPath: "/app/sub"},
@@ -224,7 +318,7 @@ func TestSync_ReportsTheCopyErrorWhenTheRetryFailsToo(t *testing.T) {
 			errors.New("no such container"),
 		},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: filepath.Join(tmpDir, "sub"), ContainerPath: "/app/sub"},
@@ -243,7 +337,7 @@ func TestSync_DoesNotRetryACopyThatFailedForAnotherReason(t *testing.T) {
 		containers: []container.Summary{{ID: "ctr1"}},
 		untarErrs:  []error{errors.New("no such container")},
 	}
-	syncer := NewTar("proj", client)
+	syncer := NewTar("proj", client, 0)
 
 	err := syncer.Sync(t.Context(), "svc", []*PathMapping{
 		{HostPath: filepath.Join(tmpDir, "sub"), ContainerPath: "/app/sub"},

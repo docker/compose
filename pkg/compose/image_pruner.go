@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -28,7 +29,7 @@ import (
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -61,14 +62,36 @@ type ImagePruneOptions struct {
 type ImagePruner struct {
 	client  client.ImageAPIClient
 	project *types.Project
+	// limiter bounds concurrent engine calls, shared with the rest of the
+	// down op set so tagged- and dangling-image removal (which run as two
+	// independent, concurrently-dispatched ops) don't each spend their own
+	// full budget on top of one another.
+	limiter *semaphore.Weighted
 }
 
-// NewImagePruner creates an ImagePruner object for a project.
-func NewImagePruner(imageClient client.ImageAPIClient, project *types.Project) *ImagePruner {
+// NewImagePruner creates an ImagePruner object for a project. limiter may be
+// nil, meaning unbounded.
+func NewImagePruner(imageClient client.ImageAPIClient, project *types.Project, limiter *semaphore.Weighted) *ImagePruner {
 	return &ImagePruner{
 		client:  imageClient,
 		project: project,
+		limiter: limiter,
 	}
+}
+
+// imageBelongsToKnownService reports whether img should be pruned: either
+// removeOrphans is set (indiscriminately prune all project images even if
+// they're not referenced by the current Compose state, e.g. the service was
+// removed from YAML), or the image belongs to a service still declared in
+// project. Shared by ImagesToPrune (tagged images) and down's own
+// dangling-image keep check, so the two can't drift on what counts as
+// orphaned — the image-side analog of containers.go's isOrphaned.
+func imageBelongsToKnownService(project *types.Project, removeOrphans bool, img image.Summary) bool {
+	if removeOrphans {
+		return true
+	}
+	_, err := project.GetService(img.Labels[api.ServiceLabel])
+	return err == nil
 }
 
 // ImagesToPrune returns the set of images that should be removed.
@@ -100,20 +123,7 @@ func (p *ImagePruner) ImagesToPrune(ctx context.Context, opts ImagePruneOptions)
 			continue
 		}
 
-		var shouldPrune bool
-		if opts.RemoveOrphans {
-			// indiscriminately prune all project images even if they're not
-			// referenced by the current Compose state (e.g. the service was
-			// removed from YAML)
-			shouldPrune = true
-		} else {
-			// only prune the image if it belongs to a known service for the project.
-			if _, err := p.project.GetService(img.Labels[api.ServiceLabel]); err == nil {
-				shouldPrune = true
-			}
-		}
-
-		if shouldPrune {
+		if imageBelongsToKnownService(p.project, opts.RemoveOrphans, img) {
 			images = append(images, img.RepoTags[0])
 		}
 	}
@@ -159,11 +169,56 @@ func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, 
 	return res.Items, nil
 }
 
-// removeDanglingImages removes a project's dangling images not spared by
-// keep, in parallel, tolerating individual failures so one bad image
-// doesn't abort the rest. Shared by down --rmi and watch --prune, which
-// differ only in what keep spares.
-func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]string, error) {
+// removeImages removes the given images in parallel, tolerating individual
+// failures so one bad image doesn't abort the rest. An image already gone
+// (a benign race with something else removing it concurrently) or still in
+// use is never joined into err — same tolerance removeResource already
+// gives a tagged image in either situation (its own distinct, correctly
+// worded event, not an error). "Still in use" is returned in its own bucket,
+// not folded into removed, since a caller aggregating several images (see
+// removeDanglingImagesOp) needs that distinction to report the batch
+// honestly; an already-gone image reached the goal the same as an actual
+// removal, so it's simply not counted against either bucket. Any other
+// removal error is joined into err so callers reporting failures to the
+// user keep the actual daemon error instead of just an image ID.
+func (s *composeService) removeImages(ctx context.Context, images []image.Summary, limiter *semaphore.Weighted) (removed, stillInUse []string, err error) {
+	var mu sync.Mutex
+	var errs []error
+	// as in removeTaggedImagesOp, a single image failure must not cancel the
+	// shared errgroup ctx, so fn always returns nil and collects into the
+	// buckets below instead.
+	_ = forEachWithLimiter(ctx, limiter, images, func(ctx context.Context, img image.Summary) error {
+		if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
+			mu.Lock()
+			defer mu.Unlock()
+			imgStillInUse, alreadyGone := classifyRemovalError(err)
+			switch {
+			case alreadyGone:
+				// e.g. removed concurrently by something else
+				logrus.Debugf("dangling image %s already removed: %v", img.ID, err)
+			case imgStillInUse:
+				// the same benign skip the tagged-image path reports via
+				// removeResource's conflict branch
+				logrus.Debugf("dangling image %s still in use: %v", img.ID, err)
+				stillInUse = append(stillInUse, img.ID)
+			default:
+				errs = append(errs, fmt.Errorf("image %s: %w", img.ID, err))
+			}
+			return nil
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		removed = append(removed, img.ID)
+		return nil
+	})
+	return removed, stillInUse, errors.Join(errs...)
+}
+
+// eligibleDanglingImages lists a project's dangling images and filters out
+// those spared by keep. Shared by down --rmi (which also needs the list
+// itself, to decide whether there's anything to report) and watch --prune,
+// so the two don't drift apart.
+func (s *composeService) eligibleDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]image.Summary, error) {
 	res, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
 		Filters: projectFilter(projectName).Add("dangling", "true"),
 	})
@@ -171,27 +226,25 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 		return nil, err
 	}
 
-	var mu sync.Mutex
-	var removed []string
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(s.maxConcurrency)
+	var eligible []image.Summary
 	for _, img := range res.Items {
-		if keep(img) {
-			continue
+		if !keep(img) {
+			eligible = append(eligible, img)
 		}
-		eg.Go(func() error {
-			if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
-				logrus.Debugf("failed to remove dangling image %s: %v", img.ID, err)
-				return nil
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			removed = append(removed, img.ID)
-			return nil
-		})
 	}
-	_ = eg.Wait() // errgroup is only used for fan-out here; goroutines never return an error
-	return removed, nil
+	return eligible, nil
+}
+
+// removeDanglingImages lists a project's dangling images and removes those
+// not spared by keep. Shared by down --rmi and watch --prune, which differ
+// only in what keep spares.
+func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]string, error) {
+	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
+	if err != nil {
+		return nil, err
+	}
+	removed, _, err := s.removeImages(ctx, eligible, newOptionalLimiter(s.maxConcurrency))
+	return removed, err
 }
 
 // unlabeledLocalImages are images that match the implicit naming convention
@@ -225,23 +278,19 @@ func (p *ImagePruner) filterImagesByExistence(ctx context.Context, imageNames []
 	var mu sync.Mutex
 	var ret []string
 
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, img := range imageNames {
-		eg.Go(func() error {
-			_, err := p.client.ImageInspect(ctx, img)
-			if errdefs.IsNotFound(err) {
-				// err on the side of caution: only skip if we successfully
-				// queried the API and got back a definitive "not exists"
-				return nil
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			ret = append(ret, img)
+	err := forEachWithLimiter(ctx, p.limiter, imageNames, func(ctx context.Context, img string) error {
+		_, err := p.client.ImageInspect(ctx, img)
+		if errdefs.IsNotFound(err) {
+			// err on the side of caution: only skip if we successfully
+			// queried the API and got back a definitive "not exists"
 			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		ret = append(ret, img)
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 

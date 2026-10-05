@@ -48,6 +48,10 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		options.Services = project.ServiceNames()
 	}
 
+	// shared across services — see restart.go's newOptionalLimiter comment
+	// for why a per-service limiter alone isn't enough.
+	limiter := newOptionalLimiter(s.maxConcurrency)
+
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		if !slices.Contains(options.Services, service) {
 			return nil
@@ -57,7 +61,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		// deployed when it published endpoints — and the plugin's own stop
 		// hook (if any) only concerns the provider's resource, so the
 		// container is stopped the same way as for any other service.
-		if err := s.stopContainers(ctx, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout, event); err != nil {
+		if err := s.stopContainers(ctx, &serv, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout, event, limiter); err != nil {
 			return err
 		}
 		if serv.Provider != nil {

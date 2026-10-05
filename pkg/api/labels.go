@@ -49,6 +49,15 @@ const (
 	// whether an existing relay can be kept on the next up. Commands that
 	// act on a service's process (exec, ...) refuse relay containers.
 	RelayLabel = "com.docker.compose.relay"
+	// RelayNetworkLabel marks the dedicated bridge network created for one
+	// provider-managed service's relay link — the sole channel between the
+	// relay container and the provider's own runtime (see get-relay-info).
+	// Never a project's user-declared network, and never joined by any
+	// dependent or sibling container: only the relay connects to it. That is
+	// isolation by network membership: the gateway is a host address, so a
+	// provider must also pin its bind to the bridge's interface to keep other
+	// local containers from reaching it by IP.
+	RelayNetworkLabel = "com.docker.compose.relay-network"
 	// SlugLabel stores unique slug used for one-off container identity
 	SlugLabel = "com.docker.compose.slug"
 	// ImageDigestLabel stores digest of the container image used to run service
@@ -69,10 +78,16 @@ const (
 	// ContainerEngineLabel stores the name of the engine that runs the container
 	ContainerEngineLabel = "com.docker.compose.engine"
 	// HookLabel identifies an ephemeral lifecycle-hook container and stores the
-	// hook type, e.g. "pre_start". It is applied to every container created by
-	// runPreStartHook so orphan hook containers from a previous failed run can
-	// be found and removed by project+service+hook label filters.
+	// hook type, e.g. "pre_start". It is applied to every runner container
+	// created by createPreStartContainer so stale runners from a previous
+	// failed run can be found and removed by project+service+hook label
+	// filters, and down can sweep them all by project+hook label.
 	HookLabel = "com.docker.compose.hook"
+	// HookIndexLabel stores the position of the hook in its service's hook
+	// list (e.g. pre_start[2] → "2"), so the start phase can match each
+	// declared hook with the runner container the reconciliation plan
+	// prepared for it.
+	HookIndexLabel = "com.docker.compose.hook-index"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel

@@ -58,6 +58,9 @@ const (
 	OpWaitCondition OperationType = 40
 	OpRunPreStart   OperationType = 41
 	OpRunPostStart  OperationType = 42
+
+	// Hook operations
+	OpCreateHookContainer OperationType = 43
 )
 
 // PlanPhase situates a node in the plan lifecycle. The Create phase converges
@@ -105,6 +108,8 @@ func (o OperationType) String() string {
 		return "RunPreStart"
 	case OpRunPostStart:
 		return "RunPostStart"
+	case OpCreateHookContainer:
+		return "CreateHookContainer"
 	default:
 		return fmt.Sprintf("Unknown(%d)", int(o))
 	}
@@ -127,11 +132,16 @@ type Operation struct {
 	Timeout      *time.Duration       // for stop operations
 	CreateNodeID int                  // for OpRenameContainer/start-phase ops: ID of the CreateContainer node whose result to target
 	Condition    string               // for OpWaitCondition: depends_on condition to wait for (service_healthy, ...)
-	// BestEffort marks an operation whose failure must not abort the plan. It is
-	// used for the optional removal of the old network on a rename: if the
-	// network is still in use (by non-Compose containers) the removal is skipped
-	// with a warning instead of failing — the new network already carries a
-	// different name, so the migration does not depend on the old one going away.
+	HookIndex    int                  // for OpCreateHookContainer: position of the hook in the service's hook list
+	// RemoveVolumes asks OpRemoveContainer to also remove the container's
+	// anonymous volumes — the imperative semantics for hook-runner containers.
+	RemoveVolumes bool
+	// BestEffort marks an operation whose failure must not abort the plan.
+	// Used for the optional removal of the old network on a rename (if the
+	// network is still in use by non-Compose containers the removal is skipped
+	// with a warning — the new network already carries a different name), and
+	// for purging stale pre_start hook runners (the imperative purge is
+	// warn-only: a failed removal leaves the container visible, never blocks).
 	BestEffort bool
 }
 

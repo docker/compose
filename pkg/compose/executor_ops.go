@@ -142,8 +142,15 @@ func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) e
 }
 
 func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation) error {
-	_, err := exec.compose.apiClient().ContainerRemove(ctx, op.Container.ID, client.ContainerRemoveOptions{Force: true})
+	_, err := exec.compose.apiClient().ContainerRemove(ctx, op.Container.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: op.RemoveVolumes})
 	if err != nil {
+		if op.BestEffort {
+			// warn-only removal (stale pre_start hook runner): the container
+			// stays visible to the operator, the plan carries on — and the
+			// live view below keeps it, since it was not removed
+			logrus.Warnf("failed to remove %s: %v", op.ResourceID, err)
+			return nil
+		}
 		return err
 	}
 	// Why: a dependent service's create may resolve `network_mode: service:X`
@@ -158,6 +165,42 @@ func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation)
 		func(c container.Summary) bool { return c.ID == op.Container.ID },
 	)
 	exec.containersMu.Unlock()
+	return nil
+}
+
+// execCreateHookContainer creates the runner container for one pre_start hook.
+// The target replica — whose volumes the hook shares via VolumesFrom — is
+// resolved from the live view at execution time: the node depends on every
+// container operation of its service, so the view is final here, and the
+// lowest-numbered replica matches the one the start phase hands the hooks.
+func (exec *planExecutor) execCreateHookContainer(ctx context.Context, node *PlanNode) error {
+	// A dependency's done-channel also closes on failure: when a replica
+	// create failed and canceled the run, bail out on the cancellation
+	// instead of reporting the empty live view as an internal error.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	op := node.Operation
+	service := *op.Service
+	exec.containersMu.Lock()
+	replicas := slices.Clone(exec.containersByService[service.Name])
+	exec.containersMu.Unlock()
+	if len(replicas) == 0 {
+		return fmt.Errorf("internal: no %q container to attach pre_start hook %d to", service.Name, op.HookIndex)
+	}
+	target := lowestNumberedContainer(replicas)
+	created, err := exec.compose.createPreStartContainer(ctx, exec.project, service, target, op.HookIndex, op.Name)
+	if err != nil {
+		return err
+	}
+	// Recorded for uniformity with execCreateContainer — every create
+	// operation publishes its result. No plan operation consumes a hook
+	// runner's entry today: the start phase rediscovers runners through
+	// listPreStartRunners, by design.
+	exec.pctx.set(node.ID, operationResult{
+		ContainerID:   created.ID,
+		ContainerName: op.Name,
+	})
 	return nil
 }
 

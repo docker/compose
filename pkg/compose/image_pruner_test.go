@@ -28,8 +28,13 @@ import (
 
 // TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures guards the
 // shared helper used by both `down --rmi` and `watch --prune`: images the
-// keep predicate spares must never be removed, and one failed removal must
-// not stop the others or propagate as an error.
+// keep predicate spares must never be removed; an image already gone (a
+// benign race with something else removing it concurrently) or still in
+// use (the same tolerance removeResource already gives a tagged image in
+// the same situation) is tolerated and not reported as a failure; a
+// genuine removal error doesn't stop the others, but is joined into the
+// returned error (preserving the actual daemon error, not just the image
+// ID) for callers that need to surface it.
 func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -44,18 +49,63 @@ func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:keep"},
 		{ID: "sha256:removed"},
+		{ID: "sha256:already-gone"},
+		{ID: "sha256:in-use"},
 		{ID: "sha256:fails"},
 	}}, nil)
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:removed", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, nil)
-	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:already-gone", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, errdefs.ErrNotFound.WithMessage("already removed"))
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used"))
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
 	// no expectation for "sha256:keep" — a call to ImageRemove for it fails the test
 
 	keep := func(img image.Summary) bool { return img.ID == "sha256:keep" }
 	removed, err := svc.removeDanglingImages(t.Context(), "prj", keep)
-	assert.NilError(t, err)
 	assert.DeepEqual(t, removed, []string{"sha256:removed"})
+	assert.ErrorContains(t, err, "sha256:fails")
+	assert.ErrorContains(t, err, "permission denied")
+}
+
+// TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved guards a
+// regression caught by review: an image still in use (goal NOT achieved)
+// must land in its own return bucket, not be folded into removed — a caller
+// aggregating several images (removeDanglingImagesOp) needs the distinction
+// to report the batch honestly. An already-gone image reaches the goal like
+// an actual removal and a genuine failure is joined into err, so neither is
+// exercised here beyond not corrupting the removed/stillInUse buckets.
+func TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	svcIface, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	images := []image.Summary{
+		{ID: "sha256:removed"},
+		{ID: "sha256:already-gone"},
+		{ID: "sha256:in-use"},
+		{ID: "sha256:fails"},
+	}
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:removed", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, nil)
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:already-gone", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrNotFound.WithMessage("already removed"))
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:in-use", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrConflict.WithMessage("image is being used"))
+	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
+		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
+
+	removed, stillInUse, err := svc.removeImages(t.Context(), images, nil)
+	assert.DeepEqual(t, removed, []string{"sha256:removed"})
+	assert.DeepEqual(t, stillInUse, []string{"sha256:in-use"})
+	assert.ErrorContains(t, err, "sha256:fails")
+	assert.ErrorContains(t, err, "permission denied")
 }
 
 // TestRemoveDanglingImages_NoneFound guards that an empty dangling-image

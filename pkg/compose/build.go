@@ -106,7 +106,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	return s.doBuildClassic(ctx, project, serviceToBuild, options)
 }
 
-func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool) error {
+func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool, skipProviders bool) error {
 	for name, service := range project.Services {
 		if service.Provider == nil && service.Image == "" && service.Build == nil {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
@@ -127,6 +127,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		return err
 	}
 
+	built := map[string]string{}
 	if buildOpts != nil {
 		err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 			func(ctx context.Context) error {
@@ -136,6 +137,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				}
 
 				for name, digest := range builtImages {
+					built[name] = digest
 					images[name] = api.ImageSummary{
 						Repository:  name,
 						ID:          digest,
@@ -143,6 +145,20 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 					}
 				}
 				return nil
+			},
+		)(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	// provider-backed services get their turn in the image phase: the
+	// provider makes the image available to ITS runtime (weak contract on
+	// the up path: a usable version present suffices)
+	if !skipProviders {
+		err = tracing.SpanWrapFunc("project/provider-pull", tracing.ProjectOptions(ctx, project),
+			func(ctx context.Context) error {
+				return s.ensureProviderImages(ctx, project, built, providerPullPolicyMissing)
 			},
 		)(ctx)
 		if err != nil {

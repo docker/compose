@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -53,15 +52,19 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	// and the dependency waits read them
 	project = project.WithoutUnresolvedOptionalDependencies()
 
-	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: projectFilter(project.Name).Add("label", oneOffFilter(false)),
-		All:     true,
-	})
+	// getContainers filters on ConfigHashLabel presence (getDefaultFilters),
+	// which every service container carries and hook runners deliberately do
+	// not: pre_start runners never leak into the start flow at the source
+	// (isNotHookContainer downstream stays as defense-in-depth).
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
-	containers := Containers(res.Items)
 
+	// the node-level bound is a correct proxy for --parallel here, unlike
+	// restart/down/stop: startService starts a service's containers in a
+	// plain sequential loop, so one engine-call burst per node is all this
+	// traversal ever dispatches concurrently.
 	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
@@ -69,6 +72,8 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 
 		return s.startService(ctx, project, service, containers, listener, options.WaitTimeout)
+	}, func(traversal *graphTraversal) {
+		traversal.maxConcurrency = s.maxConcurrency
 	})
 	if err != nil {
 		return err

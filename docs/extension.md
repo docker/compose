@@ -30,7 +30,10 @@ the resource(s) needed to run a service.
 If `provider.type` doesn't resolve into any of those, Compose will report an error and interrupt the `up` command.
 
 To be a valid Compose extension, provider command *MUST* accept a `compose` command (which can be hidden)
-with subcommands `up` and `down`. It *MAY* additionally implement a `stop` subcommand to support `docker compose stop`.
+with subcommands `up` and `down`. It *MAY* additionally implement a `stop` subcommand to support `docker compose stop`,
+and a `pull` subcommand to take part in image distribution (see [Image distribution](#image-distribution)).
+Optional subcommands are declared through the provider metadata: the presence of the command block is what
+opts the provider in.
 
 ## Up lifecycle
 
@@ -120,6 +123,68 @@ sequenceDiagram
     Provider-)Compose: EOF (command complete) exit 0
     Compose-)Shell: service started
 ```
+
+## Image distribution
+
+A provider-backed service can declare `build` or `image` like any other service; the image then has to reach
+the provider's runtime, which may be nowhere near the local daemon. Providers opt into image distribution by
+declaring a `pull` block in their `metadata` output — like `stop`, the presence of the block is the
+declaration of support. Providers without it keep managing images on their own during `up`.
+
+When the provider declares `pull`, Compose invokes it during the image phase of `up` (after any build) and on
+`docker compose pull`:
+
+```console
+awesomecloud compose --project-name <NAME> pull --image=<ref> --source=<verdict> --policy=<policy> [--digest=<id> --created=<time>] "database"
+```
+
+- `--image`: the image reference as Compose resolved it (the `image` attribute, or `<project>-<service>` for a
+  build-only service).
+- `--digest` / `--created`: the state of the **local daemon cache**, present only when the image exists there.
+  They describe the cache, they are not instructions: persist them as the bookkeeping keys of what you ingest —
+  the digest as identity test, `created` as the ordering fallback for a backend that cannot preserve digests.
+  Beware that reproducible builds can freeze `created`, so a comparable digest always wins over it.
+- `--source` is the authority verdict, computed by Compose from the model and the invocation (`pull_policy`,
+  `--build`, what the current run just built), so providers never re-implement that arbitration:
+  - `local`: the desired state is the local daemon's image. Compare your bookkeeping with the announced
+    digest/created; when they differ, request the bytes with `get-image`.
+  - `registry`: resolve the reference upstream — this includes the common workflow where `build` is only the
+    recipe CI uses to publish the image that consumers pull. The local facts are an optimization, never an
+    obligation.
+- `--policy`:
+  - `missing` (the `up` path): a usable version present in your runtime suffices;
+  - `always` (`docker compose pull`): ensure your runtime holds the latest version of the authority.
+
+### Requesting the image bytes
+
+During `pull`, the provider can ask Compose for the image content with a regular JSON line on `stdout`
+(`platform` is optional and narrows a multi-platform image):
+
+```json
+{ "type": "get-image", "message": "<image ref>", "platform": "linux/arm64" }
+```
+
+Compose answers on the provider's `stdin` with one JSON line:
+
+```json
+{ "type": "image-stream", "encoding": "chunked", "media-type": "application/x-tar" }
+```
+
+followed — unless the line carries an `error` field instead — by the image tar encoded as HTTP/1.1 chunked
+data (RFC 9112 §7.1): every block of data prefixed by its length, terminated by the zero-length chunk. Unlike
+an HTTP message there is no trailer section nor final CRLF — the next byte after the zero chunk belongs to the
+next stdin answer. Length-prefixed framing needs no in-band delimiter (any byte value can appear inside a tar), and
+any language's stock chunked-body reader consumes it — Go providers can use `httputil.NewChunkedReader`. A
+stream that ends without the terminating zero chunk was aborted and must be discarded — Compose closes the
+answer channel after an aborted transfer, so the truncation is always observable as EOF. The tar is what
+`docker image save` produces: feed it to `docker load` or whatever your runtime ingests.
+
+As during `stop`, any `setenv`, `rawsetenv` or `publish-endpoint` message emitted during `pull` is accepted
+but ignored: dependent services are not being configured in this phase.
+
+The stream is exclusive on `stdin` for its whole duration — the chunked body must be contiguous, so answers to
+any other request emitted meanwhile are delivered after it. Drain the announced stream completely before
+expecting another answer.
 
 ## Connection to a service managed by a provider
 
@@ -211,26 +276,83 @@ standalone Linux engine no address is both relay-reachable and off the LAN by de
 resolves there to the bridge gateway, which a loopback-only listener cannot accept, while the wildcard exposes
 the port on every host interface. (Docker Desktop has no such dilemma — its proxy reaches the host's loopback.)
 
-`get-relay-info` resolves this: the provider asks, and Compose answers with one JSON line listing the networks
-the relay would join — the dependents' networks, as selected for the relay deployment — each with the address a
-locally-run endpoint should bind so the relay can reach it:
+`get-relay-info` resolves this: sending it is itself the provider's declaration that it binds locally, and
+Compose reacts by creating a **dedicated relay-link network** — an `internal:true` bridge, scoped to this one
+provider service, joined by nothing but the relay container — then answers with one JSON line naming it
+alongside the address a locally-run endpoint should bind so the relay can reach it:
 
 ```json
 { "type": "get-relay-info" }
 ```
 
 ```json
-{"networks":[{"name":"myproject_default","gateway":"172.18.0.1"}]}
+{"networks":[{"name":"myproject_database_relay","gateway":"172.20.0.1"}]}
 ```
 
-Compose owns the platform knowledge behind that address: on a standalone engine it is the network's gateway —
-an address the provider's host owns on that network's bridge, reachable from the relay (and from local
-containers) but not from the LAN; under Docker Desktop it is `127.0.0.1` — the network lives inside the VM,
-and the host's own loopback is, factually, where a host process is reached through the Desktop proxy. The
-provider simply binds the announced gateway and publishes the endpoint exactly as bound: a routable address
-passes to the relay untouched, a loopback one is announced as `localhost` (translated to
+A provider backing a remote resource (an Amazon RDS instance, say) has no local endpoint to bind and simply
+never sends `get-relay-info`: no relay-link network is created for it, and its `publish-endpoint` reports the
+remote resource's own address unchanged.
+
+```mermaid
+sequenceDiagram
+    participant Compose
+    participant Provider
+    participant net as relay-link network<br/>(internal, per-service)
+    participant relay as relay container
+
+    rect rgb(235, 245, 255)
+    note over Compose,net: Provider running its service locally
+    Compose->>Provider: compose up --project-name=xx "database"
+    Provider->>Compose: json { "type": "get-relay-info" }
+    Compose->>net: create (or reuse) the dedicated<br/>relay-link network for "database"
+    Compose--)Provider: json {"networks":[{"name":"myproject_database_relay",<br/>"gateway":"172.20.0.1"}]}
+    Provider->>Provider: bind local endpoint to 172.20.0.1
+    Provider--)Compose: json { "type": "publish-endpoint",<br/>"message": "80=172.20.0.1:49152" }
+    Compose->>relay: deploy, join dependents' networks<br/>AND the relay-link network
+    end
+```
+
+```mermaid
+sequenceDiagram
+    participant Compose
+    participant Provider
+    participant resource as remote resource<br/>(e.g. Amazon RDS)
+    participant relay as relay container
+
+    rect rgb(255, 245, 235)
+    note over Compose,resource: Provider backing a remote resource
+    Compose->>Provider: compose up --project-name=xx "database"
+    Provider->>resource: provision
+    note over Provider: no local endpoint to bind:<br/>get-relay-info is never sent
+    Provider--)Compose: json { "type": "publish-endpoint",<br/>"message": "80=resource.example.com:5432" }
+    Compose->>relay: deploy, join dependents' networks only<br/>(no relay-link network created)
+    end
+```
+
+Compose owns the platform knowledge behind the announced address: on a standalone engine it is the relay-link
+network's IPv4 gateway — an address the provider's host owns on that dedicated bridge, reachable from the relay
+(same-bridge local delivery) and joined by nothing else: no other container is a member of that network, and none
+of the project's service networks includes it. This is isolation by network membership, not something the
+address alone enforces: the gateway is an address of the host itself, and a plain socket bound to it restricts
+by destination address, not by the interface traffic arrives on (Linux's weak host model) — so a container on
+another bridge, or a LAN peer routing through the host, can still reach such a listener by IP. To keep the
+endpoint reachable from the relay only, a provider should bind **only** the announced gateway — never a
+wildcard or any other address — **and** pin the socket to the relay-link bridge's own network interface
+(`SO_BINDTODEVICE` on Linux), so traffic arriving on any other interface is not accepted. Without that pin,
+treat the endpoint as reachable by any local container. Under Docker
+Desktop the announced address is `127.0.0.1` — the network lives inside the VM, and the host's own
+loopback is, factually, where a host process is reached through the Desktop proxy, so no dedicated network is
+created there. The provider simply binds the announced gateway and publishes the endpoint exactly as bound: a
+routable address passes to the relay untouched, a loopback one is announced as `localhost` (translated to
 `host.docker.internal`). The `gateway` field may be absent when it cannot be resolved (exotic network drivers,
-IPv6-only IPAM): fall back to a bind of your choice. Best-effort by design.
+IPv6-only IPAM): fall back to a bind of your choice. Best-effort by design. The relay-link network is removed
+along with the relay container when the service stops publishing endpoints, and by `down` like any other
+project resource.
+
+The `name` field is an opaque identifier, not a promise that a Docker network by that name exists: under Docker
+Desktop it is the literal string `"desktop"`, which no `docker network inspect` or `NetworkConnect` call will
+ever resolve. A provider must use it only for logging, never as an engine-level network reference — `gateway` is
+the only field it needs to bind and publish correctly.
 
 ## Down lifecycle
 
@@ -307,6 +429,9 @@ The expected JSON output format is:
         "type": "string"
       }
     ]
+  },
+  "pull": {
+    "parameters": []
   }
 }
 ```
@@ -315,6 +440,9 @@ The top elements are:
 - `up`: Object describing the parameters accepted by the `up` command
 - `down`: Object describing the parameters accepted by the `down` command
 - `stop`: Object describing the parameters accepted by the `stop` command (optional)
+- `pull`: Object describing the parameters accepted by the `pull` command (optional — declaring the block is
+  what opts the provider into [image distribution](#image-distribution); the flags Compose injects need not be
+  listed)
 
 And for each command parameter, you should include the following properties:
 - `name`: The parameter name (without `--` prefix)

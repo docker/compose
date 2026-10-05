@@ -18,8 +18,10 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -29,6 +31,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -95,8 +98,12 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
+	// shared across services — see restart.go's newOptionalLimiter comment
+	// for why a per-service limiter alone isn't enough.
+	limiter := newOptionalLimiter(s.maxConcurrency)
+
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		return s.downService(ctx, project, containers, options, service)
+		return s.downService(ctx, project, containers, options, service, limiter)
 	}, WithRootNodesAndDown(options.Services))
 	if err != nil {
 		return err
@@ -104,7 +111,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	orphans := containers.filter(isOrphaned(project))
 	if options.RemoveOrphans && len(orphans) > 0 {
-		err := s.removeContainers(ctx, orphans, nil, options.Timeout, false)
+		err := s.removeContainers(ctx, orphans, nil, options.Timeout, false, limiter)
 		if err != nil {
 			return err
 		}
@@ -114,24 +121,28 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	ops := s.ensureNetworksDown(ctx, project)
+	ops := s.ensureNetworksDown(ctx, project, limiter)
+	ops = append(ops, s.ensureRelayLinkNetworksDown(ctx, project, limiter)...)
 
 	if options.Images != "" {
-		imgOps, err := s.ensureImagesDown(ctx, project, options)
-		if err != nil {
-			return err
-		}
-		ops = append(ops, imgOps...)
+		ops = append(ops, s.ensureImagesDown(ctx, project, options, limiter)...)
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, project)...)
+		ops = append(ops, s.ensureVolumesDown(ctx, project, limiter)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
 		logrus.Warnf("Warning: No resource found to remove for project %q.", projectName)
 	}
 
+	// ops dispatch itself is intentionally unbounded: each op already gates
+	// its own engine call(s) on the shared limiter (network/volume ops
+	// directly, image ops internally via their own forEachWithLimiter call),
+	// so bounding this dispatch too on the same limiter would have an op
+	// hold a slot for its own fan-out to acquire from -- deadlocking once
+	// enough ops are in flight to exhaust it (see
+	// TestDown_NetworkAndImageRemovalShareConcurrencyBudget).
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, op := range ops {
 		eg.Go(op)
@@ -139,7 +150,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	return eg.Wait()
 }
 
-func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project) []downOp {
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, limiter *semaphore.Weighted) []downOp {
 	var ops []downOp
 	for _, vol := range project.Volumes {
 		if vol.External {
@@ -147,6 +158,10 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 		}
 		volumeName := vol.Name
 		ops = append(ops, func() error {
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
+			}
+			defer releaseSlot(limiter)
 			return s.removeVolume(ctx, volumeName)
 		})
 	}
@@ -154,50 +169,135 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions) ([]downOp, error) {
-	imagePruner := NewImagePruner(s.apiClient(), project)
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, limiter *semaphore.Weighted) []downOp {
 	pruneOpts := ImagePruneOptions{
 		Mode:          ImagePruneMode(options.Images),
 		RemoveOrphans: options.RemoveOrphans,
 	}
-	images, err := imagePruner.ImagesToPrune(ctx, pruneOpts)
-	if err != nil {
-		return nil, err
-	}
 
 	var ops []downOp
-	for i := range images {
-		img := images[i]
-		ops = append(ops, func() error {
-			return s.removeResource("Image "+img, func() error {
-				_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
-				return err
-			})
-		})
-	}
-
 	if pruneOpts.Mode != ImagePruneNone {
-		// mirrors ImagesToPrune's own orphan check: a dangling image from a
-		// service no longer in the project must be spared unless
-		// RemoveOrphans is set, same as that service's tagged image is.
-		keep := func(img image.Summary) bool {
-			if options.RemoveOrphans {
-				return false
-			}
-			_, err := project.GetService(img.Labels[api.ServiceLabel])
-			return err != nil
-		}
 		ops = append(ops, func() error {
-			return s.removeResource("Dangling images", func() error {
-				_, err := s.removeDanglingImages(ctx, project.Name, keep)
-				return err
-			})
+			return s.removeTaggedImagesOp(ctx, project, pruneOpts, limiter)
+		})
+
+		// a dangling image from a service no longer in the project must be
+		// spared unless RemoveOrphans is set, same as that service's tagged
+		// image is (imageBelongsToKnownService is ImagesToPrune's own check).
+		keep := func(img image.Summary) bool {
+			return !imageBelongsToKnownService(project, options.RemoveOrphans, img)
+		}
+		projectName := project.Name
+		ops = append(ops, func() error {
+			return s.removeDanglingImagesOp(ctx, projectName, keep, limiter)
 		})
 	}
-	return ops, nil
+	return ops
 }
 
-func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project) []downOp {
+// removeTaggedImagesOp computes the project's tagged images to prune and
+// removes them, deferring the listing (which itself calls the daemon and
+// can fail) to when the op actually runs, for the same reason
+// removeDanglingImagesOp does: a listing failure here must not abort
+// sibling down ops (network, volumes, dangling images), since — unlike
+// this op — they've already been scheduled onto the same errgroup by the
+// time `ensureImagesDown` used to fail synchronously.
+//
+// limiter is shared with the rest of down's ops (see down()'s comment) so
+// this op's fan-out doesn't spend its own full maxConcurrency budget on top
+// of removeDanglingImagesOp's, which runs concurrently with it.
+func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *types.Project, pruneOpts ImagePruneOptions, limiter *semaphore.Weighted) error {
+	images, err := NewImagePruner(s.apiClient(), project, limiter).ImagesToPrune(ctx, pruneOpts)
+	if err != nil {
+		s.events.On(errorEvent("Tagged images", err.Error()))
+		return err
+	}
+
+	var mu sync.Mutex
+	var errs []error
+	// forEachWithLimiter's own error handling isn't used here since a single
+	// image failure must not cancel the shared errgroup ctx (see
+	// TestRemoveTaggedImagesOp_ContinuesAfterOneImageFails) -- every failure
+	// is collected instead, so fn itself always returns nil.
+	_ = forEachWithLimiter(ctx, limiter, images, func(ctx context.Context, img string) error {
+		if err := s.removeResource("Image "+img, func() error {
+			_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
+			return err
+		}); err != nil {
+			mu.Lock()
+			errs = append(errs, err)
+			mu.Unlock()
+		}
+		return nil
+	})
+	return errors.Join(errs...)
+}
+
+// removeDanglingImagesOp lists a project's dangling images and removes those
+// not spared by keep, deferring both the listing and the removal to when the
+// op actually runs so a failure here can't abort the rest of `down` (this op
+// runs concurrently with the other resource-removal ops, same as any of
+// them).
+//
+// It stays silent when there's nothing to remove, mirroring removeNetwork's
+// silent skip. A listing failure surfaces under the "Dangling images" label
+// as a plain error rather than the normal Removing/Removed progression,
+// since at that point we don't know whether it would have been a no-op or
+// a real removal.
+//
+// A removal failure keeps the "Removed" label only if at least one image
+// actually got removed — with the error visible alongside it, not
+// replacing it — otherwise it's reported as a plain error. removeImages
+// also tolerates images that are already gone or still in use without that
+// being an error, so a nil error here doesn't mean every image was actually
+// removed either: stillInUse (a real, not-yet-achieved goal) is checked
+// separately, the same distinction removeResource already makes per tagged
+// image (an already-gone image simply isn't counted in either bucket).
+func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName string, keep func(image.Summary) bool, limiter *semaphore.Weighted) error {
+	eventID := "Dangling images"
+	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
+	if err != nil {
+		s.events.On(errorEvent(eventID, err.Error()))
+		return err
+	}
+	if len(eligible) == 0 {
+		return nil
+	}
+
+	s.events.On(removingEvent(eventID))
+	removed, stillInUse, err := s.removeImages(ctx, eligible, limiter)
+	var stillInUseNote string
+	if len(stillInUse) > 0 {
+		stillInUseNote = fmt.Sprintf("%d image(s) still in use", len(stillInUse))
+	}
+	switch {
+	case err != nil:
+		details := err.Error()
+		if stillInUseNote != "" {
+			details = fmt.Sprintf("%s; %s", details, stillInUseNote)
+		}
+		if len(removed) == 0 {
+			s.events.On(errorEvent(eventID, details))
+		} else {
+			s.events.On(newEvent(eventID, api.Warning, "Removed", details))
+		}
+	case len(stillInUse) > 0 && len(removed) == 0:
+		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use", stillInUseNote))
+	case len(stillInUse) > 0:
+		s.events.On(newEvent(eventID, api.Warning, "Removed", stillInUseNote))
+	case len(removed) == 0:
+		// every eligible image was already gone by the time we got to it:
+		// we already emitted "Removing", so this needs a terminal event
+		// too, not silence — same wording removeResource uses for a
+		// not-found tagged image.
+		s.events.On(newEvent(eventID, api.Done, "Warning: No resource found to remove"))
+	default:
+		s.events.On(removedEvent(eventID))
+	}
+	return err
+}
+
+func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, limiter *semaphore.Weighted) []downOp {
 	var ops []downOp
 	for key, n := range project.Networks {
 		if n.External {
@@ -207,6 +307,10 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 		networkKey := key
 		idOrName := n.Name
 		ops = append(ops, func() error {
+			if err := acquireSlot(ctx, limiter); err != nil {
+				return err
+			}
+			defer releaseSlot(limiter)
 			return s.removeNetwork(ctx, networkKey, project.Name, idOrName)
 		})
 	}
@@ -287,6 +391,15 @@ func (s *composeService) removeVolume(ctx context.Context, id string) error {
 	})
 }
 
+// classifyRemovalError reports whether a resource-removal error is a benign
+// "still in use" (Conflict) or "already gone" (NotFound) condition, as
+// opposed to a genuine failure that must be surfaced. Shared by
+// removeResource (single resource) and removeImages (a batch), so the two
+// can't independently drift on what counts as tolerable.
+func classifyRemovalError(err error) (stillInUse, alreadyGone bool) {
+	return errdefs.IsConflict(err), errdefs.IsNotFound(err)
+}
+
 // removeResource emits a "Removing" progress event, calls op, then emits the appropriate
 // completion event based on the error: nil→Removed, conflict→still-in-use warning, not-found→gone warning.
 func (s *composeService) removeResource(eventID string, op func() error) error {
@@ -296,11 +409,12 @@ func (s *composeService) removeResource(eventID string, op func() error) error {
 		s.events.On(newEvent(eventID, api.Done, "Removed"))
 		return nil
 	}
-	if errdefs.IsConflict(err) {
+	stillInUse, alreadyGone := classifyRemovalError(err)
+	if stillInUse {
 		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use"))
 		return nil
 	}
-	if errdefs.IsNotFound(err) {
+	if alreadyGone {
 		s.events.On(newEvent(eventID, api.Done, "Warning: No resource found to remove"))
 		return nil
 	}
@@ -335,24 +449,30 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	return nil
 }
 
-func (s *composeService) stopContainers(ctx context.Context, serv *types.ServiceConfig, containers []containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, ctr := range containers {
-		eg.Go(func() error {
-			return s.stopContainer(ctx, serv, ctr, timeout, listener)
-		})
-	}
-	return eg.Wait()
+func (s *composeService) stopContainers(
+	ctx context.Context,
+	serv *types.ServiceConfig,
+	containers []containerType.Summary,
+	timeout *time.Duration,
+	listener api.ContainerEventListener,
+	limiter *semaphore.Weighted,
+) error {
+	return forEachWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+		return s.stopContainer(ctx, serv, ctr, timeout, listener)
+	})
 }
 
-func (s *composeService) removeContainers(ctx context.Context, containers []containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, ctr := range containers {
-		eg.Go(func() error {
-			return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
-		})
-	}
-	return eg.Wait()
+func (s *composeService) removeContainers(
+	ctx context.Context,
+	containers []containerType.Summary,
+	service *types.ServiceConfig,
+	timeout *time.Duration,
+	volumes bool,
+	limiter *semaphore.Weighted,
+) error {
+	return forEachWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+		return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
+	})
 }
 
 func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr containerType.Summary, service *types.ServiceConfig, timeout *time.Duration, volumes bool) error {
@@ -382,10 +502,10 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 // own project containers — the relay deployed when it published endpoints —
 // and the plugin only removes the provider's own resource, so the containers
 // go first, mirroring up, which provisions the resource before the relay.
-func (s *composeService) downService(ctx context.Context, project *types.Project, containers Containers, options api.DownOptions, service string) error {
+func (s *composeService) downService(ctx context.Context, project *types.Project, containers Containers, options api.DownOptions, service string, limiter *semaphore.Weighted) error {
 	serv := project.Services[service]
 	serviceContainers := containers.filter(isService(service))
-	if err := s.removeContainers(ctx, serviceContainers, &serv, options.Timeout, options.Volumes); err != nil {
+	if err := s.removeContainers(ctx, serviceContainers, &serv, options.Timeout, options.Volumes, limiter); err != nil {
 		return err
 	}
 	if serv.Provider != nil {

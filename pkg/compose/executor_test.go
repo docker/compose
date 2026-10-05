@@ -19,10 +19,14 @@ package compose
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
@@ -40,14 +44,61 @@ func (noopEventProcessor) Start(_ context.Context, _ string) {}
 func (noopEventProcessor) On(_ ...api.Resource)              {}
 func (noopEventProcessor) Done(_ string, _ bool)             {}
 
-func newTestService(t *testing.T) (*composeService, *mocks.MockAPIClient) {
+// peakConcurrencyTracker records the highest number of overlapping
+// enter()/leave() pairs seen, used to assert a --parallel bound was honored.
+type peakConcurrencyTracker struct {
+	mu      sync.Mutex
+	current int
+	peak    int
+}
+
+func (t *peakConcurrencyTracker) enter() {
+	t.mu.Lock()
+	t.current++
+	if t.current > t.peak {
+		t.peak = t.current
+	}
+	t.mu.Unlock()
+}
+
+func (t *peakConcurrencyTracker) leave() {
+	t.mu.Lock()
+	t.current--
+	t.mu.Unlock()
+}
+
+func (t *peakConcurrencyTracker) Peak() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.peak
+}
+
+// nIndependentServiceContainers builds n services with no depends_on between
+// them — so InDependencyOrder/InReverseDependencyOrder dispatches them
+// concurrently — plus one non-oneoff container per service, used to assert a
+// limiter shared across service visits (see TestDown/TestStop
+// ConcurrencyIsBoundedAcrossServices).
+func nIndependentServiceContainers(n int) (*types.Project, []container.Summary) {
+	project := &types.Project{Name: "prj", Services: types.Services{}}
+	var containers []container.Summary
+	for i := range n {
+		name := fmt.Sprintf("svc%d", i)
+		project.Services[name] = types.ServiceConfig{Name: name}
+		containers = append(containers, testContainer(name, fmt.Sprintf("c%d", i), false))
+	}
+	return project, containers
+}
+
+func newTestService(t *testing.T, opts ...Option) (*composeService, *mocks.MockAPIClient) {
 	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	cli := mocks.NewMockCli(mockCtrl)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 
-	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	svc, err := NewComposeService(cli, append([]Option{WithEventProcessor(noopEventProcessor{})}, opts...)...)
 	assert.NilError(t, err)
 	return svc.(*composeService), apiClient
 }
@@ -174,6 +225,38 @@ func emptyObservedState(project string) *ObservedState {
 // Goes through newPlanExecutor + run (i.e. the same code path executePlan
 // uses in production) so the test exercises the errgroup, done-channel
 // wiring and group tracker — not a hand-rolled loop over executeNode.
+// A best-effort removal failure (stale pre_start hook runner purge) is
+// warn-only: the plan carries on, and the removal passes RemoveVolumes so the
+// runner's anonymous volumes go with it — the imperative purge semantics.
+func TestExecutePlanBestEffortRemoveContainerFailureTolerated(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	ctr := container.Summary{
+		ID:     "hook1",
+		Names:  []string{"/some-hook-runner"},
+		Labels: map[string]string{api.ServiceLabel: "web"},
+	}
+
+	apiClient.EXPECT().ContainerRemove(gomock.Any(), "hook1", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, opts client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			assert.Assert(t, opts.RemoveVolumes, "hook-runner purge must drop anonymous volumes")
+			return client.ContainerRemoveResult{}, errors.New("device or resource busy")
+		})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:          OpRemoveContainer,
+		ResourceID:    "hook:web:stale:hook1",
+		Cause:         "stale pre_start hook container",
+		Container:     &ctr,
+		RemoveVolumes: true,
+		BestEffort:    true,
+	}, "")
+
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), plan)
+	assert.NilError(t, err)
+}
+
 func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
@@ -285,6 +368,145 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 
 	assert.Equal(t, len(exec.containersByService["web"]), 0,
 		"all removed containers should be dropped from the live view")
+}
+
+// TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain guards that a
+// multi-level dependency chain still executes serially under
+// maxConcurrency=1 and completes rather than deadlocking. run() dispatches
+// every node's goroutine unconditionally and only acquires a concurrency
+// slot around the actual executeNode call (see run()'s comment), so this no
+// longer depends on plan.Nodes staying topologically sorted -- a goroutine
+// blocked on <-done[dep.ID] holds no slot for its dependency to starve on,
+// however plan.Nodes is ordered.
+func TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+
+	const depth = 3
+	ctrs := make([]container.Summary, depth)
+	for i := range ctrs {
+		ctrs[i] = container.Summary{
+			ID:    "c" + strconv.Itoa(i),
+			Names: []string{"/test-web-" + strconv.Itoa(i+1)},
+			Labels: map[string]string{
+				api.ServiceLabel:         "web",
+				api.ContainerNumberLabel: strconv.Itoa(i + 1),
+			},
+		}
+		apiClient.EXPECT().ContainerStop(gomock.Any(), ctrs[i].ID, gomock.Any()).
+			Return(client.ContainerStopResult{}, nil)
+	}
+
+	// A -> B -> C: each node depends on the previous one.
+	plan := &Plan{}
+	var last *PlanNode
+	for i := range ctrs {
+		var deps []*PlanNode
+		if last != nil {
+			deps = []*PlanNode{last}
+		}
+		last = plan.addNode(Operation{
+			Type:       OpStopContainer,
+			ResourceID: "service:web:" + strconv.Itoa(i+1),
+			Cause:      "chain",
+			Container:  &ctrs[i],
+		}, "", deps...)
+	}
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+
+	done := make(chan error, 1)
+	go func() { done <- exec.run(t.Context(), plan) }()
+
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("run() deadlocked on a serial dependency chain under maxConcurrency=1")
+	}
+}
+
+// TestExecutePlanIndependentNodeNotSerializedBehindADependencyWait guards
+// that a node with no unmet dependencies can run concurrently with an
+// unrelated node that's still waiting on its own dependency, instead of
+// being starved behind it. Before run() acquired its concurrency slot only
+// around executeNode, a waiting node's goroutine held its slot for the whole
+// wait, so on a wide/shallow DAG an independent, ready node could be blocked
+// from even dispatching until the waiter's chain finished -- the two
+// ContainerStop calls below could never overlap under the old behavior,
+// since the independent node's slot only freed once the dependency chain's
+// own goroutine (holding the other slot for its entire wait) had returned.
+func TestExecutePlanIndependentNodeNotSerializedBehindADependencyWait(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(2))
+
+	slow := container.Summary{ID: "c-slow", Names: []string{"/test-web-1"}, Labels: map[string]string{
+		api.ServiceLabel: "web", api.ContainerNumberLabel: "1",
+	}}
+	waiter := container.Summary{ID: "c-waiter", Names: []string{"/test-web-2"}, Labels: map[string]string{
+		api.ServiceLabel: "web", api.ContainerNumberLabel: "2",
+	}}
+	independent := container.Summary{ID: "c-independent", Names: []string{"/test-app-1"}, Labels: map[string]string{
+		api.ServiceLabel: "app", api.ContainerNumberLabel: "1",
+	}}
+
+	// slow blocks mid-call until the test releases it, so the assertion below
+	// is a deterministic happens-before check, not a timing race.
+	slowStarted := make(chan struct{})
+	slowRelease := make(chan struct{})
+	apiClient.EXPECT().ContainerStop(gomock.Any(), slow.ID, gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStopOptions) (client.ContainerStopResult, error) {
+			close(slowStarted)
+			<-slowRelease
+			return client.ContainerStopResult{}, nil
+		})
+	apiClient.EXPECT().ContainerStop(gomock.Any(), waiter.ID, gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+
+	independentStarted := make(chan struct{})
+	apiClient.EXPECT().ContainerStop(gomock.Any(), independent.ID, gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStopOptions) (client.ContainerStopResult, error) {
+			close(independentStarted)
+			return client.ContainerStopResult{}, nil
+		})
+
+	// slow -> waiter (waiter depends on slow); independent has no deps and
+	// shares no resource with either.
+	plan := &Plan{}
+	slowNode := plan.addNode(Operation{
+		Type: OpStopContainer, ResourceID: "service:web:1", Cause: "chain", Container: &slow,
+	}, "")
+	plan.addNode(Operation{
+		Type: OpStopContainer, ResourceID: "service:web:2", Cause: "chain", Container: &waiter,
+	}, "", slowNode)
+	plan.addNode(Operation{
+		Type: OpStopContainer, ResourceID: "service:app:1", Cause: "unrelated", Container: &independent,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+
+	done := make(chan error, 1)
+	go func() { done <- exec.run(t.Context(), plan) }()
+
+	select {
+	case <-slowStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("slow node never started")
+	}
+
+	select {
+	case <-independentStarted:
+		// the independent node ran while slow is still blocked -- it wasn't
+		// serialized behind the dependency chain's wait.
+	case <-time.After(2 * time.Second):
+		t.Fatal("independent node never started while the slow node (holding the other slot) was still running -- it was serialized behind the dependency chain")
+	}
+	close(slowRelease)
+
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("run() did not complete after releasing the slow node")
+	}
 }
 
 // TestExecutePlanRecreateVolume drives the destructive core of a volume
@@ -486,3 +708,83 @@ type conflictError struct{}
 
 func (conflictError) Error() string { return "conflict" }
 func (conflictError) Conflict()     {}
+
+// TestExecutePlanCreateHookContainer verifies the hook-runner create op: the
+// target replica is resolved from the executor's live view (lowest
+// container-number, mirroring what the start phase hands the hooks) and the
+// runner is created under the deterministic name carried by the operation.
+func TestExecutePlanCreateHookContainer(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: "1.44"}, nil).AnyTimes()
+	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
+
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}},
+		},
+	}
+	observed := &ObservedState{
+		ProjectName: "test",
+		Containers: map[string][]ObservedContainer{
+			"web": {
+				// Deliberately listed out of order: replica 2 first.
+				{ID: "c2", Summary: container.Summary{ID: "c2", Labels: map[string]string{api.ContainerNumberLabel: "2"}}},
+				{ID: "c1", Summary: container.Summary{ID: "c1", Labels: map[string]string{api.ContainerNumberLabel: "1"}}},
+			},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	var gotOpts client.ContainerCreateOptions
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			gotOpts = opts
+			return client.ContainerCreateResult{ID: "hook-1"}, nil
+		})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateHookContainer,
+		ResourceID: "hook:web:pre_start:0",
+		Cause:      "pre_start hook",
+		Service:    &service,
+		HookIndex:  0,
+		Name:       getHookContainerName("test", "web", 0),
+	}, "")
+
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, observed, plan)
+	assert.NilError(t, err)
+	assert.Equal(t, gotOpts.Name, "test-web-pre_start-0")
+	assert.DeepEqual(t, gotOpts.HostConfig.VolumesFrom, []string{"c1"})
+	assert.Equal(t, gotOpts.Config.Labels[api.HookIndexLabel], "0")
+}
+
+// TestExecutePlanCreateHookContainerNoReplica: a hook-create node scheduled
+// with no replica in the live view is an internal planning error — the
+// reconciler guarantees the node depends on the replica's create.
+func TestExecutePlanCreateHookContainerNoReplica(t *testing.T) {
+	svc, _ := newTestService(t)
+
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart:      []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateHookContainer,
+		ResourceID: "hook:web:pre_start:0",
+		Cause:      "pre_start hook",
+		Service:    &service,
+		HookIndex:  0,
+		Name:       getHookContainerName("test", "web", 0),
+	}, "")
+
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), plan)
+	assert.ErrorContains(t, err, `no "web" container`)
+}

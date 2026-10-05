@@ -42,7 +42,7 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	return forEachContainerConcurrent(ctx, containers, func(ctx context.Context, ctr container.Summary) error {
+	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		_, err := s.apiClient().ContainerPause(ctx, ctr.ID, client.ContainerPauseOptions{})
 		if err == nil {
 			s.events.On(newEvent(getContainerProgressName(ctr), api.Done, "Paused"))
@@ -67,7 +67,7 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	return forEachContainerConcurrent(ctx, containers, func(ctx context.Context, ctr container.Summary) error {
+	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		_, err := s.apiClient().ContainerUnpause(ctx, ctr.ID, client.ContainerUnpauseOptions{})
 		if err == nil {
 			s.events.On(newEvent(getContainerProgressName(ctr), api.Done, "Unpaused"))

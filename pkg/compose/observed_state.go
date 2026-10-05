@@ -46,6 +46,13 @@ type ObservedState struct {
 	// others as orphans (see selectNetwork/selectVolume).
 	Networks map[string][]ObservedNetwork // compose network key → observed
 	Volumes  map[string][]ObservedVolume  // compose volume key → observed
+	// HookContainers are ephemeral lifecycle-hook runners (HookLabel set),
+	// per service: fresh runners prepared by a previous plan and not yet
+	// consumed, or leftovers of a run that failed before removing them.
+	// Whenever the hooks are going to run again, the reconciler purges every
+	// observed runner and plans fresh ones (see planPreStartHookRunners), so
+	// the set always converges to the current service definition.
+	HookContainers map[string][]ObservedContainer // service name → hook containers
 }
 
 // selectNetwork picks, among the live networks recorded for a compose key, the
@@ -140,6 +147,49 @@ type ObservedVolume struct {
 
 // collectObservedState queries the Docker daemon for all resources belonging to
 // the given project and returns a structured snapshot.
+// mergeHookContainers appends the pre_start hook runner containers to raw.
+// Runners deliberately carry no ConfigHashLabel (kept invisible to ps/start's
+// default listing, which requires it -- see createPreStartContainer) -- so
+// getContainers' filters never return them, and they must be listed
+// separately, by project+hook label alone, or the classification loop never
+// sees them: stale runners would never be purged, and the next deterministic
+// create would fail with a name conflict against the one left behind. The
+// extra round-trip is only paid when the model declares pre_start hooks at
+// all. Accepted corner: a runner whose service left the model is only
+// classified (and swept by --remove-orphans) while some remaining service
+// still declares pre_start hooks -- `down` removes it by hook label
+// regardless (see removePreStartHookContainers).
+func (s *composeService) mergeHookContainers(ctx context.Context, project *types.Project, raw Containers) (Containers, error) {
+	hasPreStartHooks := false
+	for _, svc := range project.Services {
+		if len(svc.PreStart) > 0 {
+			hasPreStartHooks = true
+			break
+		}
+	}
+	if !hasPreStartHooks {
+		return raw, nil
+	}
+	hookRaw, err := s.getHookContainers(ctx, project.Name)
+	if err != nil {
+		return nil, err
+	}
+	// A legacy runner created before this ConfigHashLabel exclusion existed
+	// (or by an older compose version) can still carry the label, and so
+	// already be present in raw: append only the IDs raw doesn't already
+	// have, or it would be classified -- and scheduled for removal -- twice.
+	seen := make(map[string]bool, len(raw))
+	for _, ctr := range raw {
+		seen[ctr.ID] = true
+	}
+	for _, ctr := range hookRaw {
+		if !seen[ctr.ID] {
+			raw = append(raw, ctr)
+		}
+	}
+	return raw, nil
+}
+
 // The project model is used to classify containers by service and to identify
 // orphans, and to scope network/volume queries to declared resources.
 func (s *composeService) collectObservedState(ctx context.Context, project *types.Project) (*ObservedState, error) {
@@ -148,6 +198,8 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		Containers:  map[string][]ObservedContainer{},
 		Networks:    map[string][]ObservedNetwork{},
 		Volumes:     map[string][]ObservedVolume{},
+
+		HookContainers: map[string][]ObservedContainer{},
 	}
 
 	// --- Containers ---
@@ -155,6 +207,10 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	// FINISHED ones are classified as orphans below (see isOrphaned), so `up`
 	// can warn about them and `--remove-orphans` can clean them up.
 	raw, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return nil, err
+	}
+	raw, err = s.mergeHookContainers(ctx, project, raw)
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +226,18 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 
 	for _, ctr := range raw {
 		svcName := ctr.Labels[api.ServiceLabel]
+		if ctr.Labels[api.HookLabel] != "" && knownServices[svcName] {
+			// lifecycle-hook containers (ephemeral pre_start runners) are
+			// neither service replicas nor one-offs: classified apart, so
+			// they never masquerade as a replica (they carry no
+			// container-number label and would otherwise read as number 0)
+			// and the reconciler can plan purging stale ones. A hook
+			// container whose service left the model falls through to the
+			// orphan check below instead — nothing plans purges for an
+			// unknown service, and --remove-orphans must keep cleaning it.
+			state.HookContainers[svcName] = append(state.HookContainers[svcName], toObservedContainer(ctr))
+			continue
+		}
 		if isNotOneOff(ctr) && knownServices[svcName] {
 			state.Containers[svcName] = append(state.Containers[svcName], toObservedContainer(ctr))
 		} else if isOrphaned(project)(ctr) {

@@ -20,8 +20,10 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
@@ -169,4 +171,43 @@ func TestRestartContainerSkipsHooksForRelay(t *testing.T) {
 
 	err := svc.restartContainer(t.Context(), service, relay, api.RestartOptions{})
 	assert.NilError(t, err)
+}
+
+// TestRestart_ConcurrencyIsBoundedAcrossServices guards against a regression
+// (PR #14177 review) where each service's per-container fan-out got its own
+// maxConcurrency budget: with several independent services ready at once,
+// the dependency-order traversal could run all of them in parallel, each
+// spawning up to maxConcurrency ContainerRestart calls — up to N times the
+// documented --parallel bound. The limiter must be shared across services.
+func TestRestart_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+	apiClient.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: "1.44"}, nil).AnyTimes()
+	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
+
+	const numServices = 4
+	project := &types.Project{Name: "prj", Services: types.Services{}}
+	var containers Containers
+	for i := range numServices {
+		name := fmt.Sprintf("svc%d", i)
+		project.Services[name] = types.ServiceConfig{Name: name}
+		containers = append(containers, serviceContainer(name, 1, container.StateRunning))
+	}
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: containers}, nil)
+
+	tracker := &peakConcurrencyTracker{}
+	apiClient.EXPECT().ContainerRestart(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerRestartOptions) (client.ContainerRestartResult, error) {
+			tracker.enter()
+			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+			tracker.leave()
+			return client.ContainerRestartResult{}, nil
+		}).
+		Times(numServices)
+
+	err := svc.restart(t.Context(), "prj", api.RestartOptions{Project: project})
+	assert.NilError(t, err)
+	assert.Equal(t, tracker.Peak(), 1, "restart must never run more than maxConcurrency ContainerRestart calls at once")
 }

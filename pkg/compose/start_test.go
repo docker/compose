@@ -20,10 +20,12 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -117,6 +119,53 @@ func serviceContainer(service string, num int, state container.ContainerState) c
 	}
 }
 
+// TestStart_ConcurrencyIsBoundedAcrossServices guards against the same
+// per-service budget leak fixed on restart.go/down.go/stop.go:
+// InDependencyOrder dispatches independent services concurrently, and
+// startService's own per-container loop is sequential, so a missing
+// node-level maxConcurrency option left the dispatch itself unbounded.
+// ContainerStart is serialized process-wide by startMx regardless of this
+// bound, so the injected-secret copy (which isn't) is used as the observable
+// signal instead.
+func TestStart_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
+	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+
+	const numServices = 4
+	project := &types.Project{Name: "prj", Services: types.Services{}, Secrets: types.Secrets{}}
+	var containers []container.Summary
+	for i := range numServices {
+		name := fmt.Sprintf("svc%d", i)
+		secretName := fmt.Sprintf("secret%d", i)
+		project.Secrets[secretName] = types.SecretConfig{Name: secretName, Content: "shh"}
+		project.Services[name] = types.ServiceConfig{
+			Name:          name,
+			ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: secretName}}},
+		}
+		containers = append(containers, testContainer(name, fmt.Sprintf("c%d", i), false))
+	}
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: containers}, nil)
+
+	tracker := &peakConcurrencyTracker{}
+	apiClient.EXPECT().CopyToContainer(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+			tracker.enter()
+			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
+			tracker.leave()
+			return client.CopyToContainerResult{}, nil
+		}).
+		Times(numServices)
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).
+		Times(numServices)
+
+	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project}, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, tracker.Peak(), 1, "start must never dispatch more than maxConcurrency services concurrently")
+}
+
 func TestStartService_AlreadyRunningIsSilent(t *testing.T) {
 	svc, _, rec := newStartTestService(t)
 
@@ -190,11 +239,11 @@ func TestStartService_StartsOnlyStoppedReplicas(t *testing.T) {
 	})
 }
 
-// TestStartService_PreStartOnLowestReplica locks the pre_start gating: with no
-// replica running, the hooks run exactly once, against the replica with the
-// lowest container-number — regardless of the order the daemon listed them in
-// — and before any service container is started.
-func TestStartService_PreStartOnLowestReplica(t *testing.T) {
+// TestStartService_PreStartRunsBeforeReplicas locks the pre_start gating: with
+// no replica running, the hooks run exactly once — executing the runner
+// container the reconciliation plan prepared — and before any service
+// container is started.
+func TestStartService_PreStartRunsBeforeReplicas(t *testing.T) {
 	svc, apiClient, _ := newStartTestService(t)
 
 	project := &types.Project{Name: "prj"}
@@ -209,21 +258,13 @@ func TestStartService_PreStartOnLowestReplica(t *testing.T) {
 	// Listed out of order on purpose: replica 2 first.
 	containers := Containers{replica2, replica1}
 
-	// runPreStart sweeps orphan hook containers from any previous failed run
-	// before creating the new one.
-	orphanScan := apiClient.EXPECT().
+	// runPreStart looks up the runner containers prepared by the plan.
+	runnerScan := apiClient.EXPECT().
 		ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{}, nil)
+		Return(client.ContainerListResult{Items: []container.Summary{runnerSummary("hook-1", 0)}}, nil)
 
-	// The hook container shares the volumes of the lowest-numbered replica.
-	hookCreate := apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
-		After(orphanScan).
-		DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
-			assert.DeepEqual(t, opts.HostConfig.VolumesFrom, []string{replica1.ID})
-			return client.ContainerCreateResult{ID: "hook-1"}, nil
-		})
 	hookWait := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
-		Return(waitResultExit(0)).After(hookCreate)
+		Return(waitResultExit(0)).After(runnerScan)
 	// streamPreStartLogs always opens ContainerLogs (even with nil listener) so
 	// the tail is available for failure error messages.
 	hookLogs := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).

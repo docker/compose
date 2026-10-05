@@ -26,7 +26,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -55,6 +54,23 @@ func (s *composeService) getContainers(ctx context.Context, projectName string, 
 		containers = containers.filter(isService(selectedServices...))
 	}
 	return containers, nil
+}
+
+// getHookContainers returns every pre_start hook runner container in the
+// project, in any state. Hook runners deliberately carry no ConfigHashLabel
+// (see createPreStartContainer), so they are invisible to getContainers'
+// default filters and must be listed by project+hook label alone.
+func (s *composeService) getHookContainers(ctx context.Context, projectName string) (Containers, error) {
+	f := projectFilter(projectName)
+	f.Add("label", hookFilter(preStartHookType))
+	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: f,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return Containers(res.Items), nil
 }
 
 // getContainersByService returns all non-oneoff containers for the project, grouped by service name.
@@ -170,6 +186,14 @@ func isNotOneOff(c container.Summary) bool {
 	return !ok || v == "False"
 }
 
+// isNotHookContainer excludes pre_start hook runners: they carry the same
+// project/service labels as a real replica (and no one-off label either)
+// while being none -- starting one, or counting it as a surviving replica,
+// is always wrong.
+func isNotHookContainer(c container.Summary) bool {
+	return c.Labels[api.HookLabel] == ""
+}
+
 func isNotRunning(c container.Summary) bool {
 	return c.State != container.StateRunning
 }
@@ -185,9 +209,13 @@ func (containers Containers) filter(predicates ...containerPredicate) Containers
 	return filtered
 }
 
-// forEachContainerConcurrent runs fn for every container concurrently and waits for all goroutines.
-func forEachContainerConcurrent(ctx context.Context, containers Containers, fn func(context.Context, container.Summary) error) error {
-	eg, ctx := errgroup.WithContext(ctx)
+// forEachContainerConcurrent runs fn for every container concurrently and
+// waits for all goroutines. Use forEachWithLimiter (compose.go)
+// instead when the concurrency budget must be shared across several
+// concurrently-dispatched calls, e.g. one per service visited by
+// InDependencyOrder.
+func forEachContainerConcurrent(ctx context.Context, maxConcurrency int, containers Containers, fn func(context.Context, container.Summary) error) error {
+	eg, ctx := newLimitedErrgroup(ctx, maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return fn(ctx, ctr)

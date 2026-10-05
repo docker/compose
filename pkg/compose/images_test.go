@@ -423,7 +423,7 @@ func TestPlatformPinnedDigest(t *testing.T) {
 			Return(client.ImageInspectResult{InspectResponse: multiPlatform}, nil)
 
 		project := newProject()
-		assert.NilError(t, tested.ensureImagesExists(t.Context(), project, nil, true))
+		assert.NilError(t, tested.ensureImagesExists(t.Context(), project, nil, true, false))
 		assert.Equal(t, project.Services["app"].CustomLabels[compose.ImageDigestLabel], "sha256:s390x")
 	})
 
