@@ -355,10 +355,15 @@ func bakeOutputs(service types.ServiceConfig, options api.BuildOptions) (outputs
 
 // localBuildPaths returns the build context paths that live on the local
 // filesystem — remote (git or URL) contexts need no fs.read entitlement.
+// The Dockerfile is included when it lives on the host: bake grants fs.read
+// per path, and a dockerfile outside the context is not covered by it.
 func localBuildPaths(buildConfig types.BuildConfig) []string {
 	paths := []string{buildConfig.Context}
 	for _, path := range buildConfig.AdditionalContexts {
 		paths = append(paths, path)
+	}
+	if df := localDockerfilePath(buildConfig); df != "" {
+		paths = append(paths, df)
 	}
 	var local []string
 	for _, path := range paths {
@@ -367,6 +372,20 @@ func localBuildPaths(buildConfig types.BuildConfig) []string {
 		}
 	}
 	return local
+}
+
+// localDockerfilePath is the host path bake will read for dockerfile:, when
+// the context itself is local. Git and remote contexts keep the Dockerfile
+// inside the remote source, so they get no extra fs.read grant.
+func localDockerfilePath(buildConfig types.BuildConfig) string {
+	if buildConfig.Dockerfile == "" {
+		return ""
+	}
+	contextType, _ := build.DetectContextType(buildConfig.Context)
+	if contextType == build.ContextTypeGit || contextType == build.ContextTypeRemote || strings.Contains(buildConfig.Context, "://") {
+		return ""
+	}
+	return dockerFilePath(buildConfig.Context, buildConfig.Dockerfile)
 }
 
 // bakeMetadataPath picks a fresh temporary path for bake's --metadata-file.

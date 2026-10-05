@@ -20,12 +20,53 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
 	"gotest.tools/v3/assert"
 )
+
+func TestLocalBuildPathsIncludesDockerfileOutsideContext(t *testing.T) {
+	ctxDir := t.TempDir()
+	outside := t.TempDir()
+	df := filepath.Join(outside, "Dockerfile")
+	assert.NilError(t, os.WriteFile(df, []byte("FROM scratch\n"), 0o644))
+
+	resolvedDir, err := filepath.EvalSymlinks(outside)
+	assert.NilError(t, err)
+	wantDF := filepath.Join(resolvedDir, "Dockerfile")
+
+	got := localBuildPaths(types.BuildConfig{
+		Context:    ctxDir,
+		Dockerfile: df,
+		AdditionalContexts: map[string]string{
+			"extra": "https://github.com/docker/compose.git",
+		},
+	})
+	assert.Assert(t, containsPath(got, ctxDir))
+	assert.Assert(t, containsPath(got, wantDF))
+	for _, p := range got {
+		assert.Assert(t, !strings.Contains(p, "://"), "remote context should not be granted: %s", p)
+	}
+
+	remote := localBuildPaths(types.BuildConfig{
+		Context:    "https://github.com/docker/compose.git",
+		Dockerfile: "Dockerfile",
+	})
+	assert.Equal(t, len(remote), 0)
+}
+
+func containsPath(paths []string, want string) bool {
+	for _, p := range paths {
+		if p == want {
+			return true
+		}
+	}
+	return false
+}
 
 func TestBakeTargetNames(t *testing.T) {
 	project := &types.Project{
