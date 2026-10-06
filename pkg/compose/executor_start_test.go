@@ -84,7 +84,7 @@ func TestExecWaitCondition_RequiredMissingDependencyFails(t *testing.T) {
 	svc, _, _ := newStartPhaseTestService(t)
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
 
-	err := exec.execWaitCondition(t.Context(), Operation{
+	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
 		Name:      "db",
 		Condition: types.ServiceConditionHealthy,
 	})
@@ -99,7 +99,7 @@ func TestExecWaitCondition_OptionalMissingDependencyIsTolerated(t *testing.T) {
 	svc, _, recorder := newStartPhaseTestService(t)
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
 
-	err := exec.execWaitCondition(t.Context(), Operation{
+	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
 		BestEffort: true,
@@ -141,7 +141,7 @@ func TestExecWaitCondition_HealthyConditionSatisfied(t *testing.T) {
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed, nil)
 	exec.containersByService["db"] = Containers{dbSummary}
 
-	err := exec.execWaitCondition(t.Context(), Operation{
+	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
 		Name:      "db",
 		Condition: types.ServiceConditionHealthy,
 	})
@@ -263,6 +263,113 @@ func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
 
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Assert(t, elapsed < 5*time.Second, "waitTimeout did not bound the stuck OpWaitCondition node (took %s)", elapsed)
+}
+
+// TestExecutePlanOptionalWaitDoesNotSwallowInheritedDeadline is a regression
+// test for a Copilot review finding on #14290: waitDependency originally
+// tolerated any DeadlineExceeded on an optional dependency as long as the
+// caller had configured a timeout at all (exec.waitTimeout > 0), regardless
+// of whether THIS wait's own timeout, or an earlier deadline inherited from
+// the caller's own ctx, was the one that actually fired. Both make
+// ctx.Done() report DeadlineExceeded once the earlier of the two elapses, so
+// a bare "did I configure a timeout" flag can't tell them apart -- an
+// optional dependency would then silently swallow a real external deadline
+// (e.g. the process's own context, or a test harness timeout) and report
+// success. This plan's single OpWaitCondition node never resolves
+// (BestEffort: true) and exec.waitTimeout is set far longer than the ctx
+// passed into exec.run, so the INHERITED deadline is always the one that
+// fires first: the error must still propagate, not be tolerated as if
+// exec.waitTimeout itself had elapsed.
+func TestExecutePlanOptionalWaitDoesNotSwallowInheritedDeadline(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+		BestEffort: true,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	exec.waitTimeout = 10 * time.Second
+
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err := exec.run(ctx, plan)
+	elapsed := time.Since(start)
+
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "an inherited deadline must not be swallowed just because this wait is optional and exec.waitTimeout is set")
+	assert.Assert(t, elapsed < 5*time.Second, "took too long to fail on the inherited deadline (took %s)", elapsed)
+}
+
+// TestExecutePlanOptionalWaitTimeoutIsToleratedWithoutInheritedDeadline is
+// the positive-case counterpart to
+// TestExecutePlanOptionalWaitDoesNotSwallowInheritedDeadline: with no
+// inherited deadline at all (plain t.Context() passed into exec.run), this
+// wait's own exec.waitTimeout elapsing on an optional dependency must still
+// be tolerated as before (nil, not an error) -- the origCtx refactor must
+// not have turned every DeadlineExceeded into a hard failure.
+func TestExecutePlanOptionalWaitTimeoutIsToleratedWithoutInheritedDeadline(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+		BestEffort: true,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	exec.waitTimeout = 200 * time.Millisecond
+
+	start := time.Now()
+	err := exec.run(t.Context(), plan)
+	elapsed := time.Since(start)
+
+	assert.NilError(t, err, "exec.waitTimeout elapsing on its own, with no inherited deadline, must still be tolerated for an optional dependency")
+	assert.Assert(t, elapsed < 5*time.Second, "took too long (took %s)", elapsed)
 }
 
 // TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase is a regression test

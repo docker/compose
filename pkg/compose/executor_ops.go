@@ -220,13 +220,16 @@ func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summa
 // optional-dependency handling.
 //
 // Unlike waitDependencies, this has no timeout of its own to apply here --
-// ctx is used exactly as given. upDetached (up.go) is the caller that needs
-// one: planExecutor.waitTimeout gives this node its own fresh per-wait
-// window, derived in executeNode's OpWaitCondition dispatch rather than
-// here, the same thing start()'s own WaitTimeout already threads through
+// ctx is used exactly as given, already wrapped (or not) by executeNode's
+// OpWaitCondition dispatch in executor.go. origCtx is ctx as it stood right
+// before that wrap, passed through unchanged to waitDependency, which needs
+// it to tell its own wait timeout apart from an inherited deadline (see its
+// doc comment). upDetached (up.go) is the caller that needs a timeout here
+// at all: planExecutor.waitTimeout gives this node its own fresh per-wait
+// window, the same thing start()'s own WaitTimeout already threads through
 // every waitDependencies call -- without also bounding unrelated Create or
 // Start work the way wrapping the whole plan's ctx would.
-func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op Operation) error {
 	s := exec.compose
 	exec.containersMu.Lock()
 	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
@@ -250,11 +253,7 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 	// practically unreachable log line (an unsupported depends_on condition,
 	// filtered out before a plan is ever built).
 	//
-	// exec.waitTimeout > 0 is exactly the condition under which executeNode's
-	// OpWaitCondition dispatch wrapped ctx with its own per-node timeout (see
-	// executor.go) -- the same flag waitDependency needs to tell that wrap
-	// apart from a deadline inherited from further up the chain.
-	return s.waitDependency(ctx, exec.waitTimeout > 0, op.ResourceID, op.Name, config, waitingFor)
+	return s.waitDependency(ctx, origCtx, op.ResourceID, op.Name, config, waitingFor)
 }
 
 // execRunPreStart runs the service's pre_start hooks against the runner
