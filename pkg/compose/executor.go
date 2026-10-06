@@ -160,23 +160,24 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
 
-	// Cancellation is phase-scoped, not plan-wide: createCtx is canceled by a
-	// Create-phase node failing; startCtx, derived from it, is ALSO canceled
-	// by a Start-phase node failing. A Start-phase failure (an OpWaitCondition
-	// hitting --wait-timeout, a container failing to start, anything) must
-	// never cancel createCtx -- doing so would abort unrelated, still
-	// in-flight Create-phase work (a sibling service's container create, a
-	// network create) that has nothing to do with it. The old
-	// create()-then-start() sequence never had this failure mode: the whole
-	// create phase had always finished before any dependency wait, or
-	// anything else in the start phase, even began. A Create-phase failure
-	// still cancels the Start phase too, via createCtx's cancellation
-	// propagating to the startCtx derived from it -- matching the old
-	// sequence, where start() was never even called once create() failed.
-	createCtx, cancelCreateCtx := context.WithCancel(ctx)
-	defer cancelCreateCtx()
-	startCtx, cancelStartCtx := context.WithCancel(createCtx)
-	defer cancelStartCtx()
+	// Cancellation is phase-scoped, not plan-wide: the Create phase is
+	// canceled by a Create-phase node failing; the Start phase, derived from
+	// it, is ALSO canceled by a Start-phase node failing. A Start-phase
+	// failure (an OpWaitCondition hitting --wait-timeout, a container failing
+	// to start, anything) must never cancel the Create phase -- doing so
+	// would abort unrelated, still in-flight Create-phase work (a sibling
+	// service's container create, a network create) that has nothing to do
+	// with it. The old create()-then-start() sequence never had this failure
+	// mode: the whole create phase had always finished before any dependency
+	// wait, or anything else in the start phase, even began. A Create-phase
+	// failure still cancels the Start phase too, via the Create phase's
+	// cancellation propagating to the Start phase derived from it --
+	// matching the old sequence, where start() was never even called once
+	// create() failed.
+	createPhase := newPhaseCancel(ctx)
+	defer createPhase.cancel()
+	startPhase := newPhaseCancel(createPhase.ctx)
+	defer startPhase.cancel()
 
 	rs := &runState{
 		done:             done,
@@ -185,10 +186,8 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 		groups:           groups,
 		events:           events,
 		limiter:          newOptionalLimiter(exec.compose.maxConcurrency),
-		createCtx:        createCtx,
-		cancelCreateCtx:  cancelCreateCtx,
-		startCtx:         startCtx,
-		cancelStartCtx:   cancelStartCtx,
+		createPhase:      createPhase,
+		startPhase:       startPhase,
 	}
 	eg := errgroup.Group{}
 	for _, node := range plan.Nodes {
@@ -197,7 +196,63 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 		})
 	}
 
-	return eg.Wait()
+	err := eg.Wait()
+	// A phase's own recorded error -- set by whichever node first triggered
+	// that phase's cancellation (see phaseCancel.fail) -- is authoritative
+	// over whatever eg.Wait() itself picked: once cancellation starts
+	// unblocking siblings, more than one goroutine can be mid-return at the
+	// same time, and errgroup.Group's own first-error-wins race has no idea
+	// which of them was the actual cause versus just a cancellation casualty
+	// (a sibling's <-nodeCtx.Done() bail returning a bare context.Canceled
+	// that reveals nothing). Create takes precedence over Start: a Create
+	// failure is the more fundamental one of the two (it's what canceled
+	// Start in the first place, transitively, when both end up set).
+	if createPhase.err != nil {
+		return createPhase.err
+	}
+	if startPhase.err != nil {
+		return startPhase.err
+	}
+	return err
+}
+
+// phaseCancel bundles one phase's cancellation context with the bookkeeping
+// needed to make exactly one node's failure authoritative for it: fail is
+// called by every node in this phase that errors out, but its body -- the
+// event emission and the actual ctx cancellation -- runs for only the first
+// caller, via once. That single gate point fixes two related races a plain
+// "if nodeCtx.Err() == nil" check can't: two genuinely concurrent failures
+// in the same phase racing to emit onNodeError (the old errgroup.WithContext
+// made this vanishingly unlikely by canceling ctx atomically with recording
+// the error; splitting cancellation into our own explicit call reopened the
+// window), and errgroup.Group's own first-error-wins race picking a
+// cancellation casualty's bare context.Canceled over the actual originating
+// error once cancellation starts unblocking siblings (see run()'s use of
+// err, set here, instead of eg.Wait()'s own return value).
+type phaseCancel struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	once   sync.Once
+	err    error
+}
+
+func newPhaseCancel(parent context.Context) *phaseCancel {
+	p := &phaseCancel{}
+	p.ctx, p.cancel = context.WithCancel(parent)
+	return p
+}
+
+// fail registers node's failure as this phase's cause, for the first caller
+// only: it emits the group error event and cancels the phase's context. Any
+// later caller's err is silently dropped -- by the time it could run, this
+// phase is already canceled, so it is never anything but a cancellation
+// casualty of the first failure, not a new one of its own.
+func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *groupTracker, err error) {
+	p.once.Do(func() {
+		p.err = err
+		groups.onNodeError(node, events, err)
+		p.cancel()
+	})
 }
 
 // runState carries the per-run() state every node's goroutine shares: the
@@ -212,20 +267,29 @@ type runState struct {
 	groups           *groupTracker
 	events           api.EventProcessor
 	limiter          *semaphore.Weighted
-	createCtx        context.Context
-	cancelCreateCtx  context.CancelFunc
-	startCtx         context.Context
-	cancelStartCtx   context.CancelFunc
+	createPhase      *phaseCancel
+	startPhase       *phaseCancel
 }
 
 // runNode executes one plan node: waits for its dependencies, skips it if
 // one of them failed, then dispatches it and records the outcome. See run()
-// for the phase-scoped cancellation (createCtx/startCtx) this draws from.
+// for the phase-scoped cancellation (createPhase/startPhase) this draws
+// from.
 func (exec *planExecutor) runNode(node *PlanNode, rs *runState) error {
-	nodeCtx, cancelPhase := rs.createCtx, rs.cancelCreateCtx
+	phase := rs.createPhase
 	if node.Phase == PhaseStart {
-		nodeCtx, cancelPhase = rs.startCtx, rs.cancelStartCtx
+		phase = rs.startPhase
 	}
+	nodeCtx := phase.ctx
+
+	// Every exit path below must close rs.done[node.ID] exactly once, or a
+	// dependent blocks on it forever: deferred once here instead of before
+	// each individual return, so a future added exit path can't reintroduce
+	// the gap the original dependency-wait early-return had (no reachable
+	// hang today -- every dependent in the same phase shares this same
+	// nodeCtx, already canceled by the time it would matter -- but nothing
+	// enforces that staying true as the plan DAG grows new shapes).
+	defer close(rs.done[node.ID])
 
 	// Wait for all dependencies
 	for _, dep := range node.DependsOn {
@@ -246,13 +310,11 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState) error {
 		// every hop would compound "dependency failed: " prefixes down a
 		// multi-node chain (create -> pre_start -> start -> post_start).
 		rs.recordFailure(node.ID, err)
-		close(rs.done[node.ID])
 		return fmt.Errorf("dependency failed: %w", err)
 	}
 
 	if err := acquireSlot(nodeCtx, rs.limiter); err != nil {
 		rs.recordFailure(node.ID, err)
-		close(rs.done[node.ID])
 		return err
 	}
 	defer releaseSlot(rs.limiter)
@@ -265,22 +327,20 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState) error {
 	if err == nil {
 		// Emit group done event if this is the last node of a group
 		rs.groups.onNodeDone(node, rs.events)
-	} else {
-		rs.recordFailure(node.ID, err)
-		if nodeCtx.Err() == nil {
-			rs.groups.onNodeError(node, rs.events, err)
-			// This node's own failure, not an inherited cancellation:
-			// propagate it to this node's own phase (and, if it's a
-			// Create-phase node, transitively to Start via startCtx's
-			// derivation) -- never the other way around. Gated the same as
-			// the event above: a node whose nodeCtx is already canceled
-			// failed because of that cancellation, not a new failure of its
-			// own to propagate.
-			cancelPhase()
-		}
+		return nil
 	}
 
-	close(rs.done[node.ID])
+	rs.recordFailure(node.ID, err)
+	if nodeCtx.Err() == nil {
+		// This node's own failure, not an inherited cancellation: a node
+		// whose nodeCtx is already canceled failed because of that
+		// cancellation, not a new failure of its own to propagate. phase.fail
+		// itself gates on being the first such failure in this phase (see its
+		// doc comment) -- this outer check only spares every later,
+		// cancellation-casualty caller the cost of building the error-event
+		// payload it would be dropped anyway.
+		phase.fail(node, rs.events, rs.groups, err)
+	}
 	return err
 }
 

@@ -21,6 +21,7 @@ package compose
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -394,6 +395,58 @@ func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 		t.Fatal("VolumeCreate's ctx was never canceled -- a sibling Create-phase failure should still fail fast")
 	}
 	assert.ErrorIs(t, volumeCreateCtxErr, context.Canceled, "VolumeCreate's ctx must be canceled by a sibling Create-phase node failing")
+}
+
+// TestExecutePlanConcurrentPhaseFailureKeepsOriginatingError exercises a
+// Copilot/docker-agent finding on the phase-scoped cancellation fix:
+// errgroup.Group's plain Wait() returns whichever goroutine's error reaches
+// its internal sync.Once first, with no idea which one actually caused the
+// others to fail -- a sibling unblocked by a phase's cancellation and
+// returning a bare context.Canceled of its own could in principle win that
+// race over the originating node's real error. phaseCancel's own sync.Once
+// records the first failure explicitly, and run() prefers it over
+// eg.Wait()'s own pick, closing that window regardless of goroutine
+// scheduling. This test runs the scenario under real concurrency (one
+// immediately-failing node alongside many siblings unblocked by its
+// cancellation, via dependency-wait on a PlanNode ID never added to the
+// plan -- rs.done[dep.ID] is then a nil map entry, so the only way out of
+// the select is <-nodeCtx.Done(), firing the instant the phase cancels) and
+// asserts the real error always surfaces. Note: in practice the Go runtime
+// never actually lets a sibling win this race in this in-process test --
+// the originating goroutine keeps running uninterrupted through its own
+// short return path before the scheduler gets around to any of the
+// newly-runnable siblings -- so reverting the fix does not make this test
+// fail; its value is exercising the mechanism under load, not proving the
+// fix by ablation. The fix's correctness instead rests on reading
+// errgroup's own errOnce.Do source directly (golang.org/x/sync/errgroup),
+// confirmed independently by two reviewers.
+func TestExecutePlanConcurrentPhaseFailureKeepsOriginatingError(t *testing.T) {
+	svc, _ := newTestService(t)
+
+	plan := &Plan{}
+	fail := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:missing:service_healthy",
+		Name:       "missing", // no registered containers under this name -> immediate failure
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	fail.Phase = PhaseStart
+
+	phantom := &PlanNode{ID: -1} // never added to plan.Nodes; its done-channel is never created
+	const siblings = 30
+	for i := range siblings {
+		blocked := plan.addNode(Operation{
+			Type:       OpWaitCondition,
+			ResourceID: fmt.Sprintf("wait:phantom:%d", i),
+			Name:       "phantom",
+		}, "", phantom)
+		blocked.Phase = PhaseStart
+	}
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+
+	err := exec.run(t.Context(), plan)
+	assert.ErrorContains(t, err, "missing dependency missing")
 }
 
 // TestExecStartContainer_EnrichedResolvesCreateNodeAndStarts verifies that a
