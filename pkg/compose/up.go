@@ -119,6 +119,9 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// this final check, not one budget per wait.
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
 	if err != nil {
+		if options.Start.WaitTimeout > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
+		}
 		return err
 	}
 

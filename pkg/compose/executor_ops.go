@@ -403,13 +403,23 @@ func (exec *planExecutor) execRenameContainer(ctx context.Context, node *PlanNod
 	// temporary one for the rest of the plan's execution.
 	if op.Service != nil {
 		exec.containersMu.Lock()
+		found := false
 		for i, ctr := range exec.containersByService[op.Service.Name] {
 			if ctr.ID == createdID {
 				exec.containersByService[op.Service.Name][i].Names = []string{"/" + op.Name}
+				found = true
 				break
 			}
 		}
 		exec.containersMu.Unlock()
+		if !found {
+			// Shouldn't happen: the DAG guarantees execCreateContainer's
+			// append ran before this node does. Logged rather than silently
+			// skipped, so a future regression that breaks that invariant is
+			// at least visible instead of just quietly serving the
+			// temporary name downstream again.
+			logrus.Warnf("execRenameContainer: container %s not found in live view for service %s; dependents may see the stale temporary name", createdID, op.Service.Name)
+		}
 	}
 	return nil
 }
