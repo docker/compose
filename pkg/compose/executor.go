@@ -23,6 +23,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 // planExecutor executes a reconciliation Plan by walking the DAG and performing
@@ -32,6 +34,13 @@ type planExecutor struct {
 	compose *composeService
 	project *types.Project
 	pctx    *reconciliationContext
+
+	// listener streams pre_start/post_start hook logs, exactly like the
+	// imperative start path. nil until an attached caller wires one in (the
+	// interactive-up convergence, a later lot of #14081) — every caller today
+	// passes nil, so hook execution stays silent, matching today's detached
+	// behavior.
+	listener api.ContainerEventListener
 
 	// containersByService is a live view used to resolve service references
 	// (network_mode: service:x, volumes_from, ipc, pid) without a daemon
@@ -68,17 +77,24 @@ func (pc *reconciliationContext) get(nodeID int) operationResult {
 // executePlan walks the plan DAG, executing nodes in parallel where possible
 // while respecting dependency edges. It emits progress events and handles
 // group-based event aggregation for composite operations like recreate.
+//
+// No caller threads a hook-log listener through here yet: create() (its only
+// caller) plans no start-phase operations today. newPlanExecutor takes one
+// directly for that reason — it is what the interactive-up convergence (a
+// later lot of #14081) will call once it needs to stream pre_start/post_start
+// hook logs into an attached session.
 func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *Plan) error {
-	return s.newPlanExecutor(project, observed).run(ctx, plan)
+	return s.newPlanExecutor(project, observed, nil).run(ctx, plan)
 }
 
 // newPlanExecutor constructs a planExecutor seeded from the observed state.
 // Split out from executePlan so tests can inspect the executor's live state
 // (e.g. the containersByService cache) after running a plan.
-func (s *composeService) newPlanExecutor(project *types.Project, observed *ObservedState) *planExecutor {
+func (s *composeService) newPlanExecutor(project *types.Project, observed *ObservedState, listener api.ContainerEventListener) *planExecutor {
 	return &planExecutor{
 		compose:             s,
 		project:             project,
+		listener:            listener,
 		pctx:                &reconciliationContext{results: map[int]operationResult{}},
 		containersByService: observed.containersByService(),
 	}
@@ -96,6 +112,35 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	done := make(map[int]chan struct{}, len(plan.Nodes))
 	for _, node := range plan.Nodes {
 		done[node.ID] = make(chan struct{})
+	}
+
+	// failures records the terminal error of every node that didn't succeed,
+	// keyed by node ID. A dependent unblocked from <-done[dep.ID] consults it
+	// to tell "dependency failed for a genuine reason" apart from "dependency
+	// succeeded" -- ctx.Err() alone can't: close(done[dep.ID]) happens inside
+	// the failing node's own goroutine, strictly before errgroup's cancel()
+	// fires on that goroutine's returned error (cancel() only runs after it
+	// returns), so a dependent can observe ctx.Err() == nil for a brief
+	// window even though its dependency just failed. Without this, that
+	// dependent runs anyway and spuriously emits its own group Working/
+	// Starting event right after the dependency's Error already went out
+	// (see TestExecutePlanFailedPreStartGatesStart).
+	var failuresMu sync.Mutex
+	failures := make(map[int]error, len(plan.Nodes))
+	recordFailure := func(id int, err error) {
+		failuresMu.Lock()
+		failures[id] = err
+		failuresMu.Unlock()
+	}
+	failedDependency := func(deps []*PlanNode) error {
+		failuresMu.Lock()
+		defer failuresMu.Unlock()
+		for _, dep := range deps {
+			if err := failures[dep.ID]; err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	// Track group event state: first node emits Working, last emits Done
@@ -121,7 +166,23 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 				}
 			}
 
+			// A dependency may have just failed without ctx being canceled
+			// yet (see failures' comment above) -- skip this node exactly
+			// like a canceled one: no slot acquired, no event emitted, its
+			// own dependents unblocked with the same failure recorded.
+			if err := failedDependency(node.DependsOn); err != nil {
+				// Store the original error, not a wrapped one: this node's own
+				// dependents look it up the same way, and wrapping it again at
+				// every hop would compound "dependency failed: " prefixes down
+				// a multi-node chain (create -> pre_start -> start -> post_start).
+				recordFailure(node.ID, err)
+				close(done[node.ID])
+				return fmt.Errorf("dependency failed: %w", err)
+			}
+
 			if err := acquireSlot(ctx, limiter); err != nil {
+				recordFailure(node.ID, err)
+				close(done[node.ID])
 				return err
 			}
 			defer releaseSlot(limiter)
@@ -134,8 +195,11 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 			if err == nil {
 				// Emit group done event if this is the last node of a group
 				groups.onNodeDone(node, events)
-			} else if ctx.Err() == nil {
-				groups.onNodeError(node, events, err)
+			} else {
+				recordFailure(node.ID, err)
+				if ctx.Err() == nil {
+					groups.onNodeError(node, events, err)
+				}
 			}
 
 			close(done[node.ID])
@@ -174,6 +238,12 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 		return exec.execRenameContainer(ctx, node)
 	case OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
+	case OpWaitCondition:
+		return exec.execWaitCondition(ctx, op)
+	case OpRunPreStart:
+		return exec.execRunPreStart(ctx, op)
+	case OpRunPostStart:
+		return exec.execRunPostStart(ctx, op)
 	case OpRunProvider:
 		return exec.compose.runPlugin(ctx, exec.project, *op.Service, "up")
 	default:
