@@ -101,7 +101,13 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	}
 
 	if err := exec.run(ctx, plan); err != nil {
-		if options.Start.WaitTimeout > 0 && errors.Is(err, context.DeadlineExceeded) {
+		// The deadline itself is unconditional (set above whenever
+		// WaitTimeout > 0, regardless of Wait) -- but "application not
+		// healthy" is specifically a --wait message. Without --wait, a
+		// user who only set --wait-timeout as a hang guard sees the raw
+		// error instead of a message implying a health check they never
+		// asked for.
+		if options.Start.Wait && errors.Is(err, context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err
