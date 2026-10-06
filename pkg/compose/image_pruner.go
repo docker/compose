@@ -99,7 +99,7 @@ func imageBelongsToKnownService(project *types.Project, removeOrphans bool, img 
 func (p *ImagePruner) ImagesToPrune(ctx context.Context, opts ImagePruneOptions) ([]string, error) {
 	if opts.Mode == ImagePruneNone {
 		return nil, nil
-	} else if opts.Mode != ImagePruneLocal && opts.Mode != ImagePruneAll {
+	} else if !opts.Mode.Valid() {
 		return nil, fmt.Errorf("unsupported image prune mode: %s", opts.Mode)
 	}
 	var images []string
