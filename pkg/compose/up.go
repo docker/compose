@@ -108,8 +108,12 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		// exec.waitTimeout is 0 -- a DeadlineExceeded here can only have
 		// come from ctx's own external deadline, unrelated to
 		// --wait-timeout, so naming a "0s" duration nobody configured would
-		// be just as wrong.
-		if options.Start.Wait && options.Start.WaitTimeout > 0 && errors.Is(err, context.DeadlineExceeded) {
+		// be just as wrong. ctx.Err() == nil additionally rules out ctx
+		// itself (the caller-supplied, un-derived context) having its own
+		// independent deadline expire during exec.run -- that DeadlineExceeded
+		// didn't come from any OpWaitCondition node's own derived timeout
+		// either, so it isn't a health-readiness failure.
+		if options.Start.Wait && options.Start.WaitTimeout > 0 && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err
