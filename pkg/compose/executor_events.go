@@ -72,6 +72,7 @@ type groupState struct {
 	total     int    // total nodes in this group
 	started   int    // nodes that have started
 	done      int    // nodes that have completed
+	working   bool   // the group's Working event has been emitted
 }
 
 func (exec *planExecutor) buildGroupTracker(plan *Plan) *groupTracker {
@@ -126,6 +127,7 @@ func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) {
 	}
 	gs.started++
 	if gs.triggersWorking(node.Operation.Type) {
+		gs.working = true
 		events.On(newEvent(gs.eventName, api.Working, gs.kind.workingText()))
 	}
 }
@@ -165,6 +167,15 @@ func (gt *groupTracker) onNodeError(node *PlanNode, events api.EventProcessor, e
 	gt.mu.Lock()
 	defer gt.mu.Unlock()
 	gs := gt.groups[node.Group]
+	if !gs.working {
+		// This group's failing node never triggered Working itself (e.g.
+		// OpRunPreStart, which runs silently by design -- see
+		// triggersWorking). Emit it now so the group's progression stays
+		// well-formed (Working always precedes Done/Error) instead of a bare
+		// Error a progress consumer never saw the resource transition into.
+		gs.working = true
+		events.On(newEvent(gs.eventName, api.Working, gs.kind.workingText()))
+	}
 	events.On(api.Resource{
 		ID:     gs.eventName,
 		Status: api.Error,

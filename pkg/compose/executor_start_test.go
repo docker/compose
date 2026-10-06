@@ -473,7 +473,7 @@ func TestExecutePlanMissingRequiredDependencyFailsSilently(t *testing.T) {
 // depending on it must not call ContainerStart. No ContainerStart expectation
 // is registered below: an unexpected call fails the test.
 func TestExecutePlanFailedPreStartGatesStart(t *testing.T) {
-	svc, apiClient, _ := newStartPhaseTestService(t)
+	svc, apiClient, recorder := newStartPhaseTestService(t)
 
 	service := types.ServiceConfig{
 		Name:     "web",
@@ -525,4 +525,19 @@ func TestExecutePlanFailedPreStartGatesStart(t *testing.T) {
 
 	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
 	assert.ErrorContains(t, err, "no hook runner container found")
+
+	// The group never got to fire its own Working/Starting event (triggered
+	// only by OpStartContainer -- see triggersWorking), so onNodeError fires
+	// it implicitly before Error, keeping the progression well-formed. And
+	// precisely because OpStartContainer never ran (the assertion above),
+	// there is no second, spurious Starting after it: this is the event-side
+	// half of the race TestExecutePlanFailedPreStartGatesStart's name refers
+	// to -- see run()'s failedDependency check.
+	preStartErr := "service \"web\" pre_start[0]: no hook runner container found — " +
+		"either its runner was already consumed by a previous start, or the " +
+		"service's container state changed after reconciliation planned this " +
+		"run; run `docker compose up web` to prepare fresh runners"
+	assert.DeepEqual(t, recorder.byID["Container test-web-1"], []string{
+		"Creating", "Created", api.StatusStarting, preStartErr,
+	})
 }
