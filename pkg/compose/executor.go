@@ -114,6 +114,35 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 		done[node.ID] = make(chan struct{})
 	}
 
+	// failures records the terminal error of every node that didn't succeed,
+	// keyed by node ID. A dependent unblocked from <-done[dep.ID] consults it
+	// to tell "dependency failed for a genuine reason" apart from "dependency
+	// succeeded" -- ctx.Err() alone can't: close(done[dep.ID]) happens inside
+	// the failing node's own goroutine, strictly before errgroup's cancel()
+	// fires on that goroutine's returned error (cancel() only runs after it
+	// returns), so a dependent can observe ctx.Err() == nil for a brief
+	// window even though its dependency just failed. Without this, that
+	// dependent runs anyway and spuriously emits its own group Working/
+	// Starting event right after the dependency's Error already went out
+	// (see TestExecutePlanFailedPreStartGatesStartGroupDoesNotRestart).
+	var failuresMu sync.Mutex
+	failures := make(map[int]error, len(plan.Nodes))
+	recordFailure := func(id int, err error) {
+		failuresMu.Lock()
+		failures[id] = err
+		failuresMu.Unlock()
+	}
+	failedDependency := func(deps []*PlanNode) error {
+		failuresMu.Lock()
+		defer failuresMu.Unlock()
+		for _, dep := range deps {
+			if err := failures[dep.ID]; err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	// Track group event state: first node emits Working, last emits Done
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
@@ -137,7 +166,19 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 				}
 			}
 
+			// A dependency may have just failed without ctx being canceled
+			// yet (see failures' comment above) -- skip this node exactly
+			// like a canceled one: no slot acquired, no event emitted, its
+			// own dependents unblocked with the same failure recorded.
+			if err := failedDependency(node.DependsOn); err != nil {
+				recordFailure(node.ID, fmt.Errorf("dependency failed: %w", err))
+				close(done[node.ID])
+				return err
+			}
+
 			if err := acquireSlot(ctx, limiter); err != nil {
+				recordFailure(node.ID, err)
+				close(done[node.ID])
 				return err
 			}
 			defer releaseSlot(limiter)
@@ -150,8 +191,11 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 			if err == nil {
 				// Emit group done event if this is the last node of a group
 				groups.onNodeDone(node, events)
-			} else if ctx.Err() == nil {
-				groups.onNodeError(node, events, err)
+			} else {
+				recordFailure(node.ID, err)
+				if ctx.Err() == nil {
+					groups.onNodeError(node, events, err)
+				}
 			}
 
 			close(done[node.ID])
