@@ -249,7 +249,12 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 	// itself instead. waitDependency only ever reads this for one
 	// practically unreachable log line (an unsupported depends_on condition,
 	// filtered out before a plan is ever built).
-	return s.waitDependency(ctx, op.ResourceID, op.Name, config, waitingFor)
+	//
+	// exec.waitTimeout > 0 is exactly the condition under which executeNode's
+	// OpWaitCondition dispatch wrapped ctx with its own per-node timeout (see
+	// executor.go) -- the same flag waitDependency needs to tell that wrap
+	// apart from a deadline inherited from further up the chain.
+	return s.waitDependency(ctx, exec.waitTimeout > 0, op.ResourceID, op.Name, config, waitingFor)
 }
 
 // execRunPreStart runs the service's pre_start hooks against the runner
