@@ -433,6 +433,63 @@ func TestPlanStart_ProviderConsumerWaitsForDeployment(t *testing.T) {
 		"consumer's start must depend on the provider's own deployment node, not just its depends_on wait:\n%s", plan)
 }
 
+// TestPlanStart_ExceptionalStateConsumerWaitsForRestart is the sibling
+// regression to TestPlanStart_ProviderConsumerWaitsForDeployment for an
+// ordinary (non-provider) service: the same either/or bug in
+// planServiceStart's len(replicas) == 0 branch dropped the service's own
+// create-phase bare-restart node (TestPlanStart_ExceptionalStateReplicaCountsAsRunning)
+// from startChainEnds whenever the service also had its own depends_on,
+// keeping only the dependency wait. A downstream service_started consumer
+// could then start before a paused/dead service's only container was
+// actually running again.
+func TestPlanStart_ExceptionalStateConsumerWaitsForRestart(t *testing.T) {
+	db := types.ServiceConfig{Name: "db"}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	app := serviceWithDeps("app", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	consumer := serviceWithDeps("consumer", types.DependsOnConfig{"app": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "app": app, "consumer": consumer},
+	}
+	dbHash, err := serviceHashWithResolvedRefs(db, nil)
+	assert.NilError(t, err)
+	appHash, err := serviceHashWithResolvedRefs(app, nil)
+	assert.NilError(t, err)
+	consumerHash, err := serviceHashWithResolvedRefs(consumer, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{
+		observedServiceContainer("db", 1, container.StateRunning, dbHash),
+	}
+	observed.Containers["app"] = []ObservedContainer{
+		observedServiceContainer("app", 1, container.StatePaused, appHash),
+	}
+	observed.Containers["consumer"] = []ObservedContainer{
+		observedServiceContainer("consumer", 1, container.StateExited, consumerHash),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+
+	var appRestartNode, consumerStartNode *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:1":
+			appRestartNode = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+			consumerStartNode = n
+		}
+	}
+	if appRestartNode == nil {
+		t.Fatalf("expected the create-phase bare-restart node for app:\n%s", plan)
+	}
+	if consumerStartNode == nil {
+		t.Fatalf("expected a start node for consumer:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, appRestartNode),
+		"consumer's start must depend on app's own restart node, not just its depends_on wait:\n%s", plan)
+}
+
 // A replica condemned by scale-down must never receive a start-phase node:
 // the imperative engine only starts what survives the convergence — and the
 // condemned replica does not count as running for the pre_start gating.
