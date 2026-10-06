@@ -84,21 +84,23 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// The plan's own OpWaitCondition nodes (service_healthy /
 	// service_completed_successfully dependency waits) block on ctx with no
 	// timeout of their own -- unlike start()'s per-dependency
-	// waitDependencies call, which already threaded WaitTimeout through
-	// every wait, not just the final one below. Establish the deadline
-	// before executing the plan, not after, or a condition that's never
-	// satisfied hangs the whole command instead of failing after
-	// WaitTimeout. preparePlan above is deliberately left out of it: image
-	// pulls and the rest of create()'s own work were never bounded by
-	// --wait-timeout either, in the old create()+start() sequence.
-	if options.Start.Wait && options.Start.WaitTimeout > 0 {
+	// waitDependencies call, which already threads WaitTimeout through every
+	// wait unconditionally (InDependencyOrder passes it to startService
+	// regardless of options.Wait -- --wait-timeout alone, with no --wait, is
+	// a legal CLI combination nothing rejects). Establish the same
+	// unconditional deadline before executing the plan, not after, or a
+	// condition that's never satisfied hangs the whole command instead of
+	// failing after WaitTimeout. preparePlan above is deliberately left out
+	// of it: image pulls and the rest of create()'s own work were never
+	// bounded by --wait-timeout either, in the old create()+start() sequence.
+	if options.Start.WaitTimeout > 0 {
 		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
 		defer cancel()
 		ctx = withTimeout
 	}
 
 	if err := s.executePlan(ctx, project, observed, plan); err != nil {
-		if options.Start.Wait && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if options.Start.WaitTimeout > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err
