@@ -71,7 +71,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	project, observed, plan, err := s.preparePlan(ctx, project, options)
+	project, observed, plan, err := s.preparePlan(ctx, project, options, ScopeCreate)
 	if err != nil {
 		return err
 	}
@@ -89,10 +89,10 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 // starting, or otherwise touching a single container, network, or volume.
 // create's split from this is pure extraction: callers that need the
 // canonical project, the daemon snapshot, or the plan itself before deciding
-// how to run it (interactive up's create/start phase boundary, #14081) call
-// this directly instead of create; create itself still just chains this with
-// executePlan.
-func (s *composeService) preparePlan(ctx context.Context, project *types.Project, options api.CreateOptions) (*types.Project, *ObservedState, *Plan, error) {
+// how to run it (detached up's single-plan Create+Start, interactive up's
+// phase boundary, #14081) call this directly instead of create with a wider
+// scope; create itself still just chains ScopeCreate with executePlan.
+func (s *composeService) preparePlan(ctx context.Context, project *types.Project, options api.CreateOptions, scope ReconcileScope) (*types.Project, *ObservedState, *Plan, error) {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
@@ -151,7 +151,9 @@ func (s *composeService) preparePlan(ctx context.Context, project *types.Project
 			"--remove-orphans flag to clean it up.", observed.orphanNames())
 	}
 
-	plan, err := reconcile(ctx, project, observed, toReconcileOptions(options), s.prompt)
+	reconcileOptions := toReconcileOptions(options)
+	reconcileOptions.Scope = scope
+	plan, err := reconcile(ctx, project, observed, reconcileOptions, s.prompt)
 	if err != nil {
 		return nil, nil, nil, err
 	}
