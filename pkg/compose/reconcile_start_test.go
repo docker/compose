@@ -381,6 +381,58 @@ func TestPlanStart_ProviderWaitsOnDependencies(t *testing.T) {
 	assert.Equal(t, wait.Operation.Condition, types.ServiceConditionHealthy)
 }
 
+// TestPlanStart_ProviderConsumerWaitsForDeployment is a regression test for
+// a Copilot review finding on #14290: once ScopeCreateStart became the real,
+// exercised path for detached up, planProviderStart's startChainEnds for a
+// provider WITH its own depends_on was just that dependency's wait node --
+// dropping the provider's own OpRunProvider (deployment) node entirely. A
+// downstream consumer of the provider could therefore start while the
+// provider plugin/relay deployment was still running, a barrier the old
+// create-then-start two-phase sequence guaranteed for free.
+func TestPlanStart_ProviderConsumerWaitsForDeployment(t *testing.T) {
+	db := types.ServiceConfig{Name: "db"}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	prov := serviceWithDeps("prov", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	consumer := serviceWithDeps("consumer", types.DependsOnConfig{"prov": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "prov": prov, "consumer": consumer},
+	}
+	dbHash, err := serviceHashWithResolvedRefs(db, nil)
+	assert.NilError(t, err)
+	consumerHash, err := serviceHashWithResolvedRefs(consumer, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{
+		observedServiceContainer("db", 1, container.StateRunning, dbHash),
+	}
+	observed.Containers["consumer"] = []ObservedContainer{
+		observedServiceContainer("consumer", 1, container.StateExited, consumerHash),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+
+	var providerNode, consumerStartNode *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpRunProvider:
+			providerNode = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+			consumerStartNode = n
+		}
+	}
+	if providerNode == nil {
+		t.Fatalf("expected an OpRunProvider node for prov:\n%s", plan)
+	}
+	if consumerStartNode == nil {
+		t.Fatalf("expected a start node for consumer:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, providerNode),
+		"consumer's start must depend on the provider's own deployment node, not just its depends_on wait:\n%s", plan)
+}
+
 // A replica condemned by scale-down must never receive a start-phase node:
 // the imperative engine only starts what survives the convergence — and the
 // condemned replica does not count as running for the pre_start gating.
