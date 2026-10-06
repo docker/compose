@@ -124,7 +124,7 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	// window even though its dependency just failed. Without this, that
 	// dependent runs anyway and spuriously emits its own group Working/
 	// Starting event right after the dependency's Error already went out
-	// (see TestExecutePlanFailedPreStartGatesStartGroupDoesNotRestart).
+	// (see TestExecutePlanFailedPreStartGatesStart).
 	var failuresMu sync.Mutex
 	failures := make(map[int]error, len(plan.Nodes))
 	recordFailure := func(id int, err error) {
@@ -171,9 +171,13 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 			// like a canceled one: no slot acquired, no event emitted, its
 			// own dependents unblocked with the same failure recorded.
 			if err := failedDependency(node.DependsOn); err != nil {
-				recordFailure(node.ID, fmt.Errorf("dependency failed: %w", err))
+				// Store the original error, not a wrapped one: this node's own
+				// dependents look it up the same way, and wrapping it again at
+				// every hop would compound "dependency failed: " prefixes down
+				// a multi-node chain (create -> pre_start -> start -> post_start).
+				recordFailure(node.ID, err)
 				close(done[node.ID])
-				return err
+				return fmt.Errorf("dependency failed: %w", err)
 			}
 
 			if err := acquireSlot(ctx, limiter); err != nil {

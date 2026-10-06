@@ -144,19 +144,13 @@ func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) 
 		return err
 	}
 
-	// A dependency's done-channel closes (unblocking this node) before
-	// errgroup cancels ctx on that same dependency's error — cancel() only
-	// runs after the failing goroutine returns, close(done[...]) runs inside
-	// it. This check narrows that window (same guard as
-	// execCreateHookContainer) but cannot close it: a preceding node of this
-	// replica's chain (a wait, pre_start) can fail for a genuine reason a
-	// moment before this goroutine observes ctx.Err(), still nil, and starts
-	// a container whose pre_start hook just failed. The structural fix —
-	// carrying each node's success/failure through what dependents wait on,
-	// instead of inferring it from ctx.Err() — is tracked as its own brick of
-	// the executor lot (#14081, see the epic's "failed-dependency semantics"
-	// comment); every per-operation ctx.Err() guard here, including this one,
-	// is an interim narrowing, not the fix.
+	// run()'s failedDependency check (see its comment) already keeps this
+	// node from ever reaching here when a direct dependency of this replica's
+	// chain (a wait, pre_start) failed for a genuine reason — that window is
+	// closed, not just narrowed. This guard stays as defense in depth for
+	// everything else that can cancel ctx: an unrelated branch of the same
+	// plan failing, or an external cancellation/timeout. Redundant for the
+	// direct-dependency case, authoritative for those others.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -265,11 +259,10 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 // accepts — skips a second, redundant run of the hooks rather than erroring
 // on runners already consumed.
 func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) error {
-	// Same interim narrowing as execStartContainer's guard (see its
-	// comment), not a full fix: this node hangs off the replica's create
-	// node, whose done-channel closes before errgroup's ctx is canceled when
-	// that create fails for a genuine reason, so a narrow window remains
-	// where pre_start hooks could still run against the runner containers.
+	// Same relationship to run()'s failedDependency check as
+	// execStartContainer's guard above (see its comment): closed for this
+	// node's own direct dependency (the replica's create node) failing,
+	// defense in depth for everything else that can cancel ctx.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -288,11 +281,10 @@ func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) err
 // execRunPostStart runs the service's post_start hooks against the replica
 // the start chain just brought up.
 func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) error {
-	// Same interim narrowing as execStartContainer's guard above, not a full
-	// fix (see its comment): a failed StartContainer's done-channel closes
-	// before errgroup's ctx is canceled, so a narrow window remains where
-	// this could still run post_start against a container whose start just
-	// failed for a genuine reason.
+	// Same relationship to run()'s failedDependency check as
+	// execStartContainer's guard above (see its comment): closed for this
+	// node's own direct dependency (StartContainer) failing, defense in depth
+	// for everything else that can cancel ctx.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
