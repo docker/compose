@@ -20,6 +20,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"testing"
@@ -260,6 +261,139 @@ func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
 
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Assert(t, elapsed < 5*time.Second, "waitTimeout did not bound the stuck OpWaitCondition node (took %s)", elapsed)
+}
+
+// TestExecutePlanStartPhaseFailureDoesNotCancelCreatePhase is a regression
+// test for a Copilot review finding on #14290: run() used to dispatch every
+// node under one shared errgroup.WithContext, so a Start-phase node failing
+// (a required OpWaitCondition hitting its own waitTimeout, here) canceled
+// ctx for every other goroutine still in flight -- including a completely
+// unrelated Create-phase node (a sibling service's network create) that has
+// nothing to do with the dependency that timed out. The old
+// create()-then-start() sequence never had this failure mode: the whole
+// create phase had always finished before any dependency wait began. This
+// pairs a never-satisfied required wait (Phase: PhaseStart, matching what
+// planStartPhase actually produces) with a network create (Phase:
+// PhaseCreate, the default) deliberately slower than the wait's timeout, and
+// asserts the network create's own context is never canceled -- it must
+// complete normally, on its own schedule, even though the sibling wait
+// already failed and the plan as a whole still fails too.
+func TestExecutePlanStartPhaseFailureDoesNotCancelCreatePhase(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+
+	nw := types.NetworkConfig{Name: "test_default"}
+	var networkCreateCtxErr error
+	networkCreateDone := make(chan struct{})
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string, _ client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+			defer close(networkCreateDone)
+			// Deliberately outlives the wait's timeout below: if the
+			// Create-phase ctx were canceled by the sibling Start-phase wait
+			// failing, this ctx would already be done well before this
+			// returns.
+			time.Sleep(300 * time.Millisecond)
+			networkCreateCtxErr = ctx.Err()
+			return client.NetworkCreateResult{ID: "net-id"}, nil
+		})
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:default",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+	wait := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	wait.Phase = PhaseStart
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	exec.waitTimeout = 100 * time.Millisecond
+
+	err := exec.run(t.Context(), plan)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+
+	select {
+	case <-networkCreateDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("NetworkCreate never completed -- its context was likely canceled by the sibling Start-phase wait timing out")
+	}
+	assert.NilError(t, networkCreateCtxErr, "NetworkCreate's own ctx must not be canceled by an unrelated Start-phase failure")
+}
+
+// TestExecutePlanCreatePhaseFailureCancelsCreatePhase is the mirror image of
+// TestExecutePlanStartPhaseFailureDoesNotCancelCreatePhase: phase-scoped
+// cancellation must not weaken the Create phase's own existing fail-fast
+// behavior -- two independent (no DependsOn edge) Create-phase nodes, one
+// failing immediately, must still cancel the other's in-flight work. Both
+// nodes default to Phase: PhaseCreate (addNode's zero value), so they share
+// createCtx.
+func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		Return(client.NetworkCreateResult{}, errors.New("boom"))
+
+	var volumeCreateCtxErr error
+	volumeCreateDone := make(chan struct{})
+	apiClient.EXPECT().VolumeCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ client.VolumeCreateOptions) (client.VolumeCreateResult, error) {
+			defer close(volumeCreateDone)
+			<-ctx.Done()
+			volumeCreateCtxErr = ctx.Err()
+			return client.VolumeCreateResult{}, ctx.Err()
+		})
+
+	nw := types.NetworkConfig{Name: "test_default"}
+	vol := types.VolumeConfig{Name: "data", Driver: "local"}
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:default",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpCreateVolume,
+		ResourceID: "volume:data",
+		Name:       vol.Name,
+		Volume:     &vol,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+
+	err := exec.run(t.Context(), plan)
+	assert.ErrorContains(t, err, "boom")
+
+	select {
+	case <-volumeCreateDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("VolumeCreate's ctx was never canceled -- a sibling Create-phase failure should still fail fast")
+	}
+	assert.ErrorIs(t, volumeCreateCtxErr, context.Canceled, "VolumeCreate's ctx must be canceled by a sibling Create-phase node failing")
 }
 
 // TestExecStartContainer_EnrichedResolvesCreateNodeAndStarts verifies that a
