@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -264,54 +265,42 @@ func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
 	assert.Assert(t, elapsed < 5*time.Second, "waitTimeout did not bound the stuck OpWaitCondition node (took %s)", elapsed)
 }
 
-// TestExecutePlanStartPhaseFailureDoesNotCancelCreatePhase is a regression
-// test for a Copilot review finding on #14290: run() used to dispatch every
-// node under one shared errgroup.WithContext, so a Start-phase node failing
-// (a required OpWaitCondition hitting its own waitTimeout, here) canceled
-// ctx for every other goroutine still in flight -- including a completely
-// unrelated Create-phase node (a sibling service's network create) that has
-// nothing to do with the dependency that timed out. The old
-// create()-then-start() sequence never had this failure mode: the whole
-// create phase had always finished before any dependency wait began. This
-// pairs a never-satisfied required wait (Phase: PhaseStart, matching what
-// planStartPhase actually produces) with a network create (Phase:
-// PhaseCreate, the default) deliberately slower than the wait's timeout, and
-// asserts the network create's own context is never canceled -- it must
-// complete normally, on its own schedule, even though the sibling wait
-// already failed and the plan as a whole still fails too.
-func TestExecutePlanStartPhaseFailureDoesNotCancelCreatePhase(t *testing.T) {
-	svc, apiClient, _ := newStartPhaseTestService(t)
+// TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase is a regression test
+// for a Copilot review finding on #14291: a Start-phase node's own DependsOn
+// edges being satisfied is not enough to let it run -- nothing stopped it
+// from starting while a COMPLETELY UNRELATED Create-phase node elsewhere in
+// the plan was still in flight (or about to fail), something the old
+// create()-then-start() sequence never allowed (the whole create phase,
+// project-wide, always finished -- or failed, with start() never invoked at
+// all -- before any dependency wait, or anything else in the start phase,
+// even began). Interactive up's attach/printer session needs that same
+// guarantee: it takes exclusive hold of the terminal for the create phase's
+// progress display, handing it to continuous container log streaming only
+// once the create phase is entirely done. This pairs a slow, unrelated
+// network create (Phase: PhaseCreate, the default, no DependsOn edge to
+// anything in the Start phase) with an OpStartContainer node (Phase:
+// PhaseStart) and asserts ContainerStart is never called before the network
+// create has fully returned. Uses OpStartContainer rather than
+// OpWaitCondition deliberately: execWaitCondition's underlying poll loop
+// only checks on a 500ms ticker (never on entry), which would make a
+// same-order-of-magnitude Create delay pass this assertion even with no
+// barrier at all, and so couldn't actually catch a regression here.
+func TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase(t *testing.T) {
+	svc, apiClient := newTestService(t)
 
-	dbSummary := container.Summary{
-		ID:     "db-id",
-		Names:  []string{"/test-db-1"},
-		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
-	}
-	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
-		Container: container.InspectResponse{
-			ID:   "db-id",
-			Name: "/test-db-1",
-			State: &container.State{
-				Status: container.StateRunning,
-				Health: &container.Health{Status: container.Starting},
-			},
-			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
-		},
-	}, nil).AnyTimes()
-
+	var createDone atomic.Bool
 	nw := types.NetworkConfig{Name: "test_default"}
-	var networkCreateCtxErr error
-	networkCreateDone := make(chan struct{})
 	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
-		DoAndReturn(func(ctx context.Context, _ string, _ client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
-			defer close(networkCreateDone)
-			// Deliberately outlives the wait's timeout below: if the
-			// Create-phase ctx were canceled by the sibling Start-phase wait
-			// failing, this ctx would already be done well before this
-			// returns.
-			time.Sleep(300 * time.Millisecond)
-			networkCreateCtxErr = ctx.Err()
+		DoAndReturn(func(context.Context, string, client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+			time.Sleep(100 * time.Millisecond)
+			createDone.Store(true)
 			return client.NetworkCreateResult{ID: "net-id"}, nil
+		})
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "db-id", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
+			assert.Assert(t, createDone.Load(), "the Start-phase container start began before the unrelated Create-phase network create returned")
+			return client.ContainerStartResult{}, nil
 		})
 
 	plan := &Plan{}
@@ -321,36 +310,25 @@ func TestExecutePlanStartPhaseFailureDoesNotCancelCreatePhase(t *testing.T) {
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "")
-	wait := plan.addNode(Operation{
-		Type:       OpWaitCondition,
-		ResourceID: "wait:db:service_healthy",
-		Name:       "db",
-		Condition:  types.ServiceConditionHealthy,
+	start := plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:db:1",
+		Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
 	}, "")
-	wait.Phase = PhaseStart
+	start.Phase = PhaseStart
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
-	exec.containersByService["db"] = Containers{dbSummary}
-	exec.waitTimeout = 100 * time.Millisecond
 
-	err := exec.run(t.Context(), plan)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
-
-	select {
-	case <-networkCreateDone:
-	case <-time.After(5 * time.Second):
-		t.Fatal("NetworkCreate never completed -- its context was likely canceled by the sibling Start-phase wait timing out")
-	}
-	assert.NilError(t, networkCreateCtxErr, "NetworkCreate's own ctx must not be canceled by an unrelated Start-phase failure")
+	assert.NilError(t, exec.run(t.Context(), plan))
+	assert.Assert(t, createDone.Load())
 }
 
-// TestExecutePlanCreatePhaseFailureCancelsCreatePhase is the mirror image of
-// TestExecutePlanStartPhaseFailureDoesNotCancelCreatePhase: phase-scoped
-// cancellation must not weaken the Create phase's own existing fail-fast
+// TestExecutePlanCreatePhaseFailureCancelsCreatePhase verifies phase-scoped
+// cancellation didn't weaken the Create phase's own existing fail-fast
 // behavior -- two independent (no DependsOn edge) Create-phase nodes, one
 // failing immediately, must still cancel the other's in-flight work. Both
 // nodes default to Phase: PhaseCreate (addNode's zero value), so they share
-// createCtx.
+// the same runPhase call's phaseCancel.
 func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
@@ -395,6 +373,42 @@ func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 		t.Fatal("VolumeCreate's ctx was never canceled -- a sibling Create-phase failure should still fail fast")
 	}
 	assert.ErrorIs(t, volumeCreateCtxErr, context.Canceled, "VolumeCreate's ctx must be canceled by a sibling Create-phase node failing")
+}
+
+// TestExecutePlanCreatePhaseFailureNeverDispatchesStartPhase complements
+// TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase: that test proves the
+// Start phase waits for a successful Create phase, this one proves a failed
+// Create phase skips the Start phase entirely rather than dispatching it and
+// canceling it. run() must return the Create-phase error before runPhase is
+// ever called on startNodes -- ContainerStart's .Times(0) fails the test the
+// instant it's called at all, not just if it fails to be called.
+func TestExecutePlanCreatePhaseFailureNeverDispatchesStartPhase(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		Return(client.NetworkCreateResult{}, errors.New("boom"))
+	apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	nw := types.NetworkConfig{Name: "test_default"}
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:default",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+	start := plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:db:1",
+		Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
+	}, "")
+	start.Phase = PhaseStart
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+
+	err := exec.run(t.Context(), plan)
+	assert.ErrorContains(t, err, "boom")
 }
 
 // TestExecutePlanConcurrentPhaseFailureKeepsOriginatingError exercises a
