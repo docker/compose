@@ -87,27 +87,29 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// which already threads WaitTimeout through every wait unconditionally
 	// (InDependencyOrder passes it to startService regardless of
 	// options.Wait -- --wait-timeout alone, with no --wait, is a legal CLI
-	// combination nothing rejects). exec.waitDeadline bounds exactly those
-	// nodes (see executeNode) and nothing else in the plan: wrapping the
-	// whole run() ctx instead would also cap unrelated create/start/hook
-	// work that was never subject to --wait-timeout in the old
-	// create()+start() sequence (a slow image pull or container create could
-	// then fail as "application not healthy" with no health wait involved).
+	// combination nothing rejects). exec.waitTimeout bounds exactly those
+	// nodes (see executeNode), each with its OWN fresh window starting when
+	// that wait begins -- not a single shared budget counted down from
+	// before the plan even started. Sharing one absolute deadline across
+	// create/start/hook work and every wait would let slow, unrelated work
+	// alone exhaust it, failing an otherwise healthy deployment as "not
+	// healthy" with no wait ever actually timing out -- start()'s real,
+	// per-wait-independent behavior never had that failure mode.
 	exec := s.newPlanExecutor(project, observed, nil)
-	var deadline time.Time
-	if options.Start.WaitTimeout > 0 {
-		deadline = time.Now().Add(options.Start.WaitTimeout)
-		exec.waitDeadline = deadline
-	}
+	exec.waitTimeout = options.Start.WaitTimeout
 
 	if err := exec.run(ctx, plan); err != nil {
-		// The deadline itself is unconditional (set above whenever
-		// WaitTimeout > 0, regardless of Wait) -- but "application not
-		// healthy" is specifically a --wait message. Without --wait, a
-		// user who only set --wait-timeout as a hang guard sees the raw
-		// error instead of a message implying a health check they never
-		// asked for.
-		if options.Start.Wait && errors.Is(err, context.DeadlineExceeded) {
+		// options.Start.WaitTimeout alone is unconditional (threaded above
+		// regardless of Wait, matching start()'s own InDependencyOrder) --
+		// but "application not healthy" is specifically a --wait message.
+		// Without --wait, a user who only set --wait-timeout as a hang
+		// guard sees the raw error instead of a message implying a health
+		// check they never asked for. And without a WaitTimeout at all,
+		// exec.waitTimeout is 0 -- a DeadlineExceeded here can only have
+		// come from ctx's own external deadline, unrelated to
+		// --wait-timeout, so naming a "0s" duration nobody configured would
+		// be just as wrong.
+		if options.Start.Wait && options.Start.WaitTimeout > 0 && errors.Is(err, context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err
@@ -120,28 +122,24 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// The plan may have created or recreated containers: this verification
 	// needs their current IDs, which the pre-execution observed snapshot
 	// above doesn't have for a container that didn't exist yet at
-	// observation time. It shares the same deadline established above
-	// (when set) rather than opening a fresh WaitTimeout window of its own
-	// -- one overall budget for "becoming healthy", covering both the
-	// plan's own waits and this final check, not one budget per wait.
-	//
-	// exec.run only bounds OpWaitCondition nodes with that deadline (see
-	// above): a plan whose create/start/hook ops alone take longer than
-	// WaitTimeout can still return nil past it. applyRemainingDeadline
-	// catches that case explicitly instead of deriving an already-expired
-	// context.WithDeadline, which would fail getContainers below before it
-	// ever touches the daemon -- "not healthy" when health was never
-	// actually checked.
-	var cancel context.CancelFunc
-	ctx, cancel, err = applyRemainingDeadline(ctx, deadline, options.Start.WaitTimeout)
-	if err != nil {
-		return err
+	// observation time. It opens its own fresh WaitTimeout window, same as
+	// every OpWaitCondition node above and start()'s own final --wait check
+	// did -- not whatever's left of a shared budget, which unrelated plan
+	// work could already have exhausted with no wait ever at risk.
+	if options.Start.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
+		defer cancel()
+		ctx = withTimeout
 	}
-	defer cancel()
 
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
 	if err != nil {
-		if !deadline.IsZero() && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		// Without a WaitTimeout, ctx above is still whatever the caller
+		// passed in -- it can carry its own external deadline (an upstream
+		// command timeout, a cancellation) unrelated to --wait-timeout.
+		// Translating that into "application not healthy after 0s" would
+		// name a duration nobody configured.
+		if options.Start.WaitTimeout > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err
@@ -155,33 +153,12 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		}
 	}
 	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if options.Start.WaitTimeout > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err
 	}
 	return nil
-}
-
-// applyRemainingDeadline derives ctx bound by deadline, the no-op
-// cancel/unmodified ctx when deadline is zero (no --wait-timeout set).
-// Deadline may already be in the past -- the plan's create/start/hook ops
-// aren't bound by it (see upDetached), so they can run long enough on their
-// own to exhaust the whole --wait-timeout budget before this is ever called.
-// context.WithDeadline on an already-past deadline would silently produce an
-// immediately-canceled context, failing the caller's very next daemon call
-// with a bare context.DeadlineExceeded that looks identical to "health never
-// came up" -- misleading when health was never actually checked. Returning
-// the familiar message directly here, instead, keeps that distinction clear.
-func applyRemainingDeadline(ctx context.Context, deadline time.Time, waitTimeout time.Duration) (context.Context, context.CancelFunc, error) {
-	if deadline.IsZero() {
-		return ctx, func() {}, nil
-	}
-	if time.Until(deadline) <= 0 {
-		return nil, nil, fmt.Errorf("application not healthy after %s: deadline exceeded during plan execution", waitTimeout)
-	}
-	withDeadline, cancel := context.WithDeadline(ctx, deadline)
-	return withDeadline, cancel, nil
 }
 
 // upSession carries the state shared between the goroutines driving an

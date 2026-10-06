@@ -49,13 +49,16 @@ type planExecutor struct {
 	containersMu        sync.Mutex
 	containersByService map[string]Containers
 
-	// waitDeadline, when non-zero, bounds OpWaitCondition nodes only (see
-	// executeNode) -- not the rest of the plan. up -d --wait-timeout must
-	// cap how long a dependency's health/completion condition is waited on,
-	// the same thing start()'s own WaitTimeout already does today, without
-	// also capping unrelated create/start/hook work the way wrapping the
-	// whole run() ctx would (docker/compose#14290 review).
-	waitDeadline time.Time
+	// waitTimeout, when non-zero, bounds OpWaitCondition nodes only (see
+	// executeNode) -- not the rest of the plan, and with its OWN fresh
+	// window per wait node rather than a single shared deadline counted
+	// down from before the plan started. up -d --wait-timeout must cap how
+	// long a dependency's health/completion condition is waited on, the
+	// same thing start()'s own per-dependency WaitTimeout already does
+	// today -- without also capping unrelated create/start/hook work, and
+	// without letting that unrelated work's duration eat into (or exhaust)
+	// a wait's own budget (docker/compose#14290 review).
+	waitTimeout time.Duration
 }
 
 // reconciliationContext holds results produced by completed nodes so that downstream
@@ -248,9 +251,9 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 	case OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
 	case OpWaitCondition:
-		if !exec.waitDeadline.IsZero() {
+		if exec.waitTimeout > 0 {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithDeadline(ctx, exec.waitDeadline)
+			ctx, cancel = context.WithTimeout(ctx, exec.waitTimeout)
 			defer cancel()
 		}
 		return exec.execWaitCondition(ctx, op)
