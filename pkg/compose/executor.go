@@ -160,25 +160,6 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
 
-	// Cancellation is phase-scoped, not plan-wide: the Create phase is
-	// canceled by a Create-phase node failing; the Start phase, derived from
-	// it, is ALSO canceled by a Start-phase node failing. A Start-phase
-	// failure (an OpWaitCondition hitting --wait-timeout, a container failing
-	// to start, anything) must never cancel the Create phase -- doing so
-	// would abort unrelated, still in-flight Create-phase work (a sibling
-	// service's container create, a network create) that has nothing to do
-	// with it. The old create()-then-start() sequence never had this failure
-	// mode: the whole create phase had always finished before any dependency
-	// wait, or anything else in the start phase, even began. A Create-phase
-	// failure still cancels the Start phase too, via the Create phase's
-	// cancellation propagating to the Start phase derived from it --
-	// matching the old sequence, where start() was never even called once
-	// create() failed.
-	createPhase := newPhaseCancel(ctx)
-	defer createPhase.cancel()
-	startPhase := newPhaseCancel(createPhase.ctx)
-	defer startPhase.cancel()
-
 	rs := &runState{
 		done:             done,
 		recordFailure:    recordFailure,
@@ -186,32 +167,76 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 		groups:           groups,
 		events:           events,
 		limiter:          newOptionalLimiter(exec.compose.maxConcurrency),
-		createPhase:      createPhase,
-		startPhase:       startPhase,
-	}
-	eg := errgroup.Group{}
-	for _, node := range plan.Nodes {
-		eg.Go(func() error {
-			return exec.runNode(node, rs)
-		})
 	}
 
-	err := eg.Wait()
-	// A phase's own recorded error -- set by whichever node first triggered
-	// that phase's cancellation (see phaseCancel.fail) -- is authoritative
-	// over whatever eg.Wait() itself picked: once cancellation starts
-	// unblocking siblings, more than one goroutine can be mid-return at the
-	// same time, and errgroup.Group's own first-error-wins race has no idea
-	// which of them was the actual cause versus just a cancellation casualty
-	// (a sibling's <-nodeCtx.Done() bail returning a bare context.Canceled
-	// that reveals nothing). Create takes precedence over Start: a Create
-	// failure is the more fundamental one of the two (it's what canceled
-	// Start in the first place, transitively, when both end up set).
-	if createPhase.err != nil {
-		return createPhase.err
+	var createNodes, startNodes []*PlanNode
+	for _, node := range plan.Nodes {
+		if node.Phase == PhaseStart {
+			startNodes = append(startNodes, node)
+		} else {
+			createNodes = append(createNodes, node)
+		}
 	}
-	if startPhase.err != nil {
-		return startPhase.err
+
+	// A Create-phase node depending on a Start-phase node would deadlock
+	// forever: runPhase(createNodes, ...) only closes rs.done for nodes in
+	// createNodes, so runNode's `<-rs.done[dep.ID]` would block on a channel
+	// nothing ever closes, since the Start phase isn't even dispatched until
+	// the Create phase this node is blocking returns. Nothing in the
+	// reconciler should ever produce this edge, but failing fast with a
+	// clear error beats a silent hang if it ever does.
+	for _, node := range createNodes {
+		for _, dep := range node.DependsOn {
+			if dep.Phase == PhaseStart {
+				return fmt.Errorf("invalid plan: create-phase node %d depends on start-phase node %d", node.ID, dep.ID)
+			}
+		}
+	}
+
+	// The Create phase is a hard barrier: no Start-phase node is even
+	// dispatched until every Create-phase node has succeeded. This isn't
+	// just about not canceling unrelated in-flight Create work on a Start
+	// failure (phaseCancel already keeps that scoped per phase, see its own
+	// doc comment) -- it's that a Start-phase node whose own DependsOn
+	// edges are all satisfied has no reason to wait for a COMPLETELY
+	// UNRELATED Create-phase node elsewhere in the plan, so without this
+	// barrier a service could already be starting while a sibling it has no
+	// relationship with is still being created, or fails. The old
+	// create()-then-start() sequence never allowed that: the whole create
+	// phase, project-wide, always finished (or failed, with start() never
+	// invoked at all) before any dependency wait, or anything else in the
+	// start phase, even began. Interactive up's attach/printer session
+	// depends on this too: it takes exclusive hold of the terminal for the
+	// create phase's own progress display, handing it over to continuous
+	// container log streaming only once the create phase is entirely done
+	// -- a Start-phase node's log output interleaving with Create's
+	// progress bars has nowhere consistent to go.
+	if err := exec.runPhase(createNodes, rs, newPhaseCancel(ctx)); err != nil {
+		return err
+	}
+	return exec.runPhase(startNodes, rs, newPhaseCancel(ctx))
+}
+
+// runPhase dispatches every node in nodes concurrently (respecting their own
+// DependsOn edges via rs.done, same as a single-phase plan always did) and
+// waits for them all to finish. phase is this call's own cancellation scope:
+// a node failing here cancels phase.ctx for its siblings in THIS call only,
+// never a concurrently-running call for a different phase (not that there
+// is one today -- run() calls this sequentially -- but runNode has no way
+// to tell, so this still matters if that ever changes). See phaseCancel's
+// doc comment for why a node's failure goes through phase.fail instead of
+// errgroup.Group's own first-error-wins race.
+func (exec *planExecutor) runPhase(nodes []*PlanNode, rs *runState, phase *phaseCancel) error {
+	defer phase.cancel()
+	eg := errgroup.Group{}
+	for _, node := range nodes {
+		eg.Go(func() error {
+			return exec.runNode(node, rs, phase)
+		})
+	}
+	err := eg.Wait()
+	if phase.err != nil {
+		return phase.err
 	}
 	return err
 }
@@ -257,9 +282,11 @@ func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *gr
 
 // runState carries the per-run() state every node's goroutine shares: the
 // done-channel per node, dependency-failure bookkeeping, group event
-// tracking, the concurrency limiter, and the phase-scoped cancellation a
-// node joins depending on its own Phase. Split out of run() purely to keep
-// runNode a plain method instead of a closure captured in a loop.
+// tracking, and the concurrency limiter. Shared across both phases (built
+// once in run(), before either runs) since done/failures must stay visible
+// to a Start-phase node depending on a Create-phase one across the barrier
+// between them. Split out of run() purely to keep runNode a plain method
+// instead of a closure captured in a loop.
 type runState struct {
 	done             map[int]chan struct{}
 	recordFailure    func(id int, err error)
@@ -267,19 +294,13 @@ type runState struct {
 	groups           *groupTracker
 	events           api.EventProcessor
 	limiter          *semaphore.Weighted
-	createPhase      *phaseCancel
-	startPhase       *phaseCancel
 }
 
 // runNode executes one plan node: waits for its dependencies, skips it if
-// one of them failed, then dispatches it and records the outcome. See run()
-// for the phase-scoped cancellation (createPhase/startPhase) this draws
-// from.
-func (exec *planExecutor) runNode(node *PlanNode, rs *runState) error {
-	phase := rs.createPhase
-	if node.Phase == PhaseStart {
-		phase = rs.startPhase
-	}
+// one of them failed, then dispatches it and records the outcome. phase is
+// the cancellation scope of the runPhase call driving it -- see runPhase and
+// phaseCancel's own doc comments.
+func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCancel) error {
 	nodeCtx := phase.ctx
 
 	// Every exit path below must close rs.done[node.ID] exactly once, or a
