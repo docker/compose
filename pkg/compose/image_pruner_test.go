@@ -19,6 +19,7 @@ package compose
 import (
 	"testing"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
@@ -126,4 +127,22 @@ func TestRemoveDanglingImages_NoneFound(t *testing.T) {
 	removed, err := svc.removeDanglingImages(t.Context(), "prj", func(image.Summary) bool { return false })
 	assert.NilError(t, err)
 	assert.Equal(t, len(removed), 0)
+}
+
+// TestImagesToPrune_RejectsInvalidMode guards the one check ImagesToPrune
+// still makes on its own: down() validates options.Images upfront (see
+// TestDownRejectsInvalidImagePruneModeUpfront), but ImagePruner is exported
+// and can be driven directly with a hand-built ImagePruneOptions that
+// bypasses that check — this is the defense-in-depth path Valid() must
+// still reject. No API client call is expected: an invalid mode must be
+// rejected before any engine call is made.
+func TestImagesToPrune_RejectsInvalidMode(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, _ := prepareMocks(mockCtrl)
+
+	pruner := NewImagePruner(apiClient, &types.Project{Name: "prj"}, nil)
+	_, err := pruner.ImagesToPrune(t.Context(), ImagePruneOptions{Mode: ImagePruneMode("bogus")})
+	assert.ErrorContains(t, err, "unsupported image prune mode: bogus")
 }
