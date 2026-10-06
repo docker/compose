@@ -184,7 +184,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		}
 
 		eg.Go(func() error {
-			return s.waitDependency(ctx, dependant, dep, config, waitingFor)
+			return s.waitDependency(ctx, timeout > 0, dependant, dep, config, waitingFor)
 		})
 	}
 	err := eg.Wait()
@@ -197,7 +197,13 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 // waitDependency polls the dependency's containers until its depends_on
 // condition is satisfied (done), definitively failed (err), or ctx is
 // cancelled. Each check reports (done, err): (false, nil) means keep polling.
-func (s *composeService) waitDependency(ctx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
+// hasOwnDeadline tells apart a DeadlineExceeded this specific call is
+// responsible for (the caller wrapped ctx with its own timeout for this
+// wait) from one inherited from an ancestor context the caller never
+// touched -- only the former is safe to tolerate on an optional dependency;
+// the latter means something else entirely (an external deadline, a test
+// harness timeout) fired, and must keep propagating regardless of Required.
+func (s *composeService) waitDependency(ctx context.Context, hasOwnDeadline bool, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -209,9 +215,11 @@ func (s *composeService) waitDependency(ctx context.Context, dependant, dep stri
 			// (Ctrl-C) stays silent either way. An optional dependency
 			// tolerates a timeout exactly like it tolerates any other
 			// definitive failure the check* functions below report —
-			// skipped, not aborted.
+			// skipped, not aborted — but only this call's OWN timeout: an
+			// inherited deadline is a different, real failure the caller
+			// must still see.
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				if !config.Required {
+				if !config.Required && hasOwnDeadline {
 					s.events.On(containerReasonEvents(waitingFor, skippedEvent,
 						fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
 					logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
