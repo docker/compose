@@ -205,8 +205,18 @@ func (s *composeService) waitDependency(ctx context.Context, dependant, dep stri
 		case <-ticker.C:
 		case <-ctx.Done():
 			// An expired deadline is precisely the failure this wait is meant
-			// to detect; only a plain cancellation (Ctrl-C) stays silent.
+			// to detect for a required dependency; only a plain cancellation
+			// (Ctrl-C) stays silent either way. An optional dependency
+			// tolerates a timeout exactly like it tolerates any other
+			// definitive failure the check* functions below report —
+			// skipped, not aborted.
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				if !config.Required {
+					s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+						fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
+					logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
+					return nil
+				}
 				return ctx.Err()
 			}
 			return nil
