@@ -81,7 +81,26 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// anything, exactly what "the plan won't touch it" is supposed to mean.
 	emitRunningEvents(project, observed, plan, s.events)
 
+	// The plan's own OpWaitCondition nodes (service_healthy /
+	// service_completed_successfully dependency waits) block on ctx with no
+	// timeout of their own -- unlike start()'s per-dependency
+	// waitDependencies call, which already threaded WaitTimeout through
+	// every wait, not just the final one below. Establish the deadline
+	// before executing the plan, not after, or a condition that's never
+	// satisfied hangs the whole command instead of failing after
+	// WaitTimeout. preparePlan above is deliberately left out of it: image
+	// pulls and the rest of create()'s own work were never bounded by
+	// --wait-timeout either, in the old create()+start() sequence.
+	if options.Start.Wait && options.Start.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
+		defer cancel()
+		ctx = withTimeout
+	}
+
 	if err := s.executePlan(ctx, project, observed, plan); err != nil {
+		if options.Start.Wait && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
+		}
 		return err
 	}
 
@@ -89,13 +108,13 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		return nil
 	}
 
-	// The plan may have created or recreated containers: the verification
-	// below needs their current IDs, which the pre-execution observed
-	// snapshot above doesn't have for a container that didn't exist yet at
-	// observation time. --wait stays a final, post-plan check on the shared
-	// waitDependency primitive (synthetic conditions, global timeout) --
-	// matching start()'s own Wait handling below, which this intentionally
-	// mirrors.
+	// The plan may have created or recreated containers: this verification
+	// needs their current IDs, which the pre-execution observed snapshot
+	// above doesn't have for a container that didn't exist yet at
+	// observation time. It shares ctx's deadline (established above) rather
+	// than opening a fresh WaitTimeout window of its own -- one overall
+	// budget for "becoming healthy", covering both the plan's own waits and
+	// this final check, not one budget per wait.
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
 	if err != nil {
 		return err
@@ -107,11 +126,6 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 			Condition: getDependencyCondition(svc, project),
 			Required:  true,
 		}
-	}
-	if options.Start.WaitTimeout > 0 {
-		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
-		defer cancel()
-		ctx = withTimeout
 	}
 	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {

@@ -23,6 +23,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -143,6 +144,61 @@ func TestExecWaitCondition_HealthyConditionSatisfied(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting, api.StatusHealthy})
+}
+
+// TestExecutePlanWaitConditionRespectsContextDeadline is a regression test
+// for a gap a reviewer caught on upDetached (pkg/compose/up.go): the plan's
+// own OpWaitCondition nodes have no timeout of their own (unlike the
+// imperative engine's waitDependencies, which already threaded WaitTimeout
+// through every per-dependency wait, not just the final --wait check) --
+// they rely entirely on the ctx run() and execWaitCondition are given. If
+// nothing establishes a deadline on that ctx before executePlan runs, a
+// condition that's never satisfied blocks forever instead of failing after
+// --wait-timeout. This drives a real OpWaitCondition node (service_healthy,
+// never satisfied) through the full executePlan/run() DAG path -- not
+// execWaitCondition in isolation -- under a short deadline, and asserts it
+// returns promptly with ctx.Err(), proving the deadline really does
+// propagate from the caller into the plan's blocking nodes.
+func TestExecutePlanWaitConditionRespectsContextDeadline(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err := exec.run(ctx, plan)
+	elapsed := time.Since(start)
+
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Assert(t, elapsed < 5*time.Second, "execWaitCondition's polling loop did not stop at the deadline (took %s)", elapsed)
 }
 
 // TestExecStartContainer_EnrichedResolvesCreateNodeAndStarts verifies that a
