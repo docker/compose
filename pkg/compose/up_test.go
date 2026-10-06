@@ -228,3 +228,40 @@ func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
 	assert.NilError(t, eg.Wait())
 	assert.Equal(t, tracker.Peak(), 1, "streamContainerLogs must share --parallel's budget for concurrent log-attach opens")
 }
+
+// TestApplyRemainingDeadline_ZeroDeadlineIsNoOp covers upDetached's
+// --wait-timeout-unset path: no deadline, ctx passed through unchanged.
+func TestApplyRemainingDeadline_ZeroDeadlineIsNoOp(t *testing.T) {
+	got, cancel, err := applyRemainingDeadline(t.Context(), time.Time{}, 0)
+	defer cancel()
+	assert.NilError(t, err)
+	_, hasDeadline := got.Deadline()
+	assert.Assert(t, !hasDeadline)
+}
+
+// TestApplyRemainingDeadline_FutureDeadlineWraps covers the common case:
+// budget remains, ctx comes back bound by it.
+func TestApplyRemainingDeadline_FutureDeadlineWraps(t *testing.T) {
+	deadline := time.Now().Add(time.Minute)
+	got, cancel, err := applyRemainingDeadline(t.Context(), deadline, 5*time.Second)
+	defer cancel()
+	assert.NilError(t, err)
+	gotDeadline, hasDeadline := got.Deadline()
+	assert.Assert(t, hasDeadline)
+	assert.Equal(t, gotDeadline, deadline)
+}
+
+// TestApplyRemainingDeadline_PastDeadlineFailsImmediately is a regression
+// test for a docker-agent review finding on #14290: a plan whose
+// create/start/hook ops alone (unbounded by the wait deadline -- see
+// upDetached) take longer than --wait-timeout can still return nil past it.
+// Without this check, context.WithDeadline on an already-past deadline
+// would silently produce an immediately-canceled context, and the next
+// daemon call (getContainers) would fail with a bare context.DeadlineExceeded
+// indistinguishable from "health never came up" -- misleading, since health
+// was never actually checked. This must fail immediately with a message
+// that says so, before any daemon call happens.
+func TestApplyRemainingDeadline_PastDeadlineFailsImmediately(t *testing.T) {
+	_, _, err := applyRemainingDeadline(t.Context(), time.Now().Add(-time.Second), 5*time.Second)
+	assert.ErrorContains(t, err, "application not healthy after 5s: deadline exceeded during plan execution")
+}

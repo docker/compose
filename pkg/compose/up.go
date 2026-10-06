@@ -124,11 +124,20 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// (when set) rather than opening a fresh WaitTimeout window of its own
 	// -- one overall budget for "becoming healthy", covering both the
 	// plan's own waits and this final check, not one budget per wait.
-	if !deadline.IsZero() {
-		withDeadline, cancel := context.WithDeadline(ctx, deadline)
-		defer cancel()
-		ctx = withDeadline
+	//
+	// exec.run only bounds OpWaitCondition nodes with that deadline (see
+	// above): a plan whose create/start/hook ops alone take longer than
+	// WaitTimeout can still return nil past it. applyRemainingDeadline
+	// catches that case explicitly instead of deriving an already-expired
+	// context.WithDeadline, which would fail getContainers below before it
+	// ever touches the daemon -- "not healthy" when health was never
+	// actually checked.
+	var cancel context.CancelFunc
+	ctx, cancel, err = applyRemainingDeadline(ctx, deadline, options.Start.WaitTimeout)
+	if err != nil {
+		return err
 	}
+	defer cancel()
 
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
 	if err != nil {
@@ -152,6 +161,27 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		return err
 	}
 	return nil
+}
+
+// applyRemainingDeadline derives ctx bound by deadline, the no-op
+// cancel/unmodified ctx when deadline is zero (no --wait-timeout set).
+// Deadline may already be in the past -- the plan's create/start/hook ops
+// aren't bound by it (see upDetached), so they can run long enough on their
+// own to exhaust the whole --wait-timeout budget before this is ever called.
+// context.WithDeadline on an already-past deadline would silently produce an
+// immediately-canceled context, failing the caller's very next daemon call
+// with a bare context.DeadlineExceeded that looks identical to "health never
+// came up" -- misleading when health was never actually checked. Returning
+// the familiar message directly here, instead, keeps that distinction clear.
+func applyRemainingDeadline(ctx context.Context, deadline time.Time, waitTimeout time.Duration) (context.Context, context.CancelFunc, error) {
+	if deadline.IsZero() {
+		return ctx, func() {}, nil
+	}
+	if time.Until(deadline) <= 0 {
+		return nil, nil, fmt.Errorf("application not healthy after %s: deadline exceeded during plan execution", waitTimeout)
+	}
+	withDeadline, cancel := context.WithDeadline(ctx, deadline)
+	return withDeadline, cancel, nil
 }
 
 // upSession carries the state shared between the goroutines driving an
