@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
@@ -47,6 +48,14 @@ type planExecutor struct {
 	// round-trip per create.
 	containersMu        sync.Mutex
 	containersByService map[string]Containers
+
+	// waitDeadline, when non-zero, bounds OpWaitCondition nodes only (see
+	// executeNode) -- not the rest of the plan. up -d --wait-timeout must
+	// cap how long a dependency's health/completion condition is waited on,
+	// the same thing start()'s own WaitTimeout already does today, without
+	// also capping unrelated create/start/hook work the way wrapping the
+	// whole run() ctx would (docker/compose#14290 review).
+	waitDeadline time.Time
 }
 
 // reconciliationContext holds results produced by completed nodes so that downstream
@@ -239,6 +248,11 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 	case OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
 	case OpWaitCondition:
+		if !exec.waitDeadline.IsZero() {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(ctx, exec.waitDeadline)
+			defer cancel()
+		}
 		return exec.execWaitCondition(ctx, op)
 	case OpRunPreStart:
 		return exec.execRunPreStart(ctx, op)

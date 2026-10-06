@@ -151,14 +151,14 @@ func TestExecWaitCondition_HealthyConditionSatisfied(t *testing.T) {
 // own OpWaitCondition nodes have no timeout of their own (unlike the
 // imperative engine's waitDependencies, which already threaded WaitTimeout
 // through every per-dependency wait, not just the final --wait check) --
-// they rely entirely on the ctx run() and execWaitCondition are given. If
-// nothing establishes a deadline on that ctx before executePlan runs, a
-// condition that's never satisfied blocks forever instead of failing after
-// --wait-timeout. This drives a real OpWaitCondition node (service_healthy,
-// never satisfied) through the full executePlan/run() DAG path -- not
-// execWaitCondition in isolation -- under a short deadline, and asserts it
-// returns promptly with ctx.Err(), proving the deadline really does
-// propagate from the caller into the plan's blocking nodes.
+// they rely entirely on whatever ctx they're given (directly, or via
+// exec.waitDeadline -- see TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes for
+// that path specifically). This drives a real OpWaitCondition node
+// (service_healthy, never satisfied) through the full executePlan/run() DAG
+// path -- not execWaitCondition in isolation -- under a short deadline on
+// the ctx run() itself is given, and asserts it returns promptly with
+// ctx.Err(), proving the deadline really does propagate from the caller into
+// the plan's blocking nodes.
 func TestExecutePlanWaitConditionRespectsContextDeadline(t *testing.T) {
 	svc, apiClient, _ := newStartPhaseTestService(t)
 
@@ -199,6 +199,67 @@ func TestExecutePlanWaitConditionRespectsContextDeadline(t *testing.T) {
 
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Assert(t, elapsed < 5*time.Second, "execWaitCondition's polling loop did not stop at the deadline (took %s)", elapsed)
+}
+
+// TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes is a regression test for a
+// Copilot review finding on #14290: upDetached originally bounded
+// --wait-timeout by wrapping the whole run() ctx, which would have also
+// capped unrelated Create-phase and Start-phase work (network/container
+// creation, hooks) that was never subject to --wait-timeout in the old
+// create()+start() sequence. exec.waitDeadline (set by upDetached, consulted
+// only in executeNode's OpWaitCondition case) must bound exclusively the
+// blocking dependency wait, leaving every other node on the plan's plain,
+// deadline-free ctx. This plan pairs a never-satisfied OpWaitCondition with
+// an OpCreateNetwork that has no deadline of its own: if waitDeadline leaked
+// into the whole run(), the network create would race the same short
+// deadline instead of completing normally.
+func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+	nw := types.NetworkConfig{Name: "test_default"}
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		Return(client.NetworkCreateResult{ID: "net-id"}, nil)
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpCreateNetwork,
+		ResourceID: "network:default",
+		Name:       nw.Name,
+		Network:    &nw,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	exec.waitDeadline = time.Now().Add(200 * time.Millisecond)
+
+	start := time.Now()
+	err := exec.run(t.Context(), plan)
+	elapsed := time.Since(start)
+
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Assert(t, elapsed < 5*time.Second, "waitDeadline did not bound the stuck OpWaitCondition node (took %s)", elapsed)
 }
 
 // TestExecStartContainer_EnrichedResolvesCreateNodeAndStarts verifies that a
