@@ -865,6 +865,19 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		assert.Error(t, err, "timeout waiting for dependencies")
 	})
 
+	// Regression guard: an optional dependency's deadline expiring (new as of
+	// planExecutor.waitTimeout giving execWaitCondition a real timeout for
+	// the first time -- see waitDependency's ctx.Done() branch) must be
+	// tolerated exactly like any other definitive failure of an optional
+	// dependency, not surfaced as "timeout waiting for dependencies".
+	t.Run("expired deadline on an optional dependency is skipped, not an error", func(t *testing.T) {
+		optionalDeps := types.DependsOnConfig{
+			"db": {Condition: types.ServiceConditionHealthy, Required: false},
+		}
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", optionalDeps, containers, 50*time.Millisecond)
+		assert.NilError(t, err)
+	})
+
 	t.Run("user cancellation is not a wait failure", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()

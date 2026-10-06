@@ -1172,6 +1172,30 @@ func (r *reconciler) setContainerNode(service string, number int, node *PlanNode
 	r.containerNodes[service][number] = node
 }
 
+// exceptionalStateRestartNodes returns every create-phase bare-restart node
+// (OpStartContainer) planned for this service's exceptional-state (paused,
+// dead) replicas, in deterministic replica-number order. serviceNodes keeps
+// only the LAST node processed for a service's create-phase convergence --
+// correct for a single replica, but a scaled service with more than one
+// exceptional-state replica needs every one of them in startChainEnds, or a
+// service_started consumer could run while another replica's restart is
+// still pending.
+func (r *reconciler) exceptionalStateRestartNodes(service string) []*PlanNode {
+	planned := r.containerNodes[service]
+	numbers := make([]int, 0, len(planned))
+	for number, node := range planned {
+		if node.Operation.Type == OpStartContainer {
+			numbers = append(numbers, number)
+		}
+	}
+	sort.Ints(numbers)
+	nodes := make([]*PlanNode, len(numbers))
+	for i, number := range numbers {
+		nodes[i] = planned[number]
+	}
+	return nodes
+}
+
 // startPhaseReplicas collects the replicas to start, ascending number:
 // containers materialized by the create phase plus observed up-to-date
 // containers not running — exactly the isNotRunning set the imperative start
@@ -1354,15 +1378,20 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	}
 	if len(replicas) == 0 {
 		// the visit still happened: dependents order after its prerequisites
-		// (waits, service_started edges) AND after the create phase's own
-		// exceptional-state restart node when it planned one (anyRunning via
-		// a bare OpStartContainer, same reasoning as planProviderStart) --
-		// not either/or: a consumer must wait for both the dependency and
-		// the restart actually happening, or it can start before a
-		// paused/dead service's only container is running again.
+		// (waits, service_started edges) AND after every create phase's own
+		// exceptional-state restart node (anyRunning via a bare
+		// OpStartContainer, same reasoning as planProviderStart) -- not
+		// either/or: a consumer must wait for both the dependency and every
+		// such restart actually happening, or it can start before a
+		// paused/dead replica's container is running again. A scaled
+		// service can have more than one exceptional-state replica, so this
+		// collects all of them (exceptionalStateRestartNodes), not just the
+		// single last node serviceNodes retains.
 		ends := depNodes
-		if node, ok := r.serviceNodes[service.Name]; ok && !slices.Contains(ends, node) {
-			ends = append(ends, node)
+		for _, node := range r.exceptionalStateRestartNodes(service.Name) {
+			if !slices.Contains(ends, node) {
+				ends = append(ends, node)
+			}
 		}
 		if len(ends) > 0 {
 			r.startChainEnds[service.Name] = ends
