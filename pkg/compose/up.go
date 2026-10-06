@@ -113,8 +113,17 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		// independent deadline expire during exec.run -- that DeadlineExceeded
 		// didn't come from any OpWaitCondition node's own derived timeout
 		// either, so it isn't a health-readiness failure.
-		if options.Start.Wait && options.Start.WaitTimeout > 0 && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
+		if options.Start.WaitTimeout > 0 && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			if options.Start.Wait {
+				return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
+			}
+			// No --wait: this is exactly the dependency-timeout failure
+			// start()'s own waitDependencies already reports as "timeout
+			// waiting for dependencies" (service_containers.go) -- matching
+			// that established, actionable message instead of leaking the
+			// raw "context deadline exceeded" a user never configured in
+			// those terms.
+			return errors.New("timeout waiting for dependencies")
 		}
 		return err
 	}
