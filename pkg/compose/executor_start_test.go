@@ -189,6 +189,113 @@ func TestExecStartContainer_EnrichedResolvesCreateNodeAndStarts(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// TestExecutePlanRecreateThenStartUsesFinalName is a regression test: a
+// recreate's create node is planned under a temporary name
+// (planRecreateContainer's "<shortID>_<name>" dance, to avoid colliding with
+// the old container still holding the final name), and the final name is
+// applied by a separate OpRenameContainer node. The start phase's event
+// naming (groupEventName) and resolveContainerID both read
+// pctx.get(CreateNodeID) by design (plannedReplica keeps every start-phase
+// reference pointed at the create node, not the rename node) -- so
+// execRenameContainer must update that same entry in place once it renames
+// the container, or the start phase reports progress under the stale
+// temporary name forever. Caught via e2e (TestRestartWithDependencies)
+// before this node-result update existed.
+func TestExecutePlanRecreateThenStartUsesFinalName(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	project := &types.Project{Name: "test", Services: types.Services{"web": service}}
+
+	const tmpName = "abc123456789_test-web-1"
+	const finalName = "test-web-1"
+
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		Return(client.ContainerCreateResult{ID: "new-id"}, nil)
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "new-id", gomock.Any()).
+		Return(client.ContainerInspectResult{Container: container.InspectResponse{
+			ID:              "new-id",
+			Name:            "/" + tmpName,
+			Config:          &container.Config{},
+			NetworkSettings: &container.NetworkSettings{},
+		}}, nil)
+	apiClient.EXPECT().ContainerRename(gomock.Any(), "new-id", client.ContainerRenameOptions{NewName: finalName}).
+		Return(client.ContainerRenameResult{}, nil)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "new-id", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+
+	plan := &Plan{}
+	create := plan.addNode(Operation{
+		Type:       OpCreateContainer,
+		ResourceID: "service:web:1",
+		Cause:      "config changed (tmpName)",
+		Service:    &service,
+		Name:       tmpName,
+		Number:     1,
+	}, "")
+	rename := plan.addNode(Operation{
+		Type:         OpRenameContainer,
+		ResourceID:   "service:web:1",
+		Cause:        "finalize recreate",
+		Name:         finalName,
+		CreateNodeID: create.ID,
+	}, "", create)
+	plan.addNode(Operation{
+		Type:         OpStartContainer,
+		ResourceID:   "service:web:1",
+		Cause:        "start",
+		Service:      &service,
+		CreateNodeID: create.ID,
+	}, "start:web:1", rename)
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
+	assert.NilError(t, err)
+
+	// The start group's eventName is resolved lazily from
+	// pctx.get(CreateNodeID) (see groupEventName) once the start node
+	// actually runs -- by then the rename has already completed, so this
+	// must be the post-rename name, not create's own temporary one.
+	assert.DeepEqual(t, recorder.byID["Container "+finalName], []string{api.StatusStarting, api.StatusStarted})
+}
+
+// TestExecRenameContainer_RefreshesLiveViewName is the sibling regression to
+// TestExecutePlanRecreateThenStartUsesFinalName: execCreateContainer
+// publishes the new container into containersByService (the live view
+// OpWaitCondition and sibling execCreateContainer calls read by service
+// name) under its temporary name -- the only one it had at that point.
+// Without execRenameContainer refreshing that same entry, a dependent
+// waiting on this service's health (depends_on: condition: service_healthy)
+// reports Waiting/Healthy under the stale temporary name for the rest of the
+// plan's execution, exactly like TestRestartWithDependencies caught in e2e.
+func TestExecRenameContainer_RefreshesLiveViewName(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{Name: "web"}
+	project := &types.Project{Name: "test", Services: types.Services{"web": service}}
+
+	const tmpName = "abc123456789_test-web-1"
+	const finalName = "test-web-1"
+
+	apiClient.EXPECT().ContainerRename(gomock.Any(), "new-id", client.ContainerRenameOptions{NewName: finalName}).
+		Return(client.ContainerRenameResult{}, nil)
+
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec.pctx.set(1, operationResult{ContainerID: "new-id", ContainerName: tmpName})
+	exec.containersByService["web"] = Containers{{ID: "new-id", Names: []string{"/" + tmpName}}}
+
+	node := &PlanNode{ID: 2, Operation: Operation{
+		Type:         OpRenameContainer,
+		Name:         finalName,
+		Service:      &service,
+		CreateNodeID: 1,
+	}}
+
+	err := exec.execRenameContainer(t.Context(), node)
+	assert.NilError(t, err)
+
+	assert.DeepEqual(t, exec.containersByService["web"][0].Names, []string{"/" + finalName})
+}
+
 // TestExecRunPreStart_SkipsWhenReplicaAlreadyRunning covers the
 // observe-to-execute drift guard: the plan scheduled RunPreStart because no
 // replica was running at observation time, but a replica started in the

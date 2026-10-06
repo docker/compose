@@ -383,5 +383,33 @@ func (exec *planExecutor) execRenameContainer(ctx context.Context, node *PlanNod
 	_, err := exec.compose.apiClient().ContainerRename(ctx, createdID, client.ContainerRenameOptions{
 		NewName: op.Name,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	// Update the create node's own result in place rather than publishing a
+	// separate entry under this node's ID: plannedReplica deliberately keeps
+	// every start-phase reference (resolveContainerID, groupEventName)
+	// pointed at CreateNodeID, not at this rename node, so they all see the
+	// rename take effect without each needing their own case for "was this
+	// replica's container ever renamed". The ID is unchanged by a rename;
+	// only the name this node is renaming-TO replaces the create's own
+	// temporary one.
+	exec.pctx.set(op.CreateNodeID, operationResult{ContainerID: createdID, ContainerName: op.Name})
+
+	// execCreateContainer published this container into the live view under
+	// its temporary name (the only name it had at that point); refresh it in
+	// place now that the rename landed, or OpWaitCondition and any sibling
+	// execCreateContainer resolving a service reference keep seeing the
+	// temporary one for the rest of the plan's execution.
+	if op.Service != nil {
+		exec.containersMu.Lock()
+		for i, ctr := range exec.containersByService[op.Service.Name] {
+			if ctr.ID == createdID {
+				exec.containersByService[op.Service.Name][i].Names = []string{"/" + op.Name}
+				break
+			}
+		}
+		exec.containersMu.Unlock()
+	}
+	return nil
 }

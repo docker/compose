@@ -1511,13 +1511,18 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	}, group, removeDeps...)
 
 	// 4. Rename to final name. Link to the create node so the executor can
-	// fetch the resulting container ID directly.
+	// fetch the resulting container ID directly. Service is set so
+	// execRenameContainer can refresh that container's entry in the live
+	// containersByService view (OpWaitCondition and sibling create calls
+	// read it by service name) once the rename actually lands — otherwise
+	// they'd keep seeing the temporary name past this node.
 	finalName := getContainerName(r.project.Name, service, oc.Number)
 	renameNode := r.plan.addNode(Operation{
 		Type:         OpRenameContainer,
 		ResourceID:   resID,
 		Cause:        "finalize recreate",
 		Name:         finalName,
+		Service:      &serviceCopy,
 		CreateNodeID: createNode.ID,
 	}, group, removeNode)
 

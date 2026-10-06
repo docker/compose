@@ -44,14 +44,10 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		err := s.create(ctx, project, options.Create)
-		if err != nil {
-			return err
-		}
 		if options.Start.Attach == nil {
-			return s.start(ctx, project.Name, options.Start, nil)
+			return s.upDetached(ctx, project, options)
 		}
-		return nil
+		return s.create(ctx, project, options.Create)
 	}), "up", s.events)
 	if err != nil {
 		return err
@@ -65,6 +61,65 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	}
 	return s.runInteractiveUp(ctx, project, options)
+}
+
+// upDetached runs detached `up`'s Create and Start phases as a single plan:
+// the semantic switchover from create() + start() -- two separate daemon
+// snapshots, the second blind to what the first just did -- to one
+// preparePlan/executePlan pass covering both phases (epic #14081, lot 2).
+// Interactive up keeps the create()+start() sequence for now: its own
+// create/start phase boundary (attach/printer/monitor setup in between) is a
+// separate, riskier item of the same lot.
+func (s *composeService) upDetached(ctx context.Context, project *types.Project, options api.UpOptions) error {
+	project, observed, plan, err := s.preparePlan(ctx, project, options.Create, ScopeCreateStart)
+	if err != nil {
+		return err
+	}
+
+	// Must run against the pre-execution snapshot: observed only labels a
+	// container Running if it already was one before this plan touched
+	// anything, exactly what "the plan won't touch it" is supposed to mean.
+	emitRunningEvents(project, observed, plan, s.events)
+
+	if err := s.executePlan(ctx, project, observed, plan); err != nil {
+		return err
+	}
+
+	if !options.Start.Wait {
+		return nil
+	}
+
+	// The plan may have created or recreated containers: the verification
+	// below needs their current IDs, which the pre-execution observed
+	// snapshot above doesn't have for a container that didn't exist yet at
+	// observation time. --wait stays a final, post-plan check on the shared
+	// waitDependency primitive (synthetic conditions, global timeout) --
+	// matching start()'s own Wait handling below, which this intentionally
+	// mirrors.
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
+	if err != nil {
+		return err
+	}
+
+	depends := types.DependsOnConfig{}
+	for _, svc := range project.Services {
+		depends[svc.Name] = types.ServiceDependency{
+			Condition: getDependencyCondition(svc, project),
+			Required:  true,
+		}
+	}
+	if options.Start.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
+		defer cancel()
+		ctx = withTimeout
+	}
+	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
+		}
+		return err
+	}
+	return nil
 }
 
 // upSession carries the state shared between the goroutines driving an
