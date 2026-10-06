@@ -394,12 +394,13 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 	case OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
 	case OpWaitCondition:
+		origCtx := ctx
 		if exec.waitTimeout > 0 {
 			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(ctx, exec.waitTimeout)
 			defer cancel()
 		}
-		return exec.execWaitCondition(ctx, op)
+		return exec.execWaitCondition(ctx, origCtx, op)
 	case OpRunPreStart:
 		return exec.execRunPreStart(ctx, op)
 	case OpRunPostStart:

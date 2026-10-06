@@ -160,6 +160,7 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
+	origCtx := ctx
 	if timeout > 0 {
 		withTimeout, cancelFunc := context.WithTimeout(ctx, timeout)
 		defer cancelFunc()
@@ -184,7 +185,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		}
 
 		eg.Go(func() error {
-			return s.waitDependency(ctx, timeout > 0, dependant, dep, config, waitingFor)
+			return s.waitDependency(ctx, origCtx, dependant, dep, config, waitingFor)
 		})
 	}
 	err := eg.Wait()
@@ -197,13 +198,21 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 // waitDependency polls the dependency's containers until its depends_on
 // condition is satisfied (done), definitively failed (err), or ctx is
 // cancelled. Each check reports (done, err): (false, nil) means keep polling.
-// hasOwnDeadline tells apart a DeadlineExceeded this specific call is
-// responsible for (the caller wrapped ctx with its own timeout for this
-// wait) from one inherited from an ancestor context the caller never
-// touched -- only the former is safe to tolerate on an optional dependency;
-// the latter means something else entirely (an external deadline, a test
-// harness timeout) fired, and must keep propagating regardless of Required.
-func (s *composeService) waitDependency(ctx context.Context, hasOwnDeadline bool, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
+// origCtx is ctx as it stood before the caller wrapped it with this wait's
+// own timeout (if any) -- comparing origCtx.Err() against ctx.Err() at the
+// moment ctx.Done() fires is how this tells apart a DeadlineExceeded this
+// specific call's own wrap is responsible for from one inherited from an
+// ancestor context the caller never touched. A bare "did the caller
+// configure a timeout at all" flag isn't enough: if origCtx itself already
+// carries an earlier deadline, wrapping it with context.WithTimeout still
+// makes both origCtx and ctx report DeadlineExceeded once that earlier
+// deadline fires, even though this call's own timeout never actually
+// elapsed -- only origCtx.Err() == nil proves this wrap's own timeout is
+// the one that fired. Only that case is safe to tolerate on an optional
+// dependency; an inherited deadline means something else entirely (an
+// external deadline, a test harness timeout) fired, and must keep
+// propagating regardless of Required.
+func (s *composeService) waitDependency(ctx, origCtx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -219,7 +228,7 @@ func (s *composeService) waitDependency(ctx context.Context, hasOwnDeadline bool
 			// inherited deadline is a different, real failure the caller
 			// must still see.
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				if !config.Required && hasOwnDeadline {
+				if !config.Required && origCtx.Err() == nil {
 					s.events.On(containerReasonEvents(waitingFor, skippedEvent,
 						fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
 					logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
