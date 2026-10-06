@@ -130,6 +130,14 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// every OpWaitCondition node above and start()'s own final --wait check
 	// did -- not whatever's left of a shared budget, which unrelated plan
 	// work could already have exhausted with no wait ever at risk.
+	//
+	// origCtx is kept so the two DeadlineExceeded checks below can tell this
+	// fresh window expiring (origCtx still fine) apart from origCtx's own,
+	// independent deadline propagating through the derived one (origCtx
+	// already done): a parent deadline firing first makes the derived
+	// context's Err() report DeadlineExceeded too, inherited from the
+	// parent, even though this window's own timer never fired.
+	origCtx := ctx
 	if options.Start.WaitTimeout > 0 {
 		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
 		defer cancel()
@@ -143,7 +151,7 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		// command timeout, a cancellation) unrelated to --wait-timeout.
 		// Translating that into "application not healthy after 0s" would
 		// name a duration nobody configured.
-		if options.Start.WaitTimeout > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if options.Start.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err
@@ -157,7 +165,7 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		}
 	}
 	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
-		if options.Start.WaitTimeout > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if options.Start.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}
 		return err

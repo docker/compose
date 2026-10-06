@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -159,67 +160,128 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
 
-	// Every node's goroutine is dispatched unconditionally, so one waiting on
-	// a dependency never occupies a concurrency slot -- only the actual
-	// executeNode call does, via the semaphore below. This also means
-	// deadlock-freedom no longer depends on plan.Nodes staying topologically
-	// sorted: a goroutine blocked on <-done[dep.ID] holds no slot for a
-	// still-pending dependency to be starved on.
-	eg, ctx := errgroup.WithContext(ctx)
-	limiter := newOptionalLimiter(exec.compose.maxConcurrency)
+	// Cancellation is phase-scoped, not plan-wide: createCtx is canceled by a
+	// Create-phase node failing; startCtx, derived from it, is ALSO canceled
+	// by a Start-phase node failing. A Start-phase failure (an OpWaitCondition
+	// hitting --wait-timeout, a container failing to start, anything) must
+	// never cancel createCtx -- doing so would abort unrelated, still
+	// in-flight Create-phase work (a sibling service's container create, a
+	// network create) that has nothing to do with it. The old
+	// create()-then-start() sequence never had this failure mode: the whole
+	// create phase had always finished before any dependency wait, or
+	// anything else in the start phase, even began. A Create-phase failure
+	// still cancels the Start phase too, via createCtx's cancellation
+	// propagating to the startCtx derived from it -- matching the old
+	// sequence, where start() was never even called once create() failed.
+	createCtx, cancelCreateCtx := context.WithCancel(ctx)
+	defer cancelCreateCtx()
+	startCtx, cancelStartCtx := context.WithCancel(createCtx)
+	defer cancelStartCtx()
+
+	rs := &runState{
+		done:             done,
+		recordFailure:    recordFailure,
+		failedDependency: failedDependency,
+		groups:           groups,
+		events:           events,
+		limiter:          newOptionalLimiter(exec.compose.maxConcurrency),
+		createCtx:        createCtx,
+		cancelCreateCtx:  cancelCreateCtx,
+		startCtx:         startCtx,
+		cancelStartCtx:   cancelStartCtx,
+	}
+	eg := errgroup.Group{}
 	for _, node := range plan.Nodes {
 		eg.Go(func() error {
-			// Wait for all dependencies
-			for _, dep := range node.DependsOn {
-				select {
-				case <-done[dep.ID]:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-
-			// A dependency may have just failed without ctx being canceled
-			// yet (see failures' comment above) -- skip this node exactly
-			// like a canceled one: no slot acquired, no event emitted, its
-			// own dependents unblocked with the same failure recorded.
-			if err := failedDependency(node.DependsOn); err != nil {
-				// Store the original error, not a wrapped one: this node's own
-				// dependents look it up the same way, and wrapping it again at
-				// every hop would compound "dependency failed: " prefixes down
-				// a multi-node chain (create -> pre_start -> start -> post_start).
-				recordFailure(node.ID, err)
-				close(done[node.ID])
-				return fmt.Errorf("dependency failed: %w", err)
-			}
-
-			if err := acquireSlot(ctx, limiter); err != nil {
-				recordFailure(node.ID, err)
-				close(done[node.ID])
-				return err
-			}
-			defer releaseSlot(limiter)
-
-			// Emit group start event if this is the first node of a group
-			groups.onNodeStart(node, events)
-
-			err := exec.executeNode(ctx, node)
-
-			if err == nil {
-				// Emit group done event if this is the last node of a group
-				groups.onNodeDone(node, events)
-			} else {
-				recordFailure(node.ID, err)
-				if ctx.Err() == nil {
-					groups.onNodeError(node, events, err)
-				}
-			}
-
-			close(done[node.ID])
-			return err
+			return exec.runNode(node, rs)
 		})
 	}
 
 	return eg.Wait()
+}
+
+// runState carries the per-run() state every node's goroutine shares: the
+// done-channel per node, dependency-failure bookkeeping, group event
+// tracking, the concurrency limiter, and the phase-scoped cancellation a
+// node joins depending on its own Phase. Split out of run() purely to keep
+// runNode a plain method instead of a closure captured in a loop.
+type runState struct {
+	done             map[int]chan struct{}
+	recordFailure    func(id int, err error)
+	failedDependency func(deps []*PlanNode) error
+	groups           *groupTracker
+	events           api.EventProcessor
+	limiter          *semaphore.Weighted
+	createCtx        context.Context
+	cancelCreateCtx  context.CancelFunc
+	startCtx         context.Context
+	cancelStartCtx   context.CancelFunc
+}
+
+// runNode executes one plan node: waits for its dependencies, skips it if
+// one of them failed, then dispatches it and records the outcome. See run()
+// for the phase-scoped cancellation (createCtx/startCtx) this draws from.
+func (exec *planExecutor) runNode(node *PlanNode, rs *runState) error {
+	nodeCtx, cancelPhase := rs.createCtx, rs.cancelCreateCtx
+	if node.Phase == PhaseStart {
+		nodeCtx, cancelPhase = rs.startCtx, rs.cancelStartCtx
+	}
+
+	// Wait for all dependencies
+	for _, dep := range node.DependsOn {
+		select {
+		case <-rs.done[dep.ID]:
+		case <-nodeCtx.Done():
+			return nodeCtx.Err()
+		}
+	}
+
+	// A dependency may have just failed without nodeCtx being canceled yet
+	// (see run()'s failures comment) -- skip this node exactly like a
+	// canceled one: no slot acquired, no event emitted, its own dependents
+	// unblocked with the same failure recorded.
+	if err := rs.failedDependency(node.DependsOn); err != nil {
+		// Store the original error, not a wrapped one: this node's own
+		// dependents look it up the same way, and wrapping it again at
+		// every hop would compound "dependency failed: " prefixes down a
+		// multi-node chain (create -> pre_start -> start -> post_start).
+		rs.recordFailure(node.ID, err)
+		close(rs.done[node.ID])
+		return fmt.Errorf("dependency failed: %w", err)
+	}
+
+	if err := acquireSlot(nodeCtx, rs.limiter); err != nil {
+		rs.recordFailure(node.ID, err)
+		close(rs.done[node.ID])
+		return err
+	}
+	defer releaseSlot(rs.limiter)
+
+	// Emit group start event if this is the first node of a group
+	rs.groups.onNodeStart(node, rs.events)
+
+	err := exec.executeNode(nodeCtx, node)
+
+	if err == nil {
+		// Emit group done event if this is the last node of a group
+		rs.groups.onNodeDone(node, rs.events)
+	} else {
+		rs.recordFailure(node.ID, err)
+		if nodeCtx.Err() == nil {
+			rs.groups.onNodeError(node, rs.events, err)
+			// This node's own failure, not an inherited cancellation:
+			// propagate it to this node's own phase (and, if it's a
+			// Create-phase node, transitively to Start via startCtx's
+			// derivation) -- never the other way around. Gated the same as
+			// the event above: a node whose nodeCtx is already canceled
+			// failed because of that cancellation, not a new failure of its
+			// own to propagate.
+			cancelPhase()
+		}
+	}
+
+	close(rs.done[node.ID])
+	return err
 }
 
 // executeNode dispatches a single plan node to the appropriate API call.
