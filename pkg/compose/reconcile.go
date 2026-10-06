@@ -1354,12 +1354,15 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	}
 	if len(replicas) == 0 {
 		// the visit still happened: dependents order after its prerequisites
-		// (waits, service_started edges), else after the create phase
+		// (waits, service_started edges) AND after the create phase's own
+		// exceptional-state restart node when it planned one (anyRunning via
+		// a bare OpStartContainer, same reasoning as planProviderStart) --
+		// not either/or: a consumer must wait for both the dependency and
+		// the restart actually happening, or it can start before a
+		// paused/dead service's only container is running again.
 		ends := depNodes
-		if len(ends) == 0 {
-			if node, ok := r.serviceNodes[service.Name]; ok {
-				ends = []*PlanNode{node}
-			}
+		if node, ok := r.serviceNodes[service.Name]; ok && !slices.Contains(ends, node) {
+			ends = append(ends, node)
 		}
 		if len(ends) > 0 {
 			r.startChainEnds[service.Name] = ends
