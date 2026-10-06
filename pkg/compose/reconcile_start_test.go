@@ -490,6 +490,60 @@ func TestPlanStart_ExceptionalStateConsumerWaitsForRestart(t *testing.T) {
 		"consumer's start must depend on app's own restart node, not just its depends_on wait:\n%s", plan)
 }
 
+// TestPlanStart_ScaledExceptionalStateConsumerWaitsForEveryRestart is a
+// regression test for a Copilot review finding on
+// TestPlanStart_ExceptionalStateConsumerWaitsForRestart's own fix: for a
+// scaled service, serviceNodes keeps only the LAST create-phase node
+// processed, so a consumer's start only ended up depending on the highest-
+// numbered replica's restart. With two exceptional-state replicas, the
+// consumer must depend on BOTH restart nodes, not just one.
+func TestPlanStart_ScaledExceptionalStateConsumerWaitsForEveryRestart(t *testing.T) {
+	two := 2
+	app := types.ServiceConfig{Name: "app", Deploy: &types.DeployConfig{Replicas: &two}}
+	consumer := serviceWithDeps("consumer", types.DependsOnConfig{"app": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"app": app, "consumer": consumer},
+	}
+	appHash, err := serviceHashWithResolvedRefs(app, nil)
+	assert.NilError(t, err)
+	consumerHash, err := serviceHashWithResolvedRefs(consumer, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["app"] = []ObservedContainer{
+		observedServiceContainer("app", 1, container.StatePaused, appHash),
+		observedServiceContainer("app", 2, container.StateDead, appHash),
+	}
+	observed.Containers["consumer"] = []ObservedContainer{
+		observedServiceContainer("consumer", 1, container.StateExited, consumerHash),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+
+	var restart1, restart2, consumerStartNode *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:1":
+			restart1 = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:2":
+			restart2 = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+			consumerStartNode = n
+		}
+	}
+	if restart1 == nil || restart2 == nil {
+		t.Fatalf("expected both replicas' bare-restart nodes:\n%s", plan)
+	}
+	if consumerStartNode == nil {
+		t.Fatalf("expected a start node for consumer:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, restart1),
+		"consumer's start must depend on replica 1's restart node:\n%s", plan)
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, restart2),
+		"consumer's start must depend on replica 2's restart node too, not just the last one processed:\n%s", plan)
+}
+
 // A replica condemned by scale-down must never receive a start-phase node:
 // the imperative engine only starts what survives the convergence — and the
 // condemned replica does not count as running for the pre_start gating.

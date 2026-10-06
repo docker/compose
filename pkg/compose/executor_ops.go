@@ -219,12 +219,13 @@ func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summa
 // warning, not a plan failure — matching waitDependencies' own
 // optional-dependency handling.
 //
-// Unlike waitDependencies, this applies no deadline of its own: nothing
-// produces one yet (no ReconcileOptions field feeds a per-wait timeout the
-// way api.CreateOptions.WaitTimeout does today). A future caller needing that
-// — e.g. `up --wait` once it runs on the plan — wraps ctx before executing
-// the plan, or adds a Timeout to the operation for execWaitCondition to wrap
-// here.
+// Unlike waitDependencies, this has no timeout of its own to apply here --
+// ctx is used exactly as given. upDetached (up.go) is the caller that needs
+// one: planExecutor.waitTimeout gives this node its own fresh per-wait
+// window, derived in executeNode's OpWaitCondition dispatch rather than
+// here, the same thing start()'s own WaitTimeout already threads through
+// every waitDependencies call -- without also bounding unrelated Create or
+// Start work the way wrapping the whole plan's ctx would.
 func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) error {
 	s := exec.compose
 	exec.containersMu.Lock()
