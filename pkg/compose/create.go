@@ -83,6 +83,23 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	return s.executePlan(ctx, project, observed, plan)
 }
 
+// createAndStart runs project's Create and Start phases as a single plan --
+// the same ScopeCreateStart switchover upDetached performs for `up -d`,
+// reused by every other caller that ran create() then start() back to back
+// with no further wiring in between (Scale; watch's rebuild). Callers that
+// need --wait's post-plan verification (only up -d does) use upDetached
+// instead, not this.
+func (s *composeService) createAndStart(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	project, observed, plan, err := s.preparePlan(ctx, project, options, ScopeCreateStart)
+	if err != nil {
+		return err
+	}
+
+	emitRunningEvents(project, observed, plan, s.events)
+
+	return s.executePlan(ctx, project, observed, plan)
+}
+
 // preparePlan resolves the project model, ensures the resources the plan
 // itself doesn't own (images, models, external networks/volumes), observes
 // the daemon, and reconciles all of it into a Plan — without creating,
