@@ -126,9 +126,21 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
+	// the whole preparation (dependencies, image pull, container creation)
+	// shares one "run" operation, so the progress display renders it as a
+	// single block instead of falling back to a plain line per event for the
+	// steps that would run once a narrower bracket has closed.
+	var result prepareRunResult
 	err = Run(ctx, func(ctx context.Context) error {
-		return s.startDependencies(ctx, project, options)
+		var err error
+		result, err = s.doPrepareRun(ctx, project, options)
+		return err
 	}, "run", s.events)
+	return result, err
+}
+
+func (s *composeService) doPrepareRun(ctx context.Context, project *types.Project, options api.RunOptions) (prepareRunResult, error) {
+	err := s.startDependencies(ctx, project, options)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
