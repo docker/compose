@@ -863,6 +863,93 @@ func TestPlanStart_ProviderRelayRestartWaitsOnDependencies(t *testing.T) {
 		"the relay restart must depend on prov's own depends_on wait, not start unconditionally:\n%s", plan)
 }
 
+// TestPlanStart_OrdinaryPathBareStartsAStaleRelay is a regression test for a
+// Copilot review finding on #14296: relay detection must apply per observed
+// container, not per the service's CURRENTLY declared type. A service whose
+// provider: declaration was removed without an intervening `up`/create to
+// converge the daemon still has its old relay container observed under its
+// name; planServiceStart's ordinary (non-provider) path must still give it a
+// bare start (no secret/config injection, no post_start hooks) -- enriching
+// it would act on a shell-less scratch binary with no process to inject into
+// or exec hooks against.
+func TestPlanStart_OrdinaryPathBareStartsAStaleRelay(t *testing.T) {
+	web := types.ServiceConfig{
+		Name:      "web",
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"web": web},
+	}
+	relay := observedServiceContainer("web", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed := emptyObserved()
+	observed.Containers["web"] = []ObservedContainer{relay}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	var start *PlanNode
+	for _, n := range plan.Nodes {
+		if n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:web:1" {
+			start = n
+		}
+		assert.Assert(t, n.Operation.Type != OpRunPostStart,
+			"post_start must not run against a stale relay container:\n%s", plan)
+	}
+	if start == nil {
+		t.Fatalf("expected a start node for web's stale relay:\n%s", plan)
+	}
+	assert.Assert(t, start.Operation.Service == nil,
+		"a stale relay's start must stay bare (no injection) -- it's not a real service container:\n%s", plan)
+}
+
+// TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer is a regression
+// test for the second Copilot review finding on #14296, the symmetric gap:
+// a service declared provider: whose observed container is NOT a relay (a
+// stale normal replica left over from before the service became
+// provider-backed) must still be started -- the OLD imperative engine's
+// startService only special-cased Provider != nil for the ZERO-containers
+// case, so an existing non-relay container was always started normally,
+// including post_start hooks. planProviderRelayRestart's first version
+// silently dropped this case (filtered on isRelayContainer), returning
+// success without starting anything.
+func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
+	prov := types.ServiceConfig{
+		Name:      "prov",
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}},
+	}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	stale := observedServiceContainer("prov", 1, container.StateExited, "")
+	observed := emptyObserved()
+	observed.Containers["prov"] = []ObservedContainer{stale}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	var start, post *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:prov:1":
+			start = n
+		case n.Operation.Type == OpRunPostStart:
+			post = n
+		}
+	}
+	if start == nil {
+		t.Fatalf("expected a start node for prov's stale non-relay container, not silently skipped:\n%s", plan)
+	}
+	assert.Assert(t, start.Operation.Service != nil,
+		"a stale non-relay container must get an enriched start (injection applies), like any ordinary replica:\n%s", plan)
+	if post == nil {
+		t.Fatalf("expected post_start hooks to run for the enriched start:\n%s", plan)
+	}
+}
+
 // An optional (required: false) condition marks the shared wait node
 // best-effort — a missing dependency is skipped, not fatal; one required
 // dependent upgrades the node for everyone.
