@@ -1337,6 +1337,15 @@ func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, 
 // the dependency wait substitute for the deploy node entirely, so the
 // consumer could start while the provider's plugin/relay deployment was
 // still running.
+//
+// Under pure ScopeStart (`compose start`), serviceNodes[service.Name] is
+// never set at all: OpRunProvider is emitted by the create phase
+// (reconcileService), which plan-based start-only callers never run. Without
+// planProviderRelayRestart below, a stopped relay container had no start
+// node planned for it anywhere, so `compose start` on a provider-backed
+// service returned success without actually starting its relay -- found by
+// the e2e suite (TestProviderPublishEndpoint) once ScopeStart became a real,
+// exercised path.
 func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 	depNodes, err := r.startPhaseDependencies(service)
 	if err != nil {
@@ -1345,9 +1354,45 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 	ends := depNodes
 	if node, ok := r.serviceNodes[service.Name]; ok && !slices.Contains(ends, node) {
 		ends = append(ends, node)
+	} else if !r.options.SkipProviders {
+		// serviceNodes[service.Name] is also absent when reconcileService
+		// itself skipped this provider (r.options.SkipProviders, e.g. watch's
+		// rebuild): that is an explicit request to leave it alone, not the
+		// create phase never having run, so it must not fall through to
+		// planProviderRelayRestart.
+		if restart := r.planProviderRelayRestart(service); restart != nil {
+			ends = append(ends, restart)
+		}
 	}
 	if len(ends) > 0 {
 		r.startChainEnds[service.Name] = ends
+	}
+	return nil
+}
+
+// planProviderRelayRestart emits a bare OpStartContainer for the provider's
+// own relay container when it is observed but not running. Matches the
+// imperative engine's own behavior for a provider's relay: a bare
+// ContainerStart like any other container (service_containers.go's deleted
+// startService never special-cased providers beyond "no container is fine"),
+// never a redeploy -- ensureServiceRelay's own convergence stays a create-phase
+// concern, triggered by OpRunProvider, which a caller needing it re-run
+// (e.g. config drift) gets via ScopeCreateStart, not this.
+func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig) *PlanNode {
+	for i := range r.observed.Containers[service.Name] {
+		oc := &r.observed.Containers[service.Name][i]
+		if !isRelayContainer(oc.Summary) || oc.State == container.StateRunning {
+			continue
+		}
+		resID := serviceReplicaID(service.Name, oc.Number)
+		node := r.plan.addNode(Operation{
+			Type:       OpStartContainer,
+			ResourceID: resID,
+			Cause:      "start",
+			Container:  &oc.Summary,
+		}, startGroupID(resID))
+		node.Phase = PhaseStart
+		return node
 	}
 	return nil
 }

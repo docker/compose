@@ -740,6 +740,83 @@ func TestPlanStart_StartOnlyScope(t *testing.T) {
 `)+"\n")
 }
 
+// TestPlanStart_ProviderRelayRestart is a regression test for a real bug
+// found by the e2e suite (TestProviderPublishEndpoint) once ScopeStart
+// became the real, exercised path for `compose start`: planProviderStart
+// only ever ordered a provider after its own create-phase OpRunProvider node
+// (serviceNodes[service.Name]) -- never set under pure ScopeStart, since the
+// create phase that emits it doesn't run at all. A stopped relay container
+// therefore had no start node planned for it anywhere, and `compose start`
+// on a provider-backed service returned success without actually starting
+// it. planProviderRelayRestart now emits a bare OpStartContainer for an
+// observed, non-running relay container when the create phase hasn't
+// already covered it.
+func TestPlanStart_ProviderRelayRestart(t *testing.T) {
+	prov := types.ServiceConfig{Name: "prov"}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	observed := emptyObserved()
+	relay := observedServiceContainer("prov", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed.Containers["prov"] = []ObservedContainer{relay}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:prov:1, StartContainer, start [start:prov:1] {start}
+`)+"\n")
+}
+
+// A running relay needs no start node at all: planProviderStart's
+// serviceNodes fallback and planProviderRelayRestart both find nothing to
+// do, so the provider contributes no start-phase node of its own.
+func TestPlanStart_ProviderRelayAlreadyRunningPlansNothing(t *testing.T) {
+	prov := types.ServiceConfig{Name: "prov"}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	observed := emptyObserved()
+	relay := observedServiceContainer("prov", 1, container.StateRunning, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed.Containers["prov"] = []ObservedContainer{relay}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, len(plan.Nodes), 0)
+}
+
+// TestPlanStart_ProviderRelayRestartRespectsSkipProviders is a regression
+// test for a Copilot review finding on planProviderRelayRestart above:
+// serviceNodes[service.Name] being absent does not ALWAYS mean "the create
+// phase never ran" -- under ScopeCreateStart with SkipProviders (watch's
+// rebuild), reconcileService deliberately skips the provider and never sets
+// serviceNodes either, an explicit request to leave it alone, not an
+// invitation for the start phase to restart its relay regardless.
+func TestPlanStart_ProviderRelayRestartRespectsSkipProviders(t *testing.T) {
+	prov := types.ServiceConfig{Name: "prov"}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	observed := emptyObserved()
+	relay := observedServiceContainer("prov", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed.Containers["prov"] = []ObservedContainer{relay}
+
+	options := startScopeOptions(ScopeCreateStart)
+	options.SkipProviders = true
+	plan, err := reconcile(t.Context(), project, observed, options, noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, len(plan.Nodes), 0, "SkipProviders must leave a stopped relay untouched:\n%s", plan)
+}
+
 // An optional (required: false) condition marks the shared wait node
 // best-effort — a missing dependency is skipped, not fatal; one required
 // dependent upgrades the node for everyone.
