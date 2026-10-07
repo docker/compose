@@ -56,9 +56,17 @@ func GetAuthConfigKey(indexName string) string {
 }
 
 // AuthProvider provides registry credentials for a registry hostname, as
-// implemented by the docker CLI's configfile.
+// implemented by the docker CLI's configfile and by NewDesktopAuthProvider.
 type AuthProvider interface {
 	GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error)
+}
+
+// AuthProviderFunc adapts a function to the AuthProvider interface.
+type AuthProviderFunc func(registryHostname string) (clitypes.AuthConfig, error)
+
+// GetAuthConfig calls f(registryHostname).
+func (f AuthProviderFunc) GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error) {
+	return f(registryHostname)
 }
 
 // EncodedAuth returns the credentials for the registry hosting the given

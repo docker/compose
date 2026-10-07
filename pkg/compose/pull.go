@@ -304,7 +304,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return err
 	}
 
-	encodedAuth, err := registry.EncodedAuth(ref, s.configFile())
+	encodedAuth, err := registry.EncodedAuth(ref, s.authProvider())
 	if err != nil {
 		return err
 	}
@@ -385,9 +385,18 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 // runnable manifest to compare a running container with a fresh build/pull;
 // never funnel this resolution through the local content-digest producer, and
 // never pin a published reference with a per-platform digest.
+//
+// Docker Hub credentials come from the Docker Desktop session when there is
+// one, and from file otherwise.
 func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {
+	return imageDigestResolver(ctx, registry.NewDesktopAuthProvider(file), apiClient)
+}
+
+// imageDigestResolver is ImageDigestResolver with the source of registry
+// credentials given explicitly.
+func imageDigestResolver(ctx context.Context, credentials registry.AuthProvider, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {
 	return func(named reference.Named) (digest.Digest, error) {
-		auth, err := registry.EncodedAuth(named, file)
+		auth, err := registry.EncodedAuth(named, credentials)
 		if err != nil {
 			return "", err
 		}

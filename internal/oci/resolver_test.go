@@ -25,9 +25,12 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
+	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/opencontainers/go-digest"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/internal/registry"
 )
 
 // recordingRoundTripper counts RoundTrip invocations on a delegate so tests
@@ -103,6 +106,56 @@ func TestNewResolver_AuthorizerUsesProvidedTransport(t *testing.T) {
 
 	assert.Assert(t, rec.authCalls.Load() > 0,
 		"authorizer token fetch did not go through the supplied transport (bypassed via http.DefaultClient)")
+}
+
+// TestNewResolver_SendsPasswordGrant guards how credentials reach the token
+// endpoint: a username/password pair, which is how a Docker Desktop session
+// is provided, must be exchanged with an OAuth password grant. Without a
+// username containerd would send the secret as a refresh token instead.
+func TestNewResolver_SendsPasswordGrant(t *testing.T) {
+	type tokenRequest struct {
+		GrantType, Username, Password string
+	}
+	requests := make(chan tokenRequest, 1)
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/token") {
+			if r.Method == http.MethodPost && r.ParseForm() == nil {
+				select {
+				case requests <- tokenRequest{
+					GrantType: r.PostForm.Get("grant_type"),
+					Username:  r.PostForm.Get("username"),
+					Password:  r.PostForm.Get("password"),
+				}:
+				default:
+				}
+			}
+			_, _ = w.Write([]byte(`{"token":"fake","access_token":"fake","expires_in":300}`))
+			return
+		}
+		if r.Header.Get("Authorization") == "" {
+			w.Header().Set("Www-Authenticate", `Bearer realm="`+server.URL+`/token",service="test"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+
+	host := server.Listener.Addr().String()
+	credentials := registry.AuthProviderFunc(func(string) (clitypes.AuthConfig, error) {
+		return clitypes.AuthConfig{Username: "hubuser", Password: "desktop-oauth-token"}, nil
+	})
+	resolver := NewResolver(credentials, &http.Transport{}, host)
+	_, _, _ = resolver.Resolve(t.Context(), host+"/test/image:latest")
+
+	select {
+	case got := <-requests:
+		assert.DeepEqual(t, got, tokenRequest{GrantType: "password", Username: "hubuser", Password: "desktop-oauth-token"})
+	default:
+		t.Fatal("the resolver never requested a token with the provided credentials")
+	}
 }
 
 func TestNewResolver_NilTransportIsValid(t *testing.T) {

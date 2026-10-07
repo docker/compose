@@ -33,7 +33,6 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/config/configfile"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/jsonstream"
@@ -53,7 +52,7 @@ type DryRunClient struct {
 	containers       []containerType.Summary
 	containersSeeded bool
 	execs            sync.Map
-	configFile       *configfile.ConfigFile
+	credentials      registry.AuthProvider
 }
 
 type execDetails struct {
@@ -72,10 +71,10 @@ func (e fakeStreamResult) Close() error               { return e.ReadCloser.Clos
 // NewDryRunClient produces a DryRunClient
 func NewDryRunClient(apiClient client.APIClient, cli command.Cli) (*DryRunClient, error) {
 	return &DryRunClient{
-		apiClient:  apiClient,
-		containers: []containerType.Summary{},
-		execs:      sync.Map{},
-		configFile: cli.ConfigFile(),
+		apiClient:   apiClient,
+		containers:  []containerType.Summary{},
+		execs:       sync.Map{},
+		credentials: registry.NewDesktopAuthProvider(cli.ConfigFile()),
 	}, nil
 }
 
@@ -88,7 +87,7 @@ func (d *DryRunClient) resolve(ctx context.Context, ref string) error {
 	if err != nil {
 		return err
 	}
-	auth, err := registry.EncodedAuth(named, d.configFile)
+	auth, err := registry.EncodedAuth(named, d.credentials)
 	if err != nil {
 		return err
 	}

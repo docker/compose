@@ -30,23 +30,23 @@ import (
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
-	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/buildkit/util/contentutil"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose/v5/internal/registry"
 )
 
-// NewResolver sets up an OCI Resolver based on docker/cli config to provide
-// registry credentials. When transport is non-nil it is used as the HTTP
+// NewResolver sets up an OCI Resolver that gets registry credentials from
+// credentials (the docker/cli config file, or registry.NewDesktopAuthProvider
+// layered over it). When transport is non-nil it is used as the HTTP
 // transport for both registry calls and the authorizer's token fetches
 // (e.g. to route both through Docker Desktop's PAC-aware proxy); nil falls
 // back to containerd's default transport.
-func NewResolver(config *configfile.ConfigFile, transport http.RoundTripper, insecureRegistries ...string) remotes.Resolver {
+func NewResolver(credentials registry.AuthProvider, transport http.RoundTripper, insecureRegistries ...string) remotes.Resolver {
 	authOpts := []docker.AuthorizerOpt{
 		docker.WithAuthCreds(func(host string) (string, string, error) {
 			host = registry.GetAuthConfigKey(host)
-			auth, err := config.GetAuthConfig(host)
+			auth, err := credentials.GetAuthConfig(host)
 			if err != nil {
 				return "", "", err
 			}
