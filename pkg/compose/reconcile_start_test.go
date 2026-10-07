@@ -817,6 +817,52 @@ func TestPlanStart_ProviderRelayRestartRespectsSkipProviders(t *testing.T) {
 	assert.Equal(t, len(plan.Nodes), 0, "SkipProviders must leave a stopped relay untouched:\n%s", plan)
 }
 
+// TestPlanStart_ProviderRelayRestartWaitsOnDependencies is a regression test
+// for a Copilot review finding on planProviderRelayRestart: under pure
+// ScopeStart there is no Create->Start barrier separating a provider from
+// its siblings (unlike ScopeCreateStart's OpRunProvider, always a
+// create-phase node run to completion before any start-phase node begins).
+// Without its own depends_on wired into the relay-restart node, a stopped
+// relay could start before a required dependency's health condition
+// resolved.
+func TestPlanStart_ProviderRelayRestartWaitsOnDependencies(t *testing.T) {
+	db := types.ServiceConfig{Name: "db"}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	prov := serviceWithDeps("prov", types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: true},
+	})
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "prov": prov},
+	}
+	dbHash, err := serviceHashWithResolvedRefs(db, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{observedServiceContainer("db", 1, container.StateRunning, dbHash)}
+	relay := observedServiceContainer("prov", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed.Containers["prov"] = []ObservedContainer{relay}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	var wait, restart *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpWaitCondition:
+			wait = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:prov:1":
+			restart = n
+		}
+	}
+	if wait == nil || restart == nil {
+		t.Fatalf("expected db's wait node and prov's relay restart node:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(restart.DependsOn, wait),
+		"the relay restart must depend on prov's own depends_on wait, not start unconditionally:\n%s", plan)
+}
+
 // An optional (required: false) condition marks the shared wait node
 // best-effort — a missing dependency is skipped, not fatal; one required
 // dependent upgrades the node for everyone.

@@ -1360,7 +1360,7 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 		// rebuild): that is an explicit request to leave it alone, not the
 		// create phase never having run, so it must not fall through to
 		// planProviderRelayRestart.
-		if restart := r.planProviderRelayRestart(service); restart != nil {
+		if restart := r.planProviderRelayRestart(service, depNodes); restart != nil {
 			ends = append(ends, restart)
 		}
 	}
@@ -1378,7 +1378,14 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 // never a redeploy -- ensureServiceRelay's own convergence stays a create-phase
 // concern, triggered by OpRunProvider, which a caller needing it re-run
 // (e.g. config drift) gets via ScopeCreateStart, not this.
-func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig) *PlanNode {
+//
+// deps is the provider's own startPhaseDependencies: under pure ScopeStart
+// there is no Create->Start barrier separating this provider from its
+// siblings (unlike ScopeCreateStart's OpRunProvider, always a create-phase
+// node), so without its own depends_on wired in here, the relay could start
+// before a required dependency's health/condition wait resolves -- a Copilot
+// review finding on the first version of this fix.
+func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps []*PlanNode) *PlanNode {
 	for i := range r.observed.Containers[service.Name] {
 		oc := &r.observed.Containers[service.Name][i]
 		if !isRelayContainer(oc.Summary) || oc.State == container.StateRunning {
@@ -1390,7 +1397,7 @@ func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig) *Plan
 			ResourceID: resID,
 			Cause:      "start",
 			Container:  &oc.Summary,
-		}, startGroupID(resID))
+		}, startGroupID(resID), deps...)
 		node.Phase = PhaseStart
 		return node
 	}
