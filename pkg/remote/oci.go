@@ -37,6 +37,7 @@ import (
 
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/oci"
+	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -101,6 +102,11 @@ type ociRemoteLoader struct {
 	// detection happens once per loader rather than per Load() call.
 	transportOnce sync.Once
 	transport     http.RoundTripper
+
+	// Registry credentials, initialized lazily so the Docker Hub session
+	// is shared by every Load() call of this loader.
+	credentialsOnce sync.Once
+	credentials     registry.AuthProvider
 }
 
 func (g *ociRemoteLoader) httpTransport(ctx context.Context) http.RoundTripper {
@@ -108,6 +114,13 @@ func (g *ociRemoteLoader) httpTransport(ctx context.Context) http.RoundTripper {
 		g.transport = desktop.ProxyTransportFor(ctx, g.dockerCli.Client())
 	})
 	return g.transport
+}
+
+func (g *ociRemoteLoader) authProvider() registry.AuthProvider {
+	g.credentialsOnce.Do(func() {
+		g.credentials = registry.NewDesktopAuthProvider(g.dockerCli.ConfigFile())
+	})
+	return g.credentials
 }
 
 func (g *ociRemoteLoader) Accept(path string) bool {
@@ -146,7 +159,7 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 		return "", err
 	}
 
-	resolver := oci.NewResolver(g.dockerCli.ConfigFile(), g.httpTransport(ctx), g.insecureRegistries...)
+	resolver := oci.NewResolver(g.authProvider(), g.httpTransport(ctx), g.insecureRegistries...)
 
 	descriptor, content, err := oci.Get(ctx, resolver, ref)
 	if err != nil {

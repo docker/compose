@@ -28,6 +28,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
+	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
 	"github.com/moby/moby/api/types/container"
@@ -37,6 +38,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
 )
@@ -69,6 +71,11 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		maxConcurrency: -1,
 		dryRun:         false,
 	}
+	// Resolve the config file on each lookup rather than now: options such
+	// as WithDryRun replace s.dockerCli after this point.
+	s.auth = registry.NewDesktopAuthProvider(registry.AuthProviderFunc(func(registryHostname string) (clitypes.AuthConfig, error) {
+		return s.configFile().GetAuthConfig(registryHostname)
+	}))
 	for _, option := range options {
 		if err := option(s); err != nil {
 			return nil, err
@@ -288,6 +295,9 @@ type composeService struct {
 	maxConcurrency int
 	dryRun         bool
 
+	// auth provides registry credentials, see authProvider.
+	auth registry.AuthProvider
+
 	runtimeAPIVersion runtimeVersionCache
 }
 
@@ -309,6 +319,17 @@ func (s *composeService) apiClient() client.APIClient {
 
 func (s *composeService) configFile() *configfile.ConfigFile {
 	return s.dockerCli.ConfigFile()
+}
+
+// authProvider returns the source of credentials for a single registry:
+// Docker Desktop's Docker Hub session first, then the Docker CLI config file.
+// Services not built by NewComposeService (unit tests) use the config file
+// only, so they never reach a real Docker Desktop.
+func (s *composeService) authProvider() registry.AuthProvider {
+	if s.auth != nil {
+		return s.auth
+	}
+	return s.configFile()
 }
 
 // getContextInfo returns the context info - either custom override or dockerCli adapter

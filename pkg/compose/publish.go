@@ -124,7 +124,7 @@ func (s *composeService) pushComposeArtifact(ctx context.Context, project *types
 		insecureRegistries = append(insecureRegistries, reference.Domain(named))
 	}
 
-	resolver := oci.NewResolver(s.configFile(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
+	resolver := oci.NewResolver(s.authProvider(), desktop.ProxyTransportFor(ctx, s.apiClient()), insecureRegistries...)
 
 	descriptor, didFallback, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 	if err != nil {
@@ -331,7 +331,7 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 }
 
 func (s *composeService) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
-	project, err := project.WithImagesResolved(ImageDigestResolver(ctx, s.configFile(), s.apiClient()))
+	project, err := project.WithImagesResolved(imageDigestResolver(ctx, s.authProvider(), s.apiClient()))
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +346,7 @@ func (s *composeService) generateImageDigestsOverride(ctx context.Context, proje
 				ContainerSpec: types.ContainerSpec{Image: job.Image},
 			}
 		}
-		jobsAsServices, err = jobsAsServices.WithImagesResolved(ImageDigestResolver(ctx, s.configFile(), s.apiClient()))
+		jobsAsServices, err = jobsAsServices.WithImagesResolved(imageDigestResolver(ctx, s.authProvider(), s.apiClient()))
 		if err != nil {
 			return nil, err
 		}

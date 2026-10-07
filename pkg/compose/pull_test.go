@@ -326,7 +326,8 @@ func TestImageDigestResolverUsesDistributionDigest(t *testing.T) {
 
 	named, err := reference.ParseDockerRef("foo:1")
 	assert.NilError(t, err)
-	resolved, err := ImageDigestResolver(t.Context(), &configfile.ConfigFile{}, mockAPI)(named)
+	// The unexported variant keeps the test away from a real Docker Desktop.
+	resolved, err := imageDigestResolver(t.Context(), &configfile.ConfigFile{}, mockAPI)(named)
 	assert.NilError(t, err)
 	assert.Equal(t, resolved.String(), indexDigest)
 }
