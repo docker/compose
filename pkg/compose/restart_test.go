@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -112,7 +111,7 @@ func TestRestartContainer_Order(t *testing.T) {
 		PreStop:   []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
 		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"warmup"}}},
 	}
-	ctr := serviceContainer("web", 1, container.StateRunning)
+	ctr := serviceContainer("web")
 
 	// pre_stop exec
 	preStop := apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
@@ -163,7 +162,7 @@ func TestRestartContainerSkipsHooksForRelay(t *testing.T) {
 		PreStop:   []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
 		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"warmup"}}},
 	}
-	relay := serviceContainer("db", 1, container.StateRunning)
+	relay := serviceContainer("db")
 	relay.Labels[api.RelayLabel] = "abc123"
 
 	apiClient.EXPECT().ContainerRestart(gomock.Any(), relay.ID, gomock.Any()).
@@ -191,7 +190,7 @@ func TestRestart_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
 	for i := range numServices {
 		name := fmt.Sprintf("svc%d", i)
 		project.Services[name] = types.ServiceConfig{Name: name}
-		containers = append(containers, serviceContainer(name, 1, container.StateRunning))
+		containers = append(containers, serviceContainer(name))
 	}
 
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
