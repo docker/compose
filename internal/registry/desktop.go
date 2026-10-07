@@ -18,8 +18,11 @@ package registry
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -195,8 +198,8 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 
 	now := s.now()
 	validUntil := now.Add(sessionTTL)
-	if exp := session.Claims.ExpiresAt; exp != nil {
-		validUntil = exp.Add(-sessionExpirySkew)
+	if expiresAt, ok := sessionExpiry(session); ok {
+		validUntil = expiresAt.Add(-sessionExpirySkew)
 		if !now.Before(validUntil) {
 			return clitypes.AuthConfig{}, time.Time{}, errSessionExpired
 		}
@@ -207,6 +210,38 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 		Password:      session.AccessToken,
 		ServerAddress: IndexServer,
 	}, validUntil, nil
+}
+
+// sessionExpiry returns when the session's access token expires: from the
+// session claims, or, when the payload carries none, from the token itself.
+// An expiry that cannot be read is tolerated, the token is then reused for
+// sessionTTL only.
+func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
+	if exp := session.Claims.ExpiresAt; exp != nil {
+		return exp.Time, true
+	}
+	return jwtExpiry(session.AccessToken)
+}
+
+// jwtExpiry reads the exp claim of a JWT without verifying its signature: it
+// only decides whether the token is still worth sending, the registry
+// verifies it.
+func jwtExpiry(token string) (time.Time, bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return time.Time{}, false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return time.Time{}, false
+	}
+	var claims struct {
+		ExpiresAt *dockerhub.NumericDate `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.ExpiresAt == nil {
+		return time.Time{}, false
+	}
+	return claims.ExpiresAt.Time, true
 }
 
 // logDesktopFallback reports why Docker Hub credentials come from the
