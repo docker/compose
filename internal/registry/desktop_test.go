@@ -36,8 +36,6 @@ import (
 
 var testNow = time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 
-// fakeHub stands in for the Docker Desktop secrets engine and counts session
-// round-trips.
 type fakeHub struct {
 	session      dockerhub.UserSession
 	sessionErr   error
@@ -72,7 +70,6 @@ func (c *fakeClock) advance(d time.Duration) {
 	c.t = c.t.Add(d)
 }
 
-// recordingFallback stands in for the Docker CLI config file.
 type recordingFallback struct {
 	mu    sync.Mutex
 	hosts []string
@@ -107,9 +104,7 @@ type testProvider struct {
 	fallback *recordingFallback
 	clock    *fakeClock
 	connects atomic.Int32
-	// staging stands in for the staging realms; by default nobody is signed
-	// in to staging.
-	staging *fakeHub
+	staging  *fakeHub
 }
 
 func newTestProvider(hub hubSessions, connectErr error) *testProvider {
@@ -146,7 +141,6 @@ func newTestProvider(hub hubSessions, connectErr error) *testProvider {
 	return tp
 }
 
-// signInToStaging gives the staging realms a valid session.
 func (tp *testProvider) signInToStaging() {
 	tp.staging.sessionErr = nil
 	tp.staging.session = hubSession("stageuser", testNow.Add(time.Hour))
@@ -233,8 +227,6 @@ func TestDesktopAuthProvider_StagingRegistryUsesStagingSession(t *testing.T) {
 	}
 }
 
-// TestDesktopAuthProvider_EnvironmentsDoNotMix guards that a token is only
-// ever sent to the registry of the environment that issued it.
 func TestDesktopAuthProvider_EnvironmentsDoNotMix(t *testing.T) {
 	t.Run("staging session is not used for docker.io", func(t *testing.T) {
 		// Desktop in stage mode: signed in to staging only.
@@ -377,7 +369,6 @@ func TestDesktopAuthProvider_RefetchesSessionWithoutExpiry(t *testing.T) {
 	assert.Equal(t, hub.sessionCalls.Load(), int32(2))
 }
 
-// fakeJWT builds an unsigned JWT carrying only an exp claim.
 func fakeJWT(expiresAt time.Time) string {
 	enc := base64.RawURLEncoding.EncodeToString
 	return enc([]byte(`{"alg":"none"}`)) + "." + enc(fmt.Appendf(nil, `{"exp":%d}`, expiresAt.Unix())) + ".sig"
@@ -446,8 +437,6 @@ func TestDesktopAuthProvider_ConcurrentLookupsShareOneFetch(t *testing.T) {
 	assert.Equal(t, p.connects.Load(), int32(1))
 }
 
-// TestEncodedAuth_DesktopSession guards what the engine receives in
-// X-Registry-Auth for a Docker Hub image when Desktop has a session.
 func TestEncodedAuth_DesktopSession(t *testing.T) {
 	hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
 	p := newTestProvider(hub, nil)

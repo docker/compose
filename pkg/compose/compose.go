@@ -71,8 +71,7 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		maxConcurrency: -1,
 		dryRun:         false,
 	}
-	// Resolve the config file on each lookup rather than now: options such
-	// as WithDryRun replace s.dockerCli after this point.
+	// Look the config file up lazily: WithDryRun replaces s.dockerCli.
 	s.auth = registry.NewDesktopAuthProvider(registry.AuthProviderFunc(func(registryHostname string) (clitypes.AuthConfig, error) {
 		return s.configFile().GetAuthConfig(registryHostname)
 	}))
@@ -295,7 +294,6 @@ type composeService struct {
 	maxConcurrency int
 	dryRun         bool
 
-	// auth provides registry credentials, see authProvider.
 	auth registry.AuthProvider
 
 	runtimeAPIVersion runtimeVersionCache
@@ -321,10 +319,8 @@ func (s *composeService) configFile() *configfile.ConfigFile {
 	return s.dockerCli.ConfigFile()
 }
 
-// authProvider returns the source of credentials for a single registry:
-// Docker Desktop's Docker Hub session first, then the Docker CLI config file.
-// Services not built by NewComposeService (unit tests) use the config file
-// only, so they never reach a real Docker Desktop.
+// authProvider uses the config file only for services not built by
+// NewComposeService, so unit tests never reach Docker Desktop.
 func (s *composeService) authProvider() registry.AuthProvider {
 	if s.auth != nil {
 		return s.auth

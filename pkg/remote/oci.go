@@ -103,8 +103,6 @@ type ociRemoteLoader struct {
 	transportOnce sync.Once
 	transport     http.RoundTripper
 
-	// Registry credentials, initialized lazily so the Docker Hub session
-	// is shared by every Load() call of this loader.
 	credentialsOnce sync.Once
 	credentials     registry.AuthProvider
 }
