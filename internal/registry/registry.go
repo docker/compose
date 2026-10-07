@@ -39,6 +39,12 @@ const (
 	IndexServer = "https://" + IndexHostname + "/v1/"
 	// IndexName is the name of the index
 	IndexName = "docker.io"
+	// StagingRegistryHost is the registry of the Docker Hub staging
+	// environment, which Docker Desktop uses in stage mode.
+	StagingRegistryHost = "registry-1-stage.docker.io"
+	// StagingIndexServer is the credentials key of the Docker Hub staging
+	// environment.
+	StagingIndexServer = "https://" + StagingRegistryHost + "/"
 )
 
 // GetAuthConfigKey special-cases using the full index address of the official
