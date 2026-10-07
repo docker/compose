@@ -294,6 +294,17 @@ func TestPreStartHookVolumesMerge(t *testing.T) {
 			OutputContains("saw-config"))
 }
 
+// The environment of a pre_start hook is the service's merged with its own:
+// env_file entries must be loaded into the hook container, whether inherited
+// from the service or declared by the hook (docker/compose#14287). Each hook
+// asserts the variables it must receive and fails the up otherwise.
+func TestPreStartHookEnvFile(t *testing.T) {
+	NewScenario(t, "pre_start hooks must receive the service's env_file and environment, completed by their own").
+		Step("up succeeds: both hooks found every variable they expect",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("app", "running"))
+}
+
 // A service using volumes_from inherits it into its pre_start hook (full
 // container specification): the reference must resolve to the live container
 // like the service create path does, not reach the daemon as a raw service
