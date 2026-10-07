@@ -1408,14 +1408,52 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 // node), so without its own depends_on wired in here, this node could start
 // before a required dependency's health/condition wait resolves -- a Copilot
 // review finding on an earlier version of this fix.
+//
+// Every not-running observed container is chained in sequence (docker-agent
+// review finding: the relay is uniquely named, so at most one can exist, but
+// a service transitioning to provider-backed without an intervening
+// reconciliation can leave several stale non-relay replicas behind -- the
+// first version of this function silently dropped every container after the
+// first). pre_start runs at most once, before the first non-relay candidate
+// in observed (container-number) order, exactly mirroring the imperative
+// engine's own lowestNumberedContainer(toStart) + isRelayContainer gate
+// (another Copilot review finding: the post_start-only version of this
+// enrichment dropped pre_start for this path entirely).
 func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps []*PlanNode) *PlanNode {
-	for i := range r.observed.Containers[service.Name] {
-		oc := &r.observed.Containers[service.Name][i]
+	observed := r.observed.Containers[service.Name]
+	anyRunning := false
+	for i := range observed {
+		if observed[i].State == container.StateRunning {
+			anyRunning = true
+			break
+		}
+	}
+
+	prev := deps
+	preStarted := false
+	var chainEnd *PlanNode
+	for i := range observed {
+		oc := &observed[i]
 		if oc.State == container.StateRunning {
 			continue
 		}
 		resID := serviceReplicaID(service.Name, oc.Number)
 		relay := isRelayContainer(oc.Summary)
+
+		if !preStarted && !relay && len(service.PreStart) > 0 && !anyRunning {
+			serviceCopy := service
+			pre := r.plan.addNode(Operation{
+				Type:       OpRunPreStart,
+				ResourceID: resID,
+				Cause:      "pre_start hooks",
+				Service:    &serviceCopy,
+				Container:  &oc.Summary,
+			}, startGroupID(resID), prev...)
+			pre.Phase = PhaseStart
+			prev = []*PlanNode{pre}
+			preStarted = true
+		}
+
 		op := Operation{
 			Type:       OpStartContainer,
 			ResourceID: resID,
@@ -1426,8 +1464,9 @@ func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps 
 			serviceCopy := service
 			op.Service = &serviceCopy
 		}
-		node := r.plan.addNode(op, startGroupID(resID), deps...)
+		node := r.plan.addNode(op, startGroupID(resID), prev...)
 		node.Phase = PhaseStart
+		chainEnd = node
 		if !relay && len(service.PostStart) > 0 {
 			serviceCopy := service
 			post := r.plan.addNode(Operation{
@@ -1438,11 +1477,11 @@ func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps 
 				Container:  &oc.Summary,
 			}, startGroupID(resID), node)
 			post.Phase = PhaseStart
-			return post
+			chainEnd = post
 		}
-		return node
+		prev = []*PlanNode{chainEnd}
 	}
-	return nil
+	return chainEnd
 }
 
 func (r *reconciler) planServiceStart(service types.ServiceConfig) error {

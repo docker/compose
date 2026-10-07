@@ -917,6 +917,7 @@ func TestPlanStart_OrdinaryPathBareStartsAStaleRelay(t *testing.T) {
 func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
 	prov := types.ServiceConfig{
 		Name:      "prov",
+		PreStart:  []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
 		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}},
 	}
 	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
@@ -931,9 +932,11 @@ func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
 	assert.NilError(t, err)
 
-	var start, post *PlanNode
+	var pre, start, post *PlanNode
 	for _, n := range plan.Nodes {
 		switch {
+		case n.Operation.Type == OpRunPreStart:
+			pre = n
 		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:prov:1":
 			start = n
 		case n.Operation.Type == OpRunPostStart:
@@ -945,9 +948,55 @@ func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
 	}
 	assert.Assert(t, start.Operation.Service != nil,
 		"a stale non-relay container must get an enriched start (injection applies), like any ordinary replica:\n%s", plan)
+	// A Copilot review finding on the post_start-only version of this fix:
+	// pre_start must also run for this path, exactly like the imperative
+	// engine's own lowestNumberedContainer(toStart) + isRelayContainer gate.
+	if pre == nil {
+		t.Fatalf("expected pre_start hooks to run before starting prov's stale non-relay container:\n%s", plan)
+	}
 	if post == nil {
 		t.Fatalf("expected post_start hooks to run for the enriched start:\n%s", plan)
 	}
+}
+
+// TestPlanStart_ProviderPathChainsMultipleStaleContainers is a regression
+// test for a docker-agent review finding (100/100 confidence) on
+// planProviderRelayRestart: the relay is uniquely named, so at most one can
+// exist, but a service transitioning to provider-backed without an
+// intervening reconciliation can leave several stale non-relay replicas
+// behind (e.g. a scale>1 ordinary service whose provider: declaration was
+// just added). The first version of this function returned after the first
+// not-running container, silently dropping every other one.
+func TestPlanStart_ProviderPathChainsMultipleStaleContainers(t *testing.T) {
+	prov := types.ServiceConfig{Name: "prov"}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	observed := emptyObserved()
+	observed.Containers["prov"] = []ObservedContainer{
+		observedServiceContainer("prov", 1, container.StateExited, ""),
+		observedServiceContainer("prov", 2, container.StateExited, ""),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	var start1, start2 *PlanNode
+	for _, n := range plan.Nodes {
+		switch n.Operation.ResourceID {
+		case "service:prov:1":
+			start1 = n
+		case "service:prov:2":
+			start2 = n
+		}
+	}
+	if start1 == nil || start2 == nil {
+		t.Fatalf("expected both stale containers to be started, not just the first:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(start2.DependsOn, start1),
+		"replica 2 must chain after replica 1's start, matching the ordinary replica chain order:\n%s", plan)
 }
 
 // An optional (required: false) condition marks the shared wait node
