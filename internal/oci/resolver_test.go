@@ -108,10 +108,6 @@ func TestNewResolver_AuthorizerUsesProvidedTransport(t *testing.T) {
 		"authorizer token fetch did not go through the supplied transport (bypassed via http.DefaultClient)")
 }
 
-// TestNewResolver_SendsPasswordGrant guards how credentials reach the token
-// endpoint: a username/password pair, which is how a Docker Desktop session
-// is provided, must be exchanged with an OAuth password grant. Without a
-// username containerd would send the secret as a refresh token instead.
 func TestNewResolver_SendsPasswordGrant(t *testing.T) {
 	type tokenRequest struct {
 		GrantType, Username, Password string

@@ -34,17 +34,11 @@ import (
 )
 
 const (
-	// desktopLookupTimeout bounds a Docker Hub session lookup against the
-	// Docker Desktop secrets engine. The engine may hold a request open on
-	// user interaction and the SDK applies no timeout by default, while some
-	// callers (containerd's credential callback) have no context to cancel
-	// with, so the lookup carries its own deadline.
+	// desktopLookupTimeout bounds a lookup: the SDK has no default timeout and
+	// containerd's credential callback has no context.
 	desktopLookupTimeout = 5 * time.Second
-	// sessionExpirySkew treats a session as expired slightly early, so a
-	// token is not handed out just before it lapses mid-request.
-	sessionExpirySkew = 30 * time.Second
-	// sessionTTL bounds how long a session without an expiry claim is reused
-	// before it is fetched again.
+	sessionExpirySkew    = 30 * time.Second
+	// sessionTTL is how long a token without a readable expiry is reused.
 	sessionTTL = time.Minute
 )
 
@@ -53,8 +47,6 @@ var (
 	errSessionExpired = errors.New("the session has expired (not signed in to Docker Desktop?)")
 )
 
-// hubSessions is the subset of the secrets engine Docker Hub accessor
-// (dockerhub.ClientAuth) used to read the signed-in account.
 type hubSessions interface {
 	GetDefaultSession(ctx context.Context) (dockerhub.UserSession, error)
 	GetDefaultProfile(ctx context.Context) (dockerhub.Profile, error)
@@ -62,17 +54,10 @@ type hubSessions interface {
 
 var _ hubSessions = dockerhub.ClientAuth(nil)
 
-// The shared sessions back every provider returned by NewDesktopAuthProvider.
-// A session belongs to the user signed in to Docker Desktop rather than to a
-// Docker CLI config file, so the compose service, the oci:// loader and the
-// dry-run client share them and Docker Desktop is asked once per process
-// rather than once by each of them.
-//
-// Docker Desktop keeps production and staging sessions in separate secrets
-// engine realms. Each is only used for the registry of its own environment:
-// the engine resolves docker.io to the production registry even when Desktop
-// runs in stage mode, so a staging token must never be sent there, nor a
-// production token to the staging registry.
+// Sessions belong to the Desktop user, not to a config file, so every provider
+// in the process shares them. Each token is only sent to the registry of its
+// own environment: the engine resolves docker.io to production even when
+// Desktop runs in stage mode.
 var (
 	sharedHubSession        = newDesktopSession("Docker Hub", IndexServer)
 	sharedStagingHubSession = newDesktopSession("Docker Hub staging", StagingIndexServer, dockerhub.Staging())
@@ -90,20 +75,12 @@ func newDesktopSession(name, serverAddress string, opts ...dockerhub.Option) *de
 	}
 }
 
-// NewDesktopAuthProvider returns an AuthProvider that resolves Docker Hub
-// credentials from the Docker Desktop secrets engine, and falls back to
-// fallback (typically the Docker CLI config file and its credential helpers)
-// for every other registry, or when Desktop is not running, nobody is signed
-// in, or the session cannot be used. The Docker Hub staging registry
-// (StagingRegistryHost) is resolved the same way from the staging session.
+// NewDesktopAuthProvider returns an AuthProvider that resolves Docker Hub and
+// Docker Hub staging credentials from the Docker Desktop session, and falls
+// back to fallback for other registries or when there is no usable session.
 //
-// The Desktop OAuth access token is returned as the password of the signed-in
-// account, so it travels like any username/password credential: containerd
-// exchanges it with an OAuth password grant, and the engine receives it in
-// X-Registry-Auth. It is deliberately not returned as an IdentityToken, which
-// containerd treats as a refresh token.
-//
-// The engine is contacted lazily, on the first Docker Hub lookup.
+// The OAuth access token is returned as the account's password, as containerd
+// treats an IdentityToken as a refresh token.
 func NewDesktopAuthProvider(fallback AuthProvider) AuthProvider {
 	return &desktopAuthProvider{
 		fallback:   fallback,
@@ -123,16 +100,12 @@ func connectDesktop(opts ...dockerhub.Option) (hubSessions, error) {
 	return c.HubAuth(opts...), nil
 }
 
-// desktopAuthProvider resolves Docker Hub credentials from the Docker Desktop
-// session of the matching environment, and every other registry, or Docker
-// Hub whenever Desktop has no usable session, from the fallback provider.
 type desktopAuthProvider struct {
 	fallback   AuthProvider
 	hub        *desktopSession
 	stagingHub *desktopSession
 }
 
-// GetAuthConfig implements AuthProvider.
 func (p *desktopAuthProvider) GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error) {
 	if session := p.sessionFor(registryHostname); session != nil {
 		if auth, ok := session.auth(); ok {
@@ -142,8 +115,6 @@ func (p *desktopAuthProvider) GetAuthConfig(registryHostname string) (clitypes.A
 	return p.fallback.GetAuthConfig(registryHostname)
 }
 
-// sessionFor returns the Desktop session for the environment registryHostname
-// belongs to, or nil when it is not a Docker Hub registry.
 func (p *desktopAuthProvider) sessionFor(registryHostname string) *desktopSession {
 	switch {
 	case GetAuthConfigKey(registryHostname) == IndexServer:
@@ -155,38 +126,28 @@ func (p *desktopAuthProvider) sessionFor(registryHostname string) *desktopSessio
 	}
 }
 
-// isStagingRegistry reports whether registryHostname, a host or an index
-// server URL, is the Docker Hub staging registry.
 func isStagingRegistry(registryHostname string) bool {
 	host := strings.TrimPrefix(strings.TrimPrefix(registryHostname, "https://"), "http://")
 	return strings.TrimSuffix(host, "/") == StagingRegistryHost
 }
 
-// desktopSession reads and caches the session of the account signed in to
-// Docker Desktop, for one Docker Hub environment.
+// desktopSession caches the Desktop session of one Docker Hub environment.
 type desktopSession struct {
-	// name identifies the environment in logs.
-	name string
-	// serverAddress is the credentials key of the environment.
+	name          string
 	serverAddress string
 	connect       func() (hubSessions, error)
 	timeout       time.Duration
 	now           func() time.Time
 
-	// mu serializes lookups, so concurrent pulls share a single round-trip
-	// to the engine.
+	// mu serializes lookups so concurrent pulls share one request.
 	mu  sync.Mutex
 	hub hubSessions
-	// unavailable records that Desktop could not provide a usable session.
-	// Later lookups go straight to the fallback instead of asking (and
-	// possibly waiting out the timeout) again for every image.
+	// unavailable stops further lookups once there was no usable session.
 	unavailable bool
 	cached      *clitypes.AuthConfig
 	validUntil  time.Time
 }
 
-// auth returns the Docker Hub credentials of the Desktop session, and whether
-// there is a usable one.
 func (s *desktopSession) auth() (clitypes.AuthConfig, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -209,8 +170,6 @@ func (s *desktopSession) auth() (clitypes.AuthConfig, bool) {
 	return auth, true
 }
 
-// fetch reads the default Desktop session and converts it to credentials,
-// along with the time until which they may be reused.
 func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 	if s.hub == nil {
 		hub, err := s.connect()
@@ -228,9 +187,7 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 		return clitypes.AuthConfig{}, time.Time{}, err
 	}
 
-	// containerd reads an empty username as "the secret is a refresh token"
-	// and switches to a refresh_token grant, so the token is only usable
-	// together with the account name.
+	// containerd treats a password without a username as a refresh token.
 	username := session.Claims.Username
 	if username == "" {
 		profile, err := s.hub.GetDefaultProfile(ctx)
@@ -259,10 +216,8 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 	}, validUntil, nil
 }
 
-// sessionExpiry returns when the session's access token expires: from the
-// session claims, or, when the payload carries none, from the token itself.
-// An expiry that cannot be read is tolerated, the token is then reused for
-// sessionTTL only.
+// sessionExpiry reads the expiry from the session claims, or from the JWT when
+// the claims have none.
 func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
 	if exp := session.Claims.ExpiresAt; exp != nil {
 		return exp.Time, true
@@ -270,9 +225,7 @@ func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
 	return jwtExpiry(session.AccessToken)
 }
 
-// jwtExpiry reads the exp claim of a JWT without verifying its signature: it
-// only decides whether the token is still worth sending, the registry
-// verifies it.
+// jwtExpiry does not verify the signature: the registry verifies the token.
 func jwtExpiry(token string) (time.Time, bool) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
@@ -291,12 +244,8 @@ func jwtExpiry(token string) (time.Time, bool) {
 	return claims.ExpiresAt.Time, true
 }
 
-// logDesktopFallback reports why Docker Hub credentials come from the
-// fallback. Desktop not running and nobody signed in are routine and only
-// logged at debug level. That includes an expired session: Desktop keeps the
-// stored access token fresh while the user is signed in, so an expired one is
-// left over from an earlier sign-in. Anything else is surprising enough to
-// warn about.
+// logDesktopFallback logs expected misses at debug level. An expired session
+// is one: Desktop keeps the token fresh while the user is signed in.
 func logDesktopFallback(name string, err error) {
 	if errors.Is(err, seclient.ErrSecretsEngineNotAvailable) || errors.Is(err, dockerhub.ErrNoSession) || errors.Is(err, errSessionExpired) {
 		logrus.Debugf("no %s session available from Docker Desktop, using Docker CLI credentials: %v", name, err)

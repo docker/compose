@@ -36,9 +36,8 @@ import (
 	"github.com/docker/compose/v5/internal/registry"
 )
 
-// NewResolver sets up an OCI Resolver that gets registry credentials from
-// credentials (the docker/cli config file, or registry.NewDesktopAuthProvider
-// layered over it). When transport is non-nil it is used as the HTTP
+// NewResolver sets up an OCI Resolver using credentials to provide registry
+// credentials. When transport is non-nil it is used as the HTTP
 // transport for both registry calls and the authorizer's token fetches
 // (e.g. to route both through Docker Desktop's PAC-aware proxy); nil falls
 // back to containerd's default transport.
