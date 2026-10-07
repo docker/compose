@@ -240,7 +240,7 @@ func logDesktopFallback(name string, err error) {
 		logrus.Debugf("no %s session available from Docker Desktop, using Docker CLI credentials: %v", name, err)
 		return
 	}
-	logrus.Warnf("Could not use the %s session from Docker Desktop, using Docker CLI credentials instead: %v", name, err)
+	logrus.Warnf("could not use the %s session from Docker Desktop, using Docker CLI credentials instead: %v", name, err)
 }
 
 // isSessionUnavailable reports Desktop not running or nobody signed in. An
