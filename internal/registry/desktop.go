@@ -40,6 +40,9 @@ const (
 	sessionExpirySkew    = 30 * time.Second
 	// sessionTTL is how long a token without a readable expiry is reused.
 	sessionTTL = time.Minute
+	// retryInterval is how long Desktop is not asked again after a lookup
+	// found no usable session, so a command does not wait on it per image.
+	retryInterval = time.Minute
 )
 
 var (
@@ -140,27 +143,27 @@ type desktopSession struct {
 	now           func() time.Time
 
 	// mu serializes lookups so concurrent pulls share one request.
-	mu  sync.Mutex
-	hub hubSessions
-	// unavailable stops further lookups once there was no usable session.
-	unavailable bool
-	cached      *clitypes.AuthConfig
-	validUntil  time.Time
+	mu         sync.Mutex
+	hub        hubSessions
+	retryAt    time.Time
+	cached     *clitypes.AuthConfig
+	validUntil time.Time
 }
 
 func (s *desktopSession) auth() (clitypes.AuthConfig, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.unavailable {
+	now := s.now()
+	if now.Before(s.retryAt) {
 		return clitypes.AuthConfig{}, false
 	}
-	if s.cached != nil && s.now().Before(s.validUntil) {
+	if s.cached != nil && now.Before(s.validUntil) {
 		return *s.cached, true
 	}
 	auth, validUntil, err := s.fetch()
 	if err != nil {
-		s.unavailable = true
+		s.retryAt = s.now().Add(retryInterval)
 		s.cached = nil
 		logDesktopFallback(s.name, err)
 		return clitypes.AuthConfig{}, false
@@ -244,12 +247,17 @@ func jwtExpiry(token string) (time.Time, bool) {
 	return claims.ExpiresAt.Time, true
 }
 
-// logDesktopFallback logs expected misses at debug level. An expired session
-// is one: Desktop keeps the token fresh while the user is signed in.
 func logDesktopFallback(name string, err error) {
-	if errors.Is(err, seclient.ErrSecretsEngineNotAvailable) || errors.Is(err, dockerhub.ErrNoSession) || errors.Is(err, errSessionExpired) {
+	if isExpectedMiss(err) {
 		logrus.Debugf("no %s session available from Docker Desktop, using Docker CLI credentials: %v", name, err)
 		return
 	}
 	logrus.Warnf("Could not use the %s session from Docker Desktop, using Docker CLI credentials instead: %v", name, err)
+}
+
+// isExpectedMiss reports Desktop not running or nobody signed in. An expired
+// session is one: Desktop keeps the token fresh while the user is signed in.
+// dockerhub.ErrNoDefaultProfile wraps dockerhub.ErrNoSession.
+func isExpectedMiss(err error) bool {
+	return errors.Is(err, seclient.ErrSecretsEngineNotAvailable) || errors.Is(err, dockerhub.ErrNoSession) || errors.Is(err, errSessionExpired)
 }
