@@ -27,6 +27,8 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestLocalBuildPathsIncludesDockerfileOutsideContext(t *testing.T) {
@@ -37,26 +39,63 @@ func TestLocalBuildPathsIncludesDockerfileOutsideContext(t *testing.T) {
 
 	resolvedDir, err := filepath.EvalSymlinks(outside)
 	assert.NilError(t, err)
-	wantDF := filepath.Join(resolvedDir, "Dockerfile")
 
 	got := localBuildPaths(types.BuildConfig{
 		Context:    ctxDir,
 		Dockerfile: df,
 		AdditionalContexts: map[string]string{
 			"extra": "https://github.com/docker/compose.git",
+			"same":  ctxDir,
 		},
 	})
+	wantFile := filepath.Join(resolvedDir, "Dockerfile")
 	assert.Assert(t, containsPath(got, ctxDir))
-	assert.Assert(t, containsPath(got, wantDF))
+	assert.Assert(t, containsPath(got, resolvedDir))
+	assert.Assert(t, !containsPath(got, wantFile))
+	assert.Equal(t, 2, len(got))
 	for _, p := range got {
 		assert.Assert(t, !strings.Contains(p, "://"), "remote context should not be granted: %s", p)
 	}
+
+	inside := filepath.Join(ctxDir, "Dockerfile")
+	assert.NilError(t, os.WriteFile(inside, []byte("FROM scratch\n"), 0o644))
+	insideGot := localBuildPaths(types.BuildConfig{
+		Context:    ctxDir,
+		Dockerfile: "Dockerfile",
+	})
+	assert.DeepEqual(t, insideGot, []string{ctxDir})
+
+	gitish := filepath.Join(outside, "github.com", "org", "repo")
+	assert.NilError(t, os.MkdirAll(gitish, 0o755))
+	gitDF := filepath.Join(gitish, "Dockerfile")
+	assert.NilError(t, os.WriteFile(gitDF, []byte("FROM scratch\n"), 0o644))
+	gitishResolved, err := filepath.EvalSymlinks(gitish)
+	assert.NilError(t, err)
+	gitGot := localBuildPaths(types.BuildConfig{
+		Context:    ctxDir,
+		Dockerfile: gitDF,
+	})
+	assert.Assert(t, containsPath(gitGot, gitishResolved))
 
 	remote := localBuildPaths(types.BuildConfig{
 		Context:    "https://github.com/docker/compose.git",
 		Dockerfile: "Dockerfile",
 	})
 	assert.Equal(t, len(remote), 0)
+
+	args := bakeArgs(&bakeBuild{localPaths: got}, "meta.json", api.BuildOptions{})
+	assert.Assert(t, containsPath(allowPaths(args), resolvedDir))
+	assert.Assert(t, !containsPath(allowPaths(args), wantFile))
+}
+
+func allowPaths(args []string) []string {
+	var paths []string
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--allow" && strings.HasPrefix(args[i+1], "fs.read=") {
+			paths = append(paths, strings.TrimPrefix(args[i+1], "fs.read="))
+		}
+	}
+	return paths
 }
 
 func containsPath(paths []string, want string) bool {
