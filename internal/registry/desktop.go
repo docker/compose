@@ -78,12 +78,8 @@ func newDesktopSession(name, serverAddress string, opts ...dockerhub.Option) *de
 	}
 }
 
-// NewDesktopAuthProvider returns an AuthProvider that resolves Docker Hub and
-// Docker Hub staging credentials from the Docker Desktop session, and falls
-// back to fallback for other registries or when there is no usable session.
-//
-// The OAuth access token is returned as the account's password, as containerd
-// treats an IdentityToken as a refresh token.
+// NewDesktopAuthProvider returns an AuthProvider that uses the Docker Desktop
+// session for Docker Hub, and fallback otherwise.
 func NewDesktopAuthProvider(fallback AuthProvider) AuthProvider {
 	return &desktopAuthProvider{
 		fallback:   fallback,
