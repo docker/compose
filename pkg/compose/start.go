@@ -72,10 +72,15 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return err
 	}
 
-	// Must run against the pre-execution snapshot: observed only labels a
-	// container Running if it already was one before this plan touched
-	// anything, same reasoning as upDetached.
-	emitRunningEvents(project, observed, plan, s.events)
+	// Unlike upDetached/create, start() never calls emitRunningEvents: a
+	// no-op `compose start` (every container already running) must stay
+	// silent, matching the imperative engine's own contract (see the now
+	// deleted TestStartService_AlreadyRunningIsSilent) -- a Copilot review
+	// finding on the first version of this migration, which had copied
+	// upDetached's call without checking start()'s narrower UX contract.
+	// emitRunningEvents is create-oriented: it exists so `up`/`create`'s full
+	// project-status display accounts for containers the plan won't touch,
+	// a concern start() has never had.
 
 	// start()'s own dependency waits used to thread WaitTimeout through every
 	// wait unconditionally (InDependencyOrder → startService, regardless of
