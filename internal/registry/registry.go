@@ -43,6 +43,8 @@ const (
 	StagingRegistryHost = "registry-1-stage.docker.io"
 	// StagingIndexServer is the credentials key for StagingRegistryHost.
 	StagingIndexServer = "https://" + StagingRegistryHost + "/"
+	// DHIRegistryHost is the Docker Hardened Images registry.
+	DHIRegistryHost = "dhi.io"
 )
 
 // GetAuthConfigKey special-cases using the full index address of the official

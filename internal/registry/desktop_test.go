@@ -194,8 +194,9 @@ func TestDesktopAuthProvider_DockerHubUsesDesktopSession(t *testing.T) {
 func TestDesktopAuthProvider_OtherRegistriesUseFallback(t *testing.T) {
 	hosts := []string{
 		"ghcr.io", "localhost:5000", "registry.example.com",
-		// look-alikes of the staging registry
+		// look-alikes of the staging and DHI registries
 		StagingRegistryHost + ".example.com", "example.com/" + StagingRegistryHost,
+		DHIRegistryHost + ".example.com", "example.com/" + DHIRegistryHost, "registry." + DHIRegistryHost,
 	}
 	for _, host := range hosts {
 		t.Run(host, func(t *testing.T) {
@@ -208,6 +209,30 @@ func TestDesktopAuthProvider_OtherRegistriesUseFallback(t *testing.T) {
 			assert.DeepEqual(t, got, cliCredentials(host))
 			assert.Equal(t, p.connects.Load(), int32(0), "Docker Desktop must only be contacted for Docker Hub")
 			assert.Equal(t, p.staging.sessionCalls.Load(), int32(0), "Docker Desktop must only be contacted for Docker Hub")
+		})
+	}
+}
+
+func TestDesktopAuthProvider_DHIUsesDockerHubSession(t *testing.T) {
+	for _, host := range []string{DHIRegistryHost, "https://" + DHIRegistryHost, "https://" + DHIRegistryHost + "/"} {
+		t.Run(host, func(t *testing.T) {
+			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
+			p := newTestProvider(hub, nil)
+			p.signInToStaging()
+
+			want := desktopCredentials()
+			want.ServerAddress = DHIRegistryHost
+			got, err := p.GetAuthConfig(host)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, got, want)
+			assert.Equal(t, len(p.fallback.hosts), 0)
+			assert.Equal(t, p.staging.sessionCalls.Load(), int32(0), "the staging session must not be read for DHI")
+
+			// DHI shares the cached Docker Hub session without changing it.
+			got, err = p.GetAuthConfig("docker.io")
+			assert.NilError(t, err)
+			assert.DeepEqual(t, got, desktopCredentials())
+			assert.Equal(t, hub.sessionCalls.Load(), int32(1))
 		})
 	}
 }
