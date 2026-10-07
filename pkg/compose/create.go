@@ -152,7 +152,7 @@ func (s *composeService) preparePlan(ctx context.Context, project *types.Project
 		return nil, nil, nil, err
 	}
 
-	observed, err := s.collectObservedState(ctx, project)
+	observed, err := s.collectObservedState(ctx, project, scope)
 	if err != nil {
 		return nil, nil, nil, err
 	}

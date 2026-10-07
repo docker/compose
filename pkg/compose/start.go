@@ -62,7 +62,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	// and the dependency waits read them
 	project = project.WithoutUnresolvedOptionalDependencies()
 
-	observed, err := s.collectObservedState(ctx, project)
+	observed, err := s.collectObservedState(ctx, project, ScopeStart)
 	if err != nil {
 		return err
 	}
