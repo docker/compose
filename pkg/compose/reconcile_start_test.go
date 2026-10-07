@@ -975,9 +975,14 @@ func TestPlanStart_ProviderPathChainsMultipleStaleContainers(t *testing.T) {
 		Services: types.Services{"prov": prov},
 	}
 	observed := emptyObserved()
+	// Listed out of order on purpose (daemon list order, not replica-number
+	// order) -- a second Copilot review finding on this same function: it
+	// iterated observed.Containers directly, so the chain could end up
+	// ordered by daemon list order instead of replica number, unlike
+	// startPhaseReplicas' own sort. The chain below must still end up 1->2.
 	observed.Containers["prov"] = []ObservedContainer{
-		observedServiceContainer("prov", 1, container.StateExited, ""),
 		observedServiceContainer("prov", 2, container.StateExited, ""),
+		observedServiceContainer("prov", 1, container.StateExited, ""),
 	}
 
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
@@ -996,7 +1001,7 @@ func TestPlanStart_ProviderPathChainsMultipleStaleContainers(t *testing.T) {
 		t.Fatalf("expected both stale containers to be started, not just the first:\n%s", plan)
 	}
 	assert.Assert(t, slices.Contains(start2.DependsOn, start1),
-		"replica 2 must chain after replica 1's start, matching the ordinary replica chain order:\n%s", plan)
+		"replica 2 must chain after replica 1's start, in replica-number order regardless of daemon list order:\n%s", plan)
 }
 
 // An optional (required: false) condition marks the shared wait node

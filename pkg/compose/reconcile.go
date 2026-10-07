@@ -1420,7 +1420,14 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 // (another Copilot review finding: the post_start-only version of this
 // enrichment dropped pre_start for this path entirely).
 func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps []*PlanNode) *PlanNode {
-	observed := r.observed.Containers[service.Name]
+	// collectObservedState preserves the daemon's own container-list order,
+	// not replica-number order -- unlike startPhaseReplicas, which sorts
+	// before building its chain (see its own sort comment) to carry the
+	// plan's determinism. Without this, two stale containers could chain in
+	// list order instead of number order, making the plan non-deterministic
+	// run to run (Copilot review finding).
+	observed := slices.Clone(r.observed.Containers[service.Name])
+	slices.SortFunc(observed, func(a, b ObservedContainer) int { return cmp.Compare(a.Number, b.Number) })
 	anyRunning := false
 	for i := range observed {
 		if observed[i].State == container.StateRunning {
