@@ -243,9 +243,6 @@ func logDesktopFallback(name string, err error) {
 	logrus.Warnf("could not use the %s session from Docker Desktop, using Docker CLI credentials instead: %v", name, err)
 }
 
-// isSessionUnavailable reports Desktop not running or nobody signed in. An
-// expired session counts too: Desktop keeps the token fresh while the user is
-// signed in. dockerhub.ErrNoDefaultProfile wraps dockerhub.ErrNoSession.
 func isSessionUnavailable(err error) bool {
 	return errors.Is(err, seclient.ErrSecretsEngineNotAvailable) || errors.Is(err, dockerhub.ErrNoSession) || errors.Is(err, errSessionExpired)
 }
