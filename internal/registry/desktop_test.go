@@ -312,7 +312,7 @@ func TestDesktopAuthProvider_FallsBackWithoutUsableSession(t *testing.T) {
 				assert.NilError(t, err)
 				assert.DeepEqual(t, got, cliCredentials("docker.io"))
 			}
-			assert.Equal(t, tc.hub.sessionCalls.Load(), int32(1), "an unusable session must not be asked for again")
+			assert.Equal(t, tc.hub.sessionCalls.Load(), int32(1), "Desktop must not be asked again within retryInterval")
 		})
 	}
 }
@@ -326,6 +326,48 @@ func TestDesktopAuthProvider_FallsBackWhenClientCannotBeCreated(t *testing.T) {
 		assert.DeepEqual(t, got, cliCredentials("docker.io"))
 	}
 	assert.Equal(t, p.connects.Load(), int32(1))
+}
+
+func TestDesktopAuthProvider_RetriesAfterInterval(t *testing.T) {
+	hub := &fakeHub{sessionErr: dockerhub.ErrNoDefaultProfile}
+	p := newTestProvider(hub, nil)
+
+	got, err := p.GetAuthConfig("docker.io")
+	assert.NilError(t, err)
+	assert.DeepEqual(t, got, cliCredentials("docker.io"))
+
+	hub.sessionErr = nil
+	hub.session = hubSession("hubuser", testNow.Add(time.Hour))
+
+	p.clock.advance(retryInterval - time.Second)
+	got, err = p.GetAuthConfig("docker.io")
+	assert.NilError(t, err)
+	assert.DeepEqual(t, got, cliCredentials("docker.io"))
+	assert.Equal(t, hub.sessionCalls.Load(), int32(1))
+
+	p.clock.advance(time.Second)
+	got, err = p.GetAuthConfig("docker.io")
+	assert.NilError(t, err)
+	assert.DeepEqual(t, got, desktopCredentials())
+	assert.Equal(t, hub.sessionCalls.Load(), int32(2))
+}
+
+func TestIsExpectedMiss(t *testing.T) {
+	for _, err := range []error{
+		fmt.Errorf("%w: dial unix engine.sock", seclient.ErrSecretsEngineNotAvailable),
+		dockerhub.ErrNoSession,
+		dockerhub.ErrNoDefaultProfile,
+		errSessionExpired,
+	} {
+		assert.Assert(t, isExpectedMiss(err), err)
+	}
+	for _, err := range []error{
+		seclient.ErrAccessDenied,
+		errNoUsername,
+		context.DeadlineExceeded,
+	} {
+		assert.Assert(t, !isExpectedMiss(err), err)
+	}
 }
 
 func TestDesktopAuthProvider_ReusesSessionUntilExpiry(t *testing.T) {
