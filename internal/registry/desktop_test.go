@@ -107,16 +107,22 @@ type testProvider struct {
 	fallback *recordingFallback
 	clock    *fakeClock
 	connects atomic.Int32
+	// staging stands in for the staging realms; by default nobody is signed
+	// in to staging.
+	staging *fakeHub
 }
 
 func newTestProvider(hub hubSessions, connectErr error) *testProvider {
 	tp := &testProvider{
 		fallback: &recordingFallback{},
 		clock:    &fakeClock{t: testNow},
+		staging:  &fakeHub{sessionErr: dockerhub.ErrNoDefaultProfile},
 	}
 	tp.desktopAuthProvider = &desktopAuthProvider{
 		fallback: tp.fallback,
-		session: &desktopSession{
+		hub: &desktopSession{
+			name:          "Docker Hub",
+			serverAddress: IndexServer,
 			connect: func() (hubSessions, error) {
 				tp.connects.Add(1)
 				if connectErr != nil {
@@ -127,22 +133,46 @@ func newTestProvider(hub hubSessions, connectErr error) *testProvider {
 			timeout: time.Second,
 			now:     tp.clock.now,
 		},
+		stagingHub: &desktopSession{
+			name:          "Docker Hub staging",
+			serverAddress: StagingIndexServer,
+			connect: func() (hubSessions, error) {
+				return tp.staging, nil
+			},
+			timeout: time.Second,
+			now:     tp.clock.now,
+		},
 	}
 	return tp
 }
 
-func TestNewDesktopAuthProvider_SharesOneSession(t *testing.T) {
+// signInToStaging gives the staging realms a valid session.
+func (tp *testProvider) signInToStaging() {
+	tp.staging.sessionErr = nil
+	tp.staging.session = hubSession("stageuser", testNow.Add(time.Hour))
+	tp.staging.session.AccessToken = "staging-oauth-token"
+}
+
+func stagingCredentials() clitypes.AuthConfig {
+	return clitypes.AuthConfig{Username: "stageuser", Password: "staging-oauth-token", ServerAddress: StagingIndexServer}
+}
+
+func TestNewDesktopAuthProvider_SharesOneSessionPerEnvironment(t *testing.T) {
 	a, ok := NewDesktopAuthProvider(&recordingFallback{}).(*desktopAuthProvider)
 	assert.Assert(t, ok)
 	b, ok := NewDesktopAuthProvider(&recordingFallback{}).(*desktopAuthProvider)
 	assert.Assert(t, ok)
-	assert.Assert(t, a.session == b.session, "providers must share the process-wide Docker Desktop session")
+	assert.Assert(t, a.hub == b.hub, "providers must share the process-wide Docker Hub session")
+	assert.Assert(t, a.stagingHub == b.stagingHub, "providers must share the process-wide Docker Hub staging session")
+	assert.Assert(t, a.hub != a.stagingHub, "production and staging sessions must be separate")
+	assert.Equal(t, a.hub.serverAddress, IndexServer)
+	assert.Equal(t, a.stagingHub.serverAddress, StagingIndexServer)
 }
 
 func TestDesktopAuthProvider_ProvidersOnOneSessionFetchOnce(t *testing.T) {
 	hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
 	p := newTestProvider(hub, nil)
-	other := &desktopAuthProvider{fallback: &recordingFallback{}, session: p.session}
+	other := &desktopAuthProvider{fallback: &recordingFallback{}, hub: p.hub, stagingHub: p.stagingHub}
 
 	for _, provider := range []AuthProvider{p, other} {
 		got, err := provider.GetAuthConfig("docker.io")
@@ -168,17 +198,70 @@ func TestDesktopAuthProvider_DockerHubUsesDesktopSession(t *testing.T) {
 }
 
 func TestDesktopAuthProvider_OtherRegistriesUseFallback(t *testing.T) {
-	for _, host := range []string{"ghcr.io", "localhost:5000", "registry.example.com"} {
+	hosts := []string{
+		"ghcr.io", "localhost:5000", "registry.example.com",
+		// look-alikes of the staging registry
+		StagingRegistryHost + ".example.com", "example.com/" + StagingRegistryHost,
+	}
+	for _, host := range hosts {
 		t.Run(host, func(t *testing.T) {
 			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
 			p := newTestProvider(hub, nil)
+			p.signInToStaging()
 
 			got, err := p.GetAuthConfig(host)
 			assert.NilError(t, err)
 			assert.DeepEqual(t, got, cliCredentials(host))
 			assert.Equal(t, p.connects.Load(), int32(0), "Docker Desktop must only be contacted for Docker Hub")
+			assert.Equal(t, p.staging.sessionCalls.Load(), int32(0), "Docker Desktop must only be contacted for Docker Hub")
 		})
 	}
+}
+
+func TestDesktopAuthProvider_StagingRegistryUsesStagingSession(t *testing.T) {
+	for _, host := range []string{StagingRegistryHost, StagingIndexServer, "https://" + StagingRegistryHost} {
+		t.Run(host, func(t *testing.T) {
+			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
+			p := newTestProvider(hub, nil)
+			p.signInToStaging()
+
+			got, err := p.GetAuthConfig(host)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, got, stagingCredentials())
+			assert.Equal(t, hub.sessionCalls.Load(), int32(0), "the production session must not be read for the staging registry")
+		})
+	}
+}
+
+// TestDesktopAuthProvider_EnvironmentsDoNotMix guards that a token is only
+// ever sent to the registry of the environment that issued it.
+func TestDesktopAuthProvider_EnvironmentsDoNotMix(t *testing.T) {
+	t.Run("staging session is not used for docker.io", func(t *testing.T) {
+		// Desktop in stage mode: signed in to staging only.
+		p := newTestProvider(&fakeHub{sessionErr: dockerhub.ErrNoDefaultProfile}, nil)
+		p.signInToStaging()
+
+		got, err := p.GetAuthConfig("docker.io")
+		assert.NilError(t, err)
+		assert.DeepEqual(t, got, cliCredentials("docker.io"))
+
+		got, err = p.GetAuthConfig(StagingRegistryHost)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, got, stagingCredentials())
+	})
+
+	t.Run("production session is not used for the staging registry", func(t *testing.T) {
+		hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
+		p := newTestProvider(hub, nil)
+
+		got, err := p.GetAuthConfig(StagingRegistryHost)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, got, cliCredentials(StagingRegistryHost))
+
+		got, err = p.GetAuthConfig("docker.io")
+		assert.NilError(t, err)
+		assert.DeepEqual(t, got, desktopCredentials())
+	})
 }
 
 func TestDesktopAuthProvider_UsernameFromProfile(t *testing.T) {
