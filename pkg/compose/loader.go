@@ -37,7 +37,17 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 	// Setup remote loaders (Git, OCI)
 	remoteLoaders := s.createRemoteLoaders(options)
 
-	projectOptions, err := s.buildProjectOptions(options, remoteLoaders)
+	var onUnsupported func([]loader.UnsupportedAttribute)
+	var detected []loader.UnsupportedAttribute
+	var reported bool
+	if options.OnUnsupportedAttribute != nil {
+		onUnsupported = func(findings []loader.UnsupportedAttribute) {
+			detected = append(detected, findings...)
+			reported = true
+		}
+	}
+
+	projectOptions, err := s.buildProjectOptions(options, remoteLoaders, onUnsupported)
 	if err != nil {
 		return nil, err
 	}
@@ -54,6 +64,9 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 	}
 
 	project, err := projectOptions.LoadProject(ctx)
+	if reported {
+		options.OnUnsupportedAttribute(toAPIUnsupportedAttributes(dropHonoredFileReferences(detected, project)))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +91,7 @@ func (s *composeService) createRemoteLoaders(options api.ProjectLoadOptions) []l
 }
 
 // buildProjectOptions constructs compose-go ProjectOptions from API options
-func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, remoteLoaders []loader.ResourceLoader) (*cli.ProjectOptions, error) {
+func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, remoteLoaders []loader.ResourceLoader, onUnsupported func([]loader.UnsupportedAttribute)) (*cli.ProjectOptions, error) {
 	projectOptionsFns := []cli.ProjectOptionsFn{
 		cli.WithWorkingDirectory(options.WorkingDir),
 		cli.WithOsEnv,
@@ -113,8 +126,8 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 		cli.WithName(options.ProjectName),
 	)
 
-	if options.OnUnsupportedAttribute != nil {
-		projectOptionsFns = append(projectOptionsFns, unsupportedAttributesLoadOption(options.OnUnsupportedAttribute))
+	if onUnsupported != nil {
+		projectOptionsFns = append(projectOptionsFns, unsupportedAttributesLoadOption(onUnsupported))
 	}
 
 	return cli.NewProjectOptions(options.ConfigPaths, append(options.ProjectOptionsFns, projectOptionsFns...)...)

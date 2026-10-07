@@ -27,8 +27,14 @@ import (
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/schema"
 	"github.com/compose-spec/compose-go/v2/tree"
+	"github.com/compose-spec/compose-go/v2/types"
 
 	"github.com/docker/compose/v5/pkg/api"
+)
+
+var (
+	configReferencePath = tree.NewPath("services", "*", "configs", "[]")
+	secretReferencePath = tree.NewPath("services", "*", "secrets", "[]")
 )
 
 // genericUnsupportedReason is used for a finding that matches neither
@@ -175,12 +181,12 @@ var valueConditionalAttributes = []struct {
 		},
 	},
 	{
-		Pattern: tree.NewPath("services", "*", "configs", "[]"),
+		Pattern: configReferencePath,
 		Detect:  hasFileReferenceOverride,
 		Report:  fileReferenceReport("configs"),
 	},
 	{
-		Pattern: tree.NewPath("services", "*", "secrets", "[]"),
+		Pattern: secretReferencePath,
 		Detect:  hasFileReferenceOverride,
 		Report:  fileReferenceReport("secrets"),
 	},
@@ -285,16 +291,40 @@ func matchValueConditional(finding loader.UnsupportedAttribute) (bool, []api.Uns
 // detection with the loader — both the value-conditional patterns and the
 // supported-paths allowlist feed the same walk — invoking report once
 // loading completes with every match translated to api.UnsupportedAttribute.
-func unsupportedAttributesLoadOption(report func([]api.UnsupportedAttribute)) cli.ProjectOptionsFn {
+func unsupportedAttributesLoadOption(report func([]loader.UnsupportedAttribute)) cli.ProjectOptionsFn {
 	patterns := make([]loader.UnsupportedAttributePattern, len(valueConditionalAttributes))
 	for i, vc := range valueConditionalAttributes {
 		patterns[i] = loader.UnsupportedAttributePattern{Path: vc.Pattern, Detect: vc.Detect}
 	}
-	wrap := func(findings []loader.UnsupportedAttribute) {
-		report(toAPIUnsupportedAttributes(findings))
-	}
 	return cli.WithLoadOptions(
-		loader.WithUnsupportedAttributesCheck(patterns, wrap),
+		loader.WithUnsupportedAttributesCheck(patterns, report),
 		loader.WithSupportedAttributes(supportedAttributePaths(), nil),
 	)
+}
+
+func dropHonoredFileReferences(findings []loader.UnsupportedAttribute, project *types.Project) []loader.UnsupportedAttribute {
+	if project == nil {
+		return findings
+	}
+	return slices.DeleteFunc(slices.Clone(findings), func(finding loader.UnsupportedAttribute) bool {
+		return isInlineFileReference(finding, project)
+	})
+}
+
+func isInlineFileReference(finding loader.UnsupportedAttribute, project *types.Project) bool {
+	ref, _ := finding.Value.(map[string]any)
+	source, _ := ref["source"].(string)
+	var object types.FileObjectConfig
+	var found bool
+	switch {
+	case finding.Path.Matches(configReferencePath):
+		var config types.ConfigObjConfig
+		config, found = project.Configs[source]
+		object = types.FileObjectConfig(config)
+	case finding.Path.Matches(secretReferencePath):
+		var secret types.SecretConfig
+		secret, found = project.Secrets[source]
+		object = types.FileObjectConfig(secret)
+	}
+	return found && (object.Content != "" || object.Environment != "")
 }

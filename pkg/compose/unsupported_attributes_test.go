@@ -444,6 +444,111 @@ configs:
 		assertFindings(t, got, nil)
 	})
 
+	t.Run("config uid gid mode are honored for content and environment sources", func(t *testing.T) {
+		got := loadCompose(t, `
+services:
+  web:
+    image: alpine
+    configs:
+      - source: inline
+        uid: "1000"
+        gid: "1000"
+        mode: 0o400
+      - source: from_env
+        uid: "1000"
+        gid: "1000"
+        mode: 0o400
+configs:
+  inline:
+    content: hello
+  from_env:
+    environment: SOME_VALUE
+`)
+		assertFindings(t, got, nil)
+	})
+
+	t.Run("secret uid gid mode are honored for environment sources", func(t *testing.T) {
+		got := loadCompose(t, `
+services:
+  web:
+    image: alpine
+    secrets:
+      - source: from_env
+        uid: "1000"
+        gid: "1000"
+        mode: 0o400
+secrets:
+  from_env:
+    environment: SOME_VALUE
+`)
+		assertFindings(t, got, nil)
+	})
+
+	t.Run("only file sources are reported when references are mixed", func(t *testing.T) {
+		got := loadWithFiles(t, map[string]string{
+			"compose.yaml": `
+services:
+  web:
+    image: alpine
+    configs:
+      - source: inline
+        mode: 0o700
+      - source: start.sh
+        mode: 0o700
+    secrets:
+      - source: from_env
+        uid: "1000"
+      - source: s1
+        uid: "1000"
+configs:
+  inline:
+    content: hello
+  start.sh:
+    file: ./start.sh
+secrets:
+  from_env:
+    environment: SOME_VALUE
+  s1:
+    file: ./s1.txt
+`,
+			"start.sh": "echo hello",
+			"s1.txt":   "hello",
+		})
+		assertFindings(t, got, []findingKey{
+			{Service: "web", Path: "configs.start.sh.mode"},
+			{Service: "web", Path: "secrets.s1.uid"},
+		})
+	})
+
+	t.Run("a config shared by two services is judged by its source for each", func(t *testing.T) {
+		got := loadWithFiles(t, map[string]string{
+			"compose.yaml": `
+services:
+  a:
+    image: alpine
+    configs:
+      - source: inline
+        mode: 0o700
+      - source: from_file
+        mode: 0o700
+  b:
+    image: alpine
+    configs:
+      - source: inline
+        mode: 0o700
+configs:
+  inline:
+    content: hello
+  from_file:
+    file: ./c1.txt
+`,
+			"c1.txt": "hello",
+		})
+		assertFindings(t, got, []findingKey{
+			{Service: "a", Path: "configs.from_file.mode"},
+		})
+	})
+
 	// An unrecognized depends_on condition is not tested here: the
 	// compose-spec schema declares it as a closed enum, so schema.Validate
 	// rejects it before this check ever runs — see
