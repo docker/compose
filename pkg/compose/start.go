@@ -33,10 +33,20 @@ func (s *composeService) Start(ctx context.Context, projectName string, options 
 	}, "start", s.events)
 }
 
+// start builds and executes a Start-only plan (epic #14081, lot 2): the
+// semantic switchover from InDependencyOrder's imperative traversal
+// (startService/waitDependencies) to the same reconciler/executor pair every
+// other lifecycle command already uses. ScopeStart's planStartPhase works
+// straight off the observed containers (see TestPlanStart_StartOnlyScope) --
+// it never converges anything, matching start()'s own historical contract of
+// starting what exists, never creating. listener is non-nil only when called
+// from interactive up's own start phase (today's create()-then-start()
+// sequence, unchanged by this PR -- see upDetached's doc comment): it streams
+// pre_start/post_start hook logs into the attached session, exactly what
+// newPlanExecutor's listener parameter exists for.
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
 	project := options.Project
 	if project == nil {
-		var containers Containers
 		containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 		if err != nil {
 			return err
@@ -52,54 +62,93 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	// and the dependency waits read them
 	project = project.WithoutUnresolvedOptionalDependencies()
 
-	// getContainers filters on ConfigHashLabel presence (getDefaultFilters),
-	// which every service container carries and hook runners deliberately do
-	// not: pre_start runners never leak into the start flow at the source
-	// (isNotHookContainer downstream stays as defense-in-depth).
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
+	observed, err := s.collectObservedState(ctx, project)
 	if err != nil {
 		return err
 	}
 
-	// the node-level bound is a correct proxy for --parallel here, unlike
-	// restart/down/stop: startService starts a service's containers in a
-	// plain sequential loop, so one engine-call burst per node is all this
-	// traversal ever dispatches concurrently.
-	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-
-		return s.startService(ctx, project, service, containers, listener, options.WaitTimeout)
-	}, func(traversal *graphTraversal) {
-		traversal.maxConcurrency = s.maxConcurrency
-	})
+	plan, err := reconcile(ctx, project, observed, ReconcileOptions{Scope: ScopeStart}, s.prompt)
 	if err != nil {
 		return err
 	}
 
-	if options.Wait {
-		depends := types.DependsOnConfig{}
-		for _, s := range project.Services {
-			depends[s.Name] = types.ServiceDependency{
-				Condition: getDependencyCondition(s, project),
-				Required:  true,
-			}
-		}
-		if options.WaitTimeout > 0 {
-			withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
-			ctx = withTimeout
-			defer cancel()
-		}
+	// Must run against the pre-execution snapshot: observed only labels a
+	// container Running if it already was one before this plan touched
+	// anything, same reasoning as upDetached.
+	emitRunningEvents(project, observed, plan, s.events)
 
-		err = s.waitDependencies(ctx, project, project.Name, depends, containers, 0)
-		if err != nil {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+	// start()'s own dependency waits used to thread WaitTimeout through every
+	// wait unconditionally (InDependencyOrder → startService, regardless of
+	// options.Wait -- --wait-timeout alone, with no --wait, is a legal CLI
+	// combination nothing rejects). exec.waitTimeout reproduces that for the
+	// plan's own OpWaitCondition nodes, each with its own fresh window
+	// starting when that wait begins -- see upDetached's identical reasoning.
+	exec := s.newPlanExecutor(project, observed, listener)
+	exec.waitTimeout = options.WaitTimeout
+
+	if err := exec.run(ctx, plan); err != nil {
+		// Same distinction as upDetached: ctx.Err() == nil rules out ctx's
+		// own external deadline (unrelated to --wait-timeout) having fired
+		// during exec.run, so a DeadlineExceeded here can only be one of the
+		// plan's own OpWaitCondition nodes timing out.
+		if options.WaitTimeout > 0 && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			if options.Wait {
 				return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
 			}
-			return err
+			// No --wait: this is the dependency-timeout failure
+			// waitDependencies already reports as "timeout waiting for
+			// dependencies" elsewhere -- matching that established,
+			// actionable message instead of leaking the raw
+			// "context deadline exceeded" a user never configured in those
+			// terms.
+			return errors.New("timeout waiting for dependencies")
 		}
+		return err
+	}
+
+	if !options.Wait {
+		return nil
+	}
+
+	// origCtx is kept so the two DeadlineExceeded checks below can tell this
+	// fresh window expiring (origCtx still fine) apart from origCtx's own,
+	// independent deadline propagating through the derived one (origCtx
+	// already done) -- same reasoning as upDetached.
+	origCtx := ctx
+	if options.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
+		ctx = withTimeout
+		defer cancel()
+	}
+
+	// getContainers filters on ConfigHashLabel presence (getDefaultFilters),
+	// which every service container carries and hook runners deliberately do
+	// not: pre_start runners never leak into this verification at the source
+	// (isNotHookContainer downstream stays as defense-in-depth). ScopeStart
+	// never creates a container, so this re-listing exists only to open a
+	// fresh WaitTimeout window, not to discover new IDs the pre-execution
+	// observed snapshot wouldn't have (contrast upDetached, which can create
+	// or recreate containers).
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
+	if err != nil {
+		if options.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
+		}
+		return err
+	}
+
+	depends := types.DependsOnConfig{}
+	for _, svc := range project.Services {
+		depends[svc.Name] = types.ServiceDependency{
+			Condition: getDependencyCondition(svc, project),
+			Required:  true,
+		}
+	}
+	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
+		if options.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
+		}
+		return err
 	}
 
 	return nil
