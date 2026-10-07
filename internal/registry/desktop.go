@@ -34,14 +34,13 @@ import (
 )
 
 const (
-	// desktopLookupTimeout bounds a lookup: the SDK has no default timeout and
-	// containerd's credential callback has no context.
+	// desktopLookupTimeout limits connection time in case of hanging or
+	// unexpected request delay by the secrets engine.
 	desktopLookupTimeout = 5 * time.Second
 	sessionExpirySkew    = 30 * time.Second
 	// sessionTTL is how long a token without a readable expiry is reused.
 	sessionTTL = time.Minute
-	// retryInterval is how long Desktop is not asked again after a lookup
-	// found no usable session, so a command does not wait on it per image.
+	// retryInterval is how long Desktop is not asked again after a failed lookup.
 	retryInterval = time.Minute
 )
 
@@ -57,10 +56,6 @@ type hubSessions interface {
 
 var _ hubSessions = dockerhub.ClientAuth(nil)
 
-// Sessions belong to the Desktop user, not to a config file, so every provider
-// in the process shares them. Each token is only sent to the registry of its
-// own environment: the engine resolves docker.io to production even when
-// Desktop runs in stage mode.
 var (
 	sharedHubSession        = newDesktopSession("Docker Hub", IndexServer)
 	sharedStagingHubSession = newDesktopSession("Docker Hub staging", StagingIndexServer, dockerhub.Staging())
@@ -215,8 +210,6 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 	}, validUntil, nil
 }
 
-// sessionExpiry reads the expiry from the session claims, or from the JWT when
-// the claims have none.
 func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
 	if exp := session.Claims.ExpiresAt; exp != nil {
 		return exp.Time, true
@@ -224,7 +217,6 @@ func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
 	return jwtExpiry(session.AccessToken)
 }
 
-// jwtExpiry does not verify the signature: the registry verifies the token.
 func jwtExpiry(token string) (time.Time, bool) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
@@ -244,16 +236,16 @@ func jwtExpiry(token string) (time.Time, bool) {
 }
 
 func logDesktopFallback(name string, err error) {
-	if isExpectedMiss(err) {
+	if isSessionUnavailable(err) {
 		logrus.Debugf("no %s session available from Docker Desktop, using Docker CLI credentials: %v", name, err)
 		return
 	}
 	logrus.Warnf("Could not use the %s session from Docker Desktop, using Docker CLI credentials instead: %v", name, err)
 }
 
-// isExpectedMiss reports Desktop not running or nobody signed in. An expired
-// session is one: Desktop keeps the token fresh while the user is signed in.
-// dockerhub.ErrNoDefaultProfile wraps dockerhub.ErrNoSession.
-func isExpectedMiss(err error) bool {
+// isSessionUnavailable reports Desktop not running or nobody signed in. An
+// expired session counts too: Desktop keeps the token fresh while the user is
+// signed in. dockerhub.ErrNoDefaultProfile wraps dockerhub.ErrNoSession.
+func isSessionUnavailable(err error) bool {
 	return errors.Is(err, seclient.ErrSecretsEngineNotAvailable) || errors.Is(err, dockerhub.ErrNoSession) || errors.Is(err, errSessionExpired)
 }

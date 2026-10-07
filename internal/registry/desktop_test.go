@@ -352,21 +352,21 @@ func TestDesktopAuthProvider_RetriesAfterInterval(t *testing.T) {
 	assert.Equal(t, hub.sessionCalls.Load(), int32(2))
 }
 
-func TestIsExpectedMiss(t *testing.T) {
+func TestIsSessionUnavailable(t *testing.T) {
 	for _, err := range []error{
 		fmt.Errorf("%w: dial unix engine.sock", seclient.ErrSecretsEngineNotAvailable),
 		dockerhub.ErrNoSession,
 		dockerhub.ErrNoDefaultProfile,
 		errSessionExpired,
 	} {
-		assert.Assert(t, isExpectedMiss(err), err)
+		assert.Assert(t, isSessionUnavailable(err), err)
 	}
 	for _, err := range []error{
 		seclient.ErrAccessDenied,
 		errNoUsername,
 		context.DeadlineExceeded,
 	} {
-		assert.Assert(t, !isExpectedMiss(err), err)
+		assert.Assert(t, !isSessionUnavailable(err), err)
 	}
 }
 
