@@ -103,6 +103,9 @@ type desktopAuthProvider struct {
 func (p *desktopAuthProvider) GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error) {
 	if session := p.sessionFor(registryHostname); session != nil {
 		if auth, ok := session.auth(); ok {
+			if registryHost(registryHostname) == DHIRegistryHost {
+				auth.ServerAddress = DHIRegistryHost
+			}
 			return auth, nil
 		}
 	}
@@ -111,18 +114,19 @@ func (p *desktopAuthProvider) GetAuthConfig(registryHostname string) (clitypes.A
 
 func (p *desktopAuthProvider) sessionFor(registryHostname string) *desktopSession {
 	switch {
-	case GetAuthConfigKey(registryHostname) == IndexServer:
+	case GetAuthConfigKey(registryHostname) == IndexServer, registryHost(registryHostname) == DHIRegistryHost:
 		return p.hub
-	case isStagingRegistry(registryHostname):
+	case registryHost(registryHostname) == StagingRegistryHost:
 		return p.stagingHub
 	default:
 		return nil
 	}
 }
 
-func isStagingRegistry(registryHostname string) bool {
+// registryHost strips the scheme and trailing slash from a registry address.
+func registryHost(registryHostname string) string {
 	host := strings.TrimPrefix(strings.TrimPrefix(registryHostname, "https://"), "http://")
-	return strings.TrimSuffix(host, "/") == StagingRegistryHost
+	return strings.TrimSuffix(host, "/")
 }
 
 // desktopSession caches the Desktop session of one Docker Hub environment.
