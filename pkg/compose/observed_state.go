@@ -192,7 +192,7 @@ func (s *composeService) mergeHookContainers(ctx context.Context, project *types
 
 // The project model is used to classify containers by service and to identify
 // orphans, and to scope network/volume queries to declared resources.
-func (s *composeService) collectObservedState(ctx context.Context, project *types.Project) (*ObservedState, error) {
+func (s *composeService) collectObservedState(ctx context.Context, project *types.Project, scope ReconcileScope) (*ObservedState, error) {
 	state := &ObservedState{
 		ProjectName: project.Name,
 		Containers:  map[string][]ObservedContainer{},
@@ -249,12 +249,33 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		// `down` stops running one-offs).
 	}
 
-	// --- Networks ---
+	// Networks and volumes are a create-phase concern: ScopeStart's
+	// planStartPhase never reads resolvedNetworks/resolvedVolumes (only
+	// reconcileNetworks/reconcileVolumes, which ScopeStart never runs, do).
+	// Skipping these calls for ScopeStart isn't just an optimization -- a
+	// Copilot review finding on #14296 noted that querying them unconditionally
+	// gives `compose start` new daemon dependencies the old imperative engine
+	// never had (only ever called getContainers): an authorization plugin
+	// permitting container list/start but denying network or volume listing
+	// would now make `compose start` fail before starting anything.
+	if scope.plansCreatePhase() {
+		if err := s.collectObservedNetworksAndVolumes(ctx, project, state); err != nil {
+			return nil, err
+		}
+	}
+
+	return state, nil
+}
+
+// collectObservedNetworksAndVolumes populates state.Networks/Volumes, split
+// out of collectObservedState to keep cognitive complexity in check (and
+// gated behind scope.plansCreatePhase() there -- see its own comment).
+func (s *composeService) collectObservedNetworksAndVolumes(ctx context.Context, project *types.Project, state *ObservedState) error {
 	networkList, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
 		Filters: projectFilter(project.Name),
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, network := range networkList.Items {
 		key := network.Labels[api.NetworkLabel]
@@ -269,12 +290,11 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		})
 	}
 
-	// --- Volumes ---
 	volList, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
 		Filters: projectFilter(project.Name),
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, vol := range volList.Items {
 		key := vol.Labels[api.VolumeLabel]
@@ -290,14 +310,10 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	}
 
 	if err := s.discoverUnmanagedNetworks(ctx, project, state); err != nil {
-		return nil, err
+		return err
 	}
 
-	if err := s.discoverUnmanagedVolumes(ctx, project, state); err != nil {
-		return nil, err
-	}
-
-	return state, nil
+	return s.discoverUnmanagedVolumes(ctx, project, state)
 }
 
 // discoverUnmanagedNetworks augments the observed state with networks that match
