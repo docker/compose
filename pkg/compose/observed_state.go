@@ -210,9 +210,20 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	if err != nil {
 		return nil, err
 	}
-	raw, err = s.mergeHookContainers(ctx, project, raw)
-	if err != nil {
-		return nil, err
+	// Hook-runner snapshots are consumed exclusively by create-phase runner
+	// reconciliation (planPreStartHookRunners, reconcile.go) -- the start
+	// phase's own RunPreStart never reads observed.HookContainers, it
+	// executes a runner the create phase already prepared or fails outright
+	// if none exists. Skipping this for ScopeStart matches the
+	// network/volume guard below: one more unconditional daemon call the old
+	// imperative engine never made, which could otherwise fail a no-op
+	// `compose start` on a service with pre_start hooks declared (second
+	// Copilot review finding in the same vein as the first).
+	if scope.plansCreatePhase() {
+		raw, err = s.mergeHookContainers(ctx, project, raw)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	knownServices := map[string]bool{}

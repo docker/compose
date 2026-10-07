@@ -295,6 +295,30 @@ func TestCollectObservedState_ScopeStartSkipsNetworksAndVolumes(t *testing.T) {
 	assert.Equal(t, len(state.Volumes), 0)
 }
 
+// TestCollectObservedState_ScopeStartSkipsHookContainerQuery is a regression
+// test for a second Copilot review finding in the same vein: hook-runner
+// snapshots (mergeHookContainers/getHookContainers) are consumed exclusively
+// by create-phase runner reconciliation (planPreStartHookRunners) -- the
+// start phase's own RunPreStart never reads observed.HookContainers. Only
+// one ContainerList expectation is registered (the default Times(1)):
+// gomock fails the test if collectObservedState issues the extra
+// getHookContainers listing under ScopeStart for a service declaring
+// pre_start hooks.
+func TestCollectObservedState_ScopeStartSkipsHookContainerQuery(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"web": {Name: "web", PreStart: []types.PreStartHook{{}}},
+		},
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project, ScopeStart)
+	assert.NilError(t, err)
+	assert.Equal(t, len(state.HookContainers["web"]), 0)
+}
+
 // TestCollectObservedState_LegacyHookRunnerNotDuplicated covers a runner
 // created before the ConfigHashLabel exclusion existed (or by an older
 // compose version): it still carries the label, so it matches getContainers'
