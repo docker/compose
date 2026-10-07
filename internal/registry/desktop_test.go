@@ -18,6 +18,7 @@ package registry
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -291,6 +292,52 @@ func TestDesktopAuthProvider_RefetchesSessionWithoutExpiry(t *testing.T) {
 	_, err = p.GetAuthConfig("docker.io")
 	assert.NilError(t, err)
 	assert.Equal(t, hub.sessionCalls.Load(), int32(2))
+}
+
+// fakeJWT builds an unsigned JWT carrying only an exp claim.
+func fakeJWT(expiresAt time.Time) string {
+	enc := base64.RawURLEncoding.EncodeToString
+	return enc([]byte(`{"alg":"none"}`)) + "." + enc(fmt.Appendf(nil, `{"exp":%d}`, expiresAt.Unix())) + ".sig"
+}
+
+func TestDesktopAuthProvider_ExpiryFromTokenWhenClaimsLackIt(t *testing.T) {
+	t.Run("expired token falls back", func(t *testing.T) {
+		session := hubSession("hubuser", time.Time{})
+		session.AccessToken = fakeJWT(testNow.Add(-time.Minute))
+		p := newTestProvider(&fakeHub{session: session}, nil)
+
+		got, err := p.GetAuthConfig("docker.io")
+		assert.NilError(t, err)
+		assert.DeepEqual(t, got, cliCredentials("docker.io"))
+	})
+
+	t.Run("valid token is reused until it expires", func(t *testing.T) {
+		session := hubSession("hubuser", time.Time{})
+		session.AccessToken = fakeJWT(testNow.Add(10 * time.Minute))
+		hub := &fakeHub{session: session}
+		p := newTestProvider(hub, nil)
+
+		got, err := p.GetAuthConfig("docker.io")
+		assert.NilError(t, err)
+		assert.Equal(t, got.Password, session.AccessToken)
+
+		// Past sessionTTL, but the token's own expiry still applies.
+		p.clock.advance(sessionTTL + time.Minute)
+		_, err = p.GetAuthConfig("docker.io")
+		assert.NilError(t, err)
+		assert.Equal(t, hub.sessionCalls.Load(), int32(1))
+	})
+}
+
+func TestJWTExpiry(t *testing.T) {
+	exp, ok := jwtExpiry(fakeJWT(testNow))
+	assert.Assert(t, ok)
+	assert.Assert(t, exp.Equal(testNow))
+
+	for _, token := range []string{"", "opaque-token", "a.%%%.c", "a." + base64.RawURLEncoding.EncodeToString([]byte(`{}`)) + ".c"} {
+		_, ok := jwtExpiry(token)
+		assert.Assert(t, !ok, token)
+	}
 }
 
 func TestDesktopAuthProvider_ConcurrentLookupsShareOneFetch(t *testing.T) {
