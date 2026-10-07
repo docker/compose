@@ -1269,52 +1269,24 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 // gate — errors included: a dependency that is neither declared nor
 // disabled is the same hard failure it is today.
 func (r *reconciler) startPhaseDependencies(service types.ServiceConfig) ([]*PlanNode, error) {
-	deps := sortedKeys(service.DependsOn)
-	depTargets := make(map[string][]*PlanNode, len(deps))
-	var allTargets []*PlanNode
-	for _, dep := range deps {
+	var depNodes []*PlanNode
+	for _, dep := range sortedKeys(service.DependsOn) {
+		cfg := service.DependsOn[dep]
 		targets := r.startChainEnds[dep]
 		if len(targets) == 0 {
 			if node, ok := r.serviceNodes[dep]; ok {
 				targets = []*PlanNode{node}
 			}
 		}
-		depTargets[dep] = targets
-		for _, target := range targets {
-			if !slices.Contains(allTargets, target) {
-				allTargets = append(allTargets, target)
-			}
-		}
-	}
-
-	var depNodes []*PlanNode
-	for _, dep := range deps {
-		cfg := service.DependsOn[dep]
 		shouldWait, err := shouldWaitForDependency(dep, cfg, r.project)
 		if err != nil {
 			return nil, err
 		}
 		if !shouldWait {
-			for _, target := range depTargets[dep] {
-				if !slices.Contains(depNodes, target) {
-					depNodes = append(depNodes, target)
-				}
-			}
+			depNodes = append(depNodes, targets...)
 			continue
 		}
-		// The wait node's own exec.waitTimeout window must not open until
-		// EVERY dependency this service declares has itself finished
-		// starting, not just the one this particular condition checks --
-		// matching the old imperative engine's startService, which only
-		// calls waitDependencies(X) once every direct dependency's own
-		// startService call has already returned (see InDependencyOrder's
-		// graphTraversal.run: a node is dispatched only once none of its
-		// children are still ServiceStopped, so X's siblings all finish
-		// starting before X's own wait clock ever starts). Passing just this
-		// dep's own target here would let an unrelated, slower sibling
-		// dependency silently shrink the effective grace period this
-		// condition's health check gets, compared to the old engine.
-		depNodes = append(depNodes, r.waitConditionNode(dep, cfg, allTargets))
+		depNodes = append(depNodes, r.waitConditionNode(dep, cfg, targets))
 	}
 	return depNodes, nil
 }
@@ -1322,13 +1294,7 @@ func (r *reconciler) startPhaseDependencies(service types.ServiceConfig) ([]*Pla
 // waitConditionNode returns the shared wait node for (dep, condition),
 // creating it on first use. required:false marks it best-effort — a missing
 // dependency is skipped, not fatal; one required dependent upgrades the
-// shared node for everyone. targets is now each caller's FULL sibling
-// dependency set (see startPhaseDependencies), not just dep's own target, so
-// two dependents of the same (dep, condition) with different sibling sets
-// routinely diverge here: the merge below unions them onto the one shared
-// node rather than creating a second one, at the cost of a dependent with
-// fewer siblings waiting a little longer than its own depends_on strictly
-// requires -- preferable to losing the dedup this node exists for.
+// shared node for everyone.
 func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, targets []*PlanNode) *PlanNode {
 	key := dep + ":" + cfg.Condition
 	wait, ok := r.waitNodes[key]
@@ -1348,53 +1314,16 @@ func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, 
 	if cfg.Required && wait.Operation.BestEffort {
 		wait.Operation.BestEffort = false
 	}
-	// merge this caller's prerequisites into the shared node, skipping
-	// anything that would create a cycle: an ordinary diamond dependency
-	// (X depends on dep:cond, Z depends on X AND independently on the same
-	// dep:cond) puts X's own chain end -- which already depends on this very
-	// wait node -- into Z's sibling set. Adding it back as wait's own
-	// prerequisite would deadlock the executor forever (runNode never applies
-	// exec.waitTimeout until its own DependsOn are satisfied, and nothing
-	// detects a node depending on itself at a distance). Skipping it loses
-	// nothing: X cannot even start until wait has already succeeded, so by
-	// the time X's chain completes wait is necessarily already done.
+	// merge this caller's prerequisites into the shared node. Today every
+	// caller passes the same targets (startChainEnds[dep] is fixed before
+	// any dependent is visited), so this is defensive — but relying on that
+	// silently would break the day the targets diverge per caller.
 	for _, target := range targets {
-		if slices.Contains(wait.DependsOn, target) {
-			continue
+		if !slices.Contains(wait.DependsOn, target) {
+			wait.DependsOn = append(wait.DependsOn, target)
 		}
-		if wouldCreateCycle(target, wait) {
-			continue
-		}
-		wait.DependsOn = append(wait.DependsOn, target)
 	}
 	return wait
-}
-
-// wouldCreateCycle reports whether candidate already (transitively) depends
-// on node, via DependsOn edges -- i.e. whether appending candidate to
-// node.DependsOn would close a cycle. Only reachable from waitConditionNode's
-// merge, where candidate is a sibling target pulled in for an already-shared
-// wait node.
-func wouldCreateCycle(candidate, node *PlanNode) bool {
-	if candidate == node {
-		return true
-	}
-	seen := map[*PlanNode]bool{candidate: true}
-	queue := []*PlanNode{candidate}
-	for len(queue) > 0 {
-		n := queue[0]
-		queue = queue[1:]
-		for _, dep := range n.DependsOn {
-			if dep == node {
-				return true
-			}
-			if !seen[dep] {
-				seen[dep] = true
-				queue = append(queue, dep)
-			}
-		}
-	}
-	return false
 }
 
 // planProviderStart is the start-phase visit of a provider service: no
