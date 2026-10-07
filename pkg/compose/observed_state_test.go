@@ -230,7 +230,7 @@ func TestCollectObservedState(t *testing.T) {
 		},
 	}, nil)
 
-	state, err := tested.(*composeService).collectObservedState(t.Context(), project)
+	state, err := tested.(*composeService).collectObservedState(t.Context(), project, ScopeCreate)
 	assert.NilError(t, err)
 
 	// Containers classified by service
@@ -269,6 +269,32 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, vol.ConfigHash, "volhash1")
 }
 
+// TestCollectObservedState_ScopeStartSkipsNetworksAndVolumes is a regression
+// test for a Copilot review finding on #14296: ScopeStart's planStartPhase
+// never reads resolvedNetworks/resolvedVolumes (only reconcileNetworks/
+// reconcileVolumes, which ScopeStart never runs, do), so querying them
+// unconditionally gave `compose start` new daemon dependencies the old
+// imperative engine never had (only ever called getContainers) -- a problem
+// for an authorization plugin permitting container list/start but denying
+// network or volume listing. No NetworkList/VolumeList/NetworkInspect/
+// VolumeInspect expectation is registered here: gomock fails the test if
+// collectObservedState calls any of them under ScopeStart.
+func TestCollectObservedState_ScopeStartSkipsNetworksAndVolumes(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"web": {Name: "web"}},
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend"}},
+		Volumes:  types.Volumes{"data": {Name: "myproject_data"}},
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project, ScopeStart)
+	assert.NilError(t, err)
+	assert.Equal(t, len(state.Networks), 0)
+	assert.Equal(t, len(state.Volumes), 0)
+}
+
 // TestCollectObservedState_LegacyHookRunnerNotDuplicated covers a runner
 // created before the ConfigHashLabel exclusion existed (or by an older
 // compose version): it still carries the label, so it matches getContainers'
@@ -300,7 +326,7 @@ func TestCollectObservedState_LegacyHookRunnerNotDuplicated(t *testing.T) {
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
 	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
 
-	state, err := svc.collectObservedState(t.Context(), project)
+	state, err := svc.collectObservedState(t.Context(), project, ScopeCreate)
 	assert.NilError(t, err)
 	assert.Equal(t, len(state.HookContainers["web"]), 1, "the legacy runner must be classified exactly once")
 	assert.Equal(t, len(state.Containers["web"]), 0, "a hook runner must never be classified as a replica")
@@ -322,7 +348,7 @@ func TestCollectObservedState_AggregatesDuplicateLabels(t *testing.T) {
 		},
 	}, nil)
 
-	state, err := svc.collectObservedState(t.Context(), project)
+	state, err := svc.collectObservedState(t.Context(), project, ScopeCreate)
 	assert.NilError(t, err)
 	assert.Equal(t, len(state.Volumes["data"]), 2, "both label-sharing volumes must be recorded")
 }
@@ -388,7 +414,7 @@ func collectByNameDiscovery(t *testing.T, project *types.Project, inspect func(a
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
 	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
 	inspect(apiClient)
-	return svc.collectObservedState(t.Context(), project)
+	return svc.collectObservedState(t.Context(), project, ScopeCreate)
 }
 
 // TestCollectObservedState_LegacyNetworkMatchedByName verifies that a network
