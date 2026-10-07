@@ -104,7 +104,7 @@ func (p *desktopAuthProvider) GetAuthConfig(registryHostname string) (clitypes.A
 	if session := p.sessionFor(registryHostname); session != nil {
 		if auth, ok := session.auth(); ok {
 			if registryHost(registryHostname) == DHIRegistryHost {
-				auth.ServerAddress = DHIRegistryHost
+				auth.ServerAddress = DHIIndexServer
 			}
 			return auth, nil
 		}
