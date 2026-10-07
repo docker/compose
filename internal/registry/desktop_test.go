@@ -214,14 +214,14 @@ func TestDesktopAuthProvider_OtherRegistriesUseFallback(t *testing.T) {
 }
 
 func TestDesktopAuthProvider_DHIUsesDockerHubSession(t *testing.T) {
-	for _, host := range []string{DHIRegistryHost, "https://" + DHIRegistryHost, "https://" + DHIRegistryHost + "/"} {
+	for _, host := range []string{DHIRegistryHost, DHIIndexServer, DHIIndexServer + "/"} {
 		t.Run(host, func(t *testing.T) {
 			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
 			p := newTestProvider(hub, nil)
 			p.signInToStaging()
 
 			want := desktopCredentials()
-			want.ServerAddress = DHIRegistryHost
+			want.ServerAddress = DHIIndexServer
 			got, err := p.GetAuthConfig(host)
 			assert.NilError(t, err)
 			assert.DeepEqual(t, got, want)

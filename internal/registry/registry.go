@@ -45,6 +45,8 @@ const (
 	StagingIndexServer = "https://" + StagingRegistryHost + "/"
 	// DHIRegistryHost is the Docker Hardened Images registry.
 	DHIRegistryHost = "dhi.io"
+	// DHIIndexServer is the credentials key for DHIRegistryHost.
+	DHIIndexServer = "https://" + DHIRegistryHost
 )
 
 // GetAuthConfigKey special-cases using the full index address of the official
