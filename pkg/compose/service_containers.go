@@ -245,10 +245,21 @@ func (s *composeService) waitDependency(ctx context.Context, dependant, dep stri
 	}
 }
 
+// checkDependencyRunningOrHealthy and checkDependencyHealthy skip an optional
+// dependency whose inspection fails. A failure caused by ctx being done says
+// nothing about the dependency though: reporting it as "skipped" would turn a
+// cancellation or an expired deadline into a successful wait. They report
+// "not done yet" instead, so that waitDependency's next iteration sees
+// ctx.Done() and decides what the end of the wait means. A genuine failure that
+// coincides with the end of the wait goes unreported on purpose: the wait is
+// over anyway.
 func (s *composeService) checkDependencyRunningOrHealthy(ctx context.Context, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
 	isHealthy, err := s.isServiceHealthy(ctx, waitingFor, true)
 	if err != nil {
 		if !config.Required {
+			if ctx.Err() != nil {
+				return false, nil
+			}
 			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
 				fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep))...)
 			logrus.Warnf("optional dependency %q is not running or is unhealthy: %s", dep, err.Error())
@@ -266,6 +277,9 @@ func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string,
 	isHealthy, err := s.isServiceHealthy(ctx, waitingFor, false)
 	if err != nil {
 		if !config.Required {
+			if ctx.Err() != nil {
+				return false, nil
+			}
 			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
 				fmt.Sprintf("optional dependency %q failed to start", dep))...)
 			logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
