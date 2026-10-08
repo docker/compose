@@ -865,6 +865,35 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		assert.Error(t, err, "timeout waiting for dependencies")
 	})
 
+	// Regression guard: an optional dependency's deadline expiring (new as of
+	// planExecutor.waitTimeout giving execWaitCondition a real timeout for
+	// the first time -- see waitDependency's ctx.Done() branch) must be
+	// tolerated exactly like any other definitive failure of an optional
+	// dependency, not surfaced as "timeout waiting for dependencies".
+	t.Run("expired deadline on an optional dependency is skipped, not an error", func(t *testing.T) {
+		optionalDeps := types.DependsOnConfig{
+			"db": {Condition: types.ServiceConditionHealthy, Required: false},
+		}
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", optionalDeps, containers, 50*time.Millisecond)
+		assert.NilError(t, err)
+	})
+
+	// Regression guard: the tolerance above must apply only to a deadline
+	// THIS call's own timeout parameter is responsible for -- an unrelated,
+	// already-expired deadline the caller brought in (timeout == 0, so this
+	// call set no deadline of its own) is a different, real failure that
+	// must still propagate even for an optional dependency.
+	t.Run("an inherited parent deadline is not swallowed for an optional dependency", func(t *testing.T) {
+		optionalDeps := types.DependsOnConfig{
+			"db": {Condition: types.ServiceConditionHealthy, Required: false},
+		}
+		parentCtx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
+		defer cancel()
+		time.Sleep(10 * time.Millisecond) // let the parent's own deadline actually expire first
+		err := tested.(*composeService).waitDependencies(parentCtx, &project, "app", optionalDeps, containers, 0)
+		assert.Error(t, err, "timeout waiting for dependencies")
+	})
+
 	t.Run("user cancellation is not a wait failure", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
