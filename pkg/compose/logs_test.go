@@ -419,7 +419,7 @@ func TestDoLogContainer_ReleasesSlotOnPanic(t *testing.T) {
 
 	func() {
 		defer func() { recover() }() //nolint:errcheck
-		_ = svc.doLogContainer(t.Context(), limiter, &testLogConsumer{}, "c1", containerType.InspectResponse{ID: "c1"}, compose.LogOptions{})
+		_ = svc.doLogContainer(t.Context(), limiter, &testLogConsumer{}, "c1", containerType.InspectResponse{ID: "c1"}, compose.LogOptions{}, nil)
 	}()
 
 	assert.Assert(t, limiter.TryAcquire(1), "slot must be released even when ContainerLogs panics")
@@ -458,7 +458,7 @@ func TestDoLogContainer_CopyPanicDoesNotDoubleReleaseSlot(t *testing.T) {
 	var recovered any
 	func() {
 		defer func() { recovered = recover() }()
-		_ = svc.doLogContainer(t.Context(), limiter, &testLogConsumer{}, "c1", containerType.InspectResponse{ID: "c1", Config: &containerType.Config{Tty: true}}, compose.LogOptions{})
+		_ = svc.doLogContainer(t.Context(), limiter, &testLogConsumer{}, "c1", containerType.InspectResponse{ID: "c1", Config: &containerType.Config{Tty: true}}, compose.LogOptions{}, nil)
 	}()
 
 	assert.Equal(t, recovered, "boom-copy", "the copy-loop panic must propagate unmodified, not be replaced by a semaphore double-release panic")
