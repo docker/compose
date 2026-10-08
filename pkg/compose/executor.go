@@ -40,10 +40,10 @@ type planExecutor struct {
 	pctx    *reconciliationContext
 
 	// listener streams pre_start/post_start hook logs, exactly like the
-	// imperative start path. nil until an attached caller wires one in (the
-	// interactive-up convergence, a later lot of #14081) — every caller today
-	// passes nil, so hook execution stays silent, matching today's detached
-	// behavior.
+	// imperative start path. nil until an attached caller wires one in, either
+	// at construction or, for a caller driving the phases itself, when it
+	// enters the Start phase (planRun.runStart) — nil leaves hook execution
+	// silent, matching detached behavior.
 	listener api.ContainerEventListener
 
 	// containersByService is a live view used to resolve service references
@@ -93,11 +93,10 @@ func (pc *reconciliationContext) get(nodeID int) operationResult {
 // while respecting dependency edges. It emits progress events and handles
 // group-based event aggregation for composite operations like recreate.
 //
-// No caller threads a hook-log listener through here yet: create() (its only
-// caller) plans no start-phase operations today. newPlanExecutor takes one
-// directly for that reason — it is what the interactive-up convergence (a
-// later lot of #14081) will call once it needs to stream pre_start/post_start
-// hook logs into an attached session.
+// It threads no hook-log listener: its callers stream no pre_start/post_start
+// logs. A caller that does, into an attached session (interactive up), builds
+// the executor itself, drives a planRun, and hands its listener to runStart
+// once its session exists.
 func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *Plan) error {
 	return s.newPlanExecutor(project, observed, nil).run(ctx, plan)
 }
@@ -117,12 +116,71 @@ func (s *composeService) newPlanExecutor(project *types.Project, observed *Obser
 
 // run walks the plan DAG, executing nodes in parallel where possible while
 // respecting dependency edges. Emits progress events and handles group-based
-// event aggregation for composite operations like recreate.
+// event aggregation for composite operations like recreate. It is begin
+// followed by both phases: a caller that must act between the Create and the
+// Start phase drives a planRun itself.
 func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	if plan.IsEmpty() {
 		return nil
 	}
+	pr, err := exec.begin(plan)
+	if err != nil {
+		return err
+	}
+	if err := pr.runCreate(ctx); err != nil {
+		return err
+	}
+	return pr.runStart(ctx, nil)
+}
 
+// planRun is one execution of a Plan, split at the boundary between its two
+// phases. begin builds the state both phases share (the done channels and
+// failure bookkeeping a Start-phase node needs to see a Create-phase one
+// through, the group tracker, the limiter); runCreate and runStart then each
+// dispatch their own phase, so a caller can act in between -- interactive up
+// sets up its attach/printer/monitor session there -- without a second
+// snapshot or a second plan.
+//
+// The Create phase is a hard barrier: no Start-phase node is even
+// dispatched until every Create-phase node has succeeded. This isn't
+// just about not canceling unrelated in-flight Create work on a Start
+// failure (phaseCancel already keeps that scoped per phase, see its own
+// doc comment) -- it's that a Start-phase node whose own DependsOn
+// edges are all satisfied has no reason to wait for a COMPLETELY
+// UNRELATED Create-phase node elsewhere in the plan, so without this
+// barrier a service could already be starting while a sibling it has no
+// relationship with is still being created, or fails. The old
+// create()-then-start() sequence never allowed that: the whole create
+// phase, project-wide, always finished (or failed, with start() never
+// invoked at all) before any dependency wait, or anything else in the
+// start phase, even began. Interactive up's attach/printer session
+// depends on this too: it takes exclusive hold of the terminal for the
+// create phase's own progress display, handing it over to continuous
+// container log streaming only once the create phase is entirely done
+// -- a Start-phase node's log output interleaving with Create's
+// progress bars has nowhere consistent to go. runStart's guards enforce it
+// for a caller driving the phases itself; run() gets it by calling
+// runCreate first.
+//
+// A planRun is single-use and driven from one goroutine: each phase runs at
+// most once, Create first. There is one planRun per executor: two of them
+// would share its reconciliation context and service view.
+type planRun struct {
+	exec        *planExecutor
+	rs          *runState
+	createNodes []*PlanNode
+	startNodes  []*PlanNode
+
+	createRan bool
+	createErr error
+	startRan  bool
+}
+
+// begin prepares plan for execution without dispatching anything: it builds
+// the state shared by both phases, splits the nodes by phase and rejects a
+// plan that could only deadlock. An empty plan, or one with a single phase,
+// gives a planRun whose other phase dispatches nothing.
+func (exec *planExecutor) begin(plan *Plan) (*planRun, error) {
 	// Build a done-channel per node so dependents can wait
 	done := make(map[int]chan struct{}, len(plan.Nodes))
 	for _, node := range plan.Nodes {
@@ -203,33 +261,46 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	for _, node := range createNodes {
 		for _, dep := range node.DependsOn {
 			if dep.Phase == PhaseStart {
-				return fmt.Errorf("invalid plan: create-phase node %d depends on start-phase node %d", node.ID, dep.ID)
+				return nil, fmt.Errorf("invalid plan: create-phase node %d depends on start-phase node %d", node.ID, dep.ID)
 			}
 		}
 	}
 
-	// The Create phase is a hard barrier: no Start-phase node is even
-	// dispatched until every Create-phase node has succeeded. This isn't
-	// just about not canceling unrelated in-flight Create work on a Start
-	// failure (phaseCancel already keeps that scoped per phase, see its own
-	// doc comment) -- it's that a Start-phase node whose own DependsOn
-	// edges are all satisfied has no reason to wait for a COMPLETELY
-	// UNRELATED Create-phase node elsewhere in the plan, so without this
-	// barrier a service could already be starting while a sibling it has no
-	// relationship with is still being created, or fails. The old
-	// create()-then-start() sequence never allowed that: the whole create
-	// phase, project-wide, always finished (or failed, with start() never
-	// invoked at all) before any dependency wait, or anything else in the
-	// start phase, even began. Interactive up's attach/printer session
-	// depends on this too: it takes exclusive hold of the terminal for the
-	// create phase's own progress display, handing it over to continuous
-	// container log streaming only once the create phase is entirely done
-	// -- a Start-phase node's log output interleaving with Create's
-	// progress bars has nowhere consistent to go.
-	if err := exec.runPhase(createNodes, rs, newPhaseCancel(ctx)); err != nil {
-		return err
+	return &planRun{exec: exec, rs: rs, createNodes: createNodes, startNodes: startNodes}, nil
+}
+
+// runCreate dispatches the Create phase and waits for it. The Start phase
+// cannot be dispatched until it has returned without error.
+func (r *planRun) runCreate(ctx context.Context) error {
+	if r.createRan {
+		return errors.New("plan run: the create phase already ran")
 	}
-	return exec.runPhase(startNodes, rs, newPhaseCancel(ctx))
+	r.createRan = true
+	r.createErr = r.exec.runPhase(r.createNodes, r.rs, newPhaseCancel(ctx))
+	return r.createErr
+}
+
+// runStart dispatches the Start phase and waits for it. It refuses to run
+// before a successful Create phase, and to run twice. A non-nil listener
+// replaces the one the executor was built with and receives the
+// pre_start/post_start hook logs; nil keeps the construction-time one. It
+// can be given here because an attached caller only has one once it has set
+// up its session, which happens after the Create phase. It is set before any
+// Start-phase node is dispatched, and the planner only emits the operations
+// that read it (pre_start, post_start) in the Start phase, so no goroutine can
+// observe the previous value.
+func (r *planRun) runStart(ctx context.Context, listener api.ContainerEventListener) error {
+	if !r.createRan || r.createErr != nil {
+		return errors.New("plan run: the start phase cannot run before the create phase succeeded")
+	}
+	if r.startRan {
+		return errors.New("plan run: the start phase already ran")
+	}
+	r.startRan = true
+	if listener != nil {
+		r.exec.listener = listener
+	}
+	return r.exec.runPhase(r.startNodes, r.rs, newPhaseCancel(ctx))
 }
 
 // runPhase dispatches every node in nodes concurrently (respecting their own
@@ -237,8 +308,8 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 // waits for them all to finish. phase is this call's own cancellation scope:
 // a node failing here cancels phase.ctx for its siblings in THIS call only,
 // never a concurrently-running call for a different phase (not that there
-// is one today -- run() calls this sequentially -- but runNode has no way
-// to tell, so this still matters if that ever changes). See phaseCancel's
+// is one today -- a planRun runs its phases sequentially -- but runNode has
+// no way to tell, so this still matters if that ever changes). See phaseCancel's
 // doc comment for why a node's failure goes through phase.fail instead of
 // errgroup.Group's own first-error-wins race.
 func (exec *planExecutor) runPhase(nodes []*PlanNode, rs *runState, phase *phaseCancel) error {
@@ -324,12 +395,12 @@ func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *Pla
 	return func() { releaseSlot(limiter) }, nil
 }
 
-// runState carries the per-run() state every node's goroutine shares: the
+// runState carries the per-planRun state every node's goroutine shares: the
 // done-channel per node, dependency-failure bookkeeping, group event
 // tracking, and the concurrency limiter. Shared across both phases (built
-// once in run(), before either runs) since done/failures must stay visible
+// once in begin, before either runs) since done/failures must stay visible
 // to a Start-phase node depending on a Create-phase one across the barrier
-// between them. Split out of run() purely to keep runNode a plain method
+// between them. Split out of begin purely to keep runNode a plain method
 // instead of a closure captured in a loop.
 type runState struct {
 	done             map[int]chan struct{}
@@ -377,7 +448,7 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 	}
 
 	// A dependency may have just failed without nodeCtx being canceled yet
-	// (see run()'s failures comment) -- skip this node exactly like a
+	// (see begin's failures comment) -- skip this node exactly like a
 	// canceled one: no slot acquired, no event emitted, its own dependents
 	// unblocked with the same failure recorded.
 	if err := rs.failedDependency(node.DependsOn); err != nil {

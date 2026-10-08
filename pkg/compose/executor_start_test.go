@@ -1895,3 +1895,230 @@ func TestGroupTrackerNothingStartsAfterTheFinalEvent(t *testing.T) {
 	assert.Assert(t, !gt.onNodeStart(start, rec), "a node of a given up group must not go on")
 	assert.DeepEqual(t, rec.resources, []api.Resource{{ID: "Container test-api-1", Status: api.Error, Text: "not started: interrupted"}})
 }
+
+// TestPlanRunDrivesPhasesSeparately verifies that begin/runCreate/runStart
+// leave a real gap between the two phases: after runCreate returned, the
+// Create-phase node has fully run and no Start-phase node was dispatched --
+// the window interactive up uses to set up its attach/printer session. The
+// Start-phase node depends on the Create-phase one, so the state the two
+// phases share is exercised across the gap.
+func TestPlanRunDrivesPhasesSeparately(t *testing.T) {
+	svc, apiClient := newTestService(t)
+
+	var networkCreated, started atomic.Bool
+	nw := types.NetworkConfig{Name: "test_default"}
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+			networkCreated.Store(true)
+			return client.NetworkCreateResult{ID: "net-id"}, nil
+		})
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "db-id", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
+			started.Store(true)
+			return client.ContainerStartResult{}, nil
+		})
+
+	plan := &Plan{}
+	network := plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:db:1",
+		Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
+	}, "", network).Phase = PhaseStart
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	pr, err := exec.begin(plan)
+	assert.NilError(t, err)
+	assert.Assert(t, !networkCreated.Load() && !started.Load(), "begin must not dispatch anything")
+
+	assert.NilError(t, pr.runCreate(t.Context()))
+	assert.Assert(t, networkCreated.Load(), "the Create phase must be complete once runCreate returned")
+	assert.Assert(t, !started.Load(), "no Start-phase node may be dispatched before runStart")
+
+	assert.NilError(t, pr.runStart(t.Context(), nil))
+	assert.Assert(t, started.Load())
+}
+
+// hookLogs collects the lines of the hook logs a listener receives.
+type hookLogs struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (h *hookLogs) listener(event api.ContainerEvent) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.lines = append(h.lines, event.Line)
+}
+
+func (h *hookLogs) got() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.lines)
+}
+
+// postStartHookPlan mocks the exec round trip of a post_start hook printing
+// "post-start ok", and returns the service running it and the plan of its
+// Start phase.
+func postStartHookPlan(t *testing.T) (*composeService, *Plan) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	serverConn, clientConn := net.Pipe()
+	go func() {
+		assert.NilError(t, writeStdcopyFrame(serverConn, 1, "post-start ok\n"))
+		serverConn.Close() //nolint:errcheck
+	}()
+	apiClient.EXPECT().ExecCreate(gomock.Any(), "c1", gomock.Any()).
+		Return(client.ExecCreateResult{ID: "exec1"}, nil)
+	apiClient.EXPECT().ExecAttach(gomock.Any(), "exec1", gomock.Any()).
+		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil)
+	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec1", gomock.Any()).
+		Return(client.ExecInspectResult{ExitCode: 0}, nil)
+
+	service := types.ServiceConfig{
+		Name:      "web",
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"/notify.sh"}}},
+	}
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpRunPostStart,
+		ResourceID: "service:web:1",
+		Service:    &service,
+		Container:  &container.Summary{ID: "c1", Names: []string{"/test-web-1"}},
+	}, "").Phase = PhaseStart
+	return svc, plan
+}
+
+// TestPlanRunStartTakesTheListenerAtPhaseEntry verifies that a listener
+// handed to runStart -- not the one the executor was built with, nil here --
+// receives the hook logs of the Start phase: an attached caller only has its
+// printer once its session is set up, after the Create phase.
+func TestPlanRunStartTakesTheListenerAtPhaseEntry(t *testing.T) {
+	svc, plan := postStartHookPlan(t)
+	var logs hookLogs
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	pr, err := exec.begin(plan)
+	assert.NilError(t, err)
+	assert.NilError(t, pr.runCreate(t.Context()))
+	assert.NilError(t, pr.runStart(t.Context(), logs.listener))
+	assert.DeepEqual(t, logs.got(), []string{"post-start ok"})
+}
+
+// TestPlanRunStartListenerReplacesTheConstructionTimeOne verifies that a
+// listener handed to runStart takes over from the one the executor was built
+// with: the hook logs go to the former only.
+func TestPlanRunStartListenerReplacesTheConstructionTimeOne(t *testing.T) {
+	svc, plan := postStartHookPlan(t)
+	var constructed, given hookLogs
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), constructed.listener)
+	pr, err := exec.begin(plan)
+	assert.NilError(t, err)
+	assert.NilError(t, pr.runCreate(t.Context()))
+	assert.NilError(t, pr.runStart(t.Context(), given.listener))
+	assert.DeepEqual(t, given.got(), []string{"post-start ok"})
+	assert.Equal(t, len(constructed.got()), 0)
+}
+
+// TestExecutePlanKeepsTheConstructionTimeListener verifies that run() -- which
+// hands no listener to runStart -- still streams the Start phase's hook logs
+// to the one the executor was built with, and that a nil runStart listener
+// never drops it.
+func TestExecutePlanKeepsTheConstructionTimeListener(t *testing.T) {
+	svc, plan := postStartHookPlan(t)
+	var logs hookLogs
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), logs.listener)
+	assert.NilError(t, exec.run(t.Context(), plan))
+	assert.DeepEqual(t, logs.got(), []string{"post-start ok"})
+}
+
+// TestPlanRunRefusesAnIllegalPhaseSequence verifies the guards that keep the
+// Create-phase barrier intact for a caller driving the phases itself: the
+// Start phase never runs before the Create phase, after a failed one, or
+// twice; and a phase is never run twice either. Each mocked call is expected
+// exactly as often as the sequence makes it, and none when it makes none: a
+// call beyond that, or a missing one, fails the test.
+func TestPlanRunRefusesAnIllegalPhaseSequence(t *testing.T) {
+	// newRun plans a network create followed by a container start; createErr
+	// is what the network create returns, creates and starts how many
+	// NetworkCreate and ContainerStart calls the sequence under test makes.
+	newRun := func(t *testing.T, createErr error, creates, starts int) *planRun {
+		svc, apiClient := newTestService(t)
+		nw := types.NetworkConfig{Name: "test_default"}
+		if creates > 0 {
+			result := client.NetworkCreateResult{ID: "net-id"}
+			if createErr != nil {
+				result = client.NetworkCreateResult{}
+			}
+			apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+				Return(result, createErr).Times(creates)
+		}
+		if starts > 0 {
+			apiClient.EXPECT().ContainerStart(gomock.Any(), "db-id", gomock.Any()).
+				Return(client.ContainerStartResult{}, nil).Times(starts)
+		}
+		plan := &Plan{}
+		network := plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+		plan.addNode(Operation{
+			Type:       OpStartContainer,
+			ResourceID: "service:db:1",
+			Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
+		}, "", network).Phase = PhaseStart
+		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil).begin(plan)
+		assert.NilError(t, err)
+		return pr
+	}
+
+	t.Run("start before create", func(t *testing.T) {
+		pr := newRun(t, nil, 0, 0)
+		assert.ErrorContains(t, pr.runStart(t.Context(), nil), "before the create phase succeeded")
+	})
+	t.Run("start after a failed create", func(t *testing.T) {
+		pr := newRun(t, errors.New("boom"), 1, 0)
+		assert.ErrorContains(t, pr.runCreate(t.Context()), "boom")
+		assert.ErrorContains(t, pr.runStart(t.Context(), nil), "before the create phase succeeded")
+	})
+	t.Run("create twice", func(t *testing.T) {
+		pr := newRun(t, nil, 1, 0)
+		assert.NilError(t, pr.runCreate(t.Context()))
+		assert.ErrorContains(t, pr.runCreate(t.Context()), "already ran")
+	})
+	t.Run("create again after a failed create", func(t *testing.T) {
+		pr := newRun(t, errors.New("boom"), 1, 0)
+		assert.ErrorContains(t, pr.runCreate(t.Context()), "boom")
+		assert.ErrorContains(t, pr.runCreate(t.Context()), "already ran")
+	})
+	t.Run("start twice", func(t *testing.T) {
+		pr := newRun(t, nil, 1, 1)
+		assert.NilError(t, pr.runCreate(t.Context()))
+		assert.NilError(t, pr.runStart(t.Context(), nil))
+		assert.ErrorContains(t, pr.runStart(t.Context(), nil), "already ran")
+	})
+}
+
+// TestPlanRunOfAnEmptyOrSinglePhasePlan verifies what
+// begin documents: an empty plan, or one with a single phase, gives a planRun
+// whose phases run without error and dispatch only the nodes the plan has.
+func TestPlanRunOfAnEmptyOrSinglePhasePlan(t *testing.T) {
+	t.Run("empty plan", func(t *testing.T) {
+		svc, _ := newTestService(t) // any API call fails the test
+		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil).begin(&Plan{})
+		assert.NilError(t, err)
+		assert.NilError(t, pr.runCreate(t.Context()))
+		assert.NilError(t, pr.runStart(t.Context(), nil))
+	})
+	t.Run("create phase only", func(t *testing.T) {
+		svc, apiClient := newTestService(t) // no ContainerStart expectation: any start fails the test
+		apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+			Return(client.NetworkCreateResult{ID: "net-id"}, nil).Times(1)
+		nw := types.NetworkConfig{Name: "test_default"}
+		plan := &Plan{}
+		plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil).begin(plan)
+		assert.NilError(t, err)
+		assert.NilError(t, pr.runCreate(t.Context()))
+		assert.NilError(t, pr.runStart(t.Context(), nil))
+	})
+}
