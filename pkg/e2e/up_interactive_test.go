@@ -95,6 +95,19 @@ func TestUpInteractiveDependencyTimeout(t *testing.T) {
 			ServiceState("web", "created"))
 }
 
+// use_api_socket is applied by rewriting the project (a #apisocket config the
+// service mounts at /run/secrets/docker/config.json): a foreground up must
+// start the containers from that same rewritten project, as a detached one
+// does. The file is injected whether or not any credential is configured.
+func TestUpInteractiveInjectsAPISocketConfig(t *testing.T) {
+	NewScenario(t, "a foreground up must give a use_api_socket service its docker config file, as a detached up does").
+		Step("the service finds the config file in its session output",
+			ComposeCmd("up", "--menu=false").Within(60*time.Second),
+			OutputContains("apisocket-config-present"),
+			OutputNotContains("apisocket-config-absent"),
+			ServiceState("app", "exited"))
+}
+
 func TestUpDryRunCreatesNothing(t *testing.T) {
 	s := NewScenario(t, "a foreground up --dry-run must plan the create phase only, never the start phase")
 	s.Step("up --dry-run reports the creation, no start, and leaves no container behind",
