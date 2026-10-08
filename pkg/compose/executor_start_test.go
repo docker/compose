@@ -480,15 +480,22 @@ func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
 
-	err := exec.run(t.Context(), plan)
+	// run waits for every node, and VolumeCreate blocks until its ctx ends: if
+	// the sibling failure ever stopped canceling it, run would hang until the
+	// suite-wide timeout. This deadline turns that into a local failure, and
+	// the context.Canceled assertion below tells it apart from the sibling
+	// cancellation the test is about.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	err := exec.run(ctx, plan)
 	assert.ErrorContains(t, err, "boom")
 
 	select {
 	case <-volumeCreateDone:
-	case <-time.After(5 * time.Second):
-		t.Fatal("VolumeCreate's ctx was never canceled -- a sibling Create-phase failure should still fail fast")
+	default:
+		t.Fatal("run returned before VolumeCreate did")
 	}
-	assert.ErrorIs(t, volumeCreateCtxErr, context.Canceled, "VolumeCreate's ctx must be canceled by a sibling Create-phase node failing")
+	assert.ErrorIs(t, volumeCreateCtxErr, context.Canceled, "VolumeCreate's ctx must be canceled by a sibling Create-phase node failing, not by the test's own deadline")
 }
 
 // TestExecutePlanCreatePhaseFailureNeverDispatchesStartPhase complements
