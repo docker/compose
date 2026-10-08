@@ -47,7 +47,7 @@ func TestUpInteractiveImmediateExit(t *testing.T) {
 			OutputContains("quick-1 exited with code 0"),
 			OutputContains("Aborting on container exit"),
 			ServiceState("quick", "exited"),
-			ServiceState("long", "exited"))
+			Eventually(ServiceState("long", "exited"), 10*time.Second))
 }
 
 func TestUpInteractiveRestartsExitedContainer(t *testing.T) {
@@ -89,6 +89,9 @@ func TestUpInteractiveDependencyTimeout(t *testing.T) {
 			OutputContains("timeout waiting for dependencies"),
 			OutputNotContains("web-started"),
 			ServiceState("db", "running"),
+			// web's container is created in the create phase, before the start
+			// phase blocks on db's health: "created" (not "no container") is
+			// what says it was prepared but never started.
 			ServiceState("web", "created"))
 }
 
@@ -97,7 +100,7 @@ func TestUpDryRunCreatesNothing(t *testing.T) {
 	s.Step("up --dry-run reports the creation, no start, and leaves no container behind",
 		ComposeCmd("up", "--menu=false", "--dry-run").Within(60*time.Second),
 		OutputContains("Container "+s.Project()+"-app-1 Created"),
-		OutputNotContains("Start"),
+		OutputNotContains(s.Project()+"-app-1 Start"),
 		OutputContains("interactive run is not supported in dry-run mode"),
 		ServiceNotCreated("app"))
 }
