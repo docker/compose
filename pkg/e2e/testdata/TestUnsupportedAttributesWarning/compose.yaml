@@ -53,19 +53,14 @@ services:
         source: my-csi-volume
         target: /data
 
-  # configs/secrets file-reference uid/gid/mode are ignored outside Swarm.
+  # references the configs/secrets below. Their uid/gid/mode are not a
+  # load-time matter — see TestFileReferenceOverridesWarning.
   file-refs:
     image: alpine
     configs:
       - source: myconfig
-        uid: "1000"
-        gid: "1000"
-        mode: 0o440
     secrets:
       - source: mysecret
-        uid: "1000"
-        gid: "1000"
-        mode: 0o440
 
 configs:
   myconfig:
