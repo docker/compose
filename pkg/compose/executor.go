@@ -23,6 +23,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -180,12 +181,13 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 				return fmt.Errorf("dependency failed: %w", err)
 			}
 
-			if err := acquireSlot(ctx, limiter); err != nil {
-				recordFailure(node.ID, err)
+			release, slotErr := acquireNodeSlot(ctx, limiter, node)
+			if slotErr != nil {
+				recordFailure(node.ID, slotErr)
 				close(done[node.ID])
-				return err
+				return slotErr
 			}
-			defer releaseSlot(limiter)
+			defer release()
 
 			// Emit group start event if this is the first node of a group
 			groups.onNodeStart(node, events)
@@ -208,6 +210,25 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	}
 
 	return eg.Wait()
+}
+
+// acquireNodeSlot takes node's --parallel slot and returns the function that
+// releases it. An OpWaitCondition node holds none: it only polls the daemon on
+// a ticker, so a slot held for the whole polling would be capacity lost for
+// every unrelated node, and could starve the nodes it is waiting for. The
+// latter needs a dependency that is already running, hence with no start
+// node for the wait to depend on, whose health relies on a sibling the plan
+// has yet to start: with a bounded --parallel the wait could take the slot
+// that sibling's start needs and only end at its timeout. The imperative
+// waitDependencies stays outside the cap for the same reason.
+func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *PlanNode) (func(), error) {
+	if node.Operation.Type == OpWaitCondition {
+		return func() {}, nil
+	}
+	if err := acquireSlot(ctx, limiter); err != nil {
+		return nil, err
+	}
+	return func() { releaseSlot(limiter) }, nil
 }
 
 // executeNode dispatches a single plan node to the appropriate API call.
