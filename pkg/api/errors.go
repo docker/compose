@@ -45,6 +45,9 @@ var (
 	ErrParsingFailed = errors.New("parsing failed")
 	// ErrNoResources is returned when operation didn't selected any resource
 	ErrNoResources = errors.New("no resources")
+	// ErrIncompatibleOptions is returned when a set of options that cannot be
+	// honored together is requested. See IncompatibleOptionsError.
+	ErrIncompatibleOptions = errors.New("incompatible options")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound
@@ -85,4 +88,9 @@ func IsErrParsingFailed(err error) bool {
 // IsErrCanceled returns true if the unwrapped error is ErrCanceled
 func IsErrCanceled(err error) bool {
 	return errors.Is(err, ErrCanceled)
+}
+
+// IsErrIncompatibleOptions returns true if the unwrapped error is ErrIncompatibleOptions
+func IsErrIncompatibleOptions(err error) bool {
+	return errors.Is(err, ErrIncompatibleOptions)
 }
