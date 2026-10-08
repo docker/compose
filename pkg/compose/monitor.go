@@ -18,7 +18,10 @@ package compose
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/events"
@@ -36,6 +39,12 @@ type monitor struct {
 	// services tells us which service to consider and those we can ignore, maybe ran by a concurrent compose command
 	services  map[string]bool
 	listeners []api.ContainerEventListener
+	// since is the point from which Start subscribes to events, as the events
+	// API's "<seconds>.<nanoseconds>" timestamp, once readDaemonTime got it
+	since string
+	// sinceRead tells readDaemonTime has been through, whether it found a
+	// point or had to do without one (since is then empty)
+	sinceRead bool
 }
 
 func newMonitor(apiClient client.APIClient, project string) *monitor {
@@ -123,7 +132,38 @@ func (c *monitor) withServices(services []string) {
 // while the daemon itself is down never gets a die event at all: on daemon
 // restore it is just recorded as exited, and containers the restore restarts
 // per policy only emit start.
+//
+// Events are requested since a point taken BEFORE the initial listing. Both
+// the listing and the subscription are round trips, and a container may start
+// and terminate in between (the first container of an `up` that starts right
+// as the monitor attaches, running something like `echo hi`): its die would
+// be emitted to nobody, and the monitor would track the container forever.
+// Replaying the events from before the listing closes that window. Events
+// already reflected in the listing are harmless: the listing notifies
+// nothing, so each replayed event is reported once, and the tracked set only
+// ever gets an ID added again or removed again.
+//
+// The point is the DAEMON's clock, read from its system info (one more round
+// trip before the listing): events are stamped by the daemon, and a client
+// clock that differs from it (a remote daemon) would either miss the start of
+// the window or replay events from before the monitor was started. There is
+// no falling back on the client's clock. A daemon that refuses or can't
+// answer the request (a read-only socket proxy that doesn't expose the info
+// endpoint) doesn't fail the command, which worked without it: the monitor
+// subscribes to live events, as it did before the replay, and warns that the
+// window can't be closed. A daemon that answers with a time that can't be
+// used is another matter and makes Start fail. A caller needing to know that
+// before it goes on (before it starts the containers the monitor is to
+// follow) calls readDaemonTime itself first; Start then doesn't ask again.
 func (c *monitor) Start(ctx context.Context) error {
+	if err := c.readDaemonTime(ctx); err != nil {
+		if ctx.Err() != nil {
+			// interrupted, not failed: the same quiet end as a canceled
+			// monitor below
+			return nil
+		}
+		return err
+	}
 	// containers is the set of container IDs the application is based on
 	containers, err := c.initialContainers(ctx)
 	if err != nil {
@@ -133,6 +173,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	restarting := utils.Set[string]{}
 
 	res := c.apiClient.Events(ctx, client.EventsListOptions{
+		Since:   c.since,
 		Filters: projectFilter(c.project).Add("type", "container").Add("label", oneOffFilter(false)),
 	})
 	for {
@@ -175,6 +216,41 @@ func (c *monitor) Start(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// readDaemonTime takes, as the point from which to subscribe to events, the
+// daemon's current time, in the "<seconds>.<nanoseconds>" form the events API
+// takes as since. It does so once. A daemon that can't be asked (the request
+// is refused or fails) leaves since empty, so that events are subscribed live
+// as they were before the replay existed, with a warning: this is a missing
+// capability, not a reason to fail. A daemon that answers with no time or one
+// that can't be parsed is an error: the replay would have no sound starting
+// point, and nothing explains the answer. An interruption is an error too,
+// for the caller to end quietly.
+func (c *monitor) readDaemonTime(ctx context.Context) error {
+	if c.sinceRead {
+		return nil
+	}
+	res, err := c.apiClient.Info(ctx, client.InfoOptions{})
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("reading the daemon time to subscribe to container events: %w", err)
+		}
+		logrus.Warnf("reading the daemon time to subscribe to container events: %v; "+
+			"events emitted while the monitor attaches may be missed", err)
+		c.sinceRead = true
+		return nil
+	}
+	if res.Info.SystemTime == "" {
+		return errors.New("reading the daemon time to subscribe to container events: the daemon reports no system time")
+	}
+	t, err := time.Parse(time.RFC3339Nano, res.Info.SystemTime)
+	if err != nil {
+		return fmt.Errorf("reading the daemon time to subscribe to container events: %w", err)
+	}
+	c.since = fmt.Sprintf("%d.%09d", t.Unix(), t.Nanosecond())
+	c.sinceRead = true
+	return nil
 }
 
 // initialContainers collects the application's containers at startup,
