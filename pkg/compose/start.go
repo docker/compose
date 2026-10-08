@@ -33,10 +33,20 @@ func (s *composeService) Start(ctx context.Context, projectName string, options 
 	}, "start", s.events)
 }
 
+// start builds and executes a Start-only plan (epic #14081, lot 2): the
+// semantic switchover from InDependencyOrder's imperative traversal
+// (startService/waitDependencies) to the same reconciler/executor pair every
+// other lifecycle command already uses. ScopeStart's planStartPhase works
+// straight off the observed containers (see TestPlanStart_StartOnlyScope) --
+// it never converges anything, matching start()'s own historical contract of
+// starting what exists, never creating. listener is non-nil only when called
+// from interactive up's own start phase (today's create()-then-start()
+// sequence, unchanged by this PR -- see upDetached's doc comment): it streams
+// pre_start/post_start hook logs into the attached session, exactly what
+// newPlanExecutor's listener parameter exists for.
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
 	project := options.Project
 	if project == nil {
-		var containers Containers
 		containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 		if err != nil {
 			return err
@@ -52,54 +62,81 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	// and the dependency waits read them
 	project = project.WithoutUnresolvedOptionalDependencies()
 
+	observed, err := s.collectObservedState(ctx, project, ScopeStart)
+	if err != nil {
+		return err
+	}
+
+	plan, err := reconcile(ctx, project, observed, ReconcileOptions{Scope: ScopeStart}, s.prompt)
+	if err != nil {
+		return err
+	}
+
+	// Unlike upDetached/create, start() never calls emitRunningEvents: a
+	// no-op `compose start` (every container already running) must stay
+	// silent, matching the imperative engine's own contract (see the now
+	// deleted TestStartService_AlreadyRunningIsSilent) -- a Copilot review
+	// finding on the first version of this migration, which had copied
+	// upDetached's call without checking start()'s narrower UX contract.
+	// emitRunningEvents is create-oriented: it exists so `up`/`create`'s full
+	// project-status display accounts for containers the plan won't touch,
+	// a concern start() has never had.
+
+	// start()'s own dependency waits used to thread WaitTimeout through every
+	// wait unconditionally (InDependencyOrder → startService, regardless of
+	// options.Wait -- --wait-timeout alone, with no --wait, is a legal CLI
+	// combination nothing rejects). exec.waitTimeout reproduces that for the
+	// plan's own OpWaitCondition nodes, each with its own fresh window
+	// starting when that wait begins -- see upDetached's identical reasoning.
+	exec := s.newPlanExecutor(project, observed, listener)
+	exec.waitTimeout = options.WaitTimeout
+
+	if err := exec.run(ctx, plan); err != nil {
+		return translateWaitTimeout(err)
+	}
+
+	if !options.Wait {
+		return nil
+	}
+
 	// getContainers filters on ConfigHashLabel presence (getDefaultFilters),
 	// which every service container carries and hook runners deliberately do
-	// not: pre_start runners never leak into the start flow at the source
-	// (isNotHookContainer downstream stays as defense-in-depth).
+	// not: pre_start runners never leak into this verification at the source
+	// (isNotHookContainer downstream stays as defense-in-depth). ScopeStart
+	// never creates a container, so this re-listing exists only to give the
+	// readiness check a fresh view of the daemon, not to discover new IDs the
+	// pre-execution observed snapshot wouldn't have (contrast upDetached,
+	// which can create or recreate containers). It runs before the
+	// --wait-timeout window opens, so daemon-listing latency never eats into
+	// the budget the readiness polling is owed.
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
 
-	// the node-level bound is a correct proxy for --parallel here, unlike
-	// restart/down/stop: startService starts a service's containers in a
-	// plain sequential loop, so one engine-call burst per node is all this
-	// traversal ever dispatches concurrently.
-	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-
-		return s.startService(ctx, project, service, containers, listener, options.WaitTimeout)
-	}, func(traversal *graphTraversal) {
-		traversal.maxConcurrency = s.maxConcurrency
-	})
-	if err != nil {
-		return err
+	// origCtx is kept so the DeadlineExceeded check below can tell this
+	// fresh window expiring (origCtx still fine) apart from origCtx's own,
+	// independent deadline propagating through the derived one (origCtx
+	// already done) -- same reasoning as upDetached.
+	origCtx := ctx
+	if options.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
+		ctx = withTimeout
+		defer cancel()
 	}
 
-	if options.Wait {
-		depends := types.DependsOnConfig{}
-		for _, s := range project.Services {
-			depends[s.Name] = types.ServiceDependency{
-				Condition: getDependencyCondition(s, project),
-				Required:  true,
-			}
+	depends := types.DependsOnConfig{}
+	for _, svc := range project.Services {
+		depends[svc.Name] = types.ServiceDependency{
+			Condition: getDependencyCondition(svc, project),
+			Required:  true,
 		}
-		if options.WaitTimeout > 0 {
-			withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
-			ctx = withTimeout
-			defer cancel()
+	}
+	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
+		if options.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
 		}
-
-		err = s.waitDependencies(ctx, project, project.Name, depends, containers, 0)
-		if err != nil {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
-			}
-			return err
-		}
+		return err
 	}
 
 	return nil

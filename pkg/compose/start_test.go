@@ -20,12 +20,8 @@ package compose
 
 import (
 	"context"
-	"fmt"
-	"net"
-	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -38,12 +34,9 @@ import (
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
-// These tests characterize the imperative start path (startService,
-// startServiceContainer) before it converges into the plan engine (#14081):
-// which containers are started, in which order relative to file injection and
-// hooks, when pre_start runs, and which progress events are emitted.
-
 // recordingEventProcessor captures progress events for sequence assertions.
+// Shared by tests elsewhere in the package that exercise a single container
+// operation in isolation (e.g. stopContainer's relay guard in down_test.go).
 type recordingEventProcessor struct {
 	mu     sync.Mutex
 	events []api.Resource
@@ -103,291 +96,20 @@ func newStartTestService(t *testing.T) (*composeService, *mocks.MockAPIClient, *
 	return svc.(*composeService), apiClient, rec
 }
 
-// runningContainer/stoppedContainer build container summaries the way the
-// daemon reports project containers: canonical name, service and
+// serviceContainer builds a running container summary the way the daemon
+// reports a project's first replica: canonical name, service and
 // container-number labels.
-func serviceContainer(service string, num int, state container.ContainerState) container.Summary {
-	name := "prj-" + service + "-" + strconv.Itoa(num)
+func serviceContainer(service string) container.Summary {
+	name := "prj-" + service + "-1"
 	return container.Summary{
 		ID:    name + "-id",
 		Names: []string{"/" + name},
-		State: state,
+		State: container.StateRunning,
 		Labels: map[string]string{
 			api.ServiceLabel:         service,
-			api.ContainerNumberLabel: strconv.Itoa(num),
+			api.ContainerNumberLabel: "1",
 		},
 	}
-}
-
-// TestStart_ConcurrencyIsBoundedAcrossServices guards against the same
-// per-service budget leak fixed on restart.go/down.go/stop.go:
-// InDependencyOrder dispatches independent services concurrently, and
-// startService's own per-container loop is sequential, so a missing
-// node-level maxConcurrency option left the dispatch itself unbounded.
-// ContainerStart is serialized process-wide by startMx regardless of this
-// bound, so the injected-secret copy (which isn't) is used as the observable
-// signal instead.
-func TestStart_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
-	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
-
-	const numServices = 4
-	project := &types.Project{Name: "prj", Services: types.Services{}, Secrets: types.Secrets{}}
-	var containers []container.Summary
-	for i := range numServices {
-		name := fmt.Sprintf("svc%d", i)
-		secretName := fmt.Sprintf("secret%d", i)
-		project.Secrets[secretName] = types.SecretConfig{Name: secretName, Content: "shh"}
-		project.Services[name] = types.ServiceConfig{
-			Name:          name,
-			ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: secretName}}},
-		}
-		containers = append(containers, testContainer(name, fmt.Sprintf("c%d", i), false))
-	}
-
-	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{Items: containers}, nil)
-
-	tracker := &peakConcurrencyTracker{}
-	apiClient.EXPECT().CopyToContainer(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
-			tracker.enter()
-			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
-			tracker.leave()
-			return client.CopyToContainerResult{}, nil
-		}).
-		Times(numServices)
-
-	apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).
-		Times(numServices)
-
-	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project}, nil)
-	assert.NilError(t, err)
-	assert.Equal(t, tracker.Peak(), 1, "start must never dispatch more than maxConcurrency services concurrently")
-}
-
-func TestStartService_AlreadyRunningIsSilent(t *testing.T) {
-	svc, _, rec := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{Name: "web"}
-	containers := Containers{serviceContainer("web", 1, container.StateRunning)}
-
-	// No expectation registered: any ContainerStart (or other call) fails.
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
-	assert.Equal(t, len(rec.summary()), 0)
-}
-
-func TestStartService_ZeroReplicasIsNoop(t *testing.T) {
-	svc, _, _ := newStartTestService(t)
-
-	zero := 0
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{Name: "web", Deploy: &types.DeployConfig{Replicas: &zero}}
-
-	// Even with no containers at all, a zero-replicas service is not an error.
-	err := svc.startService(t.Context(), project, service, nil, nil, 0)
-	assert.NilError(t, err)
-}
-
-func TestStartService_NoContainers(t *testing.T) {
-	svc, _, _ := newStartTestService(t)
-	project := &types.Project{Name: "prj"}
-
-	t.Run("scaled service is an error", func(t *testing.T) {
-		service := types.ServiceConfig{Name: "web"}
-		err := svc.startService(t.Context(), project, service, nil, nil, 0)
-		assert.Error(t, err, `service "web" has no container to start`)
-	})
-
-	t.Run("scale zero is a no-op", func(t *testing.T) {
-		service := types.ServiceConfig{Name: "web", Scale: intPtr(0)}
-		err := svc.startService(t.Context(), project, service, nil, nil, 0)
-		assert.NilError(t, err)
-	})
-}
-
-// TestStartService_StartsOnlyStoppedReplicas locks three behaviors at once:
-// only non-running replicas of the target service are started, containers of
-// other services in the list are untouched, and pre_start does NOT run when at
-// least one replica is already running.
-func TestStartService_StartsOnlyStoppedReplicas(t *testing.T) {
-	svc, apiClient, rec := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:     "web",
-		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
-	}
-	running := serviceContainer("web", 1, container.StateRunning)
-	stopped := serviceContainer("web", 2, container.StateExited)
-	other := serviceContainer("db", 1, container.StateExited)
-	containers := Containers{running, stopped, other}
-
-	// Only the stopped web replica is started; no ContainerCreate expectation
-	// means any pre_start hook execution fails the test.
-	apiClient.EXPECT().ContainerStart(gomock.Any(), stopped.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil)
-
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
-
-	assert.DeepEqual(t, rec.summary(), []string{
-		"Container prj-web-2: Starting",
-		"Container prj-web-2: Started",
-	})
-}
-
-// TestStartService_PreStartRunsBeforeReplicas locks the pre_start gating: with
-// no replica running, the hooks run exactly once — executing the runner
-// container the reconciliation plan prepared — and before any service
-// container is started.
-func TestStartService_PreStartRunsBeforeReplicas(t *testing.T) {
-	svc, apiClient, _ := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:          "web",
-		ContainerSpec: types.ContainerSpec{Image: "alpine"},
-		PreStart:      []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
-	}
-
-	replica2 := serviceContainer("web", 2, container.StateExited)
-	replica1 := serviceContainer("web", 1, container.StateExited)
-	// Listed out of order on purpose: replica 2 first.
-	containers := Containers{replica2, replica1}
-
-	// runPreStart looks up the runner containers prepared by the plan.
-	runnerScan := apiClient.EXPECT().
-		ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{Items: []container.Summary{runnerSummary("hook-1", 0)}}, nil)
-
-	hookWait := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
-		Return(waitResultExit(0)).After(runnerScan)
-	// streamPreStartLogs always opens ContainerLogs (even with nil listener) so
-	// the tail is available for failure error messages.
-	hookLogs := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(hookWait)
-	hookStart := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(hookLogs)
-	// On success the hook container is removed explicitly (AutoRemove is false).
-	hookRemove := apiClient.EXPECT().
-		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, nil).After(hookStart)
-
-	// Replicas are then started sequentially, in list order, after the hook.
-	start2 := apiClient.EXPECT().ContainerStart(gomock.Any(), replica2.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(hookRemove)
-	apiClient.EXPECT().ContainerStart(gomock.Any(), replica1.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(start2)
-
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
-}
-
-// A relay stands in for the service on the network but is a shell-less
-// scratch binary: pre_start has no volumes or process inside it for the hook
-// container's VolumesFrom to share. No ContainerCreate expectation is set:
-// gomock fails the test if the hook still runs against the relay.
-func TestStartService_PreStartSkippedWhenLowestIsRelay(t *testing.T) {
-	svc, apiClient, _ := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:     "db",
-		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
-	}
-	relay := serviceContainer("db", 1, container.StateExited)
-	relay.Labels[api.RelayLabel] = "abc123"
-	containers := Containers{relay}
-
-	apiClient.EXPECT().ContainerStart(gomock.Any(), relay.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil)
-
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
-}
-
-// TestStartServiceContainer_Order locks the per-container start sequence:
-// secret/config files are copied in before ContainerStart, post_start hooks
-// run after it, and the Started event is only emitted once the hooks are done.
-func TestStartServiceContainer_Order(t *testing.T) {
-	svc, apiClient, rec := newStartTestService(t)
-
-	content := "s3cret"
-	project := &types.Project{
-		Name: "prj",
-		Secrets: types.Secrets{
-			"token": types.SecretConfig{Name: "token", Content: content},
-		},
-	}
-	service := types.ServiceConfig{
-		Name: "web",
-
-		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}}, ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "token"}}},
-	}
-	ctr := serviceContainer("web", 1, container.StateExited)
-
-	inject := apiClient.EXPECT().CopyToContainer(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.CopyToContainerResult{}, nil)
-	start := apiClient.EXPECT().ContainerStart(gomock.Any(), ctr.ID, gomock.Any()).
-		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
-			assert.Assert(t, rec.contains("Container prj-web-1: Starting"))
-			assert.Assert(t, !rec.contains("Container prj-web-1: Started"))
-			return client.ContainerStartResult{}, nil
-		}).After(inject)
-
-	// post_start hook runs as an exec after the container started.
-	execCreate := apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.ExecCreateResult{ID: "exec-1"}, nil).After(start)
-	serverConn, clientConn := net.Pipe()
-	_ = serverConn.Close()
-	execAttach := apiClient.EXPECT().ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil).
-		After(execCreate)
-	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
-		DoAndReturn(func(context.Context, string, client.ExecInspectOptions) (client.ExecInspectResult, error) {
-			// Started must not be emitted before post_start completed.
-			assert.Assert(t, !rec.contains("Container prj-web-1: Started"))
-			return client.ExecInspectResult{ExitCode: 0}, nil
-		}).After(execAttach)
-
-	err := svc.startServiceContainer(t.Context(), project, service, ctr, nil)
-	assert.NilError(t, err)
-
-	assert.DeepEqual(t, rec.summary(), []string{
-		"Container prj-web-1: Starting",
-		"Container prj-web-1: Started",
-	})
-}
-
-// TestStartServiceContainer_FailedPostStartBlocksStarted locks that a failing
-// post_start hook fails the start and leaves the Started event unemitted.
-func TestStartServiceContainer_FailedPostStart(t *testing.T) {
-	svc, apiClient, rec := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:      "web",
-		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"fail"}}},
-	}
-	ctr := serviceContainer("web", 1, container.StateExited)
-
-	apiClient.EXPECT().ContainerStart(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil)
-	apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
-	serverConn, clientConn := net.Pipe()
-	_ = serverConn.Close()
-	apiClient.EXPECT().ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil)
-	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecInspectResult{ExitCode: 3}, nil)
-
-	err := svc.startServiceContainer(t.Context(), project, service, ctr, nil)
-	assert.ErrorContains(t, err, "hook exited with status 3")
-	assert.Assert(t, !rec.contains("Container prj-web-1: Started"))
 }
 
 // TestGetDependencyCondition locks the --wait condition selection: a service

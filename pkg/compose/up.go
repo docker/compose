@@ -44,14 +44,10 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		err := s.create(ctx, project, options.Create)
-		if err != nil {
-			return err
-		}
 		if options.Start.Attach == nil {
-			return s.start(ctx, project.Name, options.Start, nil)
+			return s.upDetached(ctx, project, options)
 		}
-		return nil
+		return s.create(ctx, project, options.Create)
 	}), "up", s.events)
 	if err != nil {
 		return err
@@ -65,6 +61,95 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	}
 	return s.runInteractiveUp(ctx, project, options)
+}
+
+// upDetached runs detached `up`'s Create and Start phases as a single plan:
+// the semantic switchover from create() + start() -- two separate daemon
+// snapshots, the second blind to what the first just did -- to one
+// preparePlan/executePlan pass covering both phases (epic #14081, lot 2).
+// Interactive up keeps the create()+start() sequence for now: its own
+// create/start phase boundary (attach/printer/monitor setup in between) is a
+// separate, riskier item of the same lot.
+func (s *composeService) upDetached(ctx context.Context, project *types.Project, options api.UpOptions) error {
+	project, observed, plan, err := s.preparePlan(ctx, project, options.Create, ScopeCreateStart)
+	if err != nil {
+		return err
+	}
+
+	// Must run against the pre-execution snapshot: observed only labels a
+	// container Running if it already was one before this plan touched
+	// anything, exactly what "the plan won't touch it" is supposed to mean.
+	emitRunningEvents(project, observed, plan, s.events)
+
+	// The plan's own OpWaitCondition nodes (service_healthy /
+	// service_completed_successfully dependency waits) block with no timeout
+	// of their own -- unlike start()'s per-dependency waitDependencies call,
+	// which already threads WaitTimeout through every wait unconditionally
+	// (InDependencyOrder passes it to startService regardless of
+	// options.Wait -- --wait-timeout alone, with no --wait, is a legal CLI
+	// combination nothing rejects). exec.waitTimeout bounds exactly those
+	// nodes (see executeNode), each with its OWN fresh window starting when
+	// that wait begins -- not a single shared budget counted down from
+	// before the plan even started. Sharing one absolute deadline across
+	// create/start/hook work and every wait would let slow, unrelated work
+	// alone exhaust it, failing an otherwise healthy deployment as "not
+	// healthy" with no wait ever actually timing out -- start()'s real,
+	// per-wait-independent behavior never had that failure mode.
+	exec := s.newPlanExecutor(project, observed, nil)
+	exec.waitTimeout = options.Start.WaitTimeout
+
+	if err := exec.run(ctx, plan); err != nil {
+		return translateWaitTimeout(err)
+	}
+
+	if !options.Start.Wait {
+		return nil
+	}
+
+	// The plan may have created or recreated containers: this verification
+	// needs their current IDs, which the pre-execution observed snapshot
+	// above doesn't have for a container that didn't exist yet at
+	// observation time. The listing runs on the caller's context, before the
+	// --wait-timeout window opens, so daemon-listing latency never eats into
+	// the budget the readiness polling is owed (any deadline it hits is the
+	// caller's own, unrelated to --wait-timeout, and is returned as such).
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
+	if err != nil {
+		return err
+	}
+
+	// The check then opens its own fresh WaitTimeout window, same as every
+	// OpWaitCondition node above and start()'s own final --wait check did --
+	// not whatever's left of a shared budget, which unrelated plan work could
+	// already have exhausted with no wait ever at risk.
+	//
+	// origCtx is kept so the DeadlineExceeded check below can tell this fresh
+	// window expiring (origCtx still fine) apart from origCtx's own,
+	// independent deadline propagating through the derived one (origCtx
+	// already done): a parent deadline firing first makes the derived
+	// context's Err() report DeadlineExceeded too, inherited from the
+	// parent, even though this window's own timer never fired.
+	origCtx := ctx
+	if options.Start.WaitTimeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
+		defer cancel()
+		ctx = withTimeout
+	}
+
+	depends := types.DependsOnConfig{}
+	for _, svc := range project.Services {
+		depends[svc.Name] = types.ServiceDependency{
+			Condition: getDependencyCondition(svc, project),
+			Required:  true,
+		}
+	}
+	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
+		if options.Start.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
+		}
+		return err
+	}
+	return nil
 }
 
 // upSession carries the state shared between the goroutines driving an
