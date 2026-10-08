@@ -144,7 +144,7 @@ func TestStart_NoOpStartIsSilentAndOnlyListsContainers(t *testing.T) {
 			stoppedServiceContainer("web", 1, container.StateRunning),
 		}}, nil)
 
-	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project}, nil)
+	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project})
 	assert.NilError(t, err)
 	assert.Equal(t, len(rec.summary()), 0, "a no-op start must be silent: %v", rec.summary())
 }
@@ -184,7 +184,7 @@ func TestStart_WaitTimeoutBoundsDependencyWaits(t *testing.T) {
 	// failure instead of a hang
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	err := svc.start(ctx, "prj", api.StartOptions{Project: project, WaitTimeout: 200 * time.Millisecond}, nil)
+	err := svc.start(ctx, "prj", api.StartOptions{Project: project, WaitTimeout: 200 * time.Millisecond})
 	assert.Error(t, err, "timeout waiting for dependencies")
 }
 
