@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -365,6 +366,54 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 	return err
 }
 
+// errWaitTimeout marks the failure of an OpWaitCondition node whose own
+// --wait-timeout window (planExecutor.waitTimeout) expired, as opposed to any
+// other DeadlineExceeded that can surface from a plan: an engine call timing
+// out, a hook, or an external deadline on the caller's context. Callers that
+// translate a wait timeout into a user-facing message key on this rather than
+// on DeadlineExceeded, which is not specific to waits. The wrapped error still
+// satisfies errors.Is(err, context.DeadlineExceeded).
+var errWaitTimeout = errors.New("timeout waiting for dependencies")
+
+// translateWaitTimeout turns a plan failure caused by a wait node's own
+// --wait-timeout window (see errWaitTimeout) into the user-facing message the
+// imperative start path always reported, and leaves any other error as is.
+// "application not healthy" is specifically a --wait message: without --wait,
+// a user who only set --wait-timeout as a hang guard (a legal combination
+// nothing rejects) would otherwise see a message implying a health check they
+// never asked for, and gets the dependency-timeout message waitDependencies
+// has always used instead of a raw "context deadline exceeded".
+func translateWaitTimeout(err error, wait bool, timeout time.Duration) error {
+	if !errors.Is(err, errWaitTimeout) {
+		return err
+	}
+	if wait {
+		return fmt.Errorf("application not healthy after %s", timeout)
+	}
+	return errors.New("timeout waiting for dependencies")
+}
+
+// execBoundedWaitCondition runs an OpWaitCondition node under its own fresh
+// planExecutor.waitTimeout window, if one is set, and marks a failure caused
+// by that window expiring with errWaitTimeout. origCtx.Err() == nil rules out
+// an earlier deadline inherited from the caller having fired instead: both
+// make the derived context report DeadlineExceeded, but only the former is
+// this wait's own timeout.
+func (exec *planExecutor) execBoundedWaitCondition(origCtx context.Context, op Operation) error {
+	ctx := origCtx
+	if exec.waitTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(origCtx, exec.waitTimeout)
+		defer cancel()
+	}
+	err := exec.execWaitCondition(ctx, origCtx, op)
+	if err != nil && exec.waitTimeout > 0 && origCtx.Err() == nil &&
+		errors.Is(ctx.Err(), context.DeadlineExceeded) && errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%w: %w", errWaitTimeout, err)
+	}
+	return err
+}
+
 // executeNode dispatches a single plan node to the appropriate API call.
 func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error {
 	op := node.Operation
@@ -394,13 +443,7 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 	case OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
 	case OpWaitCondition:
-		origCtx := ctx
-		if exec.waitTimeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, exec.waitTimeout)
-			defer cancel()
-		}
-		return exec.execWaitCondition(ctx, origCtx, op)
+		return exec.execBoundedWaitCondition(ctx, op)
 	case OpRunPreStart:
 		return exec.execRunPreStart(ctx, op)
 	case OpRunPostStart:

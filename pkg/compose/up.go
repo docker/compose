@@ -99,33 +99,7 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	exec.waitTimeout = options.Start.WaitTimeout
 
 	if err := exec.run(ctx, plan); err != nil {
-		// options.Start.WaitTimeout alone is unconditional (threaded above
-		// regardless of Wait, matching start()'s own InDependencyOrder) --
-		// but "application not healthy" is specifically a --wait message.
-		// Without --wait, a user who only set --wait-timeout as a hang
-		// guard sees the raw error instead of a message implying a health
-		// check they never asked for. And without a WaitTimeout at all,
-		// exec.waitTimeout is 0 -- a DeadlineExceeded here can only have
-		// come from ctx's own external deadline, unrelated to
-		// --wait-timeout, so naming a "0s" duration nobody configured would
-		// be just as wrong. ctx.Err() == nil additionally rules out ctx
-		// itself (the caller-supplied, un-derived context) having its own
-		// independent deadline expire during exec.run -- that DeadlineExceeded
-		// didn't come from any OpWaitCondition node's own derived timeout
-		// either, so it isn't a health-readiness failure.
-		if options.Start.WaitTimeout > 0 && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
-			if options.Start.Wait {
-				return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
-			}
-			// No --wait: this is exactly the dependency-timeout failure
-			// start()'s own waitDependencies already reports as "timeout
-			// waiting for dependencies" (service_containers.go) -- matching
-			// that established, actionable message instead of leaking the
-			// raw "context deadline exceeded" a user never configured in
-			// those terms.
-			return errors.New("timeout waiting for dependencies")
-		}
-		return err
+		return translateWaitTimeout(err, options.Start.Wait, options.Start.WaitTimeout)
 	}
 
 	if !options.Start.Wait {

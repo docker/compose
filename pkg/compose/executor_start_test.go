@@ -236,8 +236,16 @@ func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
 		},
 	}, nil).AnyTimes()
 	nw := types.NetworkConfig{Name: "test_default"}
+	// the network create must run on a context with no deadline at all: the
+	// wait's own window is derived for the OpWaitCondition node only, so a
+	// deadline showing up here would mean waitTimeout leaked into the plan
+	var networkCtxHadDeadline atomic.Bool
 	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
-		Return(client.NetworkCreateResult{ID: "net-id"}, nil)
+		DoAndReturn(func(ctx context.Context, _ string, _ client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+			_, has := ctx.Deadline()
+			networkCtxHadDeadline.Store(has)
+			return client.NetworkCreateResult{ID: "net-id"}, nil
+		})
 
 	plan := &Plan{}
 	plan.addNode(Operation{
@@ -262,6 +270,7 @@ func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
 	elapsed := time.Since(start)
 
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Assert(t, !networkCtxHadDeadline.Load(), "waitTimeout leaked into a non-wait node's context")
 	assert.Assert(t, elapsed < 5*time.Second, "waitTimeout did not bound the stuck OpWaitCondition node (took %s)", elapsed)
 }
 
@@ -1072,4 +1081,173 @@ func TestExecutePlanFailedPreStartGatesStart(t *testing.T) {
 	assert.DeepEqual(t, recorder.byID["Container test-web-1"], []string{
 		"Creating", "Created", api.StatusStarting, preStartErr,
 	})
+}
+
+// TestExecutePlanWaitTimeoutIsMarked verifies that a wait node's own
+// --wait-timeout window expiring is reported as errWaitTimeout -- the marker
+// upDetached and start() translate into a user-facing message -- while still
+// satisfying context.DeadlineExceeded.
+func TestExecutePlanWaitTimeoutIsMarked(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	exec.waitTimeout = 200 * time.Millisecond
+
+	err := exec.run(t.Context(), plan)
+	assert.ErrorIs(t, err, errWaitTimeout)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+// TestExecutePlanOtherDeadlinesAreNotWaitTimeouts verifies that a
+// DeadlineExceeded that is not a wait node's own window expiring is never
+// marked errWaitTimeout, even with --wait-timeout set: an engine call timing
+// out in a node that is not a wait, and a deadline inherited from the
+// caller's context firing during a wait. Translating either into a
+// dependency-readiness message would blame the wrong thing.
+func TestExecutePlanOtherDeadlinesAreNotWaitTimeouts(t *testing.T) {
+	t.Run("engine call timing out in a non-wait node", func(t *testing.T) {
+		svc, apiClient, _ := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerStart(gomock.Any(), "db-id", gomock.Any()).
+			Return(client.ContainerStartResult{}, context.DeadlineExceeded)
+
+		plan := &Plan{}
+		plan.addNode(Operation{
+			Type:       OpStartContainer,
+			ResourceID: "service:db:1",
+			Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
+		}, "").Phase = PhaseStart
+
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+		exec.waitTimeout = time.Minute
+
+		err := exec.run(t.Context(), plan)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Assert(t, !errors.Is(err, errWaitTimeout), "an engine-call timeout was marked as a wait timeout: %v", err)
+	})
+
+	t.Run("deadline inherited from the caller during a wait", func(t *testing.T) {
+		svc, apiClient, _ := newStartPhaseTestService(t)
+		dbSummary := container.Summary{
+			ID:     "db-id",
+			Names:  []string{"/test-db-1"},
+			Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+		}
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+			Container: container.InspectResponse{
+				ID:   "db-id",
+				Name: "/test-db-1",
+				State: &container.State{
+					Status: container.StateRunning,
+					Health: &container.Health{Status: container.Starting},
+				},
+				Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+			},
+		}, nil).AnyTimes()
+
+		plan := &Plan{}
+		plan.addNode(Operation{
+			Type:       OpWaitCondition,
+			ResourceID: "wait:db:service_healthy",
+			Name:       "db",
+			Condition:  types.ServiceConditionHealthy,
+		}, "")
+
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+		exec.containersByService["db"] = Containers{dbSummary}
+		exec.waitTimeout = time.Minute // far longer than the caller's own deadline
+
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+		err := exec.run(ctx, plan)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Assert(t, !errors.Is(err, errWaitTimeout), "an inherited deadline was marked as a wait timeout: %v", err)
+	})
+}
+
+// TestExecutePlanWaitTimeoutSurvivesDependentSkip verifies the marker is still
+// what run() returns when a node depends on the wait that timed out: the
+// dependent is skipped with "dependency failed: ...", but it is the wait's own
+// failure that is reported, so the caller still translates it.
+func TestExecutePlanWaitTimeoutSurvivesDependentSkip(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		},
+	}, nil).AnyTimes()
+	// no ContainerStart expectation: the dependent must never run
+
+	plan := &Plan{}
+	wait := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:app:1",
+		Container:  &container.Summary{ID: "app-id", Names: []string{"/test-app-1"}},
+	}, "", wait).Phase = PhaseStart
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	exec.waitTimeout = 200 * time.Millisecond
+
+	err := exec.run(t.Context(), plan)
+	assert.ErrorIs(t, err, errWaitTimeout)
+}
+
+func TestTranslateWaitTimeout(t *testing.T) {
+	marked := fmt.Errorf("%w: %w", errWaitTimeout, context.DeadlineExceeded)
+	other := errors.New("boom")
+
+	assert.ErrorContains(t, translateWaitTimeout(marked, true, 3*time.Second), "application not healthy after 3s")
+	assert.Error(t, translateWaitTimeout(marked, false, 3*time.Second), "timeout waiting for dependencies")
+
+	// anything that is not a wait's own timeout comes back untouched, with or
+	// without --wait: a bare DeadlineExceeded included
+	for _, wait := range []bool{true, false} {
+		assert.Equal(t, translateWaitTimeout(other, wait, time.Second), other)
+		assert.Equal(t, translateWaitTimeout(context.DeadlineExceeded, wait, time.Second), context.DeadlineExceeded)
+	}
+	assert.NilError(t, translateWaitTimeout(nil, true, time.Second))
 }
