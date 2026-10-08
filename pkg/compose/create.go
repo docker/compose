@@ -280,7 +280,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	}
 	var dependencies []string
 	for dep, d := range service.DependsOn {
-		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", dep, d.Condition, d.Restart))
+		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t:%t", dep, d.Condition, d.Restart, d.Required))
 	}
 	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
 
