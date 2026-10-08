@@ -39,11 +39,11 @@ func (s *composeService) Start(ctx context.Context, projectName string, options 
 // other lifecycle command already uses. ScopeStart's planStartPhase works
 // straight off the observed containers (see TestPlanStart_StartOnlyScope) --
 // it never converges anything, matching start()'s own historical contract of
-// starting what exists, never creating. listener is non-nil only when called
-// from interactive up's own start phase (today's create()-then-start()
-// sequence, unchanged by this PR -- see upDetached's doc comment): it streams
-// pre_start/post_start hook logs into the attached session, exactly what
-// newPlanExecutor's listener parameter exists for.
+// starting what exists, never creating. listener streams pre_start/post_start
+// hook logs into an attached session, exactly what newPlanExecutor's listener
+// parameter exists for; interactive up no longer goes through here (it drives
+// its own plan's Start phase, see runInteractiveUp), so no caller sets it
+// today.
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
 	project := options.Project
 	if project == nil {
