@@ -21,11 +21,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 type mountType string
@@ -74,6 +78,67 @@ func (s *composeService) injectFileReferences(ctx context.Context, project *type
 		}
 	}
 	return nil
+}
+
+// warnIgnoredFileReferences warns about uid/gid/mode set on a service-level
+// configs:/secrets: reference that this runtime will not apply. Whether they
+// are applied is a property of how the referenced object reaches the
+// container, which is only settled here, at creation time: content and
+// environment sources are copied in (injectFileReferences) and honor the
+// overrides, while a `file:` source is bind-mounted as-is and does not.
+// Deciding it when the compose file is loaded would hard-wire that answer
+// into the model, whereas the engine may later be able to honor ownership on
+// bind mounts too; fileReferenceOverridesIgnored is the single place to teach
+// about such a capability.
+func warnIgnoredFileReferences(project *types.Project, services []string) {
+	for _, name := range slices.Sorted(slices.Values(services)) {
+		service, ok := project.Services[name]
+		if !ok {
+			continue
+		}
+		for _, ref := range service.Configs {
+			warnIgnoredFileReference(name, "configs", types.FileReferenceConfig(ref), types.FileObjectConfig(project.Configs[ref.Source]))
+		}
+		for _, ref := range service.Secrets {
+			warnIgnoredFileReference(name, "secrets", types.FileReferenceConfig(ref), types.FileObjectConfig(project.Secrets[ref.Source]))
+		}
+	}
+}
+
+func warnIgnoredFileReference(service, kind string, ref types.FileReferenceConfig, object types.FileObjectConfig) {
+	if !fileReferenceOverridesIgnored(object) {
+		return
+	}
+	source := ref.Source
+	if source == "" {
+		source = "(anonymous)"
+	}
+	for _, o := range []struct {
+		field string
+		set   bool
+	}{{"uid", ref.UID != ""}, {"gid", ref.GID != ""}, {"mode", ref.Mode != nil}} {
+		if !o.set {
+			continue
+		}
+		logrus.Warn(api.UnsupportedAttribute{
+			Service: service,
+			Path:    fmt.Sprintf("%s.%s.%s", kind, source, o.field),
+			Reason:  o.field + " is not supported outside Swarm mode and will be ignored",
+		})
+	}
+}
+
+// fileReferenceOverridesIgnored reports whether uid/gid/mode on a reference to
+// object are dropped: they are for an object that is bind-mounted, which is
+// what buildContainerConfigMounts and buildContainerSecretMounts do with
+// whatever injectFileReferences does not copy in (content and environment).
+// External and driver-backed objects are rejected when mounts are built, so
+// they get that error rather than a warning.
+func fileReferenceOverridesIgnored(object types.FileObjectConfig) bool {
+	if object.External || object.Driver != "" || object.TemplateDriver != "" {
+		return false
+	}
+	return object.Content == "" && object.Environment == ""
 }
 
 func (s *composeService) getFilesAndMap(project *types.Project, service types.ServiceConfig, mountType mountType) ([]types.FileReferenceConfig, map[string]types.FileObjectConfig) {

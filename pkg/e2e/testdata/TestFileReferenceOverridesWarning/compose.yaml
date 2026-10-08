@@ -1,0 +1,38 @@
+services:
+  # `file:` sources are bind-mounted as-is: uid/gid/mode are ignored.
+  file-refs:
+    image: alpine
+    configs:
+      - source: fileconfig
+        uid: "1000"
+        gid: "1000"
+        mode: 0o440
+    secrets:
+      - source: filesecret
+        uid: "1000"
+        mode: 0o440
+
+  # `content:` / `environment:` sources are copied in: uid/gid/mode are applied.
+  inline-refs:
+    image: alpine
+    configs:
+      - source: inlineconfig
+        uid: "1000"
+        gid: "1000"
+        mode: 0o440
+    secrets:
+      - source: envsecret
+        uid: "1000"
+        mode: 0o440
+
+configs:
+  fileconfig:
+    file: ./myconfig.txt
+  inlineconfig:
+    content: hello
+
+secrets:
+  filesecret:
+    file: ./mysecret.txt
+  envsecret:
+    environment: SECRET_VALUE
