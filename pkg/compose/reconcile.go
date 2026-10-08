@@ -1356,7 +1356,13 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if service.Provider != nil {
 		return r.planProviderStart(service)
 	}
-	if service.GetScale() == 0 {
+	// imperative parity (startService): deploy.replicas: 0 is an unconditional
+	// no-op, but a service with scale: 0 is still visited -- its depends_on
+	// conditions are evaluated and its dependents ordered after them -- and
+	// whatever replicas it already owns are started (scope Start only: the
+	// create phase removes them all under CreateStart). It is just never an
+	// error for it to have no container to start.
+	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}
 
@@ -1370,7 +1376,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if err != nil {
 		return err
 	}
-	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart {
+	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart && service.GetScale() > 0 {
 		// imperative parity (startService): a scale>0 service with no
 		// container at all cannot be started — only reachable under scope
 		// Start, since CreateStart would have planned the missing creates

@@ -307,6 +307,69 @@ func TestPlanStart_AllRunningStillWaitsOnConditions(t *testing.T) {
 	assert.Assert(t, !wait.Operation.BestEffort)
 }
 
+// Imperative parity (startService): a service with scale: 0 is still visited
+// -- its depends_on conditions are evaluated before the no-op, so an unhealthy
+// dependency still fails `up`/`start` and whatever is ordered after the
+// service is ordered after those prerequisites -- and under scope Start the
+// replicas it already owns are started. Only deploy.replicas: 0 is an
+// unconditional no-op. Having no container is never an error for it.
+func TestPlanStart_ScaleZeroIsStillVisited(t *testing.T) {
+	zero := 0
+	db := types.ServiceConfig{Name: "db"}
+	scaled := serviceWithDeps("app", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	scaled.Scale = &zero
+	deployed := serviceWithDeps("job", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	deployed.Deploy = &types.DeployConfig{Replicas: &zero}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "app": scaled, "job": deployed},
+	}
+	dbHash, err := serviceHashWithResolvedRefs(db, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{observedServiceContainer("db", 1, container.StateRunning, dbHash)}
+
+	// no container for the scale-zero service: its dependency wait is planned
+	// and nothing is an error; deploy.replicas: 0 plans nothing at all
+	for _, scope := range []ReconcileScope{ScopeStart, ScopeCreateStart} {
+		plan, err := reconcile(t.Context(), project, observed, startScopeOptions(scope), noPrompt)
+		assert.NilError(t, err)
+		waits := 0
+		for _, n := range plan.Nodes {
+			switch n.Operation.Type {
+			case OpWaitCondition:
+				waits++
+				assert.Equal(t, n.Operation.Name, "db")
+			case OpStartContainer, OpCreateContainer:
+				t.Fatalf("no container expected for scale-zero services, got %s %s:\n%s", n.Operation.Type, n.Operation.ResourceID, plan)
+			}
+		}
+		assert.Equal(t, waits, 1, "one deduplicated db wait, from app only:\n%s", plan)
+	}
+
+	// scope Start also starts the replicas the scale-zero service still owns
+	appHash, err := serviceHashWithResolvedRefs(scaled, nil)
+	assert.NilError(t, err)
+	observed.Containers["app"] = []ObservedContainer{observedServiceContainer("app", 1, container.StateExited, appHash)}
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	var started []string
+	for _, n := range plan.Nodes {
+		if n.Operation.Type == OpStartContainer {
+			started = append(started, n.Operation.ResourceID)
+		}
+	}
+	assert.DeepEqual(t, started, []string{"service:app:1"})
+
+	// the create phase removes every replica of a scale-zero service before
+	// the start phase looks: nothing to start under CreateStart
+	plan, err = reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+	for _, n := range plan.Nodes {
+		assert.Assert(t, n.Operation.Type != OpStartContainer, "unexpected start node:\n%s", plan)
+	}
+}
+
 // Imperative parity (startService): under scope Start, a scale>0 service
 // with no container at all fails the plan the way `compose start` fails.
 func TestPlanStart_NoContainerToStartFails(t *testing.T) {
