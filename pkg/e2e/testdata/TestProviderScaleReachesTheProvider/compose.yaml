@@ -1,0 +1,19 @@
+services:
+  test:
+    image: alpine
+    command: env
+    depends_on:
+      - db
+  db:
+    # valid fields that marshal into a shape compose-go's types.ServiceConfig
+    # cannot read back: the control channel must still work for them
+    extra_hosts:
+      - "h:1.2.3.4"
+    ulimits:
+      nproc: 65535
+    provider:
+      type: example-provider
+      options:
+        name: db
+        type: test1
+        size: 1
