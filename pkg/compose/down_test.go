@@ -1348,7 +1348,7 @@ func TestStopContainerSkipsPreStopForRelay(t *testing.T) {
 		Name:    "db",
 		PreStop: []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
 	}
-	relay := serviceContainer("db", 1, container.StateRunning)
+	relay := serviceContainer("db")
 	relay.Labels[compose.RelayLabel] = "abc123"
 
 	apiClient.EXPECT().ContainerStop(gomock.Any(), relay.ID, gomock.Any()).
