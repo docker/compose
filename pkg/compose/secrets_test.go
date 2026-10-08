@@ -27,6 +27,7 @@ import (
 
 func TestWarnIgnoredFileReferences(t *testing.T) {
 	mode := types.FileMode(0o400)
+	zero := 0
 	overrides := func(source string) types.ServiceConfigObjConfig {
 		return types.ServiceConfigObjConfig{Source: source, UID: "1000", GID: "1000", Mode: &mode}
 	}
@@ -41,6 +42,12 @@ func TestWarnIgnoredFileReferences(t *testing.T) {
 			},
 			"other": {
 				Name:          "other",
+				ContainerSpec: types.ContainerSpec{Configs: []types.ServiceConfigObjConfig{overrides("file-cfg")}},
+			},
+			// scaled to zero: no container, nothing to warn about
+			"scaled-down": {
+				Name:          "scaled-down",
+				Scale:         &zero,
 				ContainerSpec: types.ContainerSpec{Configs: []types.ServiceConfigObjConfig{overrides("file-cfg")}},
 			},
 			// a reference without source reaches the zero-value object
@@ -78,7 +85,7 @@ func TestWarnIgnoredFileReferences(t *testing.T) {
 	const ignored = " is not supported outside Swarm mode and will be ignored"
 	// only `file:` sources are bind-mounted, so only their overrides are
 	// dropped; content and environment sources honor all of them.
-	assert.DeepEqual(t, collect([]string{"web", "other", "anonymous"}), []string{
+	assert.DeepEqual(t, collect([]string{"web", "other", "anonymous", "scaled-down"}), []string{
 		`service "anonymous": configs.(anonymous).uid: uid` + ignored,
 		`service "other": configs.file-cfg.uid: uid` + ignored,
 		`service "other": configs.file-cfg.gid: gid` + ignored,
