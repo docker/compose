@@ -1,0 +1,22 @@
+services:
+  db:
+    image: alpine
+    command: sh -c 'sleep 3; touch /shared/ready; sleep 60'
+    init: true
+    volumes:
+      - shared:/shared
+    healthcheck:
+      test: ["CMD", "test", "-f", "/shared/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+  web:
+    image: alpine
+    command: sh -c 'if [ -f /shared/ready ]; then echo web-saw-ready; else echo web-too-early; fi'
+    volumes:
+      - shared:/shared
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  shared:
