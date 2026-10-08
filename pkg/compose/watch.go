@@ -671,30 +671,25 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("service(s) %q successfully built", services))
 
-	err = s.create(ctx, project, api.CreateOptions{
+	// Narrowed to services + their dependents for both phases, not just
+	// start: a rebuild of one service has no business re-checking drift on
+	// the rest of the project (Networks/Volumes/Configs/Secrets aren't
+	// touched by narrowing -- WithSelectedServices only trims the Services
+	// map, so create's own convergence of those is unaffected).
+	p, err := project.WithSelectedServices(services, types.IncludeDependents)
+	if err != nil {
+		return err
+	}
+	err = s.createAndStart(ctx, p, api.CreateOptions{
 		Services:      services,
 		Inherit:       true,
 		Recreate:      api.RecreateForce,
 		SkipProviders: true,
 	})
 	if err != nil {
-		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate services after update. Error: %v", err))
-		return err
+		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate and restart service(s) after update. Error: %v", err))
 	}
-
-	p, err := project.WithSelectedServices(services, types.IncludeDependents)
-	if err != nil {
-		return err
-	}
-	err = s.start(ctx, project.Name, api.StartOptions{
-		Project:  p,
-		Services: services,
-		AttachTo: services,
-	}, nil)
-	if err != nil {
-		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Application failed to start after update. Error: %v", err))
-	}
-	return nil
+	return err
 }
 
 // writeWatchSyncMessage prints out a message about the sync for the changed paths.
