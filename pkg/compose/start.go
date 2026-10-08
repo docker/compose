@@ -92,23 +92,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	exec.waitTimeout = options.WaitTimeout
 
 	if err := exec.run(ctx, plan); err != nil {
-		// Same distinction as upDetached: ctx.Err() == nil rules out ctx's
-		// own external deadline (unrelated to --wait-timeout) having fired
-		// during exec.run, so a DeadlineExceeded here can only be one of the
-		// plan's own OpWaitCondition nodes timing out.
-		if options.WaitTimeout > 0 && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
-			if options.Wait {
-				return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
-			}
-			// No --wait: this is the dependency-timeout failure
-			// waitDependencies already reports as "timeout waiting for
-			// dependencies" elsewhere -- matching that established,
-			// actionable message instead of leaking the raw
-			// "context deadline exceeded" a user never configured in those
-			// terms.
-			return errors.New("timeout waiting for dependencies")
-		}
-		return err
+		return translateWaitTimeout(err)
 	}
 
 	if !options.Wait {
