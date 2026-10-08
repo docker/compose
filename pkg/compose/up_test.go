@@ -223,8 +223,12 @@ func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
 	}
 
 	var eg errgroup.Group
-	eg.Go(func() error { return u.streamContainerLogs(api.ContainerEvent{ID: "c1", Service: "web"}, "") })
-	eg.Go(func() error { return u.streamContainerLogs(api.ContainerEvent{ID: "c2", Service: "web"}, "") })
+	eg.Go(func() error {
+		return u.streamContainerLogs(newLogCursors().enter("c1"), api.ContainerEvent{ID: "c1", Service: "web"}, "")
+	})
+	eg.Go(func() error {
+		return u.streamContainerLogs(newLogCursors().enter("c2"), api.ContainerEvent{ID: "c2", Service: "web"}, "")
+	})
 	assert.NilError(t, eg.Wait())
 	assert.Equal(t, tracker.Peak(), 1, "streamContainerLogs must share --parallel's budget for concurrent log-attach opens")
 }

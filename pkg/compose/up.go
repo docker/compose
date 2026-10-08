@@ -437,6 +437,7 @@ var logStreamDrainTimeout = 5 * time.Second
 
 func (u *upSession) followStartedContainers(attached []string) api.ContainerEventListener {
 	runEnds := newRunEndTracker()
+	cursors := newLogCursors()
 	return func(event api.ContainerEvent) {
 		runEnds.Observe(event)
 		if !shouldFollowStartEvent(event, attached, u.options.Start.AttachTo) {
@@ -446,18 +447,24 @@ func (u *upSession) followStartedContainers(attached []string) api.ContainerEven
 		// later, a fast run's own exit could already be recorded and the log
 		// window would drop the whole run.
 		since := runEnds.Since(event.ID)
+		// Queued here, in event order, for the same reason.
+		turn := cursors.enter(event.ID)
 		// counted before the goroutine starts so the shutdown drain can never
 		// miss a stream dispatched but not yet running
 		u.logStreams.Add(1)
 		u.eg.Go(func() error {
 			defer u.logStreams.Done()
-			u.appendErr(u.streamContainerLogs(event, since))
+			defer turn.end()
+			u.appendErr(u.streamContainerLogs(turn, event, since))
 			return nil
 		})
 	}
 }
 
-func (u *upSession) streamContainerLogs(event api.ContainerEvent, since string) error {
+func (u *upSession) streamContainerLogs(turn *logTurn, event api.ContainerEvent, since string) error {
+	if err := turn.wait(u.globalCtx); err != nil {
+		return err
+	}
 	ctr, err := u.inspectWithSlot(u.globalCtx, u.logOpenLimiter, event.ID)
 	if err != nil {
 		return err
@@ -469,10 +476,11 @@ func (u *upSession) streamContainerLogs(event api.ContainerEvent, since string) 
 	err = u.doLogContainer(u.globalCtx, u.logOpenLimiter, u.options.Start.Attach, event.Source, ctr, api.LogOptions{
 		Follow: true,
 		Since:  since,
-	})
+	}, turn.cursor)
 	if errdefs.IsNotImplemented(err) {
 		// container may be configured with logging_driver: none
 		// as container already started, we might miss the very first logs. But still better than none
+		turn.end() // nothing was relayed, and the attach lasts as long as the run
 		return u.doAttachContainer(u.globalCtx, event.Service, event.ID, event.Source, u.printer.HandleEvent)
 	}
 	return err
