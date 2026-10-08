@@ -63,13 +63,24 @@ func rejectUnknownSubcommand(cmd *cobra.Command, args []string) error {
 	}
 }
 
+// rejectDryRun is a PreRunE: bridge commands write to the local filesystem and
+// don't go through the dry-run backend, so honoring the flag silently would
+// still modify (or delete) files.
+func rejectDryRun(cmd *cobra.Command, _ []string) error {
+	if dryRun, _ := cmd.Flags().GetBool("dry-run"); dryRun {
+		return fmt.Errorf("--dry-run is not supported by %q", cmd.CommandPath())
+	}
+	return nil
+}
+
 func convertCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 	convertOpts := bridge.ConvertOptions{}
 	var assumeYes bool
 	cmd := &cobra.Command{
-		Use:   "convert",
-		Short: "Convert compose files to Kubernetes manifests, Helm charts, or another model",
-		Args:  cobra.NoArgs,
+		Use:     "convert",
+		Short:   "Convert compose files to Kubernetes manifests, Helm charts, or another model",
+		Args:    cobra.NoArgs,
+		PreRunE: rejectDryRun,
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if assumeYes {
 				convertOpts.Confirm = func(string, bool) (bool, error) { return true, nil }
@@ -121,6 +132,7 @@ func listTransformersCommand(dockerCli command.Cli) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List available transformations",
 		Args:    cobra.NoArgs,
+		PreRunE: rejectDryRun,
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			transformers, err := bridge.ListTransformers(ctx, dockerCli)
 			if err != nil {
@@ -171,9 +183,10 @@ func displayTransformer(dockerCli command.Cli, transformers []image.Summary, opt
 func createTransformerCommand(dockerCli command.Cli) *cobra.Command {
 	var opts bridge.CreateTransformerOptions
 	cmd := &cobra.Command{
-		Use:   "create [OPTION] PATH",
-		Short: "Create a new transformation",
-		Args:  cli.ExactArgs(1),
+		Use:     "create [OPTION] PATH",
+		Short:   "Create a new transformation",
+		Args:    cli.ExactArgs(1),
+		PreRunE: rejectDryRun,
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			opts.Dest = args[0]
 			return bridge.CreateTransformer(ctx, dockerCli, opts)

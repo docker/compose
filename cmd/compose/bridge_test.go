@@ -18,6 +18,7 @@ package compose
 
 import (
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -90,6 +91,24 @@ func TestBridgeCommandsArgsValidation(t *testing.T) {
 			} else {
 				assert.ErrorContains(t, err, test.wantErr)
 			}
+		})
+	}
+}
+
+func TestBridgeCommandsRejectDryRun(t *testing.T) {
+	for _, args := range [][]string{
+		{"convert"},
+		{"transformations", "create", "dest"},
+		{"transformations", "list"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			root := &cobra.Command{Use: "compose", SilenceUsage: true, SilenceErrors: true}
+			root.PersistentFlags().Bool("dry-run", false, "")
+			root.AddCommand(bridgeCommand(&ProjectOptions{}, nil))
+			root.SetArgs(append([]string{"bridge", "--dry-run"}, args...))
+			root.SetOut(io.Discard)
+			root.SetErr(io.Discard)
+			assert.ErrorContains(t, root.Execute(), "--dry-run is not supported")
 		})
 	}
 }
