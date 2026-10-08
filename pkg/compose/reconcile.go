@@ -724,6 +724,16 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		return nil
 	}
 	if service.Provider != nil {
+		// A provider's relay is a singleton network stand-in, never itself a
+		// replica: this branch always plans exactly one OpRunProvider node,
+		// regardless of service.GetScale(). scale/deploy.replicas is NOT
+		// rejected or otherwise special-cased here -- it is deliberately
+		// passed through unmodified as part of the service config the
+		// provider receives over its control channel (GetServiceConfigType
+		// in plugins.go marshals the whole resolved ServiceConfig, Scale
+		// included), so interpreting it -- scaling the real
+		// resource the provider manages, ignoring it, or rejecting it itself
+		// -- is entirely the provider's call, never Compose's.
 		serviceCopy := service
 		deps := r.infrastructureDeps(service)
 		// A service migrated from replicas to a provider leaves its old

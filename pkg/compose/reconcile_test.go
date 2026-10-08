@@ -260,6 +260,33 @@ func TestReconcileService_ProviderRelayLeftAlone(t *testing.T) {
 `)+"\n")
 }
 
+// A provider's relay is a singleton network stand-in, never itself a
+// replica: `compose scale`/`deploy.replicas` on a provider-backed service
+// must still plan exactly one OpRunProvider node, whatever count was
+// requested -- the value is neither rejected nor acted on by Compose, it is
+// passed through unmodified to the provider over its control channel
+// (GetServiceConfigType marshals the whole resolved ServiceConfig), which
+// decides what to do with it for the resource it actually manages.
+func TestReconcileService_ProviderScaleNeverMultipliesTheRelay(t *testing.T) {
+	scale := 3
+	db := types.ServiceConfig{
+		Name:     "db",
+		Provider: &types.ServiceProviderConfig{Type: "test"},
+		Scale:    &scale,
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db},
+	}
+	observed := emptyObserved()
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 provider:db, RunProvider, provider service
+`)+"\n")
+}
+
 // TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer verifies the
 // entangled case: when a container attached to a diverged network also has its
 // own config changed, it is both reconnected (by the network recreate) and

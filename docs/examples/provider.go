@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -223,11 +224,16 @@ func up(options options, args []string) {
 	// buffered bytes and hang on the next answer.
 	responses := json.NewDecoder(os.Stdin)
 	fmt.Printf(`{ "type": "get-service-config" }%s`, lineSeparator)
-	var config struct {
-		Provider struct {
-			Type string `json:"type"`
-		} `json:"provider"`
-	}
+	// Decoding into the real types.ServiceConfig (the same struct Compose
+	// marshaled) means GetScale() is available: Compose never rejects or
+	// interprets a scale request on a provider-backed service -- the relay
+	// it deploys is always a single container regardless -- the value is
+	// passed through unmodified here instead, for the provider itself to
+	// act on (or ignore) for the real resource it manages. GetScale() is
+	// the canonical way to read it, already handling both the scale: and
+	// deploy.replicas: spellings; reading either field directly would miss
+	// whichever one the compose file didn't use.
+	var config types.ServiceConfig
 	if err := responses.Decode(&config); err != nil {
 		// error text is not JSON-safe either: encode, don't interpolate
 		msg, _ := json.Marshal(map[string]string{"type": "error", "message": fmt.Sprintf("get-service-config failed: %v", err)})
@@ -238,6 +244,8 @@ func up(options options, args []string) {
 	// encode the message instead of interpolating it into a JSON literal
 	setenv, _ := json.Marshal(map[string]string{"type": "setenv", "message": "CONFIG_TYPE=" + config.Provider.Type})
 	fmt.Println(string(setenv))
+	scaleEnv, _ := json.Marshal(map[string]string{"type": "setenv", "message": fmt.Sprintf("CONFIG_SCALE=%d", config.GetScale())})
+	fmt.Println(string(scaleEnv))
 
 	// When asked to, stand up a real endpoint on the host and publish it, so
 	// compose deploys a relay and consumers reach it as http://<service>:80.
