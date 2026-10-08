@@ -1,0 +1,4 @@
+services:
+  app:
+    image: alpine
+    command: sh -c 'if [ -f /tmp/ran ]; then echo second-run; else touch /tmp/ran; fi'
