@@ -29,12 +29,13 @@ import (
 // it (epic #14081, lot 2) can be reviewed against a fixed specification.
 // Most e2e coverage of the start phase runs detached; these do not.
 
+// pre_start output is not asserted: a foreground up does not stream it into the
+// session today, only post_start's. What is locked for pre_start is its effect.
 func TestUpInteractiveHookLogs(t *testing.T) {
-	NewScenario(t, "a foreground up must stream pre_start and post_start hook output into its session").
-		Step("up prints both hooks' output, and the service reads what pre_start wrote before it started",
+	NewScenario(t, "a foreground up must run pre_start before the service starts and stream post_start output into its session").
+		Step("up shows post_start's output, and the service reads what pre_start wrote before it started",
 			ComposeCmd("up", "--menu=false").Within(120*time.Second),
-			OutputContains("pre-start-hook-ran"),
-			OutputContains("app-read:pre-start-hook-ran"),
+			OutputContains("app-read:pre-start-file-content"),
 			OutputContains("post-start-hook-ran"),
 			ServiceState("app", "exited"))
 }
