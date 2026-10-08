@@ -1,0 +1,6 @@
+services:
+  app:
+    image: alpine
+    command: sh -c 'echo "value=$VALUE"; sleep 2'
+    environment:
+      VALUE: ${VALUE:-one}
