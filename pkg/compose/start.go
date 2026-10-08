@@ -115,7 +115,22 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return nil
 	}
 
-	// origCtx is kept so the two DeadlineExceeded checks below can tell this
+	// getContainers filters on ConfigHashLabel presence (getDefaultFilters),
+	// which every service container carries and hook runners deliberately do
+	// not: pre_start runners never leak into this verification at the source
+	// (isNotHookContainer downstream stays as defense-in-depth). ScopeStart
+	// never creates a container, so this re-listing exists only to give the
+	// readiness check a fresh view of the daemon, not to discover new IDs the
+	// pre-execution observed snapshot wouldn't have (contrast upDetached,
+	// which can create or recreate containers). It runs before the
+	// --wait-timeout window opens, so daemon-listing latency never eats into
+	// the budget the readiness polling is owed.
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
+	if err != nil {
+		return err
+	}
+
+	// origCtx is kept so the DeadlineExceeded check below can tell this
 	// fresh window expiring (origCtx still fine) apart from origCtx's own,
 	// independent deadline propagating through the derived one (origCtx
 	// already done) -- same reasoning as upDetached.
@@ -124,22 +139,6 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		withTimeout, cancel := context.WithTimeout(ctx, options.WaitTimeout)
 		ctx = withTimeout
 		defer cancel()
-	}
-
-	// getContainers filters on ConfigHashLabel presence (getDefaultFilters),
-	// which every service container carries and hook runners deliberately do
-	// not: pre_start runners never leak into this verification at the source
-	// (isNotHookContainer downstream stays as defense-in-depth). ScopeStart
-	// never creates a container, so this re-listing exists only to open a
-	// fresh WaitTimeout window, not to discover new IDs the pre-execution
-	// observed snapshot wouldn't have (contrast upDetached, which can create
-	// or recreate containers).
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
-	if err != nil {
-		if options.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return fmt.Errorf("application not healthy after %s", options.WaitTimeout)
-		}
-		return err
 	}
 
 	depends := types.DependsOnConfig{}
