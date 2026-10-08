@@ -376,19 +376,15 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 var errWaitTimeout = errors.New("timeout waiting for dependencies")
 
 // translateWaitTimeout turns a plan failure caused by a wait node's own
-// --wait-timeout window (see errWaitTimeout) into the user-facing message the
-// imperative start path always reported, and leaves any other error as is.
-// "application not healthy" is specifically a --wait message: without --wait,
-// a user who only set --wait-timeout as a hang guard (a legal combination
-// nothing rejects) would otherwise see a message implying a health check they
-// never asked for, and gets the dependency-timeout message waitDependencies
-// has always used instead of a raw "context deadline exceeded".
-func translateWaitTimeout(err error, wait bool, timeout time.Duration) error {
+// --wait-timeout window (see errWaitTimeout) into the "timeout waiting for
+// dependencies" message the imperative start path always reported for a
+// depends_on wait timing out, with or without --wait, and leaves any other
+// error as is. It is deliberately not the "application not healthy" message:
+// that one belongs to the final --wait readiness check that runs after the
+// plan, which has its own translation.
+func translateWaitTimeout(err error) error {
 	if !errors.Is(err, errWaitTimeout) {
 		return err
-	}
-	if wait {
-		return fmt.Errorf("application not healthy after %s", timeout)
 	}
 	return errors.New("timeout waiting for dependencies")
 }

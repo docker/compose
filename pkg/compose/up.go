@@ -99,7 +99,7 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	exec.waitTimeout = options.Start.WaitTimeout
 
 	if err := exec.run(ctx, plan); err != nil {
-		return translateWaitTimeout(err, options.Start.Wait, options.Start.WaitTimeout)
+		return translateWaitTimeout(err)
 	}
 
 	if !options.Start.Wait {
