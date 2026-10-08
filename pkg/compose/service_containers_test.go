@@ -890,3 +890,229 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		assert.Assert(t, strings.Contains(joined, `service "app": unsupported depends_on condition "some_future_condition"`), joined)
 	})
 }
+
+// TestOptionalDependencyInspectFailure locks what an optional (required:
+// false) dependency's failing inspection means. A genuine inspection error
+// (the daemon doesn't know the container, the API call fails) says the
+// dependency didn't start, so it is skipped. A failure caused by the wait's
+// context being done says nothing about the dependency: it must not be
+// turned into a skipped dependency, i.e. into a successful wait, and the end
+// of the wait is left to waitDependency (a deadline is an error, a plain
+// cancellation stays silent). A required dependency is never skipped.
+func TestOptionalDependencyInspectFailure(t *testing.T) {
+	const skipped = "Skipped: "
+	conditions := []string{ServiceConditionRunningOrHealthy, types.ServiceConditionHealthy}
+	dbContainers := Containers{{
+		ID:     "db-ctr",
+		Names:  []string{"/db-ctr"},
+		Labels: map[string]string{api.ServiceLabel: "db"},
+	}}
+	project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+		"db": {Name: "db", Scale: intPtr(1)},
+	}}
+
+	newTested := func(t *testing.T) (*composeService, *mocks.MockAPIClient, *capturingEvents) {
+		t.Helper()
+		mockCtrl := gomock.NewController(t)
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		cli := mocks.NewMockCli(mockCtrl)
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
+		events := &capturingEvents{}
+		tested, err := NewComposeService(cli, WithEventProcessor(events))
+		assert.NilError(t, err)
+		return tested.(*composeService), apiClient, events
+	}
+	wasSkipped := func(events *capturingEvents) bool {
+		for _, r := range events.resources {
+			if strings.HasPrefix(r.Text, skipped) {
+				return true
+			}
+		}
+		return false
+	}
+	dependenciesOn := func(condition string, required bool) types.DependsOnConfig {
+		return types.DependsOnConfig{"db": {Condition: condition, Required: required}}
+	}
+	// inspectFailsWithContext makes ContainerInspect fail the way the client
+	// does when the context it was given is done: it waits for it and
+	// returns its error, wrapped. It must be reached at least once (or the
+	// test would pass without exercising the inspection); once the context is
+	// done, a pending poll tick may win the select against ctx.Done() for one
+	// more check, so there is no upper bound.
+	inspectFailsWithContext := func(apiClient *mocks.MockAPIClient) {
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+			DoAndReturn(func(ctx context.Context, _ string, _ client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+				<-ctx.Done()
+				return client.ContainerInspectResult{}, fmt.Errorf("inspect db-ctr: %w", ctx.Err())
+			}).MinTimes(1)
+	}
+
+	for _, condition := range conditions {
+		t.Run(condition, func(t *testing.T) {
+			t.Run("a genuine inspection error skips an optional dependency", func(t *testing.T) {
+				t.Parallel()
+				tested, apiClient, events := newTested(t)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+					Return(client.ContainerInspectResult{}, errors.New("Error response from daemon: No such container: db-ctr"))
+				err := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, false), dbContainers, 0)
+				assert.NilError(t, err)
+				assert.Assert(t, wasSkipped(events))
+			})
+
+			t.Run("a genuine inspection error fails a required dependency", func(t *testing.T) {
+				t.Parallel()
+				tested, apiClient, events := newTested(t)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+					Return(client.ContainerInspectResult{}, errors.New("Error response from daemon: No such container: db-ctr"))
+				err := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, true), dbContainers, 0)
+				assert.ErrorContains(t, err, "No such container: db-ctr")
+				assert.Assert(t, !wasSkipped(events))
+			})
+
+			t.Run("a cancellation during the inspection is not a skipped optional dependency", func(t *testing.T) {
+				t.Parallel()
+				tested, apiClient, events := newTested(t)
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+					DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+						cancel()
+						return client.ContainerInspectResult{}, fmt.Errorf("inspect db-ctr: %w", context.Canceled)
+					}).MinTimes(1) // a pending poll tick may win the select once more
+				// a plain cancellation is not a wait failure (see
+				// TestWaitDependencyDeadline), but it is no skip either
+				err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, false), dbContainers, 0)
+				assert.NilError(t, err)
+				assert.Assert(t, !wasSkipped(events))
+			})
+
+			t.Run("a cancellation during the inspection still fails a required dependency", func(t *testing.T) {
+				t.Parallel()
+				tested, apiClient, _ := newTested(t)
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+					DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+						cancel()
+						return client.ContainerInspectResult{}, fmt.Errorf("inspect db-ctr: %w", context.Canceled)
+					})
+				err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, true), dbContainers, 0)
+				assert.Assert(t, errors.Is(err, context.Canceled), "got %v", err)
+			})
+
+			for _, required := range []bool{false, true} {
+				t.Run(fmt.Sprintf("a deadline inherited from the caller expiring during the inspection is an error (required=%t)", required), func(t *testing.T) {
+					t.Parallel()
+					tested, apiClient, events := newTested(t)
+					inspectFailsWithContext(apiClient)
+					// the first poll (500ms) starts the inspection, which only
+					// ends with the deadline
+					ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+					defer cancel()
+					err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, required), dbContainers, 0)
+					assert.Error(t, err, "timeout waiting for dependencies")
+					assert.Assert(t, !wasSkipped(events))
+				})
+			}
+
+			// The wait's own timeout expiring during the inspection must end
+			// the wait exactly as it does when it expires between two polls:
+			// whatever waitDependency decides for an optional dependency, the
+			// check functions must not decide differently.
+			for _, required := range []bool{false, true} {
+				t.Run(fmt.Sprintf("the wait's own timeout expiring during the inspection ends like it does between polls (required=%t)", required), func(t *testing.T) {
+					t.Parallel()
+					tested, apiClient, _ := newTested(t)
+					inspectFailsWithContext(apiClient)
+					duringInspect := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, required), dbContainers, time.Second)
+
+					// shorter than the first poll: expires before any check
+					betweenPolls := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, required), dbContainers, 50*time.Millisecond)
+
+					assert.Equal(t, fmt.Sprint(duringInspect), fmt.Sprint(betweenPolls))
+					if required {
+						assert.Error(t, duringInspect, "timeout waiting for dependencies")
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestCheckDependencyDoneContext tests the check functions directly with a
+// context that is already done, so no poll timing is involved: an optional
+// dependency is "not done yet" (the wait's loop then sees ctx.Done()), never
+// skipped; a required one keeps reporting the failure.
+func TestCheckDependencyDoneContext(t *testing.T) {
+	containers := Containers{{
+		ID:     "db-ctr",
+		Names:  []string{"/db-ctr"},
+		Labels: map[string]string{api.ServiceLabel: "db"},
+	}}
+	expired := func(t *testing.T) context.Context {
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+		t.Cleanup(cancel)
+		return ctx
+	}
+	canceled := func(t *testing.T) context.Context {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		return ctx
+	}
+	contexts := map[string]func(*testing.T) context.Context{"canceled": canceled, "expired": expired}
+	checks := map[string]func(*composeService, context.Context, types.ServiceDependency) (bool, error){
+		"running_or_healthy": func(s *composeService, ctx context.Context, c types.ServiceDependency) (bool, error) {
+			return s.checkDependencyRunningOrHealthy(ctx, "db", c, containers)
+		},
+		"service_healthy": func(s *composeService, ctx context.Context, c types.ServiceDependency) (bool, error) {
+			return s.checkDependencyHealthy(ctx, "db", c, containers)
+		},
+	}
+
+	for checkName, check := range checks {
+		for ctxName, newCtx := range contexts {
+			t.Run(checkName+"/"+ctxName, func(t *testing.T) {
+				t.Parallel()
+				mockCtrl := gomock.NewController(t)
+				apiClient := mocks.NewMockAPIClient(mockCtrl)
+				cli := mocks.NewMockCli(mockCtrl)
+				cli.EXPECT().Client().Return(apiClient).AnyTimes()
+				events := &capturingEvents{}
+				svc, err := NewComposeService(cli, WithEventProcessor(events))
+				assert.NilError(t, err)
+				tested := svc.(*composeService)
+
+				ctx := newCtx(t)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+					Return(client.ContainerInspectResult{}, fmt.Errorf("inspect db-ctr: %w", ctx.Err())).Times(2)
+
+				done, err := check(tested, ctx, types.ServiceDependency{Required: false})
+				assert.NilError(t, err)
+				assert.Assert(t, !done, "an optional dependency must not complete on a done context")
+				assert.Equal(t, len(events.resources), 0, "no skipped event expected, got %v", events.resources)
+
+				_, err = check(tested, ctx, types.ServiceDependency{Required: true})
+				assert.Assert(t, errors.Is(err, ctx.Err()), "got %v", err)
+			})
+		}
+	}
+
+	// service_completed_successfully never skipped an optional dependency on
+	// an inspection error (only on a non-zero exit code): unchanged.
+	t.Run("service_completed_successfully", func(t *testing.T) {
+		t.Parallel()
+		mockCtrl := gomock.NewController(t)
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		cli := mocks.NewMockCli(mockCtrl)
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
+		svc, err := NewComposeService(cli)
+		assert.NilError(t, err)
+
+		ctx := canceled(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+			Return(client.ContainerInspectResult{}, ctx.Err())
+		done, err := svc.(*composeService).checkDependencyCompleted(ctx, "db", types.ServiceDependency{Required: false}, containers)
+		assert.Assert(t, errors.Is(err, context.Canceled), "got %v", err)
+		assert.Assert(t, !done)
+	})
+}
