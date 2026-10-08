@@ -1,0 +1,8 @@
+services:
+  quick:
+    image: alpine
+    command: echo hi
+  long:
+    image: alpine
+    command: sleep infinity
+    init: true

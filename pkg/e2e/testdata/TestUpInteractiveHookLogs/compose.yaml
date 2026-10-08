@@ -1,0 +1,13 @@
+services:
+  app:
+    image: alpine
+    command: sh -c 'echo "app-read:$(cat /shared/init.txt)"; sleep 3'
+    volumes:
+      - data:/shared
+    pre_start:
+      - image: alpine
+        command: sh -c 'echo "pre-start-hook-ran" | tee /shared/init.txt'
+    post_start:
+      - command: echo post-start-hook-ran
+volumes:
+  data:
