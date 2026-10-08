@@ -160,6 +160,7 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
+	origCtx := ctx
 	if timeout > 0 {
 		withTimeout, cancelFunc := context.WithTimeout(ctx, timeout)
 		defer cancelFunc()
@@ -184,7 +185,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		}
 
 		eg.Go(func() error {
-			return s.waitDependency(ctx, dependant, dep, config, waitingFor)
+			return s.waitDependency(ctx, origCtx, dependant, dep, config, waitingFor)
 		})
 	}
 	err := eg.Wait()
@@ -197,7 +198,21 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 // waitDependency polls the dependency's containers until its depends_on
 // condition is satisfied (done), definitively failed (err), or ctx is
 // cancelled. Each check reports (done, err): (false, nil) means keep polling.
-func (s *composeService) waitDependency(ctx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
+// origCtx is ctx as it stood before the caller wrapped it with this wait's
+// own timeout (if any) -- comparing origCtx.Err() against ctx.Err() at the
+// moment ctx.Done() fires is how this tells apart a DeadlineExceeded this
+// specific call's own wrap is responsible for from one inherited from an
+// ancestor context the caller never touched. A bare "did the caller
+// configure a timeout at all" flag isn't enough: if origCtx itself already
+// carries an earlier deadline, wrapping it with context.WithTimeout still
+// makes both origCtx and ctx report DeadlineExceeded once that earlier
+// deadline fires, even though this call's own timeout never actually
+// elapsed -- only origCtx.Err() == nil proves this wrap's own timeout is
+// the one that fired. Only that case is safe to tolerate on an optional
+// dependency; an inherited deadline means something else entirely (an
+// external deadline, a test harness timeout) fired, and must keep
+// propagating regardless of Required.
+func (s *composeService) waitDependency(ctx, origCtx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -205,8 +220,20 @@ func (s *composeService) waitDependency(ctx context.Context, dependant, dep stri
 		case <-ticker.C:
 		case <-ctx.Done():
 			// An expired deadline is precisely the failure this wait is meant
-			// to detect; only a plain cancellation (Ctrl-C) stays silent.
+			// to detect for a required dependency; only a plain cancellation
+			// (Ctrl-C) stays silent either way. An optional dependency
+			// tolerates a timeout exactly like it tolerates any other
+			// definitive failure the check* functions below report —
+			// skipped, not aborted — but only this call's OWN timeout: an
+			// inherited deadline is a different, real failure the caller
+			// must still see.
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				if !config.Required && origCtx.Err() == nil {
+					s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+						fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
+					logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
+					return nil
+				}
 				return ctx.Err()
 			}
 			return nil
@@ -581,96 +608,6 @@ func (s *composeService) isServiceCompleted(ctx context.Context, containers Cont
 		}
 	}
 	return false, 0, nil
-}
-
-func (s *composeService) startService(ctx context.Context,
-	project *types.Project, service types.ServiceConfig,
-	containers Containers, listener api.ContainerEventListener,
-	timeout time.Duration,
-) error {
-	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
-		return nil
-	}
-	err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, containers, timeout)
-	if err != nil {
-		return err
-	}
-
-	if len(containers) == 0 {
-		if service.GetScale() == 0 {
-			return nil
-		}
-		if service.Provider != nil {
-			// a provider-backed service usually has no container of its own
-			// (it gets one — the relay — only when the provider published
-			// endpoints), so a project made only of provider services
-			// legitimately reaches the start phase with no container at all
-			return nil
-		}
-		return errNoContainerToStart(service.Name)
-	}
-
-	serviceContainers := containers.filter(isService(service.Name), isNotOneOff, isNotHookContainer)
-	toStart := serviceContainers.filter(isNotRunning)
-	if len(toStart) == 0 {
-		return nil
-	}
-
-	// pre_start runs once per service, only when no replica is already running
-	// (e.g. initial up, force-recreate, or spec change). per_replica: false is
-	// the only currently supported mode. The hooks execute in runner containers
-	// prepared by the reconciliation plan. Pick the replica with the lowest
-	// container-number so the choice is deterministic regardless of the
-	// order the daemon returns containers in.
-	if candidate := lowestNumberedContainer(toStart); len(service.PreStart) > 0 && len(serviceContainers) == len(toStart) && !isRelayContainer(candidate) {
-		if err := s.runPreStart(ctx, project, service, listener); err != nil {
-			return err
-		}
-	}
-
-	for _, ctr := range toStart {
-		if err := s.startServiceContainer(ctx, project, service, ctr, listener); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *composeService) startServiceContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, ctr container.Summary, listener api.ContainerEventListener) error {
-	// A relay stands in for the service on the network but is a static,
-	// shell-less scratch binary: secrets/configs injection and lifecycle
-	// hooks have no filesystem or process to act on inside it. The compose
-	// spec doesn't forbid declaring them on a provider: service, so this
-	// must be checked, not assumed unreachable.
-	relay := isRelayContainer(ctr)
-	if !relay {
-		if err := s.injectSecrets(ctx, project, service, ctr.ID); err != nil {
-			return err
-		}
-		if err := s.injectConfigs(ctx, project, service, ctr.ID); err != nil {
-			return err
-		}
-	}
-
-	eventName := getContainerProgressName(ctr)
-	s.events.On(newEvent(eventName, api.Working, api.StatusStarting))
-	startMx.Lock()
-	_, err := s.apiClient().ContainerStart(ctx, ctr.ID, client.ContainerStartOptions{})
-	startMx.Unlock()
-	if err != nil {
-		return err
-	}
-
-	if !relay {
-		for _, hook := range service.PostStart {
-			if err := s.runHook(ctx, ctr, service, hook, listener); err != nil {
-				return err
-			}
-		}
-	}
-
-	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
-	return nil
 }
 
 func mergeLabels(ls ...types.Labels) types.Labels {

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/api/types/system"
 	"github.com/moby/moby/client"
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
@@ -86,7 +88,17 @@ func inspectResult(running, restarting bool) client.ContainerInspectResult {
 	}
 }
 
+// expectNowAsDaemonTime makes the mocked engine report a system time, as many
+// times as the monitor asks: the test's clock, as a local daemon would.
+func expectNowAsDaemonTime(apiClient *mocks.MockAPIClient) {
+	apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, client.InfoOptions) (client.SystemInfoResult, error) {
+			return client.SystemInfoResult{Info: system.Info{SystemTime: time.Now().Format(time.RFC3339Nano)}}, nil
+		}).AnyTimes()
+}
+
 func expectEventStream(apiClient *mocks.MockAPIClient, initial []container.Summary, capacity int) (chan events.Message, chan error) {
+	expectNowAsDaemonTime(apiClient)
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
 		Return(client.ContainerListResult{Items: initial}, nil)
 	messages := make(chan events.Message, capacity)
@@ -259,6 +271,7 @@ func newMonitorTestFixture(t *testing.T) (*monitor, *mocks.MockAPIClient) {
 	t.Cleanup(mockCtrl.Finish)
 	apiMock := mocks.NewMockAPIClient(mockCtrl)
 
+	expectNowAsDaemonTime(apiMock)
 	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
 		Return(client.ContainerListResult{Items: []container.Summary{testContainer("service1", "123", false)}}, nil)
 
@@ -488,4 +501,412 @@ func TestMonitorDieClearsStaleRestartingEntry(t *testing.T) {
 		{eventType: api.ContainerEventExited, id: "keepalive", source: "keepalive-name"},
 		{eventType: api.ContainerEventExited, id: "target", source: "target-name", exitCode: 2},
 	}, cmpRecordedEvents)
+}
+
+// fakeEventLog stands in for the engine's event stream with respect to the
+// one property the monitor's startup depends on: an event emitted while
+// nobody is subscribed is lost to a plain subscription, and only delivered
+// to one that asks for it with Since -- the engine replays its buffered
+// events newer than Since, then goes live.
+//
+// Events are stamped, and the system time reported, by the engine's own
+// clock, which skew sets apart from the test's.
+type fakeEventLog struct {
+	mu      sync.Mutex
+	entries []loggedEvent
+	// since records the Since of every subscription, in order
+	since []string
+
+	// skew is how far the engine's clock is ahead of the local one
+	skew time.Duration
+	// infoErr, when set, is what the engine answers to Info
+	infoErr error
+	// systemTime, when set, is the SystemTime the engine reports instead of
+	// its clock's (an empty one included)
+	systemTime *string
+	// reportedTime is the last SystemTime the engine reported
+	reportedTime string
+}
+
+// setSystemTime makes the engine report the given system time.
+func (l *fakeEventLog) setSystemTime(systemTime string) {
+	l.systemTime = &systemTime
+}
+
+// now is the engine's clock.
+func (l *fakeEventLog) now() time.Time {
+	return time.Now().Add(l.skew)
+}
+
+// info answers the monitor's request for the engine's system information.
+func (l *fakeEventLog) info() (client.SystemInfoResult, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.infoErr != nil {
+		return client.SystemInfoResult{}, l.infoErr
+	}
+	if l.systemTime != nil {
+		l.reportedTime = *l.systemTime
+	} else {
+		l.reportedTime = l.now().Format(time.RFC3339Nano)
+	}
+	return client.SystemInfoResult{Info: system.Info{SystemTime: l.reportedTime}}, nil
+}
+
+type loggedEvent struct {
+	at  time.Time
+	msg events.Message
+}
+
+func (l *fakeEventLog) emit(msg events.Message) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	msg.TimeNano = now.UnixNano()
+	l.entries = append(l.entries, loggedEvent{at: now, msg: msg})
+}
+
+// subscribe opens a stream replaying the buffered events newer than
+// opts.Since (none when it is empty), followed by the given live events.
+func (l *fakeEventLog) subscribe(t *testing.T, opts client.EventsListOptions, live ...events.Message) client.EventsResult {
+	t.Helper()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.since = append(l.since, opts.Since)
+
+	messages := make(chan events.Message, len(l.entries)+len(live))
+	if opts.Since != "" {
+		since := parseEventsSince(t, opts.Since)
+		for _, e := range l.entries {
+			if !e.at.Before(since) {
+				messages <- e.msg
+			}
+		}
+	}
+	for _, msg := range live {
+		messages <- msg
+	}
+	return client.EventsResult{Messages: messages, Err: make(chan error)}
+}
+
+// parseEventsSince parses the "<seconds>.<nanoseconds>" form of the events
+// API's since parameter.
+func parseEventsSince(t *testing.T, since string) time.Time {
+	t.Helper()
+	sec, nsec, _ := strings.Cut(since, ".")
+	// called from the monitor's goroutine: Check, not NilError, which would
+	// FailNow off the test goroutine
+	s, err := strconv.ParseInt(sec, 10, 64)
+	assert.Check(t, err, "since %q", since)
+	var n int64
+	if nsec != "" {
+		n, err = strconv.ParseInt(nsec, 10, 64)
+		assert.Check(t, err, "since %q", since)
+	}
+	return time.Unix(s, n)
+}
+
+// monitorWithEventLog wires a monitor on a mocked engine whose container
+// listing returns listed, after running during (the engine-side activity
+// happening between the monitor's snapshot and its subscription), and whose
+// event subscription is served by the returned log, followed by live.
+func monitorWithEventLog(t *testing.T, listed []container.Summary, during func(*fakeEventLog), live ...events.Message) (*monitor, *mocks.MockAPIClient, *fakeEventLog) {
+	t.Helper()
+	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
+	log := &fakeEventLog{}
+	apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, client.InfoOptions) (client.SystemInfoResult, error) {
+			return log.info()
+		})
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, client.ContainerListOptions) (client.ContainerListResult, error) {
+			if during != nil {
+				during(log)
+			}
+			return client.ContainerListResult{Items: listed}, nil
+		})
+	apiClient.EXPECT().Events(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts client.EventsListOptions) client.EventsResult {
+			return log.subscribe(t, opts, live...)
+		})
+	return newMonitor(apiClient, "p"), apiClient, log
+}
+
+// startWithin runs the monitor and fails the test when it doesn't terminate
+// on its own: a monitor which missed the event it waits for blocks forever.
+func startWithin(t *testing.T, m *monitor) {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() { done <- m.Start(t.Context()) }()
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("monitor did not terminate: it never saw the event it was waiting for")
+	}
+}
+
+// TestMonitorSeesEventsEmittedBeforeSubscription is the startup race of an
+// `up` running its Create and Start phases back to back: the first container
+// starts and exits right after the monitor takes its snapshot, before its
+// event subscription is effective ("echo hi"). Without Since, the die is
+// emitted to nobody, the monitor tracks the container forever, and
+// --abort-on-container-exit / --exit-code-from never fire.
+func TestMonitorSeesEventsEmittedBeforeSubscription(t *testing.T) {
+	m, apiClient, _ := monitorWithEventLog(t,
+		[]container.Summary{{ID: "c1", Labels: map[string]string{api.ServiceLabel: "web"}}},
+		func(log *fakeEventLog) {
+			log.emit(containerMessage(events.ActionStart, "c1", "c1-name", "web", nil))
+			log.emit(containerMessage(events.ActionDie, "c1", "c1-name", "web", map[string]string{"exitCode": "3"}))
+		})
+	got := recordEvents(m)
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "c1", gomock.Any()).Return(inspectResult(false, false), nil)
+
+	startWithin(t, m)
+
+	assert.DeepEqual(t, *got, []recordedEvent{
+		{eventType: api.ContainerEventStarted, id: "c1", source: "c1-name"},
+		{eventType: api.ContainerEventExited, id: "c1", source: "c1-name", exitCode: 3},
+	}, cmpRecordedEvents)
+}
+
+// TestMonitorReplayIsIdempotent covers the other side of asking the engine
+// for events since a point BEFORE the container listing: some of the replayed
+// events are already reflected in that listing. Each must leave the tracked
+// set and the notifications the way a live delivery would have.
+func TestMonitorReplayIsIdempotent(t *testing.T) {
+	web := map[string]string{api.ServiceLabel: "web"}
+	exit := func(code string) map[string]string { return map[string]string{"exitCode": code} }
+
+	tests := []struct {
+		name   string
+		listed []container.Summary
+		during func(*fakeEventLog)
+		live   []events.Message
+		// inspects are the successive ContainerInspect results
+		inspects map[string][]client.ContainerInspectResult
+		want     []recordedEvent
+	}{
+		{
+			name: "die of a container the listing reports exited",
+			// the listing is taken after the container exited: it is tracked
+			// all the same, and only the replayed die gets it out of the set
+			listed: []container.Summary{{ID: "c1", Labels: web, State: container.StateExited}},
+			during: func(log *fakeEventLog) {
+				log.emit(containerMessage(events.ActionStart, "c1", "c1-name", "web", nil))
+				log.emit(containerMessage(events.ActionDie, "c1", "c1-name", "web", exit("0")))
+			},
+			inspects: map[string][]client.ContainerInspectResult{"c1": {inspectResult(false, false)}},
+			want: []recordedEvent{
+				{eventType: api.ContainerEventStarted, id: "c1", source: "c1-name"},
+				{eventType: api.ContainerEventExited, id: "c1", source: "c1-name"},
+			},
+		},
+		{
+			name: "start of a container the listing reports running",
+			// the replayed start keeps the container tracked: it only ends
+			// with the live die that follows
+			listed: []container.Summary{{ID: "c1", Labels: web, State: container.StateRunning}},
+			during: func(log *fakeEventLog) {
+				log.emit(containerMessage(events.ActionStart, "c1", "c1-name", "web", nil))
+			},
+			live:     []events.Message{containerMessage(events.ActionDie, "c1", "c1-name", "web", exit("0"))},
+			inspects: map[string][]client.ContainerInspectResult{"c1": {inspectResult(false, false)}},
+			want: []recordedEvent{
+				{eventType: api.ContainerEventStarted, id: "c1", source: "c1-name"},
+				{eventType: api.ContainerEventExited, id: "c1", source: "c1-name"},
+			},
+		},
+		{
+			name: "whole life of a container the listing doesn't know",
+			// c1 came and went before the listing; c2 is what keeps the
+			// monitor running
+			listed: []container.Summary{{ID: "c2", Labels: web, State: container.StateRunning}},
+			during: func(log *fakeEventLog) {
+				log.emit(containerMessage(events.ActionCreate, "c1", "c1-name", "web", nil))
+				log.emit(containerMessage(events.ActionStart, "c1", "c1-name", "web", nil))
+				log.emit(containerMessage(events.ActionDie, "c1", "c1-name", "web", exit("0")))
+				log.emit(containerMessage(events.ActionDestroy, "c1", "c1-name", "web", nil))
+			},
+			live: []events.Message{containerMessage(events.ActionDie, "c2", "c2-name", "web", exit("0"))},
+			inspects: map[string][]client.ContainerInspectResult{
+				"c1": {{}}, // removed since: NotFound, see below
+				"c2": {inspectResult(false, false)},
+			},
+			want: []recordedEvent{
+				{eventType: api.ContainerEventCreated, id: "c1", source: "c1-name"},
+				{eventType: api.ContainerEventStarted, id: "c1", source: "c1-name"},
+				{eventType: api.ContainerEventExited, id: "c1", source: "c1-name"},
+				{eventType: api.ContainerEventExited, id: "c2", source: "c2-name"},
+			},
+		},
+		{
+			name: "restart policy already in action",
+			// die then start of a container the listing reports running
+			// again: the replayed die finds it running and is reported as a
+			// restart, as live delivery would, and the container stays
+			// tracked until its final die
+			listed: []container.Summary{{ID: "c1", Labels: web, State: container.StateRunning}},
+			during: func(log *fakeEventLog) {
+				log.emit(containerMessage(events.ActionDie, "c1", "c1-name", "web", exit("1")))
+				log.emit(containerMessage(events.ActionStart, "c1", "c1-name", "web", nil))
+			},
+			live: []events.Message{containerMessage(events.ActionDie, "c1", "c1-name", "web", exit("0"))},
+			inspects: map[string][]client.ContainerInspectResult{
+				"c1": {inspectResult(true, false), inspectResult(false, false)},
+			},
+			want: []recordedEvent{
+				{eventType: api.ContainerEventExited, id: "c1", source: "c1-name", restarting: true, exitCode: 1},
+				{eventType: api.ContainerEventStarted, id: "c1", source: "c1-name", restarting: true},
+				{eventType: api.ContainerEventExited, id: "c1", source: "c1-name"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, apiClient, _ := monitorWithEventLog(t, tt.listed, tt.during, tt.live...)
+			got := recordEvents(m)
+			for id, results := range tt.inspects {
+				var calls []any
+				for _, res := range results {
+					if res.Container.State == nil {
+						calls = append(calls, apiClient.EXPECT().ContainerInspect(gomock.Any(), id, gomock.Any()).
+							Return(client.ContainerInspectResult{}, errdefs.ErrNotFound))
+						continue
+					}
+					calls = append(calls, apiClient.EXPECT().ContainerInspect(gomock.Any(), id, gomock.Any()).Return(res, nil))
+				}
+				gomock.InOrder(calls...)
+			}
+
+			startWithin(t, m)
+
+			assert.DeepEqual(t, *got, tt.want, cmpRecordedEvents)
+		})
+	}
+}
+
+// TestMonitorSinceIsTheDaemonTime pins the clock the replay is relative to:
+// the daemon's, read from its system info, not the client's. Events are
+// stamped by the daemon, so a client clock that differs from it, as it does
+// for a remote daemon, would miss an event emitted between the monitor's
+// reading of the time and its subscription (clock behind), or replay what
+// predates the monitor (clock ahead).
+func TestMonitorSinceIsTheDaemonTime(t *testing.T) {
+	for name, skew := range map[string]time.Duration{
+		"daemon clock behind": -3 * time.Hour,
+		"daemon clock ahead":  3 * time.Hour,
+	} {
+		t.Run(name, func(t *testing.T) {
+			m, apiClient, log := monitorWithEventLog(t,
+				[]container.Summary{{ID: "c1", Labels: map[string]string{api.ServiceLabel: "web"}}},
+				func(log *fakeEventLog) {
+					log.emit(containerMessage(events.ActionDie, "c1", "c1-name", "web", map[string]string{"exitCode": "0"}))
+				})
+			log.skew = skew
+			// an event of the daemon's past, from before the monitor is started
+			log.emit(containerMessage(events.ActionDie, "old", "old-name", "web", map[string]string{"exitCode": "0"}))
+			time.Sleep(time.Millisecond)
+			got := recordEvents(m)
+			apiClient.EXPECT().ContainerInspect(gomock.Any(), "c1", gomock.Any()).Return(inspectResult(false, false), nil)
+
+			startWithin(t, m)
+
+			// the die emitted while the monitor was starting is replayed, and
+			// not the one that predates it...
+			assert.DeepEqual(t, *got, []recordedEvent{
+				{eventType: api.ContainerEventExited, id: "c1", source: "c1-name"},
+			}, cmpRecordedEvents)
+			// ... because the subscription asks for what the daemon reported
+			assert.Equal(t, len(log.since), 1)
+			reported, err := time.Parse(time.RFC3339Nano, log.reportedTime)
+			assert.NilError(t, err)
+			assert.Check(t, parseEventsSince(t, log.since[0]).Equal(reported),
+				"since %s is not the daemon time %s", log.since[0], log.reportedTime)
+			assert.Check(t, time.Until(reported) > skew-time.Minute && time.Until(reported) < skew+time.Minute,
+				"daemon time %s doesn't carry the clock skew %s", reported, skew)
+		})
+	}
+}
+
+// TestMonitorSinceUsesTheReportedSystemTime pins that the daemon's time is
+// used as reported, whatever it is: here one deliberately far from the local
+// clock, with a UTC offset of its own.
+func TestMonitorSinceUsesTheReportedSystemTime(t *testing.T) {
+	m, apiClient, log := monitorWithEventLog(t,
+		[]container.Summary{{ID: "c1", Labels: map[string]string{api.ServiceLabel: "web"}}},
+		nil,
+		containerMessage(events.ActionDie, "c1", "c1-name", "web", map[string]string{"exitCode": "0"}))
+	log.setSystemTime("2001-02-03T04:05:06.789012345+05:30")
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "c1", gomock.Any()).Return(inspectResult(false, false), nil)
+
+	startWithin(t, m)
+
+	// 2001-02-03T04:05:06.789012345+05:30 is 2001-02-02T22:35:06.789012345Z
+	assert.DeepEqual(t, log.since, []string{"981153306.789012345"})
+}
+
+// TestMonitorStartFailsWithoutDaemonTime: a daemon whose time can't be read
+// has no sound starting point to replay events from, and the client's clock
+// is no substitute: Start fails, explicitly, before anything else is asked of
+// the engine (a strict mock: no listing, no subscription).
+func TestMonitorStartFailsWithoutDaemonTime(t *testing.T) {
+	unreachable := errors.New("daemon unreachable")
+	tests := []struct {
+		name       string
+		systemTime string
+		infoErr    error
+		wantErr    string
+	}{
+		{name: "info fails", infoErr: unreachable, wantErr: "daemon unreachable"},
+		{name: "system time is empty", wantErr: "no system time"},
+		{name: "system time is not a time", systemTime: "yesterday-ish", wantErr: "yesterday-ish"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
+			apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(
+				client.SystemInfoResult{Info: system.Info{SystemTime: tt.systemTime}}, tt.infoErr)
+			m := newMonitor(apiClient, "p")
+
+			err := m.Start(t.Context())
+
+			assert.ErrorContains(t, err, "reading the daemon time to subscribe to container events")
+			assert.ErrorContains(t, err, tt.wantErr)
+			if tt.infoErr != nil {
+				assert.Check(t, errors.Is(err, tt.infoErr), "the engine's error is wrapped: %v", err)
+			}
+		})
+	}
+}
+
+// TestMonitorStartCanceledBeforeDaemonTime: an interruption that makes the
+// daemon's time unavailable is no failure, as for an interruption anywhere
+// else in Start.
+func TestMonitorStartCanceledBeforeDaemonTime(t *testing.T) {
+	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
+	apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(client.SystemInfoResult{}, context.Canceled)
+	m := newMonitor(apiClient, "p")
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	assert.NilError(t, m.Start(ctx))
+}
+
+// TestMonitorReadDaemonTimeOnce: a caller that took the daemon's time ahead
+// of Start (to fail before it starts any container) doesn't make Start ask
+// again, and Start keeps the point taken then.
+func TestMonitorReadDaemonTimeOnce(t *testing.T) {
+	m, apiClient, log := monitorWithEventLog(t,
+		[]container.Summary{{ID: "c1", Labels: map[string]string{api.ServiceLabel: "web"}}},
+		nil,
+		containerMessage(events.ActionDie, "c1", "c1-name", "web", map[string]string{"exitCode": "0"}))
+	log.setSystemTime("2001-02-03T04:05:06.789012345+05:30")
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "c1", gomock.Any()).Return(inspectResult(false, false), nil)
+
+	assert.NilError(t, m.readDaemonTime(t.Context()))
+	log.setSystemTime("2002-02-03T04:05:06Z") // would be seen by a second reading
+	startWithin(t, m)
+
+	assert.DeepEqual(t, log.since, []string{"981153306.789012345"})
 }
