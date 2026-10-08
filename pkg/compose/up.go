@@ -46,11 +46,14 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	if err := options.Validate(); err != nil {
 		return err
 	}
+	var created *createdUp
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		if options.Start.Attach == nil {
 			return s.upDetached(ctx, project, options)
 		}
-		return s.create(ctx, project, options.Create)
+		var err error
+		created, err = s.upCreatePhase(ctx, project, options)
+		return err
 	}), "up", s.events)
 	if err != nil {
 		return err
@@ -63,16 +66,52 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		_, _ = fmt.Fprintln(s.stdout(), "end of 'compose up' output, interactive run is not supported in dry-run mode")
 		return err
 	}
-	return s.runInteractiveUp(ctx, project, options)
+	return s.runInteractiveUp(ctx, created, options)
+}
+
+// createdUp is what an interactive up carries from its Create phase to its
+// Start phase: the canonical project the plan was built for, and the plan run
+// whose Start phase is still to dispatch. Both phases share the one daemon
+// snapshot and the one plan the Create phase was prepared from.
+type createdUp struct {
+	project *types.Project
+	run     *planRun
+}
+
+// upCreatePhase prepares interactive up's single Create+Start plan and runs
+// its Create phase only, under the "up" progress scope the caller wraps it in.
+// The Start phase is deliberately left out of that scope: it runs once
+// runInteractiveUp has set up the session streaming logs to the terminal, and
+// the progress display's refresh would repaint over them.
+func (s *composeService) upCreatePhase(ctx context.Context, project *types.Project, options api.UpOptions) (*createdUp, error) {
+	project, observed, plan, err := s.preparePlan(ctx, project, options.Create, ScopeCreateStart)
+	if err != nil {
+		return nil, err
+	}
+
+	// Must run against the pre-execution snapshot, see upDetached.
+	emitRunningEvents(project, observed, plan, s.events)
+
+	// Same per-wait --wait-timeout window as upDetached, see there.
+	exec := s.newPlanExecutor(project, observed, nil)
+	exec.waitTimeout = options.Start.WaitTimeout
+
+	run, err := exec.begin(plan)
+	if err != nil {
+		return nil, err
+	}
+	if err := run.runCreate(ctx); err != nil {
+		return nil, err
+	}
+	return &createdUp{project: project, run: run}, nil
 }
 
 // upDetached runs detached `up`'s Create and Start phases as a single plan:
 // the semantic switchover from create() + start() -- two separate daemon
 // snapshots, the second blind to what the first just did -- to one
 // preparePlan/executePlan pass covering both phases (epic #14081, lot 2).
-// Interactive up keeps the create()+start() sequence for now: its own
-// create/start phase boundary (attach/printer/monitor setup in between) is a
-// separate, riskier item of the same lot.
+// Interactive up prepares the same plan but drives its two phases itself,
+// with the attach/printer/monitor setup in between (see upCreatePhase).
 func (s *composeService) upDetached(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	project, observed, plan, err := s.preparePlan(ctx, project, options.Create, ScopeCreateStart)
 	if err != nil {
@@ -183,7 +222,15 @@ type upSession struct {
 	exitCode     int
 }
 
-func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Project, options api.UpOptions) error {
+// runInteractiveUp sets up the attach/printer/monitor session around the
+// Start phase of created's plan, runs it, then follows the application until
+// it terminates. The Create phase already ran, and signal.Notify only comes
+// after it: Ctrl+C during Create keeps its default behavior.
+func (s *composeService) runInteractiveUp(ctx context.Context, created *createdUp, options api.UpOptions) error {
+	// the plan's own project, not the caller's: the one carrying what
+	// preparePlan resolved (see useAPISocket)
+	project := created.project
+
 	// if we get a second signal during shutdown, we kill the services
 	// immediately, so the channel needs to have sufficient capacity or
 	// we might miss a signal while setting up the second channel read
@@ -279,6 +326,15 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 	}
 	monitor.withListener(u.followStartedContainers(attached))
 
+	// The monitor replays events from the daemon's time. Read it now, before
+	// the Start phase: a daemon whose time can't be read fails the command
+	// without any container started, and the point precedes the first start.
+	if err := monitor.readDaemonTime(globalCtx); err != nil {
+		cancel()
+		_ = u.eg.Wait()
+		return err
+	}
+
 	u.eg.Go(func() error {
 		err := monitor.Start(globalCtx)
 		// The monitor returning means every watched container is gone for
@@ -306,7 +362,8 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 	})
 
 	// We use the parent context without cancellation as we manage sigterm to stop the stack
-	err = s.start(context.WithoutCancel(ctx), project.Name, options.Start, u.printer.HandleEvent)
+	err = created.run.runStart(context.WithoutCancel(ctx), u.printer.HandleEvent)
+	err = translateWaitTimeout(err)
 	if err != nil && !u.isTerminated.Load() { // Ignore error if the process is terminated
 		cancel()
 		_ = u.eg.Wait()

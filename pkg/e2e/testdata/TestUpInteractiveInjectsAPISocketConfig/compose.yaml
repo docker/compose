@@ -1,0 +1,6 @@
+services:
+  app:
+    image: alpine
+    use_api_socket: true
+    command: >
+      sh -c 'if [ -f /run/secrets/docker/config.json ]; then echo apisocket-config-present; else echo apisocket-config-absent; fi'
