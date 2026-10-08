@@ -1436,6 +1436,23 @@ func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps 
 		}
 	}
 
+	// pre_start's eligibility is decided once, from the first non-running
+	// container only -- exactly like planServiceStart's own gate and the old
+	// imperative engine's lowestNumberedContainer(toStart): if that one
+	// candidate is a relay, pre_start is skipped entirely for this chain,
+	// with no fallback to a later non-relay candidate. Checking !relay again
+	// inside the loop below (as a condition on *running* the hook) would
+	// instead retry the gate on every later replica, executing hooks in a
+	// state the relay guard was meant to suppress entirely (Copilot review
+	// finding).
+	preStartEligible := len(service.PreStart) > 0 && !anyRunning
+	for i := range observed {
+		if observed[i].State != container.StateRunning {
+			preStartEligible = preStartEligible && !isRelayContainer(observed[i].Summary)
+			break
+		}
+	}
+
 	prev := deps
 	preStarted := false
 	var chainEnd *PlanNode
@@ -1447,7 +1464,7 @@ func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps 
 		resID := serviceReplicaID(service.Name, oc.Number)
 		relay := isRelayContainer(oc.Summary)
 
-		if !preStarted && !relay && len(service.PreStart) > 0 && !anyRunning {
+		if !preStarted && preStartEligible {
 			serviceCopy := service
 			pre := r.plan.addNode(Operation{
 				Type:       OpRunPreStart,
