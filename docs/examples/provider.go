@@ -223,10 +223,20 @@ func up(options options, args []string) {
 	// buffered bytes and hang on the next answer.
 	responses := json.NewDecoder(os.Stdin)
 	fmt.Printf(`{ "type": "get-service-config" }%s`, lineSeparator)
+	// Only what this example reads is decoded. Compose sends the whole
+	// resolved service, scale included and unmodified: it never rejects or
+	// acts on the scale of a provider-backed service, and the relay it deploys
+	// stays a single container. compose-go's types.ServiceConfig can't be used
+	// to read it back: a few fields marshal into a form that type fails to
+	// decode (extra_hosts, scalar ulimits, secret modes).
 	var config struct {
 		Provider struct {
 			Type string `json:"type"`
 		} `json:"provider"`
+		Scale  *int `json:"scale"`
+		Deploy *struct {
+			Replicas *int `json:"replicas"`
+		} `json:"deploy"`
 	}
 	if err := responses.Decode(&config); err != nil {
 		// error text is not JSON-safe either: encode, don't interpolate
@@ -238,6 +248,17 @@ func up(options options, args []string) {
 	// encode the message instead of interpolating it into a JSON literal
 	setenv, _ := json.Marshal(map[string]string{"type": "setenv", "message": "CONFIG_TYPE=" + config.Provider.Type})
 	fmt.Println(string(setenv))
+	// same precedence as compose-go's GetScale(): scale:, then
+	// deploy.replicas:, then 1
+	scale := 1
+	switch {
+	case config.Scale != nil:
+		scale = *config.Scale
+	case config.Deploy != nil && config.Deploy.Replicas != nil:
+		scale = *config.Deploy.Replicas
+	}
+	scaleEnv, _ := json.Marshal(map[string]string{"type": "setenv", "message": fmt.Sprintf("CONFIG_SCALE=%d", scale)})
+	fmt.Println(string(scaleEnv))
 
 	// When asked to, stand up a real endpoint on the host and publish it, so
 	// compose deploys a relay and consumers reach it as http://<service>:80.
