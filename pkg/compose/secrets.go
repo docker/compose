@@ -93,7 +93,8 @@ func (s *composeService) injectFileReferences(ctx context.Context, project *type
 func warnIgnoredFileReferences(project *types.Project, services []string) {
 	for _, name := range slices.Sorted(slices.Values(services)) {
 		service, ok := project.Services[name]
-		if !ok {
+		// a service scaled to zero gets no container, so nothing is ignored
+		if !ok || service.GetScale() == 0 {
 			continue
 		}
 		for _, ref := range service.Configs {
