@@ -202,6 +202,9 @@ func (s *composeService) doPrepareRun(ctx context.Context, project *types.Projec
 		return prepareRunResult{}, err
 	}
 
+	// the run target is created here, not by create(), which only handles its dependencies
+	warnIgnoredFileReferences(project, []string{service.Name})
+
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, -1, createOpts)
 	if err != nil {
 		return prepareRunResult{}, err
