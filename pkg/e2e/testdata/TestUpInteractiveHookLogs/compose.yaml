@@ -6,7 +6,7 @@ services:
       - data:/shared
     pre_start:
       - image: alpine
-        command: sh -c 'echo "pre-start-hook-ran" | tee /shared/init.txt'
+        command: sh -c 'echo "pre-start-file-content" > /shared/init.txt'
     post_start:
       - command: echo post-start-hook-ran
 volumes:
