@@ -680,7 +680,7 @@ func TestExecutePlanRecreateThenStartUsesFinalName(t *testing.T) {
 		Cause:        "start",
 		Service:      &service,
 		CreateNodeID: create.ID,
-	}, "start:web:1", rename)
+	}, "start:web:1", rename).Phase = PhaseStart
 
 	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
 	assert.NilError(t, err)
@@ -1222,6 +1222,9 @@ func TestExecutePlanWaitTimeoutSurvivesDependentSkip(t *testing.T) {
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
+	// both in the Start phase, like the reconciler plans them: the skipped
+	// dependent only exists if the wait that fails is in its own phase
+	wait.Phase = PhaseStart
 	plan.addNode(Operation{
 		Type:       OpStartContainer,
 		ResourceID: "service:app:1",
@@ -1240,14 +1243,14 @@ func TestTranslateWaitTimeout(t *testing.T) {
 	marked := fmt.Errorf("%w: %w", errWaitTimeout, context.DeadlineExceeded)
 	other := errors.New("boom")
 
-	assert.ErrorContains(t, translateWaitTimeout(marked, true, 3*time.Second), "application not healthy after 3s")
-	assert.Error(t, translateWaitTimeout(marked, false, 3*time.Second), "timeout waiting for dependencies")
+	// a depends_on wait timing out is a dependency timeout, whether or not
+	// --wait was given: "application not healthy" is the final readiness
+	// check's message, not this one's
+	assert.Error(t, translateWaitTimeout(marked), "timeout waiting for dependencies")
 
-	// anything that is not a wait's own timeout comes back untouched, with or
-	// without --wait: a bare DeadlineExceeded included
-	for _, wait := range []bool{true, false} {
-		assert.Equal(t, translateWaitTimeout(other, wait, time.Second), other)
-		assert.Equal(t, translateWaitTimeout(context.DeadlineExceeded, wait, time.Second), context.DeadlineExceeded)
-	}
-	assert.NilError(t, translateWaitTimeout(nil, true, time.Second))
+	// anything that is not a wait's own timeout comes back untouched: a bare
+	// DeadlineExceeded included
+	assert.Equal(t, translateWaitTimeout(other), other)
+	assert.Equal(t, translateWaitTimeout(context.DeadlineExceeded), context.DeadlineExceeded)
+	assert.NilError(t, translateWaitTimeout(nil))
 }
