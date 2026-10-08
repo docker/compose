@@ -1004,6 +1004,41 @@ func TestPlanStart_ProviderPathChainsMultipleStaleContainers(t *testing.T) {
 		"replica 2 must chain after replica 1's start, in replica-number order regardless of daemon list order:\n%s", plan)
 }
 
+// TestPlanStart_ProviderPathPreStartGateDoesNotRetryPastARelay is a
+// regression test for a Copilot review finding on
+// planProviderRelayRestart's pre_start gate: it used to re-check "is this
+// replica a relay?" on every iteration of the chain-building loop, so when
+// the lowest-numbered stale container was the relay (skipped) but a later
+// one was an ordinary stale replica, pre_start still ran against that later
+// one. The old imperative engine's own gate -- lowestNumberedContainer(toStart)
+// checked once -- never falls through like that: if its single candidate is
+// a relay, pre_start is skipped entirely for the whole chain, with no
+// fallback to a later non-relay container.
+func TestPlanStart_ProviderPathPreStartGateDoesNotRetryPastARelay(t *testing.T) {
+	prov := types.ServiceConfig{
+		Name:     "prov",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	relay := observedServiceContainer("prov", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	stale := observedServiceContainer("prov", 2, container.StateExited, "")
+	observed := emptyObserved()
+	observed.Containers["prov"] = []ObservedContainer{relay, stale}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	for _, n := range plan.Nodes {
+		assert.Assert(t, n.Operation.Type != OpRunPreStart,
+			"pre_start must not run when the lowest-numbered stale container is a relay, even though a later one (#2) is not:\n%s", plan)
+	}
+}
+
 // An optional (required: false) condition marks the shared wait node
 // best-effort — a missing dependency is skipped, not fatal; one required
 // dependent upgrades the node for everyone.
