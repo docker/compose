@@ -312,7 +312,7 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 	if len(project.Services) > 0 {
 		return s.start(ctx, project.Name, api.StartOptions{
 			Project: project,
-		}, nil)
+		})
 	}
 	return nil
 }

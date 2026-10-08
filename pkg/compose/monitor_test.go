@@ -516,6 +516,8 @@ type fakeEventLog struct {
 	entries []loggedEvent
 	// since records the Since of every subscription, in order
 	since []string
+	// subscribers receive the events emitted after they subscribed
+	subscribers []chan events.Message
 
 	// skew is how far the engine's clock is ahead of the local one
 	skew time.Duration
@@ -564,17 +566,22 @@ func (l *fakeEventLog) emit(msg events.Message) {
 	now := l.now()
 	msg.TimeNano = now.UnixNano()
 	l.entries = append(l.entries, loggedEvent{at: now, msg: msg})
+	for _, sub := range l.subscribers {
+		sub <- msg
+	}
 }
 
 // subscribe opens a stream replaying the buffered events newer than
-// opts.Since (none when it is empty), followed by the given live events.
+// opts.Since (none when it is empty), followed by the given live events, then
+// by whatever is emitted from now on.
 func (l *fakeEventLog) subscribe(t *testing.T, opts client.EventsListOptions, live ...events.Message) client.EventsResult {
 	t.Helper()
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.since = append(l.since, opts.Since)
 
-	messages := make(chan events.Message, len(l.entries)+len(live))
+	messages := make(chan events.Message, len(l.entries)+len(live)+64)
+	l.subscribers = append(l.subscribers, messages)
 	if opts.Since != "" {
 		since := parseEventsSince(t, opts.Since)
 		for _, e := range l.entries {
