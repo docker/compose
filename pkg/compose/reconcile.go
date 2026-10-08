@@ -1172,6 +1172,30 @@ func (r *reconciler) setContainerNode(service string, number int, node *PlanNode
 	r.containerNodes[service][number] = node
 }
 
+// exceptionalStateRestartNodes returns every create-phase bare-restart node
+// (OpStartContainer) planned for this service's exceptional-state (paused,
+// dead) replicas, in deterministic replica-number order. serviceNodes keeps
+// only the LAST node processed for a service's create-phase convergence --
+// correct for a single replica, but a scaled service with more than one
+// exceptional-state replica needs every one of them in startChainEnds, or a
+// service_started consumer could run while another replica's restart is
+// still pending.
+func (r *reconciler) exceptionalStateRestartNodes(service string) []*PlanNode {
+	planned := r.containerNodes[service]
+	numbers := make([]int, 0, len(planned))
+	for number, node := range planned {
+		if node.Operation.Type == OpStartContainer {
+			numbers = append(numbers, number)
+		}
+	}
+	sort.Ints(numbers)
+	nodes := make([]*PlanNode, len(numbers))
+	for i, number := range numbers {
+		nodes[i] = planned[number]
+	}
+	return nodes
+}
+
 // startPhaseReplicas collects the replicas to start, ascending number:
 // containers materialized by the create phase plus observed up-to-date
 // containers not running — exactly the isNotRunning set the imperative start
@@ -1305,17 +1329,22 @@ func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, 
 // planProviderStart is the start-phase visit of a provider service: no
 // container to start, but its own depends_on still applies — the imperative
 // startService waits on it for every service, providers included. Its chain
-// end is those prerequisites, else its create-phase RunProvider node.
+// end is its create-phase RunProvider node (the deployment itself), plus
+// those dependency prerequisites when it has any -- a consumer must wait for
+// both: the provider's own dependencies satisfied AND the provider actually
+// deployed, not either in isolation. Before this ordering was corrected, a
+// provider with both an upstream dependency and a downstream consumer let
+// the dependency wait substitute for the deploy node entirely, so the
+// consumer could start while the provider's plugin/relay deployment was
+// still running.
 func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 	depNodes, err := r.startPhaseDependencies(service)
 	if err != nil {
 		return err
 	}
 	ends := depNodes
-	if len(ends) == 0 {
-		if node, ok := r.serviceNodes[service.Name]; ok {
-			ends = []*PlanNode{node}
-		}
+	if node, ok := r.serviceNodes[service.Name]; ok && !slices.Contains(ends, node) {
+		ends = append(ends, node)
 	}
 	if len(ends) > 0 {
 		r.startChainEnds[service.Name] = ends
@@ -1327,7 +1356,13 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if service.Provider != nil {
 		return r.planProviderStart(service)
 	}
-	if service.GetScale() == 0 {
+	// imperative parity (startService): deploy.replicas: 0 is an unconditional
+	// no-op, but a service with scale: 0 is still visited -- its depends_on
+	// conditions are evaluated and its dependents ordered after them -- and
+	// whatever replicas it already owns are started (scope Start only: the
+	// create phase removes them all under CreateStart). It is just never an
+	// error for it to have no container to start.
+	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
 		return nil
 	}
 
@@ -1341,7 +1376,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if err != nil {
 		return err
 	}
-	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart {
+	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart && service.GetScale() > 0 {
 		// imperative parity (startService): a scale>0 service with no
 		// container at all cannot be started — only reachable under scope
 		// Start, since CreateStart would have planned the missing creates
@@ -1349,11 +1384,19 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	}
 	if len(replicas) == 0 {
 		// the visit still happened: dependents order after its prerequisites
-		// (waits, service_started edges), else after the create phase
+		// (waits, service_started edges) AND after every create phase's own
+		// exceptional-state restart node (anyRunning via a bare
+		// OpStartContainer, same reasoning as planProviderStart) -- not
+		// either/or: a consumer must wait for both the dependency and every
+		// such restart actually happening, or it can start before a
+		// paused/dead replica's container is running again. A scaled
+		// service can have more than one exceptional-state replica, so this
+		// collects all of them (exceptionalStateRestartNodes), not just the
+		// single last node serviceNodes retains.
 		ends := depNodes
-		if len(ends) == 0 {
-			if node, ok := r.serviceNodes[service.Name]; ok {
-				ends = []*PlanNode{node}
+		for _, node := range r.exceptionalStateRestartNodes(service.Name) {
+			if !slices.Contains(ends, node) {
+				ends = append(ends, node)
 			}
 		}
 		if len(ends) > 0 {
@@ -1511,13 +1554,18 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	}, group, removeDeps...)
 
 	// 4. Rename to final name. Link to the create node so the executor can
-	// fetch the resulting container ID directly.
+	// fetch the resulting container ID directly. Service is set so
+	// execRenameContainer can refresh that container's entry in the live
+	// containersByService view (OpWaitCondition and sibling create calls
+	// read it by service name) once the rename actually lands — otherwise
+	// they'd keep seeing the temporary name past this node.
 	finalName := getContainerName(r.project.Name, service, oc.Number)
 	renameNode := r.plan.addNode(Operation{
 		Type:         OpRenameContainer,
 		ResourceID:   resID,
 		Cause:        "finalize recreate",
 		Name:         finalName,
+		Service:      &serviceCopy,
 		CreateNodeID: createNode.ID,
 	}, group, removeNode)
 

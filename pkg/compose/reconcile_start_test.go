@@ -307,6 +307,69 @@ func TestPlanStart_AllRunningStillWaitsOnConditions(t *testing.T) {
 	assert.Assert(t, !wait.Operation.BestEffort)
 }
 
+// Imperative parity (startService): a service with scale: 0 is still visited
+// -- its depends_on conditions are evaluated before the no-op, so an unhealthy
+// dependency still fails `up`/`start` and whatever is ordered after the
+// service is ordered after those prerequisites -- and under scope Start the
+// replicas it already owns are started. Only deploy.replicas: 0 is an
+// unconditional no-op. Having no container is never an error for it.
+func TestPlanStart_ScaleZeroIsStillVisited(t *testing.T) {
+	zero := 0
+	db := types.ServiceConfig{Name: "db"}
+	scaled := serviceWithDeps("app", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	scaled.Scale = &zero
+	deployed := serviceWithDeps("job", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	deployed.Deploy = &types.DeployConfig{Replicas: &zero}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "app": scaled, "job": deployed},
+	}
+	dbHash, err := serviceHashWithResolvedRefs(db, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{observedServiceContainer("db", 1, container.StateRunning, dbHash)}
+
+	// no container for the scale-zero service: its dependency wait is planned
+	// and nothing is an error; deploy.replicas: 0 plans nothing at all
+	for _, scope := range []ReconcileScope{ScopeStart, ScopeCreateStart} {
+		plan, err := reconcile(t.Context(), project, observed, startScopeOptions(scope), noPrompt)
+		assert.NilError(t, err)
+		waits := 0
+		for _, n := range plan.Nodes {
+			switch n.Operation.Type {
+			case OpWaitCondition:
+				waits++
+				assert.Equal(t, n.Operation.Name, "db")
+			case OpStartContainer, OpCreateContainer:
+				t.Fatalf("no container expected for scale-zero services, got %s %s:\n%s", n.Operation.Type, n.Operation.ResourceID, plan)
+			}
+		}
+		assert.Equal(t, waits, 1, "one deduplicated db wait, from app only:\n%s", plan)
+	}
+
+	// scope Start also starts the replicas the scale-zero service still owns
+	appHash, err := serviceHashWithResolvedRefs(scaled, nil)
+	assert.NilError(t, err)
+	observed.Containers["app"] = []ObservedContainer{observedServiceContainer("app", 1, container.StateExited, appHash)}
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	var started []string
+	for _, n := range plan.Nodes {
+		if n.Operation.Type == OpStartContainer {
+			started = append(started, n.Operation.ResourceID)
+		}
+	}
+	assert.DeepEqual(t, started, []string{"service:app:1"})
+
+	// the create phase removes every replica of a scale-zero service before
+	// the start phase looks: nothing to start under CreateStart
+	plan, err = reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+	for _, n := range plan.Nodes {
+		assert.Assert(t, n.Operation.Type != OpStartContainer, "unexpected start node:\n%s", plan)
+	}
+}
+
 // Imperative parity (startService): under scope Start, a scale>0 service
 // with no container at all fails the plan the way `compose start` fails.
 func TestPlanStart_NoContainerToStartFails(t *testing.T) {
@@ -379,6 +442,169 @@ func TestPlanStart_ProviderWaitsOnDependencies(t *testing.T) {
 	}
 	assert.Equal(t, wait.Operation.Name, "db")
 	assert.Equal(t, wait.Operation.Condition, types.ServiceConditionHealthy)
+}
+
+// TestPlanStart_ProviderConsumerWaitsForDeployment is a regression test for
+// a Copilot review finding on #14290: once ScopeCreateStart became the real,
+// exercised path for detached up, planProviderStart's startChainEnds for a
+// provider WITH its own depends_on was just that dependency's wait node --
+// dropping the provider's own OpRunProvider (deployment) node entirely. A
+// downstream consumer of the provider could therefore start while the
+// provider plugin/relay deployment was still running, a barrier the old
+// create-then-start two-phase sequence guaranteed for free.
+func TestPlanStart_ProviderConsumerWaitsForDeployment(t *testing.T) {
+	db := types.ServiceConfig{Name: "db"}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	prov := serviceWithDeps("prov", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	consumer := serviceWithDeps("consumer", types.DependsOnConfig{"prov": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "prov": prov, "consumer": consumer},
+	}
+	dbHash, err := serviceHashWithResolvedRefs(db, nil)
+	assert.NilError(t, err)
+	consumerHash, err := serviceHashWithResolvedRefs(consumer, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{
+		observedServiceContainer("db", 1, container.StateRunning, dbHash),
+	}
+	observed.Containers["consumer"] = []ObservedContainer{
+		observedServiceContainer("consumer", 1, container.StateExited, consumerHash),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+
+	var providerNode, consumerStartNode *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpRunProvider:
+			providerNode = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+			consumerStartNode = n
+		}
+	}
+	if providerNode == nil {
+		t.Fatalf("expected an OpRunProvider node for prov:\n%s", plan)
+	}
+	if consumerStartNode == nil {
+		t.Fatalf("expected a start node for consumer:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, providerNode),
+		"consumer's start must depend on the provider's own deployment node, not just its depends_on wait:\n%s", plan)
+}
+
+// TestPlanStart_ExceptionalStateConsumerWaitsForRestart is the sibling
+// regression to TestPlanStart_ProviderConsumerWaitsForDeployment for an
+// ordinary (non-provider) service: the same either/or bug in
+// planServiceStart's len(replicas) == 0 branch dropped the service's own
+// create-phase bare-restart node (TestPlanStart_ExceptionalStateReplicaCountsAsRunning)
+// from startChainEnds whenever the service also had its own depends_on,
+// keeping only the dependency wait. A downstream service_started consumer
+// could then start before a paused/dead service's only container was
+// actually running again.
+func TestPlanStart_ExceptionalStateConsumerWaitsForRestart(t *testing.T) {
+	db := types.ServiceConfig{Name: "db"}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	app := serviceWithDeps("app", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	consumer := serviceWithDeps("consumer", types.DependsOnConfig{"app": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "app": app, "consumer": consumer},
+	}
+	dbHash, err := serviceHashWithResolvedRefs(db, nil)
+	assert.NilError(t, err)
+	appHash, err := serviceHashWithResolvedRefs(app, nil)
+	assert.NilError(t, err)
+	consumerHash, err := serviceHashWithResolvedRefs(consumer, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{
+		observedServiceContainer("db", 1, container.StateRunning, dbHash),
+	}
+	observed.Containers["app"] = []ObservedContainer{
+		observedServiceContainer("app", 1, container.StatePaused, appHash),
+	}
+	observed.Containers["consumer"] = []ObservedContainer{
+		observedServiceContainer("consumer", 1, container.StateExited, consumerHash),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+
+	var appRestartNode, consumerStartNode *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:1":
+			appRestartNode = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+			consumerStartNode = n
+		}
+	}
+	if appRestartNode == nil {
+		t.Fatalf("expected the create-phase bare-restart node for app:\n%s", plan)
+	}
+	if consumerStartNode == nil {
+		t.Fatalf("expected a start node for consumer:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, appRestartNode),
+		"consumer's start must depend on app's own restart node, not just its depends_on wait:\n%s", plan)
+}
+
+// TestPlanStart_ScaledExceptionalStateConsumerWaitsForEveryRestart is a
+// regression test for a Copilot review finding on
+// TestPlanStart_ExceptionalStateConsumerWaitsForRestart's own fix: for a
+// scaled service, serviceNodes keeps only the LAST create-phase node
+// processed, so a consumer's start only ended up depending on the highest-
+// numbered replica's restart. With two exceptional-state replicas, the
+// consumer must depend on BOTH restart nodes, not just one.
+func TestPlanStart_ScaledExceptionalStateConsumerWaitsForEveryRestart(t *testing.T) {
+	two := 2
+	app := types.ServiceConfig{Name: "app", Deploy: &types.DeployConfig{Replicas: &two}}
+	consumer := serviceWithDeps("consumer", types.DependsOnConfig{"app": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"app": app, "consumer": consumer},
+	}
+	appHash, err := serviceHashWithResolvedRefs(app, nil)
+	assert.NilError(t, err)
+	consumerHash, err := serviceHashWithResolvedRefs(consumer, nil)
+	assert.NilError(t, err)
+	observed := emptyObserved()
+	observed.Containers["app"] = []ObservedContainer{
+		observedServiceContainer("app", 1, container.StatePaused, appHash),
+		observedServiceContainer("app", 2, container.StateDead, appHash),
+	}
+	observed.Containers["consumer"] = []ObservedContainer{
+		observedServiceContainer("consumer", 1, container.StateExited, consumerHash),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+
+	var restart1, restart2, consumerStartNode *PlanNode
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:1":
+			restart1 = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:2":
+			restart2 = n
+		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+			consumerStartNode = n
+		}
+	}
+	if restart1 == nil || restart2 == nil {
+		t.Fatalf("expected both replicas' bare-restart nodes:\n%s", plan)
+	}
+	if consumerStartNode == nil {
+		t.Fatalf("expected a start node for consumer:\n%s", plan)
+	}
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, restart1),
+		"consumer's start must depend on replica 1's restart node:\n%s", plan)
+	assert.Assert(t, slices.Contains(consumerStartNode.DependsOn, restart2),
+		"consumer's start must depend on replica 2's restart node too, not just the last one processed:\n%s", plan)
 }
 
 // A replica condemned by scale-down must never receive a start-phase node:
