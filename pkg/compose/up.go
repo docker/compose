@@ -43,6 +43,9 @@ import (
 )
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
