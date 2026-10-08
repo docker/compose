@@ -1337,6 +1337,40 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// TestDownHookContainerListFailureIsNonFatal verifies that a failure to list
+// retained hook containers is logged as a warning and the teardown still goes
+// on to remove networks and volumes.
+func TestDownHookContainerListFailureIsNonFatal(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	// No regular service containers running.
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).
+		Return(client.ContainerListResult{}, nil)
+	api.EXPECT().VolumeList(gomock.Any(), client.VolumeListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)),
+	}).Return(client.VolumeListResult{}, nil)
+
+	// Hook scan fails — the network teardown below must still run.
+	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).
+		Return(client.ContainerListResult{}, errors.New("daemon busy"))
+
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)),
+	}).Return(client.NetworkListResult{}, nil)
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
+
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{})
+	assert.NilError(t, err)
+}
+
 // A relay stands in for the service on the network but is a shell-less
 // scratch binary: pre_stop has no process inside it to act on. No
 // ExecCreate expectation is set: per newStartTestService, gomock fails the
