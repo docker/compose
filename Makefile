@@ -45,6 +45,12 @@ endif
 
 BUILDX_CMD ?= docker buildx
 
+# Pinned so that a new upstream release cannot break the build without a change
+# in this repository. Keep GOTESTSUM_VERSION in sync with the Dockerfile.
+GOTESTSUM_VERSION ?= v1.13.0
+GOFUMPT_VERSION ?= v0.12.0
+GOTESTSUM = go run gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
+
 # DESTDIR overrides the output path for binaries and other artifacts
 # this is used by docker/docker-ce-packaging for the apt/rpm builds,
 # so it's important that the resulting binary ends up EXACTLY at the
@@ -77,11 +83,11 @@ install: binary
 
 .PHONY: e2e-compose
 e2e-compose: example-provider ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
-	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -v $(TEST_FLAGS) -count=1 -parallel=$(E2E_PARALLEL_PLUGIN) -timeout 20m -tags e2e ./pkg/e2e
+	$(GOTESTSUM) --format testname --junitfile "/tmp/report/report.xml" -- -v $(TEST_FLAGS) -count=1 -parallel=$(E2E_PARALLEL_PLUGIN) -timeout 20m -tags e2e ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
-	go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- $(TEST_FLAGS) -v -count=1 -parallel=$(E2E_STANDALONE_PARALLEL) -timeout 20m --tags=e2e,standalone ./pkg/e2e
+	$(GOTESTSUM) --format testname --junitfile "/tmp/report/report.xml" -- $(TEST_FLAGS) -v -count=1 -parallel=$(E2E_STANDALONE_PARALLEL) -timeout 20m --tags=e2e,standalone ./pkg/e2e
 
 .PHONY: build-and-e2e-compose
 build-and-e2e-compose: build e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
@@ -136,7 +142,7 @@ relay-lint: ## run linter(s) for the relay/ module
 
 .PHONY: fmt
 fmt:
-	gofumpt --version >/dev/null 2>&1 || go install mvdan.cc/gofumpt@latest
+	gofumpt --version >/dev/null 2>&1 || go install mvdan.cc/gofumpt@$(GOFUMPT_VERSION)
 	gofumpt -w .
 
 .PHONY: docs
