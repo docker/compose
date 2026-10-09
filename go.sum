@@ -92,8 +92,8 @@ github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/docker/secrets-engine/client v0.1.2 h1:MFfk2TTo6h25DczTQ2ByQwgg2aVrVnSEis979Xle7KM=
 github.com/docker/secrets-engine/client v0.1.2/go.mod h1:5Ocu33awF0dvSOCd9Z21qP0eFEgFn47gJROzas0pghc=
-github.com/docker/secrets-engine/x v0.8.2 h1:40pNxy/HjpU9yRRo15s8k8f0Xc7PiPd6ADoJzlksObw=
-github.com/docker/secrets-engine/x v0.8.2/go.mod h1:+s6rb56pq1B376jzzkGqZreFJ3mUtkz+kaYlMuj7/Qs=
+github.com/docker/secrets-engine/x v0.8.3 h1:0rt91D54Ah6vI96qbc0Qcaxbkd0n36QAkQm+2614FzA=
+github.com/docker/secrets-engine/x v0.8.3/go.mod h1:+s6rb56pq1B376jzzkGqZreFJ3mUtkz+kaYlMuj7/Qs=
 github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 h1:XBBHcIb256gUJtLmY22n99HaZTz+r2Z51xUPi01m3wg=
 github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203/go.mod h1:E1jcSv8FaEny+OP/5k9UxZVw9YFWGj7eI4KR/iOBqCg=
 github.com/felixge/httpsnoop v1.1.0 h1:3YtUj32ZZkqZtt3sZZsClsymw/QDuVfpNhoA31zeORc=
