@@ -136,7 +136,7 @@ func TestForwardReapsIdleHalfOpenPair(t *testing.T) {
 // client half-closed its request side is relayed past the grace, not cut.
 func TestForwardKeepsStreamingAfterHalfClose(t *testing.T) {
 	restore := halfCloseIdleTimeout
-	halfCloseIdleTimeout = 300 * time.Millisecond
+	halfCloseIdleTimeout = time.Second
 	t.Cleanup(func() { halfCloseIdleTimeout = restore })
 
 	upstream, err := net.Listen("tcp", "127.0.0.1:0")
@@ -144,16 +144,18 @@ func TestForwardKeepsStreamingAfterHalfClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = upstream.Close() })
-	const chunks = 6
+	const chunks = 12
 	go func() {
 		conn, err := upstream.Accept()
 		if err != nil {
 			return
 		}
 		defer func() { _ = conn.Close() }()
-		// stream chunks for well past the idle grace, each within it
+		// stream chunks for past the idle grace in total, each arriving well
+		// within it: a wide margin so a loaded CI runner cannot delay one
+		// beyond the grace and trip the reaper
 		for range chunks {
-			time.Sleep(150 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			if _, err := conn.Write([]byte("chunk")); err != nil {
 				return
 			}

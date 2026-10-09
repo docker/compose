@@ -648,7 +648,17 @@ func TestBuildTLS(t *testing.T) {
 		return poll.Continue("waiting for Docker daemon to be running")
 	}, poll.WithTimeout(10*time.Second))
 
-	time.Sleep(1 * time.Second) // wait for dind setup
+	// the daemon logging that it listens does not guarantee the client
+	// certificates are fully written yet
+	poll.WaitOn(t, func(_ poll.LogT) poll.Result {
+		res := c.RunDockerOrExitError(t, "exec", dindBuilder, "sh", "-c",
+			"test -s /certs/client/ca.pem && test -s /certs/client/cert.pem && test -s /certs/client/key.pem")
+		if res.ExitCode != 0 {
+			return poll.Continue("waiting for the dind client certificates: %s", res.Combined())
+		}
+		return poll.Success()
+	}, poll.WithTimeout(30*time.Second))
+
 	c.RunDockerCmd(t, "cp", dindBuilder+":/certs/client", tmp)
 
 	res := c.RunDockerCmd(t, "inspect", "-f", "{{(index (index .NetworkSettings.Ports \"2376/tcp\") 0).HostPort}}", dindBuilder)
