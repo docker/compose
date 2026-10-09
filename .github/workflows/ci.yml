@@ -360,6 +360,33 @@ jobs:
         with:
           files: ./coverage.txt
 
+  # Single required check for branch protection: it fails if any gating job
+  # failed, was cancelled or was skipped, except the pull_request-only image
+  # tests, which are expected to be skipped on push. Adding, renaming or
+  # splitting a job in the matrices above then needs no change to the
+  # repository settings. coverage and release are left out on purpose: the
+  # former depends on an external service, the latter only runs on tags.
+  ci-ok:
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs:
+      - validate
+      - binary
+      - binary-finalize
+      - bin-image-test
+      - relay-image-test
+      - test
+      - e2e
+    steps:
+      -
+        name: Check the result of the required jobs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'to_entries | all(.[]; .value.result == "success" or ((.key | IN("bin-image-test", "relay-image-test")) and .value.result == "skipped"))' > /dev/null
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
