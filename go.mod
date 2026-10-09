@@ -1,6 +1,6 @@
 module github.com/docker/compose/v5
 
-go 1.26.8
+go 1.26.9
 
 require (
 	github.com/DefangLabs/secret-detector v0.0.0-20260916192156-3e28d7ed64df
