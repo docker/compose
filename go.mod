@@ -14,7 +14,7 @@ require (
 	github.com/containerd/platforms v1.0.0-rc.5
 	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v29.8.2+incompatible
+	github.com/docker/cli v29.9.0+incompatible
 	github.com/docker/cli-docs-tool v0.11.0
 	github.com/docker/go-units v0.5.0
 	github.com/docker/secrets-engine/client v0.1.2
