@@ -252,7 +252,7 @@ func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBui
 
 		entitlements, privileged := bakeEntitlements(buildConfig)
 		bake.privileged = bake.privileged || privileged
-		bake.localPaths = append(bake.localPaths, localBuildPaths(buildConfig)...)
+		bake.localPaths = dedupePaths(append(bake.localPaths, localBuildPaths(buildConfig)...))
 
 		image := api.GetImageNameOrDefault(service, project.Name)
 		if _, ok := serviceToBeBuild[serviceName]; ok {
@@ -353,20 +353,109 @@ func bakeOutputs(service types.ServiceConfig, options api.BuildOptions) (outputs
 	}
 }
 
-// localBuildPaths returns the build context paths that live on the local
-// filesystem — remote (git or URL) contexts need no fs.read entitlement.
+// localBuildPaths returns host paths bake needs an fs.read grant for.
+// Remote contexts are skipped. A Dockerfile outside the context is granted
+// as its directory — bake reads that directory, including a sibling
+// .dockerignore — and left out when a context grant already covers it.
 func localBuildPaths(buildConfig types.BuildConfig) []string {
-	paths := []string{buildConfig.Context}
-	for _, path := range buildConfig.AdditionalContexts {
-		paths = append(paths, path)
+	var contexts []string
+	if isLocalContextPath(buildConfig.Context) {
+		contexts = append(contexts, buildConfig.Context)
 	}
-	var local []string
-	for _, path := range paths {
-		if _, _, err := gitutil.ParseGitRef(path); !strings.Contains(path, "://") && err != nil {
-			local = append(local, path)
+	for _, path := range buildConfig.AdditionalContexts {
+		if isLocalContextPath(path) {
+			contexts = append(contexts, path)
 		}
 	}
-	return local
+	local := append([]string{}, contexts...)
+	if dir := localDockerfileDir(buildConfig); dir != "" && !dirCovered(contexts, dir) {
+		local = append(local, dir)
+	}
+	return dedupePaths(local)
+}
+
+// isLocalContextPath reports whether path is a host directory rather than a
+// git or URL context. The git-ref check stays on contexts only: a resolved
+// host path can contain "github.com" and must not be dropped.
+func isLocalContextPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	if _, _, err := gitutil.ParseGitRef(path); strings.Contains(path, "://") || err == nil {
+		return false
+	}
+	return true
+}
+
+// isRemoteContext matches the check dockerFilePath uses so the entitlement
+// decision and the path written into the bake file cannot drift.
+func isRemoteContext(ctxName string) bool {
+	contextType, _ := build.DetectContextType(ctxName)
+	if contextType == build.ContextTypeGit || contextType == build.ContextTypeRemote {
+		return true
+	}
+	return strings.Contains(ctxName, "://")
+}
+
+// localDockerfileDir is the host directory bake reads for dockerfile:, when
+// the context itself is local. Git and remote contexts keep the Dockerfile
+// inside the remote source, so they get no extra fs.read grant.
+func localDockerfileDir(buildConfig types.BuildConfig) string {
+	if buildConfig.Dockerfile == "" || isRemoteContext(buildConfig.Context) {
+		return ""
+	}
+	resolved := dockerFilePath(buildConfig.Context, buildConfig.Dockerfile)
+	if resolved == "" {
+		return ""
+	}
+	return filepath.Dir(resolved)
+}
+
+// dirCovered reports whether dir is the same as, or inside, one of the
+// context paths. Comparison follows symlinks so a TempDir and its resolved
+// path still match.
+func dirCovered(contexts []string, dir string) bool {
+	dirKey := pathKey(dir)
+	for _, c := range contexts {
+		cKey := pathKey(c)
+		if cKey == dirKey {
+			return true
+		}
+		rel, err := filepath.Rel(cKey, dirKey)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func dedupePaths(paths []string) []string {
+	seen := make(map[string]struct{}, len(paths))
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		key := pathKey(p)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, p)
+	}
+	return out
+}
+
+func pathKey(p string) string {
+	cleaned := filepath.Clean(p)
+	if resolved, err := filepath.EvalSymlinks(cleaned); err == nil {
+		return filepath.Clean(resolved)
+	}
+	if abs, err := filepath.Abs(cleaned); err == nil {
+		if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+			return filepath.Clean(resolved)
+		}
+		return filepath.Clean(abs)
+	}
+	return cleaned
 }
 
 // bakeMetadataPath picks a fresh temporary path for bake's --metadata-file.
@@ -622,11 +711,7 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
-	contextType, _ := build.DetectContextType(ctxName)
-	if contextType == build.ContextTypeGit || contextType == build.ContextTypeRemote {
-		return dockerfile
-	}
-	if strings.Contains(ctxName, "://") {
+	if isRemoteContext(ctxName) {
 		return dockerfile
 	}
 	if !filepath.IsAbs(dockerfile) {
