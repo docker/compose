@@ -19,6 +19,8 @@ ARG GO_VERSION=1.26.8
 ARG XX_VERSION=1.9.0
 ARG GOLANGCI_LINT_VERSION=v2.13.2
 ARG ADDLICENSE_VERSION=v1.0.0
+# Keep in sync with GOTESTSUM_VERSION in the Makefile
+ARG GOTESTSUM_VERSION=v1.13.0
 
 ARG BUILD_TAGS="e2e"
 ARG DOCS_FORMATS="md,yaml"
@@ -119,8 +121,11 @@ RUN --mount=type=bind,target=. \
     golangci-lint run --build-tags "$BUILD_TAGS" ./...
 
 FROM build-base AS test
-ARG CGO_ENABLED=0
+# the race detector requires cgo (ENV: base sets CGO_ENABLED=0, which an ARG can't override)
+ENV CGO_ENABLED=1
 ARG BUILD_TAGS
+ARG GOTESTSUM_VERSION
+RUN apk add --no-cache gcc musl-dev
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
@@ -128,7 +133,7 @@ RUN --mount=type=bind,target=. \
     mkdir -p /tmp/coverage && \
     rm -rf /tmp/report && \
     mkdir -p /tmp/report && \
-    go run gotest.tools/gotestsum@latest --format testname --junitfile "/tmp/report/report.xml" -- -tags "$BUILD_TAGS" -v -cover -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') -args -test.gocoverdir="/tmp/coverage" && \
+    go run gotest.tools/gotestsum@${GOTESTSUM_VERSION} --format testname --junitfile "/tmp/report/report.xml" -- -tags "$BUILD_TAGS" -v -race -cover -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') -args -test.gocoverdir="/tmp/coverage" && \
     go tool covdata percent -i=/tmp/coverage
 
 FROM scratch AS test-coverage
