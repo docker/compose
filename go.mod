@@ -25,7 +25,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/mattn/go-runewidth v0.0.30
-	github.com/mattn/go-shellwords v1.0.15
+	github.com/mattn/go-shellwords v1.0.16
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.33.1
 	github.com/moby/go-archive v0.3.3
