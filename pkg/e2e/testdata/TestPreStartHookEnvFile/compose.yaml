@@ -1,0 +1,18 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    env_file:
+      - service.env
+    environment:
+      FROM_SERVICE_ENV: service
+    pre_start:
+      # declares nothing: inherits the service's env_file and environment
+      - command: sh -c 'test "$$FROM_SERVICE_FILE" = service && test "$$FROM_SERVICE_ENV" = service'
+      # completes the inherited environment with its own, which wins on conflicts
+      - command: sh -c 'test "$$FROM_SERVICE_FILE" = service && test "$$FROM_SERVICE_ENV" = service && test "$$FROM_HOOK_FILE" = hook && test "$$FROM_HOOK_ENV" = hook && test "$$SHARED" = hook_file'
+        env_file:
+          - hook.env
+        environment:
+          FROM_HOOK_ENV: hook
