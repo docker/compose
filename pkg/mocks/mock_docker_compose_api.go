@@ -529,6 +529,632 @@ func (mr *MockComposeMockRecorder) Watch(ctx, project, options any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockCompose)(nil).Watch), ctx, project, options)
 }
 
+// MockLifecycle is a mock of Lifecycle interface.
+type MockLifecycle struct {
+	ctrl     *gomock.Controller
+	recorder *MockLifecycleMockRecorder
+}
+
+// MockLifecycleMockRecorder is the mock recorder for MockLifecycle.
+type MockLifecycleMockRecorder struct {
+	mock *MockLifecycle
+}
+
+// NewMockLifecycle creates a new mock instance.
+func NewMockLifecycle(ctrl *gomock.Controller) *MockLifecycle {
+	mock := &MockLifecycle{ctrl: ctrl}
+	mock.recorder = &MockLifecycleMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockLifecycle) EXPECT() *MockLifecycleMockRecorder {
+	return m.recorder
+}
+
+// Create mocks base method.
+func (m *MockLifecycle) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockLifecycleMockRecorder) Create(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockLifecycle)(nil).Create), ctx, project, options)
+}
+
+// Down mocks base method.
+func (m *MockLifecycle) Down(ctx context.Context, projectName string, options api.DownOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Down", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Down indicates an expected call of Down.
+func (mr *MockLifecycleMockRecorder) Down(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Down", reflect.TypeOf((*MockLifecycle)(nil).Down), ctx, projectName, options)
+}
+
+// Kill mocks base method.
+func (m *MockLifecycle) Kill(ctx context.Context, projectName string, options api.KillOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Kill", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Kill indicates an expected call of Kill.
+func (mr *MockLifecycleMockRecorder) Kill(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Kill", reflect.TypeOf((*MockLifecycle)(nil).Kill), ctx, projectName, options)
+}
+
+// Pause mocks base method.
+func (m *MockLifecycle) Pause(ctx context.Context, projectName string, options api.PauseOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Pause", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Pause indicates an expected call of Pause.
+func (mr *MockLifecycleMockRecorder) Pause(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pause", reflect.TypeOf((*MockLifecycle)(nil).Pause), ctx, projectName, options)
+}
+
+// Remove mocks base method.
+func (m *MockLifecycle) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Remove", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Remove indicates an expected call of Remove.
+func (mr *MockLifecycleMockRecorder) Remove(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockLifecycle)(nil).Remove), ctx, projectName, options)
+}
+
+// Restart mocks base method.
+func (m *MockLifecycle) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Restart", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Restart indicates an expected call of Restart.
+func (mr *MockLifecycleMockRecorder) Restart(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Restart", reflect.TypeOf((*MockLifecycle)(nil).Restart), ctx, projectName, options)
+}
+
+// Scale mocks base method.
+func (m *MockLifecycle) Scale(ctx context.Context, project *types.Project, options api.ScaleOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Scale", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Scale indicates an expected call of Scale.
+func (mr *MockLifecycleMockRecorder) Scale(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scale", reflect.TypeOf((*MockLifecycle)(nil).Scale), ctx, project, options)
+}
+
+// Start mocks base method.
+func (m *MockLifecycle) Start(ctx context.Context, projectName string, options api.StartOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockLifecycleMockRecorder) Start(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockLifecycle)(nil).Start), ctx, projectName, options)
+}
+
+// Stop mocks base method.
+func (m *MockLifecycle) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Stop", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Stop indicates an expected call of Stop.
+func (mr *MockLifecycleMockRecorder) Stop(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockLifecycle)(nil).Stop), ctx, projectName, options)
+}
+
+// UnPause mocks base method.
+func (m *MockLifecycle) UnPause(ctx context.Context, projectName string, options api.PauseOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnPause", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnPause indicates an expected call of UnPause.
+func (mr *MockLifecycleMockRecorder) UnPause(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnPause", reflect.TypeOf((*MockLifecycle)(nil).UnPause), ctx, projectName, options)
+}
+
+// Up mocks base method.
+func (m *MockLifecycle) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Up", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Up indicates an expected call of Up.
+func (mr *MockLifecycleMockRecorder) Up(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Up", reflect.TypeOf((*MockLifecycle)(nil).Up), ctx, project, options)
+}
+
+// Wait mocks base method.
+func (m *MockLifecycle) Wait(ctx context.Context, projectName string, options api.WaitOptions) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Wait", ctx, projectName, options)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Wait indicates an expected call of Wait.
+func (mr *MockLifecycleMockRecorder) Wait(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockLifecycle)(nil).Wait), ctx, projectName, options)
+}
+
+// MockInspector is a mock of Inspector interface.
+type MockInspector struct {
+	ctrl     *gomock.Controller
+	recorder *MockInspectorMockRecorder
+}
+
+// MockInspectorMockRecorder is the mock recorder for MockInspector.
+type MockInspectorMockRecorder struct {
+	mock *MockInspector
+}
+
+// NewMockInspector creates a new mock instance.
+func NewMockInspector(ctrl *gomock.Controller) *MockInspector {
+	mock := &MockInspector{ctrl: ctrl}
+	mock.recorder = &MockInspectorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockInspector) EXPECT() *MockInspectorMockRecorder {
+	return m.recorder
+}
+
+// Events mocks base method.
+func (m *MockInspector) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Events", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Events indicates an expected call of Events.
+func (mr *MockInspectorMockRecorder) Events(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Events", reflect.TypeOf((*MockInspector)(nil).Events), ctx, projectName, options)
+}
+
+// Images mocks base method.
+func (m *MockInspector) Images(ctx context.Context, projectName string, options api.ImagesOptions) (map[string]api.ImageSummary, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Images", ctx, projectName, options)
+	ret0, _ := ret[0].(map[string]api.ImageSummary)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Images indicates an expected call of Images.
+func (mr *MockInspectorMockRecorder) Images(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Images", reflect.TypeOf((*MockInspector)(nil).Images), ctx, projectName, options)
+}
+
+// List mocks base method.
+func (m *MockInspector) List(ctx context.Context, options api.ListOptions) ([]api.Stack, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, options)
+	ret0, _ := ret[0].([]api.Stack)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockInspectorMockRecorder) List(ctx, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockInspector)(nil).List), ctx, options)
+}
+
+// Logs mocks base method.
+func (m *MockInspector) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Logs", ctx, projectName, consumer, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Logs indicates an expected call of Logs.
+func (mr *MockInspectorMockRecorder) Logs(ctx, projectName, consumer, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logs", reflect.TypeOf((*MockInspector)(nil).Logs), ctx, projectName, consumer, options)
+}
+
+// Ports mocks base method.
+func (m *MockInspector) Ports(ctx context.Context, projectName, service string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ports", ctx, projectName, service, port, options)
+	ret0, _ := ret[0].(api.PortPublishers)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Ports indicates an expected call of Ports.
+func (mr *MockInspectorMockRecorder) Ports(ctx, projectName, service, port, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ports", reflect.TypeOf((*MockInspector)(nil).Ports), ctx, projectName, service, port, options)
+}
+
+// Ps mocks base method.
+func (m *MockInspector) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ps", ctx, projectName, options)
+	ret0, _ := ret[0].([]api.ContainerSummary)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Ps indicates an expected call of Ps.
+func (mr *MockInspectorMockRecorder) Ps(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ps", reflect.TypeOf((*MockInspector)(nil).Ps), ctx, projectName, options)
+}
+
+// Top mocks base method.
+func (m *MockInspector) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Top", ctx, projectName, services)
+	ret0, _ := ret[0].([]api.ContainerProcSummary)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Top indicates an expected call of Top.
+func (mr *MockInspectorMockRecorder) Top(ctx, projectName, services any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Top", reflect.TypeOf((*MockInspector)(nil).Top), ctx, projectName, services)
+}
+
+// Viz mocks base method.
+func (m *MockInspector) Viz(ctx context.Context, project *types.Project, options api.VizOptions) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Viz", ctx, project, options)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Viz indicates an expected call of Viz.
+func (mr *MockInspectorMockRecorder) Viz(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Viz", reflect.TypeOf((*MockInspector)(nil).Viz), ctx, project, options)
+}
+
+// Volumes mocks base method.
+func (m *MockInspector) Volumes(ctx context.Context, project string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Volumes", ctx, project, options)
+	ret0, _ := ret[0].([]api.VolumesSummary)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Volumes indicates an expected call of Volumes.
+func (mr *MockInspectorMockRecorder) Volumes(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Volumes", reflect.TypeOf((*MockInspector)(nil).Volumes), ctx, project, options)
+}
+
+// MockImageManager is a mock of ImageManager interface.
+type MockImageManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockImageManagerMockRecorder
+}
+
+// MockImageManagerMockRecorder is the mock recorder for MockImageManager.
+type MockImageManagerMockRecorder struct {
+	mock *MockImageManager
+}
+
+// NewMockImageManager creates a new mock instance.
+func NewMockImageManager(ctrl *gomock.Controller) *MockImageManager {
+	mock := &MockImageManager{ctrl: ctrl}
+	mock.recorder = &MockImageManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockImageManager) EXPECT() *MockImageManagerMockRecorder {
+	return m.recorder
+}
+
+// Build mocks base method.
+func (m *MockImageManager) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Build", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Build indicates an expected call of Build.
+func (mr *MockImageManagerMockRecorder) Build(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Build", reflect.TypeOf((*MockImageManager)(nil).Build), ctx, project, options)
+}
+
+// Publish mocks base method.
+func (m *MockImageManager) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Publish", ctx, project, repository, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Publish indicates an expected call of Publish.
+func (mr *MockImageManagerMockRecorder) Publish(ctx, project, repository, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockImageManager)(nil).Publish), ctx, project, repository, options)
+}
+
+// Pull mocks base method.
+func (m *MockImageManager) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Pull", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Pull indicates an expected call of Pull.
+func (mr *MockImageManagerMockRecorder) Pull(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pull", reflect.TypeOf((*MockImageManager)(nil).Pull), ctx, project, options)
+}
+
+// Push mocks base method.
+func (m *MockImageManager) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Push", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Push indicates an expected call of Push.
+func (mr *MockImageManagerMockRecorder) Push(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Push", reflect.TypeOf((*MockImageManager)(nil).Push), ctx, project, options)
+}
+
+// MockRunner is a mock of Runner interface.
+type MockRunner struct {
+	ctrl     *gomock.Controller
+	recorder *MockRunnerMockRecorder
+}
+
+// MockRunnerMockRecorder is the mock recorder for MockRunner.
+type MockRunnerMockRecorder struct {
+	mock *MockRunner
+}
+
+// NewMockRunner creates a new mock instance.
+func NewMockRunner(ctrl *gomock.Controller) *MockRunner {
+	mock := &MockRunner{ctrl: ctrl}
+	mock.recorder = &MockRunnerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRunner) EXPECT() *MockRunnerMockRecorder {
+	return m.recorder
+}
+
+// Attach mocks base method.
+func (m *MockRunner) Attach(ctx context.Context, projectName string, options api.AttachOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Attach", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Attach indicates an expected call of Attach.
+func (mr *MockRunnerMockRecorder) Attach(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Attach", reflect.TypeOf((*MockRunner)(nil).Attach), ctx, projectName, options)
+}
+
+// Commit mocks base method.
+func (m *MockRunner) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Commit", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Commit indicates an expected call of Commit.
+func (mr *MockRunnerMockRecorder) Commit(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockRunner)(nil).Commit), ctx, projectName, options)
+}
+
+// Copy mocks base method.
+func (m *MockRunner) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Copy", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Copy indicates an expected call of Copy.
+func (mr *MockRunnerMockRecorder) Copy(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Copy", reflect.TypeOf((*MockRunner)(nil).Copy), ctx, projectName, options)
+}
+
+// Exec mocks base method.
+func (m *MockRunner) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Exec", ctx, projectName, options)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Exec indicates an expected call of Exec.
+func (mr *MockRunnerMockRecorder) Exec(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exec", reflect.TypeOf((*MockRunner)(nil).Exec), ctx, projectName, options)
+}
+
+// Export mocks base method.
+func (m *MockRunner) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Export", ctx, projectName, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Export indicates an expected call of Export.
+func (mr *MockRunnerMockRecorder) Export(ctx, projectName, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Export", reflect.TypeOf((*MockRunner)(nil).Export), ctx, projectName, options)
+}
+
+// RunOneOffContainer mocks base method.
+func (m *MockRunner) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RunOneOffContainer", ctx, project, opts)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RunOneOffContainer indicates an expected call of RunOneOffContainer.
+func (mr *MockRunnerMockRecorder) RunOneOffContainer(ctx, project, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunOneOffContainer", reflect.TypeOf((*MockRunner)(nil).RunOneOffContainer), ctx, project, opts)
+}
+
+// MockWatcher is a mock of Watcher interface.
+type MockWatcher struct {
+	ctrl     *gomock.Controller
+	recorder *MockWatcherMockRecorder
+}
+
+// MockWatcherMockRecorder is the mock recorder for MockWatcher.
+type MockWatcherMockRecorder struct {
+	mock *MockWatcher
+}
+
+// NewMockWatcher creates a new mock instance.
+func NewMockWatcher(ctrl *gomock.Controller) *MockWatcher {
+	mock := &MockWatcher{ctrl: ctrl}
+	mock.recorder = &MockWatcherMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockWatcher) EXPECT() *MockWatcherMockRecorder {
+	return m.recorder
+}
+
+// Watch mocks base method.
+func (m *MockWatcher) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Watch", ctx, project, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Watch indicates an expected call of Watch.
+func (mr *MockWatcherMockRecorder) Watch(ctx, project, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockWatcher)(nil).Watch), ctx, project, options)
+}
+
+// MockProjectLoader is a mock of ProjectLoader interface.
+type MockProjectLoader struct {
+	ctrl     *gomock.Controller
+	recorder *MockProjectLoaderMockRecorder
+}
+
+// MockProjectLoaderMockRecorder is the mock recorder for MockProjectLoader.
+type MockProjectLoaderMockRecorder struct {
+	mock *MockProjectLoader
+}
+
+// NewMockProjectLoader creates a new mock instance.
+func NewMockProjectLoader(ctrl *gomock.Controller) *MockProjectLoader {
+	mock := &MockProjectLoader{ctrl: ctrl}
+	mock.recorder = &MockProjectLoaderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProjectLoader) EXPECT() *MockProjectLoaderMockRecorder {
+	return m.recorder
+}
+
+// Generate mocks base method.
+func (m *MockProjectLoader) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Generate", ctx, options)
+	ret0, _ := ret[0].(*types.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Generate indicates an expected call of Generate.
+func (mr *MockProjectLoaderMockRecorder) Generate(ctx, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockProjectLoader)(nil).Generate), ctx, options)
+}
+
+// LoadProject mocks base method.
+func (m *MockProjectLoader) LoadProject(ctx context.Context, options api.ProjectLoadOptions) (*types.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LoadProject", ctx, options)
+	ret0, _ := ret[0].(*types.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LoadProject indicates an expected call of LoadProject.
+func (mr *MockProjectLoaderMockRecorder) LoadProject(ctx, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadProject", reflect.TypeOf((*MockProjectLoader)(nil).LoadProject), ctx, options)
+}
+
 // MockLogConsumer is a mock of LogConsumer interface.
 type MockLogConsumer struct {
 	ctrl     *gomock.Controller
