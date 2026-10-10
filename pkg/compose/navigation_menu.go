@@ -21,7 +21,6 @@ import (
 	"os"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/eiannone/keyboard"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -36,11 +35,20 @@ type NavigationMenu interface {
 	EnableWatch(enabled bool, watcher api.Feature)
 	// EnableDetach sets the function run when the user asks to detach
 	EnableDetach(detach func())
-	// HandleKeyEvents reacts to a key typed by the user
-	HandleKeyEvents(ctx context.Context, event keyboard.KeyEvent, project *types.Project, options api.UpOptions)
+	// Open takes control of the keyboard. Keys typed from then on are kept until
+	// Run consumes them. An error means the menu can't be used (no terminal, …)
+	// and the session carries on without it.
+	Open() error
+	// Run reacts to the keys typed by the user until ctx is done. It is called
+	// once, after Open and after the menu has been fully configured.
+	Run(ctx context.Context, project *types.Project, options api.UpOptions)
+	// Close gives the keyboard back. It can be called several times, and also
+	// when Open failed.
+	Close() error
 }
 
-// NavigationMenuFactory creates the NavigationMenu of an `up` session.
+// NavigationMenuFactory creates the NavigationMenu of an `up` session. It must
+// return a nil interface, not a typed nil pointer, when there is no menu.
 // isDockerDesktopActive and isLogsViewEnabled tell which Docker Desktop
 // integrations the menu can offer, and signals is the channel the menu notifies
 // with an interruption when the user asks to stop the application.
