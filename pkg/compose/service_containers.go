@@ -399,6 +399,12 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 // concurrent starts can be assigned the same port. Every code path calling
 // ContainerStart on a service container must hold it (the plan executor's
 // execStartContainer and the imperative startServiceContainer both do).
+//
+// It deliberately stays a package-level variable rather than a composeService
+// field: the race lives in the daemon, not in a service instance, so two
+// instances (e.g. SDK users) driving the same daemon must still exclude each
+// other. A per-instance lock would silently reintroduce the duplicate-port
+// assignment between them.
 var startMx sync.Mutex
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,

@@ -131,8 +131,6 @@ type pluginVariables struct {
 	endpoints map[int]string
 }
 
-var mux sync.Mutex
-
 func (s *composeService) runPlugin(ctx context.Context, project *types.Project, service types.ServiceConfig, command string, extraArgs ...string) error {
 	provider := *service.Provider
 
@@ -167,7 +165,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	// in ensureServiceRelay does not: holding the lock across it would make
 	// every concurrent provider wait on the slowest one (image pull
 	// included), so the relay is deployed after the lock is released.
-	mux.Lock()
+	s.pluginMu.Lock()
 	for name, s := range project.Services {
 		if _, ok := s.DependsOn[service.Name]; ok {
 			prefix := strings.ToUpper(service.Name) + "_"
@@ -187,7 +185,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 	if deployRelay {
 		networkKeys = relayNetworks(project, service)
 	}
-	mux.Unlock()
+	s.pluginMu.Unlock()
 
 	if isUp {
 		if deployRelay {

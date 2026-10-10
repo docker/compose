@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
@@ -70,6 +71,8 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		dockerCli:      dockerCli,
 		maxConcurrency: -1,
 		dryRun:         false,
+
+		logStreamDrainTimeout: defaultLogStreamDrainTimeout,
 	}
 	// Look the config file up lazily: WithDryRun replaces s.dockerCli.
 	s.auth = registry.NewDesktopAuthProvider(registry.AuthProviderFunc(func(registryHostname string) (clitypes.AuthConfig, error) {
@@ -297,6 +300,17 @@ type composeService struct {
 	auth registry.AuthProvider
 
 	runtimeAPIVersion runtimeVersionCache
+
+	// swarm caches the daemon's swarm mode, see isSwarmEnabled.
+	swarm swarmState
+
+	// pluginMu guards the project's services while concurrent provider runs
+	// inject their variables into the services depending on them, see runPlugin.
+	pluginMu sync.Mutex
+
+	// logStreamDrainTimeout bounds the shutdown drain of re-attached log
+	// streams, see drainTimeout.
+	logStreamDrainTimeout time.Duration
 }
 
 // Close releases any connections/resources held by the underlying clients.
@@ -575,26 +589,30 @@ func (s *composeService) actualNetworks(ctx context.Context, projectName string)
 	return actual, nil
 }
 
-var swarmEnabled = struct {
+// swarmState caches whether the daemon this service talks to runs in swarm
+// mode. The answer belongs to the daemon behind the service's client, so it is
+// held per composeService rather than shared by every instance in the process.
+type swarmState struct {
 	once sync.Once
 	val  bool
 	err  error
-}{}
+}
 
 func (s *composeService) isSwarmEnabled(ctx context.Context) (bool, error) {
-	swarmEnabled.once.Do(func() {
+	st := &s.swarm
+	st.once.Do(func() {
 		res, err := s.apiClient().Info(ctx, client.InfoOptions{})
 		if err != nil {
-			swarmEnabled.err = err
+			st.err = err
 		}
 		switch res.Info.Swarm.LocalNodeState {
 		case swarm.LocalNodeStateInactive, swarm.LocalNodeStateLocked:
-			swarmEnabled.val = false
+			st.val = false
 		default:
-			swarmEnabled.val = true
+			st.val = true
 		}
 	})
-	return swarmEnabled.val, swarmEnabled.err
+	return st.val, st.err
 }
 
 // runtimeVersionCache caches a version string after a successful lookup.
