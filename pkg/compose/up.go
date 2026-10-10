@@ -208,7 +208,7 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 		}()
 		select {
 		case <-drained:
-		case <-time.After(logStreamDrainTimeout):
+		case <-time.After(u.drainTimeout()):
 		case <-globalCtx.Done():
 		}
 		// cancel the global context to terminate signal-handler goroutines
@@ -426,15 +426,23 @@ func (u *upSession) captureExitCodeFrom() api.ContainerEventListener {
 	}
 }
 
+// defaultLogStreamDrainTimeout is the default bound on the shutdown drain of the
+// streams opened by followStartedContainers: EOF is guaranteed once the containers exited, the bound only protects against a
+// wedged daemon holding the connection open. It is a composeService field so
+// tests can shrink it without touching package state.
+const defaultLogStreamDrainTimeout = 5 * time.Second
+
+// drainTimeout returns the configured drain bound, falling back to the default
+// for a composeService not built by NewComposeService.
+func (s *composeService) drainTimeout() time.Duration {
+	if s.logStreamDrainTimeout > 0 {
+		return s.logStreamDrainTimeout
+	}
+	return defaultLogStreamDrainTimeout
+}
+
 // followStartedContainers streams logs of containers (re)started after `up`,
 // so they are followed like the initially attached ones.
-//
-// logStreamDrainTimeout bounds the shutdown drain of these streams: EOF is
-// guaranteed once the containers exited, the bound only protects against a
-// wedged daemon holding the connection open. A variable so tests can shrink
-// it.
-var logStreamDrainTimeout = 5 * time.Second
-
 func (u *upSession) followStartedContainers(attached []string) api.ContainerEventListener {
 	runEnds := newRunEndTracker()
 	cursors := newLogCursors()
