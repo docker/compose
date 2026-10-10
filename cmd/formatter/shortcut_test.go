@@ -60,6 +60,25 @@ func TestRunHandlesKeysUntilContextIsDone(t *testing.T) {
 	assert.NilError(t, lk.Close(), "Close must be idempotent")
 }
 
+func TestRunReturnsWhenKeyboardIsClosed(t *testing.T) {
+	keys := make(chan keyboard.KeyEvent)
+	lk := NewKeyboardManager(false, false, make(chan os.Signal, 1))
+	lk.keys = keys
+
+	done := make(chan struct{})
+	go func() {
+		lk.Run(t.Context(), &types.Project{}, api.UpOptions{})
+		close(done)
+	}()
+
+	close(keys) // what keyboard.Close does to the channel it handed out
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run must return once the keyboard channel is closed")
+	}
+}
+
 func TestRunWithoutOpenReturnsImmediately(t *testing.T) {
 	lk := NewKeyboardManager(false, false, make(chan os.Signal, 1))
 	done := make(chan struct{})
