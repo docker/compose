@@ -327,7 +327,10 @@ func (lk *LogKeyboard) Run(ctx context.Context, project *types.Project, options 
 		select {
 		case <-ctx.Done():
 			return
-		case event := <-lk.keys:
+		case event, ok := <-lk.keys:
+			if !ok { // the keyboard was closed
+				return
+			}
 			lk.handleKeyEvent(ctx, event, project, options)
 		}
 	}
