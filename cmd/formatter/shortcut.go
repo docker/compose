@@ -73,13 +73,7 @@ func (ke *KeyboardError) error() string {
 
 type KeyboardWatch struct {
 	Watching bool
-	Watcher  Feature
-}
-
-// Feature is an compose feature that can be started/stopped by a menu command
-type Feature interface {
-	Start(context.Context) error
-	Stop() error
+	Watcher  api.Feature
 }
 
 type KEYBOARD_LOG_LEVEL int
@@ -356,7 +350,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	}
 }
 
-func (lk *LogKeyboard) EnableWatch(enabled bool, watcher Feature) {
+func (lk *LogKeyboard) EnableWatch(enabled bool, watcher api.Feature) {
 	lk.Watch = &KeyboardWatch{
 		Watching: enabled,
 		Watcher:  watcher,

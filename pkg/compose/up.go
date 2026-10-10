@@ -36,7 +36,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
@@ -79,7 +78,7 @@ type upSession struct {
 	// drain them before tearing the context down — see the monitor wrapper.
 	logStreams sync.WaitGroup
 	watcher    *Watcher
-	menu       *formatter.LogKeyboard
+	menu       NavigationMenu
 	globalCtx  context.Context
 	cancel     context.CancelFunc
 	// logOpenLimiter bounds concurrent log-attach opens from
@@ -238,10 +237,16 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 }
 
 // setupNavigationMenu initializes the interactive keyboard menu when enabled.
-// It returns a nil menu when the menu is disabled, or when the keyboard can't
-// be grabbed — then disabling the option.
-func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.UpOptions, signalChan chan os.Signal) (*formatter.LogKeyboard, <-chan keyboard.KeyEvent, error) {
+// It returns a nil menu when the menu is disabled, when no menu implementation
+// was configured (WithNavigationMenu), or when the keyboard can't be grabbed —
+// then disabling the option.
+func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.UpOptions, signalChan chan os.Signal) (NavigationMenu, <-chan keyboard.KeyEvent, error) {
 	if !options.Start.NavigationMenu {
+		return nil, nil, nil
+	}
+	if s.navigationMenu == nil {
+		logrus.Warn("no navigation menu implementation configured (see WithNavigationMenu), disabling the option")
+		options.Start.NavigationMenu = false
 		return nil, nil, nil
 	}
 	kEvents, err := keyboard.GetKeys(100)
@@ -257,7 +262,13 @@ func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.U
 	}
 	isLogsViewEnabled := s.isDesktopFeatureActive(ctx, desktop.FeatureLogsTab)
 	tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isLogsViewEnabled)
-	return formatter.NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled, signalChan), kEvents, nil
+	menu := s.navigationMenu(isDockerDesktopActive, isLogsViewEnabled, signalChan)
+	if menu == nil {
+		_ = keyboard.Close()
+		options.Start.NavigationMenu = false
+		return nil, nil, nil
+	}
+	return menu, kEvents, nil
 }
 
 // appendErr records err for the final report, unless it is nothing more than

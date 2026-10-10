@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -231,4 +232,22 @@ func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
 	})
 	assert.NilError(t, eg.Wait())
 	assert.Equal(t, tracker.Peak(), 1, "streamContainerLogs must share --parallel's budget for concurrent log-attach opens")
+}
+
+func TestSetupNavigationMenuWithoutImplementation(t *testing.T) {
+	s := &composeService{}
+	options := api.UpOptions{Start: api.StartOptions{NavigationMenu: true}}
+
+	menu, events, err := s.setupNavigationMenu(t.Context(), &options, make(chan os.Signal, 1))
+
+	assert.NilError(t, err)
+	assert.Assert(t, menu == nil)
+	assert.Assert(t, events == nil, "the keyboard must not be grabbed when there is no menu to feed")
+	assert.Assert(t, !options.Start.NavigationMenu)
+}
+
+func TestWithNavigationMenu(t *testing.T) {
+	s := &composeService{}
+	assert.NilError(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu { return nil })(s))
+	assert.Assert(t, s.navigationMenu != nil)
 }
