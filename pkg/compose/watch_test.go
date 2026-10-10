@@ -398,3 +398,45 @@ func TestPruneDanglingImagesOnRebuild(t *testing.T) {
 	tested.(*composeService).pruneDanglingImagesOnRebuild(t.Context(), "proj",
 		map[string]string{"app-image:latest": "sha256:justbuilt"})
 }
+
+// TestWatcher_StartStopIndependent guards that the Start/Stop lock is per
+// watcher: a Start blocked inside its WatchFunc must not stall another watcher.
+func TestWatcher_StartStopIndependent(t *testing.T) {
+	project := &types.Project{Services: types.Services{"app": {
+		Name:    "app",
+		Develop: &types.DevelopConfig{Watch: []types.Trigger{{Path: ".", Action: types.WatchActionSync}}},
+	}}}
+
+	release := make(chan struct{})
+	entered := make(chan struct{})
+	blocking, err := NewWatcher(project, api.UpOptions{}, func(ctx context.Context, _ *types.Project, _ api.WatchOptions) (func() error, error) {
+		close(entered)
+		<-release
+		return func() error { return nil }, nil
+	}, nil)
+	assert.NilError(t, err)
+	go func() { _ = blocking.Start(t.Context()) }()
+	<-entered
+
+	other, err := NewWatcher(project, api.UpOptions{}, func(ctx context.Context, _ *types.Project, _ api.WatchOptions) (func() error, error) {
+		return func() error { return nil }, nil
+	}, nil)
+	assert.NilError(t, err)
+
+	done := make(chan error, 1)
+	go func() {
+		if err := other.Start(t.Context()); err != nil {
+			done <- err
+			return
+		}
+		done <- other.Stop()
+	}()
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("a Watcher blocked on another Watcher's Start: the lock must not be shared")
+	}
+	close(release)
+	assert.NilError(t, blocking.Stop())
+}
