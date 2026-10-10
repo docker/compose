@@ -31,7 +31,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli"
-	"github.com/eiannone/keyboard"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -104,12 +103,12 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 	defer signal.Stop(signalChan)
 
 	logConsumer := options.Start.Attach
-	navigationMenu, kEvents, err := s.setupNavigationMenu(ctx, &options, signalChan)
+	navigationMenu, err := s.setupNavigationMenu(ctx, &options, signalChan)
 	if err != nil {
 		return err
 	}
 	if navigationMenu != nil {
-		defer keyboard.Close() //nolint:errcheck
+		defer navigationMenu.Close() //nolint:errcheck
 		logConsumer = navigationMenu.Decorate(logConsumer)
 	}
 
@@ -144,8 +143,14 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 	}
 
 	u.eg.Go(func() error {
-		return u.runEventLoop(ctx, kEvents)
+		return u.runEventLoop(ctx)
 	})
+	if navigationMenu != nil {
+		u.eg.Go(func() error {
+			navigationMenu.Run(globalCtx, project, options)
+			return nil
+		})
+	}
 
 	if options.Start.Watch && watcher != nil {
 		if err := watcher.Start(globalCtx); err != nil {
@@ -240,35 +245,32 @@ func (s *composeService) runInteractiveUp(ctx context.Context, project *types.Pr
 // It returns a nil menu when the menu is disabled, when no menu implementation
 // was configured (WithNavigationMenu), or when the keyboard can't be grabbed —
 // then disabling the option.
-func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.UpOptions, signalChan chan os.Signal) (NavigationMenu, <-chan keyboard.KeyEvent, error) {
+func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.UpOptions, signalChan chan os.Signal) (NavigationMenu, error) {
 	if !options.Start.NavigationMenu {
-		return nil, nil, nil
+		return nil, nil
 	}
 	if s.navigationMenu == nil {
 		logrus.Warn("no navigation menu implementation configured (see WithNavigationMenu), disabling the option")
 		options.Start.NavigationMenu = false
-		return nil, nil, nil
-	}
-	kEvents, err := keyboard.GetKeys(100)
-	if err != nil {
-		logrus.Warnf("could not start menu, an error occurred while starting: %v", err)
-		options.Start.NavigationMenu = false
-		return nil, nil, nil
+		return nil, nil
 	}
 	isDockerDesktopActive, err := s.isDesktopIntegrationActive(ctx)
 	if err != nil {
-		_ = keyboard.Close()
-		return nil, nil, err
+		return nil, err
 	}
 	isLogsViewEnabled := s.isDesktopFeatureActive(ctx, desktop.FeatureLogsTab)
-	tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isLogsViewEnabled)
 	menu := s.navigationMenu(isDockerDesktopActive, isLogsViewEnabled, signalChan)
 	if menu == nil {
-		_ = keyboard.Close()
 		options.Start.NavigationMenu = false
-		return nil, nil, nil
+		return nil, nil
 	}
-	return menu, kEvents, nil
+	if err := menu.Open(); err != nil {
+		logrus.Warnf("could not start menu, an error occurred while starting: %v", err)
+		options.Start.NavigationMenu = false
+		return nil, nil
+	}
+	tracing.KeyboardMetrics(ctx, options.Start.NavigationMenu, isDockerDesktopActive, isLogsViewEnabled)
+	return menu, nil
 }
 
 // appendErr records err for the final report, unless it is nothing more than
@@ -290,10 +292,10 @@ func (u *upSession) appendErr(err error) {
 	u.mu.Unlock()
 }
 
-// runEventLoop reacts to cancellation, SIGINT/SIGTERM and keyboard input until
+// runEventLoop reacts to cancellation and SIGINT/SIGTERM until
 // the application terminates: a first interruption triggers a graceful stop,
 // a second one kills the services.
-func (u *upSession) runEventLoop(ctx context.Context, kEvents <-chan keyboard.KeyEvent) error {
+func (u *upSession) runEventLoop(ctx context.Context) error {
 	first := true
 	gracefulTeardown := func() {
 		first = false
@@ -317,14 +319,14 @@ func (u *upSession) runEventLoop(ctx context.Context, kEvents <-chan keyboard.Ke
 			}
 		case <-u.signalChan:
 			if first {
-				_ = keyboard.Close()
+				if u.menu != nil {
+					_ = u.menu.Close()
+				}
 				gracefulTeardown()
 				break
 			}
 			u.killApplication()
 			return nil
-		case event := <-kEvents:
-			u.menu.HandleKeyEvents(u.globalCtx, event, u.project, u.options)
 		}
 	}
 }
