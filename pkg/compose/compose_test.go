@@ -21,6 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 
@@ -51,4 +54,46 @@ func TestNewLimitedErrgroup_NonPositiveIsUnlimited(t *testing.T) {
 			assert.NilError(t, eg.Wait())
 		})
 	}
+}
+
+func swarmInfo(state swarm.LocalNodeState) client.SystemInfoResult {
+	res := client.SystemInfoResult{}
+	res.Info.Swarm.LocalNodeState = state
+	return res
+}
+
+// TestIsSwarmEnabled_PerInstance guards that the swarm answer is cached per
+// service: two services talking to different daemons must each report their
+// own daemon's mode instead of sharing the first answer given in the process.
+func TestIsSwarmEnabled_PerInstance(t *testing.T) {
+	inactive, inactiveClient := newTestService(t)
+	inactiveClient.EXPECT().Info(gomock.Any(), gomock.Any()).Times(1).
+		Return(swarmInfo(swarm.LocalNodeStateInactive), nil)
+	active, activeClient := newTestService(t)
+	activeClient.EXPECT().Info(gomock.Any(), gomock.Any()).Times(1).
+		Return(swarmInfo(swarm.LocalNodeStateActive), nil)
+
+	for range 2 { // second round is served from each instance's own cache
+		enabled, err := inactive.isSwarmEnabled(t.Context())
+		assert.NilError(t, err)
+		assert.Assert(t, !enabled)
+
+		enabled, err = active.isSwarmEnabled(t.Context())
+		assert.NilError(t, err)
+		assert.Assert(t, enabled)
+	}
+}
+
+// TestDrainTimeout guards the per-instance log drain bound and its fallback
+// for a composeService not built by NewComposeService.
+func TestDrainTimeout(t *testing.T) {
+	svc, _ := newTestService(t)
+	assert.Equal(t, svc.drainTimeout(), defaultLogStreamDrainTimeout)
+
+	svc.logStreamDrainTimeout = time.Millisecond
+	other, _ := newTestService(t)
+	assert.Equal(t, svc.drainTimeout(), time.Millisecond)
+	assert.Equal(t, other.drainTimeout(), defaultLogStreamDrainTimeout)
+
+	assert.Equal(t, (&composeService{}).drainTimeout(), defaultLogStreamDrainTimeout)
 }
