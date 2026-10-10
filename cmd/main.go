@@ -29,6 +29,7 @@ import (
 	"github.com/docker/compose/v5/cmd/cmdtrace"
 	"github.com/docker/compose/v5/cmd/compatibility"
 	commands "github.com/docker/compose/v5/cmd/compose"
+	"github.com/docker/compose/v5/cmd/formatter"
 	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/docker/compose/v5/internal"
 	"github.com/docker/compose/v5/pkg/compose"
@@ -40,6 +41,9 @@ func pluginMain() {
 			backendOptions := &commands.BackendOptions{
 				Options: []compose.Option{
 					compose.WithPrompt(prompt.NewPrompt(cli.In(), cli.Out()).Confirm),
+					compose.WithNavigationMenu(func(isDockerDesktopActive, isLogsViewEnabled bool, signals chan<- os.Signal) compose.NavigationMenu {
+						return formatter.NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled, signals)
+					}),
 				},
 			}
 
