@@ -281,6 +281,8 @@ type composeService struct {
 	dockerCli command.Cli
 	// prompt is used to interact with user and confirm actions
 	prompt Prompt
+	// navigationMenu creates the interactive menu of a foreground `up`, if any
+	navigationMenu NavigationMenuFactory
 	// eventBus collects tasks execution events
 	events api.EventProcessor
 

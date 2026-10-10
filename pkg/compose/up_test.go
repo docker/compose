@@ -21,10 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
@@ -231,4 +233,67 @@ func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
 	})
 	assert.NilError(t, eg.Wait())
 	assert.Equal(t, tracker.Peak(), 1, "streamContainerLogs must share --parallel's budget for concurrent log-attach opens")
+}
+
+func TestSetupNavigationMenuWithoutImplementation(t *testing.T) {
+	s := &composeService{}
+	options := api.UpOptions{Start: api.StartOptions{NavigationMenu: true}}
+
+	menu, err := s.setupNavigationMenu(t.Context(), &options, make(chan os.Signal, 1))
+
+	assert.NilError(t, err)
+	assert.Assert(t, menu == nil)
+	assert.Assert(t, !options.Start.NavigationMenu)
+}
+
+// fakeMenu records how the session drives a NavigationMenu.
+type fakeMenu struct {
+	openErr error
+	opened  bool
+}
+
+func (m *fakeMenu) Decorate(l api.LogConsumer) api.LogConsumer         { return l }
+func (m *fakeMenu) EnableWatch(bool, api.Feature)                      {}
+func (m *fakeMenu) EnableDetach(func())                                {}
+func (m *fakeMenu) Run(context.Context, *types.Project, api.UpOptions) {}
+func (m *fakeMenu) Close() error                                       { return nil }
+func (m *fakeMenu) Open() error {
+	m.opened = true
+	return m.openErr
+}
+
+func TestSetupNavigationMenu(t *testing.T) {
+	tests := []struct {
+		name     string
+		menu     NavigationMenu
+		wantMenu bool
+	}{
+		{name: "usable", menu: &fakeMenu{}, wantMenu: true},
+		{name: "keyboard can't be grabbed", menu: &fakeMenu{openErr: errors.New("no tty")}},
+		{name: "factory without menu"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient := newTestService(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu {
+				return tt.menu
+			}))
+			apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(client.SystemInfoResult{}, nil).AnyTimes()
+			options := api.UpOptions{Start: api.StartOptions{NavigationMenu: true}}
+
+			menu, err := svc.setupNavigationMenu(t.Context(), &options, make(chan os.Signal, 1))
+
+			assert.NilError(t, err)
+			assert.Equal(t, menu != nil, tt.wantMenu)
+			assert.Equal(t, options.Start.NavigationMenu, tt.wantMenu, "the option must be disabled when there is no usable menu")
+			if fm, ok := tt.menu.(*fakeMenu); ok {
+				assert.Assert(t, fm.opened, "the keyboard must be grabbed through the menu")
+			}
+		})
+	}
+}
+
+func TestWithNavigationMenu(t *testing.T) {
+	s := &composeService{}
+	assert.NilError(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu { return nil })(s))
+	assert.Assert(t, s.navigationMenu != nil)
 }

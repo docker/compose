@@ -23,6 +23,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -73,13 +74,7 @@ func (ke *KeyboardError) error() string {
 
 type KeyboardWatch struct {
 	Watching bool
-	Watcher  Feature
-}
-
-// Feature is an compose feature that can be started/stopped by a menu command
-type Feature interface {
-	Start(context.Context) error
-	Stop() error
+	Watcher  api.Feature
 }
 
 type KEYBOARD_LOG_LEVEL int
@@ -98,6 +93,9 @@ type LogKeyboard struct {
 	IsLogsViewEnabled     bool
 	logLevel              KEYBOARD_LOG_LEVEL
 	signalChannel         chan<- os.Signal
+	keys                  <-chan keyboard.KeyEvent
+	closeOnce             sync.Once
+	closeErr              error
 }
 
 func NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled bool, sc chan<- os.Signal) *LogKeyboard {
@@ -310,7 +308,42 @@ func (lk *LogKeyboard) ToggleWatch(ctx context.Context, options api.UpOptions) {
 	}
 }
 
-func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEvent, project *types.Project, options api.UpOptions) {
+// Open puts the terminal in raw mode; keys are buffered until Run reads them.
+func (lk *LogKeyboard) Open() error {
+	keys, err := keyboard.GetKeys(100)
+	if err != nil {
+		return err
+	}
+	lk.keys = keys
+	return nil
+}
+
+// Run handles the keys typed by the user until ctx is done.
+func (lk *LogKeyboard) Run(ctx context.Context, project *types.Project, options api.UpOptions) {
+	if lk.keys == nil { // Open was not called, or failed
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-lk.keys:
+			if !ok { // the keyboard was closed
+				return
+			}
+			lk.handleKeyEvent(ctx, event, project, options)
+		}
+	}
+}
+
+// Close restores the terminal. It can be called several times, from several
+// goroutines (Ctrl+C is seen both as a key and as a signal).
+func (lk *LogKeyboard) Close() error {
+	lk.closeOnce.Do(func() { lk.closeErr = keyboard.Close() })
+	return lk.closeErr
+}
+
+func (lk *LogKeyboard) handleKeyEvent(ctx context.Context, event keyboard.KeyEvent, project *types.Project, options api.UpOptions) {
 	switch kRune := event.Rune; kRune {
 	case 'd':
 		lk.clearNavigationMenu()
@@ -341,7 +374,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	}
 	switch key := event.Key; key {
 	case keyboard.KeyCtrlC:
-		_ = keyboard.Close()
+		_ = lk.Close()
 		lk.clearNavigationMenu()
 		showCursor()
 
@@ -356,7 +389,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	}
 }
 
-func (lk *LogKeyboard) EnableWatch(enabled bool, watcher Feature) {
+func (lk *LogKeyboard) EnableWatch(enabled bool, watcher api.Feature) {
 	lk.Watch = &KeyboardWatch{
 		Watching: enabled,
 		Watcher:  watcher,
