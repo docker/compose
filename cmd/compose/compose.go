@@ -321,7 +321,7 @@ func (o *ProjectOptions) ToModel(ctx context.Context, dockerCli command.Cli, ser
 // finding compose-go's loader reports during that load. Accepts optional
 // cli.ProjectOptionsFn to control loader behavior.
 func (o *ProjectOptions) ToProject(
-	ctx context.Context, dockerCli command.Cli, backend api.Compose, services []string,
+	ctx context.Context, dockerCli command.Cli, backend api.ProjectLoader, services []string,
 	warn unsupportedAttributeWarning, po ...cli.ProjectOptionsFn,
 ) (*types.Project, tracing.Metrics, error) {
 	var metrics tracing.Metrics
