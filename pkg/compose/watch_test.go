@@ -440,3 +440,64 @@ func TestWatcher_StartStopIndependent(t *testing.T) {
 	close(release)
 	assert.NilError(t, blocking.Stop())
 }
+
+// A sync trigger writes into the container: when its path is already
+// bind-mounted the sync writes back to the host, which the watcher sees as a
+// new change, looping forever. Every action that syncs must be skipped; the
+// others (restart, rebuild) don't write and stay monitored.
+func TestWatchTriggerPaths_BindMountedPath(t *testing.T) {
+	hostDir := t.TempDir()
+	service := types.ServiceConfig{
+		Name: "svc",
+		ContainerSpec: types.ContainerSpec{
+			Volumes: []types.ServiceVolumeConfig{
+				{Type: types.VolumeTypeBind, Source: hostDir, Target: "/code", Bind: &types.ServiceVolumeBind{}},
+			},
+		},
+	}
+
+	for action, monitored := range map[types.WatchAction]bool{
+		types.WatchActionSync:        false,
+		types.WatchActionSyncRestart: false,
+		types.WatchActionSyncExec:    false,
+		types.WatchActionRestart:     true,
+		types.WatchActionRebuild:     true,
+	} {
+		t.Run(string(action), func(t *testing.T) {
+			paths, err := (&composeService{}).watchTriggerPaths(t.Context(), service, &types.DevelopConfig{
+				Watch: []types.Trigger{{Path: hostDir, Action: action, Target: "/tmp/target"}},
+			}, nil)
+			assert.NilError(t, err)
+			if monitored {
+				assert.DeepEqual(t, paths, []string{hostDir})
+			} else {
+				assert.Equal(t, len(paths), 0)
+			}
+		})
+	}
+}
+
+// initial_sync applies to every sync+x action, sync+exec included.
+func TestWatchTriggerPaths_InitialSyncExec(t *testing.T) {
+	hostDir := t.TempDir()
+	hostFile := filepath.Join(hostDir, "test.txt")
+	assert.NilError(t, os.WriteFile(hostFile, []byte("hello"), 0o600))
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	paths, err := (&composeService{}).watchTriggerPaths(t.Context(), types.ServiceConfig{
+		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
+	}, &types.DevelopConfig{
+		Watch: []types.Trigger{{Path: hostDir, Action: types.WatchActionSyncExec, Target: "/app", InitialSync: true}},
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []string{hostDir})
+	select {
+	case synced := <-syncer.synced:
+		assert.DeepEqual(t, synced, []*sync.PathMapping{{
+			HostPath:      hostFile,
+			ContainerPath: "/app/test.txt",
+		}})
+	default:
+		t.Fatal("initial_sync was not performed for sync+exec")
+	}
+}

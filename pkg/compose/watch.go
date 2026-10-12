@@ -351,7 +351,7 @@ func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]
 }
 
 func isSync(trigger types.Trigger) bool {
-	return trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart
+	return trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart || trigger.Action == types.WatchActionSyncExec
 }
 
 func (s *composeService) watchEvents(ctx context.Context, project *types.Project, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, rules []watchRule) error {
