@@ -247,6 +247,11 @@ func logDesktopFallback(name string, err error) {
 	logrus.Warnf("could not use the %s session from Docker Desktop, using Docker CLI credentials instead: %v", name, err)
 }
 
+// isSessionUnavailable reports whether err means there is no Desktop session
+// to use, including any failure to reach the secrets engine.
 func isSessionUnavailable(err error) bool {
-	return errors.Is(err, seclient.ErrSecretsEngineNotAvailable) || errors.Is(err, dockerhub.ErrNoSession) || errors.Is(err, errSessionExpired)
+	if _, ok := errors.AsType[*seclient.ConnectError](err); ok {
+		return true
+	}
+	return errors.Is(err, dockerhub.ErrNoSession) || errors.Is(err, errSessionExpired)
 }
