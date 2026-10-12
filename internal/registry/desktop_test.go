@@ -301,7 +301,11 @@ func TestDesktopAuthProvider_FallsBackWithoutUsableSession(t *testing.T) {
 	}{
 		{
 			name: "secrets engine not running",
-			hub:  &fakeHub{sessionErr: fmt.Errorf("%w: dial unix engine.sock: connect: no such file or directory", seclient.ErrSecretsEngineNotAvailable)},
+			hub:  &fakeHub{sessionErr: connectError(seclient.ReasonNotRunning)},
+		},
+		{
+			name: "secrets engine socket not accessible",
+			hub:  &fakeHub{sessionErr: connectError(seclient.ReasonPermissionDenied)},
 		},
 		{
 			name: "nobody signed in",
@@ -379,7 +383,11 @@ func TestDesktopAuthProvider_RetriesAfterInterval(t *testing.T) {
 
 func TestIsSessionUnavailable(t *testing.T) {
 	for _, err := range []error{
-		fmt.Errorf("%w: dial unix engine.sock", seclient.ErrSecretsEngineNotAvailable),
+		connectError(seclient.ReasonNotRunning),
+		fmt.Errorf("get session: %w", connectError(seclient.ReasonNotRunning)),
+		connectError(seclient.ReasonPermissionDenied),
+		connectError(seclient.ReasonTimeout),
+		connectError(seclient.ReasonUnknown),
 		dockerhub.ErrNoSession,
 		dockerhub.ErrNoDefaultProfile,
 		errSessionExpired,
@@ -392,6 +400,14 @@ func TestIsSessionUnavailable(t *testing.T) {
 		context.DeadlineExceeded,
 	} {
 		assert.Assert(t, !isSessionUnavailable(err), err)
+	}
+}
+
+func connectError(reason seclient.ConnectReason) error {
+	return &seclient.ConnectError{
+		Reason:     reason,
+		SocketPath: "/run/engine.sock",
+		Err:        errors.New("dial unix /run/engine.sock"),
 	}
 }
 
