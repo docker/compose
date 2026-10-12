@@ -219,13 +219,17 @@ func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summa
 // warning, not a plan failure — matching waitDependencies' own
 // optional-dependency handling.
 //
-// Unlike waitDependencies, this applies no deadline of its own: nothing
-// produces one yet (no ReconcileOptions field feeds a per-wait timeout the
-// way api.CreateOptions.WaitTimeout does today). A future caller needing that
-// — e.g. `up --wait` once it runs on the plan — wraps ctx before executing
-// the plan, or adds a Timeout to the operation for execWaitCondition to wrap
-// here.
-func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) error {
+// Unlike waitDependencies, this has no timeout of its own to apply here --
+// ctx is used exactly as given, already wrapped (or not) by executeNode's
+// OpWaitCondition dispatch in executor.go. origCtx is ctx as it stood right
+// before that wrap, passed through unchanged to waitDependency, which needs
+// it to tell its own wait timeout apart from an inherited deadline (see its
+// doc comment). upDetached (up.go) is the caller that needs a timeout here
+// at all: planExecutor.waitTimeout gives this node its own fresh per-wait
+// window, the same thing start()'s own WaitTimeout already threads through
+// every waitDependencies call -- without also bounding unrelated Create or
+// Start work the way wrapping the whole plan's ctx would.
+func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op Operation) error {
 	s := exec.compose
 	exec.containersMu.Lock()
 	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
@@ -248,7 +252,8 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 	// itself instead. waitDependency only ever reads this for one
 	// practically unreachable log line (an unsupported depends_on condition,
 	// filtered out before a plan is ever built).
-	return s.waitDependency(ctx, op.ResourceID, op.Name, config, waitingFor)
+	//
+	return s.waitDependency(ctx, origCtx, op.ResourceID, op.Name, config, waitingFor)
 }
 
 // execRunPreStart runs the service's pre_start hooks against the runner
@@ -383,5 +388,43 @@ func (exec *planExecutor) execRenameContainer(ctx context.Context, node *PlanNod
 	_, err := exec.compose.apiClient().ContainerRename(ctx, createdID, client.ContainerRenameOptions{
 		NewName: op.Name,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	// Update the create node's own result in place rather than publishing a
+	// separate entry under this node's ID: plannedReplica deliberately keeps
+	// every start-phase reference (resolveContainerID, groupEventName)
+	// pointed at CreateNodeID, not at this rename node, so they all see the
+	// rename take effect without each needing their own case for "was this
+	// replica's container ever renamed". The ID is unchanged by a rename;
+	// only the name this node is renaming-TO replaces the create's own
+	// temporary one.
+	exec.pctx.set(op.CreateNodeID, operationResult{ContainerID: createdID, ContainerName: op.Name})
+
+	// execCreateContainer published this container into the live view under
+	// its temporary name (the only name it had at that point); refresh it in
+	// place now that the rename landed, or OpWaitCondition and any sibling
+	// execCreateContainer resolving a service reference keep seeing the
+	// temporary one for the rest of the plan's execution.
+	if op.Service != nil {
+		exec.containersMu.Lock()
+		found := false
+		for i, ctr := range exec.containersByService[op.Service.Name] {
+			if ctr.ID == createdID {
+				exec.containersByService[op.Service.Name][i].Names = []string{"/" + op.Name}
+				found = true
+				break
+			}
+		}
+		exec.containersMu.Unlock()
+		if !found {
+			// Shouldn't happen: the DAG guarantees execCreateContainer's
+			// append ran before this node does. Logged rather than silently
+			// skipped, so a future regression that breaks that invariant is
+			// at least visible instead of just quietly serving the
+			// temporary name downstream again.
+			logrus.Warnf("execRenameContainer: container %s not found in live view for service %s; dependents may see the stale temporary name", createdID, op.Service.Name)
+		}
+	}
+	return nil
 }

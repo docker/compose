@@ -18,11 +18,14 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -36,10 +39,10 @@ type planExecutor struct {
 	pctx    *reconciliationContext
 
 	// listener streams pre_start/post_start hook logs, exactly like the
-	// imperative start path. nil until an attached caller wires one in (the
-	// interactive-up convergence, a later lot of #14081) — every caller today
-	// passes nil, so hook execution stays silent, matching today's detached
-	// behavior.
+	// imperative start path. nil until an attached caller wires one in, either
+	// at construction or, for a caller driving the phases itself, when it
+	// enters the Start phase (planRun.runStart) — nil leaves hook execution
+	// silent, matching detached behavior.
 	listener api.ContainerEventListener
 
 	// containersByService is a live view used to resolve service references
@@ -47,6 +50,17 @@ type planExecutor struct {
 	// round-trip per create.
 	containersMu        sync.Mutex
 	containersByService map[string]Containers
+
+	// waitTimeout, when non-zero, bounds OpWaitCondition nodes only (see
+	// executeNode) -- not the rest of the plan, and with its OWN fresh
+	// window per wait node rather than a single shared deadline counted
+	// down from before the plan started. up -d --wait-timeout must cap how
+	// long a dependency's health/completion condition is waited on, the
+	// same thing start()'s own per-dependency WaitTimeout already does
+	// today -- without also capping unrelated create/start/hook work, and
+	// without letting that unrelated work's duration eat into (or exhaust)
+	// a wait's own budget (docker/compose#14290 review).
+	waitTimeout time.Duration
 }
 
 // reconciliationContext holds results produced by completed nodes so that downstream
@@ -102,12 +116,48 @@ func (s *composeService) newPlanExecutor(project *types.Project, observed *Obser
 
 // run walks the plan DAG, executing nodes in parallel where possible while
 // respecting dependency edges. Emits progress events and handles group-based
-// event aggregation for composite operations like recreate.
+// event aggregation for composite operations like recreate. It is begin
+// followed by both phases: a caller that must act between the Create and the
+// Start phase drives a planRun itself.
 func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	if plan.IsEmpty() {
 		return nil
 	}
+	pr, err := exec.begin(plan)
+	if err != nil {
+		return err
+	}
+	if err := pr.runCreate(ctx); err != nil {
+		return err
+	}
+	return pr.runStart(ctx, nil)
+}
 
+// planRun is one execution of a Plan, split at the boundary between its two
+// phases. begin builds the state both phases share (the done channels and
+// failure bookkeeping a Start-phase node needs to see a Create-phase one
+// through, the group tracker, the limiter); runCreate and runStart then each
+// dispatch their own phase, so a caller can act in between -- interactive up
+// sets up its attach/printer/monitor session there -- without a second
+// snapshot or a second plan.
+//
+// A planRun is single-use and driven from one goroutine: each phase runs at
+// most once, Create first.
+type planRun struct {
+	exec        *planExecutor
+	rs          *runState
+	createNodes []*PlanNode
+	startNodes  []*PlanNode
+
+	createRan bool
+	createErr error
+	startRan  bool
+}
+
+// begin prepares plan for execution without dispatching anything: it builds
+// the state shared by both phases, splits the nodes by phase and rejects a
+// plan that could only deadlock.
+func (exec *planExecutor) begin(plan *Plan) (*planRun, error) {
 	// Build a done-channel per node so dependents can wait
 	done := make(map[int]chan struct{}, len(plan.Nodes))
 	for _, node := range plan.Nodes {
@@ -147,67 +197,306 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
 
-	// Every node's goroutine is dispatched unconditionally, so one waiting on
-	// a dependency never occupies a concurrency slot -- only the actual
-	// executeNode call does, via the semaphore below. This also means
-	// deadlock-freedom no longer depends on plan.Nodes staying topologically
-	// sorted: a goroutine blocked on <-done[dep.ID] holds no slot for a
-	// still-pending dependency to be starved on.
-	eg, ctx := errgroup.WithContext(ctx)
-	limiter := newOptionalLimiter(exec.compose.maxConcurrency)
-	for _, node := range plan.Nodes {
-		eg.Go(func() error {
-			// Wait for all dependencies
-			for _, dep := range node.DependsOn {
-				select {
-				case <-done[dep.ID]:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-
-			// A dependency may have just failed without ctx being canceled
-			// yet (see failures' comment above) -- skip this node exactly
-			// like a canceled one: no slot acquired, no event emitted, its
-			// own dependents unblocked with the same failure recorded.
-			if err := failedDependency(node.DependsOn); err != nil {
-				// Store the original error, not a wrapped one: this node's own
-				// dependents look it up the same way, and wrapping it again at
-				// every hop would compound "dependency failed: " prefixes down
-				// a multi-node chain (create -> pre_start -> start -> post_start).
-				recordFailure(node.ID, err)
-				close(done[node.ID])
-				return fmt.Errorf("dependency failed: %w", err)
-			}
-
-			if err := acquireSlot(ctx, limiter); err != nil {
-				recordFailure(node.ID, err)
-				close(done[node.ID])
-				return err
-			}
-			defer releaseSlot(limiter)
-
-			// Emit group start event if this is the first node of a group
-			groups.onNodeStart(node, events)
-
-			err := exec.executeNode(ctx, node)
-
-			if err == nil {
-				// Emit group done event if this is the last node of a group
-				groups.onNodeDone(node, events)
-			} else {
-				recordFailure(node.ID, err)
-				if ctx.Err() == nil {
-					groups.onNodeError(node, events, err)
-				}
-			}
-
-			close(done[node.ID])
-			return err
-		})
+	rs := &runState{
+		done:             done,
+		recordFailure:    recordFailure,
+		failedDependency: failedDependency,
+		groups:           groups,
+		events:           events,
+		limiter:          newOptionalLimiter(exec.compose.maxConcurrency),
 	}
 
-	return eg.Wait()
+	var createNodes, startNodes []*PlanNode
+	for _, node := range plan.Nodes {
+		if node.Phase == PhaseStart {
+			startNodes = append(startNodes, node)
+		} else {
+			createNodes = append(createNodes, node)
+		}
+	}
+
+	// A Create-phase node depending on a Start-phase node would deadlock
+	// forever: runPhase(createNodes, ...) only closes rs.done for nodes in
+	// createNodes, so runNode's `<-rs.done[dep.ID]` would block on a channel
+	// nothing ever closes, since the Start phase isn't even dispatched until
+	// the Create phase this node is blocking returns. Nothing in the
+	// reconciler should ever produce this edge, but failing fast with a
+	// clear error beats a silent hang if it ever does.
+	for _, node := range createNodes {
+		for _, dep := range node.DependsOn {
+			if dep.Phase == PhaseStart {
+				return nil, fmt.Errorf("invalid plan: create-phase node %d depends on start-phase node %d", node.ID, dep.ID)
+			}
+		}
+	}
+
+	return &planRun{exec: exec, rs: rs, createNodes: createNodes, startNodes: startNodes}, nil
+}
+
+// runCreate dispatches the Create phase and waits for it. The Start phase
+// cannot be dispatched until it has returned without error.
+func (r *planRun) runCreate(ctx context.Context) error {
+	if r.createRan {
+		return errors.New("plan run: the create phase already ran")
+	}
+	r.createRan = true
+	r.createErr = r.exec.runPhase(r.createNodes, r.rs, newPhaseCancel(ctx))
+	return r.createErr
+}
+
+// runStart dispatches the Start phase and waits for it. A non-nil listener
+// replaces the one the executor was built with and receives the
+// pre_start/post_start hook logs; nil keeps the construction-time one. It
+// can be given here because an attached caller only has one once it has set
+// up its session, which happens after the Create phase. It is set before any
+// Start-phase node is dispatched, and runCreate only returned once runPhase
+// waited for every Create-phase node, so no goroutine can observe the
+// previous value.
+//
+// The Create phase is a hard barrier: no Start-phase node is even
+// dispatched until every Create-phase node has succeeded. This isn't
+// just about not canceling unrelated in-flight Create work on a Start
+// failure (phaseCancel already keeps that scoped per phase, see its own
+// doc comment) -- it's that a Start-phase node whose own DependsOn
+// edges are all satisfied has no reason to wait for a COMPLETELY
+// UNRELATED Create-phase node elsewhere in the plan, so without this
+// barrier a service could already be starting while a sibling it has no
+// relationship with is still being created, or fails. The old
+// create()-then-start() sequence never allowed that: the whole create
+// phase, project-wide, always finished (or failed, with start() never
+// invoked at all) before any dependency wait, or anything else in the
+// start phase, even began. Interactive up's attach/printer session
+// depends on this too: it takes exclusive hold of the terminal for the
+// create phase's own progress display, handing it over to continuous
+// container log streaming only once the create phase is entirely done
+// -- a Start-phase node's log output interleaving with Create's
+// progress bars has nowhere consistent to go. The guards below are what
+// enforce it for a caller driving the phases itself; run() gets it by
+// calling runCreate first.
+func (r *planRun) runStart(ctx context.Context, listener api.ContainerEventListener) error {
+	if !r.createRan || r.createErr != nil {
+		return errors.New("plan run: the start phase cannot run before the create phase succeeded")
+	}
+	if r.startRan {
+		return errors.New("plan run: the start phase already ran")
+	}
+	r.startRan = true
+	if listener != nil {
+		r.exec.listener = listener
+	}
+	return r.exec.runPhase(r.startNodes, r.rs, newPhaseCancel(ctx))
+}
+
+// runPhase dispatches every node in nodes concurrently (respecting their own
+// DependsOn edges via rs.done, same as a single-phase plan always did) and
+// waits for them all to finish. phase is this call's own cancellation scope:
+// a node failing here cancels phase.ctx for its siblings in THIS call only,
+// never a concurrently-running call for a different phase (not that there
+// is one today -- run() calls this sequentially -- but runNode has no way
+// to tell, so this still matters if that ever changes). See phaseCancel's
+// doc comment for why a node's failure goes through phase.fail instead of
+// errgroup.Group's own first-error-wins race.
+func (exec *planExecutor) runPhase(nodes []*PlanNode, rs *runState, phase *phaseCancel) error {
+	defer phase.cancel()
+	eg := errgroup.Group{}
+	for _, node := range nodes {
+		eg.Go(func() error {
+			return exec.runNode(node, rs, phase)
+		})
+	}
+	err := eg.Wait()
+	if phase.err != nil {
+		return phase.err
+	}
+	return err
+}
+
+// phaseCancel bundles one phase's cancellation context with the bookkeeping
+// needed to make exactly one node's failure authoritative for it: fail is
+// called by every node in this phase that errors out, but its body -- the
+// event emission and the actual ctx cancellation -- runs for only the first
+// caller, via once. That single gate point fixes two related races a plain
+// "if nodeCtx.Err() == nil" check can't: two genuinely concurrent failures
+// in the same phase racing to emit onNodeError (the old errgroup.WithContext
+// made this vanishingly unlikely by canceling ctx atomically with recording
+// the error; splitting cancellation into our own explicit call reopened the
+// window), and errgroup.Group's own first-error-wins race picking a
+// cancellation casualty's bare context.Canceled over the actual originating
+// error once cancellation starts unblocking siblings (see run()'s use of
+// err, set here, instead of eg.Wait()'s own return value).
+type phaseCancel struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	once   sync.Once
+	err    error
+}
+
+func newPhaseCancel(parent context.Context) *phaseCancel {
+	p := &phaseCancel{}
+	p.ctx, p.cancel = context.WithCancel(parent)
+	return p
+}
+
+// fail registers node's failure as this phase's cause, for the first caller
+// only: it emits the group error event and cancels the phase's context. Any
+// later caller's err is silently dropped -- by the time it could run, this
+// phase is already canceled, so it is never anything but a cancellation
+// casualty of the first failure, not a new one of its own.
+func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *groupTracker, err error) {
+	p.once.Do(func() {
+		p.err = err
+		groups.onNodeError(node, events, err)
+		p.cancel()
+	})
+}
+
+// runState carries the per-run() state every node's goroutine shares: the
+// done-channel per node, dependency-failure bookkeeping, group event
+// tracking, and the concurrency limiter. Shared across both phases (built
+// once in run(), before either runs) since done/failures must stay visible
+// to a Start-phase node depending on a Create-phase one across the barrier
+// between them. Split out of run() purely to keep runNode a plain method
+// instead of a closure captured in a loop.
+type runState struct {
+	done             map[int]chan struct{}
+	recordFailure    func(id int, err error)
+	failedDependency func(deps []*PlanNode) error
+	groups           *groupTracker
+	events           api.EventProcessor
+	limiter          *semaphore.Weighted
+}
+
+// runNode executes one plan node: waits for its dependencies, skips it if
+// one of them failed, then dispatches it and records the outcome. phase is
+// the cancellation scope of the runPhase call driving it -- see runPhase and
+// phaseCancel's own doc comments.
+func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCancel) error {
+	nodeCtx := phase.ctx
+
+	// Every exit path below must close rs.done[node.ID] exactly once, or a
+	// dependent blocks on it forever: deferred once here instead of before
+	// each individual return, so a future added exit path can't reintroduce
+	// the gap the original dependency-wait early-return had (no reachable
+	// hang today -- every dependent in the same phase shares this same
+	// nodeCtx, already canceled by the time it would matter -- but nothing
+	// enforces that staying true as the plan DAG grows new shapes).
+	defer close(rs.done[node.ID])
+
+	// Wait for all dependencies
+	for _, dep := range node.DependsOn {
+		select {
+		case <-rs.done[dep.ID]:
+		case <-nodeCtx.Done():
+			return nodeCtx.Err()
+		}
+	}
+
+	// A dependency may have just failed without nodeCtx being canceled yet
+	// (see run()'s failures comment) -- skip this node exactly like a
+	// canceled one: no slot acquired, no event emitted, its own dependents
+	// unblocked with the same failure recorded.
+	if err := rs.failedDependency(node.DependsOn); err != nil {
+		// Store the original error, not a wrapped one: this node's own
+		// dependents look it up the same way, and wrapping it again at
+		// every hop would compound "dependency failed: " prefixes down a
+		// multi-node chain (create -> pre_start -> start -> post_start).
+		rs.recordFailure(node.ID, err)
+		return fmt.Errorf("dependency failed: %w", err)
+	}
+
+	release, slotErr := acquireNodeSlot(nodeCtx, rs.limiter, node)
+	if slotErr != nil {
+		rs.recordFailure(node.ID, slotErr)
+		return slotErr
+	}
+	defer release()
+
+	// Emit group start event if this is the first node of a group
+	rs.groups.onNodeStart(node, rs.events)
+
+	err := exec.executeNode(nodeCtx, node)
+
+	if err == nil {
+		// Emit group done event if this is the last node of a group
+		rs.groups.onNodeDone(node, rs.events)
+		return nil
+	}
+
+	rs.recordFailure(node.ID, err)
+	if nodeCtx.Err() == nil {
+		// This node's own failure, not an inherited cancellation: a node
+		// whose nodeCtx is already canceled failed because of that
+		// cancellation, not a new failure of its own to propagate. phase.fail
+		// itself gates on being the first such failure in this phase (see its
+		// doc comment) -- this outer check only spares every later,
+		// cancellation-casualty caller the cost of building the error-event
+		// payload it would be dropped anyway.
+		phase.fail(node, rs.events, rs.groups, err)
+	}
+	return err
+}
+
+// errWaitTimeout marks the failure of an OpWaitCondition node whose own
+// --wait-timeout window (planExecutor.waitTimeout) expired, as opposed to any
+// other DeadlineExceeded that can surface from a plan: an engine call timing
+// out, a hook, or an external deadline on the caller's context. Callers that
+// translate a wait timeout into a user-facing message key on this rather than
+// on DeadlineExceeded, which is not specific to waits. The wrapped error still
+// satisfies errors.Is(err, context.DeadlineExceeded).
+var errWaitTimeout = errors.New("timeout waiting for dependencies")
+
+// translateWaitTimeout turns a plan failure caused by a wait node's own
+// --wait-timeout window (see errWaitTimeout) into the "timeout waiting for
+// dependencies" message the imperative start path always reported for a
+// depends_on wait timing out, with or without --wait, and leaves any other
+// error as is. It is deliberately not the "application not healthy" message:
+// that one belongs to the final --wait readiness check that runs after the
+// plan, which has its own translation.
+func translateWaitTimeout(err error) error {
+	if !errors.Is(err, errWaitTimeout) {
+		return err
+	}
+	return errors.New("timeout waiting for dependencies")
+}
+
+// execBoundedWaitCondition runs an OpWaitCondition node under its own fresh
+// planExecutor.waitTimeout window, if one is set, and marks a failure caused
+// by that window expiring with errWaitTimeout. origCtx.Err() == nil rules out
+// an earlier deadline inherited from the caller having fired instead: both
+// make the derived context report DeadlineExceeded, but only the former is
+// this wait's own timeout.
+func (exec *planExecutor) execBoundedWaitCondition(origCtx context.Context, op Operation) error {
+	ctx := origCtx
+	if exec.waitTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(origCtx, exec.waitTimeout)
+		defer cancel()
+	}
+	err := exec.execWaitCondition(ctx, origCtx, op)
+	if err != nil && exec.waitTimeout > 0 && origCtx.Err() == nil &&
+		errors.Is(ctx.Err(), context.DeadlineExceeded) && errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%w: %w", errWaitTimeout, err)
+	}
+	return err
+}
+
+// acquireNodeSlot takes node's --parallel slot and returns the function that
+// releases it. An OpWaitCondition node holds none: it only polls the daemon on
+// a ticker, so a slot held for the whole polling would be capacity lost for
+// every unrelated node, and could starve the nodes it is waiting for. The
+// latter needs a dependency that is already running, hence with no start
+// node for the wait to depend on, whose health relies on a sibling the plan
+// has yet to start: with a bounded --parallel the wait could take the slot
+// that sibling's start needs and only end at its timeout. The imperative
+// waitDependencies stays outside the cap for the same reason.
+func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *PlanNode) (func(), error) {
+	if node.Operation.Type == OpWaitCondition {
+		return func() {}, nil
+	}
+	if err := acquireSlot(ctx, limiter); err != nil {
+		return nil, err
+	}
+	return func() { releaseSlot(limiter) }, nil
 }
 
 // executeNode dispatches a single plan node to the appropriate API call.
@@ -239,7 +528,7 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error
 	case OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
 	case OpWaitCondition:
-		return exec.execWaitCondition(ctx, op)
+		return exec.execBoundedWaitCondition(ctx, op)
 	case OpRunPreStart:
 		return exec.execRunPreStart(ctx, op)
 	case OpRunPostStart:
