@@ -36,6 +36,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/console"
 	"github.com/containerd/errdefs"
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/image/build"
@@ -43,10 +44,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/moby/buildkit/client"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
+	buildkitgit "github.com/moby/buildkit/util/gitutil"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/tonistiigi/go-csvvalue"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -121,12 +124,13 @@ type buildStatus struct {
 // drive `buildx bake`: the bake file definition, plus the settings that travel
 // as command arguments or environment variables rather than in the file.
 type bakeBuild struct {
-	cfg            bakeConfig
-	targetNames    map[string]string // service name -> bake target name
-	expectedImages map[string]string // service name -> expected image
-	localPaths     []string          // local build inputs bake needs `--allow fs.read` for
-	entitlements   []string
-	secretsEnv     []string
+	cfg             bakeConfig
+	targetNames     map[string]string // service name -> bake target name
+	expectedImages  map[string]string // service name -> expected image
+	localPaths      []string          // local build inputs bake needs `--allow fs.read` for
+	localWritePaths []string          // local cache destinations bake needs `--allow fs.write` for
+	entitlements    []string
+	secretsEnv      []string
 }
 
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) {
@@ -253,6 +257,23 @@ func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBui
 		entitlements := bakeEntitlements(buildConfig)
 		bake.entitlements = append(bake.entitlements, entitlements...)
 		bake.localPaths = append(bake.localPaths, localBuildPaths(project, buildConfig)...)
+		bake.localPaths = append(bake.localPaths, localCachePaths(buildConfig.CacheFrom, "src")...)
+		bake.localWritePaths = append(bake.localWritePaths, localCachePaths(buildConfig.CacheTo, "dest")...)
+
+		ssh := slices.Concat(buildConfig.SSH, options.SSHs)
+		for _, key := range ssh {
+			if key.Path == "" {
+				bake.entitlements = append(bake.entitlements, "ssh")
+			} else {
+				bake.localPaths = append(bake.localPaths, strings.Split(key.Path, ",")...)
+			}
+		}
+		// Bake implicitly forwards the default agent for SSH Git contexts.
+		if len(ssh) == 0 {
+			if u, err := buildkitgit.ParseURL(buildConfig.Context); err == nil && u.Scheme == buildkitgit.SSHProtocol {
+				bake.entitlements = append(bake.entitlements, "ssh")
+			}
+		}
 
 		image := api.GetImageNameOrDefault(service, project.Name)
 		if _, ok := serviceToBeBuild[serviceName]; ok {
@@ -280,7 +301,7 @@ func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBui
 			Platforms:     buildConfig.Platforms,
 			Target:        buildConfig.Target,
 			Secrets:       secrets,
-			SSH:           toBakeSSH(append(buildConfig.SSH, options.SSHs...)),
+			SSH:           toBakeSSH(ssh),
 			Pull:          buildConfig.Pull || options.Pull,
 			NoCache:       buildConfig.NoCache || options.NoCache,
 			ShmSize:       buildConfig.ShmSize,
@@ -361,13 +382,20 @@ func localBuildPaths(project *types.Project, buildConfig types.BuildConfig) []st
 	}
 	var local []string
 	for _, path := range paths {
-		if _, _, err := gitutil.ParseGitRef(path); !strings.Contains(path, "://") && err != nil {
+		if cwdPath, ok := strings.CutPrefix(path, "cwd://"); ok {
+			local = append(local, cwdPath)
+		} else if layout, ok := strings.CutPrefix(path, "oci-layout://"); ok {
+			local = append(local, ociLayoutPath(layout))
+		} else if strings.HasPrefix(path, types.ServicePrefix) || strings.HasPrefix(path, "target:") || strings.HasPrefix(path, "docker-image:") {
+			continue
+		} else if _, _, err := gitutil.ParseGitRef(path); !strings.Contains(path, "://") && err != nil {
 			local = append(local, path)
 		}
 	}
+	contextPath := strings.TrimPrefix(buildConfig.Context, "cwd://")
 	if buildConfig.Dockerfile != "" && buildConfig.DockerfileInline == "" &&
-		(!isRemoteContext(buildConfig.Context) || filepath.IsAbs(buildConfig.Dockerfile)) {
-		local = append(local, dockerFilePath(buildConfig.Context, buildConfig.Dockerfile))
+		(!isRemoteContext(contextPath) || filepath.IsAbs(buildConfig.Dockerfile)) {
+		local = append(local, dockerFilePath(contextPath, buildConfig.Dockerfile))
 	}
 	for _, ref := range buildConfig.Secrets {
 		secret := project.Secrets[ref.Source]
@@ -376,6 +404,59 @@ func localBuildPaths(project *types.Project, buildConfig types.BuildConfig) []st
 		}
 	}
 	return local
+}
+
+// ociLayoutPath extracts the filesystem path using Buildx's OCI layout syntax.
+// The caller removes the scheme; Bake validates the original reference.
+// Path extraction adapted from https://github.com/docker/buildx/blob/c7748d0a0bdbdad73fb939cb62fcd4e634e3d7e6/util/ocilayout/parse.go
+func ociLayoutPath(path string) string {
+	if i := strings.LastIndex(path, "@"); i >= 0 && reference.DigestRegexp.MatchString(path[i+1:]) {
+		path = path[:i]
+	}
+	if i := strings.LastIndex(path, ":"); i >= 0 && !isWindowsDrivePath(path, i) {
+		if reference.TagRegexp.MatchString(path[i+1:]) {
+			path = path[:i]
+		}
+	}
+	return path
+}
+
+// isWindowsDrivePath reports whether colon marks an absolute Windows drive prefix.
+// Adapted from https://github.com/docker/buildx/blob/c7748d0a0bdbdad73fb939cb62fcd4e634e3d7e6/util/ocilayout/parse.go
+func isWindowsDrivePath(path string, colon int) bool {
+	if colon != 1 || len(path) < 3 {
+		return false
+	}
+	if path[2] != '/' && path[2] != '\\' {
+		return false
+	}
+	c := path[0]
+	return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+}
+
+// localCachePaths extracts local cache sources or destinations. Bake reports
+// invalid cache definitions; they must not produce grants here.
+func localCachePaths(entries []string, key string) []string {
+	var paths []string
+	for _, entry := range entries {
+		fields, err := csvvalue.Fields(entry, nil)
+		if err != nil {
+			continue
+		}
+		attrs := make(map[string]string, len(fields))
+		for _, field := range fields {
+			name, value, ok := strings.Cut(field, "=")
+			if !ok {
+				attrs = nil
+				break
+			}
+			attrs[strings.ToLower(name)] = value
+		}
+		if attrs["type"] == "local" && attrs[key] != "" {
+			paths = append(paths, attrs[key])
+		}
+	}
+	return paths
 }
 
 // bakeMetadataPath picks a fresh temporary path for bake's --metadata-file.
@@ -403,6 +484,9 @@ func bakeArgs(bake *bakeBuild, metadataFile string, options api.BuildOptions) []
 	// FIXME we should prompt user about this, but this is a breaking change in UX
 	for _, path := range slices.Compact(slices.Sorted(slices.Values(bake.localPaths))) {
 		args = append(args, "--allow", "fs.read="+path)
+	}
+	for _, path := range slices.Compact(slices.Sorted(slices.Values(bake.localWritePaths))) {
+		args = append(args, "--allow", "fs.write="+path)
 	}
 	for _, entitlement := range slices.Compact(slices.Sorted(slices.Values(bake.entitlements))) {
 		args = append(args, "--allow", entitlement)
@@ -582,7 +666,11 @@ func toBakeUlimits(ulimits map[string]*types.UlimitsConfig) []string {
 func toBakeSSH(ssh types.SSHConfig) []string {
 	var s []string
 	for _, key := range ssh {
-		s = append(s, fmt.Sprintf("%s=%s", key.ID, key.Path))
+		if key.Path == "" {
+			s = append(s, key.ID)
+		} else {
+			s = append(s, fmt.Sprintf("%s=%s", key.ID, key.Path))
+		}
 	}
 	return s
 }

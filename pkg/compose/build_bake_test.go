@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -167,6 +168,269 @@ func TestPrepareBakeBuildGrants(t *testing.T) {
 		assert.Equal(t, args[index-1], "--allow")
 	}
 	assert.Assert(t, !slices.Contains(args, "fs.read="+filepath.Dir(dockerfile)), "must not grant the Dockerfile's parent directory")
+}
+
+func TestPrepareBakeCWDGrants(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	for _, tc := range []struct {
+		name    string
+		context string
+		want    string
+	}{
+		{
+			name:    "relative context",
+			context: "cwd://app",
+			want:    filepath.Join("docker", "Dockerfile"),
+		},
+		{
+			name:    "absolute context",
+			context: "cwd://" + filepath.Join(root, "app"),
+			want:    filepath.Join(root, "docker", "Dockerfile"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dockerfile := filepath.Join("..", "docker", "Dockerfile")
+			project := &types.Project{
+				Name: "cwd-grants",
+				Services: types.Services{"app": {Name: "app", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
+					Context: tc.context, Dockerfile: dockerfile,
+				}}}},
+			}
+			s := &composeService{proxyConfig: map[string]string{}, events: &ignore{}}
+			bake := s.prepareBakeBuild(project, project.Services, api.BuildOptions{})
+			assert.Equal(t, bake.cfg.Targets["app"].Dockerfile, dockerfile)
+			assert.DeepEqual(t, bake.localPaths, []string{strings.TrimPrefix(tc.context, "cwd://"), tc.want})
+			assert.Assert(t, slices.Contains(bakeArgs(bake, "metadata.json", api.BuildOptions{}), "fs.read="+tc.want))
+		})
+	}
+}
+
+func TestPrepareBakeSSHGrants(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		context    string
+		ssh        types.SSHConfig
+		cliSSH     []types.SSHKey
+		wantSSH    []string
+		wantGrants []string
+	}{
+		{
+			name: "none",
+		},
+		{
+			name:       "configured key",
+			ssh:        types.SSHConfig{{ID: "key", Path: "/keys/id"}},
+			wantSSH:    []string{"key=/keys/id"},
+			wantGrants: []string{"fs.read=/keys/id"},
+		},
+		{
+			name:       "configured agent",
+			ssh:        types.SSHConfig{{ID: "default"}},
+			wantSSH:    []string{"default"},
+			wantGrants: []string{"ssh"},
+		},
+		{
+			name:       "CLI socket",
+			cliSSH:     []types.SSHKey{{ID: "default", Path: "/agent/socket"}},
+			wantSSH:    []string{"default=/agent/socket"},
+			wantGrants: []string{"fs.read=/agent/socket"},
+		},
+		{
+			name:       "CLI agent",
+			cliSSH:     []types.SSHKey{{ID: "default"}},
+			wantSSH:    []string{"default"},
+			wantGrants: []string{"ssh"},
+		},
+		{
+			name:       "multiple key paths",
+			cliSSH:     []types.SSHKey{{ID: "keys", Path: "/keys/one,/keys/two"}},
+			wantSSH:    []string{"keys=/keys/one,/keys/two"},
+			wantGrants: []string{"fs.read=/keys/one", "fs.read=/keys/two"},
+		},
+		{
+			name:       "both sources",
+			ssh:        types.SSHConfig{{ID: "key", Path: "/keys/id"}},
+			cliSSH:     []types.SSHKey{{ID: "default"}},
+			wantSSH:    []string{"key=/keys/id", "default"},
+			wantGrants: []string{"fs.read=/keys/id", "ssh"},
+		},
+		{
+			name:       "implicit Git agent",
+			context:    "git@github.com:docker/compose.git",
+			wantGrants: []string{"ssh"},
+		},
+		{
+			name:       "implicit SSH URL agent",
+			context:    "ssh://git@example.com/project.git",
+			wantGrants: []string{"ssh"},
+		},
+		{
+			name:    "HTTPS Git context",
+			context: "https://example.com/project.git",
+		},
+		{
+			name:       "explicit Git key",
+			context:    "git@github.com:docker/compose.git",
+			ssh:        types.SSHConfig{{ID: "default", Path: "/keys/id"}},
+			wantSSH:    []string{"default=/keys/id"},
+			wantGrants: []string{"fs.read=/keys/id"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			contextPath := tc.context
+			if contextPath == "" {
+				contextPath = "https://example.com/project.git"
+			}
+			project := &types.Project{Name: "ssh", Services: types.Services{"app": {
+				Name: "app", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: contextPath, SSH: tc.ssh}},
+			}}}
+			s := &composeService{proxyConfig: map[string]string{}, events: &ignore{}}
+			bake := s.prepareBakeBuild(project, project.Services, api.BuildOptions{SSHs: tc.cliSSH})
+			assert.DeepEqual(t, bake.cfg.Targets["app"].SSH, tc.wantSSH)
+			assert.DeepEqual(t, bake.cfg.Targets["app"].Entitlements, []string(nil))
+			want := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", "metadata.json"}
+			for _, grant := range tc.wantGrants {
+				want = append(want, "--allow", grant)
+			}
+			assert.DeepEqual(t, bakeArgs(bake, "metadata.json", api.BuildOptions{}), want)
+		})
+	}
+}
+
+func TestLocalCachePaths(t *testing.T) {
+	for _, tc := range []struct {
+		entry string
+		key   string
+		want  []string
+	}{
+		{
+			entry: "type=local,src=/cache",
+			key:   "src",
+			want:  []string{"/cache"},
+		},
+		{
+			entry: "type=local,dest=/cache",
+			key:   "dest",
+			want:  []string{"/cache"},
+		},
+		{
+			entry: `type=local,"src=/cache,one"`,
+			key:   "src",
+			want:  []string{"/cache,one"},
+		},
+		{
+			entry: "TYPE=local,SRC=/cache",
+			key:   "src",
+			want:  []string{"/cache"},
+		},
+		{
+			entry: "type=local,src=/old,src=/new",
+			key:   "src",
+			want:  []string{"/new"},
+		},
+		{
+			entry: "type=local,src=/cache,type=registry",
+			key:   "src",
+		},
+		{
+			entry: "type=local,src=/cache",
+			key:   "dest",
+		},
+		{
+			entry: "image:cache",
+			key:   "src",
+		},
+		{
+			entry: "type=registry,ref=image:cache",
+			key:   "src",
+		},
+		{
+			entry: "type=local,src=/cache,invalid",
+			key:   "src",
+		},
+		{
+			entry: `type=local,"src=/cache`,
+			key:   "src",
+		},
+	} {
+		t.Run(tc.entry+"/"+tc.key, func(t *testing.T) {
+			assert.DeepEqual(t, localCachePaths([]string{tc.entry}, tc.key), tc.want)
+		})
+	}
+}
+
+func TestPrepareBakeCacheGrants(t *testing.T) {
+	project := &types.Project{Name: "cache", Services: types.Services{"app": {
+		Name: "app", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{
+			Context:   "https://example.com/project.git",
+			CacheFrom: []string{"type=local,src=/cache/in"}, CacheTo: []string{"type=local,dest=/cache/out"},
+		}},
+	}}}
+	s := &composeService{proxyConfig: map[string]string{}, events: &ignore{}}
+	bake := s.prepareBakeBuild(project, project.Services, api.BuildOptions{})
+	assert.DeepEqual(t, bakeArgs(bake, "metadata.json", api.BuildOptions{}), []string{
+		"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", "metadata.json",
+		"--allow", "fs.read=/cache/in", "--allow", "fs.write=/cache/out",
+	})
+}
+
+func TestLocalBuildContextPaths(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	for _, tc := range []struct {
+		context string
+		want    []string
+	}{
+		{
+			context: "oci-layout:///layouts/image",
+			want:    []string{"/layouts/image"},
+		},
+		{
+			context: "oci-layout:///layouts/image:latest",
+			want:    []string{"/layouts/image"},
+		},
+		{
+			context: "oci-layout:///layouts/image@" + digest,
+			want:    []string{"/layouts/image"},
+		},
+		{
+			context: "oci-layout:///layouts/image:v1@" + digest,
+			want:    []string{"/layouts/image"},
+		},
+		{
+			context: "oci-layout:///layouts/@/image",
+			want:    []string{"/layouts/@/image"},
+		},
+		{
+			context: `oci-layout://C:\layouts\image`,
+			want:    []string{`C:\layouts\image`},
+		},
+		{
+			context: "oci-layout://C:/layouts/image:v1@" + digest,
+			want:    []string{"C:/layouts/image"},
+		},
+		{
+			context: "cwd://../local",
+			want:    []string{"../local"},
+		},
+		{
+			context: "service:base",
+		},
+		{
+			context: "target:base",
+		},
+		{
+			context: "docker-image:alpine:3.23",
+		},
+		{
+			context: "https://example.com/project.git",
+		},
+	} {
+		t.Run(tc.context, func(t *testing.T) {
+			config := types.BuildConfig{Context: "https://example.com/main.git", AdditionalContexts: map[string]string{"base": tc.context}}
+			assert.DeepEqual(t, localBuildPaths(&types.Project{}, config), tc.want)
+		})
+	}
 }
 
 func TestBakeTargetNames(t *testing.T) {
