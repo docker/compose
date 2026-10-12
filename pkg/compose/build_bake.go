@@ -124,8 +124,8 @@ type bakeBuild struct {
 	cfg            bakeConfig
 	targetNames    map[string]string // service name -> bake target name
 	expectedImages map[string]string // service name -> expected image
-	localPaths     []string          // local build contexts bake needs `--allow fs.read` for
-	privileged     bool
+	localPaths     []string          // local build inputs bake needs `--allow fs.read` for
+	entitlements   []string
 	secretsEnv     []string
 }
 
@@ -250,9 +250,9 @@ func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBui
 			args[k] = strings.ReplaceAll(v, "${", "$${")
 		}
 
-		entitlements, privileged := bakeEntitlements(buildConfig)
-		bake.privileged = bake.privileged || privileged
-		bake.localPaths = append(bake.localPaths, localBuildPaths(buildConfig)...)
+		entitlements := bakeEntitlements(buildConfig)
+		bake.entitlements = append(bake.entitlements, entitlements...)
+		bake.localPaths = append(bake.localPaths, localBuildPaths(project, buildConfig)...)
 
 		image := api.GetImageNameOrDefault(service, project.Name)
 		if _, ok := serviceToBeBuild[serviceName]; ok {
@@ -325,16 +325,16 @@ func bakeTargetNames(project *types.Project) map[string]string {
 	return targets
 }
 
-// bakeEntitlements returns the entitlements for a build target, and whether
-// bake must be granted `security.insecure`.
-func bakeEntitlements(buildConfig types.BuildConfig) ([]string, bool) {
-	entitlements := buildConfig.Entitlements
-	privileged := slices.Contains(buildConfig.Entitlements, "security.insecure")
-	if buildConfig.Privileged {
+// bakeEntitlements returns the entitlements requested by a build target.
+func bakeEntitlements(buildConfig types.BuildConfig) []string {
+	entitlements := slices.Clone(buildConfig.Entitlements)
+	if buildConfig.Privileged && !slices.Contains(entitlements, "security.insecure") {
 		entitlements = append(entitlements, "security.insecure")
-		privileged = true
 	}
-	return entitlements, privileged
+	if buildConfig.Network == "host" && !slices.Contains(entitlements, "network.host") {
+		entitlements = append(entitlements, "network.host")
+	}
+	return entitlements
 }
 
 // bakeOutputs selects the bake output type — or the lint call for `--check` —
@@ -353,9 +353,8 @@ func bakeOutputs(service types.ServiceConfig, options api.BuildOptions) (outputs
 	}
 }
 
-// localBuildPaths returns the build context paths that live on the local
-// filesystem — remote (git or URL) contexts need no fs.read entitlement.
-func localBuildPaths(buildConfig types.BuildConfig) []string {
+// localBuildPaths returns local build inputs that need an fs.read grant.
+func localBuildPaths(project *types.Project, buildConfig types.BuildConfig) []string {
 	paths := []string{buildConfig.Context}
 	for _, path := range buildConfig.AdditionalContexts {
 		paths = append(paths, path)
@@ -364,6 +363,16 @@ func localBuildPaths(buildConfig types.BuildConfig) []string {
 	for _, path := range paths {
 		if _, _, err := gitutil.ParseGitRef(path); !strings.Contains(path, "://") && err != nil {
 			local = append(local, path)
+		}
+	}
+	if buildConfig.Dockerfile != "" && buildConfig.DockerfileInline == "" &&
+		(!isRemoteContext(buildConfig.Context) || filepath.IsAbs(buildConfig.Dockerfile)) {
+		local = append(local, dockerFilePath(buildConfig.Context, buildConfig.Dockerfile))
+	}
+	for _, ref := range buildConfig.Secrets {
+		secret := project.Secrets[ref.Source]
+		if secret.Environment == "" && secret.File != "" {
+			local = append(local, secret.File)
 		}
 	}
 	return local
@@ -392,11 +401,11 @@ func bakeMetadataPath() (string, error) {
 func bakeArgs(bake *bakeBuild, metadataFile string, options api.BuildOptions) []string {
 	args := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", metadataFile}
 	// FIXME we should prompt user about this, but this is a breaking change in UX
-	for _, path := range bake.localPaths {
+	for _, path := range slices.Compact(slices.Sorted(slices.Values(bake.localPaths))) {
 		args = append(args, "--allow", "fs.read="+path)
 	}
-	if bake.privileged {
-		args = append(args, "--allow", "security.insecure")
+	for _, entitlement := range slices.Compact(slices.Sorted(slices.Values(bake.entitlements))) {
+		args = append(args, "--allow", entitlement)
 	}
 	if options.SBOM != "" {
 		args = append(args, "--sbom="+options.SBOM)
@@ -618,15 +627,17 @@ func appendAttest(attests []string, attestType, value string) []string {
 	return attests
 }
 
+// isRemoteContext reports whether the Dockerfile is resolved within a remote source.
+func isRemoteContext(ctxName string) bool {
+	contextType, _ := build.DetectContextType(ctxName)
+	return contextType == build.ContextTypeGit || contextType == build.ContextTypeRemote || strings.Contains(ctxName, "://")
+}
+
 func dockerFilePath(ctxName string, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
-	contextType, _ := build.DetectContextType(ctxName)
-	if contextType == build.ContextTypeGit || contextType == build.ContextTypeRemote {
-		return dockerfile
-	}
-	if strings.Contains(ctxName, "://") {
+	if isRemoteContext(ctxName) {
 		return dockerfile
 	}
 	if !filepath.IsAbs(dockerfile) {
