@@ -64,3 +64,13 @@ func Removing(id string) api.Resource {
 func Removed(id string) api.Resource {
 	return New(id, api.Done, api.StatusRemoved)
 }
+
+// Stopping is the event of a resource being stopped.
+func Stopping(id string) api.Resource {
+	return New(id, api.Working, api.StatusStopping)
+}
+
+// Stopped is the event of a resource that was stopped.
+func Stopped(id string) api.Resource {
+	return New(id, api.Done, api.StatusStopped)
+}
