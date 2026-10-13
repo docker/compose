@@ -22,9 +22,13 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	dockerconfig "github.com/docker/cli/cli/config"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
@@ -384,4 +388,48 @@ func TestExecutePlugin_GetRelayInfoDesktop(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, variables.prefixed["RELAY_NETWORK"], "desktop")
 	assert.Equal(t, variables.prefixed["RELAY_GATEWAY"], "127.0.0.1")
+}
+
+// TestRunPlugin_DryRunDoesNotExecuteProvider: a provider is an external
+// process the dry-run API client cannot intercept; runPlugin must not run it
+// in dry-run mode (only the read-only metadata command may be invoked).
+func TestRunPlugin_DryRunDoesNotExecuteProvider(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake provider is a shell script")
+	}
+	// getPluginMetadata caches the provider metadata under config.Dir()
+	old := dockerconfig.Dir()
+	dockerconfig.SetDir(t.TempDir())
+	t.Cleanup(func() { dockerconfig.SetDir(old) })
+
+	dir := t.TempDir()
+	calls := filepath.Join(dir, "calls.log")
+	script := `#!/bin/sh
+if [ "$2" = "metadata" ]; then
+  echo '{"description":"fake","up":{"parameters":[]},"down":{"parameters":[]},"stop":{"parameters":[]},"pull":{"parameters":[]}}'
+  exit 0
+fi
+echo "$*" >> "` + calls + `"
+`
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "dryrunprov"), []byte(script), 0o700))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(mocks.NewMockAPIClient(mockCtrl)).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
+	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	assert.NilError(t, err)
+	s := svc.(*composeService)
+	s.dryRun = true
+
+	service := types.ServiceConfig{Name: "db", Provider: &types.ServiceProviderConfig{Type: "dryrunprov"}}
+	project := &types.Project{Name: "proj", Services: types.Services{"db": service}}
+	for _, command := range []string{"up", "down", "stop", "pull"} {
+		t.Run(command, func(t *testing.T) {
+			assert.NilError(t, s.runPlugin(t.Context(), project, service, command))
+			_, err := os.Stat(calls)
+			assert.Assert(t, os.IsNotExist(err), "provider must not be executed in dry-run mode")
+		})
+	}
 }
