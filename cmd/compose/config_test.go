@@ -17,11 +17,15 @@
 package compose
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/cli/streams"
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -306,4 +310,80 @@ func TestLockModel(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestRunConfigImagesPureResourceProvider pins the shape of the
+// pure-resource provider guard of the pull path
+// (pkg/compose/provider_images.go): only a provider service declaring
+// neither image: nor build: has no main image to list — the
+// GetImageNameOrDefault fallback would fabricate a "<project>-<service>"
+// reference — while its pre_start hook images must stay listed, as pull
+// still pulls them.
+func TestRunConfigImagesPureResourceProvider(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{
+			name: "pure resource provider lists only its hook images",
+			yaml: `
+name: edgecase
+services:
+  db:
+    provider:
+      type: awesomecloud
+    pre_start:
+      - image: busybox:1.36.1
+`,
+			want: "busybox:1.36.1\n",
+		},
+		{
+			name: "provider with an image lists it",
+			yaml: `
+name: edgecase
+services:
+  db:
+    provider:
+      type: awesomecloud
+    image: redis
+`,
+			want: "redis\n",
+		},
+		{
+			name: "provider with a build lists the built image tag",
+			yaml: `
+name: edgecase
+services:
+  db:
+    provider:
+      type: awesomecloud
+    build:
+      context: .
+`,
+			want: "edgecase-db\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			dir := t.TempDir()
+			composePath := filepath.Join(dir, "compose.yaml")
+			assert.NilError(t, os.WriteFile(composePath, []byte(tt.yaml), 0o600))
+
+			buf := new(bytes.Buffer)
+			cli := mocks.NewMockCli(ctrl)
+			cli.EXPECT().Out().Return(streams.NewOut(buf)).AnyTimes()
+
+			opts := configOptions{
+				ProjectOptions: &ProjectOptions{
+					ConfigPaths: []string{composePath},
+				},
+			}
+			assert.NilError(t, runConfigImages(t.Context(), cli, opts, nil))
+			assert.Equal(t, buf.String(), tt.want)
+		})
+	}
 }
