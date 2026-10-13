@@ -18,15 +18,21 @@ package compose
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
+	"github.com/moby/buildkit/client"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -526,4 +532,43 @@ func TestMakeConsole(t *testing.T) {
 		buf := &bytes.Buffer{}
 		assert.Equal(t, makeConsole(buf), io.Writer(buf))
 	})
+}
+
+// A bake that writes a long stream of solve statuses, then why it failed, and
+// exits right away, while the consumer of the statuses (the progress display)
+// is slower than it: the process is gone when most of the stream is still to
+// be read. The error, which comes last, must reach the caller all the same.
+func TestWaitBakeKeepsTheEndOfTheStream(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	const statuses = 200
+	cmd := exec.CommandContext(t.Context(), "sh", "-c", fmt.Sprintf(`
+		i=0; while [ $i -lt %d ]; do echo '{}' >&2; i=$((i+1)); done
+		echo 'ERROR: failed to solve: no match for platform in manifest' >&2
+		exit 1`, statuses))
+	stderr, err := cmd.StderrPipe()
+	assert.NilError(t, err)
+	assert.NilError(t, cmd.Start())
+
+	ch := make(chan *client.SolveStatus)
+	received := make(chan int, 1) // buffered, so the consumer cannot leak if an assertion below aborts the test
+	go func() {
+		n := 0
+		for range ch {
+			n++
+			time.Sleep(time.Millisecond) // a display slower than bake
+		}
+		received <- n
+	}()
+
+	errMessage, err := waitBake(cmd, stderr, ch)
+	close(ch)
+
+	var exitErr *exec.ExitError
+	assert.Assert(t, errors.As(err, &exitErr), "the exit status of bake must be reported, got %v", err)
+	assert.Equal(t, exitErr.ExitCode(), 1)
+	assert.Equal(t, len(errMessage), 1, "the line telling why bake failed was lost: %v", errMessage)
+	assert.Assert(t, strings.Contains(errMessage[0], "no match for platform in manifest"), errMessage[0])
+	assert.Equal(t, <-received, statuses, "every status must be forwarded")
 }

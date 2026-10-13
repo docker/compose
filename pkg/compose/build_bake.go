@@ -208,15 +208,13 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if err != nil {
 		return nil, err
 	}
-	eg.Go(cmd.Wait)
 
-	errMessage, err := forwardBakeStatus(pipe, ch)
-	if err != nil {
-		return nil, err
-	}
+	errMessage, err := waitBake(cmd, pipe, ch)
 	close(ch) // stop build progress UI
 
-	err = eg.Wait()
+	if displayErr := eg.Wait(); err == nil {
+		err = displayErr
+	}
 	if err != nil {
 		if len(errMessage) > 0 {
 			return nil, errors.New(strings.Join(errMessage, "\n"))
@@ -506,9 +504,29 @@ func bakeArgs(bake *bakeBuild, metadataFile string, options api.BuildOptions) []
 	return args
 }
 
-// forwardBakeStatus reads bake's rawjson stderr stream, forwarding solve
-// statuses to the progress UI channel. Lines that are not solve statuses are
-// collected as error messages, to be reported if bake exits non-zero.
+// waitBake forwards the solve statuses of a started bake command's rawjson
+// stderr stream to ch, then waits for the command to exit. It returns the
+// lines of the stream that are not solve statuses — where bake tells why it
+// failed — along with the error of the command.
+//
+// The stream is read to EOF before Wait is called, not while it runs: Wait
+// closes the pipe as soon as the process exits, and what was not read yet is
+// lost. That is the end of the stream, bake's last words and so its error,
+// whenever the consumer of ch lags behind the process.
+func waitBake(cmd *exec.Cmd, stderr io.Reader, ch chan<- *client.SolveStatus) ([]string, error) {
+	errMessage, err := forwardBakeStatus(stderr, ch)
+	if err != nil {
+		// bake may be blocked writing to a stream nobody reads any more
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return nil, err
+	}
+	return errMessage, cmd.Wait()
+}
+
+// forwardBakeStatus reads bake's rawjson stderr stream until EOF, forwarding
+// solve statuses to the progress UI channel. Lines that are not solve statuses
+// are collected as error messages, to be reported if bake exits non-zero.
 func forwardBakeStatus(pipe io.Reader, ch chan<- *client.SolveStatus) ([]string, error) {
 	var errMessage []string
 	reader := bufio.NewReader(pipe)
@@ -517,12 +535,10 @@ func forwardBakeStatus(pipe io.Reader, ch chan<- *client.SolveStatus) ([]string,
 		if readErr == io.EOF {
 			return errMessage, nil
 		}
-		if errors.Is(readErr, os.ErrClosed) {
-			logrus.Debugf("bake stopped")
-			return errMessage, nil
-		}
 		if readErr != nil {
-			return nil, fmt.Errorf("failed to execute bake: %w", readErr)
+			// not wrapped here: doBuildBake does, once, for every error that
+			// comes without a message from bake itself
+			return nil, readErr
 		}
 		decoder := json.NewDecoder(strings.NewReader(line))
 		var status client.SolveStatus
