@@ -83,3 +83,34 @@ func TestReplace(t *testing.T) {
 		})
 	}
 }
+
+// A flow-style document puts every node on line 1: the position scan in
+// replace never sees a newline preceding the target, pos runs to the end of
+// the stream, and the column offset then slices out of range. compose
+// publish feeds the user's original file bytes into this path
+// (processFile), so the flow style is reachable input, not a hypothetical.
+func TestReplaceFlowStyle(t *testing.T) {
+	t.Run("extends file", func(t *testing.T) {
+		_, err := ReplaceExtendsFile([]byte(`{services: {test: {extends: {file: old.yaml}}}}`), "test", "REPLACED")
+		assert.ErrorContains(t, err, "flow-style")
+	})
+	t.Run("env_file", func(t *testing.T) {
+		_, err := ReplaceEnvFile([]byte(`{services: {test: {env_file: old.env}}}`), "test", 0, "REPLACED")
+		assert.ErrorContains(t, err, "flow style")
+	})
+	// on main this silently corrupted the stream: rewriting an entry of a
+	// flow sequence swallowed the rest of the line, closing bracket included
+	t.Run("env_file flow sequence", func(t *testing.T) {
+		_, err := ReplaceEnvFile([]byte(`{services: {test: {env_file: [a.env, b.env]}}}`), "test", 1, "REPLACED")
+		assert.ErrorContains(t, err, "flow style")
+	})
+	t.Run("env_file out-of-range entry", func(t *testing.T) {
+		_, err := ReplaceEnvFile([]byte(`services:
+  test:
+    env_file:
+      - a.env
+      - b.env
+`), "test", 5, "REPLACED")
+		assert.ErrorContains(t, err, "cannot rewrite entry 5")
+	})
+}
