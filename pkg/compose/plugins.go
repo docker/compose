@@ -152,7 +152,7 @@ func (s *composeService) runPlugin(ctx context.Context, project *types.Project, 
 		return err
 	}
 
-	if command == "stop" || command == "pull" {
+	if command == "stop" || command == "pull" || s.dryRun {
 		return nil
 	}
 
@@ -236,6 +236,13 @@ func (s *composeService) executePlugin(ctx context.Context, project *types.Proje
 		return pluginVariables{}, fmt.Errorf("unsupported plugin command: %s", command)
 	}
 
+	if s.dryRun {
+		// the provider is an external process the dry-run API client cannot
+		// intercept: running it would apply the change for real
+		s.events.On(pluginDoneEvent(command, service.Name))
+		return pluginVariables{}, nil
+	}
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return pluginVariables{}, err
@@ -315,17 +322,21 @@ func (s *composeService) executePlugin(ctx context.Context, project *types.Proje
 		s.events.On(errorEvent(service.Name, err.Error()))
 		return pluginVariables{}, fmt.Errorf("failed to %s service provider: %s", action, err.Error())
 	}
+	s.events.On(pluginDoneEvent(command, service.Name))
+	return variables, nil
+}
+
+func pluginDoneEvent(command, service string) api.Resource {
 	switch command {
 	case "up":
-		s.events.On(createdEvent(service.Name))
+		return createdEvent(service)
 	case "down":
-		s.events.On(removedEvent(service.Name))
+		return removedEvent(service)
 	case "stop":
-		s.events.On(stoppedEvent(service.Name))
-	case "pull":
-		s.events.On(newEvent(service.Name, api.Done, "Pulled"))
+		return stoppedEvent(service)
+	default: // pull
+		return newEvent(service, api.Done, api.StatusPulled)
 	}
-	return variables, nil
 }
 
 // imageStreamChunkSize is the fixed buffer compose fills from the image
