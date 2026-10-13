@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package projectloader
 
 import (
 	"os"
@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/docker/cli/cli/command"
+	"github.com/moby/moby/client"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 
@@ -47,8 +49,7 @@ services:
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	assert.NilError(t, err)
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Load the project
 	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
@@ -85,8 +86,7 @@ services:
 	// Set environment variable
 	t.Setenv("TEST_VAR", "resolved_value")
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Test with environment resolution (default)
 	t.Run("WithResolution", func(t *testing.T) {
@@ -133,8 +133,7 @@ services:
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	assert.NilError(t, err)
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Load only specific services
 	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
@@ -163,8 +162,7 @@ services:
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	assert.NilError(t, err)
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Without debug profile
 	t.Run("WithoutProfile", func(t *testing.T) {
@@ -200,8 +198,7 @@ services:
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	assert.NilError(t, err)
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Track events received
 	var events []string
@@ -233,8 +230,7 @@ services:
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	assert.NilError(t, err)
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Without explicit project name
 	t.Run("InferredName", func(t *testing.T) {
@@ -268,8 +264,7 @@ services:
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	assert.NilError(t, err)
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// With compatibility mode
 	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
@@ -295,8 +290,7 @@ this is not valid yaml: [[[
 	err := os.WriteFile(composeFile, []byte(composeContent), 0o644)
 	assert.NilError(t, err)
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Should return an error for invalid YAML
 	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
@@ -308,8 +302,7 @@ this is not valid yaml: [[[
 }
 
 func TestLoadProject_MissingComposeFile(t *testing.T) {
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	// Should return an error for missing file
 	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
@@ -319,3 +312,9 @@ func TestLoadProject_MissingComposeFile(t *testing.T) {
 	assert.Assert(t, err != nil)
 	assert.Assert(t, project == nil)
 }
+
+// noBackend is a Backend with no daemon and no CLI, enough to load local Compose files.
+type noBackend struct{}
+
+func (noBackend) APIClient() client.APIClient { return nil }
+func (noBackend) CLI() command.Cli            { return nil }

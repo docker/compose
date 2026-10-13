@@ -106,9 +106,3 @@ func TestPortsAsksForTheReplica(t *testing.T) {
 	assert.Equal(t, backend.oneOff, OneOffInclude)
 	assert.Equal(t, backend.all, false)
 }
-
-func TestCanonicalContainerName(t *testing.T) {
-	assert.Equal(t, canonicalContainerName(container.Summary{Names: []string{"/proj-web-1", "/other/web"}}), "proj-web-1")
-	assert.Equal(t, canonicalContainerName(container.Summary{Names: []string{"/linked_by/web"}}), "linked_by/web")
-	assert.Equal(t, canonicalContainerName(container.Summary{ID: "0123456789abcdef"}), "0123456789ab")
-}

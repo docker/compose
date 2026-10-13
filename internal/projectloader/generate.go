@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package projectloader
 
 import (
 	"context"
@@ -29,11 +29,12 @@ import (
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
-	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+func (s *Service) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
+	res, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("name", options.Containers...),
 		All:     true,
 	})
@@ -42,7 +43,7 @@ func (s *composeService) Generate(ctx context.Context, options api.GenerateOptio
 	}
 	containers := res.Items
 
-	containersByIds, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+	containersByIds, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("id", options.Containers...),
 		All:     true,
 	})
@@ -65,7 +66,7 @@ func (s *composeService) Generate(ctx context.Context, options api.GenerateOptio
 	return s.createProjectFromContainers(containers, options.ProjectName)
 }
 
-func (s *composeService) createProjectFromContainers(containers []container.Summary, projectName string) (*types.Project, error) {
+func (s *Service) createProjectFromContainers(containers []container.Summary, projectName string) (*types.Project, error) {
 	project := &types.Project{}
 	services := types.Services{}
 	networks := types.Networks{}
@@ -80,7 +81,7 @@ func (s *composeService) createProjectFromContainers(containers []container.Summ
 		// if the container is from a previous Compose application, use the existing service name
 		serviceLabel, ok := ctr.Labels[api.ServiceLabel]
 		if !ok {
-			serviceLabel = getCanonicalContainerName(ctr)
+			serviceLabel = naming.CanonicalContainerName(ctr)
 		}
 		service, ok := services[serviceLabel]
 		if !ok {
@@ -94,7 +95,7 @@ func (s *composeService) createProjectFromContainers(containers []container.Summ
 		}
 		service.Scale = increment(service.Scale)
 
-		inspect, err := s.apiClient().ContainerInspect(context.Background(), ctr.ID, client.ContainerInspectOptions{})
+		inspect, err := s.backend.APIClient().ContainerInspect(context.Background(), ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			services[serviceLabel] = service
 			continue
@@ -111,7 +112,7 @@ func (s *composeService) createProjectFromContainers(containers []container.Summ
 	return project, nil
 }
 
-func (s *composeService) extractComposeConfiguration(service *types.ServiceConfig, inspect container.InspectResponse, volumes types.Volumes, secrets types.Secrets, networks types.Networks) {
+func (s *Service) extractComposeConfiguration(service *types.ServiceConfig, inspect container.InspectResponse, volumes types.Volumes, secrets types.Secrets, networks types.Networks) {
 	service.Environment = types.NewMappingWithEquals(inspect.Config.Env)
 	if inspect.Config.Healthcheck != nil {
 		healthConfig := inspect.Config.Healthcheck
@@ -143,7 +144,7 @@ func (s *composeService) extractComposeConfiguration(service *types.ServiceConfi
 	}
 }
 
-func (s *composeService) toComposeHealthCheck(healthConfig *container.HealthConfig) *types.HealthCheckConfig {
+func (s *Service) toComposeHealthCheck(healthConfig *container.HealthConfig) *types.HealthCheckConfig {
 	var healthCheck types.HealthCheckConfig
 	healthCheck.Test = healthConfig.Test
 	if healthConfig.Timeout != 0 {
@@ -169,7 +170,7 @@ func (s *composeService) toComposeHealthCheck(healthConfig *container.HealthConf
 	return &healthCheck
 }
 
-func (s *composeService) toComposeVolumes(volumes []container.MountPoint) (map[string]types.VolumeConfig,
+func (s *Service) toComposeVolumes(volumes []container.MountPoint) (map[string]types.VolumeConfig,
 	[]types.ServiceVolumeConfig, map[string]types.SecretConfig, []types.ServiceSecretConfig,
 ) {
 	volumeConfigs := make(map[string]types.VolumeConfig)
@@ -214,12 +215,12 @@ func (s *composeService) toComposeVolumes(volumes []container.MountPoint) (map[s
 	return volumeConfigs, serviceVolumeConfigs, secretConfigs, serviceSecretConfigs
 }
 
-func (s *composeService) toComposeNetwork(networks map[string]*network.EndpointSettings) (map[string]types.NetworkConfig, map[string]*types.ServiceNetworkConfig) {
+func (s *Service) toComposeNetwork(networks map[string]*network.EndpointSettings) (map[string]types.NetworkConfig, map[string]*types.ServiceNetworkConfig) {
 	networkConfigs := make(map[string]types.NetworkConfig)
 	serviceNetworkConfigs := make(map[string]*types.ServiceNetworkConfig)
 
 	for name, net := range networks {
-		inspect, err := s.apiClient().NetworkInspect(context.Background(), name, client.NetworkInspectOptions{})
+		inspect, err := s.backend.APIClient().NetworkInspect(context.Background(), name, client.NetworkInspectOptions{})
 		if err != nil {
 			networkConfigs[name] = types.NetworkConfig{}
 		} else {
@@ -242,4 +243,12 @@ func cleanDockerPreviousLabels(labels types.Labels) types.Labels {
 		}
 	}
 	return cleanedLabels
+}
+
+func increment(scale *int) *int {
+	i := 1
+	if scale != nil {
+		i = *scale + 1
+	}
+	return &i
 }

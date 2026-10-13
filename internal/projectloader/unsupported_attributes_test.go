@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package projectloader
 
 import (
 	"cmp"
@@ -65,11 +65,10 @@ func loadWithFiles(t *testing.T, files map[string]string) []api.UnsupportedAttri
 		assert.NilError(t, os.WriteFile(path, []byte(content), 0o644))
 	}
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
+	service := New(noBackend{})
 
 	var findings []api.UnsupportedAttribute
-	_, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{
+	_, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 		ConfigPaths: []string{filepath.Join(tmpDir, "compose.yaml")},
 		OnUnsupportedAttribute: func(f []api.UnsupportedAttribute) {
 			findings = f
@@ -229,8 +228,7 @@ services:
 `
 		assert.NilError(t, os.WriteFile(filepath.Join(tmpDir, "compose.yaml"), []byte(content), 0o644))
 
-		service, err := NewComposeService(nil)
-		assert.NilError(t, err)
+		service := New(noBackend{})
 		var got []api.UnsupportedAttribute
 		project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
 			ConfigPaths:            []string{filepath.Join(tmpDir, "compose.yaml")},
@@ -657,8 +655,7 @@ services:
 `
 	assert.NilError(t, os.WriteFile(composeFile, []byte(content), 0o644))
 
-	service, err := NewComposeService(nil)
-	assert.NilError(t, err)
-	_, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{ConfigPaths: []string{composeFile}})
+	service := New(noBackend{})
+	_, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{ConfigPaths: []string{composeFile}})
 	assert.ErrorContains(t, err, "condition")
 }

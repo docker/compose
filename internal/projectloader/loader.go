@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package projectloader
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 
 // LoadProject implements api.Compose.LoadProject
 // It loads and validates a Compose project from configuration files.
-func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoadOptions) (*types.Project, error) {
+func (s *Service) LoadProject(ctx context.Context, options api.ProjectLoadOptions) (*types.Project, error) {
 	// Setup remote loaders (Git, OCI)
 	remoteLoaders := s.createRemoteLoaders(options)
 
@@ -68,17 +68,17 @@ func (s *composeService) LoadProject(ctx context.Context, options api.ProjectLoa
 }
 
 // createRemoteLoaders creates Git and OCI remote loaders if not in offline mode
-func (s *composeService) createRemoteLoaders(options api.ProjectLoadOptions) []loader.ResourceLoader {
+func (s *Service) createRemoteLoaders(options api.ProjectLoadOptions) []loader.ResourceLoader {
 	if options.Offline {
 		return nil
 	}
-	git := remote.NewGitRemoteLoader(s.dockerCli, options.Offline)
-	oci := remote.NewOCIRemoteLoader(s.dockerCli, options.Offline, options.OCI)
+	git := remote.NewGitRemoteLoader(s.backend.CLI(), options.Offline)
+	oci := remote.NewOCIRemoteLoader(s.backend.CLI(), options.Offline, options.OCI)
 	return []loader.ResourceLoader{git, oci}
 }
 
 // buildProjectOptions constructs compose-go ProjectOptions from API options
-func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, remoteLoaders []loader.ResourceLoader) (*cli.ProjectOptions, error) {
+func (s *Service) buildProjectOptions(options api.ProjectLoadOptions, remoteLoaders []loader.ResourceLoader) (*cli.ProjectOptions, error) {
 	projectOptionsFns := []cli.ProjectOptionsFn{
 		cli.WithWorkingDirectory(options.WorkingDir),
 		cli.WithOsEnv,
@@ -121,7 +121,7 @@ func (s *composeService) buildProjectOptions(options api.ProjectLoadOptions, rem
 }
 
 // postProcessProject applies post-loading transformations to the project
-func (s *composeService) postProcessProject(project *types.Project, options api.ProjectLoadOptions) (*types.Project, error) {
+func (s *Service) postProcessProject(project *types.Project, options api.ProjectLoadOptions) (*types.Project, error) {
 	if project.Name == "" {
 		return nil, errors.New("project name can't be empty. Use ProjectName option to set a valid name")
 	}
