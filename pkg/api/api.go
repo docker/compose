@@ -491,6 +491,8 @@ type ConfigOptions struct {
 type PushOptions struct {
 	Quiet          bool
 	IgnoreFailures bool
+	// IgnoreMissing skips the images that are not available locally instead of failing to push them
+	IgnoreMissing  bool
 	ImageMandatory bool
 }
 
