@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"
@@ -65,6 +66,10 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 
 		for _, tag := range tags {
 			eg.Go(func() error {
+				if options.IgnoreMissing && s.isMissingLocally(ctx, tag) {
+					s.events.On(newEvent(tag, api.Done, "Skipped", "No local image"))
+					return nil
+				}
 				s.events.On(newEvent(tag, api.Working, "Pushing"))
 				err := s.pushServiceImage(ctx, tag, options.Quiet)
 				if err != nil {
@@ -81,6 +86,13 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 		}
 	}
 	return eg.Wait()
+}
+
+// isMissingLocally tells whether the image is known to be absent from the local image store; any other failure
+// to look it up is left to the push to report.
+func (s *composeService) isMissingLocally(ctx context.Context, tag string) bool {
+	_, err := s.apiClient().ImageInspect(ctx, tag)
+	return errdefs.IsNotFound(err)
 }
 
 func (s *composeService) pushServiceImage(ctx context.Context, tag string, quietPush bool) error {

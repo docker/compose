@@ -22,12 +22,13 @@ services:
 
 ### Options
 
-| Name                     | Type   | Default | Description                                            |
-|:-------------------------|:-------|:--------|:-------------------------------------------------------|
-| `--dry-run`              | `bool` |         | Execute command in dry run mode                        |
-| `--ignore-push-failures` | `bool` |         | Push what it can and ignores images with push failures |
-| `--include-deps`         | `bool` |         | Also push images of services declared as dependencies  |
-| `-q`, `--quiet`          | `bool` |         | Push without printing progress information             |
+| Name                     | Type   | Default | Description                                                                |
+|:-------------------------|:-------|:--------|:---------------------------------------------------------------------------|
+| `--dry-run`              | `bool` |         | Execute command in dry run mode                                            |
+| `--ignore-missing`       | `bool` |         | Skip images that are not available locally instead of failing to push them |
+| `--ignore-push-failures` | `bool` |         | Push what it can and ignores images with push failures                     |
+| `--include-deps`         | `bool` |         | Also push images of services declared as dependencies                      |
+| `-q`, `--quiet`          | `bool` |         | Push without printing progress information                                 |
 
 
 <!---MARKER_GEN_END-->

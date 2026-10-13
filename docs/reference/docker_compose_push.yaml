@@ -23,6 +23,17 @@ usage: docker compose push [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: ignore-missing
+      value_type: bool
+      default_value: "false"
+      description: |
+        Skip images that are not available locally instead of failing to push them
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: ignore-push-failures
       value_type: bool
       default_value: "false"
