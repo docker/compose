@@ -19,9 +19,15 @@ package naming
 import (
 	"testing"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"gotest.tools/v3/assert"
 )
+
+func TestContainerName(t *testing.T) {
+	assert.Equal(t, ContainerName("proj", types.ServiceConfig{Name: "web"}, 2), "proj-web-2")
+	assert.Equal(t, ContainerName("proj", types.ServiceConfig{Name: "web", ContainerName: "custom"}, 2), "custom")
+}
 
 func TestCanonicalContainerName(t *testing.T) {
 	assert.Equal(t, CanonicalContainerName(container.Summary{Names: []string{"/proj-web-1", "/other/web"}}), "proj-web-1")

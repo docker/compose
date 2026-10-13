@@ -18,10 +18,23 @@
 package naming
 
 import (
+	"strconv"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
+
+// ContainerName returns the name of the replica of a service: the container_name
+// the service declares, or the default <project>-<service>-<number>.
+func ContainerName(projectName string, service types.ServiceConfig, number int) string {
+	if service.ContainerName != "" {
+		return service.ContainerName
+	}
+	return strings.Join([]string{projectName, service.Name, strconv.Itoa(number)}, api.Separator)
+}
 
 // CanonicalContainerName returns the name a container goes by, without the
 // leading slash nor the link aliases.
