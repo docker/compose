@@ -89,7 +89,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 		return err
 	}
 
-	encodedAuth, err := registry.EncodedAuth(ref, s.authProvider())
+	encodedAuth, err := registry.EncodedAuth(ref, s.authProvider(ctx))
 	if err != nil {
 		return err
 	}
