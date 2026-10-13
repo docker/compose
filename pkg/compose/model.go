@@ -76,6 +76,7 @@ type modelAPI struct {
 	prepare func(ctx context.Context, cmd *exec.Cmd) error
 	cleanup func()
 	version string
+	dryRun  bool
 }
 
 func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) {
@@ -101,6 +102,7 @@ func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) 
 		},
 		cleanup: cleanup,
 		env:     append(project.Environment.Values(), endpoint...),
+		dryRun:  s.dryRun,
 	}, nil
 }
 
@@ -114,6 +116,11 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 		Status: api.Working,
 		Text:   api.StatusPulling,
 	})
+	if m.dryRun {
+		// the plugin is an external process the dry-run API client cannot intercept
+		events.On(api.Resource{ID: model.Name, Status: api.Working, Text: api.StatusPulled})
+		return nil
+	}
 
 	cmd := exec.CommandContext(ctx, m.path, "pull", model.Model)
 	err := m.prepare(ctx, cmd)
@@ -164,6 +171,10 @@ func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig,
 		Status: api.Working,
 		Text:   api.StatusConfiguring,
 	})
+	if m.dryRun {
+		events.On(api.Resource{ID: config.Name, Status: api.Done, Text: api.StatusConfigured})
+		return nil
+	}
 	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]
 	args := []string{"configure"}
 	if config.ContextSize > 0 {
