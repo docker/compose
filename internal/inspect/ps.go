@@ -24,6 +24,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -64,7 +65,7 @@ func (s *Service) containerSummary(ctx context.Context, ctr container.Summary) (
 	mounts, localVolumes := containerMounts(ctr)
 	return api.ContainerSummary{
 		ID:           ctr.ID,
-		Name:         canonicalContainerName(ctr),
+		Name:         naming.CanonicalContainerName(ctr),
 		Names:        ctr.Names,
 		Image:        ctr.Image,
 		Project:      ctr.Labels[api.ProjectLabel],

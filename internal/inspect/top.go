@@ -22,6 +22,7 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -44,7 +45,7 @@ func (s *Service) Top(ctx context.Context, projectName string, services []string
 			if err != nil {
 				return err
 			}
-			name := canonicalContainerName(ctr)
+			name := naming.CanonicalContainerName(ctr)
 			s := api.ContainerProcSummary{
 				ID:        ctr.ID,
 				Name:      name,

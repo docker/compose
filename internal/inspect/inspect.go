@@ -21,7 +21,6 @@ package inspect
 import (
 	"context"
 	"slices"
-	"strings"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -85,21 +84,4 @@ func limitedGroup(ctx context.Context, maxConcurrency int) (*errgroup.Group, con
 		eg.SetLimit(maxConcurrency)
 	}
 	return eg, ctx
-}
-
-// canonicalContainerName returns the name a container goes by, without the
-// leading slash nor the link aliases.
-func canonicalContainerName(c container.Summary) string {
-	if len(c.Names) == 0 {
-		// corner case, sometime happens on removal. return short ID as a safeguard value
-		return c.ID[:12]
-	}
-	// Names return container canonical name /foo  + link aliases /linked_by/foo
-	for _, name := range c.Names {
-		if strings.LastIndex(name, "/") == 0 {
-			return name[1:]
-		}
-	}
-
-	return strings.TrimPrefix(c.Names[0], "/")
 }
