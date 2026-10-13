@@ -5,11 +5,33 @@ usage: docker compose stats [OPTIONS] [SERVICE]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: aggregate
+      value_type: bool
+      default_value: "false"
+      description: |
+        Show one line per project, summing the resource usage of its containers (only 'table' and 'json' formats)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: all
       shorthand: a
       value_type: bool
       default_value: "false"
       description: Show all containers (default shows just running)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: all-projects
+      value_type: bool
+      default_value: "false"
+      description: |
+        Show the containers of all projects instead of the current one, with their project (only 'table' and 'json' formats)
       deprecated: false
       hidden: false
       experimental: false
