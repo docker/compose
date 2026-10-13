@@ -143,6 +143,9 @@ func (s *composeService) preparePlan(ctx context.Context, project *types.Project
 	observed.setResolvedVolumes(externalVolumes)
 	warnUnmanagedNetworks(project, observed)
 	warnUnmanagedVolumes(project, observed)
+	// every enabled service, not just options.Services: dependencies of the
+	// requested services get created too
+	warnIgnoredFileReferences(project, project.ServiceNames())
 
 	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
 		logrus.Warnf("Found orphan containers (%s) for this project. If "+

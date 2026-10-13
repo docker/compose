@@ -48,15 +48,35 @@ func TestUnsupportedAttributesWarning(t *testing.T) {
 			OutputContains(`service \"swarm-attrs\": credential_spec`),
 			OutputContains(`service \"ports-demo\": ports[80/tcp].mode`),
 			OutputContains(`service \"cluster-vol\": volumes[my-csi-volume].type`),
-			OutputContains(`service \"file-refs\": configs.myconfig.uid`),
-			OutputContains(`service \"file-refs\": configs.myconfig.gid`),
-			OutputContains(`service \"file-refs\": configs.myconfig.mode`),
-			OutputContains(`service \"file-refs\": secrets.mysecret.uid`),
-			OutputContains(`service \"file-refs\": secrets.mysecret.gid`),
-			OutputContains(`service \"file-refs\": secrets.mysecret.mode`),
 			OutputContains(`configs.myconfig.labels`),
 			OutputContains(`secrets.mysecret.driver_opts`),
 			OutputContains(`secrets.mysecret.labels`),
 			OutputNotContains(`service \"clean\"`),
 			OutputNotContains(`configs.myconfig.driver_opts`))
+}
+
+// TestFileReferenceOverridesWarning locks the warning on uid/gid/mode of a
+// service-level configs:/secrets: reference. Whether they apply depends on how
+// the referenced object reaches the container — copied in for `content:` and
+// `environment:` sources, bind-mounted (and so unchanged) for `file:` — which
+// is settled when the container is created, not when the file is loaded: the
+// warning must follow the actual behavior, not the mere presence of the
+// attributes.
+func TestFileReferenceOverridesWarning(t *testing.T) {
+	NewScenario(t, "compose must warn at creation about uid/gid/mode it cannot apply to a bind-mounted file, and only then").
+		Step("loading the project says nothing about them",
+			ComposeCmd("config"),
+			OutputNotContains(`configs.fileconfig.uid`)).
+		Step("creating reports the references to `file:` sources, not the ones to inline or environment sources",
+			ComposeCmd("create"),
+			OutputContains(`service \"file-refs\": configs.fileconfig.uid`),
+			OutputContains(`service \"file-refs\": configs.fileconfig.gid`),
+			OutputContains(`service \"file-refs\": configs.fileconfig.mode`),
+			OutputContains(`service \"file-refs\": secrets.filesecret.uid`),
+			OutputContains(`service \"file-refs\": secrets.filesecret.mode`),
+			OutputNotContains(`secrets.filesecret.gid`),
+			OutputNotContains(`service \"inline-refs\"`)).
+		Step("running the service reports them too, since its container is not created by create",
+			ComposeCmd("run", "--rm", "file-refs", "true"),
+			OutputContains(`service \"file-refs\": configs.fileconfig.uid`))
 }
