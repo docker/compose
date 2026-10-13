@@ -29,28 +29,13 @@ import (
 )
 
 // The relay containers and relay link networks standing in for provider
-// services are managed in internal/relay: composeService hands that package
-// the engine it works with, and the functions below let the lifecycle code
-// keep calling it by the names it always did.
+// services are managed in internal/relay (and deployed by internal/provider):
+// composeService hands that package the engine it works with, and the
+// functions below let the lifecycle code keep calling it by the names it
+// always did.
 
 func (s *composeService) relayService() *relaymgr.Service {
 	return relaymgr.New(relayBackend{s})
-}
-
-func (s *composeService) relayInfo(ctx context.Context, project *types.Project, service types.ServiceConfig) relaymgr.InfoAnswer {
-	return s.relayService().Info(ctx, project, service)
-}
-
-func relayNetworks(project *types.Project, service types.ServiceConfig) []string {
-	return relaymgr.Networks(project, service)
-}
-
-func (s *composeService) ensureServiceRelay(ctx context.Context, project *types.Project, service types.ServiceConfig, endpoints map[int]string, networkKeys []string) error {
-	return s.relayService().Ensure(ctx, project, service, endpoints, networkKeys)
-}
-
-func (s *composeService) removeServiceRelay(ctx context.Context, projectName, serviceName string) error {
-	return s.relayService().Remove(ctx, projectName, serviceName)
 }
 
 func isRelayContainer(ctr container.Summary) bool {

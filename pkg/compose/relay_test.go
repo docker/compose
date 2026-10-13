@@ -31,18 +31,6 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func TestParseEndpointMessage(t *testing.T) {
-	port, upstream, err := parseEndpointMessage("80=host.docker.internal:49152")
-	assert.NilError(t, err)
-	assert.Equal(t, port, 80)
-	assert.Equal(t, upstream, "host.docker.internal:49152")
-
-	for _, invalid := range []string{"80", "abc=host:1", "0=host:1", "80=nohostport"} {
-		_, _, err := parseEndpointMessage(invalid)
-		assert.Assert(t, err != nil, "expected error for %q", invalid)
-	}
-}
-
 // actualNetworks (compose.go) indexes discovered networks by their
 // NetworkLabel value to rebuild project.Networks when down runs without an
 // explicit compose file. A relay-link network never carries that label —
