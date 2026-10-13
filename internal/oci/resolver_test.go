@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/opencontainers/go-digest"
@@ -211,5 +212,6 @@ func TestGetBlob_RejectsSizeMismatch(t *testing.T) {
 		Digest:    dgst,
 		Size:      int64(len(content)) - 1, // registry serves more than declared
 	})
-	assert.ErrorContains(t, err, "size mismatch")
+	assert.ErrorType(t, err, errdefs.IsFailedPrecondition)
+	assert.ErrorContains(t, err, "read past expected size")
 }
