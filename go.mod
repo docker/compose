@@ -4,7 +4,7 @@ go 1.26.9
 
 require (
 	github.com/DefangLabs/secret-detector v0.0.0-20260916192156-3e28d7ed64df
-	github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29
+	github.com/Microsoft/go-winio v0.6.3
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
 	github.com/compose-spec/compose-go/v2 v2.16.2-0.20261012152039-c53b35077dd1
