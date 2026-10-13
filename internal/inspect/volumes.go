@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package inspect
 
 import (
 	"context"
@@ -26,8 +26,8 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Volumes(ctx context.Context, projectName string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
-	allContainers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+func (s *Service) Volumes(ctx context.Context, projectName string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
+	allContainers, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: projectFilter(projectName),
 	})
 	if err != nil {
@@ -47,7 +47,7 @@ func (s *composeService) Volumes(ctx context.Context, projectName string, option
 		containers = allContainers.Items
 	}
 
-	volumesResponse, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
+	volumesResponse, err := s.backend.APIClient().VolumeList(ctx, client.VolumeListOptions{
 		Filters: projectFilter(projectName),
 	})
 	if err != nil {

@@ -1,0 +1,105 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+// Package inspect implements the read-only operations that report on a
+// project and its resources: ps, ls, top, port, volumes, events and viz.
+package inspect
+
+import (
+	"context"
+	"slices"
+	"strings"
+
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/pkg/api"
+)
+
+// OneOff tells whether the containers of `compose run` are part of a listing.
+type OneOff int
+
+const (
+	// OneOffInclude lists the one-off containers along with the services' ones.
+	OneOffInclude OneOff = iota
+	// OneOffExclude leaves the one-off containers out.
+	OneOffExclude
+)
+
+// Backend is what the operations need from the engine they report on.
+type Backend interface {
+	// APIClient talks to the Docker daemon.
+	APIClient() client.APIClient
+	// MaxConcurrency bounds the daemon calls made in parallel, 0 meaning no bound.
+	MaxConcurrency() int
+	// Containers lists the containers of a project, narrowed to services when given.
+	Containers(ctx context.Context, projectName string, oneOff OneOff, all bool, services ...string) ([]container.Summary, error)
+	// SpecifiedContainer returns the container of a service, the replica with
+	// the given index when it is above zero.
+	SpecifiedContainer(ctx context.Context, projectName string, oneOff OneOff, all bool, serviceName string, index int) (container.Summary, error)
+}
+
+// Service runs the inspection operations on a Backend.
+type Service struct {
+	backend Backend
+}
+
+// New creates a Service reporting on the given Backend.
+func New(backend Backend) *Service {
+	return &Service{backend: backend}
+}
+
+func projectFilter(projectName string) client.Filters {
+	return make(client.Filters).Add("label", api.ProjectLabel+"="+projectName)
+}
+
+// inServices keeps the containers of the given services.
+func inServices(containers []container.Summary, services []string) []container.Summary {
+	var filtered []container.Summary
+	for _, ctr := range containers {
+		if slices.Contains(services, ctr.Labels[api.ServiceLabel]) {
+			filtered = append(filtered, ctr)
+		}
+	}
+	return filtered
+}
+
+// limitedGroup returns an errgroup running at most maxConcurrency goroutines at once.
+func limitedGroup(ctx context.Context, maxConcurrency int) (*errgroup.Group, context.Context) {
+	eg, ctx := errgroup.WithContext(ctx)
+	if maxConcurrency > 0 {
+		eg.SetLimit(maxConcurrency)
+	}
+	return eg, ctx
+}
+
+// canonicalContainerName returns the name a container goes by, without the
+// leading slash nor the link aliases.
+func canonicalContainerName(c container.Summary) string {
+	if len(c.Names) == 0 {
+		// corner case, sometime happens on removal. return short ID as a safeguard value
+		return c.ID[:12]
+	}
+	// Names return container canonical name /foo  + link aliases /linked_by/foo
+	for _, name := range c.Names {
+		if strings.LastIndex(name, "/") == 0 {
+			return name[1:]
+		}
+	}
+
+	return strings.TrimPrefix(c.Names[0], "/")
+}

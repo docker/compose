@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package inspect
 
 import (
 	"context"
@@ -25,27 +25,26 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
+func (s *Service) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
 	projectName = strings.ToLower(projectName)
-	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false)
+	containers, err := s.backend.Containers(ctx, projectName, OneOffInclude, false)
 	if err != nil {
 		return nil, err
 	}
 	if len(services) > 0 {
-		containers = containers.filter(isService(services...))
+		containers = inServices(containers, services)
 	}
 	summary := make([]api.ContainerProcSummary, len(containers))
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := limitedGroup(ctx, s.backend.MaxConcurrency())
 	for i, ctr := range containers {
 		eg.Go(func() error {
-			topContent, err := s.apiClient().ContainerTop(ctx, ctr.ID, client.ContainerTopOptions{
+			topContent, err := s.backend.APIClient().ContainerTop(ctx, ctr.ID, client.ContainerTopOptions{
 				Arguments: []string{},
 			})
 			if err != nil {
 				return err
 			}
-			name := getCanonicalContainerName(ctr)
+			name := canonicalContainerName(ctr)
 			s := api.ContainerProcSummary{
 				ID:        ctr.ID,
 				Name:      name,

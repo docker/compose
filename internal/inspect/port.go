@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package inspect
 
 import (
 	"context"
@@ -26,9 +26,9 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Ports(ctx context.Context, projectName string, serviceName string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
+func (s *Service) Ports(ctx context.Context, projectName string, serviceName string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
 	projectName = strings.ToLower(projectName)
-	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, serviceName, options.Index)
+	ctr, err := s.backend.SpecifiedContainer(ctx, projectName, OneOffInclude, false, serviceName, options.Index)
 	if err != nil {
 		return nil, err
 	}
