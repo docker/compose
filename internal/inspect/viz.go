@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package inspect
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 // maps a service with the services it depends on
 type vizGraph map[*types.ServiceConfig][]*types.ServiceConfig
 
-func (s *composeService) Viz(_ context.Context, project *types.Project, options api.VizOptions) (string, error) {
+func (s *Service) Viz(_ context.Context, project *types.Project, options api.VizOptions) (string, error) {
 	graph := make(vizGraph)
 	for _, service := range project.Services {
 		graph[&service] = make([]*types.ServiceConfig, 0, len(service.DependsOn))

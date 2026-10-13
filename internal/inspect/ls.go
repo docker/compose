@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package inspect
 
 import (
 	"context"
@@ -30,8 +30,8 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) List(ctx context.Context, options api.ListOptions) ([]api.Stack, error) {
-	list, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
+func (s *Service) List(ctx context.Context, options api.ListOptions) ([]api.Stack, error) {
+	list, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("label", api.ProjectLabel).Add("label", api.ConfigHashLabel),
 		All:     options.All,
 	})

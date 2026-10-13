@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package inspect
 
 import (
 	"context"
@@ -27,9 +27,9 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
+func (s *Service) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
 	projectName = strings.ToLower(projectName)
-	res := s.apiClient().Events(ctx, client.EventsListOptions{
+	res := s.backend.APIClient().Events(ctx, client.EventsListOptions{
 		Filters: projectFilter(projectName),
 		Since:   options.Since,
 		Until:   options.Until,

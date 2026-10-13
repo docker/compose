@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package inspect
 
 import (
 	"context"
@@ -27,22 +27,22 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
+func (s *Service) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	projectName = strings.ToLower(projectName)
-	oneOff := oneOffExclude
+	oneOff := OneOffExclude
 	if options.All {
-		oneOff = oneOffInclude
+		oneOff = OneOffInclude
 	}
-	containers, err := s.getContainers(ctx, projectName, oneOff, options.All, options.Services...)
+	containers, err := s.backend.Containers(ctx, projectName, oneOff, options.All, options.Services...)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(options.Services) != 0 {
-		containers = containers.filter(isService(options.Services...))
+		containers = inServices(containers, options.Services)
 	}
 	summary := make([]api.ContainerSummary, len(containers))
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := limitedGroup(ctx, s.backend.MaxConcurrency())
 	for i, ctr := range containers {
 		eg.Go(func() error {
 			var err error
@@ -55,8 +55,8 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 
 // containerSummary builds the api summary for a container, inspecting it to
 // retrieve its health and exit code
-func (s *composeService) containerSummary(ctx context.Context, ctr container.Summary) (api.ContainerSummary, error) {
-	inspect, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+func (s *Service) containerSummary(ctx context.Context, ctr container.Summary) (api.ContainerSummary, error) {
+	inspect, err := s.backend.APIClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return api.ContainerSummary{}, err
 	}
@@ -64,7 +64,7 @@ func (s *composeService) containerSummary(ctx context.Context, ctr container.Sum
 	mounts, localVolumes := containerMounts(ctr)
 	return api.ContainerSummary{
 		ID:           ctr.ID,
-		Name:         getCanonicalContainerName(ctr),
+		Name:         canonicalContainerName(ctr),
 		Names:        ctr.Names,
 		Image:        ctr.Image,
 		Project:      ctr.Labels[api.ProjectLabel],
