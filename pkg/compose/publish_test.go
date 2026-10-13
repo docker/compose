@@ -112,6 +112,47 @@ services:
 	}, cmp.Ignore()))
 }
 
+// a processFile failure must say which file it came from: a project can
+// carry many compose files and its extends references add more, so an
+// unattributed error leaves the user guessing which one to fix. The
+// flow-style file makes the assertions meaningful: the rejection itself
+// does not name the file, so only the wrap satisfies them.
+func Test_createLayers_error_includes_file_name(t *testing.T) {
+	dir := t.TempDir()
+	flowFile := filepath.Join(dir, "flow.yaml")
+	assert.NilError(t, os.WriteFile(flowFile, []byte(`{services: {test: {env_file: old.env}}}`), 0o600))
+	// the env file must exist, or the loader rejects it before the
+	// flow-style rewrite gets a chance to fail
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "old.env"), []byte("FOO=bar\n"), 0o600))
+
+	project := &types.Project{
+		Name:         "test",
+		WorkingDir:   dir,
+		Environment:  types.Mapping{},
+		ComposeFiles: []string{flowFile},
+	}
+
+	service := &composeService{}
+	_, err := service.createLayers(t.Context(), project, api.PublishOptions{})
+	assert.ErrorContains(t, err, "failed to process compose file "+flowFile)
+	assert.ErrorContains(t, err, "flow style")
+}
+
+func Test_processExtends_error_includes_file_name(t *testing.T) {
+	dir := t.TempDir()
+	flowFile := filepath.Join(dir, "flow.yaml")
+	assert.NilError(t, os.WriteFile(flowFile, []byte(`{services: {test: {env_file: old.env}}}`), 0o600))
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "old.env"), []byte("FOO=bar\n"), 0o600))
+
+	_, err := processExtends(t.Context(), &types.Project{
+		Name:        "test",
+		WorkingDir:  dir,
+		Environment: types.Mapping{},
+	}, map[string]string{flowFile: "deadbeef"})
+	assert.ErrorContains(t, err, "failed to process compose file "+flowFile)
+	assert.ErrorContains(t, err, "flow style")
+}
+
 func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	dir := t.TempDir()
 	envPath := dir + "/secrets.env"
