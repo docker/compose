@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/moby/moby/client/pkg/versions"
 	"gotest.tools/v3/icmd"
 )
 
@@ -646,6 +647,19 @@ func ContainerdImageStore(t testing.TB, c *CLI) string {
 		return "daemon is not using the containerd image store"
 	}
 	return ""
+}
+
+// EngineAPIVersionAtLeast requires a minimum Engine API version (for example
+// "1.56"), the unit in which the daemon's features are versioned.
+func EngineAPIVersionAtLeast(minimum string) Requirement {
+	return func(t testing.TB, c *CLI) string {
+		t.Helper()
+		version := strings.TrimSpace(c.RunDockerCmd(t, "version", "-f", "{{.Server.APIVersion}}").Stdout())
+		if versions.LessThan(version, minimum) {
+			return fmt.Sprintf("engine API version %s < %s", version, minimum)
+		}
+		return ""
+	}
 }
 
 // EngineVersionAtLeast requires a minimum daemon major version.
