@@ -18,12 +18,18 @@ package compose
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/docker/cli/cli/streams"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
@@ -135,6 +141,117 @@ func TestCollectContainerStats(t *testing.T) {
 	// stopped and removed containers are still listed, without usage
 	assert.Equal(t, rows[2].memory, 0.0)
 	assert.Equal(t, rows[4].memory, 0.0)
+}
+
+// A container whose sampling fails is still listed, without usage, and does not stop the others.
+func TestCollectContainerStatsKeepsRowsWhenSamplingFails(t *testing.T) {
+	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{Items: []container.Summary{
+		projectContainer("web-1", "app", "running"),
+		projectContainer("db-1", "app", "running"),
+	}}, nil)
+	apiClient.EXPECT().ContainerStats(gomock.Any(), "web-1-id", gomock.Any()).Return(client.ContainerStatsResult{}, errors.New("daemon unavailable"))
+	apiClient.EXPECT().ContainerStats(gomock.Any(), "db-1-id", gomock.Any()).Return(statsBody(t, sampleResponse(1000, 0)), nil)
+
+	rows, err := collectContainerStats(t.Context(), apiClient, false, client.Filters{})
+	assert.NilError(t, err)
+	assert.Equal(t, len(rows), 2)
+	assert.Equal(t, rows[0].name, "db-1")
+	assert.Equal(t, rows[0].memory, 1000.0)
+	assert.Equal(t, rows[1].name, "web-1")
+	assert.Equal(t, rows[1].memory, 0.0)
+}
+
+// Stopping the command interrupts the sampling, which must be reported as such rather than rendered as
+// containers without usage.
+func TestCollectContainerStatsReportsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{Items: []container.Summary{
+		projectContainer("web-1", "app", "running"),
+	}}, nil)
+	apiClient.EXPECT().ContainerStats(gomock.Any(), "web-1-id", gomock.Any()).DoAndReturn(
+		func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
+			cancel()
+			return client.ContainerStatsResult{}, ctx.Err()
+		})
+
+	_, err := collectContainerStats(ctx, apiClient, false, client.Filters{})
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// The containers are sampled concurrently, but never more than statsConcurrency at once.
+func TestCollectContainerStatsBoundsConcurrency(t *testing.T) {
+	const containers = statsConcurrency + 8
+	var items []container.Summary
+	for i := range containers {
+		items = append(items, projectContainer(fmt.Sprintf("c-%02d", i), "app", "running"))
+	}
+	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{Items: items}, nil)
+
+	var inFlight, peak atomic.Int32
+	apiClient.EXPECT().ContainerStats(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
+			n := inFlight.Add(1)
+			defer inFlight.Add(-1)
+			for p := peak.Load(); n > p && !peak.CompareAndSwap(p, n); p = peak.Load() {
+			}
+			time.Sleep(20 * time.Millisecond)
+			return statsBody(t, sampleResponse(1, 0)), nil
+		}).Times(containers)
+
+	rows, err := collectContainerStats(t.Context(), apiClient, false, client.Filters{})
+	assert.NilError(t, err)
+	assert.Equal(t, len(rows), containers)
+	assert.Equal(t, peak.Load(), int32(statsConcurrency))
+}
+
+// --no-stream samples once and returns: the rows of all the projects, or one line per project with --aggregate.
+func TestRunStatsProjectsNoStream(t *testing.T) {
+	tests := []struct {
+		name      string
+		aggregate bool
+		expected  []string
+	}{
+		{"containers", false, []string{"alpha/alpha-1", "alpha/alpha-2", "beta/beta-1"}},
+		{"aggregate", true, []string{"alpha/2", "beta/1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			apiClient := mocks.NewMockAPIClient(ctrl)
+			out := new(bytes.Buffer)
+			cli := mocks.NewMockCli(ctrl)
+			cli.EXPECT().Client().Return(apiClient).AnyTimes()
+			cli.EXPECT().Out().Return(streams.NewOut(out)).AnyTimes()
+
+			apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{Items: []container.Summary{
+				projectContainer("beta-1", "beta", "running"),
+				projectContainer("alpha-2", "alpha", "running"),
+				projectContainer("alpha-1", "alpha", "running"),
+			}}, nil)
+			apiClient.EXPECT().ContainerStats(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
+					return statsBody(t, sampleResponse(1000, 0)), nil
+				}).Times(3)
+
+			opts := statsOptions{ProjectOptions: &ProjectOptions{}, allProjects: true, aggregate: tt.aggregate, noStream: true, format: "json"}
+			assert.NilError(t, runStatsProjects(t.Context(), cli, opts, nil))
+
+			var got []string
+			for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+				var row map[string]any
+				assert.NilError(t, json.Unmarshal([]byte(line), &row), line)
+				if tt.aggregate {
+					got = append(got, fmt.Sprintf("%s/%v", row["Project"], row["Containers"]))
+				} else {
+					got = append(got, fmt.Sprintf("%s/%s", row["Project"], row["Name"]))
+				}
+			}
+			assert.DeepEqual(t, got, tt.expected)
+		})
+	}
 }
 
 func TestAggregateByProject(t *testing.T) {

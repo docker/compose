@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/container"
@@ -40,6 +39,10 @@ import (
 )
 
 const statsProjectsRefreshInterval = 2 * time.Second
+
+// statsConcurrency bounds the samples collected at the same time. The daemon needs about a second to sample a
+// container, so a refresh of n containers lasts at least n/statsConcurrency seconds.
+const statsConcurrency = 32
 
 // usage is the resource consumption of one or several containers.
 type usage struct {
@@ -181,27 +184,26 @@ func collectContainerStats(ctx context.Context, apiClient client.ContainerAPICli
 	}
 
 	rows := make([]containerStats, len(list.Items))
-	eg, egCtx := errgroup.WithContext(ctx)
+	var eg errgroup.Group
+	eg.SetLimit(statsConcurrency)
 	for i, c := range list.Items {
 		rows[i] = containerStats{project: c.Labels[api.ProjectLabel], name: naming.CanonicalContainerName(c)}
 		if c.State != container.StateRunning {
 			continue
 		}
 		eg.Go(func() error {
-			v, err := sampleStats(egCtx, apiClient, c.ID)
-			if errdefs.IsNotFound(err) {
-				// removed since it was listed
-				return nil
+			// a container that cannot be sampled (removed since it was listed, daemon failure) is shown without
+			// usage rather than stopping the refresh of the others
+			if v, err := sampleStats(ctx, apiClient, c.ID); err == nil {
+				rows[i].usage = containerUsage(v)
+				rows[i].memLimit = float64(v.MemoryStats.Limit)
 			}
-			if err != nil {
-				return err
-			}
-			rows[i].usage = containerUsage(v)
-			rows[i].memLimit = float64(v.MemoryStats.Limit)
 			return nil
 		})
 	}
-	if err := eg.Wait(); err != nil {
+	_ = eg.Wait() // the goroutines never fail
+	// an interrupted sampling is not a list of containers without usage
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
@@ -238,7 +240,9 @@ func sampleStats(ctx context.Context, apiClient client.ContainerAPIClient, id st
 	return v, err
 }
 
-// containerUsage computes the same figures as `docker stats` for a Linux container.
+// containerUsage computes the same figures as `docker stats` for a Linux container. It follows the helpers of
+// docker/cli (cli/command/container/stats_helpers.go: calculateCPUPercentUnix, calculateMemUsageUnixNoCache,
+// calculateBlockIO and calculateNetwork), which must be kept in step with it.
 func containerUsage(v container.StatsResponse) usage {
 	u := usage{
 		memory: float64(v.MemoryStats.Usage),
