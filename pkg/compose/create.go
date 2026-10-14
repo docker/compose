@@ -384,6 +384,10 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
+	umask, err := umaskOption(service, apiVersion)
+	if err != nil {
+		return createConfigs{}, err
+	}
 	portBindings, err := buildContainerPortBindingOptions(service)
 	if err != nil {
 		return createConfigs{}, err
@@ -448,6 +452,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		GroupAdd:       service.GroupAdd,
 		Links:          links,
 		OomScoreAdj:    int(service.OomScoreAdj),
+		Umask:          umask,
 	}
 
 	if unconfined {
@@ -709,6 +714,20 @@ func defaultNetworkSettings(project *types.Project,
 	// > Supported standard values are: bridge, host, none, and container:<name|id>.
 	// > Any other value is taken as a custom network's name to which this container should connect to.
 	return container.NetworkMode(primaryNetworkMobyNetworkName), networkConfig, nil
+}
+
+// umaskOption returns the umask to set on the container, if any. An engine
+// older than API 1.56 ignores HostConfig.Umask without any error: running the
+// container with the runtime's default mask instead of the requested one would
+// go unnoticed, so the unsupported case is reported.
+func umaskOption(service types.ServiceConfig, version string) (*uint32, error) {
+	if service.Umask == nil {
+		return nil, nil
+	}
+	if versions.LessThan(version, apiVersion156) {
+		return nil, fmt.Errorf("umask requires Docker Engine %s or later", dockerEngineV29_8)
+	}
+	return service.Umask, nil
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
