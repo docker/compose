@@ -48,6 +48,16 @@ const (
 	//  - interface_name was not configurable
 	//  - ImageList didn't support platform filtering
 	apiVersion149 = "1.49"
+
+	// apiVersion156 represents Docker Engine API version 1.56 (Engine v29.8).
+	//
+	// New features in this version:
+	//  - HostConfig.Umask in ContainerCreate
+	//
+	// Before this version:
+	//  - The daemon silently ignores HostConfig.Umask, so the container would
+	//    run with the runtime's default umask instead of the requested one
+	apiVersion156 = "1.56"
 )
 
 // Docker Engine version strings for user-facing error messages.
@@ -58,6 +68,9 @@ const (
 
 	// DockerEngineV28_1 is the specific version string for Docker Engine 28.1
 	DockerEngineV28_1 = "v28.1"
+
+	// dockerEngineV29_8 is the specific version string for Docker Engine 29.8
+	dockerEngineV29_8 = "v29.8"
 )
 
 // Build tool version constants
