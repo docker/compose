@@ -114,7 +114,7 @@ jobs:
           find bin/release -type f -exec file -e ascii -- {} +
       -
         name: Upload artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release
           path: ./bin/release/*
@@ -172,7 +172,7 @@ jobs:
             *.cache-to=type=gha,scope=test
       -
         name: Gather coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-data-unit
           path: bin/coverage/unit/
@@ -301,7 +301,7 @@ jobs:
 
       - name: Gather coverage data
         if: ${{ matrix.mode == 'plugin' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-data-e2e-${{ env.MODE_ENGINE_PAIR }}
           path: bin/coverage/e2e/
@@ -350,7 +350,7 @@ jobs:
         run: |
           go tool covdata textfmt -i=./coverage/unit,./coverage/e2e -o ./coverage.txt
       - name: Store coverage report in GitHub Actions
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: go-covdata-txt
           path: ./coverage.txt
