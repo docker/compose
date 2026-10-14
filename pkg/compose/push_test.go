@@ -26,12 +26,14 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/dryrun"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
@@ -127,4 +129,36 @@ func TestPushIgnoreMissingStillPushesWhenInspectFails(t *testing.T) {
 	apiClient.EXPECT().ImagePush(gomock.Any(), "registry.example.com/app:present", gomock.Any()).Return(pushStream(pushedOK), nil)
 
 	assert.NilError(t, svc.push(t.Context(), project, api.PushOptions{IgnoreMissing: true}))
+}
+
+// In dry-run, --ignore-missing must judge the images by what the engine really holds: the dry-run client
+// delegates ImageInspect, the push of an image is faked, and nothing is ever pushed for real. The mock engine
+// below expects neither an ImagePush nor a lookup of the skipped image in the registry.
+func TestPushIgnoreMissingInDryRun(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	engine := mocks.NewMockAPIClient(ctrl)
+	cli := mocks.NewMockCli(ctrl)
+	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
+
+	dryRunClient, err := dryrun.NewDryRunClient(engine, cli)
+	assert.NilError(t, err)
+	cli.EXPECT().Client().Return(dryRunClient).AnyTimes()
+
+	events := &recordingEventProcessor{}
+	svc := &composeService{dockerCli: cli, dryRun: true, events: events, maxConcurrency: 1}
+
+	for _, tag := range []string{"registry.example.com/app:absent", "registry.example.com/app:absent-extra"} {
+		engine.EXPECT().ImageInspect(gomock.Any(), tag).Return(client.ImageInspectResult{}, errdefs.ErrNotFound)
+	}
+	engine.EXPECT().ImageInspect(gomock.Any(), "registry.example.com/app:present").Return(client.ImageInspectResult{}, nil)
+	// the faked push only resolves the image it is asked to push
+	engine.EXPECT().DistributionInspect(gomock.Any(), "registry.example.com/app:present", gomock.Any()).
+		Return(client.DistributionInspectResult{}, nil)
+
+	err = svc.push(t.Context(), pushProject(), api.PushOptions{IgnoreMissing: true})
+	assert.NilError(t, err)
+
+	assert.Assert(t, events.contains("registry.example.com/app:absent: Skipped"))
+	assert.Assert(t, events.contains("registry.example.com/app:absent-extra: Skipped"))
+	assert.Assert(t, events.contains("registry.example.com/app:present: Pushed"))
 }
