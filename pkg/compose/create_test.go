@@ -360,6 +360,53 @@ func TestCreateEndpointSettings(t *testing.T) {
 	}, cmpopts.EquateComparable(netip.Addr{})))
 }
 
+func TestGetAliases(t *testing.T) {
+	enabled, disabled := true, false
+	tests := []struct {
+		name              string
+		cfg               *composetypes.ServiceNetworkConfig
+		useNetworkAliases bool
+		expected          []string
+	}{
+		{
+			name:              "no network config",
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "serviceName"},
+		},
+		{
+			name:              "use_service_name_alias unset",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}},
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "serviceName", "alias1"},
+		},
+		{
+			name:              "use_service_name_alias true",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}, UseServiceNameAlias: &enabled},
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "serviceName", "alias1"},
+		},
+		{
+			name:              "use_service_name_alias false keeps the container name and the aliases",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}, UseServiceNameAlias: &disabled},
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "alias1"},
+		},
+		{
+			name:              "network aliases disabled for the run",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}},
+			useNetworkAliases: false,
+			expected:          []string{"containerName"},
+		},
+	}
+	service := composetypes.ServiceConfig{Name: "serviceName", ContainerName: "containerName"}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			aliases := getAliases(&composetypes.Project{Name: "projName"}, service, 0, tt.cfg, tt.useNetworkAliases)
+			assert.DeepEqual(t, aliases, tt.expected)
+		})
+	}
+}
+
 func Test_buildContainerVolumes(t *testing.T) {
 	pwd, err := os.Getwd()
 	assert.NilError(t, err)
