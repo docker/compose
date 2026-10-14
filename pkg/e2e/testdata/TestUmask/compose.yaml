@@ -1,0 +1,6 @@
+services:
+  app:
+    image: alpine
+    umask: 027
+    # the entrypoint records the mask it started with
+    command: sh -c "umask > /tmp/entrypoint-umask && sleep infinity"
