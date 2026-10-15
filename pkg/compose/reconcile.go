@@ -20,7 +20,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -290,7 +289,7 @@ func (r *reconciler) reconcileNetworks() error {
 		// a same-name divergence does, and can't while a container the plan
 		// doesn't manage is still attached.
 		if observed.Name == desired.Name {
-			if held := r.heldOutsideSelection(networkConsumers(r.declaredServices(), key)); len(held) > 0 {
+			if held := r.heldOutsideSelection(networkConsumers(r.project.AllServices(), key)); len(held) > 0 {
 				logrus.Warnf("network %q config has changed but it is still used by %s, outside the current service selection: not recreated. "+
 					"Run the command on the whole project to apply the change", desired.Name, strings.Join(held, ", "))
 				continue
@@ -464,7 +463,7 @@ func (r *reconciler) reconcileVolumes() error {
 		}
 		// Removing the volume requires removing every container referencing
 		// it first: don't ask to destroy its data when the plan can't.
-		if held := r.heldOutsideSelection(volumeConsumers(r.declaredServices(), key)); len(held) > 0 {
+		if held := r.heldOutsideSelection(volumeConsumers(r.project.AllServices(), key)); len(held) > 0 {
 			logrus.Warnf("volume %q config has changed but it is still used by %s, outside the current service selection: not recreated. "+
 				"Run the command on the whole project to apply the change", desired.Name, strings.Join(held, ", "))
 			continue
@@ -609,16 +608,6 @@ func networkConsumers(services types.Services, networkKey string) []string {
 		}
 	}
 	return names
-}
-
-// declaredServices returns every service of the model, selected or not:
-// project.Services plus the DisabledServices a selection (or an inactive
-// profile) moved aside.
-func (r *reconciler) declaredServices() types.Services {
-	all := make(types.Services, len(r.project.Services)+len(r.project.DisabledServices))
-	maps.Copy(all, r.project.DisabledServices)
-	maps.Copy(all, r.project.Services)
-	return all
 }
 
 // heldOutsideSelection filters the given consumers of a network or volume down
