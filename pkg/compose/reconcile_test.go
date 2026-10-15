@@ -2184,3 +2184,62 @@ func TestReconcileVolumes_DivergedDisabledServiceWithoutContainerDoesNotBlock(t 
 [4] -> #5 service:web:1, CreateContainer, no existing container
 `)+"\n")
 }
+
+// A rebuild narrows the project to the rebuilt service and its dependents:
+// the services left out must stay out of the plan altogether, however far
+// they drifted, and out of the orphans --remove-orphans would clean.
+func TestReconcile_SelectionLeavesOtherServicesUntouched(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1)}
+	worker := types.ServiceConfig{Name: "worker", Scale: intPtr(1)}
+	worker.DependsOn = types.DependsOnConfig{"web": {Condition: types.ServiceConditionStarted, Required: true}}
+	apiSvc := types.ServiceConfig{Name: "api", Scale: intPtr(1)}
+	full := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"web": web, "worker": worker, "api": apiSvc},
+	}
+	project, err := full.WithSelectedServices([]string{"web"}, types.IncludeDependents)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, project.ServiceNames(), []string{"web", "worker"})
+	assert.DeepEqual(t, project.DisabledServiceNames(), []string{"api"})
+
+	// api's live container was created from a configuration that has since
+	// drifted: it would be recreated if it were part of the plan
+	driftedAPI := apiSvc
+	driftedAPI.Image = "stale"
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"web":    {runningContainer(t, web, "c1aabbccddee")},
+			"worker": {runningContainer(t, worker, "c2aabbccddee")},
+			"api":    {runningContainer(t, driftedAPI, "c3aabbccddee")},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	opts := defaultReconcileOptions()
+	opts.Recreate = api.RecreateForce
+	opts.RemoveOrphans = true
+	plan, err := reconcile(t.Context(), project, observed, opts, noPrompt)
+	assert.NilError(t, err)
+
+	recreated := map[string]bool{}
+	for _, node := range plan.Nodes {
+		assert.Assert(t, !strings.Contains(node.Operation.ResourceID, "api") && !strings.HasPrefix(node.Operation.ResourceID, "orphan:"),
+			"a service outside the selection must not be touched:\n%s", plan.String())
+		recreated[node.Operation.ResourceID] = true
+	}
+	assert.Assert(t, recreated["service:web:1"], "the selected service must be recreated:\n%s", plan.String())
+}
+
+func runningContainer(t *testing.T, svc types.ServiceConfig, id string) ObservedContainer {
+	t.Helper()
+	hash := mustServiceHash(t, svc)
+	return ObservedContainer{
+		ID: id, Number: 1, State: container.StateRunning, ConfigHash: hash,
+		Summary: container.Summary{
+			ID: id, State: container.StateRunning,
+			Labels: map[string]string{api.ServiceLabel: svc.Name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+		},
+	}
+}
