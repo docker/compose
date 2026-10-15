@@ -120,7 +120,7 @@ func TestRebuildOnDotEnvWithExternalNetwork(t *testing.T) {
 	pn2 := c.RunDockerCmd(t, "inspect", containerName, "-f", "{{ .HostConfig.NetworkMode }}")
 	assert.Equal(t, strings.TrimSpace(pn2.Stdout()), networkName)
 
-	assert.Check(t, !strings.Contains(r.Combined(), "Application failed to start after update"))
+	assert.Check(t, !strings.Contains(r.Combined(), "Failed to recreate and restart"))
 
 	t.Cleanup(cleanup)
 	t.Cleanup(func() {
