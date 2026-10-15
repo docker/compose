@@ -42,6 +42,20 @@ func TestUpWaitTimeout(t *testing.T) {
 		ServiceState("app", "running"))
 }
 
+// The dependency waits of the plan are bounded by --wait-timeout even without
+// --wait, and an expired one is reported as a dependency timeout, not as the
+// final "application not healthy" verification of --wait.
+func TestUpWaitTimeoutOnDependency(t *testing.T) {
+	NewScenario(t, "up --wait-timeout must bound the wait on a depends_on service_healthy dependency that never gets healthy").
+		Step("up -d fails with a dependency timeout and never starts the dependent service",
+			ComposeCmd("up", "-d", "--wait-timeout", "3").MayFail().Within(60*time.Second),
+			ExitCode(1),
+			OutputContains("timeout waiting for dependencies"),
+			OutputNotContains("deadline exceeded"),
+			ServiceState("db", "running"),
+			ServiceState("web", "created"))
+}
+
 func TestUpExitCodeFrom(t *testing.T) {
 	NewScenario(t, "up --exit-code-from must return the selected service's exit code").
 		Step("up returns the failing service's code once it exits",
