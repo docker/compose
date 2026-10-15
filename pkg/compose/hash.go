@@ -145,6 +145,9 @@ var serviceHashKeyOrder = []string{
 	// merge order made the fallback place it here already: listing it is a
 	// no-op for every hash, it only freezes the position)
 	"pull_refresh_after",
+	// appended with the support of the umask attribute: only configurations
+	// declaring one see their hash move
+	"umask",
 }
 
 // trimServiceHashFields removes the attributes deliberately excluded from the
