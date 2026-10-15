@@ -337,7 +337,15 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 		select {
 		case <-rs.done[dep.ID]:
 		case <-nodeCtx.Done():
-			return nodeCtx.Err()
+			// Record the cancellation like any other failure: the deferred
+			// close below makes done[node.ID] ready, and a dependent that
+			// selects it before seeing nodeCtx.Done() would otherwise find
+			// no failure recorded for this node, then emit a "Starting"
+			// event it never finalizes and enter executeNode on a canceled
+			// context.
+			err := nodeCtx.Err()
+			rs.recordFailure(node.ID, err)
+			return err
 		}
 	}
 

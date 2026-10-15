@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -496,6 +497,41 @@ func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 		t.Fatal("run returned before VolumeCreate did")
 	}
 	assert.ErrorIs(t, volumeCreateCtxErr, context.Canceled, "VolumeCreate's ctx must be canceled by a sibling Create-phase node failing, not by the test's own deadline")
+}
+
+// TestExecutePlanCanceledDependencyIsRecordedAsFailure pins the failure a
+// node records when it leaves its dependency wait because its phase was
+// canceled. In X -> A -> B with X failing without any I/O, A bails out on the
+// cancellation and its done channel is closed; B may select that channel
+// before it sees the cancellation itself. With no failure recorded for A, B
+// then went on to start and enter executeNode on a canceled context. B must
+// be skipped. The bad interleaving needs B to reach its select late, when
+// both channels are already ready and the select picks one at random: a
+// single P makes that the usual case, and the repetition covers the rest of
+// the randomness.
+func TestExecutePlanCanceledDependencyIsRecordedAsFailure(t *testing.T) {
+	prev := runtime.GOMAXPROCS(1)
+	t.Cleanup(func() { runtime.GOMAXPROCS(prev) })
+
+	svc, apiClient := newTestService(t)
+
+	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
+		Return(client.NetworkCreateResult{}, errors.New("boom")).AnyTimes()
+	apiClient.EXPECT().VolumeCreate(gomock.Any(), gomock.Any()).Times(0)
+
+	nw := types.NetworkConfig{Name: "test_default"}
+	volA := types.VolumeConfig{Name: "a", Driver: "local"}
+	volB := types.VolumeConfig{Name: "b", Driver: "local"}
+
+	for range 200 {
+		plan := &Plan{}
+		x := plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+		a := plan.addNode(Operation{Type: OpCreateVolume, ResourceID: "volume:a", Name: volA.Name, Volume: &volA}, "", x)
+		plan.addNode(Operation{Type: OpCreateVolume, ResourceID: "volume:b", Name: volB.Name, Volume: &volB}, "", a)
+
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+		assert.ErrorContains(t, exec.run(t.Context(), plan), "boom")
+	}
 }
 
 // TestExecutePlanCreatePhaseFailureNeverDispatchesStartPhase complements
