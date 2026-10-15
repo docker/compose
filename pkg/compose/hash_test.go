@@ -92,6 +92,23 @@ func TestHashGoldenValues(t *testing.T) {
 	assert.Equal(t, vol, "dd3953f0ff20e0f9044086b0483690f2cc2b4653e57aaaa5fa8ea2735da61000")
 }
 
+// TestVolumeHashIgnoresExtensions guards the assumption reconcileVolumes
+// relies on: tagging or untagging a volume with x-disposable (or any other
+// extension) must never itself change VolumeHash, or it would trigger the
+// very "spec mismatch" recreation the extension is meant to bypass.
+func TestVolumeHashIgnoresExtensions(t *testing.T) {
+	plain, err := VolumeHash(types.VolumeConfig{Name: "proj_data"})
+	assert.NilError(t, err)
+
+	withExtension, err := VolumeHash(types.VolumeConfig{
+		Name:       "proj_data",
+		Extensions: types.Extensions{"x-disposable": true},
+	})
+	assert.NilError(t, err)
+
+	assert.Equal(t, plain, withExtension)
+}
+
 // pinRootKeyOrder is the identity for an object whose keys already follow
 // the frozen order — the property that keeps every released hash valid.
 func TestPinRootKeyOrderIdentity(t *testing.T) {

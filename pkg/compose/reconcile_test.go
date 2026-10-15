@@ -582,6 +582,48 @@ func TestReconcileVolumes_DivergedPromptMessage(t *testing.T) {
 	assert.Equal(t, rec.messages[0], `Volume "myproject_data" exists but doesn't match configuration in compose file. Recreate (data will be lost)?`)
 }
 
+// TestReconcileVolumes_DivergedDisposable verifies that a volume tagged with
+// the experimental x-disposable extension is recreated without ever
+// consulting the prompt.
+func TestReconcileVolumes_DivergedDisposable(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+	vol := project.Volumes["data"]
+	vol.Extensions = types.Extensions{"x-disposable": true}
+	project.Volumes["data"] = vol
+
+	// noPrompt panics if consulted, proving x-disposable short-circuits it.
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, !plan.IsEmpty(), "expected the disposable volume to be recreated")
+}
+
+// TestReconcileVolumes_DivergedDisposableFalse verifies that an explicit
+// x-disposable: false still goes through the confirmation prompt.
+func TestReconcileVolumes_DivergedDisposableFalse(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+	vol := project.Volumes["data"]
+	vol.Extensions = types.Extensions{"x-disposable": false}
+	project.Volumes["data"] = vol
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), declinePrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+}
+
+// TestReconcileVolumes_DivergedDisposableMalformed verifies that a malformed
+// x-disposable value (wrong type) is not fatal: it falls back to the safe,
+// prompt-gated path instead of aborting the whole reconcile.
+func TestReconcileVolumes_DivergedDisposableMalformed(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+	vol := project.Volumes["data"]
+	vol.Extensions = types.Extensions{"x-disposable": []string{"not-a-bool"}}
+	project.Volumes["data"] = vol
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), declinePrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+}
+
 // TestReconcileVolumes_DivergedPromptError propagates a prompt failure.
 func TestReconcileVolumes_DivergedPromptError(t *testing.T) {
 	project, observed := divergedVolumeProject(t, 1, 1)
