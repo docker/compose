@@ -624,9 +624,6 @@ func (s *composeService) ensureJobsDown(ctx context.Context, project *types.Proj
 // Best-effort: any error, including an engine with no jobs feature, is
 // treated as "no jobs" so it never blocks an otherwise-successful down.
 func (s *composeService) actualJobs(ctx context.Context, projectName string) types.Jobs {
-	if supported, err := s.jobsSupported(ctx); err != nil || !supported {
-		return nil
-	}
 	jc, err := s.jobsClient()
 	if err != nil {
 		return nil

@@ -233,31 +233,33 @@ func TestRunRunJob(t *testing.T) {
 			}},
 		}
 	}
-	run := func(t *testing.T, backend api.Compose) error {
+	run := func(t *testing.T, ctrl *gomock.Controller, backend api.Compose) error {
 		t.Helper()
-		ctrl := gomock.NewController(t)
 		return runRun(t.Context(), backend, newProject(),
 			runOptions{composeOptions: &composeOptions{ProjectOptions: &ProjectOptions{}}, Service: "migrate", noTty: true, capAdd: cliopts.NewListOpts(nil), capDrop: cliopts.NewListOpts(nil)},
 			createOptions{}, buildOptions{ProjectOptions: &ProjectOptions{}}, mocks.NewMockCli(ctrl))
 	}
 
 	t.Run("an engine with the jobs API runs the job through it", func(t *testing.T) {
-		backend := mocks.NewMockCompose(gomock.NewController(t))
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
 		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, nil)
-		assert.NilError(t, run(t, backend))
+		assert.NilError(t, run(t, ctrl, backend))
 	})
 
 	t.Run("a failing job reports its exit code", func(t *testing.T) {
-		backend := mocks.NewMockCompose(gomock.NewController(t))
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
 		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(3, nil)
-		err := run(t, backend)
+		err := run(t, ctrl, backend)
 		var statusErr cli.StatusError
 		assert.Assert(t, errors.As(err, &statusErr), err)
 		assert.Equal(t, statusErr.StatusCode, 3)
 	})
 
 	t.Run("an engine without the jobs API runs the job like a one-off service", func(t *testing.T) {
-		backend := mocks.NewMockCompose(gomock.NewController(t))
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
 		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, api.ErrJobsNotSupported)
 		backend.EXPECT().RunOneOffContainer(gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, project *types.Project, opts api.RunOptions) (int, error) {
@@ -266,6 +268,6 @@ func TestRunRunJob(t *testing.T) {
 				assert.Assert(t, materialized, "the job must be materialized as a service")
 				return 0, nil
 			})
-		assert.NilError(t, run(t, backend))
+		assert.NilError(t, run(t, ctrl, backend))
 	})
 }

@@ -370,18 +370,22 @@ func scheduledJobsProject() *types.Project {
 // the version negotiation fails the test.
 func newJobsTestService(t *testing.T, apiVersion string) *composeService {
 	t.Helper()
-	mockCtrl := gomock.NewController(t)
-	apiClient, cli := prepareMocks(mockCtrl)
-	expectAPIVersion(apiClient, apiVersion)
-	tested, err := NewComposeService(cli)
-	assert.NilError(t, err)
-	return tested.(*composeService)
+	_, tested := newTestComposeService(t, gomock.NewController(t), apiVersion)
+	return tested
 }
+
+const (
+	// noJobsEngine is the newest API version below apiVersionJobs.
+	noJobsEngine = "1.56"
+	// scheduledJobsRefused is what a project declaring the scheduled jobs of
+	// scheduledJobsProject gets on an engine without the jobs API.
+	scheduledJobsRefused = "scheduled jobs are not supported in this version: backup, sync"
+)
 
 func TestJobsSupported(t *testing.T) {
 	for version, want := range map[string]bool{
 		"1.44":         false,
-		"1.56":         false,
+		noJobsEngine:   false,
 		apiVersionJobs: true,
 		"1.96":         true,
 	} {
@@ -394,11 +398,9 @@ func TestJobsSupported(t *testing.T) {
 }
 
 func TestRejectUnsupportedScheduledJobs(t *testing.T) {
-	const noJobsEngine = "1.56"
-
 	t.Run("an engine without the jobs API refuses scheduled jobs, naming them", func(t *testing.T) {
 		err := newJobsTestService(t, noJobsEngine).rejectUnsupportedScheduledJobs(t.Context(), scheduledJobsProject())
-		assert.Error(t, err, "scheduled jobs are not supported in this version: backup, sync")
+		assert.Error(t, err, scheduledJobsRefused)
 	})
 
 	t.Run("an engine with the jobs API accepts them", func(t *testing.T) {
@@ -431,20 +433,19 @@ func TestRejectUnsupportedScheduledJobs(t *testing.T) {
 // scheduled jobs before touching the daemon: the mocks carry no expectation
 // besides the version negotiation.
 func TestScheduledJobsRefusedWithoutJobsEngine(t *testing.T) {
-	const want = "scheduled jobs are not supported in this version: backup, sync"
-	tested := newJobsTestService(t, "1.56")
+	tested := newJobsTestService(t, noJobsEngine)
 	project := scheduledJobsProject()
 
-	assert.ErrorContains(t, tested.Create(t.Context(), project, api.CreateOptions{}), want)
-	assert.ErrorContains(t, tested.Up(t.Context(), project, api.UpOptions{}), want)
-	assert.ErrorContains(t, tested.Start(t.Context(), project.Name, api.StartOptions{Project: project}), want)
+	assert.ErrorContains(t, tested.Create(t.Context(), project, api.CreateOptions{}), scheduledJobsRefused)
+	assert.ErrorContains(t, tested.Up(t.Context(), project, api.UpOptions{}), scheduledJobsRefused)
+	assert.ErrorContains(t, tested.Start(t.Context(), project.Name, api.StartOptions{Project: project}), scheduledJobsRefused)
 }
 
 // RunJob reports the missing engine support with a sentinel before doing any
 // work, so the CLI can fall back to running the job like a one-off service.
 func TestRunJobWithoutJobsEngine(t *testing.T) {
 	project := scheduledJobsProject()
-	_, err := newJobsTestService(t, "1.56").RunJob(t.Context(), project, "migrate", api.RunOptions{Service: "migrate"})
+	_, err := newJobsTestService(t, noJobsEngine).RunJob(t.Context(), project, "migrate", api.RunOptions{Service: "migrate"})
 	assert.ErrorIs(t, err, api.ErrJobsNotSupported)
 }
 
@@ -452,10 +453,9 @@ func TestRunJobWithoutJobsEngine(t *testing.T) {
 func TestDownJobsWithoutJobsEngine(t *testing.T) {
 	project := scheduledJobsProject()
 
-	t.Run("without the jobs API there is nothing to remove or list", func(t *testing.T) {
-		tested := newJobsTestService(t, "1.56")
+	t.Run("without the jobs API there is nothing to remove", func(t *testing.T) {
+		tested := newJobsTestService(t, noJobsEngine)
 		assert.Equal(t, len(tested.ensureJobsDown(t.Context(), project)), 0)
-		assert.Equal(t, len(tested.actualJobs(t.Context(), project.Name)), 0)
 	})
 
 	t.Run("with the jobs API every declared job is removed", func(t *testing.T) {

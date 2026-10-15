@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
 	"gotest.tools/v3/icmd"
 )
@@ -649,8 +650,8 @@ func ContainerdImageStore(t testing.TB, c *CLI) string {
 	return ""
 }
 
-// EngineAPIVersionAtLeast requires the daemon to expose at least the given API
-// version, e.g. "1.57".
+// EngineAPIVersionAtLeast requires the API version Compose negotiates with the
+// daemon to be at least the given one, e.g. "1.57".
 func EngineAPIVersionAtLeast(version string) Requirement {
 	return func(t testing.TB, c *CLI) string {
 		t.Helper()
@@ -661,9 +662,9 @@ func EngineAPIVersionAtLeast(version string) Requirement {
 	}
 }
 
-// EngineAPIVersionBelow requires the daemon to expose an API version older
-// than the given one, for scenarios pinning the behavior of Compose on an
-// engine that lacks a feature.
+// EngineAPIVersionBelow requires the API version Compose negotiates with the
+// daemon to be older than the given one, for scenarios pinning the behavior of
+// Compose on an engine that lacks a feature.
 func EngineAPIVersionBelow(version string) Requirement {
 	return func(t testing.TB, c *CLI) string {
 		t.Helper()
@@ -674,9 +675,16 @@ func EngineAPIVersionBelow(version string) Requirement {
 	}
 }
 
+// engineAPIVersion returns the API version Compose negotiates with the daemon:
+// the daemon's, capped at what the client library Compose is built with
+// supports.
 func engineAPIVersion(t testing.TB, c *CLI) string {
 	t.Helper()
-	return strings.TrimSpace(c.RunDockerCmd(t, "version", "-f", "{{.Server.APIVersion}}").Combined())
+	v := strings.TrimSpace(c.RunDockerCmd(t, "version", "-f", "{{.Server.APIVersion}}").Combined())
+	if versions.LessThan(client.MaxAPIVersion, v) {
+		return client.MaxAPIVersion
+	}
+	return v
 }
 
 // EngineVersionAtLeast requires a minimum daemon major version.

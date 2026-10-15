@@ -29,6 +29,10 @@ import (
 // jobs are refused.
 const jobsAPIVersion = "1.57"
 
+// scheduledJobsRefused is the error of an engine without the jobs API refusing
+// the project of TestUpRejectsScheduledJobs.
+const scheduledJobsRefused = "scheduled jobs are not supported in this version: backup"
+
 // Without the jobs API, scheduled jobs cannot run: silently not scheduling
 // them would break the user's expectations, so every command bringing the
 // project up must refuse it as a whole, before creating anything.
@@ -37,15 +41,15 @@ func TestUpRejectsScheduledJobs(t *testing.T) {
 		Requires(EngineAPIVersionBelow(jobsAPIVersion)).
 		Step("up fails naming the scheduled job",
 			ComposeCmd("up", "-d").MayFail(),
-			StderrContains("scheduled jobs are not supported in this version: backup"),
+			StderrContains(scheduledJobsRefused),
 			ServiceNotCreated("web")).
 		Step("create fails the same way",
 			ComposeCmd("create").MayFail(),
-			StderrContains("scheduled jobs are not supported in this version: backup"),
+			StderrContains(scheduledJobsRefused),
 			ServiceNotCreated("web")).
 		Step("start fails the same way",
 			ComposeCmd("start").MayFail(),
-			StderrContains("scheduled jobs are not supported in this version: backup"),
+			StderrContains(scheduledJobsRefused),
 			ServiceNotCreated("web"))
 }
 
