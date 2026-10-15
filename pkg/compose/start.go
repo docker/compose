@@ -29,6 +29,11 @@ import (
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return Run(ctx, func(ctx context.Context) error {
+		if options.Project != nil {
+			if err := s.rejectUnsupportedScheduledJobs(ctx, options.Project); err != nil {
+				return err
+			}
+		}
 		return s.start(ctx, strings.ToLower(projectName), options, nil)
 	}, "start", s.events)
 }

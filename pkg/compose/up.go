@@ -42,6 +42,9 @@ import (
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
+		if err := s.rejectUnsupportedScheduledJobs(ctx, project); err != nil {
+			return err
+		}
 		if options.Start.Attach == nil && !options.Start.NoStart {
 			if err := s.upDetached(ctx, project, options); err != nil {
 				return err

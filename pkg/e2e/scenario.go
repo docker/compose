@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/moby/moby/client/pkg/versions"
 	"gotest.tools/v3/icmd"
 )
 
@@ -646,6 +647,36 @@ func ContainerdImageStore(t testing.TB, c *CLI) string {
 		return "daemon is not using the containerd image store"
 	}
 	return ""
+}
+
+// EngineAPIVersionAtLeast requires the daemon to expose at least the given API
+// version, e.g. "1.57".
+func EngineAPIVersionAtLeast(version string) Requirement {
+	return func(t testing.TB, c *CLI) string {
+		t.Helper()
+		if v := engineAPIVersion(t, c); versions.LessThan(v, version) {
+			return fmt.Sprintf("engine API version %s < %s", v, version)
+		}
+		return ""
+	}
+}
+
+// EngineAPIVersionBelow requires the daemon to expose an API version older
+// than the given one, for scenarios pinning the behavior of Compose on an
+// engine that lacks a feature.
+func EngineAPIVersionBelow(version string) Requirement {
+	return func(t testing.TB, c *CLI) string {
+		t.Helper()
+		if v := engineAPIVersion(t, c); !versions.LessThan(v, version) {
+			return fmt.Sprintf("engine API version %s >= %s", v, version)
+		}
+		return ""
+	}
+}
+
+func engineAPIVersion(t testing.TB, c *CLI) string {
+	t.Helper()
+	return strings.TrimSpace(c.RunDockerCmd(t, "version", "-f", "{{.Server.APIVersion}}").Combined())
 }
 
 // EngineVersionAtLeast requires a minimum daemon major version.

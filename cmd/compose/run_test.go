@@ -17,13 +17,20 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli"
+	cliopts "github.com/docker/cli/opts"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 func TestMaterializeManualJob(t *testing.T) {
@@ -207,5 +214,58 @@ func TestJobTargetErr(t *testing.T) {
 		err, replaced := jobTargetErr(t.Context(), nil, opts, []string{"migrate"}, original)
 		assert.Assert(t, !replaced)
 		assert.Equal(t, err, original)
+	})
+}
+
+// run targets a job through the engine's jobs API when it has one, and
+// degrades to a one-off service container, exactly like a service run, when
+// it does not.
+func TestRunRunJob(t *testing.T) {
+	yes := true
+	newProject := func() *types.Project {
+		return &types.Project{
+			Name:     "prj",
+			Services: types.Services{},
+			Jobs: types.Jobs{"migrate": {
+				Name:          "migrate",
+				Triggers:      &types.TriggerConfig{Manual: &yes},
+				ContainerSpec: types.ContainerSpec{Image: "migrator"},
+			}},
+		}
+	}
+	run := func(t *testing.T, backend api.Compose) error {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		return runRun(t.Context(), backend, newProject(),
+			runOptions{composeOptions: &composeOptions{ProjectOptions: &ProjectOptions{}}, Service: "migrate", noTty: true, capAdd: cliopts.NewListOpts(nil), capDrop: cliopts.NewListOpts(nil)},
+			createOptions{}, buildOptions{ProjectOptions: &ProjectOptions{}}, mocks.NewMockCli(ctrl))
+	}
+
+	t.Run("an engine with the jobs API runs the job through it", func(t *testing.T) {
+		backend := mocks.NewMockCompose(gomock.NewController(t))
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, nil)
+		assert.NilError(t, run(t, backend))
+	})
+
+	t.Run("a failing job reports its exit code", func(t *testing.T) {
+		backend := mocks.NewMockCompose(gomock.NewController(t))
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(3, nil)
+		err := run(t, backend)
+		var statusErr cli.StatusError
+		assert.Assert(t, errors.As(err, &statusErr), err)
+		assert.Equal(t, statusErr.StatusCode, 3)
+	})
+
+	t.Run("an engine without the jobs API runs the job like a one-off service", func(t *testing.T) {
+		backend := mocks.NewMockCompose(gomock.NewController(t))
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, api.ErrJobsNotSupported)
+		backend.EXPECT().RunOneOffContainer(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, project *types.Project, opts api.RunOptions) (int, error) {
+				assert.Equal(t, opts.Service, "migrate")
+				_, materialized := project.Services["migrate"]
+				assert.Assert(t, materialized, "the job must be materialized as a service")
+				return 0, nil
+			})
+		assert.NilError(t, run(t, backend))
 	})
 }

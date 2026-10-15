@@ -23,11 +23,38 @@ import (
 	"time"
 )
 
+// jobsAPIVersion is the first engine API version exposing the jobs API, see
+// apiVersionJobs in pkg/compose/api_versions.go, which it must follow. Below
+// it Compose degrades: manual jobs run as one-off services and scheduled
+// jobs are refused.
+const jobsAPIVersion = "1.57"
+
+// Without the jobs API, scheduled jobs cannot run: silently not scheduling
+// them would break the user's expectations, so every command bringing the
+// project up must refuse it as a whole, before creating anything.
+func TestUpRejectsScheduledJobs(t *testing.T) {
+	NewScenario(t, "up, create and start must reject a project declaring active scheduled jobs when the engine has no jobs API, before creating anything").
+		Requires(EngineAPIVersionBelow(jobsAPIVersion)).
+		Step("up fails naming the scheduled job",
+			ComposeCmd("up", "-d").MayFail(),
+			StderrContains("scheduled jobs are not supported in this version: backup"),
+			ServiceNotCreated("web")).
+		Step("create fails the same way",
+			ComposeCmd("create").MayFail(),
+			StderrContains("scheduled jobs are not supported in this version: backup"),
+			ServiceNotCreated("web")).
+		Step("start fails the same way",
+			ComposeCmd("start").MayFail(),
+			StderrContains("scheduled jobs are not supported in this version: backup"),
+			ServiceNotCreated("web"))
+}
+
 // A scheduled job registers with the engine instead of being rejected: up is
 // safely re-runnable on an unchanged spec, and the schedule fires on the
 // engine's own clock, independent of the client.
 func TestUpRegistersScheduledJobs(t *testing.T) {
 	NewScenario(t, "up must register a project's scheduled jobs with the engine and let them fire on their own").
+		Requires(EngineAPIVersionAtLeast(jobsAPIVersion)).
 		Step("up starts services and registers the scheduled job",
 			ComposeCmd("up", "-d"),
 			ServiceState("web", "running")).
@@ -47,6 +74,7 @@ func TestUpRegistersScheduledJobs(t *testing.T) {
 // changed.
 func TestRunAlreadyRegisteredScheduledJob(t *testing.T) {
 	NewScenario(t, "run must not conflict with a scheduled job up already registered with the identical spec").
+		Requires(EngineAPIVersionAtLeast(jobsAPIVersion)).
 		Step("up registers the scheduled job",
 			ComposeCmd("up", "-d"),
 			ServiceState("web", "running")).
@@ -60,6 +88,7 @@ func TestRunAlreadyRegisteredScheduledJob(t *testing.T) {
 // entirely by calling Create directly, silently skipping registration.
 func TestUpNoStartRegistersScheduledJobs(t *testing.T) {
 	NewScenario(t, "up --no-start must still register a project's scheduled jobs with the engine").
+		Requires(EngineAPIVersionAtLeast(jobsAPIVersion)).
 		Step("up --no-start creates but never starts web, yet the schedule still fires on its own",
 			ComposeCmd("up", "--no-start"),
 			ServiceState("web", "created"),

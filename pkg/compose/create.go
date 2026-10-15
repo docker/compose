@@ -66,6 +66,9 @@ type createConfigs struct {
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return Run(ctx, func(ctx context.Context) error {
+		if err := s.rejectUnsupportedScheduledJobs(ctx, project); err != nil {
+			return err
+		}
 		return s.create(ctx, project, options)
 	}, "create", s.events)
 }

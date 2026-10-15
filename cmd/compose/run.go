@@ -447,18 +447,19 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 	}
 
 	if _, ok := project.AllJobs()[options.Service]; ok {
-		if options.name != "" {
-			logrus.Warnf("--name has no effect on a job: the engine names its run containers itself")
-		}
 		exitCode, err := backend.RunJob(ctx, project, options.Service, runOpts)
-		if exitCode != 0 {
-			errMsg := ""
-			if err != nil {
-				errMsg = err.Error()
+		// An engine without the jobs API runs the manual job like a one-off
+		// service: fall through, the job is already materialized as one.
+		if !errors.Is(err, api.ErrJobsNotSupported) {
+			if exitCode != 0 {
+				errMsg := ""
+				if err != nil {
+					errMsg = err.Error()
+				}
+				return cli.StatusError{StatusCode: exitCode, Status: errMsg, Cause: err}
 			}
-			return cli.StatusError{StatusCode: exitCode, Status: errMsg, Cause: err}
+			return err
 		}
-		return err
 	}
 
 	for name, service := range project.Services {

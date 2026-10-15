@@ -73,6 +73,7 @@ func TestDown(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -295,6 +296,7 @@ func TestDownWithGivenServices(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -351,6 +353,7 @@ func TestDownWithSpecifiedServiceButTheServicesAreNotRunning(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -388,6 +391,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -457,6 +461,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -611,6 +616,7 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -688,6 +694,13 @@ func prepareMocks(mockCtrl *gomock.Controller) (*mocks.MockAPIClient, *mocks.Moc
 	// that pass an explicit Project and never reach it.
 	api.EXPECT().Dialer().Return(noJobsDialer).AnyTimes()
 	return api, cli
+}
+
+// expectAPIVersion makes RuntimeAPIVersion resolve to version on the mock.
+func expectAPIVersion(api *mocks.MockAPIClient, version string) {
+	api.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: version}, nil).AnyTimes()
+	api.EXPECT().ClientVersion().Return(version).AnyTimes()
 }
 
 // TestEnsureImagesDown_TaggedImageListingFailureStaysVisibleWithoutAbortingDown
@@ -1265,6 +1278,7 @@ func TestDownRemovesRetainedPreStartHookContainers(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -1311,6 +1325,7 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(api, apiVersionJobs)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 

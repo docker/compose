@@ -21,11 +21,13 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gotest.tools/v3/assert"
 
 	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestJobTrigger(t *testing.T) {
@@ -346,4 +348,118 @@ func TestBuildJobSpecIsDeterministic(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Equal(t, string(spec.ContainerSpec), string(first.ContainerSpec), msg)
 	}
+}
+
+// scheduledJobsProject declares one scheduled and one manual job next to a
+// service, the shape the degraded-mode tests below run against.
+func scheduledJobsProject() *types.Project {
+	yes := true
+	return &types.Project{
+		Name:     "prj",
+		Services: types.Services{"web": {Name: "web"}},
+		Jobs: types.Jobs{
+			"backup":  {Name: "backup", Triggers: &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}}},
+			"sync":    {Name: "sync", Triggers: &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 4 * * *"}}}},
+			"migrate": {Name: "migrate", Triggers: &types.TriggerConfig{Manual: &yes}},
+		},
+	}
+}
+
+// newJobsTestService returns a compose service whose engine negotiates
+// apiVersion. The mocks carry no other expectation: any daemon call beyond
+// the version negotiation fails the test.
+func newJobsTestService(t *testing.T, apiVersion string) *composeService {
+	t.Helper()
+	mockCtrl := gomock.NewController(t)
+	apiClient, cli := prepareMocks(mockCtrl)
+	expectAPIVersion(apiClient, apiVersion)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	return tested.(*composeService)
+}
+
+func TestJobsSupported(t *testing.T) {
+	for version, want := range map[string]bool{
+		"1.44":         false,
+		"1.56":         false,
+		apiVersionJobs: true,
+		"1.96":         true,
+	} {
+		t.Run(version, func(t *testing.T) {
+			supported, err := newJobsTestService(t, version).jobsSupported(t.Context())
+			assert.NilError(t, err)
+			assert.Equal(t, supported, want)
+		})
+	}
+}
+
+func TestRejectUnsupportedScheduledJobs(t *testing.T) {
+	const noJobsEngine = "1.56"
+
+	t.Run("an engine without the jobs API refuses scheduled jobs, naming them", func(t *testing.T) {
+		err := newJobsTestService(t, noJobsEngine).rejectUnsupportedScheduledJobs(t.Context(), scheduledJobsProject())
+		assert.Error(t, err, "scheduled jobs are not supported in this version: backup, sync")
+	})
+
+	t.Run("an engine with the jobs API accepts them", func(t *testing.T) {
+		err := newJobsTestService(t, apiVersionJobs).rejectUnsupportedScheduledJobs(t.Context(), scheduledJobsProject())
+		assert.NilError(t, err)
+	})
+
+	t.Run("manual jobs never block, whatever the engine", func(t *testing.T) {
+		project := scheduledJobsProject()
+		delete(project.Jobs, "backup")
+		delete(project.Jobs, "sync")
+		assert.NilError(t, newJobsTestService(t, noJobsEngine).rejectUnsupportedScheduledJobs(t.Context(), project))
+	})
+
+	t.Run("profile-disabled scheduled jobs don't block", func(t *testing.T) {
+		project := &types.Project{DisabledJobs: scheduledJobsProject().Jobs}
+		assert.NilError(t, newJobsTestService(t, noJobsEngine).rejectUnsupportedScheduledJobs(t.Context(), project))
+	})
+
+	t.Run("a project without jobs never negotiates the engine version", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		_, cli := prepareMocks(mockCtrl) // no Ping expectation: negotiating would fail
+		tested, err := NewComposeService(cli)
+		assert.NilError(t, err)
+		assert.NilError(t, tested.(*composeService).rejectUnsupportedScheduledJobs(t.Context(), &types.Project{Name: "prj"}))
+	})
+}
+
+// Without the jobs API, create, up and start refuse a project declaring
+// scheduled jobs before touching the daemon: the mocks carry no expectation
+// besides the version negotiation.
+func TestScheduledJobsRefusedWithoutJobsEngine(t *testing.T) {
+	const want = "scheduled jobs are not supported in this version: backup, sync"
+	tested := newJobsTestService(t, "1.56")
+	project := scheduledJobsProject()
+
+	assert.ErrorContains(t, tested.Create(t.Context(), project, api.CreateOptions{}), want)
+	assert.ErrorContains(t, tested.Up(t.Context(), project, api.UpOptions{}), want)
+	assert.ErrorContains(t, tested.Start(t.Context(), project.Name, api.StartOptions{Project: project}), want)
+}
+
+// RunJob reports the missing engine support with a sentinel before doing any
+// work, so the CLI can fall back to running the job like a one-off service.
+func TestRunJobWithoutJobsEngine(t *testing.T) {
+	project := scheduledJobsProject()
+	_, err := newJobsTestService(t, "1.56").RunJob(t.Context(), project, "migrate", api.RunOptions{Service: "migrate"})
+	assert.ErrorIs(t, err, api.ErrJobsNotSupported)
+}
+
+// Down only talks to the engine's jobs registry when the engine has one.
+func TestDownJobsWithoutJobsEngine(t *testing.T) {
+	project := scheduledJobsProject()
+
+	t.Run("without the jobs API there is nothing to remove or list", func(t *testing.T) {
+		tested := newJobsTestService(t, "1.56")
+		assert.Equal(t, len(tested.ensureJobsDown(t.Context(), project)), 0)
+		assert.Equal(t, len(tested.actualJobs(t.Context(), project.Name)), 0)
+	})
+
+	t.Run("with the jobs API every declared job is removed", func(t *testing.T) {
+		tested := newJobsTestService(t, apiVersionJobs)
+		assert.Equal(t, len(tested.ensureJobsDown(t.Context(), project)), len(project.Jobs))
+	})
 }

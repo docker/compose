@@ -29,6 +29,7 @@ import (
 	"github.com/moby/moby/api/pkg/stdcopy"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/versions"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -57,6 +58,34 @@ func (s *composeService) jobsClient() (jobsv0.Jobs, error) {
 		s.jobsAPI, s.jobsAPIErr = extensionclient.Resolve(exts, jobsv0.Point)
 	})
 	return s.jobsAPI, s.jobsAPIErr
+}
+
+// jobsSupported reports whether the daemon exposes the jobs API, gated on the
+// negotiated API version. Without it, jobs degrade to what Compose can do on
+// its own: a manual job runs as a one-off service container, a scheduled job
+// is refused (see rejectUnsupportedScheduledJobs).
+func (s *composeService) jobsSupported(ctx context.Context) (bool, error) {
+	version, err := s.RuntimeAPIVersion(ctx)
+	if err != nil {
+		return false, err
+	}
+	return !versions.LessThan(version, apiVersionJobs), nil
+}
+
+// rejectUnsupportedScheduledJobs refuses a project declaring active scheduled
+// jobs when the engine cannot run them: silently not scheduling them would
+// break the user's expectations, unlike manual jobs which simply wait for an
+// explicit trigger.
+func (s *composeService) rejectUnsupportedScheduledJobs(ctx context.Context, project *types.Project) error {
+	names := sortedJobNames(project.Jobs, HasSchedule)
+	if len(names) == 0 {
+		return nil
+	}
+	supported, err := s.jobsSupported(ctx)
+	if err != nil || supported {
+		return err
+	}
+	return fmt.Errorf("scheduled jobs are not supported in this version: %s", strings.Join(names, ", "))
 }
 
 // engineJobNameSeparator joins a project and job name into the engine's
@@ -358,11 +387,21 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	if ManualTriggerDisabled(job) {
 		return 0, ManualTriggerDisabledErr(name)
 	}
+	supported, err := s.jobsSupported(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if !supported {
+		return 0, api.ErrJobsNotSupported
+	}
+	if options.Name != "" {
+		logrus.Warnf("--name has no effect on a job: the engine names its run containers itself")
+	}
 
 	// materializeManualJob already put the job into project.Services, so it
 	// is seen by these project-wide normalization passes exactly like a
 	// service would be (use_api_socket / models: support).
-	project, err := s.useAPISocket(project)
+	project, err = s.useAPISocket(project)
 	if err != nil {
 		return 0, err
 	}
@@ -556,6 +595,12 @@ func (s *composeService) streamJobLogs(ctx context.Context, containerID string, 
 // already being gone, matching removeResource's NotFound handling.
 func (s *composeService) ensureJobsDown(ctx context.Context, project *types.Project) []downOp {
 	names := sortedJobNames(project.Jobs, nil)
+	if len(names) == 0 {
+		return nil
+	}
+	if supported, err := s.jobsSupported(ctx); err != nil || !supported {
+		return nil
+	}
 
 	var ops []downOp
 	for _, name := range names {
@@ -579,6 +624,9 @@ func (s *composeService) ensureJobsDown(ctx context.Context, project *types.Proj
 // Best-effort: any error, including an engine with no jobs feature, is
 // treated as "no jobs" so it never blocks an otherwise-successful down.
 func (s *composeService) actualJobs(ctx context.Context, projectName string) types.Jobs {
+	if supported, err := s.jobsSupported(ctx); err != nil || !supported {
+		return nil
+	}
 	jc, err := s.jobsClient()
 	if err != nil {
 		return nil
