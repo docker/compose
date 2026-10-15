@@ -2202,21 +2202,19 @@ func TestReconcile_SelectionLeavesOtherServicesUntouched(t *testing.T) {
 	assert.DeepEqual(t, project.ServiceNames(), []string{"web", "worker"})
 	assert.DeepEqual(t, project.DisabledServiceNames(), []string{"api"})
 
-	// api's live container was created from a configuration that has since
-	// drifted: it would be recreated if it were part of the plan
-	driftedAPI := apiSvc
-	driftedAPI.Image = "stale"
 	observed := &ObservedState{
 		ProjectName: "myproject",
 		Containers: map[string][]ObservedContainer{
 			"web":    {runningContainer(t, web, "c1aabbccddee")},
 			"worker": {runningContainer(t, worker, "c2aabbccddee")},
-			"api":    {runningContainer(t, driftedAPI, "c3aabbccddee")},
+			"api":    {runningContainer(t, apiSvc, "c3aabbccddee")},
 		},
 		Networks: map[string][]ObservedNetwork{},
 		Volumes:  map[string][]ObservedVolume{},
 	}
 
+	// force recreate rebuilds every service of the plan: api would be
+	// recreated too if the narrowing ever stopped keeping it out
 	opts := defaultReconcileOptions()
 	opts.Recreate = api.RecreateForce
 	opts.RemoveOrphans = true
@@ -2225,11 +2223,12 @@ func TestReconcile_SelectionLeavesOtherServicesUntouched(t *testing.T) {
 
 	recreated := map[string]bool{}
 	for _, node := range plan.Nodes {
-		assert.Assert(t, !strings.Contains(node.Operation.ResourceID, "api") && !strings.HasPrefix(node.Operation.ResourceID, "orphan:"),
+		assert.Assert(t, !strings.HasPrefix(node.Operation.ResourceID, "service:api:") && !strings.HasPrefix(node.Operation.ResourceID, "orphan:"),
 			"a service outside the selection must not be touched:\n%s", plan.String())
 		recreated[node.Operation.ResourceID] = true
 	}
 	assert.Assert(t, recreated["service:web:1"], "the selected service must be recreated:\n%s", plan.String())
+	assert.Assert(t, recreated["service:worker:1"], "a dependent of the selected service must be recreated too:\n%s", plan.String())
 }
 
 func runningContainer(t *testing.T, svc types.ServiceConfig, id string) ObservedContainer {
