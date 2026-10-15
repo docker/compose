@@ -672,9 +672,10 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 
 	// Narrowed to services + their dependents for both phases, not just
 	// start: a rebuild of one service has no business re-checking drift on
-	// the rest of the project (Networks/Volumes/Configs/Secrets aren't
-	// touched by narrowing -- WithSelectedServices only trims the Services
-	// map, so create's own convergence of those is unaffected).
+	// the rest of the project. The services left out move to
+	// DisabledServices; Networks and Volumes stay declared, and the
+	// reconciler leaves a drifted one alone while a live container of such a
+	// service still uses it (it can only detach the ones it manages).
 	p, err := project.WithSelectedServices(services, types.IncludeDependents)
 	if err != nil {
 		return err
