@@ -20,6 +20,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -285,6 +286,16 @@ func (r *reconciler) reconcileNetworks() error {
 		if observed.ConfigHash == "" || observed.ConfigHash == expected {
 			continue
 		}
+		// A rename never removes the live network (see planRecreateNetworks);
+		// a same-name divergence does, and can't while a container the plan
+		// doesn't manage is still attached.
+		if observed.Name == desired.Name {
+			if held := r.heldOutsideSelection(networkConsumers(r.declaredServices(), key)); len(held) > 0 {
+				logrus.Warnf("network %q config has changed but it is still used by %s, outside the current service selection: not recreated. "+
+					"Run the command on the whole project to apply the change", desired.Name, strings.Join(held, ", "))
+				continue
+			}
+		}
 		diverged = append(diverged, key)
 	}
 	r.planRecreateNetworks(diverged)
@@ -451,6 +462,13 @@ func (r *reconciler) reconcileVolumes() error {
 			r.resolvedVolumes[key] = observed
 			continue
 		}
+		// Removing the volume requires removing every container referencing
+		// it first: don't ask to destroy its data when the plan can't.
+		if held := r.heldOutsideSelection(volumeConsumers(r.declaredServices(), key)); len(held) > 0 {
+			logrus.Warnf("volume %q config has changed but it is still used by %s, outside the current service selection: not recreated. "+
+				"Run the command on the whole project to apply the change", desired.Name, strings.Join(held, ", "))
+			continue
+		}
 		confirmed, err := r.prompt(
 			fmt.Sprintf("Volume %q exists but doesn't match configuration in compose file. Recreate (data will be lost)?", desired.Name),
 			false)
@@ -577,14 +595,47 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 // servicesUsingNetwork returns the names of services that reference the given
 // compose network key, sorted for deterministic plan output.
 func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
+	return networkConsumers(r.project.Services, networkKey)
+}
+
+// networkConsumers returns the names of the given services that reference the
+// compose network key, sorted.
+func networkConsumers(services types.Services, networkKey string) []string {
 	var names []string
-	for _, key := range sortedKeys(r.project.Services) {
-		service := r.project.Services[key]
+	for _, key := range sortedKeys(services) {
+		service := services[key]
 		if _, ok := service.Networks[networkKey]; ok {
 			names = append(names, service.Name)
 		}
 	}
 	return names
+}
+
+// declaredServices returns every service of the model, selected or not:
+// project.Services plus the DisabledServices a selection (or an inactive
+// profile) moved aside.
+func (r *reconciler) declaredServices() types.Services {
+	all := make(types.Services, len(r.project.Services)+len(r.project.DisabledServices))
+	maps.Copy(all, r.project.DisabledServices)
+	maps.Copy(all, r.project.Services)
+	return all
+}
+
+// heldOutsideSelection filters the given consumers of a network or volume down
+// to those the plan doesn't manage (DisabledServices) yet still have a live
+// container: they keep the resource in use, and the plan neither detaches nor
+// recreates them.
+func (r *reconciler) heldOutsideSelection(consumers []string) []string {
+	var held []string
+	for _, name := range consumers {
+		if _, disabled := r.project.DisabledServices[name]; !disabled {
+			continue
+		}
+		if len(r.observed.Containers[name]) > 0 {
+			held = append(held, name)
+		}
+	}
+	return held
 }
 
 // servicesUsingVolume returns the names of services whose containers reference
@@ -599,10 +650,15 @@ func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 // network_mode/ipc/pid: service:x share namespaces, not mounts, so they do not
 // keep a volume in use and are intentionally excluded here.
 func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
+	return volumeConsumers(r.project.Services, volumeKey)
+}
+
+// volumeConsumers is servicesUsingVolume over an arbitrary set of services.
+func volumeConsumers(services types.Services, volumeKey string) []string {
 	inSet := map[string]bool{}
 	// Seed with services that mount the volume directly.
-	for _, key := range sortedKeys(r.project.Services) {
-		service := r.project.Services[key]
+	for _, key := range sortedKeys(services) {
+		service := services[key]
 		for _, v := range service.Volumes {
 			if v.Source == volumeKey {
 				inSet[service.Name] = true
@@ -615,8 +671,8 @@ func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	// the set (references to external containers carry no compose dependency).
 	for {
 		added := false
-		for _, key := range sortedKeys(r.project.Services) {
-			service := r.project.Services[key]
+		for _, key := range sortedKeys(services) {
+			service := services[key]
 			if inSet[service.Name] {
 				continue
 			}

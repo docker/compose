@@ -2032,3 +2032,155 @@ func mustResolvedServiceHash(t *testing.T, svc types.ServiceConfig, containers m
 	assert.NilError(t, err)
 	return h
 }
+
+// --- Infrastructure shared with services outside the selection ---
+//
+// A project narrowed with WithSelectedServices (watch's rebuild, `up --no-deps`)
+// keeps the networks and volumes of the whole model but moves the services left
+// out of the selection to DisabledServices, whose live containers stay attached.
+// Recreating a drifted resource would have to detach those containers too,
+// and the plan can't: it only converges the selected services.
+
+// restrictedNetworkProject builds a project narrowed to "web" whose "frontend"
+// network (drifted: stale config-hash) is also used by "api", a disabled service
+// that has a live container when apiRunning is set.
+func restrictedNetworkProject(t *testing.T, apiRunning bool) (*types.Project, *ObservedState) {
+	t.Helper()
+	onFrontend := types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: onFrontend}
+	apiSvc := types.ServiceConfig{Name: "api", Scale: intPtr(1), ContainerSpec: onFrontend}
+	project := &types.Project{
+		Name:             "myproject",
+		Networks:         types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+		Services:         types.Services{"web": web},
+		DisabledServices: types.Services{"api": apiSvc},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"web": {networkAttachedContainer(t, web, "c1aabbccddee")}},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}},
+		},
+		Volumes: map[string][]ObservedVolume{},
+	}
+	if apiRunning {
+		observed.Containers["api"] = []ObservedContainer{networkAttachedContainer(t, apiSvc, "c2aabbccddee")}
+	}
+	return project, observed
+}
+
+// A drifted network still attached to a container of a service outside the
+// selection is left alone, with a warning: removing it would fail with
+// "network in use".
+func TestReconcileNetworks_DivergedUsedOutsideSelectionIsKept(t *testing.T) {
+	project, observed := restrictedNetworkProject(t, true)
+
+	hook := logrustest.NewGlobal()
+	t.Cleanup(hook.Reset)
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+
+	var warned bool
+	for _, e := range hook.AllEntries() {
+		warned = warned || (e.Level == logrus.WarnLevel && strings.Contains(e.Message, `"myproject_frontend"`) && strings.Contains(e.Message, "api"))
+	}
+	assert.Assert(t, warned, "expected a warning naming the network and the service keeping it in use")
+}
+
+// A disabled service with no live container holds nothing: the drifted network
+// is recreated as usual.
+func TestReconcileNetworks_DivergedDisabledServiceWithoutContainerDoesNotBlock(t *testing.T) {
+	project, observed := restrictedNetworkProject(t, false)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, StopContainer, network frontend config changed
+[1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
+[2] -> #3 network:frontend, RemoveNetwork, config hash diverged
+[3] -> #4 network:frontend, CreateNetwork, recreate after config change
+[4] -> #5 service:web:1, ConnectNetwork, network frontend recreate
+`)+"\n")
+}
+
+// restrictedVolumeProject builds a project narrowed to "web" whose "data" volume
+// (drifted) is also mounted by "worker", a disabled service that has a live
+// container when workerRunning is set. viaVolumesFrom makes worker inherit the
+// mount from web (volumes_from) instead of declaring it.
+func restrictedVolumeProject(t *testing.T, workerRunning, viaVolumesFrom bool) (*types.Project, *ObservedState) {
+	t.Helper()
+	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
+	mounts := types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}}
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: mounts}
+	worker := types.ServiceConfig{Name: "worker", Scale: intPtr(1), ContainerSpec: mounts}
+	if viaVolumesFrom {
+		worker.ContainerSpec = types.ContainerSpec{VolumesFrom: []string{"web"}}
+	}
+	project := &types.Project{
+		Name:             "myproject",
+		Volumes:          types.Volumes{"data": vol},
+		Services:         types.Services{"web": web},
+		DisabledServices: types.Services{"worker": worker},
+	}
+	observedContainer := func(svc types.ServiceConfig, id string) ObservedContainer {
+		hash := mustServiceHash(t, svc)
+		return ObservedContainer{
+			ID: id, Number: 1, State: container.StateRunning, ConfigHash: hash,
+			Summary: container.Summary{
+				ID: id, State: container.StateRunning,
+				Labels: map[string]string{api.ServiceLabel: svc.Name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+				Mounts: []container.MountPoint{{Type: "volume", Name: vol.Name}},
+			},
+		}
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"web": {observedContainer(web, "web-1")}},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{"data": {{Name: vol.Name, ConfigHash: "oldhash"}}},
+	}
+	if workerRunning {
+		observed.Containers["worker"] = []ObservedContainer{observedContainer(worker, "worker-1")}
+	}
+	return project, observed
+}
+
+// A drifted volume still mounted by a container outside the selection is left
+// alone, and the user is not asked to destroy its data: the removal could not
+// succeed while that container references it.
+func TestReconcileVolumes_DivergedUsedOutsideSelectionIsKept(t *testing.T) {
+	for name, viaVolumesFrom := range map[string]bool{"direct mount": false, "volumes_from": true} {
+		t.Run(name, func(t *testing.T) {
+			project, observed := restrictedVolumeProject(t, true, viaVolumesFrom)
+
+			hook := logrustest.NewGlobal()
+			t.Cleanup(hook.Reset)
+			plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+			assert.NilError(t, err)
+			assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+
+			var warned bool
+			for _, e := range hook.AllEntries() {
+				warned = warned || (e.Level == logrus.WarnLevel && strings.Contains(e.Message, `"myproject_data"`) && strings.Contains(e.Message, "worker"))
+			}
+			assert.Assert(t, warned, "expected a warning naming the volume and the service keeping it in use")
+		})
+	}
+}
+
+// A disabled service with no live container holds nothing: the usual prompt
+// and recreation apply.
+func TestReconcileVolumes_DivergedDisabledServiceWithoutContainerDoesNotBlock(t *testing.T) {
+	project, observed := restrictedVolumeProject(t, false, false)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, StopContainer, mounted volume config changed
+[1] -> #2 service:web:1, RemoveContainer, mounted volume config changed
+[2] -> #3 volume:data, RemoveVolume, config hash diverged
+[3] -> #4 volume:data, CreateVolume, recreate after config change
+[4] -> #5 service:web:1, CreateContainer, no existing container
+`)+"\n")
+}
