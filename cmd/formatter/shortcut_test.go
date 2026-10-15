@@ -30,6 +30,11 @@ import (
 )
 
 func TestRunHandlesKeysUntilContextIsDone(t *testing.T) {
+	// the detach key clears the navigation menu with escape sequences written to
+	// os.Stdout, which would corrupt the `go test -v` output parsed by gotestsum
+	disableAnsi = true
+	t.Cleanup(func() { disableAnsi = false })
+
 	detached := make(chan struct{})
 	keys := make(chan keyboard.KeyEvent, 1)
 	lk := NewKeyboardManager(false, false, make(chan os.Signal, 1))
