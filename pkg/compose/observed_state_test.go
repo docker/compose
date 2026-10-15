@@ -721,3 +721,45 @@ func TestEmitRunningEvents(t *testing.T) {
 		assert.Equal(t, len(events.resources), 0)
 	})
 }
+
+// A project narrowed to a selection of services (watch's rebuild) moves the
+// others to DisabledServices: their containers are known to the project, so
+// they must not be reported as orphans -- that would print the "Found orphan
+// containers" warning on every rebuild, and let --remove-orphans remove live
+// services. A container of a service absent from the model altogether still is.
+func TestCollectObservedState_SelectionDoesNotMakeDisabledServicesOrphans(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project, err := (&types.Project{
+		Name:     "myproject",
+		Services: types.Services{"web": {Name: "web"}, "api": {Name: "api"}},
+	}).WithSelectedServices([]string{"web"})
+	assert.NilError(t, err)
+
+	replica := func(id, service string) container.Summary {
+		return container.Summary{
+			ID:    id,
+			Names: []string{"/myproject-" + service + "-1"},
+			State: container.StateRunning,
+			Labels: map[string]string{
+				api.ServiceLabel:         service,
+				api.ProjectLabel:         "myproject",
+				api.ConfigHashLabel:      "hash-" + service,
+				api.ContainerNumberLabel: "1",
+				api.OneoffLabel:          "False",
+			},
+		}
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{replica("c1", "web"), replica("c2", "api"), replica("c3", "removed")},
+	}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(state.Containers["web"]), 1)
+	assert.Equal(t, len(state.Containers["api"]), 1, "the disabled service's container is observed as its own")
+	assert.Equal(t, len(state.Orphans), 1)
+	assert.Equal(t, state.Orphans[0].ID, "c3", "only the service absent from the model is an orphan")
+}
