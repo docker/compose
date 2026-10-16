@@ -31,6 +31,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -131,6 +132,7 @@ type bakeBuild struct {
 	localWritePaths []string          // local cache destinations bake needs `--allow fs.write` for
 	entitlements    []string
 	secretsEnv      []string
+	jobs            int // bake `--jobs` limit, 0 for unlimited
 }
 
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) {
@@ -177,6 +179,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if err != nil {
 		return nil, err
 	}
+	bake.jobs = bakeJobs(bake.cfg, s.maxConcurrency, buildx.Version)
 	args := bakeArgs(bake, metadataFile, options)
 	logrus.Debugf("Executing bake with args: %v", args)
 
@@ -498,10 +501,40 @@ func bakeArgs(bake *bakeBuild, metadataFile string, options api.BuildOptions) []
 	if options.Builder != "" {
 		args = append(args, "--builder", options.Builder)
 	}
+	if bake.jobs > 0 {
+		args = append(args, "--jobs", strconv.Itoa(bake.jobs))
+	}
 	if options.Quiet {
 		args = append(args, "--progress=quiet")
 	}
 	return args
+}
+
+// bakeJobs returns how many targets bake can build concurrently
+func bakeJobs(cfg bakeConfig, maxConcurrency int, buildxVersion string) int {
+	// no limit
+	if maxConcurrency <= 0 {
+		return 0
+	}
+	// limit doesn't hold target back
+	targets := cfg.Groups["default"].Targets
+	if maxConcurrency >= len(targets) {
+		return 0
+	}
+	if versions.LessThan(buildxVersion[1:], buildxJobsMinVersion) {
+		logrus.Warnf("limiting build concurrency requires buildx %s or later, ignoring parallel limit", buildxJobsMinVersion)
+		return 0
+	}
+	// bake rejects parallel limit when targets linked by `target:` contexts
+	for _, target := range targets {
+		for _, source := range cfg.Targets[target].Contexts {
+			if strings.HasPrefix(source, "target:") {
+				logrus.Warn("limiting build concurrency is not supported with service additional_contexts, ignoring parallel limit")
+				return 0
+			}
+		}
+	}
+	return maxConcurrency
 }
 
 // waitBake forwards the solve statuses of a started bake command's rawjson

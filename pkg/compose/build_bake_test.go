@@ -149,6 +149,37 @@ func TestBakeReadGrants(t *testing.T) {
 	})
 }
 
+func TestBakeJobs(t *testing.T) {
+	group := func(targets ...string) bakeConfig {
+		return bakeConfig{
+			Groups: map[string]bakeGroup{"default": {Targets: targets}},
+			Targets: map[string]bakeTarget{
+				"app":  {Contexts: map[string]string{"base": "target:base"}},
+				"base": {},
+				"db":   {},
+				"web":  {},
+			},
+		}
+	}
+	for _, tc := range []struct {
+		name           string
+		cfg            bakeConfig
+		maxConcurrency int
+		buildx         string
+		want           int
+	}{
+		{name: "unlimited", cfg: group("base", "db", "web"), maxConcurrency: -1, buildx: "v0.38.0"},
+		{name: "limited, link not built", cfg: group("base", "db", "web"), maxConcurrency: 2, buildx: "v0.38.0", want: 2},
+		{name: "limit holds no target back", cfg: group("base", "db"), maxConcurrency: 2, buildx: "v0.38.0"},
+		{name: "buildx too old", cfg: group("base", "db", "web"), maxConcurrency: 2, buildx: "v0.37.2"},
+		{name: "linked targets", cfg: group("app", "base", "db"), maxConcurrency: 2, buildx: "v0.38.0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, bakeJobs(tc.cfg, tc.maxConcurrency, tc.buildx), tc.want)
+		})
+	}
+}
+
 func TestPrepareBakeBuildGrants(t *testing.T) {
 	root := t.TempDir()
 	contextDir := filepath.Join(root, "app")
